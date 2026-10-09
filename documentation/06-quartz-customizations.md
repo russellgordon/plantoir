@@ -786,8 +786,31 @@ three lines (sized by digits, `nowrap`); the corners sat at the paper's edge
   headings after an untitled self-check can show two 3s, and the agent
   guidance tells authors to label questions.
 
-**Not done / open:** Safari presetting its dialog from `size` is unmeasured
-(Russell drives Safari in the smoke test — choose Landscape in the MENU);
+**Safari, measured after the review (Safari 26.6, the scratch site, Safari driven
+on the Mac with `print()` intercepted, then once with the real
+print window):** the completeness check first REFUSED MVVM Review in Safari
+on both papers while Chrome printed it — three shapes, each a WebKit
+difference in how Paged.js's page-as-a-column measuring leaves things:
+(1) a line of code Paged.js split before its words leaves an empty piece
+whose box reaches into the column the layout throws away (the rest prints on
+the next page) — such a `data-split-to` piece is not a loss and is no longer
+counted; (2) a blank code line holds only a space, which Paged.js does not
+break before, so it straddled the page's foot with its number cut off —
+blank lines now hold a zero-width space and break like any other; (3)
+WebKit honours `table { break-inside: avoid }` itself and moved a 40-row
+table's first rows into the thrown-away column, a real loss — in the
+handout tables may now split (⌘P keeps them whole). The check also counts an
+element cut off only if NO copy of it sits whole on a page, measures each
+piece rather than the union box, and allows a line 3 px of hanging leading.
+After: all six prints of MVVM Review and of the verify fixture lay out every
+piece in Safari (`scratchpad/i499/safari-sweep.txt`). **Safari does NOT take
+its orientation from the page:** asked for landscape, its print window opened
+on Portrait and showed the 11 in pages shrunk onto portrait sheets; choosing
+Landscape there printed them right, footers included. So a landscape print
+says `printablePages.words.landscapeInDialog` beside the button while the
+print window is open (review S6's fallback; Chrome and Edge follow the page).
+
+**Not done / open:**
 the answer key has no strand headings; a displayed formula taller than the
 page, or one unbreakable term wider than it, cannot print (refused, with the
 sentence). Windows owes all of this:

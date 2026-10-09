@@ -72,6 +72,9 @@ const SPLITTABLE_LINES = 25
 // How far, in CSS pixels, a laid-out element may sit past its page's edge
 // before the handout counts as cut off (rounding, not content).
 const OVERFLOW_TOLERANCE = 1.5
+// How far, in CSS pixels, a line may hang below the page and lose only the
+// space under its letters (its leading), not a letter.
+const LEADING_TOLERANCE = 3
 // How much wider a formula's character is than a letter of text, near enough.
 const MATH_WIDTH = 1.5
 // Room kept under a picture that fills a page, for its caption.
@@ -657,6 +660,13 @@ function buildHandout(mode: Mode, settings: Settings): HTMLElement {
     for (const line of code.querySelectorAll(":scope > [data-line]")) {
       number += 1
       line.setAttribute("data-plantoir-line", String(number))
+      // A blank line holds only a space, which the layout does not break
+      // before, so Safari left one straddling the foot of a page with its
+      // number cut off (measured, Safari 26.6). A zero-width space in its
+      // place breaks like any other line.
+      if ((line.textContent ?? "").trim() === "") {
+        line.textContent = "\u200b"
+      }
     }
     ;(code as HTMLElement).style.setProperty("--plantoir-digits", String(Math.max(2, String(number).length)))
   }
@@ -912,7 +922,7 @@ function layoutRules(paper: Paper): string {
     ".plantoir-answers { break-before: page; }",
     ".plantoir-answers-only { break-before: auto; }",
     "h1, h2, h3, h4, h5, h6 { break-after: avoid; }",
-    "blockquote.callout, table, figure:not(.plantoir-splittable), .katex-display, .pl-figure, pre:not(.plantoir-splittable), .plantoir-parts:not(.plantoir-columns-1), .plantoir-number-line { break-inside: avoid; }",
+    "blockquote.callout, figure:not(.plantoir-splittable), .katex-display, .pl-figure, pre:not(.plantoir-splittable), .plantoir-parts:not(.plantoir-columns-1), .plantoir-number-line { break-inside: avoid; }",
     ".plantoir-number-line, .plantoir-keep-with-next { break-after: avoid; }",
     "figure.plantoir-splittable { break-inside: auto; }",
     "pre.plantoir-flowing, pre.plantoir-flowing > code, .katex-display, .table-container { overflow: visible !important; }",
@@ -947,6 +957,12 @@ function pagedRules(paper: Paper, settings: Settings): string {
 function checkComplete(doc: Document, expected: number): { found: number; overflowing: string[] } {
   const found: Set<string> = new Set()
   const overflowing: string[] = []
+  // An element counts as cut off only when NO copy of it sits whole on a
+  // page: Safari leaves copies of table rows in the column the layout throws
+  // away while the same rows print whole on the next page (measured, Safari
+  // 26.6: the fixture's first two rows at x = 1,920 px beside a 672 px page).
+  const whole: Set<string> = new Set()
+  const cutOff: Map<string, string> = new Map()
   for (const page of doc.querySelectorAll(".pagedjs_page")) {
     const area = page.querySelector(".pagedjs_page_content") ?? page.querySelector(".pagedjs_area")
     if (!area) {
@@ -962,6 +978,17 @@ function checkComplete(doc: Document, expected: number): { found: number; overfl
       if (!shown) {
         continue
       }
+      // The first piece of an element the layout split between pages: its
+      // rest is on the next page, stamped the same and checked there. In
+      // Safari that piece's box reaches into the column the layout throws
+      // away (a line of code split before its words: an empty 4 px piece
+      // here, "import SwiftUI" on the next page), which is not a loss -
+      // counted as one, Safari refused MVVM Review on both papers (measured,
+      // Safari 26.6).
+      if (element.hasAttribute("data-split-to")) {
+        whole.add(id)
+        continue
+      }
       if (element instanceof (view as unknown as typeof window).HTMLImageElement) {
         // A picture that loaded but was laid out with no height is missing
         // from the page as surely as one cut off (review B1).
@@ -971,6 +998,7 @@ function checkComplete(doc: Document, expected: number): { found: number; overfl
         }
       }
       if (rect.width <= 0 && rect.height <= 0) {
+        whole.add(id)
         continue
       }
       // A displayed formula's box is always the column's width; the formula
@@ -982,15 +1010,36 @@ function checkComplete(doc: Document, expected: number): { found: number; overfl
         overflowing.push(`${id} a formula ${inner.scrollWidth - inner.clientWidth}px too wide`)
         continue
       }
-      if (
-        rect.bottom > edge.bottom + OVERFLOW_TOLERANCE ||
-        rect.right > edge.right + OVERFLOW_TOLERANCE ||
-        rect.left < edge.left - OVERFLOW_TOLERANCE
-      ) {
-        const past = Math.max(rect.bottom - edge.bottom, rect.right - edge.right, edge.left - rect.left)
-        const what = element.className && typeof element.className === "string" ? "." + element.className.split(" ")[0] : ""
-        overflowing.push(`${id} ${element.tagName.toLowerCase()}${what} ${Math.round(past)}px`)
+      // Piece by piece (getClientRects): what lies in the column the layout
+      // throws away, or below the page, is lost height; what runs past the
+      // page's right or left edge in its own column is lost width. A line's
+      // leading may hang below the page by LEADING_TOLERANCE without losing a
+      // letter (Safari left 2 px of a 15 px line of code there, measured).
+      let lostHeight = 0
+      let lostWidth = 0
+      for (const piece of Array.from(element.getClientRects())) {
+        if (piece.width <= 0 && piece.height <= 0) {
+          continue
+        }
+        if (piece.left >= edge.right - OVERFLOW_TOLERANCE) {
+          lostHeight += piece.height
+          continue
+        }
+        lostHeight += Math.max(0, piece.bottom - Math.max(edge.bottom, piece.top))
+        lostWidth = Math.max(lostWidth, piece.right - edge.right, edge.left - piece.left)
       }
+      if (lostHeight > LEADING_TOLERANCE || lostWidth > OVERFLOW_TOLERANCE) {
+        const past = Math.max(lostHeight, lostWidth)
+        const what = element.className && typeof element.className === "string" ? "." + element.className.split(" ")[0] : ""
+        cutOff.set(id, `${id} ${element.tagName.toLowerCase()}${what} ${Math.round(past)}px`)
+      } else {
+        whole.add(id)
+      }
+    }
+  }
+  for (const [id, reason] of cutOff) {
+    if (!whole.has(id)) {
+      overflowing.push(reason)
     }
   }
   return { found: found.size, overflowing: Array.from(new Set(overflowing)) }
@@ -1147,7 +1196,11 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     }
 
     frame.contentWindow!.addEventListener("afterprint", () => restore(), { once: true })
-    say(status, "")
+    // Safari's print window does not take its orientation from the page: it
+    // opens on Portrait and shrinks a landscape handout onto portrait sheets
+    // until Landscape is chosen there too (measured, Safari 26.6). Said while
+    // that window is open; Chrome and Edge follow the page.
+    say(status, paper === "landscape" ? words.landscapeInDialog : "")
     frame.contentWindow!.focus()
     frame.contentWindow!.print()
     // print() returns when the dialog closes in Safari, Chrome and Edge
@@ -1155,6 +1208,7 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     // browser never sends afterprint, the page must not be left light with a
     // dead button until a reload (review N4).
     restore()
+    say(status, "")
   } catch {
     say(status, words.couldNotPrepare)
     restore()

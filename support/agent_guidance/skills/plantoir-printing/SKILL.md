@@ -169,5 +169,6 @@ and everything under it up to the next heading of the same or a higher level.
 Ask the teacher to preview the section in Plantoir and press Print on the
 page, then choose Questions only, Answers only or Both. In Plantoir's own
 preview, Print opens the page in their web browser to print. Choose
-Landscape in the menu, not in the browser's print dialog: the handout is
-laid out before the dialog opens.
+Landscape in the page's Print menu - the handout is laid out before the
+browser's print window opens - and, in Safari, choose Landscape in its print
+window too: Safari opens it on Portrait whatever the page asks.
