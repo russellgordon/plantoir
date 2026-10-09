@@ -143,9 +143,9 @@ export const PlantoirFigures: QuartzTransformerPlugin = () => ({
               hName: "figure",
               hProperties: {
                 className: ["pl-figure", `pl-${engine}`],
-                dataPlantoirEngine: engine,
-                dataPlantoirKey: key,
-                dataPlantoirSource: engine === "functionplot" ? node.value : undefined,
+                dataFigureEngine: engine,
+                dataFigureKey: key,
+                dataFigureSource: engine === "functionplot" ? node.value : undefined,
               },
               hChildren: [element("figcaption", { className: ["pl-sr-only"] }, [text(alt)])],
             },
@@ -169,13 +169,13 @@ export const PlantoirFigures: QuartzTransformerPlugin = () => ({
           if (node.tagName !== "figure" || !classesOf(node).includes("pl-figure")) {
             return
           }
-          const engine = String(node.properties?.dataPlantoirEngine ?? "")
-          const key = String(node.properties?.dataPlantoirKey ?? "")
+          const engine = String(node.properties?.dataFigureEngine ?? "")
+          const key = String(node.properties?.dataFigureKey ?? "")
           if (!ENGINES.includes(engine) || key === "") {
             return
           }
-          const source = String(node.properties?.dataPlantoirSource ?? "")
-          delete node.properties.dataPlantoirSource
+          const source = String(node.properties?.dataFigureSource ?? "")
+          delete node.properties.dataFigureSource
           const entry = known.figures[engine]?.[key]
           const caption = node.children
           if (engine === "tikz") {
@@ -218,9 +218,9 @@ export const PlantoirFigures: QuartzTransformerPlugin = () => ({
             return
           }
           node.properties.dataPlot = JSON.stringify(entry.plot ?? {})
-          node.properties.dataPlantoirRoot = root
-          node.properties.dataPlantoirFailed = words.graphCouldNotBeDrawn
-          node.properties.dataPlantoirMissing = words.graphNeedsPreview
+          node.properties.dataFigureRoot = root
+          node.properties.dataFigureFailed = words.graphCouldNotBeDrawn
+          node.properties.dataFigureMissing = words.graphNeedsPreview
           node.children = [element("div", { className: ["pl-plot"], ariaHidden: "true" }, []), sourceBox, ...caption]
         })
       },

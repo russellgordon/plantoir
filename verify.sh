@@ -481,6 +481,17 @@ else
   cat /tmp/verify_print_settings_test.log
 fi
 
+# Diagrams and graphs (#485 E1): the fences, the tidying and key every engine
+# shares, the cache, the clock, the restart after a diagram that never
+# finishes, the gate and the words - against a stand-in engine, stdlib only.
+# The real engines are checked in the image below.
+if (cd scripts && python3 test_figures.py) >/tmp/verify_figures_test.log 2>&1; then
+  pass "diagrams and graphs: fences, tidying, the cache and its clock, what a site carries, and the words (scripts/test_figures.py, #485)"
+else
+  fail "diagrams and graphs: fences, tidying, the cache and its clock, what a site carries, and the words (scripts/test_figures.py, #485)"
+  cat /tmp/verify_figures_test.log
+fi
+
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
 else
@@ -1007,6 +1018,23 @@ else
   cat /tmp/verify_print_rules_site.log
 fi
 
+# ---- Diagrams and graphs (#485 E1): the rules, run against the real engines ----
+# figureRules.js (the file the site's transformer and the build's helper both
+# import) runs every tidy and cacheKey case in Node; the helper, driven as a
+# build drives it, answers every texErrors case with real TeX and every
+# functionplot case with the real evaluator.
+echo ""
+echo "🔎 Checking the figure rules against the real engines…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_figure_rules_against_the_site.py" /opt/scripts/check_figure_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_figure_rules_against_the_site.py \
+  >/tmp/verify_figure_rules_site.log 2>&1; then
+  pass "every figureFences case holds in the real engines: the shared rules in Node, TeX's own errors, the graph evaluator (scripts/check_figure_rules_against_the_site.py, #485)"
+else
+  fail "every figureFences case holds in the real engines (scripts/check_figure_rules_against_the_site.py, #485)"
+  cat /tmp/verify_figure_rules_site.log
+fi
+
 # ---- The date and title writers, against what the site reads ----
 # GitHub #199. `contracts/file-formats.json` -> `datesAndTitles.writingCases`
 # says what the built site reads from each page a writer produces; this runs
@@ -1299,9 +1327,12 @@ check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 # the guidance the app writes into each working folder.
 check_baked scripts/page_features.py      /opt/scripts/page_features.py
 check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
+# Diagrams and graphs (#485 E1): the build's pass, and (in the loop) the
+# helper, its lockfile and the site's transformer, script and styles.
+check_baked scripts/figures.py            /opt/scripts/figures.py
 while IFS= read -r addition; do
   check_baked "$addition" "/opt/$addition"
-done < <(find support/quartz support/agent_guidance -type f ! -name '.*' | sort)
+done < <(find support/quartz support/agent_guidance support/figures -type f ! -name '.*' | sort)
 # The print engine itself, by the hash the pin carries (contracts/toolchain.json).
 PAGEDJS_PIN="$(python3 -c 'import json; print([p["fileSha256"] for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "pagedjs"][0])')"
 PAGEDJS_BAKED="$(docker run --rm "$DEV_TEST_IMAGE" sha256sum /opt/vendor/pagedjs/paged.min.js 2>/dev/null | cut -d' ' -f1)"
@@ -1335,6 +1366,37 @@ if [[ -z "$LM_PROBLEMS" ]]; then
   pass "The image carries the six Latin Modern faces at /opt/vendor/pagedjs/fonts, matching the pin, with their licence (#499)"
 else
   fail "The image's Latin Modern faces do not match contracts/toolchain.json: $LM_PROBLEMS"
+fi
+# The two figure engines (#485 E1), by the hashes their pins carry:
+# function-plot's file, node-tikzjax's version, and its TeX engine's three
+# files - the ones that are byte-identical to the Obsidian plugin's.
+FIGURE_ENGINE_PROBLEMS="$(python3 - "$DEV_TEST_IMAGE" <<'FEPY'
+import json, subprocess, sys
+pins = {p["pin"]: p for p in json.load(open("contracts/toolchain.json"))["pins"]}
+plot, tikz = pins["functionPlot"], pins["nodeTikzjax"]
+files = sorted(tikz["files"])
+script = ("sha256sum /opt/vendor/function-plot/function-plot.js && ls /opt/vendor/function-plot/LICENSE"
+          " && cd /opt/vendor/tikz-engine/node_modules/node-tikzjax && sha256sum " + " ".join(files)
+          + " && node -p 'require(\"./package.json\").version' && ls css/bakoma/LICENCE")
+out = subprocess.run(["docker", "run", "--rm", sys.argv[1], "sh", "-c", script], capture_output=True, text=True).stdout
+problems = []
+if plot["fileSha256"] + "  /opt/vendor/function-plot/function-plot.js" not in out:
+    problems.append("function-plot.js does not match its pin")
+for name in files:
+    if tikz["files"][name] + "  " + name not in out:
+        problems.append(f"node-tikzjax's {name} does not match its pin")
+if "\n" + tikz["value"] + "\n" not in "\n" + out:
+    problems.append(f"node-tikzjax is not {tikz['value']}")
+for licence in ("LICENSE", "css/bakoma/LICENCE"):
+    if licence not in out:
+        problems.append(f"{licence} is missing")
+print("; ".join(problems))
+FEPY
+)"
+if [[ -z "$FIGURE_ENGINE_PROBLEMS" ]]; then
+  pass "The image carries function-plot and node-tikzjax at /opt/vendor, matching their pins, with their licences (#485)"
+else
+  fail "The image's figure engines do not match contracts/toolchain.json: $FIGURE_ENGINE_PROBLEMS"
 fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
@@ -1456,6 +1518,7 @@ restore_hit_fixture() {
   rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
         "$HIT_COURSE/Printable Too Tall.md" \
+        "$HIT_COURSE/Figures Fixture.md" "$HIT_COURSE/Figures Hidden.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -1564,6 +1627,27 @@ def area(width, height):
 ```
 
 <figure class="pl-figure pl-test"><svg viewBox="0 0 200 100" width="400" height="200" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="180" height="80" fill="none" stroke="black"/><text x="100" y="55" text-anchor="middle">plantoir figure</text></svg><figcaption>A figure an engine would draw.</figcaption></figure>
+
+Before the drawn figures (plantoir-before-figures).
+
+```tikz
+% alt: A right triangle with legs 3 and 4
+\begin{document}
+\begin{tikzpicture}
+\draw[thick] (0,0) -- (4,0) node[midway, below]{$4$} -- (4,3) node[midway, right]{$3$} -- cycle;
+\end{tikzpicture}
+\end{document}
+```
+
+```functionplot
+---
+bounds: [-4, 4, -2, 8]
+alt: The parabola y = x^2
+---
+y = x^2
+```
+
+After the drawn figures (plantoir-after-figures).
 
 ## Question 3
 
@@ -1899,6 +1983,142 @@ open(sys.argv[1], "w").write("---\nprintable: true\n---\nBefore the tall formula
     + formula + "\n\\end{aligned}\n$$\n\n| Row | Lines |\n|---|---|\n| 1 | " + cell + " |\n\n> [!answer]-\n>\n> Never printed.\n")
 PY
 
+# ---- #485 E1: diagrams and graphs, planted for the same build ----
+# Every place a fence can sit (top level, a folded callout, a list item), the
+# packages that matter (pgfplots, circuitikz), a drawing with no description,
+# one TeX cannot draw (\foo), one taller than a page, the same drawing twice
+# (its ids must not clash), three graphs (one with zoom off, one that cannot be
+# drawn), and a graph on a page students cannot see, which must not make the
+# site carry the graph engine. Removed by restore_hit_fixture.
+cat > "$HIT_COURSE/Figures Fixture.md" <<'FIGURESFIXTURE'
+---
+title: Figures Fixture
+---
+Diagrams and graphs planted by verify.sh (plantoir-figures-sentinel-7f3a).
+
+```tikz
+% alt: Two similar triangles, ABC and a 1.5 times enlargement DEF (plantoir-alt-triangles)
+\begin{document}
+\begin{tikzpicture}
+  \draw[thick] (0,0) node[below left]{$A$} -- (3,0) node[below right]{$B$} -- (1,2) node[above]{$C$} -- cycle;
+  \draw[thick] (5,0) node[below left]{$D$} -- (9.5,0) node[below right]{$E$} -- (6.5,3) node[above]{$F$} -- cycle;
+  \node at (1.5,-0.5) {$3$};
+  \node at (7.25,-0.5) {$4.5$};
+\end{tikzpicture}
+\end{document}
+```
+
+> [!example]- A tree diagram
+> ```tikz
+> % alt: A tree of two coin tosses (plantoir-alt-tree)
+> \begin{document}
+> \begin{tikzpicture}[level distance=1.5cm, sibling distance=2cm]
+>   \node {Start}
+>     child { node {H} child { node {HH} } child { node {HT} } }
+>     child { node {T} child { node {TH} } child { node {TT} } };
+> \end{tikzpicture}
+> \end{document}
+> ```
+
+1. Read the graph of a cubic.
+
+   ```tikz
+   % alt: A cubic drawn with pgfplots (plantoir-alt-pgfplots)
+   \usepackage{pgfplots}
+   \pgfplotsset{compat=1.16}
+   \begin{document}
+   \begin{tikzpicture}
+   \begin{axis}[axis lines=middle, xlabel=$x$, ylabel=$y$]
+   \addplot[domain=-2:2, samples=40, red] {x^3 - x};
+   \end{axis}
+   \end{tikzpicture}
+   \end{document}
+   ```
+
+```tikz
+% alt: A circuit with a battery and a resistor (plantoir-alt-circuit)
+\usepackage{circuitikz}
+\begin{document}
+\begin{circuitikz}
+\draw (0,0) to[battery1, l=$V$] (0,2) to[R, l=$R$] (3,2) -- (3,0) -- (0,0);
+\end{circuitikz}
+\end{document}
+```
+
+```tikz
+\begin{document}
+\begin{tikzpicture}
+\draw (0,0) circle (1);
+\end{tikzpicture}
+\end{document}
+```
+
+Before the broken diagram (plantoir-before-broken).
+
+```tikz
+% alt: A diagram that cannot be drawn
+\begin{document}
+\begin{tikzpicture}
+\foo
+\end{tikzpicture}
+\end{document}
+```
+
+After the broken diagram (plantoir-after-broken). Before the tall diagram (plantoir-before-tall-figure).
+
+```tikz
+% alt: A tall tree, three levels down (plantoir-alt-tall)
+\begin{document}
+\begin{tikzpicture}[grow=down, level distance=4.5cm, sibling distance=1.2cm]
+  \node {Root}
+    child { node {A} child { node {A1} child { node {A1a} } } }
+    child { node {B} child { node {B1} child { node {B1a} } } };
+\end{tikzpicture}
+\end{document}
+```
+
+After the tall diagram (plantoir-after-tall-figure).
+
+```tikz
+% alt: A cubic drawn with pgfplots (plantoir-alt-pgfplots)
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[axis lines=middle, xlabel=$x$, ylabel=$y$]
+\addplot[domain=-2:2, samples=40, red] {x^3 - x};
+\end{axis}
+\end{tikzpicture}
+\end{document}
+```
+
+```functionplot
+---
+title: Two lines
+xLabel: x
+yLabel: y
+bounds: [-5, 5, -5, 5]
+alt: Two lines crossing at (1, 3) (plantoir-alt-lines)
+---
+y = 2x + 1
+y = -x + 4
+```
+
+```functionplot
+---
+bounds: [-6, 6, -6, 6]
+disableZoom: true
+---
+y = 1/(x - 2) + 1
+```
+
+```functionplot
+y = ln(x)
+```
+FIGURESFIXTURE
+printf -- '---\ntitle: Figures Hidden\npublish: false\n---\nA hidden graph (plantoir-figures-hidden-7f3a).\n\n```functionplot\ny = x^2\n```\n' \
+  > "$HIT_COURSE/Figures Hidden.md"
+
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
 echo "🚦 Running: ./preview.sh EXC2O 1 --image $DEV_TEST_IMAGE --full-rebuild --build-only"
@@ -2112,6 +2332,81 @@ else
   fail "printable pages: one of the checks above failed (#454)"
 fi
 
+
+# ---- 6i. Diagrams and graphs (#485 E1), as the build left them ----
+# The planted Figures Fixture: every drawing is an SVG with a viewBox in the
+# page; the one TeX cannot draw is the sentence a student reads, and a folder
+# problem naming the page and the line of the teacher's file; the site
+# carries exactly the faces its drawings name and the pinned function-plot,
+# served by itself; the page's description is the words, not the lettering of
+# its drawings; a hidden page's graph is nowhere.
+cp "$SITE_PUBLIC/Help-Sessions.html" /tmp/verify_untouched_page.html 2>/dev/null || true
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE/Figures Fixture.md" <<'FIGPY'
+import hashlib, html, json, re, sys
+from pathlib import Path
+public, log, planted = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+problems = []
+page_path = public / "Figures-Fixture.html"
+page = page_path.read_text(encoding="utf-8") if page_path.is_file() else ""
+if not page:
+    problems.append("Figures-Fixture.html was not built")
+figures = re.findall(r'<figure class="pl-figure pl-(tikz|functionplot)( pl-figure-failed)?"[^>]*>(.*?)</figure>', page, re.S)
+fences = sum(1 for line in planted.read_text(encoding="utf-8").splitlines() if re.match(r"^[ >]*```(tikz|functionplot)\s*$", line))
+if len(figures) != fences:
+    problems.append(f"{len(figures)} figures on the page for {fences} fences")
+drawn = [body for engine, failed, body in figures if engine == "tikz" and not failed]
+if len(drawn) != 7 or any(not re.search(r'<svg[^>]*viewBox="', body) for body in drawn):
+    problems.append(f"{len(drawn)} TikZ drawings on the page, not 7 each with a viewBox")
+failed = [body for engine, failed, body in figures if failed]
+if len(failed) != 2 or "This diagram couldn" not in failed[0] or "This graph couldn" not in failed[1]:
+    problems.append("the two figures that cannot be drawn do not say so in the contract's words")
+if page.count("static/tikz/fonts.css") != 1:
+    problems.append(f"the faces are linked {page.count('static/tikz/fonts.css')} times, not once")
+ids = re.findall(r'\bid="(pgf[^"]+)"', page)
+if len(ids) != len(set(ids)):
+    problems.append("two drawings on the page share an element id (review N5)")
+description = re.search(r'<meta name="description" content="([^"]*)"', page)
+if not description or html.unescape(description.group(1)) != "Diagrams and graphs planted by verify.sh (plantoir-figures-sentinel-7f3a).":
+    problems.append(f"the page's description is not its words: {description and description.group(1)!r}")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+foo_line = 1 + [index for index, line in enumerate(planted.read_text(encoding="utf-8").splitlines()) if line.strip() == "\\foo"][0]
+if f"plantoir: error: Figures Fixture.md: tikz block 6, line {foo_line}:" not in said:
+    problems.append(f"no plantoir: error line names Figures Fixture.md, tikz block 6, line {foo_line}")
+if not re.search(r'PLANTOIR_HEALTH: \{"name": "figuresCouldNotBeDrawn"[^\n]*Figures Fixture[^\n]*diagram 6, line ' + str(foo_line), said):
+    problems.append("the build did not report the diagram it could not draw as a folder problem naming page and line")
+if "plantoir: note: Figures Fixture.md: tikz block 5" not in said:
+    problems.append("the drawing with no description was not noted")
+if not re.search(r"Drew ([7-9]|[1-9][0-9]+) diagrams \(0 from before\)", said):
+    problems.append("the first build (a full rebuild, which empties the cache) did not draw every diagram afresh")
+named = set(re.findall(r'font-family="([a-z0-9]+)"', page))
+tikz = public / "static" / "tikz"
+carried = sorted(path.name for path in tikz.iterdir()) if tikz.is_dir() else []
+if carried != sorted([f"{face}.ttf" for face in named] + ["LICENCE", "fonts.css"]):
+    problems.append(f"static/tikz holds {carried}, not the faces the drawings name ({sorted(named)})")
+pins = {pin["pin"]: pin for pin in json.load(open("contracts/toolchain.json"))["pins"]}
+engine = public / "static" / "function-plot" / "function-plot.js"
+if not engine.is_file() or hashlib.sha256(engine.read_bytes()).hexdigest() != pins["functionPlot"]["fileSha256"]:
+    problems.append("the site does not carry the pinned function-plot at static/function-plot/")
+for path in [page_path, engine] + [path for path in tikz.glob("*.css")]:
+    text = path.read_text(encoding="utf-8", errors="ignore") if path.is_file() else ""
+    for found in re.findall(r"https?://[^\s\"')]+", text):
+        if "w3.org" in found or "jsdelivr.net/npm/katex" in found or "plausible.io" in found:
+            continue
+        if path == page_path and not any(found in body for _, _, body in figures):
+            continue
+        problems.append(f"{path.name} names {found}: figures are served by the site itself")
+if (public / "Figures-Hidden.html").exists() or any("plantoir-figures-hidden-7f3a" in p.read_text(encoding="utf-8", errors="ignore") for p in public.glob("*.html")):
+    problems.append("the hidden page with a graph reached the site")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+FIGPY
+then
+  pass "diagrams and graphs: every fence drawn as an SVG in the page or reported by page and line, the faces and function-plot carried by the site itself, descriptions free of lettering, a hidden graph nowhere (#485)"
+else
+  fail "diagrams and graphs: one of the checks above failed (#485)"
+fi
+
 # ---- 6h, continued: the handout as a browser prints it (#454 review B1) ----
 # Opened from Plantoir's preview, Print starts at the first page load. In a
 # LIGHT page nothing used to wait for Quartz to draw the diagrams, so the
@@ -2147,6 +2442,19 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
 else
   RESULTS+=("⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
   echo "⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac"
+fi
+# ---- 6i, continued: a second build draws nothing (#485 E1) ----
+# The cache: the same figures, built again without --full-rebuild, are all
+# found from before, the drawing engine is never started, and the page comes
+# out byte for byte the same.
+cp "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html 2>/dev/null || true
+if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_figures_second.log 2>&1 \
+   && grep -Eq "Drew 0 diagrams \([1-9][0-9]* from before\)" /tmp/verify_figures_second.log \
+   && cmp -s "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html; then
+  pass "diagrams and graphs: a second build finds every figure from before, draws none, and the page is byte-identical (#485)"
+else
+  fail "diagrams and graphs: a second build drew again or changed the page (#485)"
+  grep -n "Drew\|plantoir:" /tmp/verify_figures_second.log | head -5
 fi
 restore_hit_fixture
 trap release_verify_lock EXIT
@@ -2278,6 +2586,17 @@ for entry in os.listdir("/proc"):
     pass "and with no printable page left, the site no longer carries the print engine (#454)"
   else
     fail "the site still carries static/pagedjs with no printable page in it (#454)"
+  fi
+  # And no figures either (#485 E1): neither engine's folder, nothing drawn,
+  # and a page that never had a figure byte for byte what the first build
+  # made - the guarantee for every site without figures.
+  if [[ -f "$SITE_INDEX" && ! -e "$SITE_PUBLIC/static/function-plot" && ! -e "$SITE_PUBLIC/static/tikz" ]] \
+     && ! grep -q "Drew [0-9]* diagram" /tmp/verify_old_container.log \
+     && ! grep -q "pl-figure" "$SITE_PUBLIC/Help-Sessions.html" \
+     && cmp -s "$SITE_PUBLIC/Help-Sessions.html" /tmp/verify_untouched_page.html; then
+    pass "and with no figure left, the site carries neither figure engine, nothing is drawn, and a page without figures is byte-identical (#485)"
+  else
+    fail "a site with no figures still carries static/function-plot or static/tikz, drew something, or changed a page without figures (#485)"
   fi
 else
   fail "could not put back a container without the builds mount"
