@@ -586,7 +586,11 @@ coverage map; on a worksheet it is noise. The rule and its cases are
 `printablePages.curriculumConnection`: a heading reading "Curriculum
 connection(s)" in any capitals (closing colon allowed; one that merely
 contains the words is the teacher's and prints), and everything after it to
-the next heading of the same or a higher level. **The build emits no hook,
+the next heading of the same or a higher level — or to the page's footnotes,
+which Quartz puts after the LAST section as a sibling (`section[data-footnotes]`)
+and which must print: the first version left them off the PDF of a page
+ending in a Curriculum connection (review finding, measured; the fixture now
+carries a footnote and a second, final Curriculum connection). **The build emits no hook,
 and none was added:** measured on the verify fixture, the skeleton
 templates' `%%curriculum-start%%` markers are comments Quartz strips, and the
 section arrives as a bare `<h2 id="curriculum-connection">` followed by its
