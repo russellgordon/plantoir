@@ -97,6 +97,15 @@ summary:focus-visible {
   flex-wrap: wrap;
 }
 
+/* Seven nouns and the brand need about 700px, more than the 620px text
+   column (measured 2026-10-09 in headless Chromium: nav 591px, brand 97px,
+   gap 20px). On a window wide enough, the bar alone reaches 60px past the
+   column on each side so it stays one row; below that it wraps, brand above
+   the links (DECISIONS 41a). */
+@media (min-width: 820px) {
+  .topbar { margin: 0 -60px; }
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -134,6 +143,8 @@ summary:focus-visible {
    carries navigation alone rather than saying the name twice. */
 .home .brand { display: none; }
 .home .topbar { justify-content: center; }
+/* When the links wrap on a phone, the rows stay centred under each other. */
+.home .nav { justify-content: center; }
 
 /* ---------- Masthead ---------- */
 
@@ -241,7 +252,7 @@ code {
   overflow-wrap: break-word;
 }
 
-/* ---------- Interactive class notes (v1.7.0) ---------- */
+/* ---------- Visualizations and Printing pages (v1.7.0; one Interactive page until DECISIONS 41) ---------- */
 
 /* A block exactly as a teacher types it, with a Copy button (interactive.js). */
 pre.fence {
@@ -597,7 +608,8 @@ footer .footer-nav a { margin-right: 18px; }
   .rule { margin: 44px 0; }
   .note { padding: 20px; }
   .topbar { gap: 12px; padding-top: 18px; }
-  .nav { gap: 16px; font-size: 15px; }
+  /* Seven links wrap to two rows on a phone; keep the rows close together. */
+  .nav { gap: 6px 16px; font-size: 15px; }
 
   /* Stack the label above its link instead of squeezing it into a column */
   ul.links .label { display: block; min-width: 0; margin-bottom: 1px; }

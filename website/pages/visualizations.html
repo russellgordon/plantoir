@@ -1,0 +1,112 @@
+---
+title: Visualizations — Plantoir
+description: Diagrams and graphs for class notes — a drawn TikZ diagram, or a graph students can move — each written as a few lines in an ordinary note.
+nav_label: Visualizations
+---
+
+<div class="page-head">
+  <h1>Visualizations</h1>
+  <p class="standfirst">Diagrams and graphs, each written as a few lines in a note. Type them in Obsidian, preview the section, and students get a diagram drawn for them or a graph they can move. More kinds are on the way.</p>
+</div>
+
+<hr class="rule">
+
+<section>
+  <p>Each part of this page shows the text you type, exactly as you type it, beside what students get from it. The examples come from the ready-made mathematics course for MPM2D, so you can open the same pages in a course of your own.</p>
+  <p>Nothing here changes a page you already have. A page without these blocks is built exactly as before.</p>
+  <p id="printing">Handouts that print properly have a page of their own: <a href="{{up}}printing/">Printing</a>.</p>
+</section>
+
+<hr class="rule">
+
+<section id="diagrams-and-graphs">
+  <h2>Diagrams and graphs</h2>
+  <p>Two kinds of mathematics figure, each a block of plain text in the note itself — never a picture file to redraw when a number changes.</p>
+
+  <h3 id="tikz">A diagram, drawn from TikZ</h3>
+  <p>TikZ is the drawing language of LaTeX. Plantoir draws the diagram once, when the site is built: students download a crisp picture, it follows the site's light or dark theme, and it prints black on white.</p>
+  <h4 class="label">What you type</h4>
+  <pre class="fence"><code>```tikz
+% alt: Triangle ABC with AB = 4 and BC = 6, beside the larger similar triangle DEF with DE = 10 and EF unknown.
+\begin{document}
+\begin{tikzpicture}
+  \draw[thick] (0,0) node[below left]{$A$} -- (2.4,0) node[below right]{$B$} -- (0.8,1.6) node[above]{$C$} -- cycle;
+  \node[below] at (1.2,0) {$4$};
+  \node[above right] at (1.6,0.8) {$6$};
+  \draw[thick] (4,0) node[below left]{$D$} -- (10,0) node[below right]{$E$} -- (6,4) node[above]{$F$} -- cycle;
+  \node[below] at (7,0) {$10$};
+  \node[above right] at (8,2) {$?$};
+\end{tikzpicture}
+\end{document}
+```</code></pre>
+  <h4 class="label">What students get</h4>
+  <figure class="drawn-figure tikz-figure">
+    <svg xmlns="http://www.w3.org/2000/svg" width="418.824" height="188.813" viewBox="-72 -72 314.118 141.609" role="img" aria-label="Triangle ABC with AB = 4 and BC = 6, beside the larger similar triangle DEF with DE = 10 and EF unknown." focusable="false"><g stroke="#000" stroke-miterlimit="10" stroke-width=".4"><g stroke-width=".8"><path fill="none" d="M-57.704 55.44h68.286L-34.942 9.916Z"></path><text x="-57.704" y="55.44" stroke="none" font-family="cmmi10" font-size="10" transform="translate(-11.233 10.566)">A</text><text x="-57.704" y="55.44" stroke="none" font-family="cmmi10" font-size="10" transform="translate(72.02 10.566)">B</text><text x="-57.704" y="55.44" stroke="none" font-family="cmmi10" font-size="10" transform="translate(18.831 -49.258)">C</text></g><text x="-57.704" y="55.44" stroke="none" font-family="cmr10" font-size="10" transform="translate(31.643 9.977)">4</text><text x="-57.704" y="55.44" stroke="none" font-family="cmr10" font-size="10" transform="translate(49.058 -26.295)">6</text><g stroke-width=".8"><path fill="none" d="M56.107 55.44h170.716L113.013-58.37Z"></path><text x="-57.704" y="55.44" stroke="none" font-family="cmmi10" font-size="10" transform="translate(101.521 10.566)">D</text><text x="-57.704" y="55.44" stroke="none" font-family="cmmi10" font-size="10" transform="translate(288.26 10.566)">E</text><text x="-57.704" y="55.44" stroke="none" font-family="cmmi10" font-size="10" transform="translate(166.807 -117.544)">F</text></g><text x="-57.704" y="55.44" stroke="none" font-family="cmr10" font-size="10" transform="translate(194.17 9.977)">10</text><text x="-57.704" y="55.44" stroke="none" font-family="cmr10" font-size="10" transform="translate(231.155 -60.438)">?</text></g></svg>
+    <figcaption>Question 1 of <em>Similar Triangles Practice</em>, as the class site draws it.</figcaption>
+  </figure>
+  <h4 class="label">What it accepts</h4>
+  <ul class="plain">
+    <li>The first line, <code>% alt: …</code>, is one sentence a screen reader says instead of the picture.</li>
+    <li><code>\usepackage{…}</code> and <code>\usetikzlibrary{…}</code> go before <code>\begin{document}</code>; the picture goes between <code>\begin{document}</code> and <code>\end{document}</code>. One picture to a block.</li>
+    <li><code>pgfplots</code>, <code>circuitikz</code>, <code>chemfig</code>, <code>tikz-cd</code>, <code>amsmath</code> and TikZ's own libraries work. <code>siunitx</code>, <code>mathtools</code> and <code>tkz-euclide</code> do not.</li>
+    <li>A diagram that can't be drawn shows students “This diagram couldn't be drawn.”, and Plantoir tells you the page, the diagram and the line.</li>
+  </ul>
+  <p>To see the diagram inside Obsidian as you write, install Obsidian's TikZJax plugin: the site is drawn with the same engine.</p>
+
+  <h3 id="graphs">A graph students can move</h3>
+  <p>A <code>functionplot</code> block is drawn in the student's browser from the site's own files. They can drag it, and zoom with ⌘ or Ctrl and a scroll. On paper it prints at the bounds you wrote.</p>
+  <h4 class="label">What you type</h4>
+  <pre class="fence"><code>```functionplot
+---
+bounds: [-4, 5, -6, 10]
+alt: The parent parabola y = x^2 and y = -2(x - 1)^2 + 3, which opens down, is narrower, and has its vertex at (1, 3).
+---
+y = x^2
+y = -2(x - 1)^2 + 3
+```</code></pre>
+  <h4 class="label">What students get</h4>
+  <figure class="drawn-figure live-graph" data-plot="{&quot;functions&quot;: [&quot;x^2&quot;, &quot;-2(x - 1)^2 + 3&quot;], &quot;bounds&quot;: [-4, 5, -6, 10]}">
+    <div class="plot" role="img" aria-label="The parent parabola y = x^2 and y = -2(x - 1)^2 + 3, which opens down, is narrower, and has its vertex at (1, 3)."></div>
+    <p class="graph-fallback">The graph of y = x^2 and y = -2(x - 1)^2 + 3 is drawn here when the page has loaded.</p>
+  </figure>
+  <p>From <em>Transformations of Parabolas</em>: the parent and the finished sketch on one set of axes. Try dragging it.</p>
+  <h4 class="label">What it accepts</h4>
+  <ul class="plain">
+    <li>The settings come first, between <code>---</code> lines, then one function per line: <code>y = x^2</code>.</li>
+    <li>Settings, all optional: <code>title</code>, <code>xLabel</code>, <code>yLabel</code>, <code>bounds: [xMin, xMax, yMin, yMax]</code>, <code>grid</code>, <code>disableZoom: true</code>, and <code>alt</code> — one sentence a screen reader says instead of the graph.</li>
+    <li>The grapher's own spelling: <code>^</code> for powers, <code>x*(x - 1)</code> rather than <code>x(x - 1)</code>, <code>log</code> for the natural log, <code>PI</code> and <code>E</code> in capitals, brackets on every function.</li>
+    <li>It can't mark a point or shade a region. For a marked point, draw the graph in TikZ with <code>pgfplots</code>.</li>
+  </ul>
+  <p>In Obsidian the block shows as its text; the graph is drawn when you preview.</p>
+  <p>Function graphs pan and zoom now; sliders and dynamic geometry arrive with GeoGebra in the next release.</p>
+  {{availability:maths-figures}}
+</section>
+
+<hr class="rule">
+
+<section id="ask">
+  <h2>Or ask Claude or Codex</h2>
+  <p>You don't have to learn any of this. Plantoir writes its guidance for these blocks into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows how to write each one — when a graph suits and when a diagram does, the patterns that work, and what to avoid. There is nothing to install or paste.</p>
+  <p>Asked this, in a working folder holding an MPM2D course:</p>
+  <pre class="fence ask"><code>Add a graph of y = 3(x - 2)^2 - 4 beside its parent function y = x^2 to the page "courses/MPM2D/Unit 2/Parabolas.md", under the example.</code></pre>
+  <p>Claude added this block under the example:</p>
+  <pre class="fence"><code>```functionplot
+---
+title: y = 3(x - 2)^2 - 4 and its parent
+bounds: [-4, 6, -6, 10]
+alt: The parent parabola y = x^2 and y = 3(x - 2)^2 - 4, which opens up, is narrower, and has its vertex at (2, -4)
+---
+y = x^2
+y = 3(x - 2)^2 - 4
+```</code></pre>
+  <p>and this is the graph it draws:</p>
+  <figure class="drawn-figure live-graph" data-plot="{&quot;functions&quot;: [&quot;x^2&quot;, &quot;3(x - 2)^2 - 4&quot;], &quot;bounds&quot;: [-4, 6, -6, 10]}">
+    <div class="plot" role="img" aria-label="The parent parabola y = x^2 and y = 3(x - 2)^2 - 4, which opens up, is narrower, and has its vertex at (2, -4)."></div>
+    <p class="graph-fallback">The graph of y = x^2 and y = 3(x - 2)^2 - 4 is drawn here when the page has loaded.</p>
+  </figure>
+  <p>Ask for a slider and it says sliders arrive with GeoGebra in the next release, and offers the nearest thing for now: two or three curves on one set of axes.</p>
+  <p>Open either from a course's menu with <a href="{{up}}features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
+</section>
+
+<script src="{{up}}assets/function-plot.js" defer></script>
+<script src="{{up}}assets/interactive.js" defer></script>

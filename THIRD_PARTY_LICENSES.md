@@ -24,8 +24,8 @@ teacher's site. Fonts a site carries for its own look are described in
 
 ## Carried by plantoir.app itself
 
-The Interactive class notes page (`website/pages/interactive.html`, v1.7.0)
-draws a live graph and a TikZ diagram the way a class site does, so the site
+The Visualizations page (`website/pages/visualizations.html`; v1.7.0's
+Interactive page, renamed by DECISIONS 41) draws a live graph and a TikZ diagram the way a class site does, so the site
 carries the same files: `website/assets/function-plot.js` (function-plot
 1.25.4, byte for byte the file a class site carries, with the bundled
 packages named in the row above; licence in `function-plot-LICENSE.txt`
