@@ -2778,7 +2778,9 @@ figure productively, not only the fence syntax, so it carries when to use
 which fence, four complete patterns (a parabola beside its parent, two lines
 meeting — interactive and with the point marked, labelled similar triangles,
 a number line), the measured package list, the limits on paper and time,
-how a failure shows up, what to avoid, and what cannot be done (sliders).
+how a failure shows up, what to avoid, and what cannot be done (a slider
+is for GeoGebra, arriving in the next release, with several curves for
+several values of the parameter offered meanwhile).
 Every pattern in it is drawn by the real engines (the same check as verify's
 payload figures). Scratch working folder with the guidance as the app
 mirrors it and `courses/MPM2D/Unit 2/Parabolas.md` (vertex form, the example
