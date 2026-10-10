@@ -56,26 +56,31 @@
   "nav": [
     "index",
     "features",
-    "interactive",
+    "visualizations",
+    "printing",
     "day-to-day",
     "deploying",
     "support"
   ],
   "redirects": {
-    "why": "Pages that moved, so their old addresses keep working. build.py writes each move into site/_redirects as a permanent (301) redirect, old address and everything under it, and --check refuses a move whose new page is missing, whose old page still exists, or whose old address a page still links to. 'publishing' became 'deploying' in v1.4.4 (#443): DEPLOY puts a site online, PUBLISH only marks a page. Never remove a move: outside links to the old address cannot be counted.",
+    "why": "Pages that moved, so their old addresses keep working. build.py writes each move into site/_redirects as a permanent (301) redirect, old address and everything under it, and --check refuses a move whose new page is missing, whose old page still exists, or whose old address a page still links to. 'publishing' became 'deploying' in v1.4.4 (#443): DEPLOY puts a site online, PUBLISH only marks a page. 'interactive' became 'visualizations' after v1.7.0 (DECISIONS 41): the header reads in nouns, the page carries diagrams and graphs, and printing moved to /printing/ of its own — so /interactive/#printing lands on /visualizations/#printing, which is kept as the one sentence that links to /printing/. Never remove a move: outside links to the old address cannot be counted.",
     "moved": [
       {
         "from": "publishing",
         "to": "deploying"
+      },
+      {
+        "from": "interactive",
+        "to": "visualizations"
       }
     ]
   },
   "shortcuts": {
-    "why": "Short addresses that land on a section of a page, for saying aloud or printing: build.py writes site/<from>/index.html, a page that sends the browser on to <to> (which may name a #section). Not a _redirects rule, because a redirect to an address with a #section is the one shape whose handling on Netlify was not measured. --check refuses a shortcut whose page or section is missing, or whose address is also a page. /math was promised for the mathematics section in #486 (v1.7.0).",
+    "why": "Short addresses that land on a section of a page, for saying aloud or printing: build.py writes site/<from>/index.html, a page that sends the browser on to <to> (which may name a #section). Not a _redirects rule, because a redirect to an address with a #section is the one shape whose handling on Netlify was not measured. --check refuses a shortcut whose page or section is missing, or whose address is also a page. /math was promised for the mathematics section in #486 (v1.7.0); it lands on /visualizations/ since that page was renamed (DECISIONS 41).",
     "to": [
       {
         "from": "math",
-        "to": "interactive/#diagrams-and-graphs"
+        "to": "visualizations/#diagrams-and-graphs"
       }
     ]
   },
