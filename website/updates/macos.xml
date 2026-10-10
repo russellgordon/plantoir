@@ -6,6 +6,255 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Plantoir</title>
         <item>
+            <title>1.7.0</title>
+            <pubDate>Fri, 09 Oct 2026 20:23:21 -0400</pubDate>
+            <link>https://plantoir.app/</link>
+            <sparkle:version>3569</sparkle:version>
+            <sparkle:shortVersionString>1.7.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<style>div.sparkle-installed-version, div.sparkle-installed-version ~ div { display: none; }</style>
+<div data-sparkle-version="3569">
+<h2>Plantoir 1.7.0</h2>
+<p>Plantoir 1.7.0 is for the Mac. Plantoir 1.4.0 or later will offer this update by itself.</p>
+<p>Nothing you have already built looks any different on screen. A page without a diagram or a graph shows exactly as it did before, a printable page&#x27;s handout prints exactly as it did in 1.6.0, and every site you have already deployed stays as it is until you deploy it again.</p>
+<h3>New</h3>
+<ul>
+<li>Draw a diagram right in your notes with TikZ, the drawing language of LaTeX. Plantoir draws it when the site is built, so students see a crisp picture that follows the site&#x27;s light or dark theme.</li>
+<li>Add a graph of a function with a few lines of text. Students can drag it and zoom in, right on the page.</li>
+<li>Diagrams and graphs print whole, in black on white, from a handout or from the browser&#x27;s own Print command, even when the page is shown in dark mode.</li>
+<li>If a diagram or graph can&#x27;t be drawn, students see one plain sentence in its place, and Plantoir tells you which page, which figure and which line to look at.</li>
+<li>Claude and Codex know how to add diagrams and graphs to a page. Plantoir writes the guidance into your working folder, so you can ask for &quot;a graph of y = 3(x − 2)² − 4 beside its parent&quot; and get one that works.</li>
+<li>The ready-made Grade 10 mathematics course (MPM2D) now draws its similar triangles and its parabolas, and its Similar Triangles Practice prints as a handout.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Printing a page that isn&#x27;t marked printable, with ⌘P, now prints the whole article. Before, the site&#x27;s folder list could print over part of the page and hide the words underneath, and in Safari the page could run off the edge of the paper.</li>
+</ul>
+<p>To see a diagram inside Obsidian while you write, install Obsidian&#x27;s TikZJax plugin. Graphs show as text in Obsidian and are drawn when you preview.</p>
+</div>
+<div data-sparkle-version="3543">
+<h2>Plantoir 1.6.0</h2>
+<p>Plantoir 1.6.0 is for the Mac. Plantoir 1.4.0 or later will offer this update by itself.</p>
+<p>Nothing you have already built changes. A page prints as a handout only when you mark it printable; every other page builds exactly as it did before, down to the last byte, and every site you have already deployed stays as it is.</p>
+<h3>New</h3>
+<ul>
+<li>A page can print as a proper handout. Add <code>printable: true</code> to the settings at the top of a worksheet, review or practice page, and it gains a Print button beside its date.</li>
+<li>Print offers three choices: Questions only, Answers only, or Both, with the answers starting on a fresh page and numbered separately. Nothing prints until you choose one, and you can choose Portrait or Landscape paper first.</li>
+<li>The handout looks like a typical typeset worksheet: Latin Modern type, a bold title, questions numbered in the margin with lettered parts set side by side, and a footer with the page&#x27;s title, the course code and the page number.</li>
+<li>Answers you write in folded callouts move to the answer key, labelled by the question they belong to. Hints print in place, unfolded.</li>
+<li>Course Settings has a Printing section: your school&#x27;s name, the blanks students fill in (Name, Date, Class #), and where the school name and course code print on each page.</li>
+<li>A page can hand out a PDF you already have instead. Name the file, kept in the course&#x27;s Media folder, in the page&#x27;s settings, and Print opens that PDF.</li>
+<li>Claude, Codex and other assistants are told how to write a page that prints well. Plantoir writes a short guide into your working folder, and if you already keep your own CLAUDE.md or AGENTS.md there, it asks before adding a section to the end, leaving your own words untouched.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li>Pressing Print in Plantoir&#x27;s own preview opens the page in your web browser, ready to print.</li>
+<li>On paper, a handout leaves out buttons, menus and the &quot;click to expand&quot; hints, prints diagrams and pictures whole and in light colours, and prints code in a plain box with line numbers.</li>
+<li>A worked example keeps its box on paper; nothing else is boxed or shaded.</li>
+<li>A page&#x27;s Curriculum connections section never prints, in a handout or from the browser&#x27;s own Print command, so students see the questions rather than the planning.</li>
+<li>If any part of a handout would be cut off at the edge of the paper, Plantoir says so and prints nothing, rather than handing you a sheet with words missing.</li>
+</ul>
+</div>
+<div data-sparkle-version="3506">
+<h2>Plantoir 1.5.0</h2>
+<p>Plantoir 1.5.0 is for the Mac. Plantoir 1.4.0 or later will offer this update by itself.</p>
+<h3>New</h3>
+<ul>
+<li>A Course menu and a Section menu in the menu bar hold everything you can do to the course or section you have selected, with keyboard shortcuts shown beside them.</li>
+<li>Things you used to ask the assistant for are now in the Section menu too: Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last Change, Add Next Class, Re-date Classes…, Make Room for Classes… and Class Dates…. Each shows you what it will do before it does it. Right-click a section for the everyday ones.</li>
+<li>When you deploy, Plantoir asks about class pages students can already see that are dated after your next class. You can hide the ones you tick, or keep them all; tomorrow&#x27;s class, published the evening before, is never asked about.</li>
+<li>File ▸ Open Recent lists the working folders you have opened, and it and Open Working Folder… work even when no window is open.</li>
+<li>Help ▸ Publishing and Deploying… explains the difference between the two, and Help ▸ Plantoir Help opens plantoir.app.</li>
+<li>Plantoir ▸ Settings has a Deploying tab, which holds your Cloudflare Account ID in one place. Course settings and the New Course panel show it, with an Open Settings… button to change it.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li>Plantoir follows the Mac&#x27;s own conventions more closely. Escape closes every sheet, Return presses a sheet&#x27;s main button only when that button can be used, every sheet&#x27;s title is the same size and shape, and every text field wears the same border.</li>
+<li>The Delete key removes the course, section, backup or archive you have selected (after asking), and Remove… now sits at the bottom of each right-click menu.</li>
+<li>Right-clicking a course or section offers Revise With ▸ Claude…, Codex… or Local AI Assistant…, named the same way as in the menu bar.</li>
+<li>All Backups can be sorted by course, date made or size, and its rows have a right-click menu.</li>
+<li>When a backup, restore or deletion goes wrong, the message names what could not be done.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>A failed build is no longer blamed on Netlify limiting deploys just because the number 429 appeared somewhere in its output.</li>
+<li>The − button under the sidebar can no longer remove a section of a course you keep for reference.</li>
+<li>Copy a Page can now be closed with Escape.</li>
+</ul>
+</div>
+<div data-sparkle-version="3471">
+<h2>Plantoir 1.4.5</h2>
+<p>Plantoir 1.4.5 is for the Mac and for Windows. Plantoir 1.4.0 or later will offer this update by itself.</p>
+<h3>Improved</h3>
+<ul>
+<li>The first window after an update used to be held back while Plantoir got your folder ready — about two minutes on Windows, a few seconds on a Mac. Now the window appears at once, with a notice that says the folder is being got ready and that Preview and Deploy wait for it. Preview and Deploy are available again the moment it finishes: usually a few seconds on a Mac, 15 to 20 seconds on a typical Windows laptop, and longer on a slow disk.</li>
+<li>Every text field in Plantoir is now the same height and wears the same border: the New Course panel&#x27;s fields and the Copy a Page search field matched an older look and were two points shorter than the rest.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>When Claude or Codex rebuilds a preview or publishes a page while that section is being deployed, the answer now says the section is being deployed, so the preview cannot be built until that finishes. Before, it only said the preview could not be built. On a Mac the answer also no longer sends you to &quot;that section&#x27;s window&quot; when Claude or Codex has no window to look in.</li>
+<li>An update Plantoir found but could not show at the time — because you kept Plantoir in front all day, or had switched away and quit before coming back — is offered again later the same day, and looked for again the next time Plantoir opens, instead of waiting for tomorrow&#x27;s check.</li>
+<li>When Claude or Codex schedules a deploy and names classes like &quot;Unit 2, Day 3&quot;, the title is no longer cut in half. Class titles are now separated by semicolons, so a comma inside a title stays where you put it.</li>
+</ul>
+</div>
+<div data-sparkle-version="3366">
+<h2>Plantoir 1.4.4</h2>
+<p>Plantoir 1.4.4 is for the Mac. Windows: no changes in this release; the Windows download stays at 1.4.3. Plantoir 1.4.0 or later on a Mac will offer this update by itself.</p>
+<h3>New</h3>
+<ul>
+<li>Plantoir now says &quot;deploy&quot; for putting your website online and &quot;publish&quot; only for marking a page to be included. The words are kept apart everywhere you read them: in the app, in what the assistant says, in the starter pages a new course comes with, and on plantoir.app, where the Publishing page is now called Deploying (the old address still works).</li>
+<li>Type &quot;schedule a deploy for tomorrow at 6:30 am&quot; to the assistant and it sets that up for you to agree to; &quot;schedule a deploy&quot; with no time asks you for one and never deploys right away; &quot;cancel that scheduled deploy&quot; cancels it. A request that names a later time is never carried out straight away.</li>
+<li>&quot;Start a new unit with the next class&quot; and &quot;Add three more days to Unit 2&quot; are answered by the assistant exactly as you say them. A request it cannot be sure about is pointed at the wording that does it, rather than adding a page you did not ask for.</li>
+<li>A Claude or Codex session opened from Plantoir now keeps hold of the course it was opened from, the way the built-in assistant does: its backup is kept, a second session on the same course is refused, and renaming or restoring the course waits until the session ends.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li>A deploy no longer starts while that section&#x27;s scheduled deploy is still working, including one left running after Plantoir was closed. The new deploy waits for it, up to thirty minutes, and tells you if it had to stand down.</li>
+<li>A scheduled deploy&#x27;s notification now reads &quot;deployed on its own to …&quot;, and says that your website has the new pages.</li>
+<li>The About window and the plantoir.app card say &quot;Grow a class website.&quot;</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>The &quot;_DUPLICATE ME&quot; page a new course comes with names its heading marks again: &quot;Every <code>##</code> (level 2) and <code>###</code> (level 3) heading…&quot;. Courses made before this update keep the page as it was.</li>
+</ul>
+</div>
+<div data-sparkle-version="3160">
+<h2>Plantoir 1.4.3</h2>
+<p><strong>This release is for the Mac.</strong> The Windows download on <a href="https://plantoir.app">plantoir.app</a> remains version 1.4.2 for now. On a Mac, Plantoir 1.4.0 or later will offer this update by itself.</p>
+<h3>New</h3>
+<ul>
+<li>(Mac) Claude and Codex can change a course while its preview is open. They are asked to wait only while Plantoir is actually building that course&#x27;s website, for a preview or for a deploy. A change made while a preview is open is saved straight away; press Stop Preview, then Preview, to see it.</li>
+<li>(Mac) Ask Claude or Codex to deploy a section and the deploy goes ahead even when a preview is open. If that closes the preview, Plantoir says &quot;Closed for a deploy&quot; instead of telling you something went wrong.</li>
+<li>(Mac) Type &quot;publish unit 4, day 3&quot; to the assistant and it is answered straight away.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li>When two pages have the same name, asking the assistant to publish one now asks which you meant, naming each with its folder.</li>
+<li>When making room for extra classes cannot finish every page, Plantoir names the pages to look over before they go on your website.</li>
+<li>If a change to several pages stops part way, the assistant says plainly that only part of it was made. On the Mac it also points you to Restore Section.</li>
+<li>A deploy that has to rebuild a website made by a preview explains itself in plainer words.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>(Mac) Adding a section no longer shows a hidden page in the new section when that page&#x27;s settings were written with quotation marks.</li>
+<li>(Mac) Hiding or publishing a whole unit, publishing a class by its date, and the links checklist now change the right page when a class page shares its name with another page.</li>
+<li>Class dates remembered with an impossible year are asked for again instead of being believed.</li>
+</ul>
+</div>
+<div data-sparkle-version="2827">
+<h2>Plantoir 1.4.2</h2>
+<p>macOS only: Windows has no changes in this release; the Windows download is still 1.1.0.</p>
+<h3>New</h3>
+<ul>
+<li>Press Preview when today&#x27;s class is published but the section&#x27;s front page still shows an older one, and Plantoir offers to put today&#x27;s class there. A &quot;Not Today&quot; button leaves things as they are.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li>Scheduling a deploy now names every place the course deploys to, and no longer warns about classes that are not published yet.</li>
+<li>In the links checklist, a page that is only reached through another page is listed under it, and a page brought along by a ticked class is shown coming with it. Pages are named by their titles.</li>
+<li>Asking the assistant (or Claude or Codex) which courses you have now names every place each one deploys to.</li>
+<li>Setting up a course at the command line now follows the same course-code rules as the apps.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>The first colour scheme is now called &quot;Standard Colours&quot;. Your courses keep the colours they already have.</li>
+</ul>
+</div>
+<div data-sparkle-version="2766">
+<h2>Plantoir 1.4.1</h2>
+<p>macOS only: Windows has no changes in this release; the Windows download on <a href="https://plantoir.app">plantoir.app</a> is still 1.1.0.</p>
+<p><strong>This release is for the Mac.</strong> It makes previewing and deploying more dependable, tidies Course Settings, and adds a checklist for pages that link to pages students cannot see yet. Plantoir 1.4.0 will offer it to you by itself.</p>
+<h3>New</h3>
+<ul>
+<li>When a page you are publishing links to pages that are hidden, Plantoir shows a checklist in the section window. Tick the pages to publish, each dated like the class that uses it. A hidden class is offered unticked and brings its own pages along. Choosing Not Now publishes nothing.</li>
+<li>With &quot;This is a club&quot; ticked, the New Course panel says Meetings, Club code, Club name and Create Club.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li>A preview that has to wait now says what it is waiting for.</li>
+<li>A section cannot be previewed while that same section is being deployed, whether the deploy came from another window, the assistant or Terminal.</li>
+<li>Get Ready for the Start of the Year names pages by their titles, and adds a folder only when two pages share a title.</li>
+<li>Course Settings shows the Class Pages rows only for a course that recorded them, such as a club, and says &quot;Language and region&quot; instead of &quot;Language / region (Quartz locale)&quot;.</li>
+<li>Course Settings&#x27; Save button looks disabled when it is, and says why when something holds it back.</li>
+<li>Every text field now has the same visible border.</li>
+<li>The details shown under a preview, a deploy or a new course say &quot;website builder&quot;, never container or Docker.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Work left behind by a closed Revise with Claude or Codex session no longer stops previews until the Mac restarts.</li>
+<li>A deploy you ask Claude or Codex for now stops at a question and tells you to deploy once from Plantoir, instead of waiting for ever.</li>
+<li>An emoji or grade-in-title setting in Course Settings no longer changes on its own.</li>
+<li>Copy a Page&#x27;s checklist, and the screen after it, now fit on the screen however many pages are skipped.</li>
+<li>The example course&#x27;s progress bar now reaches every step.</li>
+<li>Deploying to Cloudflare Pages after its project was deleted there now makes the project again instead of stopping.</li>
+</ul>
+</div>
+<div data-sparkle-version="2653">
+<h2>Plantoir 1.4.0</h2>
+<p><strong>This release is for the Mac.</strong> It is the biggest one since Plantoir began: Plantoir now keeps itself up to date, the first course on a new Mac starts much sooner, and there is new help for the start of the year, for clubs and for deploying on a schedule.</p>
+<h3>Before you update</h3>
+<ul>
+<li><strong>This is the last release you install by hand.</strong> From 1.4.0 on, Plantoir checks for new versions by itself and asks you before installing one. If you are on 1.3.1 or earlier, download this one yourself; after that, you will not need to.</li>
+<li><strong>The Mac download is now about 411 MB</strong> (it used to be about 60 MB). Plantoir now carries its own copies of the helper programs it used to download the first time it ran, so the first course on a new Mac is ready much sooner. A download this much bigger than you remember is still the right file.</li>
+<li><strong>A deploy you scheduled before updating still happens as you set it.</strong> Until it runs it may appear under a slightly different name than new ones; it can be shown, cancelled and run just as before. Scheduling that section again replaces it.</li>
+</ul>
+<h3>New</h3>
+<ul>
+<li>Plantoir finds its own new versions, asks before installing them, and never installs one while it is building, previewing or deploying.</li>
+<li><strong>Get Ready for the Start of the Year…</strong> puts every class after the first into draft in one step. You see what will change first, and you can undo it.</li>
+<li><strong>This is a club</strong> in the New Course wizard: weekly meeting pages and a club front page, and the assistant talks about &quot;meetings&quot; rather than classes.</li>
+<li>A <strong>How I Teach</strong> page for each course, which Claude and Codex read before helping with it. Open or create it from Course Settings.</li>
+<li>A course with two curriculum folders gets a coverage map for each, and College Board codes count.</li>
+<li>Ready-made example content for TAS2O.</li>
+<li>A deploy set for later tells you how it went in a notification, even when Plantoir is closed. Clicking the notification opens that section.</li>
+<li>The assistant can answer &quot;What does Unit 2, Day 3 link to?&quot; straight from the page, and &quot;Publish all the classes in Unit 2.&quot; publishes the unit.</li>
+<li>The build warns you when a published class links to pages students cannot see yet.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li>The first time Plantoir runs on a Mac, it gets the website builder ready in the background, and that first build is smaller and faster.</li>
+<li>Plantoir reopens on the working folder you used last.</li>
+<li>Every folder and file list in Course Settings and the New Course wizard is now a table with checkboxes.</li>
+<li>The Backups list shows how much space each backup takes, and you can delete several at once.</li>
+<li>The front page, and every page a class links to, show that class&#x27;s date.</li>
+<li>A scheduled deploy goes where the course deploys at the time it runs, and every deploy uses the settings as you last saved them.</li>
+<li>The assistant reads a course&#x27;s settings when it acts, not when its window was opened.</li>
+<li>Times the assistant cannot place, such as &quot;deploy at 6:30&quot;, are asked about instead of deploying right away. &quot;Publish all of those&quot; asks which pages you mean.</li>
+<li>Duplicating a class that moves other classes warns you, on its card, that Undo will not move them back.</li>
+<li>Two working folders that hold the same course each keep their own scheduled deploy.</li>
+<li>A page whose settings Plantoir cannot read is hidden from students and named in the build, instead of being published or stopping the build.</li>
+<li>Messages about a working folder say plainly what is wrong, and the first-run messages talk about &quot;your website builder&quot;.</li>
+<li>Clearer wording in several places: skeleton pages no longer show &quot;{subject}&quot;, the skeleton choice says &quot;an English skeleton&quot;, and the wizard&#x27;s unit row no longer says &quot;Unit&quot; twice.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li><strong>Hide from the site&#x27;s sidebar</strong> now always matches the built site, even with two windows open or a preview running.</li>
+<li>Unpublishing a class no longer hides another class it links to.</li>
+<li>Adding a section no longer publishes a page you had hidden.</li>
+<li>Publishing now follows every way of writing a link — with an escaped <code>|</code>, in angle brackets, or Markdown style — and never follows a link inside code or a <code>%%</code> comment.</li>
+<li>Pages with unusually written settings are no longer treated as hidden, broken by a restore, or skipped. Moving or renaming a class no longer leaves half a date behind.</li>
+<li>A scheduled deploy whose build failed no longer names a destination it never reached.</li>
+<li>A deploy to a folder lands where it says, or tells you it did not. Pressing Cancel during a deploy ends it quietly.</li>
+<li>Previews: the address is never lost, a Mac that cannot reach the website builder stops within seconds instead of waiting, each working folder finds room for its own previews, and two people on one Mac no longer see each other&#x27;s previews.</li>
+<li>The window, the assistant, a scheduled deploy and an outside assistant can no longer build the same course at the same time.</li>
+<li>A working folder whose name has an accent or different capitals no longer gets a second website builder.</li>
+<li>Plantoir no longer offers to use a working folder that the website builder cannot reach.</li>
+<li>Approving a change from the assistant no longer freezes the window while the course is backed up.</li>
+<li>Copies and imports of a course no longer bring its Obsidian add-ons along.</li>
+<li>One unreadable character no longer empties a problem report.</li>
+<li>A course can no longer be called &quot;work&quot;, and the folder path shown under a chosen folder now names every folder in it.</li>
+<li>Four ready-made curriculum explainers no longer link to pages a skeleton course does not have.</li>
+</ul>
+</div>
+]]></description>
+            <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.0/Plantoir-macOS.dmg" length="412990813" type="application/octet-stream" sparkle:edSignature="zF3eiiRVGC1yppVuEgxRsegwLOwVulsaiIU9GrYNt/uyXs8EfcKszrJ0JzPHK5kA1uaACeJIqOfOnhPeBmBGCw=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.0/Plantoir3569-3543.delta" sparkle:deltaFrom="3543" length="346114" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="aPwVYhGf++Kh1EFdwRnCAerIMgzMYvZpZNFF5tbW8lOhj5dNL17s7aiQfUcoNv5RKI/bBt2OJY8wkkTWNiLYDw=="/>
+                <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.0/Plantoir3569-3506.delta" sparkle:deltaFrom="3506" length="2022866" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="7YbBtNQ2dBlKtMj0peWh8/e2eaO8OXCdkabOe4Dm9SDieLDWIle6ceVMGyB3jlqOMzKeUJw7FQupIPLwMx01Bg=="/>
+                <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.0/Plantoir3569-3471.delta" sparkle:deltaFrom="3471" length="3305054" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="BSN90VjAtQHmaRd3B+nQCP1HW19nvR3NhmFTrZ3stO6YR9aRkXDfzIbAAqLfiCDh2xehBr5wqcSSjJgjjZxdAw=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>1.6.0</title>
             <pubDate>Fri, 09 Oct 2026 15:40:48 -0400</pubDate>
             <link>https://plantoir.app/</link>
@@ -1222,6 +1471,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: 63rdfba7lexxpTSqllCy4sKFEskiYERkh3oNdEnc3xQwpG5gTEytw2+1SQLPbLIvtGj5E1tpQSulOY0a8JoqDg==
-length: 120994
+edSignature: JJQNaAtCpq0WngdTdC2cSHv7UQp5o542EWS9YvrkirQrk53hrVQ+kcomxRVDCCsjRKa7esDoaNQhvrW4/EmgAg==
+length: 146266
 -->
