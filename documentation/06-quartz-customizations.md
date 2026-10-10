@@ -1021,6 +1021,28 @@ would have to be undone on paper).
   figure's width and 0.62 of it in height, again after a resize. function-
   plot gives its drawing a size and no viewBox, so one is added after every
   draw. A page without a graph fetches nothing and adds no listener.
+- **A page's own ids (#502, measured in Chrome for Testing).** A browser
+  makes every element with an id a property of `window`, and function-plot
+  1.25.4 reads two such names once, as its file runs, keeping what it found
+  for the whole visit: `math` (its evaluator — a heading "Math", id
+  `math`, became the evaluator and every graph said `graphCouldNotBeDrawn`)
+  and `exports` (where it puts itself — a heading "Exports" left it nowhere
+  and every graph said `graphNeedsPreview`). Because the engine is loaded
+  once and kept across page changes, the FIRST page with a graph decided
+  every graph for the rest of the visit: measured on a built site, a `# Math`
+  page opened first failed there and on the next graph page Quartz's page
+  change reached; the reverse order drew both. The script gives `window` an
+  own property of each name, `undefined`, for the moment the file runs (only
+  where `window` has none of its own) and deletes it on `load`/`error`, so the
+  page's ids answer as before. `module` and `define` were measured too and
+  break nothing on their own, so they are left alone. Rejected: handing
+  function-plot its evaluator (it copies the one it found into a table that
+  cannot be reached afterwards), renaming the ids at build (it would break
+  every `[[Page#Math]]` link), and leaving the names hidden (the page's ids
+  would stop answering for the visit). `figureFences.pageIds`;
+  `browser-checks/graphs_draw.mjs` in verify.sh 6h's browser checks. plantoir.app's
+  Interactive page loads the same file its own way and avoids the trap by
+  having no such id (`website/assets/interactive.js` says so).
 - **Zoom (review B2, measured in Chrome for Testing).** function-plot
   attaches d3-zoom to the graph's surface even with `disableZoom: true`
   (that option only ignores the result), and while it is attached a scroll
