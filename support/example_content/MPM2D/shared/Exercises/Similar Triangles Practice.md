@@ -1,5 +1,7 @@
 ---
 title: Similar Triangles Practice
+description: Show your work. Before trusting an answer, check that its size makes sense against its triangle.
+printable: true
 publish: true
 created: __CREATED__
 tags:
@@ -10,76 +12,108 @@ reasoning your group used outdoors in [[How Tall Is the Flagpole]].
 One habit runs through the set: before trusting an answer, ask whether
 its *size* makes sense against the triangle it lives in.
 
-## Questions
+### Question 1
 
-1. $\triangle ABC \sim \triangle DEF$, with $AB = 4$, $DE = 10$, and
-   $BC = 6$. Find $EF$.
-2. **Explain why.** Every pair of congruent triangles is similar, but
-   not every pair of similar triangles is congruent. Explain both
-   halves using scale factors.
-3. One triangle has sides $6$, $8$, $10$; another has sides $9$,
-   $12$, $15$. Are they similar? Justify with ratios, and state what
-   that means about their angles.
-4. A metre stick casts a shadow $1.6$ m long while a tree's shadow
-   measures $12.8$ m. How tall is the tree — and why are the two
-   triangles similar in the first place?
-5. **Find the error.** For question 1's triangles, Sam finds $BC$
-   from $EF = 15$ via $\frac{4}{10} = \frac{15}{BC}$, getting
-   $BC = 37.5$. Catch the slip with a size check, then fix it.
-6. **Challenge.** A ramp runs $7.5$ m along the ground to a wall. A
-   vertical post $1.2$ m tall, standing $3$ m from the ramp's foot,
-   just touches the ramp. How high does the ramp meet the wall?
-7. **From similar right triangles to trig ratios.** Right triangle
-   $\triangle ABC$ has $\angle A = 30°$, adjacent side
-   $AC = \sqrt{3} \approx 1.73$, opposite side $BC = 1$, and
-   hypotenuse $AB = 2$. A larger right triangle $\triangle DEF$ has
-   $\angle D = 30°$ and hypotenuse $DE = 10$.
-   (a) Verify $\triangle ABC \sim \triangle DEF$ and find $EF$ and $DF$.
-   (b) Compute the ratio $\frac{\text{opposite}}{\text{hypotenuse}}$ in
-   both triangles. What constant ratio does this define for $30°$?
+$\triangle ABC \sim \triangle DEF$, with $AB = 4$, $DE = 10$, and
+$BC = 6$. Find $EF$.
 
-## Answers
+```tikz
+% alt: Triangle ABC with AB = 4 and BC = 6, beside the larger similar triangle DEF with DE = 10 and EF unknown.
+\begin{document}
+\begin{tikzpicture}
+  \draw[thick] (0,0) node[below left]{$A$} -- (2.4,0) node[below right]{$B$} -- (0.8,1.6) node[above]{$C$} -- cycle;
+  \node[below] at (1.2,0) {$4$};
+  \node[above right] at (1.6,0.8) {$6$};
+  \draw[thick] (4,0) node[below left]{$D$} -- (10,0) node[below right]{$E$} -- (6,4) node[above]{$F$} -- cycle;
+  \node[below] at (7,0) {$10$};
+  \node[above right] at (8,2) {$?$};
+\end{tikzpicture}
+\end{document}
+```
 
-> [!success]- Answer 1
-> The scale factor is $\frac{10}{4} = 2.5$, so
-> $EF = 6 \times 2.5 = 15$. Bigger triangle, bigger side. ✓
+> [!answer]-
+>
+> $EF = 15$. The scale factor is $\frac{10}{4} = 2.5$, so
+> $EF = 6 \times 2.5 = 15$.
 
-> [!success]- Answer 2
+### Question 2
+
+**Explain why.** Every pair of congruent triangles is similar, but not
+every pair of similar triangles is congruent. Explain both halves using
+scale factors.
+
+> [!answer]-
+>
 > Congruent triangles are similar with scale factor exactly $1$.
 > Similar triangles allow *any* scale factor: a $2:1$ enlargement
-> keeps every angle but matches no side. Congruence locks the zoom.
+> keeps every angle but matches no side.
 
-> [!success]- Answer 3
-> $\frac{9}{6} = \frac{12}{8} = \frac{15}{10} = 1.5$ — all three
-> ratios agree, so the triangles are similar and corresponding angles
-> are equal. Both are $3$–$4$–$5$ right triangles, scaled.
+### Question 3
 
-> [!success]- Answer 4
-> $\frac{h}{12.8} = \frac{1}{1.6}$, so $h = 8$ m. The sun's rays land
-> at the same angle on stick and tree; with right angles at the
-> ground, two matching angles make the triangles similar.
+One triangle has sides $6$, $8$, $10$; another has sides $9$, $12$,
+$15$. Are they similar? Justify with ratios, and state what that means
+about their angles.
 
-> [!success]- Answer 5
-> Size check: $\triangle ABC$ is the smaller triangle, so $BC$ must
-> be under $15$ — and $37.5$ fails instantly. Sam flipped one ratio.
-> Correctly, $\frac{BC}{15} = \frac{4}{10}$, so $BC = 6$. ✓
+> [!answer]-
+>
+> Similar: $\frac{9}{6} = \frac{12}{8} = \frac{15}{10} = 1.5$, so
+> corresponding angles are equal.
 
-> [!success]- Answer 6
-> Post and wall form right triangles sharing the angle at the ramp's
-> foot — similar. So $\frac{h}{1.2} = \frac{7.5}{3}$, giving
-> $h = 3$ m. The wall is farther out, so it must beat the post. ✓
+### Question 4
 
-> [!success]- Answer 7
-> (a) Both triangles share angles $30°$, $60°$, and $90°$, so
-> $\triangle ABC \sim \triangle DEF$ with scale factor
-> $\frac{10}{2} = 5$. Thus $EF = 1 \times 5 = 5$ and
-> $DF = \sqrt{3} \times 5 \approx 8.66$.
-> (b) In $\triangle ABC$: $\frac{BC}{AB} = \frac{1}{2} = 0.5$.
-> In $\triangle DEF$: $\frac{EF}{DE} = \frac{5}{10} = 0.5$.
-> The ratio is invariant for all right triangles with a $30°$ angle —
-> defining $\sin 30° = 0.5$. Trigonometric ratios exist because
-> similar right triangles preserve side ratios — the foundation of
-> [[The Primary Trigonometric Ratios]].
+A metre stick casts a shadow $1.6$ m long while a tree's shadow
+measures $12.8$ m. How tall is the tree — and why are the two
+triangles similar in the first place?
+
+> [!answer]-
+>
+> $8$ m, from $\frac{h}{12.8} = \frac{1}{1.6}$. The sun's rays meet
+> stick and tree at the same angle, and both stand at right angles to
+> the ground, so two pairs of angles match.
+
+### Question 5
+
+**Find the error.** For question 1's triangles, Sam finds $BC$ from
+$EF = 15$ via $\frac{4}{10} = \frac{15}{BC}$, getting $BC = 37.5$.
+Catch the slip with a size check, then fix it.
+
+> [!answer]-
+>
+> $BC$ belongs to the smaller triangle, so it must be under $15$. Sam
+> flipped one ratio: $\frac{BC}{15} = \frac{4}{10}$, so $BC = 6$.
+
+### Question 6
+
+**Challenge.** A ramp runs $7.5$ m along the ground to a wall. A
+vertical post $1.2$ m tall, standing $3$ m from the ramp's foot, just
+touches the ramp. How high does the ramp meet the wall?
+
+> [!answer]-
+>
+> $3$ m, from $\frac{h}{1.2} = \frac{7.5}{3}$.
+
+### Question 7
+
+**From similar right triangles to trig ratios.** Right triangle
+$\triangle ABC$ has $\angle A = 30°$, adjacent side
+$AC = \sqrt{3} \approx 1.73$, opposite side $BC = 1$, and hypotenuse
+$AB = 2$. A larger right triangle $\triangle DEF$ has $\angle D = 30°$
+and hypotenuse $DE = 10$.
+
+1. Verify $\triangle ABC \sim \triangle DEF$ and find $EF$ and $DF$.
+   > [!answer]-
+   >
+   > Both have angles $30°$, $60°$ and $90°$; the scale factor is
+   > $5$, so $EF = 5$ and $DF = 5\sqrt{3} \approx 8.66$.
+2. Compute $\frac{\text{opposite}}{\text{hypotenuse}}$ in both
+   triangles. What constant ratio does this define for $30°$?
+   > [!answer]-
+   >
+   > $\frac{1}{2} = \frac{5}{10} = 0.5$ in both: this is
+   > $\sin 30°$.
+
+Trigonometric ratios exist because similar right triangles keep their
+side ratios — the idea behind [[The Primary Trigonometric Ratios]].
 
 %%curriculum-start%%
 ## Curriculum connection
