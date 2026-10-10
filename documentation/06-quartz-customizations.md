@@ -1041,7 +1041,8 @@ would have to be undone on paper).
   every `[[Page#Math]]` link), and leaving the names hidden (the page's ids
   would stop answering for the visit). `figureFences.pageIds`;
   `browser-checks/graphs_draw.mjs` in verify.sh 6h's browser checks. plantoir.app's
-  Interactive page loads the same file its own way and avoids the trap by
+  Visualizations page (`/visualizations/`, Interactive until v1.7.0's
+  renaming) loads the same file its own way and avoids the trap by
   having no such id (`website/assets/interactive.js` says so).
 - **Zoom (review B2, measured in Chrome for Testing).** function-plot
   attaches d3-zoom to the graph's surface even with `disableZoom: true`

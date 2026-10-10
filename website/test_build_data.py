@@ -197,14 +197,15 @@ class DownloadTests(unittest.TestCase):
 class ShortcutTests(unittest.TestCase):
 
     def test_math_lands_on_the_diagrams_and_graphs_section(self):
-        # #486 promised /math; it lands on a section of the Interactive page.
+        # #486 promised /math; it lands on a section of the Visualizations
+        # page (called Interactive until DECISIONS 41 renamed it).
         site = build.read_json(build.WEBSITE / "site.json")
         destinations = {}
         for shortcut in build.shortcuts(site):
             destinations[shortcut["from"]] = shortcut["to"]
-        self.assertEqual(destinations.get("math"), "interactive/#diagrams-and-graphs")
+        self.assertEqual(destinations.get("math"), "visualizations/#diagrams-and-graphs")
         page = build.shortcut_page(site, destinations["math"])
-        self.assertIn('url=../interactive/#diagrams-and-graphs"', page)
+        self.assertIn('url=../visualizations/#diagrams-and-graphs"', page)
 
     def test_a_shortcut_to_a_missing_section_or_page_is_a_problem(self):
         site = {"shortcuts": {"to": [{"from": "math", "to": "interactive/#nowhere"},
@@ -217,8 +218,9 @@ class ShortcutTests(unittest.TestCase):
     def test_no_element_is_called_math_on_a_page_with_a_graph(self):
         # function-plot reads window.math, which an element with id="math"
         # becomes: every graph on the page then fails (measured 2026-10-09).
-        page = (build.WEBSITE / "pages" / "interactive.html").read_text(encoding="utf-8")
-        self.assertNotIn('id="math"', page)
+        for name in ("visualizations.html", "printing.html"):
+            page = (build.WEBSITE / "pages" / name).read_text(encoding="utf-8")
+            self.assertNotIn('id="math"', page, name)
 
 
 class FragmentTests(unittest.TestCase):
@@ -250,6 +252,24 @@ class RedirectTests(unittest.TestCase):
         self.assertNotIn("publishing", site["nav"])
         self.assertFalse((build.WEBSITE / "pages" / "publishing.html").exists())
         self.assertTrue((build.WEBSITE / "pages" / "deploying.html").exists())
+
+    def test_the_real_site_moves_interactive_to_visualizations(self):
+        # DECISIONS 41: the header reads in nouns. /interactive/ answers 301
+        # with /visualizations/, printing has a page of its own, and the old
+        # #printing section is kept on Visualizations as the sentence that
+        # points at /printing/, so an old link still lands somewhere useful.
+        site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
+        self.assertIn({"from": "interactive", "to": "visualizations"}, build.moved_pages(site))
+        self.assertEqual(site["nav"], ["index", "features", "visualizations", "printing",
+                                       "day-to-day", "deploying", "support"])
+        self.assertFalse((build.WEBSITE / "pages" / "interactive.html").exists())
+        visualizations = (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8")
+        self.assertIn('id="printing"', visualizations)
+        self.assertIn('href="{{up}}printing/"', visualizations)
+        self.assertNotIn("{{shot:print-", visualizations)
+        printing = (build.WEBSITE / "pages" / "printing.html").read_text(encoding="utf-8")
+        self.assertIn("{{shot:print-page}}", printing)
+        self.assertIn("{{shot:print-handout}}", printing)
 
     def test_a_clean_move_has_no_problems(self):
         rendered = {"features": '<a href="../deploying/#on-a-schedule">how</a>'}

@@ -582,8 +582,9 @@ whose section does not exist.
   (`https://plantoir.app/publishing/`).
   Never remove a move: links to the old address from outside cannot be counted.
 - **Short addresses.** `site.json → shortcuts → to` names an address that
-  lands on a section of a page — `/math` on `/interactive/#diagrams-and-graphs`
-  (#486, v1.7.0). `build.py` writes each as a small page at `site/<from>/`
+  lands on a section of a page — `/math` on `/visualizations/#diagrams-and-graphs`
+  (#486, v1.7.0; the page was `/interactive/` until DECISIONS 41 renamed it,
+  and that address is now a move). `build.py` writes each as a small page at `site/<from>/`
   that sends the browser on, rather than a `_redirects` rule, because how
   Netlify treats a redirect whose destination carries a `#section` was never
   measured. `--check` refuses one whose page or section is missing or whose

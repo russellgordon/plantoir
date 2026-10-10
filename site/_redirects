@@ -1,3 +1,5 @@
 # Written by website/build.py from site.json "redirects". Do not edit by hand.
 /publishing    /deploying/    301!
 /publishing/*    /deploying/:splat    301!
+/interactive    /visualizations/    301!
+/interactive/*    /visualizations/:splat    301!
