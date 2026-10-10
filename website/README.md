@@ -384,8 +384,25 @@ python3 website/shots/capture.py --app         # hero and the ENG2D window shots
 python3 website/shots/capture.py --sites       # the class sites, search, phone and the figures
 python3 website/shots/capture.py --colour-figures   # only the two colour figures, from the three home pages
 python3 website/shots/capture.py --browser-shots <id,id>   # only these class-site shots
+python3 website/shots/capture.py --print-set   # what printing does (v1.7.0): see below
 python3 website/build.py && python3 website/build.py --check
 ```
+
+**What printing does (v1.7.0, `--print-set`).** `print-page` (light and
+dark) and `print-handout` (static, light: it is paper) are taken from a
+PREVIEW of MPM2D's example content in a working folder of their own,
+`~/Plantoir Print` (`--print-folder` names another): the published demo
+sites carry no printable page, and a preview is where a teacher presses
+Print. The run makes the folder when it is absent — `setup.sh` answered the
+way the New Course panel answers it — then previews the section, photographs
+*Similar Triangles Practice* in `webwindow.swift` (no browser toolbar, since
+the address is localhost; the window is scrolled to the page's top, because
+Quartz scrolls a page about 300 points down to show its place in the sidebar),
+prints its Questions only handout in Chrome for Testing the way the Print
+button does (`handout_pdf.mjs`), and shows that PDF in the same kind of
+window. Both are whole window captures with their own corners and shadow.
+A payload page changed since the folder was made is not in it: delete the
+folder and run again.
 
 **Before starting:** the screen unlocked and left alone for about an hour,
 Focus off, Plantoir's notifications allowed, the Safari profile `⎚` present,
@@ -564,6 +581,15 @@ whose section does not exist.
   a page still links to — relative, root-relative (`/publishing/`) or absolute
   (`https://plantoir.app/publishing/`).
   Never remove a move: links to the old address from outside cannot be counted.
+- **Short addresses.** `site.json → shortcuts → to` names an address that
+  lands on a section of a page — `/math` on `/interactive/#diagrams-and-graphs`
+  (#486, v1.7.0). `build.py` writes each as a small page at `site/<from>/`
+  that sends the browser on, rather than a `_redirects` rule, because how
+  Netlify treats a redirect whose destination carries a `#section` was never
+  measured. `--check` refuses one whose page or section is missing or whose
+  address is also a page. No element on a page with a graph may have the id
+  `math`: function-plot reads `window.math`, which such an element becomes,
+  and every graph on the page then fails.
 - **Availability.** `{{availability:<key>}}` prints "On the Mac. The Windows
   version gets this in a later release." under a section while `site.json →
   availability → features → <key> → windows` is false, and nothing once it is

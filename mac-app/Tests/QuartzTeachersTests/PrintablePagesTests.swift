@@ -422,6 +422,29 @@ final class PrintablePagesTests: XCTestCase {
         XCTAssertEqual(second.changed, 0, "a second pass changes nothing")
     }
 
+    /// #485 E1: the graphs-and-diagrams skill travels the same way as the
+    /// printing one, and both root files name it - so an assistant asked for
+    /// "a graph of y = x^2" is pointed at the fences the site draws.
+    func testTheGraphsSkillIsWrittenAndBothRootFilesNameIt() throws {
+        let figureFences: [String: Any] = try SharedRulesContractTests.section("figureFences")
+        let guidance: [String: Any] = try XCTUnwrap(figureFences["agentGuidance"] as? [String: Any])
+        let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        for home in [".claude", ".agents"] {
+            let skill: String = try String(
+                contentsOf: folder.appendingPathComponent("\(home)/skills/\(skillName)/SKILL.md"), encoding: .utf8)
+            XCTAssertTrue(skill.contains("name: \(skillName)"), home)
+            XCTAssertTrue(skill.contains("```functionplot"), home)
+            XCTAssertTrue(skill.contains("% alt:"), home)
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertTrue(text.contains(skillName), "\(name) must name the \(skillName) skill")
+        }
+    }
+
     func testATeachersOwnFileIsAskedAboutNotWrittenAndTheirSkillsAreLeftAlone() throws {
         let fileManager: FileManager = FileManager.default
         let own: String = "# My own notes for Claude\n\nAlways use British spelling.\n"

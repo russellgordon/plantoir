@@ -128,6 +128,15 @@ final class PageWindow: NSObject, WKNavigationDelegate {
                 return
             }
             try? await Task.sleep(for: .seconds(1.5))
+        } else {
+            // Without a fragment the picture is of the page's TOP. Quartz
+            // scrolls the sidebar's list to the current page when a page that
+            // is not the home page loads, which in a window this size scrolls
+            // the whole page about 300 points down (measured on 2026-10-09: a
+            // class site's exercise page loaded at scrollY 346), cutting off
+            // the title and its Print button.
+            _ = try? await webView.evaluateJavaScript("window.scrollTo(0, 0); true")
+            try? await Task.sleep(for: .seconds(1.0))
         }
         await capture()
     }

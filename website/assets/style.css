@@ -241,6 +241,100 @@ code {
   overflow-wrap: break-word;
 }
 
+/* ---------- Interactive class notes (v1.7.0) ---------- */
+
+/* A block exactly as a teacher types it, with a Copy button (interactive.js). */
+pre.fence {
+  position: relative;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+pre.fence code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  overflow-wrap: normal;
+  white-space: pre;
+}
+
+pre.fence .copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 10px;
+  color: var(--green-deep);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+h4.label {
+  margin: 22px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* An ask typed to Claude or Codex wraps like the sentence it is. */
+pre.fence.ask code { white-space: pre-wrap; }
+
+/* What a student sees: a drawn diagram or a live graph, on a card. */
+figure.drawn-figure {
+  margin: 0 0 18px;
+  padding: 18px 12px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  text-align: center;
+}
+
+figure.drawn-figure figcaption {
+  margin-top: 10px;
+  font-size: 14.5px;
+  color: var(--ink-soft);
+}
+
+/* The diagram as the class site draws it: black follows the theme, and the
+   lettering is set in the faces the drawing names (Computer Modern). */
+@font-face { font-family: cmmi10; src: url("cmmi10.ttf") format("truetype"); font-display: block; }
+@font-face { font-family: cmr10; src: url("cmr10.ttf") format("truetype"); font-display: block; }
+
+figure.tikz-figure svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+  color: var(--ink);
+}
+
+figure.tikz-figure svg [stroke="#000"] { stroke: currentColor; }
+figure.tikz-figure svg text { fill: currentColor; }
+
+figure.live-graph .plot { width: 100%; }
+figure.live-graph .plot svg { display: block; margin: 0 auto; max-width: 100%; height: auto; overflow: visible; }
+figure.live-graph .function-plot text { fill: var(--ink-soft); font-family: inherit; }
+figure.live-graph .function-plot .axis path,
+figure.live-graph .function-plot .axis line { stroke: var(--ink-soft); }
+figure.live-graph .function-plot .axis .tick line { stroke: var(--rule); }
+figure.live-graph .function-plot .origin { stroke: var(--ink-soft); opacity: 1; }
+figure.live-graph .function-plot .zoom-and-drag { cursor: grab; }
+/* Until it is drawn (or if it cannot be), the block's own text stands in. */
+figure.live-graph.drawn .graph-fallback { display: none; }
+figure.live-graph .graph-fallback { color: var(--ink-soft); font-style: italic; }
+
 /* ---------- Steps ---------- */
 
 ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }

@@ -280,6 +280,21 @@ belong in the same mental model:
 | `printable: true` | any page | **#454 (v1.6.0); #499 (v1.6.0).** A Print button on the page's date line, trailing edge, that opens a menu — Portrait / Landscape, then Questions only, Answers only, Both — and prints nothing until a choice; the handout reads like a LaTeX worksheet (numbered questions, lettered parts, an answer key with the same numbers, Latin Modern, no boxes but a worked example's and code's). Answers (folded `success`/`solution`/`answer` callouts, or any folded callout titled Answer… or Solution…) gathered on a fresh page at the end, folded hints opened, folded `question` callouts keeping their title, the corners from the four `print_*` settings, and the questions and answers numbered separately. ⌘P prints questions only. Read as the build reads every page: `yes`/`on` opt in (YAML 1.1), `"true"` and `1` do not. A page without it prints exactly as before #454. Cases: `file-formats.json` → `pageOptIns.readingCases`; the site side is [06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200). |
 | `printPdf: <file name>` | any page | **#454.** A PDF the teacher already has, in the course's **Media** folder, named by its FILE NAME only (`Worksheet 3.pdf`, or the link Obsidian writes, `"[[Worksheet 3.pdf]]"`; the unquoted `[[…]]` is accepted too). The Print button becomes a plain link to it — no menu, no script — and it wins over `printable`. Found by the Media folder's own listing without regard to capitals, and linked by the folder's spelling (Netlify and Cloudflare are case-sensitive). A name that is not there, is not a PDF (by name or by its first bytes `%PDF-`), or is a path is taken off the BUILD's copy of the page (never the teacher's), so the page falls back to the generated handout or to no button, and the teacher is told by the folder check `printPdfNotFound` — it never stops a build. Cases: `file-formats.json` → `pageOptIns.printPdfCases`. |
 
+Two FENCES (not frontmatter keys) are read from page content too, since #485
+E1 (v1.7.0) — the fence is the opt-in, so there is no setting for them:
+
+| Fence | Effect |
+|---|---|
+| ` ```tikz ` | A LaTeX TikZ picture, drawn when the site is built (the Obsidian TikZJax plugin's own engine) and placed in the page as an SVG that follows the site's theme. `% alt: …` as its first line is what a screen reader reads; `\usepackage`/`\usetikzlibrary` lines before `\begin{document}`; one picture per fence; never `\documentclass`. A site carries only the Computer Modern faces its drawings use. |
+| ` ```functionplot ` | A graph of y = f(x) in obsidian-functionplot 1.2.1's syntax (settings between `---` lines first — `title`, `xLabel`, `yLabel`, `bounds: [xMin, xMax, yMin, yMax]`, `grid`, `disableZoom`, and Plantoir's `alt` — then one `y = …` per line), checked when the site is built and drawn in the reader's browser from the site's own copy of function-plot, which a site carries only while one of its visible pages has a graph. |
+
+Either kind that cannot be drawn shows students a one-line sentence in its
+place and is reported to the teacher as the folder problem
+`figuresCouldNotBeDrawn`. The rules and every case are in
+`contracts/shared-rules.json` → `figureFences`; the reasons are in
+[05](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170)
+and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170).
+
 <a name="whether-students-see-a-page"></a>
 
 ## Whether students see a page
