@@ -501,14 +501,13 @@ p.availability { margin-top: 14px; font-size: 15px; color: var(--ink-soft); font
 /* ---------- Note panel ---------- */
 
 .note {
+  margin: 18px 0;
   background: var(--paper-deep);
   border: 1px solid var(--rule);
   border-radius: 12px;
   padding: 22px 24px;
   font-size: 15.5px;
 }
-
-.note + .note { margin-top: 16px; }
 
 .note h3 { margin: 0 0 10px; font-size: 16px; font-weight: 600; color: var(--green-deep); }
 .note h3:not(:first-child) { margin-top: 22px; }
