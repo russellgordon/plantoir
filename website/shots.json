@@ -92,6 +92,42 @@
       "windows": true
     },
     {
+      "id": "print-page",
+      "capture": {
+        "kind": "preview-page",
+        "course": "MPM2D",
+        "path": "/Exercises/Similar-Triangles-Practice",
+        "scene": "print-set"
+      },
+      "alt": "A Grade 10 mathematics worksheet on a class website: typeset equations, a diagram of two similar triangles drawn from the notes, folded answers, and a Print button beside the date.",
+      "caption": "Mathematics typeset, a diagram drawn from your notes, and a Print button.",
+      "windows": false,
+      "expectText": [
+        "Similar Triangles Practice",
+        "Print",
+        "Question 1"
+      ]
+    },
+    {
+      "id": "print-handout",
+      "static": true,
+      "capture": {
+        "kind": "handout",
+        "course": "MPM2D",
+        "path": "/Exercises/Similar-Triangles-Practice",
+        "mode": "questionsOnly",
+        "paper": "portrait",
+        "scene": "print-set"
+      },
+      "alt": "The same worksheet printed: a typeset handout with a name and date line, numbered questions, the triangle diagram in black on white, lettered parts, and Page 1 of 1 in the footer.",
+      "caption": "The same page, printed: questions only. The answers can print as a key of their own.",
+      "windows": false,
+      "expectText": [
+        "Similar Triangles Practice",
+        "Page 1 of 1"
+      ]
+    },
+    {
       "id": "site-mcv4u",
       "capture": {
         "kind": "browser",

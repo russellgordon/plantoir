@@ -208,6 +208,7 @@ cheap and re-runs on every invocation.
 python3 website/shots/capture.py --scenes   # the eleven v1.4.0 scenes (marketing folder)
 python3 website/shots/capture.py --app      # the hero and the older app windows (demo folder)
 python3 website/shots/capture.py --sites    # the class sites and the phone
+python3 website/shots/capture.py --print-set   # what printing does: a preview of MPM2D (~/Plantoir Print)
 ```
 
 The scenes re-take one at a time too: `capture.py --only reference,two-maps`
