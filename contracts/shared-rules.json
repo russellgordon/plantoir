@@ -23840,6 +23840,23 @@
     "zoom": {
       "rule": "function-plot attaches its zoom to the graph's own surface whether or not zoom is on (`disableZoom` only ignores the result), and while it is attached a scroll or a finger drag that starts over a graph moves the graph instead of the page - measured: page scroll 0 px for a 400 px wheel and a 300 px touch drag (review B2). So the site DETACHES those listeners when the teacher wrote `disableZoom: true` and on every touch screen (`(pointer: coarse)`), and with a mouse or trackpad keeps drag-to-move but zooms only with ⌘ or Ctrl held (Chrome and Edge send a trackpad pinch that way; Safari does not) - so a plain scroll always moves the page. Not Obsidian's behaviour (the plugin keeps the trap); that is not Plantoir's to change."
     },
+    "pageIds": {
+      "rule": "#502. A browser makes every element with an id a property of window, so a heading \"Math\" (id=\"math\") answers `window.math`. function-plot 1.25.4 reads two such names ONCE, as its file runs, and keeps what it found for the rest of the visit: `math` (its evaluator, when it is there - a heading became the evaluator and every graph said words.site.graphCouldNotBeDrawn) and `exports` (where it puts itself - every graph said words.site.graphNeedsPreview). The site's graph script gives window an own property of each name, undefined, for the moment the file runs, only where window has none of its own, and deletes it once the file has run, so the page's ids answer as before. The engine is loaded once and kept across page changes, so before this the FIRST page with a graph decided every graph for the rest of the visit, whichever page later showed one.",
+      "names": ["math", "exports"],
+      "cases": [
+        {"heading": "Math", "id": "math", "before": "words.site.graphCouldNotBeDrawn on this page and on every page with a graph visited after it", "after": "every graph drawn, and window.math is the heading again once the engine has loaded"},
+        {"heading": "Exports", "id": "exports", "before": "words.site.graphNeedsPreview on this page and on every page with a graph visited after it", "after": "every graph drawn"},
+        {"heading": "Module", "id": "module", "before": "every graph drawn", "after": "every graph drawn - not hidden, because it changes nothing on its own (measured)"},
+        {"heading": "Define", "id": "define", "before": "every graph drawn", "after": "every graph drawn - not hidden: the engine asks for a FUNCTION of that name, which an element is not (measured)"}
+      ],
+      "measured": "Chrome for Testing (the copy documentation/06 F7 installs), 2026-10-09: a built page with `# Math` and a graph showed figureFailed; Quartz's own page change from it to a second graph page showed figureFailed there too; the reverse order drew both. The same four ids on a bare page with function-plot.js, with and without the names hidden, gave the cases above.",
+      "rejected": [
+        "Handing function-plot its evaluator: it copies the one it found into its own table as its file runs, and that table cannot be reached from outside, so there is nothing to hand it to afterwards.",
+        "Renaming the ids at build time (math to math-1): it would break every `[[Page#Math]]` link a teacher has written and change every page with such a heading, graph or not.",
+        "Leaving the names hidden after the file has run: a page's own ids would stop answering for the whole visit, which the hiding does not need."
+      ],
+      "checkedBy": "browser-checks/graphs_draw.mjs in verify.sh 6h's browser checks: the planted Graphs Math Heading page (a `# Math` and an `# Exports` heading) opened first, every graph's curve drawn, then Quartz's page change to the Figures Fixture, every graph there drawn too."
+    },
     "words": {
       "note": "English, as data: the site's words appear on a page students read, the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {name} is a command, package, setting or function name as written; {said} is the engine's own words; {seconds} is timing.perDiagramSeconds.",
       "site": {
