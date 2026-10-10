@@ -182,15 +182,43 @@ class DownloadTests(unittest.TestCase):
         # to 1.4.3 for the mac-first v1.4.4 cut until it joined v1.4.4 (2026-10-08).
         # The Mac card was pinned to 1.4.4 from the Windows-only v1.4.5 cut
         # (2026-10-08) until Plantoir-macOS.dmg joined v1.4.5 the same day.
-        # Both cards are unpinned now. A release that lacks an installer pins
-        # that card again, and this test changes with it (the downloads_note
-        # in site.json says when).
+        # Windows is pinned to 1.4.5 for the mac-only v1.5.0, v1.6.0 and
+        # v1.7.0 cuts (2026-10-09) until PlantoirSetup.exe joins a release
+        # again. A release that lacks an installer pins that card, and this
+        # test changes with it (the downloads_note in site.json says when).
         site = build.read_json(build.WEBSITE / "site.json")
         pins: dict = {}
         for entry in site["downloads"]:
             pins[entry["platform"]] = entry.get("pinned")
         self.assertIsNone(pins["macOS"])
-        self.assertIsNone(pins["Windows"])
+        self.assertEqual(pins["Windows"], "1.4.5")
+
+
+class ShortcutTests(unittest.TestCase):
+
+    def test_math_lands_on_the_diagrams_and_graphs_section(self):
+        # #486 promised /math; it lands on a section of the Interactive page.
+        site = build.read_json(build.WEBSITE / "site.json")
+        destinations = {}
+        for shortcut in build.shortcuts(site):
+            destinations[shortcut["from"]] = shortcut["to"]
+        self.assertEqual(destinations.get("math"), "interactive/#diagrams-and-graphs")
+        page = build.shortcut_page(site, destinations["math"])
+        self.assertIn('url=../interactive/#diagrams-and-graphs"', page)
+
+    def test_a_shortcut_to_a_missing_section_or_page_is_a_problem(self):
+        site = {"shortcuts": {"to": [{"from": "math", "to": "interactive/#nowhere"},
+                                     {"from": "x", "to": "missing/"},
+                                     {"from": "features", "to": "interactive/"}]}}
+        rendered = {"interactive": '<section id="here"></section>', "features": ""}
+        problems = build.shortcut_problems(site, ["interactive", "features"], rendered)
+        self.assertEqual(len(problems), 3, problems)
+
+    def test_no_element_is_called_math_on_a_page_with_a_graph(self):
+        # function-plot reads window.math, which an element with id="math"
+        # becomes: every graph on the page then fails (measured 2026-10-09).
+        page = (build.WEBSITE / "pages" / "interactive.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="math"', page)
 
 
 class FragmentTests(unittest.TestCase):
@@ -364,8 +392,14 @@ class ReleaseReadinessTests(unittest.TestCase):
 # other id must be `windows: true` (Russell, 2026-10-04). Empty since that day:
 # `schedule`, the last, is the sheet alone on Windows, because Windows'
 # notification is no window Windows.Graphics.Capture can be given (Russell's
-# ruling, 2026-10-04).
-WINDOWS_PICTURE_OWED: dict = {}
+# ruling, 2026-10-04) — until v1.7.0's two print pictures, below.
+WINDOWS_PICTURE_OWED: dict = {
+    # v1.7.0, mac only (DECISIONS 15): what printing does, and a drawn
+    # diagram, photographed from a Mac preview. Windows owes the features
+    # first (#496 printing, #485 E1's windows issue), then the pictures.
+    "print-page": "#496 and #485 E1 (Windows has neither printing nor figures yet)",
+    "print-handout": "#496 (Windows has no Print button yet)",
+}
 
 
 class WindowsSwapTests(unittest.TestCase):

@@ -26,6 +26,7 @@ import markdown_code
 import how_i_teach
 import page_visibility
 import page_features
+import figures
 import print_settings
 import reference_course
 import stop_preview
@@ -1492,8 +1493,38 @@ def _wire_content_layout(layout_ts: Path) -> None:
     layout_ts.write_text(text[:start] + block + text[end:], encoding="utf-8")
 
 
+def _wire_transformers_index(index_ts: Path) -> None:
+    """Export the figures transformer (#485 E1) beside Quartz's own."""
+    text = index_ts.read_text(encoding="utf-8")
+    if "PlantoirFigures" in text:
+        return
+    if not text.endswith("\n"):
+        text += "\n"
+    text += f'export {{ PlantoirFigures }} from "./plantoirFigures" // {QUARTZ_ADDITIONS_MARKER}\n'
+    index_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_figures_transformer(config_ts: Path) -> None:
+    """Put the figures transformer straight AFTER Description (#485 E1), so a
+    page's description is made before any drawing is in the page and never
+    fills with a diagram's single-letter labels."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirFigures(" in text:
+        return
+    anchor = "Plugin.Description(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add diagrams and graphs: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirFigures()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
 def wire_quartz_additions(output_dir: Path) -> None:
-    """The two edits that connect support/quartz to Quartz. Idempotent; an
+    """The edits that connect support/quartz to Quartz: the Print button's two
+    (#454) and the figures transformer's two (#485 E1). Idempotent; an
     anchor that has moved warns and leaves the file alone.
 
     Deliberately NOT a third edit to mermaid.inline.ts (an event saying the
@@ -1503,6 +1534,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
     for path, wire in (
         (output_dir / "quartz" / "components" / "index.ts", _wire_components_index),
         (output_dir / "quartz.layout.ts", _wire_content_layout),
+        (output_dir / "quartz" / "plugins" / "transformers" / "index.ts", _wire_transformers_index),
+        (output_dir / "quartz.config.ts", _wire_figures_transformer),
     ):
         try:
             wire(path)
@@ -1571,6 +1604,33 @@ def _resolve_print_settings_of_pages(content_root: Path, course_dir: Path) -> di
             except OSError as error:
                 print(f"⚠️ Could not update the print settings of {page.name}: {error}")
     return {"problems": problems, "counts": counts}
+
+
+def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, full_rebuild: bool) -> dict:
+    """
+    Diagrams and graphs (#485 E1; scripts/figures.py): every ```tikz drawn and
+    every ```functionplot checked on the pages students can see, by the gate's
+    own visibility rule, with the cache kept beside the course's built sites
+    (outside the teacher's folder, and kept when the website builder is
+    remade). Never stops a build: if this cannot run, the fences stay plain
+    code on the site and the build says so in one line.
+    """
+    try:
+        def source_of(page):
+            source = _vault_sources.get(page)
+            return source[0] if source is not None else None
+
+        pages = figures.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            source_of, skip=_is_media_name)
+        cache_root = toolchain_paths.merged_output_root(course_dir) / figures.CACHE_FOLDER
+        return figures.prepare(pages, output_dir, cache_root, full_rebuild=full_rebuild)
+    except Exception as error:
+        print(f"⚠️ Could not prepare the diagrams and graphs: {error}")
+        shutil.rmtree(output_dir / "quartz" / figures.WORKSPACE, ignore_errors=True)
+        return {"counts": {figures.GRAPH_ENGINE: 0}, "fonts": [], "problems": [], "notes": [],
+                "drawn": 0, "fromBefore": 0, "figures": 0}
 
 
 LOCALES_SRC_CANDIDATES = [
@@ -7587,6 +7647,10 @@ def build_section_site(
     # how many pages ask for the print layout. Before the checks, so a PDF
     # that could not be used is said where every folder problem is said.
     print_pages_here = _resolve_print_settings_of_pages(content_root, course_dir)
+    # Diagrams and graphs (#485 E1), ALWAYS: drawn and checked here, before
+    # the checks, so a figure that cannot be drawn is said where every folder
+    # problem is said.
+    figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
 
     health_facts = {
         "coverage_wanted": coverage_wanted,
@@ -7621,6 +7685,8 @@ def build_section_site(
         "links_into_hidden_pages": _links_into_hidden_pages(content_root),
         # Pages whose own PDF could not be used (#454, review S3).
         "print_pdf_problems": print_pages_here["problems"],
+        # Diagrams and graphs that could not be drawn (#485 E1).
+        "figure_problems": figures.health_finding_facts(figures_here),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)
@@ -7766,7 +7832,11 @@ def build_section_site(
     # see asks for it, the corners and words from this course's settings, and
     # the three edits that put the Print button on the page. After every other
     # edit to quartz.layout.ts above, so nothing rewrites the wrapped line.
-    page_features.install_gated_assets(output_dir, print_pages_here["counts"])
+    # A graph's engine rides the same gate (#485 E1): its count comes from the
+    # figures pass, not from a page setting.
+    gated_counts = dict(print_pages_here["counts"])
+    gated_counts.update(figures_here["counts"])
+    page_features.install_gated_assets(output_dir, gated_counts)
     try:
         print_settings.write(output_dir, config, displayed_course_code(config, course_code))
     except Exception as error:

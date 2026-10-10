@@ -45,6 +45,19 @@ To sketch $y = -2(x - 1)^2 + 3$ by hand:
 - [ ] Join with a smooth symmetric curve, then confirm one point in
       the equation — or the whole curve in [[Using Desmos]].
 
+Here is the parent and the finished sketch on the same axes. Check
+yours against it: the vertex sits at $(1, 3)$, and the curve falls away
+twice as steeply as the parent does.
+
+```functionplot
+---
+bounds: [-4, 5, -6, 10]
+alt: The parent parabola y = x^2 and y = -2(x - 1)^2 + 3, which opens down, is narrower, and has its vertex at (1, 3).
+---
+y = x^2
+y = -2(x - 1)^2 + 3
+```
+
 The order matters: stretch and flip first, slide second. Sliding
 first and stretching afterward drags the vertex out of position,
 and the graph betrays it immediately — a worthwhile thing to watch

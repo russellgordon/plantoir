@@ -428,7 +428,7 @@ coverage map for it, linked from Key Links under that folder's entry.
 
 ---
 
-## F. Additions installed every build: printable pages (#454, v2.0.0)
+## F. Additions installed every build: printable pages (#454, v1.6.0)
 
 A page whose settings say `printable: true` prints as a worksheet that reads
 like the teacher's LaTeX handouts (#499, F8); a page that says
@@ -446,14 +446,30 @@ pages that do not opt in are byte-identical** once what Quartz already varies
 between ANY two builds is set aside (the explorer's random list id, build-time
 dates on curriculum pages, and the order of tag-list entries sharing one of
 those dates); the only pages that differ are the 7 that opt in. Every new CSS
-selector is scoped to a printable page or the handout frame, and nothing adds
-an `@page`. ⌘P of a page that does not opt in prints the same pages with the
-same text in Chrome for Testing 155 (13 and 3 pages, light and dark,
-`pdftotext` identical) and in Safari 26.6. **verify.sh gates it on every
-run**: section 5 plants "Printable Not Opted", the worksheet with only
-`printable: true` taken out, and the 6h printable-pages check fails if that
-page carries `plantoir-meta-line`, `plantoir-print`, `data-plantoir` or
+selector is scoped to a printable page or the handout frame — with ONE
+exception since #501, below — and nothing adds an `@page`. **verify.sh gates
+it on every run**: section 5 plants "Printable Not Opted", the worksheet with
+only `printable: true` taken out, and the 6h printable-pages check fails if
+that page carries `plantoir-meta-line`, `plantoir-print`, `data-plantoir` or
 `@page`, or if its date line is not the plain one straight after its title.
+
+**Its HTML is unchanged; its PRINT is not, since #501 (v1.7.0, F9).** The
+shared `index.css` carries one `@media print` block scoped
+`html:not(.plantoir-printable):not(.plantoir-print-frame)` that hides the
+sidebars and caps the column under ⌘P (`printablePages.everyOtherPage`). So
+every page's stylesheet changed (`index.css` +316 bytes, measured on EXC2O in
+the dev-test image) while its HTML stayed byte-identical (237 of 304 pages
+once Quartz's random list ids are set aside — the explorer's AND a table of
+contents' `<ul class="overflow">`; the other 67 differ only in the build-time
+`<time datetime>` on Curriculum and tag pages and the order of list entries
+sharing one, the variances named above), and
+`postscript.js` identical but for the explorer id. The 6h check also looks
+for the block's text in `index.css`, and `browser-checks/print_plain_page.mjs`
+prints a page that does not opt in and reads its ink back. **WITHDRAWN:** this
+paragraph used to say "⌘P of a page that does not opt in prints the same pages
+with the same text" (Chrome for Testing 155, `pdftotext` identical, and Safari
+26.6). True, and blind: the words Quartz's folder list covered on paper stayed
+in the PDF's text layer, so a text comparison found them all (F9).
 What every site DOES change is its two shared bundles, measured on EXC2O
 against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
 `index.css` 35,386 → 41,045 (+5,659) on the final branch (the review measured
@@ -666,6 +682,9 @@ page's height too, `object-fit: contain`, the same cap as every picture and
 Mermaid diagram — keeps its own resolution, and any dark-mode filter is removed. A browser-drawn engine registers in
 `window.plantoirPrint.prepare`.
 
+E1 conforms (v1.7.0): `pl-tikz` and `pl-functionplot`, with three additions
+of its own that hold on EVERY page, not only printable ones — see G4.
+
 ### F7. Measured matrix (macOS 26.6, M4 Pro), the verify fixture
 
 | Browser | With answers | Questions only | Answers only | ⌘P | Press → print |
@@ -674,7 +693,7 @@ Mermaid diagram — keeps its own resolution, and any dark-mode filter is remove
 | Chrome for Testing 155.0.8059.39 | 3 (2 + 1) | 2 | 1 | 2, corners | 131–214 ms |
 | Edge 155.0.4283.45 | 3 (2 + 1) | 2 | 1 | 2, corners | 124–212 ms |
 
-Light and dark gave the same page counts in every cell. Chrome and Edge were
+Light and dark gave about the same page counts in every cell. Chrome and Edge were
 driven by puppeteer-core 24.10.0 (handout: the frame's document as printed,
 re-rendered by `page.pdf`; ⌘P: `page.pdf` with the page's `@page`). **Trap:**
 Edge's first launch from a Homebrew cask waits on macOS's "downloaded from
@@ -827,7 +846,277 @@ page, or one unbreakable term wider than it, cannot print (refused, with the
 sentence). Windows owes all of this:
 #496.
 
+### F9. ⌘P on every other page (#501, v1.7.0)
+
+Found in passing by #485 E1's implementer: ⌘P on a page that is NOT
+printable lost words under the folder list. It predates #454 and E1 —
+**Quartz ships no print rules**, so ⌘P laid out the screen's page:
+
+- **Chrome and Edge** print letter paper with their default margins at 739 px
+  wide, under Quartz's 800 px breakpoint, so the page printed in the PHONE
+  layout. On a page loaded at desktop width the explorer is not `collapsed`,
+  and its mobile rule makes `.explorer-content` an opaque panel (`absolute`,
+  `z-index: 100`, `var(--light)`, `100dvh`) drawn OVER the article. On a long
+  test page it covered paragraphs 03–13 across pages 1–2.
+- **The covered words stayed in the PDF's text layer.** `pdftotext` found
+  every one, which is why #454's "pdftotext identical" check could not see
+  this. Two things do: the INK under a word, and the folder list read INTO
+  the paragraphs (5 of 68 no longer matched whole).
+- **Safari 26** lays out at the window's width (1512 px): the three-column
+  desktop grid, so the left sidebar printed on page 1 and the column's RIGHT
+  edge ran off the paper, visibly cut ("the class ta"). Not in the issue.
+
+**The fix** is one block in `support/quartz/components/styles/print.scss`,
+"⌘P on every other page", data in `contracts/shared-rules.json` →
+`printablePages.everyOtherPage`:
+
+```scss
+@media print {
+  html:not(.plantoir-printable):not(.plantoir-print-frame) {
+    .page > #quartz-body > .sidebar { display: none !important; }
+    .page > #quartz-body { display: block !important; }
+    .page { max-width: 8.5in !important; margin: 0 !important; }
+  }
+}
+```
+
+- `:not(.plantoir-printable)`: a printable page's ⌘P (F4) is untouched by
+  construction — 0 pixels differ, measured, though specificity alone gave
+  that too.
+- **`:not(.plantoir-print-frame)` is LOAD-BEARING.** The handout's frame has
+  a `.page` and Paged.js applies `@media print`; without this, both landscape
+  handouts were refused as `printablePages.words.incomplete`
+  (`print_handout.mjs` FAILED). Proven again by the implementer: drop only
+  that `:not()` and the check fails on landscape.
+- 8.5 in never narrows Chrome's portrait page, and keeps Safari's column on
+  the paper.
+
+**Before → after** (planner's measurement, Chrome for Testing 155 headless at
+a 1512 × 900 window, and Safari 26 by script — ⌘P, Save as PDF — macOS 26):
+
+| | Chrome, light and dark | Safari, light and dark |
+|---|---|---|
+| A 62-paragraph plain page | 6 → 6 pages; words with no ink 346 → 0; sidebar text on paper → none | 4 → 4 pages; words past the edge 98 → 0; 62/62 sentinels |
+| What This Site Can Do | 13 → 13; no ink 195 → 0 (dark 224 → 28, all labels of Mermaid drawn dark — out of scope) | 8 → 8; past the edge 29 → 0 |
+| Printable Not Opted | 21 → 21; no ink 86 → 0; "Search" gone | 10 → 10; past the edge 14 → 0 |
+| The plain page, landscape | 8 → 8; the tablet layout's sidebar gone | — |
+| Printable pages, portrait and landscape | **0 pixels differ** at 72 dpi; text identical | **0 pixels differ** |
+| Handout, 3 modes × 2 papers | `print_handout.mjs` OK; **0 pixels differ** | — |
+
+The Safari column was re-taken by the implementer from the planner's saved
+PDFs (`pdftotext -bbox` against the paper's width less 18 pt; `pdfinfo`; a
+72-dpi pixel comparison) and holds, and measured again by script on the
+implementer's run (Safari 26, a 1512 × 948 window opened for the purpose,
+⌘P → PDF → Save as PDF): the 62-paragraph page, light and dark, 4 → 4 pages,
+words past the edge 100 → 0, the sidebar's "Search" and "EXC2O S1" on paper →
+gone, sentinels inked 61/62 → 62/62; Printable Fixture 12 → 12 pages, 0
+pixels differ.
+
+**Gated on every run** where Chrome for Testing is present (verify.sh 6h,
+SKIPPED otherwise, with the handout check): section 5 plants "Plain Long
+Page", 40 paragraphs each starting `plantoir-plain-para-NN`, under headings
+and with list items, and `browser-checks/print_plain_page.mjs` loads it in a
+1512 px window and prints it portrait and landscape with ⌘P's defaults (no
+backgrounds). It asserts no line of any element `everyOtherPage.hidden` names
+is on paper, every paragraph is whole in the text, the darkest pixel under
+every sentinel (`pdftoppm -gray -r 100`, read as PGM by hand) is at most 200,
+and no word is within 18 pt of the paper's edge. The 6h static check also
+requires the block's minified text in `index.css`, built from
+`everyOtherPage.scope` and `.hidden`. **Must-fail, proven by copy-and-restore
+of `print.scss` through full verify.sh runs:** with the block taken out, both
+6h checks FAILED — portrait, the sidebar's words on paper ("🔬 EXC2O S1",
+"Search", "All Classes", …), 6 of 44 paragraphs not whole, 7 paragraphs with
+no ink (page 2, 11–17); landscape, the sidebar's words — and with only
+`:not(.plantoir-print-frame)` taken out, `print_handout.mjs` FAILED: Questions
+only and Both on landscape were refused with `printablePages.words.incomplete`.
+
+**REJECTED, all measured:** sidebars only (Safari kept the grid's tracks and
+printed 7 pages in a quarter-width column); the block with no cap (Safari
+clipped 50 words); a 7 in cap as on printable pages (Chrome clipped more of
+the wide table and formulas); hiding only the folder panel (Safari still
+clipped, and printed the folder list).
+
+**Found, not fixed:** in Chrome, ⌘P on a page that is not printable clips
+Quartz's horizontal scroll boxes — the wrapped code comment, the wide
+formulas and the 12-column timetable of the verify fixture are missing from
+the text both before and after the fix; a printable page's ⌘P and the
+handout handle them (F8). Mermaid drawn dark prints near-white labels (28
+words on What This Site Can Do).
+
+**Windows inherits it free** — the block is in `support/quartz`, installed by
+`build_site.py` on every build. It owes one measurement: ⌘P → Save as PDF in
+Edge and Chrome on a long page that is not printable, portrait and landscape,
+light and dark, because Windows' DPI and default margins can put the paper
+width on the other side of 800 px.
+
 ---
+
+## G. Diagrams and graphs (#485 E1, v1.7.0)
+
+A ` ```tikz ` fence is drawn when the site is built and placed in the page as
+an inline SVG; a ` ```functionplot ` fence is drawn in the reader's browser
+from function-plot served by the site itself. The build half is
+[05 → Diagrams and graphs](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170);
+the rules are `contracts/shared-rules.json` → `figureFences`.
+
+### G1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/figureRules.js` — plain JavaScript shared with the
+  build's helper: `tidy`, `keyOf`, `altOf`, `parseFunctionPlot`,
+  `texProblem`. An ES module, as Quartz is; esbuild bundles the `.js` import
+  from TypeScript without complaint.
+- `plugins/transformers/plantoirFigures.ts` — the transformer, wired by
+  `build_site.wire_quartz_additions` straight AFTER `Plugin.Description()` in
+  `quartz.config.ts` and exported from `plugins/transformers/index.ts`
+  (both idempotent).
+- `components/scripts/figures.inline.ts` and `components/styles/figures.scss`
+  — carried by `PlantoirMetaLine` (the component every content page already
+  has), so no layout edit was needed.
+
+### G2. Two stages, and why the second comes after Description
+
+The **markdown stage** turns the fence into
+`<figure class="pl-figure pl-<engine>">` holding only a hidden figcaption
+(the description a screen reader reads). The **html stage**, which runs after
+Quartz's `Description`, then puts the drawing in. In that order the page's
+summary — its search card and its social card — is made from the words and
+the description, never from the drawing's lettering, which is hundreds of
+single glyphs (`A B C 3 4 . 5`; seen in the spike, and checked in verify.sh).
+No manifest means the stage does nothing at all, so a site without figures
+is untouched. A failed figure is `pl-figure-failed` with the contract's
+sentence (ruling E1-7: students see "This diagram couldn't be drawn." rather
+than a gap); a graph keeps its own text, shown until it is drawn and kept if
+it cannot be. A second copy of the same drawing on a page has its element ids
+renamed (`-pl2`): node-tikzjax names ids after the drawing, and a first copy
+folded away in a callout would otherwise take the second's clip paths with
+it (review N5). The first drawing on a page links `static/tikz/fonts.css`
+once; Paged.js keeps that link, and the faces are loaded in the handout's
+frame when it prints (measured: cmmi10, cmr10, cmsy10 all `loaded`).
+
+### G3. Colour, on screen (no filter)
+
+Black and white in a drawing follow the theme, as obsidian-tikzjax's own
+dark-mode setting does: CSS on the drawing's own attributes,
+`[stroke="#000"]`/`black` → `currentColor` with `color: var(--dark)`, and
+`#fff`/`white` → `var(--light)`, so a label box behind text takes the page's
+background. **Labels need one more step:** Quartz's own `base.scss` gives
+EVERY svg `<text>` `fill: var(--darkgray)`, which beats an SVG's `fill`
+attribute — found by verify.sh's first run: a label drawn red came out grey,
+and black lettering printed #4e4e4e. So the transformer writes each label's
+own colour (worked out from its ancestors, as SVG inherits) as an inline
+style, leaves black to `figures.scss` (`text { color: inherit; fill:
+currentColor }`), and turns white into the page's background. A teacher's
+own colours are kept; pure blue is dim on a dark page, exactly as in
+Obsidian.
+A graph's text, axes and grid take `--darkgray`, `--gray` and `--lightgray`.
+**Rejected:** `filter: invert()` (it inverts the teacher's colours too, and
+would have to be undone on paper).
+
+### G4. Graphs, zoom, and print
+
+- **Loaded only where needed.** On a page with a graph, the script loads
+  `static/function-plot/function-plot.js` at once (`spa-preserve`, so a page
+  change does not drop it) — eagerly, because ⌘P's `beforeprint` gives no
+  time to wait — and draws each graph when a tenth of it is visible, at the
+  figure's width and 0.62 of it in height, again after a resize. function-
+  plot gives its drawing a size and no viewBox, so one is added after every
+  draw. A page without a graph fetches nothing and adds no listener.
+- **A page's own ids (#502, measured in Chrome for Testing).** A browser
+  makes every element with an id a property of `window`, and function-plot
+  1.25.4 reads two such names once, as its file runs, keeping what it found
+  for the whole visit: `math` (its evaluator — a heading "Math", id
+  `math`, became the evaluator and every graph said `graphCouldNotBeDrawn`)
+  and `exports` (where it puts itself — a heading "Exports" left it nowhere
+  and every graph said `graphNeedsPreview`). Because the engine is loaded
+  once and kept across page changes, the FIRST page with a graph decided
+  every graph for the rest of the visit: measured on a built site, a `# Math`
+  page opened first failed there and on the next graph page Quartz's page
+  change reached; the reverse order drew both. The script gives `window` an
+  own property of each name, `undefined`, for the moment the file runs (only
+  where `window` has none of its own) and deletes it on `load`/`error`, so the
+  page's ids answer as before. `module` and `define` were measured too and
+  break nothing on their own, so they are left alone. Rejected: handing
+  function-plot its evaluator (it copies the one it found into a table that
+  cannot be reached afterwards), renaming the ids at build (it would break
+  every `[[Page#Math]]` link), and leaving the names hidden (the page's ids
+  would stop answering for the visit). `figureFences.pageIds`;
+  `browser-checks/graphs_draw.mjs` in verify.sh 6h's browser checks. plantoir.app's
+  Interactive page loads the same file its own way and avoids the trap by
+  having no such id (`website/assets/interactive.js` says so).
+- **Zoom (review B2, measured in Chrome for Testing).** function-plot
+  attaches d3-zoom to the graph's surface even with `disableZoom: true`
+  (that option only ignores the result), and while it is attached a scroll
+  or a finger drag starting over a graph moves the graph instead of the
+  page. Measured on the fixture: a 400 px wheel over a graph scrolled the
+  page **0 px** without the fix and **400 px** with it; a 300 px touch drag
+  (touch emulation, 820 × 1180) **0 px** without and **286 px** with — both
+  proved by putting the old behaviour back in the built script and measuring
+  again. So the script detaches the `.zoom` listeners (through d3's own
+  `__on` list, so nothing re-adds them) when the teacher wrote
+  `disableZoom: true` and on every touch screen (`(pointer: coarse)`); with a
+  mouse or trackpad dragging still moves the graph, and the wheel zooms only
+  with ⌘ or Ctrl held (Chrome and Edge also send a trackpad pinch that way;
+Safari does not, and there a pinch zooms the page) — so a plain scroll
+  always scrolls the page. That answers the review's open question about the
+  desktop "map trap" by the safe default; Russell may prefer click-to-zoom.
+  The Obsidian plugin keeps the trap; that is not Plantoir's to change.
+- **Print (decision 13).** The handout awaits a function in
+  `window.plantoirPrint.prepare` that draws every graph; ⌘P's
+  `beforeprint` draws every graph at the teacher's bounds whatever was
+  zoomed. `figures.scss` holds, on EVERY page: a `@media print` block that
+  sets the figure's own colours light (`--light #fff … --dark #000`), so ⌘P
+  from dark mode prints black on white with white label boxes (review B1 —
+  #454's light flip covers printable pages only, and before this a figure
+  printed near-white with black boxes); `break-inside: avoid`; and a cap of
+  **8 in on portrait paper, 6 in on landscape**, with `width: auto` (review
+  B3 — a 1,400 px figure split over four pages with the text after it printed
+  twice). The cap sits inside `:where()`, with no specificity, because the
+  handout has its own per-paper cap that must win: the first version's 8 in
+  beat it and a landscape handout with a tall figure refused to print, and
+  ⌘P in landscape split it (E1 implementation review B1). Measured after the
+  fix, a 30 cm TikZ ladder in Chrome for Testing: the handout prints on both
+  papers (854 px and 614 px tall, whole, 5 of 5 pieces), and ⌘P keeps all 29
+  rungs on one page in portrait and landscape. **Safari not measured**: it
+  needs "Allow remote automation", which only `safaridriver --enable` (an
+  administrator's password) and a restart of the running Safari turn on. Measured: the handout of a
+  printable fixture with 11 figures, from dark mode, in all three modes and
+  both papers: every piece laid out (29 of 29), none split, lettering
+  rgb(0, 0, 0), the 530 px tree whole.
+
+**Found in passing, not E1's, and fixed in the same release:** Quartz's own ⌘P on a page that is NOT
+printable used to overlay the sidebar's folder list on page 2 of the paper and
+lose what was under it — measured on `Style/What This Site Can Do` with no
+figure at all, so it predated E1. #501 (v1.7.0) fixes it with one print-only
+block in the shared stylesheet; see the #501 section of F for what it does and
+what it leaves pixel-identical.
+
+### G5. What every site carries, figures or not
+
+The figures' styles and script are bundled into every site's `index.css`
+and `postscript.js`, like #454's print code: every rule is under
+`.pl-figure` and the script returns at once on a page without a graph, so
+no page that has no figure changes — its HTML is byte-identical, which
+verify.sh checks (a page built with figures elsewhere in the site against
+the same page once they are gone). The site-wide bundle grows by the
+script's and the styles' size; a site without figures carries neither
+`static/function-plot` nor `static/tikz`.
+
+### G6. Teacher note: "Graphs and diagrams"
+
+Write ` ```functionplot ` for a graph students can explore and ` ```tikz `
+for a precise diagram; preview, and anything that cannot be drawn is named
+with its page and line. In Obsidian, a TikZ fence shows as a picture only
+with the community plugin **TikZJax** installed (Plantoir does not install
+it yet — #495); the functionplot plugin is no longer in Obsidian's plugin
+directory (review S1, checked 2026-10-09 against `community-plugins.json`
+and the removed list), so there a graph shows as its text — the site draws
+it. The skill `plantoir-math-graphs` (support/agent_guidance) carries the
+whole syntax for an assistant.
+
+**Rejected** (with the reasons in 05 and 02): TikZJax in the browser;
+`<img>` SVGs; every Computer Modern face on every site (140 faces, 20–33 KB
+each — a site carries only the ones its drawings name, ~30 KB a face);
+carrying function-plot in every site; a CDN.
 
 ## E. Summary: what is *not* customized
 

@@ -1640,7 +1640,7 @@ folders", and asks "Revise with Claude…" to draft one page per code from the
 framework they have; the next build draws its map.
 
 
-## Printable pages: what the build does (#454, v2.0.0)
+## Printable pages: what the build does (#454, v1.6.0)
 
 The site side is [06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200);
 the build's share is four steps, all in the ALWAYS section so every existing
@@ -1677,6 +1677,126 @@ under `Media/`, `&` and spaces included, at exactly that slug.
 
 **Compatibility:** none of this changes a page that does not opt in — verify.sh
 plants one and checks it (06 → F, "Compatibility").
+
+## Diagrams and graphs: what the build does (#485 E1, v1.7.0)
+
+A teacher writes ` ```tikz ` (a LaTeX TikZ picture, as the Obsidian TikZJax
+plugin reads it) or ` ```functionplot ` (a graph of y = f(x), in
+obsidian-functionplot 1.2.1's syntax). **Python prepares and Quartz
+places**: `scripts/figures.py` does everything that can fail, and the site's
+transformer (06 → G) only reads what it left. Not inside Quartz, because a
+figure that cannot be drawn must reach the teacher as a folder problem and a
+preview build never returns; the cache and the clock are Python's; and this
+file runs on Windows, where every `scripts/test_*.py` runs. The rules and
+cases: `contracts/shared-rules.json` → `figureFences`.
+
+1. **When.** ALWAYS section, straight after the printable pages' scan and
+   BEFORE the folder checks (`_prepare_figures` in `build_site.py`), so a
+   failure is said where every folder problem is said. It never stops a
+   build: if the pass itself fails, the fences stay plain code on the site
+   and the build says so in one line.
+2. **Which pages.** `figures.pages_students_see`: every processed page the
+   gate's own rule (`_is_draft`) shows, outside Media. The fence is the
+   opt-in — no page setting, no course switch.
+3. **Finding fences.** `markdown_code.fenced_blocks`: the #313 fence rule
+   (any quote depth, list items, backticks or tildes), run after every `%%`
+   comment is removed as Quartz removes it. The language is the info
+   string's first word, exactly.
+4. **Keys and the cache.** A figure is named by SHA-256 of its *tidied*
+   fence (obsidian-tikzjax's own tidying: drop `&nbsp;`, trim each line with
+   JavaScript's trim set, drop empty lines). The cache is
+   `<course's builds folder>/.figure-cache/<engine id>/<engine>-<key>.json`
+   — shared by sections, outside the teacher's folder, kept when the website
+   builder is remade. The **engine id** is SHA-256 over the lockfile, the
+   helper, `figureRules.js` and function-plot.js, so a changed engine empties
+   the cache by itself (review S3: a hand-bumped version string missed svgo
+   moving under the lockfile). Entries unused for 90 days are pruned;
+   `--full-rebuild` clears this engine's. Writes go to a temporary file and
+   are moved into place, and a missing or half-written entry is a miss
+   (review S7: previewing one section while publishing another is the
+   supported way of working). A build whose figures are all cached never
+   starts Node: "📐 Drew 0 diagrams (12 from before)".
+5. **The helper.** `support/figures/plantoir-figures.mjs`, one process per
+   build, JSON lines each way (protocol at the top of the file). It says
+   `ready` once it can take work; TeX's engine is loaded only before the
+   first diagram (`{"load": "tikz"}`, 474 ms measured), so a build of graphs
+   alone never pays for it (review N1). Python keeps the clock on a reader
+   thread (no `select`, so it works on Windows): **120 s to start, then 20 s
+   per diagram** — 25 times the slowest measured (pgfplots, 842 ms). A
+   diagram past its 20 s is ended by killing the helper, which is started
+   again for the rest; it is `tookTooLong` and NOT cached, so the next build
+   tries again (review S5 — a slow moment must not become a permanent
+   failure). `\def\x{\x}\x` loops for ever and says nothing, measured;
+   that is the case the clock exists for.
+6. **What is answered.** TikZ: the SVG, or the reason from TeX's console —
+   the first `! ` line, and `l.N`, which is the tidied fence's line N − 1
+   (node-tikzjax puts a one-line preamble in front; measured), mapped back
+   through the tidying to the fence's line and then, by re-finding the same
+   fence in the teacher's own file (`remember_vault_source`), to the line in
+   their file. Reasons: `undefinedCommand`, `missingPackage`,
+   `missingDocument`, `documentClassNotNeeded` (an Overleaf paste — the line
+   is NOT removed, so Obsidian and the site still agree; review S6),
+   `texSaid`, `tookTooLong`, `engineMissing`. functionplot: the 1.2.1 parse,
+   then each function tried at three points with function-plot's own
+   evaluator (a name it does not know is only found by evaluating) and
+   sampled at 51 points across the bounds (`sin x` is NaN everywhere and
+   would draw nothing); `log(x, 2)` is refused from the text, because the
+   evaluator silently drops the base (review S2).
+7. **What the site gets.** `quartz/plantoir-figures/manifest.json` (the
+   site's words from the contract, and per figure: drawn or not, its
+   description, the SVG's file or the graph's settings) and one `<key>.svg`
+   per drawing. No figures: no folder, and the transformer leaves every page
+   exactly as it was. `static/tikz/` holds exactly the faces the drawings
+   name, `fonts.css` and the BaKoMa `LICENCE` (three faces, 87,840 bytes, on
+   the verify fixture); `static/function-plot/` rides the #454 gate
+   (`page_features.GATED_ASSETS`), counted by pages with a graph that CAN be
+   drawn, with its own words in the build's output (review S9).
+8. **What the teacher and an assistant are told.** One folder problem per
+   section build, `figuresCouldNotBeDrawn` (page, figure, line, reason; at
+   most ten named), surfaced by both apps and recorded on the trail as the
+   existing "found a problem with this course's folders" — **no new trail
+   event**: the app does nothing new a teacher can see. And one line per
+   figure for an assistant (issue #485 §7.5):
+   `plantoir: error: Units/Similar Triangles.md: tikz block 2, line 14: …`;
+   a drawing with no `% alt:` and a graph setting nobody reads are
+   `plantoir: note:` lines only (ruling E1-3).
+
+**Measured** (M4 Pro, Colima at 6 CPUs, the dev-test image, Node 20.20.2):
+the verify fixture's first build drew its 7 distinct diagrams and checked 5
+graphs; the scratch EXC2O build took 5.3 s with them drawn and 2.9 s with
+all of them cached. Single diagrams: triangles 74 ms, a TeX error 19–43 ms,
+circuitikz 664 ms, pgfplots 842 ms.
+
+**The live-preview edge.** The preview's live reload re-reads `content/`,
+not the teacher's vault, so a fence edited in Obsidian reaches the site on
+the next Preview, which runs this pass again. A fence Quartz sees with no
+manifest entry says it could not be drawn — never "appears once previewed",
+which would stay on the page for ever if the build simply could not see the
+fence (review S1 found exactly that for a fence opened on a list marker's
+line, which the build now reads). `words.site.graphNeedsPreview` is only for
+a site whose graph engine is missing in the reader's browser.
+
+**Known limit, deliberately not reported as a folder problem.** The build
+finds fences with the toolchain's own fence rule, not a full Markdown parser,
+so a few shapes the site's parser reads differently still slip past it
+(measured by the fix review): a nested list marker (`- - ```tikz`), a fence
+whose content is less indented than the marker's text (lazy lines), a
+numbered fence straight after a paragraph line, a closing fence at column 0
+under a bullet. Each shows students "couldn't be drawn" (or turns the next
+figure into plain code), and Obsidian shows the same shapes broken too. Not
+raised as a finding because the only place that knows is Quartz's own
+parse, after the folder checks have been said; a post-build scan for a
+failed figure with no manifest failure would do it and is the way to add it
+if a teacher ever meets one. Fences in a list item opened on the marker's
+line and indented with tabs (Obsidian's default) ARE read, since the E1
+reviews.
+
+**Rejected:** rendering inside Quartz (no way to stop a build-long wait or
+reach the folder checks); raw `<svg>` in the processed Markdown (`ofm.ts`
+rewrites raw text, and the drawing's single glyphs flooded the page's
+description); SVGs as `<img>` (no page fonts and no theme colours); a cache
+in the teacher's vault; a `math_engines.json` switch (the fence is the
+opt-in); stopping the build on a figure (`--strict`).
 
 ## Stage 4: Configuration patching
 
