@@ -765,7 +765,7 @@ def redirect_problems(site: dict, slugs: list[str], rendered: dict[str, str]) ->
 # ---------- Short addresses ----------
 
 # site.json's "shortcuts": an address like /math that lands on a section of a
-# page (/interactive/#math). Written as a page of its own that sends the
+# page (/visualizations/#diagrams-and-graphs). Written as a page of its own that sends the
 # browser on, rather than a _redirects rule: Netlify's handling of a redirect
 # whose destination carries a #section was never measured here, and this
 # works the same on any server and under --serve.

@@ -1,0 +1,79 @@
+---
+title: Printing — Plantoir
+description: Handouts that print properly — questions only, answers only, or both — from an ordinary note with one line added to its settings.
+nav_label: Printing
+---
+
+<div class="page-head">
+  <h1>Printing</h1>
+  <p class="standfirst">A worksheet in your notes can print as a proper handout: questions only, answers only, or both, set like a typeset worksheet. One line in the page's settings is the whole job.</p>
+</div>
+
+<hr class="rule">
+
+<section>
+  <p>This page shows the text you type, exactly as you type it, beside what students get from it. The example comes from the ready-made mathematics course for MPM2D, so you can open the same page in a course of your own.</p>
+  <p>Nothing here changes a page you already have. A page you don't mark is built and printed exactly as before.</p>
+  {{availability:printing}}
+</section>
+
+<hr class="rule">
+
+<section id="handouts">
+  <h2>Handouts that print properly</h2>
+  <p>Add one line to the settings at the top of a worksheet, write each question under its own heading, and fold each answer away. That's all.</p>
+  <h4 class="label">What you type</h4>
+  <pre class="fence"><code>---
+printable: true
+---
+
+### Question 1
+
+$\triangle ABC \sim \triangle DEF$, with $AB = 4$, $DE = 10$,
+and $BC = 6$. Find $EF$.
+
+&gt; [!answer]-
+&gt;
+&gt; $EF = 15$. The scale factor is $\frac{10}{4} = 2.5$.</code></pre>
+  <h4 class="label">What students get</h4>
+  <p>A Print button beside the date. It asks for Portrait or Landscape, then <strong>Questions only</strong>, <strong>Answers only</strong> or <strong>Both</strong> — the questions, then the answers on a fresh page — and prints a handout set like a typeset worksheet: the student's name and date lines, numbered questions with lettered parts side by side, and the page's title and number at the foot of every page.</p>
+  {{shot:print-page}}
+  {{shot:print-handout}}
+  <h4 class="label">What it accepts</h4>
+  <ul class="plain">
+    <li><code>printable: true</code> in the settings block marks the page. Written exactly like that.</li>
+    <li>A heading <code>### Question 3</code> prints as the number “3.” beside the question's words. A numbered list under a question is its parts, lettered a), b), c).</li>
+    <li>An answer is a folded callout — <code>&gt; [!answer]-</code>, <code>[!solution]-</code> or <code>[!success]-</code> — with an empty <code>&gt;</code> line after its first line. It moves to the answer key, labelled with its question's number.</li>
+    <li>An open <code>[!example]</code> callout is a worked example and keeps its box on paper. A folded <code>[!tip]-</code> hint prints opened, where it is.</li>
+    <li><code>description:</code> in the settings prints under the title, as a worksheet's instructions line.</li>
+    <li><code>printPdf: Unit 3 Review.pdf</code> hands out a PDF you already have instead — put it in the course's Media folder, the same place your images go.</li>
+    <li>The Curriculum connection section never prints, from the button or from the browser's own Print.</li>
+  </ul>
+  <p>A page you don't mark keeps the browser's own Print, which now prints the page's article in full, without the site's menus beside it.</p>
+</section>
+
+<hr class="rule">
+
+<section id="settings">
+  <h2>The course's printing settings</h2>
+  <p>Course Settings has a Printing section, and what you choose there is used on every printable page in the course:</p>
+  <ul class="plain">
+    <li><strong>School name</strong>, printed at the top left or the bottom left of each page, or not at all.</li>
+    <li><strong>Blanks to fill in</strong>: Name, Date and Class #, each switched on or off.</li>
+    <li><strong>Course code</strong>, printed at the top left or the bottom left, or not at all.</li>
+  </ul>
+  <p>A small sketch of a page's corners beside the settings shows where each will land before you print anything.</p>
+</section>
+
+<hr class="rule">
+
+<section id="ask">
+  <h2>Or ask Claude or Codex</h2>
+  <p>You don't have to learn any of this. Plantoir writes its guidance for printable pages into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows how to mark a page printable, number its questions, fold each answer away so it moves to the key, and hand out a PDF you already have instead. There is nothing to install or paste.</p>
+  <p>Asked, in a working folder holding an MPM2D course, something like:</p>
+  <pre class="fence ask"><code>Make the page "courses/MPM2D/Exercises/Similar Triangles Practice.md" printable, with each answer folded away so it prints as a key.</code></pre>
+  <p>its guidance has it write the page in the shape shown above: <code>printable: true</code> in the settings, each question under its own heading, each answer in a folded <code>[!answer]-</code> callout.</p>
+  <p>Open either from a course's menu with <a href="{{up}}features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
+</section>
+
+<script src="{{up}}assets/interactive.js" defer></script>
