@@ -1,5 +1,6 @@
-// The Interactive class notes page (v1.7.0): a Copy button on every block a
-// teacher would type, and the live graphs, drawn by function-plot 1.25.4 —
+// The Visualizations and Printing pages (v1.7.0, one Interactive page until
+// DECISIONS 41): a Copy button on every block a teacher would type, and the
+// live graphs, drawn by function-plot 1.25.4 —
 // the same file, byte for byte, a class site carries when a page has a
 // graph (#485 E1; licence in function-plot-LICENSE.txt). An external file
 // because the site's policy allows no inline code but the one in the layout.

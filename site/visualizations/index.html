@@ -1,55 +1,103 @@
----
-title: Interactive class notes — Plantoir
-description: Printable handouts, drawn diagrams and graphs students can move, each written as a few lines in an ordinary note.
-nav_label: Interactive
----
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visualizations — Plantoir</title>
+<meta name="description" content="Diagrams and graphs for class notes — a drawn TikZ diagram, or a graph students can move — each written as a few lines in an ordinary note.">
+<link rel="canonical" href="https://plantoir.app/visualizations">
+
+<!-- Social preview. Update the URLs if the domain changes. -->
+<meta property="og:site_name" content="Plantoir">
+<meta property="og:title" content="Visualizations — Plantoir">
+<meta property="og:description" content="Diagrams and graphs for class notes — a drawn TikZ diagram, or a graph students can move — each written as a few lines in an ordinary note.">
+<meta property="og:url" content="https://plantoir.app/visualizations">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://plantoir.app/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Plantoir seedling icon beside the words Plantoir, on a cream background.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Visualizations — Plantoir">
+<meta name="twitter:description" content="Diagrams and graphs for class notes — a drawn TikZ diagram, or a graph students can move — each written as a few lines in an ordinary note.">
+<meta name="twitter:image" content="https://plantoir.app/social-card.png">
+
+<!-- Mastodon verification. The profile's matching link back to plantoir.app
+     is the other half; without it Mastodon shows nothing. -->
+<link rel="me" href="https://mastodon.social/@plantoir">
+
+<meta name="theme-color" content="#F7EEDA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1A15" media="(prefers-color-scheme: dark)">
+
+<link rel="icon" href="../icon.png">
+<link rel="apple-touch-icon" href="../icon.png">
+<script>
+(function() {
+  var isWin = /Win/i.test(navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform) || navigator.userAgent);
+  if (isWin) {
+    document.documentElement.classList.add('is-windows');
+    function swap(el) {
+      if (el.hasAttribute('data-win-srcset')) el.setAttribute('srcset', el.getAttribute('data-win-srcset'));
+      if (el.hasAttribute('data-win-src')) el.setAttribute('src', el.getAttribute('data-win-src'));
+      if (el.hasAttribute('data-win-alt')) el.setAttribute('alt', el.getAttribute('data-win-alt'));
+    }
+    function scan(node) {
+      if (node.nodeType !== 1) return;
+      swap(node);
+      var matches = node.querySelectorAll ? node.querySelectorAll('[data-win-srcset], [data-win-src]') : [];
+      for (var i = 0; i < matches.length; i++) swap(matches[i]);
+    }
+    var observer = new MutationObserver(function(mutations) {
+      for (var i = 0; i < mutations.length; i++) {
+        var added = mutations[i].addedNodes;
+        for (var j = 0; j < added.length; j++) scan(added[j]);
+      }
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener('DOMContentLoaded', function() {
+      observer.disconnect();
+      scan(document.body);
+    });
+  }
+})();
+</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+
+<body class="">
+<a class="skip-link" href="#main">Skip to the main text</a>
+<div class="wrap">
+
+<div class="topbar">
+  <a class="brand" href="../">
+    <img src="../icon.png" alt="">
+    <span>Plantoir</span>
+  </a>
+  <nav class="nav" aria-label="Site">
+      <a href="../">Home</a>
+      <a href="../features/">Features</a>
+      <a href="../visualizations/" aria-current="page">Visualizations</a>
+      <a href="../printing/">Printing</a>
+      <a href="../day-to-day/">Day to day</a>
+      <a href="../deploying/">Deployment</a>
+      <a href="../support/">Support</a>
+  </nav>
+</div>
+
+<main id="main">
 
 <div class="page-head">
-  <h1>Interactive class notes</h1>
-  <p class="standfirst">A few lines in a note are the whole job. Type them in Obsidian, preview the section, and students get a handout that prints properly, a diagram drawn for them, or a graph they can move.</p>
+  <h1>Visualizations</h1>
+  <p class="standfirst">Diagrams and graphs, each written as a few lines in a note. Type them in Obsidian, preview the section, and students get a diagram drawn for them or a graph they can move. More kinds are on the way.</p>
 </div>
 
 <hr class="rule">
 
 <section>
   <p>Each part of this page shows the text you type, exactly as you type it, beside what students get from it. The examples come from the ready-made mathematics course for MPM2D, so you can open the same pages in a course of your own.</p>
-  <p>Nothing here changes a page you already have. A page without these lines is built and printed exactly as before.</p>
-</section>
-
-<hr class="rule">
-
-<section id="printing">
-  <h2>Handouts that print properly</h2>
-  <p>Add one line to the settings at the top of a worksheet, write each question under its own heading, and fold each answer away. That's all.</p>
-  <h4 class="label">What you type</h4>
-  <pre class="fence"><code>---
-printable: true
----
-
-### Question 1
-
-$\triangle ABC \sim \triangle DEF$, with $AB = 4$, $DE = 10$,
-and $BC = 6$. Find $EF$.
-
-&gt; [!answer]-
-&gt;
-&gt; $EF = 15$. The scale factor is $\frac{10}{4} = 2.5$.</code></pre>
-  <h4 class="label">What students get</h4>
-  <p>A Print button beside the date. It asks for Portrait or Landscape, then <strong>Questions only</strong>, <strong>Answers only</strong> or <strong>Both</strong> — the questions, then the answers on a fresh page — and prints a handout set like a typeset worksheet: the student's name and date lines, numbered questions with lettered parts side by side, and the page's title and number at the foot of every page.</p>
-  {{shot:print-page}}
-  {{shot:print-handout}}
-  <h4 class="label">What it accepts</h4>
-  <ul class="plain">
-    <li><code>printable: true</code> in the settings block marks the page. Written exactly like that.</li>
-    <li>A heading <code>### Question 3</code> prints as the number “3.” beside the question's words. A numbered list under a question is its parts, lettered a), b), c).</li>
-    <li>An answer is a folded callout — <code>&gt; [!answer]-</code>, <code>[!solution]-</code> or <code>[!success]-</code> — with an empty <code>&gt;</code> line after its first line. It moves to the answer key, labelled with its question's number.</li>
-    <li>An open <code>[!example]</code> callout is a worked example and keeps its box on paper. A folded <code>[!tip]-</code> hint prints opened, where it is.</li>
-    <li><code>description:</code> in the settings prints under the title, as a worksheet's instructions line.</li>
-    <li><code>printPdf: Unit 3 Review.pdf</code> hands out a PDF you already have instead — put it in the course's Media folder, the same place your images go.</li>
-    <li>The Curriculum connection section never prints, from the button or from the browser's own Print.</li>
-  </ul>
-  <p>A page you don't mark keeps the browser's own Print, which now prints the page's article in full, without the site's menus beside it.</p>
-  {{availability:printing}}
+  <p>Nothing here changes a page you already have. A page without these blocks is built exactly as before.</p>
+  <p id="printing">Handouts that print properly have a page of their own: <a href="../printing/">Printing</a>.</p>
 </section>
 
 <hr class="rule">
@@ -114,7 +162,7 @@ y = -2(x - 1)^2 + 3
   </ul>
   <p>In Obsidian the block shows as its text; the graph is drawn when you preview.</p>
   <p>Function graphs pan and zoom now; sliders and dynamic geometry arrive with GeoGebra in the next release.</p>
-  {{availability:maths-figures}}
+  <p class="availability">On the Mac. The Windows version gets this in a later release.</p>
 </section>
 
 <hr class="rule">
@@ -140,8 +188,29 @@ y = 3(x - 2)^2 - 4
     <p class="graph-fallback">The graph of y = x^2 and y = 3(x - 2)^2 - 4 is drawn here when the page has loaded.</p>
   </figure>
   <p>Ask for a slider and it says sliders arrive with GeoGebra in the next release, and offers the nearest thing for now: two or three curves on one set of axes.</p>
-  <p>Open either from a course's menu with <a href="{{up}}features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
+  <p>Open either from a course's menu with <a href="../features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
 </section>
 
-<script src="{{up}}assets/function-plot.js" defer></script>
-<script src="{{up}}assets/interactive.js" defer></script>
+<script src="../assets/function-plot.js" defer></script>
+<script src="../assets/interactive.js" defer></script>
+
+</main>
+
+<footer>
+  <nav class="footer-nav" aria-label="Pages">
+    <a href="../">Home</a>
+    <a href="../features/">Features</a>
+    <a href="../visualizations/">Visualizations</a>
+    <a href="../printing/">Printing</a>
+    <a href="../day-to-day/">Day to day</a>
+    <a href="../deploying/">Deployment</a>
+    <a href="../support/">Support</a>
+  </nav>
+  Icon from <a href="https://phosphoricons.com">Phosphor Icons</a> (MIT).<br>
+  Designed by <a href="https://www.russellgordon.ca">Russell Gordon</a>.<br>
+  Made with Claude.
+</footer>
+
+</div>
+</body>
+</html>
