@@ -21,6 +21,16 @@
 // * Printing (printablePages.figures, decision 13): the handout waits for
 //   window.plantoirPrint.prepare, and ⌘P's beforeprint draws every graph at
 //   the bounds the teacher wrote, whatever was zoomed on screen.
+// * A page's own ids (#502): a browser makes every element with an id a
+//   property of window, and function-plot reads two such names ONCE, as its
+//   file runs - `math` (a heading "Math" has id="math"; its evaluator became
+//   the heading, so every graph said graphCouldNotBeDrawn) and `exports`
+//   (where it put itself, so it was never found and every graph said
+//   graphNeedsPreview).
+//   Both are hidden for the moment the file runs and given back after
+//   (figureFences.pageIds). The engine is loaded once and kept across page
+//   changes, so before this the FIRST page with a graph decided every graph
+//   for the rest of the visit.
 
 type Plot = {
   title?: string
@@ -38,12 +48,38 @@ type PrintHooks = { prepare: Array<() => Promise<void>> }
 const ENGINE = "static/function-plot/function-plot.js"
 const HEIGHT_RATIO = 0.62
 const SMALLEST_WIDTH = 240
+// The names function-plot 1.25.4 reads from window as its file runs, which
+// an element's id would otherwise answer (#502, measured: `module` and
+// `define` alone change nothing, so they are not hidden).
+const NAMES_THE_ENGINE_READS = ["math", "exports"]
 
 let loading: Promise<boolean> | null = null
 
 function engine(): FunctionPlot | null {
   const found = (window as unknown as { functionPlot?: FunctionPlot }).functionPlot
   return typeof found === "function" ? found : null
+}
+
+// An id answers `window.math` only while window has no property of that
+// name of its own, so one is given for the moment the engine's file runs
+// (it reads them then, and never again) and taken away once it has: the
+// page's ids answer as before. A real global of that name is left alone.
+function hideThePageIds(): string[] {
+  const hidden: string[] = []
+  for (const name of NAMES_THE_ENGINE_READS) {
+    if (Object.prototype.hasOwnProperty.call(window, name)) {
+      continue
+    }
+    Object.defineProperty(window, name, { value: undefined, configurable: true, writable: true })
+    hidden.push(name)
+  }
+  return hidden
+}
+
+function giveBack(hidden: string[]) {
+  for (const name of hidden) {
+    delete (window as unknown as Record<string, unknown>)[name]
+  }
 }
 
 function loadEngine(root: string): Promise<boolean> {
@@ -54,14 +90,23 @@ function loadEngine(root: string): Promise<boolean> {
     return loading
   }
   loading = new Promise((resolve) => {
+    const hidden = hideThePageIds()
     const script = document.createElement("script")
     script.src = `${root.replace(/\/$/, "")}/${ENGINE}`
     // Kept across Quartz's page changes, which replace the rest of <head>.
     script.setAttribute("spa-preserve", "")
-    script.addEventListener("load", () => resolve(engine() !== null), { once: true })
+    script.addEventListener(
+      "load",
+      () => {
+        giveBack(hidden)
+        resolve(engine() !== null)
+      },
+      { once: true },
+    )
     script.addEventListener(
       "error",
       () => {
+        giveBack(hidden)
         loading = null
         resolve(false)
       },

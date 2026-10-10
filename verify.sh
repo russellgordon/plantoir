@@ -1550,6 +1550,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
         "$HIT_COURSE/Printable Too Tall.md" \
         "$HIT_COURSE/Figures Fixture.md" "$HIT_COURSE/Figures Hidden.md" \
+        "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2183,6 +2184,15 @@ y = ln(x)
 FIGURESFIXTURE
 printf -- '---\ntitle: Figures Hidden\npublish: false\n---\nA hidden graph (plantoir-figures-hidden-7f3a).\n\n```functionplot\ny = x^2\n```\n' \
   > "$HIT_COURSE/Figures Hidden.md"
+# #502: a heading "Math" is id="math", which answered window.math, and a
+# heading "Exports" is id="exports", which answered window.exports - the two
+# names function-plot reads as its file runs (figureFences.pageIds). Drawn in
+# the browser by browser-checks/graphs_draw.mjs, below. Removed by
+# restore_hit_fixture.
+printf -- '---\ntitle: Figures Math Heading\n---\nA graph under a heading named Math (plantoir-figures-math-7f3a).\n\n# Math\n\n```functionplot\n---\nalt: A parabola under a Math heading\n---\ny = x^2 - 3\n```\n' \
+  > "$HIT_COURSE/Figures Math Heading.md"
+printf -- '---\ntitle: Figures Exports Heading\n---\nA graph under a heading named Exports (plantoir-figures-exports-7f3a).\n\n# Exports\n\n```functionplot\ny = x^3 - 2x\n```\n' \
+  > "$HIT_COURSE/Figures Exports Heading.md"
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -2527,10 +2537,21 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "⌘P on a page that is not printable lost words under the sidebars or ran off the paper (browser-checks/print_plain_page.mjs, #501)"
     cat /tmp/verify_print_plain_page.log
   fi
+  # #502: graphs drawn on a page whose own ids answered the names
+  # function-plot reads, and on the next page the site's own page change
+  # reaches from it.
+  if node browser-checks/graphs_draw.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Figures-Math-Heading.html" \
+       "http://127.0.0.1:$PRINT_PORT/Figures-Fixture.html" \
+       "http://127.0.0.1:$PRINT_PORT/Figures-Exports-Heading.html" >/tmp/verify_graphs_draw.log 2>&1; then
+    pass "graphs on a page with a heading named Math, then on the Figures Fixture reached by the site's own page change from it, then on a page with a heading named Exports: every curve drawn, and the page's ids given back (#502, figureFences.pageIds, browser-checks/graphs_draw.mjs)"
+  else
+    fail "graphs were not drawn on a page whose own ids answer the names the graph engine reads, or on a page visited after it (browser-checks/graphs_draw.mjs, #502)"
+    cat /tmp/verify_graphs_draw.log
+  fi
   kill "$PRINT_SERVER_PID" 2>/dev/null || true
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them: no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them: no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, and graphs drawn under a heading named Math (#502): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, and graphs drawn under a heading named Math (#502): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
