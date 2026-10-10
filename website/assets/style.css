@@ -508,6 +508,8 @@ p.availability { margin-top: 14px; font-size: 15px; color: var(--ink-soft); font
   font-size: 15.5px;
 }
 
+.note + .note { margin-top: 16px; }
+
 .note h3 { margin: 0 0 10px; font-size: 16px; font-weight: 600; color: var(--green-deep); }
 .note h3:not(:first-child) { margin-top: 22px; }
 .note p { margin-bottom: 0; color: var(--ink-soft); }
