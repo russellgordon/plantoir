@@ -35,11 +35,12 @@ not edit it.
 | A circuit (`circuitikz`), a molecule (`chemfig`), a commutative diagram (`tikz-cd`) | `tikz` | |
 | A flowchart or a timeline | Mermaid (` ```mermaid `) | not a maths figure |
 
-**Not possible** - say so plainly and offer the nearest thing: a slider,
-an animation, a graph a student can type into, shading between curves, or
-points on a functionplot graph. For "y = a(x - 2)^2 with a slider for a",
-offer two or three curves with chosen values of `a` on one functionplot
-graph, beside the parent `y = x^2`.
+**Not possible** - say so plainly and offer the nearest thing: an
+animation, a graph a student can type into, shading between curves, or
+points on a functionplot graph. A slider is for GeoGebra, which Plantoir
+adds in its next release: say so, and offer the nearest static thing now -
+for "y = a(x - 2)^2 with a slider for a", two or three curves with chosen
+values of `a` on one functionplot graph, beside the parent `y = x^2`.
 
 ## 2. functionplot: the fence
 

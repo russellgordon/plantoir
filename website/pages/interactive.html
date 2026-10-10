@@ -1,7 +1,7 @@
 ---
 title: Interactive class notes — Plantoir
 description: Printable handouts, drawn diagrams and graphs students can move, each written as a few lines in an ordinary note.
-nav_label: Interactive notes
+nav_label: Interactive
 ---
 
 <div class="page-head">
@@ -110,9 +110,10 @@ y = -2(x - 1)^2 + 3
     <li>The settings come first, between <code>---</code> lines, then one function per line: <code>y = x^2</code>.</li>
     <li>Settings, all optional: <code>title</code>, <code>xLabel</code>, <code>yLabel</code>, <code>bounds: [xMin, xMax, yMin, yMax]</code>, <code>grid</code>, <code>disableZoom: true</code>, and <code>alt</code> — one sentence a screen reader says instead of the graph.</li>
     <li>The grapher's own spelling: <code>^</code> for powers, <code>x*(x - 1)</code> rather than <code>x(x - 1)</code>, <code>log</code> for the natural log, <code>PI</code> and <code>E</code> in capitals, brackets on every function.</li>
-    <li>It can't mark a point, shade a region or carry a slider. For a marked point, draw the graph in TikZ with <code>pgfplots</code>.</li>
+    <li>It can't mark a point or shade a region. For a marked point, draw the graph in TikZ with <code>pgfplots</code>.</li>
   </ul>
   <p>In Obsidian the block shows as its text; the graph is drawn when you preview.</p>
+  <p>Function graphs pan and zoom now; sliders and dynamic geometry arrive with GeoGebra in the next release.</p>
   {{availability:maths-figures}}
 </section>
 
@@ -138,7 +139,7 @@ y = 3(x - 2)^2 - 4
     <div class="plot" role="img" aria-label="The parent parabola y = x^2 and y = 3(x - 2)^2 - 4, which opens up, is narrower, and has its vertex at (2, -4)."></div>
     <p class="graph-fallback">The graph of y = x^2 and y = 3(x - 2)^2 - 4 is drawn here when the page has loaded.</p>
   </figure>
-  <p>Ask for something a page can't do — a slider, say — and it says so, and offers the nearest thing: two or three curves on one set of axes.</p>
+  <p>Ask for a slider and it says sliders arrive with GeoGebra in the next release, and offers the nearest thing for now: two or three curves on one set of axes.</p>
   <p>Open either from a course's menu with <a href="{{up}}features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
 </section>
 
