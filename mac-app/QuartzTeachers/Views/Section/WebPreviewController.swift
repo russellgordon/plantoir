@@ -27,6 +27,21 @@ class WebPreviewController {
     /// Print and new-window links, handed to the web browser (#454).
     let browserHandoff: PreviewBrowserHandoff
 
+    /// The last address the TEACHER navigated to in the pane (#504) — a
+    /// click, Back, Forward, a swipe — and how many such navigations there
+    /// have been, so a view can act on each one even when two land on the
+    /// same address. The app's own loads never move either
+    /// (`PreviewNavigationLedger`).
+    var teacherPage: URL?
+    var teacherNavigations: Int = 0
+
+    /// Whether an app load is under way, and which navigation it is.
+    @ObservationIgnored private var ledger: PreviewNavigationLedger = PreviewNavigationLedger()
+    @ObservationIgnored private var appNavigation: WKNavigation?
+
+    /// Tells this controller when a navigation ends (#504).
+    let navigationWatcher: PreviewNavigationWatcher
+
     // MARK: - Initializer
 
     init() {
@@ -35,10 +50,13 @@ class WebPreviewController {
         configuration.userContentController.add(handoff, name: PreviewBrowserHandoff.messageName)
         let webView: WKWebView = WKWebView(frame: .zero, configuration: configuration)
         webView.uiDelegate = handoff
+        let watcher: PreviewNavigationWatcher = PreviewNavigationWatcher()
+        webView.navigationDelegate = watcher
         webView.allowsBackForwardNavigationGestures = true
         webView.setAccessibilityIdentifier("previewWebViewNative")
         self.webView = webView
         self.browserHandoff = handoff
+        self.navigationWatcher = watcher
 
         let backObservation = webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in
             Task { @MainActor in
@@ -56,8 +74,36 @@ class WebPreviewController {
                 self.canGoForward = self.webView.canGoForward
             }
         }
+        // The address, for the page last viewed (#504). Measured (504 plan
+        // review M-a, an offscreen WKWebView on a built Quartz site): this
+        // fires for Quartz's own in-page navigation — a link click is a
+        // pushState with no `didFinish` — and for Back and Forward. Handled
+        // at once when it arrives on the main thread, as WebKit delivers it,
+        // so it is judged against the ledger as it stands at that moment
+        // rather than after an app load's end has already been noted.
+        let addressObservation = webView.observe(\.url, options: [.new]) { [weak self] _, _ in
+            if Thread.isMainThread {
+                MainActor.assumeIsolated {
+                    guard let self else {
+                        return
+                    }
+                    self.addressChanged(to: self.webView.url)
+                }
+            } else {
+                Task { @MainActor in
+                    guard let self else {
+                        return
+                    }
+                    self.addressChanged(to: self.webView.url)
+                }
+            }
+        }
         observations.append(backObservation)
         observations.append(forwardObservation)
+        observations.append(addressObservation)
+        watcher.whenEnded = { [weak self] navigation in
+            self?.navigationEnded(navigation)
+        }
     }
 
     // MARK: - Functions
@@ -108,6 +154,12 @@ class WebPreviewController {
     /// preview keeps the things a teacher would notice losing, such as the
     /// site's own light or dark setting.
     private func loadIgnoringEverythingCached(_ url: URL) {
+        // An app load: nothing it lands on is the teacher's choice (#504).
+        // The previous app navigation is forgotten HERE, not when this one
+        // is handed to WebKit after the caches are emptied: an earlier load
+        // ending in between must not end this one.
+        ledger.appLoadBegan()
+        appNavigation = nil
         let caches: Set<String> = [
             WKWebsiteDataTypeDiskCache,
             WKWebsiteDataTypeMemoryCache,
@@ -122,7 +174,7 @@ class WebPreviewController {
             guard let self else {
                 return
             }
-            self.webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+            self.appNavigation = self.webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
         }
     }
 
@@ -174,6 +226,71 @@ class WebPreviewController {
             loadIgnoringEverythingCached(url)
             return
         }
-        webView.reloadFromOrigin()
+        ledger.appLoadBegan()
+        appNavigation = webView.reloadFromOrigin()
+    }
+
+    /// The web view's address changed. Counted as the teacher's only when no
+    /// app load is under way (#504).
+    func addressChanged(to address: URL?) {
+        if !ledger.changeIsTheTeachers() {
+            return
+        }
+        teacherPage = address
+        teacherNavigations += 1
+    }
+
+    /// A navigation finished or failed. When it is the app's own load, the
+    /// address changes after it are the teacher's again. A teacher's click
+    /// that interrupts an app load ends that load as failed, so the ledger
+    /// is never left waiting.
+    func navigationEnded(_ navigation: WKNavigation?) {
+        guard let navigation, let appNavigation, navigation === appNavigation else {
+            return
+        }
+        appLoadEnded()
+    }
+
+    /// Marks the app's load as over. Called by `navigationEnded`, and by a
+    /// test standing in for WebKit.
+    func appLoadEnded() {
+        ledger.appLoadEnded()
+        appNavigation = nil
+    }
+
+    /// Whether an app load is under way — for tests.
+    var appLoadIsUnderWay: Bool {
+        return ledger.appLoadIsUnderWay
+    }
+}
+
+/// Tells the preview's controller when WebKit ends a navigation — finished,
+/// failed, or failed before it began (#504). Implements nothing else, so
+/// every other navigation decision stays WebKit's default, as it was before
+/// this delegate existed (no policy method is implemented: everything is
+/// allowed, exactly as with no delegate at all).
+///
+/// An NSObject of its own because WebKit's delegate protocol needs one, and
+/// so the web view's (weak) reference to its delegate is to something the
+/// controller owns.
+final class PreviewNavigationWatcher: NSObject, WKNavigationDelegate {
+
+    // MARK: - Stored properties
+
+    /// Told which navigation ended.
+    var whenEnded: ((WKNavigation?) -> Void)?
+
+    // MARK: - Functions
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        whenEnded?(navigation)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
+        whenEnded?(navigation)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
+        whenEnded?(navigation)
     }
 }

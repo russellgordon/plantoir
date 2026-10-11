@@ -69,8 +69,18 @@ struct SectionSiteCommands: Equatable {
     var lastChangeIsHere: Bool = false
     var verbIsRunning: Bool = false
 
+    /// Where a press of Preview opens by default (#504) — Settings ▸ Preview,
+    /// read by the section window. In `==` because the menu item's TITLE
+    /// follows it ("Preview" or "Preview at Last Viewed").
+    var previewOpensAt: PreviewOpensAt = .frontPage
+
     /// Presses the button the item names, or runs the function.
     var perform: (SubjectMenuRules.Item) -> Void
+
+    /// Presses Preview asking for one start page (#504): Section ▸ Preview
+    /// asks for the setting, and its Option alternate for the opposite. Kept
+    /// out of `==`, like `perform`.
+    var preview: (PreviewOpensAt) -> Void = { _ in }
 
     // MARK: - Functions
 
@@ -81,6 +91,7 @@ struct SectionSiteCommands: Equatable {
             && left.previewIsShowing == right.previewIsShowing
             && left.lastChangeIsHere == right.lastChangeIsHere
             && left.verbIsRunning == right.verbIsRunning
+            && left.previewOpensAt == right.previewOpensAt
     }
 }
 
