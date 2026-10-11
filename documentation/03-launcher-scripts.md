@@ -2654,6 +2654,21 @@ The rule and its cases are `contracts/shared-rules.json` →
 `workLeases.declining`; `09-mac-app.md` → "Two programs, one course" is the
 manual.
 
+### Starting again at the page last viewed (#504) changes nothing here
+
+Since v1.7.1 a teacher's press of Preview can open the page last viewed
+instead of the front page (`shared-rules.json` → `previewStartPage`;
+`documentation/09-mac-app.md` → "Opening the preview at the page last viewed
+(#504)"). **Neither stopping nor starting changed for it, and no launcher
+learned a page.** Measured for the plan: `preview.sh` has no page or `--open`
+flag and opens nothing itself, so the app starts the preview exactly as before,
+waits for the announced root to answer 200, then asks the remembered page's
+address on that same server and loads whichever answers. REJECTED: a
+`--open <path>` flag on all three launchers — a second way to say what the app
+already does, on two platforms. The page is remembered by the app from the
+teacher's navigations in its own pane, so a stop needs to capture nothing: a
+`--stop` still ends what it always ended.
+
 ## A course kept for reference is refused in the launcher, early
 
 > **deploy.ps1, measured (bundle 6b):** all 26 `markerAgreement` rows pass against the real launcher (`ReferenceMarkerAgreementTests`, about 100 s). deploy.ps1 ends its "cannot tell" headline with an ASCII hyphen where deploy.sh has an em dash — Windows PowerShell 5.1 reads a script without a byte-order mark in the machine's code page — and the app's `FailureExplainer` reads both shapes into the same sentence.
