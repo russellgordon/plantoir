@@ -155,6 +155,16 @@ struct SectionMenu: Commands {
     /// own title — and "Cancel Deploy at…" whenever it is greyed, with no
     /// time (Russell's decision 4): a course kept for reference, a sheet up,
     /// or nothing scheduled.
+    /// Where Preview opens by default (#504): the section window's copy of
+    /// the setting when one is in front, so the title moves with the
+    /// window's own republish; otherwise the setting itself.
+    var previewSetting: PreviewOpensAt {
+        if let site {
+            return site.previewOpensAt
+        }
+        return AppSettings.shared.previewOpensAt
+    }
+
     var cancelTitle: String {
         let canCancel: Bool = SubjectMenuRules.enabledItems(situation).contains(.cancelScheduledDeploy)
         if canCancel, let scheduledFor = sidebar?.scheduledFor, situation.row == .section {
@@ -174,8 +184,23 @@ struct SectionMenu: Commands {
             // runs the button's own action — including the question about
             // today's class on the front page (#397; class-planning.json →
             // askedFrom).
-            item(site?.previewIsRunning == true ? "Stop Preview" : "Preview", .preview, enabled)
-                .keyboardShortcut("p", modifiers: [.command, .shift])
+            //
+            // #504: titled by what it will do, the setting's start page, with
+            // an Option ALTERNATE (⌥⇧⌘P) for the other one — a real
+            // `NSMenuItem.isAlternate`, measured (504 plan M3), which inherits
+            // the item's enablement, so no new `SubjectMenuRules.Item`. While
+            // a preview runs the item stops it and has no alternate: Option
+            // means nothing to Stop.
+            if site?.previewIsRunning == true {
+                item(PreviewStartPageWording.stopPreview, .preview, enabled)
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+            } else {
+                previewItem(opensAt: previewSetting, enabled)
+                    .modifierKeyAlternate(.option) {
+                        previewItem(opensAt: previewSetting.opposite, enabled)
+                    }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+            }
             item("Deploy…", .deploy, enabled)
                 .keyboardShortcut("d", modifiers: [.command, .shift])
             item("Open in Browser", .openInBrowser, enabled)
@@ -249,6 +274,17 @@ struct SectionMenu: Commands {
     }
 
     // MARK: - Functions
+
+    /// Section ▸ Preview asking for one start page (#504). Titled by
+    /// `PreviewStartPage` — the same function as the toolbar button.
+    func previewItem(opensAt: PreviewOpensAt, _ enabled: Set<SubjectMenuRules.Item>) -> some View {
+        return Button(PreviewStartPage.title(for: opensAt)) {
+            MenuRoute.run(.preview, in: workspace?.window) {
+                site?.preview(opensAt)
+            }
+        }
+        .disabled(!enabled.contains(.preview))
+    }
 
     func item(_ title: String, _ item: SubjectMenuRules.Item, _ enabled: Set<SubjectMenuRules.Item>) -> some View {
         return Button(title) {
