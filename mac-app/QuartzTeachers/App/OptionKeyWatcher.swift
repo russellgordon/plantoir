@@ -13,6 +13,13 @@ import Observation
 /// let go elsewhere sends Plantoir no event) and read afresh when it comes
 /// back.
 ///
+/// **Only the KEY window's toolbar reads it** (implementation review, 4):
+/// Option typed for é or for word movement in the assistant or Course
+/// Settings must not flip every open section window's button, a threefold
+/// width change on a toolbar this app already handles with care. The
+/// section view reads `controlActiveState` FIRST, so a window that is not
+/// key never reads this value and is not redrawn when it changes.
+///
 /// **This is for the title only.** The press itself reads
 /// `NSEvent.modifierFlags` at the moment it happens, which is the authority:
 /// a first click on a window that was not active, with Option already held,
@@ -32,6 +39,9 @@ final class OptionKeyWatcher {
     /// The local event monitor, once installed.
     @ObservationIgnored private var monitor: Any?
 
+    /// The observer of menus closing, once installed.
+    @ObservationIgnored private var menuObserver: (any NSObjectProtocol)?
+
     // MARK: - Functions
 
     /// Installs the monitor, once.
@@ -42,6 +52,17 @@ final class OptionKeyWatcher {
         monitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
             OptionKeyWatcher.shared.note(event.modifierFlags)
             return event
+        }
+        // A menu's tracking loop does not pass `flagsChanged` through the
+        // monitor: Option let go inside an open Section menu would otherwise
+        // leave the toolbar saying "Preview at Last Viewed" after the menu
+        // closed (implementation review, 3). Ask the keyboard when it closes.
+        menuObserver = NotificationCenter.default.addObserver(
+            forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                OptionKeyWatcher.shared.note(NSEvent.modifierFlags)
+            }
         }
         note(NSEvent.modifierFlags)
     }

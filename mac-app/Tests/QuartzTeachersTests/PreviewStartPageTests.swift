@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 import XCTest
 @testable import QuartzTeachers
 
@@ -247,6 +248,29 @@ final class PreviewStartPageTests: XCTestCase {
         XCTAssertTrue(controller.appLoadIsUnderWay)
     }
 
+    /// An app load ends when its page COMMITS, not only at the load event
+    /// (implementation review, 1, measured): every built page waits on CDN
+    /// resources, and a teacher's click before they arrive was dropped.
+    func testACommitEndsTheAppsLoad() {
+        let watcher: PreviewNavigationWatcher = PreviewNavigationWatcher()
+        var ended: Int = 0
+        watcher.whenEnded = { _ in
+            ended += 1
+        }
+        let delegate: any WKNavigationDelegate = watcher
+        delegate.webView?(WKWebView(), didCommit: nil)
+        XCTAssertEqual(ended, 1, "didCommit must end the app's load")
+        delegate.webView?(WKWebView(), didFinish: nil)
+        XCTAssertEqual(ended, 2)
+    }
+
+    /// Option let go inside an open menu is not seen by the monitor, so the
+    /// watcher asks the keyboard when any menu closes (review, 3).
+    func testTheWatcherAsksAgainWhenAMenuCloses() throws {
+        let source: String = try PreviewStartPageTests.productSource("App/OptionKeyWatcher.swift")
+        XCTAssertTrue(source.contains("NSMenu.didEndTrackingNotification"))
+    }
+
     func testTheLedgerByItself() {
         var ledger: PreviewNavigationLedger = PreviewNavigationLedger()
         XCTAssertTrue(ledger.changeIsTheTeachers())
@@ -357,8 +381,26 @@ final class PreviewStartPageTests: XCTestCase {
         let view: String = try PreviewStartPageTests.sectionViewSource()
         XCTAssertTrue(view.contains("optionHeld: PreviewStartPage.optionIsHeld(NSEvent.modifierFlags)"),
                       "the press reads the keyboard when it happens")
-        XCTAssertTrue(view.contains("optionHeld: OptionKeyWatcher.shared.optionIsHeld"),
+        XCTAssertTrue(view.contains("optionHeld: optionRetitlesThisWindow"),
                       "the title follows the watcher")
+        // Only the KEY window is re-titled, and it asks whether it is key
+        // BEFORE reading the watcher, so other windows are not redrawn
+        // (implementation review, 4).
+        let retitles: String = try PreviewStartPageTests.body(of: "var optionRetitlesThisWindow: Bool", in: view)
+        let key: Range<String.Index> = try XCTUnwrap(retitles.range(of: "controlActiveState != .key"))
+        let watcher: Range<String.Index> = try XCTUnwrap(retitles.range(of: "OptionKeyWatcher.shared.optionIsHeld"))
+        XCTAssertLessThan(key.lowerBound, watcher.lowerBound)
+
+        // The start page's trail line is written only once the run is known
+        // to be this one (implementation review, 2).
+        let wait: String = try PreviewStartPageTests.body(of: "func waitForPreviewServer(", in: view)
+        let asked: Range<String.Index> = try XCTUnwrap(wait.range(of: "await startPageToShow("))
+        let same: Range<String.Index> = try XCTUnwrap(wait.range(of: "PreviewReachability.isStillTheSameWait("))
+        let noted: Range<String.Index> = try XCTUnwrap(wait.range(of: ".previewStartedAtLastViewed"))
+        XCTAssertLessThan(asked.lowerBound, same.lowerBound)
+        XCTAssertLessThan(same.lowerBound, noted.lowerBound, "the line is written after the same-run check")
+        let toShow: String = try PreviewStartPageTests.body(of: "func startPageToShow(", in: view)
+        XCTAssertFalse(toShow.contains("ActivityTrail.note("), "asking writes no line of its own")
         XCTAssertTrue(view.contains("    func startPreview(at request: PreviewStartPage.Request = .frontPage) {"),
                       "every other way in opens the front page")
 
