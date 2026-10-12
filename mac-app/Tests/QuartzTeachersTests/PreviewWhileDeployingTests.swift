@@ -98,7 +98,7 @@ final class PreviewWhileDeployingTests: XCTestCase {
     /// a port is leased, before other programs' leases are read. Read from
     /// the source because nothing in the suite constructs the view.
     func testStartPreviewAsksBeforeAnythingIsTaken() throws {
-        let body: String = try codeLines(of: "SectionDetailView.swift", from: "    func startPreview() {",
+        let body: String = try codeLines(of: "SectionDetailView.swift", from: "    func startPreview(at request: PreviewStartPage.Request = .frontPage) {",
                                           to: "        Task { @MainActor in")
         let asked: Range<String.Index> = try XCTUnwrap(
             body.range(of: "SectionDetailView.refusalWhileThisSectionDeploys("),

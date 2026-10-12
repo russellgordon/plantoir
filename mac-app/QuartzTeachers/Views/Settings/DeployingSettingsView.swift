@@ -148,6 +148,8 @@ struct DeployingSettingsView: View {
 enum SettingsPane: String {
 
     case assistant
+    /// Where Preview opens (#504).
+    case preview
     case deploying
 
     // MARK: - Stored properties

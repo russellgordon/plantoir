@@ -18,7 +18,8 @@ import XCTest
 /// - **Titles, keys and dividers only** — never enablement, which follows the
 ///   selection and is `SubjectMenuRules`' to pin; and the two titles that
 ///   change with state (Stop Preview, "Cancel Deploy at 6:30 AM…") are read
-///   back in their resting form.
+///   back in their resting form — and so are Preview and its Option
+///   alternate (#504), which the teacher's setting swaps.
 ///
 /// A Revise With item is in the golden with a tag — `[if claude]`, `[if
 /// codex]`, `[if local]`, `[if any reviser]` — and is expected only when
@@ -76,6 +77,14 @@ final class MenuBarTreeTests: XCTestCase {
             var title: String = item.title
             if title == "Stop Preview" {
                 title = "Preview"
+            }
+            // #504: the setting swaps Preview and its Option alternate, and
+            // the setting is the teacher's — read back as the front-page
+            // default whatever it says (the golden's header).
+            if title == PreviewStartPageWording.previewAtLastViewed && !item.isAlternate {
+                title = PreviewStartPageWording.preview
+            } else if title == PreviewStartPageWording.preview && item.isAlternate {
+                title = PreviewStartPageWording.previewAtLastViewed
             }
             if title.hasPrefix("Cancel Deploy at ") {
                 title = "Cancel Deploy at…"
