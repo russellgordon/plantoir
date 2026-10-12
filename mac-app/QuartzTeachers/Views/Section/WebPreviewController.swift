@@ -240,10 +240,10 @@ class WebPreviewController {
         teacherNavigations += 1
     }
 
-    /// A navigation finished or failed. When it is the app's own load, the
-    /// address changes after it are the teacher's again. A teacher's click
-    /// that interrupts an app load ends that load as failed, so the ledger
-    /// is never left waiting.
+    /// A navigation committed, finished or failed. When it is the app's own
+    /// load, the address changes after it are the teacher's again. A
+    /// teacher's click that interrupts an app load ends that load as failed,
+    /// so the ledger is never left waiting.
     func navigationEnded(_ navigation: WKNavigation?) {
         guard let navigation, let appNavigation, navigation === appNavigation else {
             return
@@ -264,11 +264,20 @@ class WebPreviewController {
     }
 }
 
-/// Tells the preview's controller when WebKit ends a navigation — finished,
-/// failed, or failed before it began (#504). Implements nothing else, so
+/// Tells the preview's controller when WebKit ends a navigation — COMMITTED,
+/// finished, failed, or failed before it began (#504). Implements nothing
+/// else, so
 /// every other navigation decision stays WebKit's default, as it was before
 /// this delegate existed (no policy method is implemented: everything is
 /// allowed, exactly as with no delegate at all).
+///
+/// **Commit ends an app load, not only the load event** (implementation
+/// review, 1, measured). didFinish waits for the window's `load` event, and
+/// every built page pulls KaTeX and fonts from CDNs in its head: with one
+/// resource answering after 8 s, a teacher's click at 2 s was not
+/// remembered. Server redirects happen BEFORE commit, so a redirected page
+/// still ends correctly, and no app load's address was ever seen to change
+/// after its commit.
 ///
 /// An NSObject of its own because WebKit's delegate protocol needs one, and
 /// so the web view's (weak) reference to its delegate is to something the
@@ -281,6 +290,10 @@ final class PreviewNavigationWatcher: NSObject, WKNavigationDelegate {
     var whenEnded: ((WKNavigation?) -> Void)?
 
     // MARK: - Functions
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        whenEnded?(navigation)
+    }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         whenEnded?(navigation)

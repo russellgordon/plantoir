@@ -151,10 +151,6 @@ struct SectionMenu: Commands {
         )
     }
 
-    /// "Cancel Deploy at 6:30 AM…" when it can be used — the context menu's
-    /// own title — and "Cancel Deploy at…" whenever it is greyed, with no
-    /// time (Russell's decision 4): a course kept for reference, a sheet up,
-    /// or nothing scheduled.
     /// Where Preview opens by default (#504): the section window's copy of
     /// the setting when one is in front, so the title moves with the
     /// window's own republish; otherwise the setting itself.
@@ -165,6 +161,10 @@ struct SectionMenu: Commands {
         return AppSettings.shared.previewOpensAt
     }
 
+    /// "Cancel Deploy at 6:30 AM…" when it can be used — the context menu's
+    /// own title — and "Cancel Deploy at…" whenever it is greyed, with no
+    /// time (Russell's decision 4): a course kept for reference, a sheet up,
+    /// or nothing scheduled.
     var cancelTitle: String {
         let canCancel: Bool = SubjectMenuRules.enabledItems(situation).contains(.cancelScheduledDeploy)
         if canCancel, let scheduledFor = sidebar?.scheduledFor, situation.row == .section {

@@ -32,6 +32,10 @@ struct SectionDetailView: View {
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
 
+    /// Whether this window is the key window, for the Preview button's
+    /// Option title (#504).
+    @Environment(\.controlActiveState) var controlActiveState
+
     /// The ROOT of the site this run serves, set beside `previewURL` when the
     /// server first answers and cleared wherever it is (#504). Kept apart
     /// because `previewURL` may now be the page last viewed rather than the
@@ -303,6 +307,17 @@ struct SectionDetailView: View {
         return previewRunner.isRunning || deployRunner.isRunning
     }
 
+    /// Whether Option re-titles THIS window's Preview button (#504): only
+    /// while the window is key. `controlActiveState` is read first, so a
+    /// window that is not key never reads the watcher and is not redrawn as
+    /// Option comes and goes elsewhere (implementation review, 4).
+    var optionRetitlesThisWindow: Bool {
+        if controlActiveState != .key {
+            return false
+        }
+        return OptionKeyWatcher.shared.optionIsHeld
+    }
+
     /// The Preview (or Stop Preview) button's enablement — read by the
     /// button and by Section ▸ Preview alike (#457).
     ///
@@ -496,7 +511,7 @@ struct SectionDetailView: View {
                 Button(
                     PreviewStartPage.buttonTitle(
                         setting: AppSettings.shared.previewOpensAt,
-                        optionHeld: OptionKeyWatcher.shared.optionIsHeld,
+                        optionHeld: optionRetitlesThisWindow,
                         previewIsRunning: previewRunner.isRunning
                     ),
                     systemImage: previewRunner.isRunning ? "stop.fill" : "play.fill"
@@ -2430,6 +2445,35 @@ struct SectionDetailView: View {
         ))
     }
 
+    /// Opens the page currently shown in the preview (not just the site
+    /// root) in the teacher's default browser.
+    func openInBrowser() {
+        var urlToOpen: URL? = previewController.webView.url
+        if urlToOpen == nil {
+            urlToOpen = previewURL
+        }
+        if let urlToOpen {
+            NSWorkspace.shared.open(SectionDetailView.browserSafeURL(for: urlToOpen))
+        }
+    }
+
+    /// Rewrites "localhost" to "127.0.0.1" for hand-off to a browser.
+    /// Safari tries IPv6 (::1) first for "localhost", and the container
+    /// only publishes the port on IPv4 — which reads as "server dropped
+    /// the connection". The numeric address sidesteps that entirely.
+    static func browserSafeURL(for url: URL) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        if components.host == "localhost" {
+            components.host = "127.0.0.1"
+        }
+        if let rewritten = components.url {
+            return rewritten
+        }
+        return url
+    }
+
     // MARK: - The page last viewed (#504)
 
     /// The key this section's page last viewed is kept under: the folder the
@@ -2462,12 +2506,15 @@ struct SectionDetailView: View {
         LastViewedPages.shared.remember(path, forKey: key)
     }
 
-    /// The address the preview opens at once its server has answered: the
+    /// The address the preview opens at once its server has answered — the
     /// root, or the page last viewed when the request asked for it, one was
-    /// remembered, and it answers. Writes the trail line the decision
-    /// carries. A gone page falls back to the front page with NO dialog and
-    /// no band (decision 504-3): the trail says why.
-    func startPageToShow(root: URL, request: PreviewStartPage.Request) async -> URL {
+    /// remembered, and it answers — and the decision, whose trail line the
+    /// CALLER writes once it knows the run is still the one this was about
+    /// (implementation review, 2: a line written before that check could
+    /// describe a page a stopped preview never opened). A gone page falls
+    /// back to the front page with NO dialog and no band (decision 504-3):
+    /// the trail says why.
+    func startPageToShow(root: URL, request: PreviewStartPage.Request) async -> (page: URL, decision: PreviewStartPage.Decision) {
         var remembered: String?
         if let key = lastViewedKey() {
             remembered = LastViewedPages.shared.page(forKey: key)
@@ -2492,13 +2539,10 @@ struct SectionDetailView: View {
         let decision: PreviewStartPage.Decision = PreviewStartPage.decide(
             request, remembered: remembered, answer: answer
         )
-        if let words = decision.trailWords {
-            ActivityTrail.note(.previewStartedAtLastViewed, words, course: course.code, section: sectionNumber)
-        }
         if decision.opensRememberedPage, let pageAddress {
-            return pageAddress
+            return (page: pageAddress, decision: decision)
         }
-        return root
+        return (page: root, decision: decision)
     }
 
     /// One try at a page's address: its status after redirects (a folder
@@ -2517,35 +2561,6 @@ struct SectionDetailView: View {
         } catch {
             return nil
         }
-    }
-
-    /// Opens the page currently shown in the preview (not just the site
-    /// root) in the teacher's default browser.
-    func openInBrowser() {
-        var urlToOpen: URL? = previewController.webView.url
-        if urlToOpen == nil {
-            urlToOpen = previewURL
-        }
-        if let urlToOpen {
-            NSWorkspace.shared.open(SectionDetailView.browserSafeURL(for: urlToOpen))
-        }
-    }
-
-    /// Rewrites "localhost" to "127.0.0.1" for hand-off to a browser.
-    /// Safari tries IPv6 (::1) first for "localhost", and the container
-    /// only publishes the port on IPv4 — which reads as "server dropped
-    /// the connection". The numeric address sidesteps that entirely.
-    static func browserSafeURL(for url: URL) -> URL {
-        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return url
-        }
-        if components.host == "localhost" {
-            components.host = "127.0.0.1"
-        }
-        if let rewritten = components.url {
-            return rewritten
-        }
-        return url
     }
 
     /// Waits for THIS run's Quartz server, then switches the view from
@@ -2766,7 +2781,10 @@ struct SectionDetailView: View {
                         // means the first build is done (504 plan review
                         // M-c), and the launcher is never told a page.
                         let theRunThisIsAbout: Date? = previewRunner.startedAt
-                        let pageToShow: URL = await startPageToShow(root: addressToOpen, request: startRequest)
+                        let startPage: (page: URL, decision: PreviewStartPage.Decision) = await startPageToShow(
+                            root: addressToOpen, request: startRequest
+                        )
+                        let pageToShow: URL = startPage.page
                         // The question may have taken seconds. A run the
                         // teacher stopped, or a new one, owns what happens
                         // now; the SAME run ending by itself is ended here,
@@ -2787,6 +2805,14 @@ struct SectionDetailView: View {
                                 releasePreviewLease()
                             }
                             return
+                        }
+                        // Only now, with the run known to be this one, is
+                        // the start page recorded (#504).
+                        if let words = startPage.decision.trailWords {
+                            ActivityTrail.note(
+                                .previewStartedAtLastViewed, words,
+                                course: course.code, section: sectionNumber
+                            )
                         }
                         previewBuildWait.end()
                         // Serving from here: a later end may be a deploy
