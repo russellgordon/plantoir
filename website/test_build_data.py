@@ -183,7 +183,7 @@ class DownloadTests(unittest.TestCase):
         # The Mac card was pinned to 1.4.4 from the Windows-only v1.4.5 cut
         # (2026-10-08) until Plantoir-macOS.dmg joined v1.4.5 the same day.
         # Windows is pinned to 1.4.5 for the mac-only v1.5.0, v1.6.0 and
-        # v1.7.0 cuts (2026-10-09) until PlantoirSetup.exe joins a release
+        # v1.7.0 cuts (2026-10-09), and v1.7.1 (2026-10-11), until PlantoirSetup.exe joins a release
         # again. A release that lacks an installer pins that card, and this
         # test changes with it (the downloads_note in site.json says when).
         site = build.read_json(build.WEBSITE / "site.json")
