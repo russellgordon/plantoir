@@ -1207,6 +1207,15 @@ nonisolated enum ActivityTrail {
         /// folder (#454 review S1): how many problems, and the first (a file
         /// and the system's reason). It never holds the folder back.
         case guidanceCouldNotBeWritten = "guidance for assistants could not be written"
+        /// The teacher pressed Preview asking for the page last viewed —
+        /// the setting, or Option (#504): the page it opened at (its SLUG,
+        /// never its words), or why it opened the front page instead — the
+        /// page was gone, did not answer, none had been viewed, or today's
+        /// class had just been put on the front page. A plain press that
+        /// opened the front page writes nothing new.
+        case previewStartedAtLastViewed = "preview started at the page last viewed"
+        /// Settings ▸ Preview changed where Preview opens (#504): which.
+        case previewStartPageChosenInSettings = "preview start page chosen in Settings"
     }
 
     // MARK: - Stored properties

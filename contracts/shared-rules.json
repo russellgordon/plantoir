@@ -913,6 +913,18 @@
         "carries": "how many problems, and the first: a file (or a skill's folder) and the system's reason. Never anything a teacher wrote.",
         "line": "could not write the guidance for assistants into the working folder: 1 problem(s) — first: .agents/skills/plantoir-printing: You don’t have permission to save the file.",
         "why": "#454 implementation review S1: a failure here used to mark the whole folder not ready, refusing Preview and Deploy; now it holds nothing back, so this line and a quiet notice are the only record that an assistant started there will find no guidance."
+      },
+      {
+        "event": "preview started at the page last viewed",
+        "carries": "the course and section, and EITHER the slug of the page the preview opened at (its address below the preview's root, decoded) OR why it opened the front page instead: the page was gone (a 404 or 410 - renamed, deleted or unpublished - with its slug), the page did not answer (no 200, 404 or 410 after every try - with its slug), no page had been viewed yet in this section, the page last viewed WAS the front page, or today's class had just been put on the front page (#397). Written only when the teacher's press asked for the page last viewed - the setting, or Option (Alt on Windows) - so a plain press that opens the front page writes nothing new. The exact words are previewStartPage.cases[].trail. NEVER a page's words.",
+        "line": "{course}/{section} · started preview at the front page because the page was gone (Unit-1/Lesson-3)",
+        "why": "#504. The fallback is SILENT on screen (decision 504-3: no dialog, no band over the site), so 'I pressed Preview at Last Viewed and got the front page' has its answer only here - and which of the five reasons it was decides whether anything is wrong at all."
+      },
+      {
+        "event": "preview start page chosen in Settings",
+        "carries": "the choice made: the front page or the page last viewed (previewStartPage.setting.values). One line per change, written when the teacher changes it.",
+        "line": "Settings ▸ Preview — Preview now opens at the page last viewed",
+        "why": "#504. The setting changes what the plain Preview press does in every course, so 'Preview stopped opening the front page' is answered by when it was changed - on the 'assistant model chosen' precedent."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -22000,7 +22012,7 @@
   },
   "subjectMenus": {
     "note": "GitHub #457 (Russell, 2026-10-07/08). Every action a teacher can take on a course or a section is in the menu bar, in two subject menus — Course and Section, between View and Window — as well as in the sidebar's context menus and the windows' own buttons, which stay as second routes and call the SAME code. This section is the rule for which items can be USED; it is written in neutral item names so either platform can run it, and the mac runs it in SubjectMenuRulesTests. The mac's titles, order and key equivalents are pinned separately, by a golden of the real menu bar (mac-app/Tests/Goldens/menu-bar.txt), because a menu's shape is platform mechanics and WinUI's menu bar is a different animal (documentation/09-mac-app.md → 'Mac conventions').",
-    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addNextClass, reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all.",
+    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addNextClass, reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all. Section > Preview carries an Option ALTERNATE (#504, previewStartPage): the item is titled by where the press will open the site, and the alternate does the opposite; the alternate is the same item for this rule (no new item), enabled exactly when Preview is, and absent while Preview reads Stop Preview.",
     "situationDefaults": {
       "hasFolder": false,
       "folderGettingReady": false,
@@ -23900,6 +23912,106 @@
       "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so a teacher's Obsidian shows a functionplot fence as plain text; the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site, once the teacher installs it there.",
       "A site opened as files on a computer, rather than served, shows a diagram's lettering in the browser's own font: browsers do not load fonts beside a page opened that way.",
       "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5)."
+    ]
+  },
+  "previewStartPage": {
+    "note": "GitHub #504 (v1.7.1, mac first; Russell's comment of 2026-10-11 is binding). A teacher who stops a preview to change something and starts it again lands on the front page and has to click back to where they were. An app-wide setting now chooses where a press of Preview opens - the site's front page (the default, what Preview always did) or the page last viewed in that section's preview - and holding Option (Alt on Windows) while pressing does the OPPOSITE. The button and the menu item are TITLED by what a press will do, the setting's choice or, while the modifier is held, the other (decision 504-2). documentation/09-mac-app.md -> 'Opening the preview at the page last viewed (#504)' says what was measured and rejected.",
+    "rule": "THE PRESS DECIDES, THE APP OPENS. Where the site opens is opensAt = setting XOR modifierHeld, read at the moment of the press - from the keyboard for the toolbar button, from which of the two items was chosen for the menu. Only the TEACHER's press of Preview (the toolbar button, Section > Preview and its alternate) can ask for the page last viewed; every other way a preview starts - the assistant, Rebuild Preview, Course Settings' Preview Again, Start of the Year, a repair - opens the front page as before. The launcher is never told a page: the preview starts exactly as it always did, and once the site's root answers 200 the app asks the remembered page's address on the same server and opens it if it answers 200; a 404 or 410 means it is gone and the front page opens; anything else - a timeout, an error, another status - is asked again, `attempts` times in all, and then the front page opens. A request made while the server rebuilds WAITS for the build rather than failing (measured, Quartz v4.5.0 handlers.js), which is why silence is retried and not read as 'gone'. Falling back is SILENT on screen - no dialog, no band - and says why on the trail (activityTrail -> 'preview started at the page last viewed'). A Show on Front Page answer to the question about today's class (#397) that wrote the page opens the FRONT page whatever was asked: the teacher has just asked to change it. WHAT IS REMEMBERED is the PATH below the site's root (no query, no fragment, percent-encoded as it arrived; '' for the front page), per working folder, course and section, across quits - and ONLY from the teacher's own navigations in the app's preview pane: a click, Back, Forward. The app's own loads - the first page of a fresh build, Reload, Rebuild Preview, a restart by the assistant - never change it, or the first rebuild would erase the page being read. An address on another site, another port, or no address at all is ignored and leaves what was remembered alone. A page opened in the teacher's web browser is not observable and is not remembered.",
+    "rejected": [
+      "A launcher flag naming the page (preview.sh --open <path>): the launcher opens nothing - the app shows the site once the server answers - so the flag would be a second way to say what the app already does, in three launchers on two platforms.",
+      "Reading the server's request log for the last page: it mixes the app's own loads, the web browser's requests and every asset, and cannot tell a teacher's click from a script fetching a page.",
+      "Reading the web browser's history (the issue body bars it): another program's private data, and not the preview.",
+      "Capturing the page when the preview STOPS: a quit, a crash or a window torn down before its stop runs would lose it, and a stray redraw after a stop reloads the old root.",
+      "Capturing it at the next PRESS: by then the pane may already show the front page again.",
+      "Remembering every address the pane shows: the app's own loads land on the front page, so Rebuild Preview or the assistant would erase the page last viewed and 'Preview at Last Viewed' would open the front page the next morning (504 plan review, the blocker).",
+      "Telling the app's loads apart by comparing the address with the one asked for: a teacher's own click on the site's Home link would be ignored too, and a redirected page (/Concepts -> /Concepts/, measured) would never match.",
+      "Keeping the fragment or the query: #plantoir-print= would print a handout again on the next press.",
+      "Falling back on a TIMEOUT at once: a request made during a rebuild waits for it, so a save in Obsidian as the preview came up would read as 'the page is gone'.",
+      "A dialog or a band when the page is gone (decision 504-3): the teacher asked for a page and got the site; saying so on screen interrupts them for something they can see.",
+      "Titling the item 'Preview' when nothing has been remembered yet: Option would then appear to do nothing, which reads as broken; the item says what was asked and the trail says what happened.",
+      "Remembering per COURSE, the most recent across its sections: a section's window is the thing a teacher comes back to (decision 504-1), and the 404 check would only hide the mismatch.",
+      "Rewording the sentences that say 'press Preview': 'Preview' is the button's own prefix in both titles, and one of them is generated assistant wording."
+    ],
+    "attempts": 3,
+    "secondsPerAttempt": 5,
+    "goneStatuses": [404, 410],
+    "setting": {
+      "note": "Stored app-wide (the mac's previewOpensAt preference). Anything unreadable reads as frontPage, what Preview did before the setting existed.",
+      "values": ["frontPage", "lastViewed"],
+      "default": "frontPage",
+      "cases": [
+        { "stored": "frontPage", "reads": "frontPage" },
+        { "stored": "lastViewed", "reads": "lastViewed" },
+        { "stored": null, "reads": "frontPage" },
+        { "stored": "", "reads": "frontPage" },
+        { "stored": "pageLeftOff", "reads": "frontPage" }
+      ]
+    },
+    "wording": {
+      "preview": "Preview",
+      "previewAtLastViewed": "Preview at Last Viewed",
+      "stopPreview": "Stop Preview",
+      "paneTitle": "Preview",
+      "settingLabel": "When you press Preview, open",
+      "frontPageChoice": "The site's front page",
+      "lastViewedChoice": "The page you last viewed",
+      "optionNote": "Hold Option to do the other one. The Preview button and Section ▸ Preview change their names while Option is held, so they always say what will happen."
+    },
+    "titles": {
+      "note": "The ONE function behind the button's title and the menu item's: what a press will do. While a preview runs the item stops it and the modifier changes nothing. On the mac the menu's alternate carries the opposite title; the toolbar's title follows the modifier live.",
+      "cases": [
+        { "setting": "frontPage", "modifierHeld": false, "previewIsRunning": false, "title": "preview" },
+        { "setting": "frontPage", "modifierHeld": true, "previewIsRunning": false, "title": "previewAtLastViewed" },
+        { "setting": "lastViewed", "modifierHeld": false, "previewIsRunning": false, "title": "previewAtLastViewed" },
+        { "setting": "lastViewed", "modifierHeld": true, "previewIsRunning": false, "title": "preview" },
+        { "setting": "frontPage", "modifierHeld": true, "previewIsRunning": true, "title": "stopPreview" },
+        { "setting": "lastViewed", "modifierHeld": false, "previewIsRunning": true, "title": "stopPreview" }
+      ]
+    },
+    "remembering": {
+      "note": "What one address the TEACHER navigated to leaves remembered, against the preview's root. remember is the path kept ('' is the front page) or null for 'ignore it and keep what was there'. appLoadUnderWay is true while one of the app's own loads is in flight - between its request and the end of that navigation - and nothing is remembered then.",
+      "cases": [
+        { "name": "a page", "page": "http://127.0.0.1:8091/Unit-1/Lesson-3", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": "Unit-1/Lesson-3" },
+        { "name": "query and fragment dropped", "page": "http://127.0.0.1:8091/Unit-1/Lesson-3?x=1#plantoir-print=answersOnly", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": "Unit-1/Lesson-3" },
+        { "name": "localhost and 127.0.0.1 are the same Mac", "page": "http://localhost:8091/Help-Sessions", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": "Help-Sessions" },
+        { "name": "the teacher navigated to the front page", "page": "http://127.0.0.1:8091/", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": "" },
+        { "name": "the app opened the front page", "page": "http://127.0.0.1:8091/", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": true, "remember": null },
+        { "name": "the app opened a page", "page": "http://127.0.0.1:8091/Concepts/", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": true, "remember": null },
+        { "name": "a folder page keeps its slash", "page": "http://127.0.0.1:8091/Concepts/", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": "Concepts/" },
+        { "name": "percent-encoded, kept encoded", "page": "http://127.0.0.1:8091/Unit%201/Lesson%203", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": "Unit%201/Lesson%203" },
+        { "name": "another site", "page": "https://example.com/Unit-1", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": null },
+        { "name": "another port (a dead server's provisional address)", "page": "http://localhost:1/Gone", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": null },
+        { "name": "no address", "page": null, "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": null },
+        { "name": "about:blank", "page": "about:blank", "previewRoot": "http://127.0.0.1:8091/", "appLoadUnderWay": false, "remember": null }
+      ]
+    },
+    "answers": {
+      "note": "What the remembered page's address said, try by try (a status, or null for a timeout or an error), and what that means. Asking stops at the first 200 (answered) or 404/410 (gone); after `attempts` tries with neither, didNotAnswer.",
+      "cases": [
+        { "statuses": [200], "answer": "answered" },
+        { "statuses": [404], "answer": "gone" },
+        { "statuses": [410], "answer": "gone" },
+        { "statuses": [null, 200], "answer": "answered" },
+        { "statuses": [null, null, 404], "answer": "gone" },
+        { "statuses": [null, null, null], "answer": "didNotAnswer" },
+        { "statuses": [500, 503, null], "answer": "didNotAnswer" }
+      ]
+    },
+    "cases": [
+      { "name": "front page by default, no modifier", "setting": "frontPage", "modifierHeld": false, "remembered": "Unit-1/Lesson-3", "answer": null, "frontPageWasJustChanged": false, "opens": "frontPage", "trail": null },
+      { "name": "front page by default, modifier held, the page is there", "setting": "frontPage", "modifierHeld": true, "remembered": "Unit-1/Lesson-3", "answer": "answered", "frontPageWasJustChanged": false, "opens": "rememberedPage", "trail": "started preview at Unit-1/Lesson-3" },
+      { "name": "modifier held, the page is gone (renamed or unpublished)", "setting": "frontPage", "modifierHeld": true, "remembered": "Unit-1/Lesson-3", "answer": "gone", "frontPageWasJustChanged": false, "opens": "frontPage", "trail": "started preview at the front page because the page was gone (Unit-1/Lesson-3)" },
+      { "name": "modifier held, the page did not answer", "setting": "frontPage", "modifierHeld": true, "remembered": "Unit-1/Lesson-3", "answer": "didNotAnswer", "frontPageWasJustChanged": false, "opens": "frontPage", "trail": "started preview at the front page because the page did not answer (Unit-1/Lesson-3)" },
+      { "name": "modifier held, nothing remembered", "setting": "frontPage", "modifierHeld": true, "remembered": null, "answer": null, "frontPageWasJustChanged": false, "opens": "frontPage", "trail": "started preview at the front page because no page had been viewed yet" },
+      { "name": "last viewed by default, the page is there", "setting": "lastViewed", "modifierHeld": false, "remembered": "Unit-1/Lesson-3", "answer": "answered", "frontPageWasJustChanged": false, "opens": "rememberedPage", "trail": "started preview at Unit-1/Lesson-3" },
+      { "name": "last viewed by default, modifier held", "setting": "lastViewed", "modifierHeld": true, "remembered": "Unit-1/Lesson-3", "answer": null, "frontPageWasJustChanged": false, "opens": "frontPage", "trail": null },
+      { "name": "the page last viewed was the front page", "setting": "lastViewed", "modifierHeld": false, "remembered": "", "answer": null, "frontPageWasJustChanged": false, "opens": "frontPage", "trail": "started preview at the front page, the page last viewed" },
+      { "name": "Show on Front Page just wrote the front page (#397)", "setting": "lastViewed", "modifierHeld": false, "remembered": "Unit-1/Lesson-3", "answer": null, "frontPageWasJustChanged": true, "opens": "frontPage", "trail": "started preview at the front page because today's class was just put on it" },
+      { "name": "the trail decodes the slug", "setting": "lastViewed", "modifierHeld": false, "remembered": "Unit%201/Lesson%203", "answer": "answered", "frontPageWasJustChanged": false, "opens": "rememberedPage", "trail": "started preview at Unit 1/Lesson 3" }
+    ],
+    "settingChangedTrail": [
+      { "choice": "frontPage", "trail": "Settings ▸ Preview — Preview now opens at the front page" },
+      { "choice": "lastViewed", "trail": "Settings ▸ Preview — Preview now opens at the page last viewed" }
     ]
   }
 }

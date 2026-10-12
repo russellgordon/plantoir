@@ -395,12 +395,12 @@ final class TodaysClassOnTheFrontPageTests: XCTestCase {
 
         let offerFunction: String = try TodaysClassOnTheFrontPageTests.body(of: "func todaysClassOffer()", in: view)
         XCTAssertTrue(offerFunction.contains("TodaysClassOnTheFrontPage.offer("))
-        let press: String = try TodaysClassOnTheFrontPageTests.body(of: "func pressPreview()", in: view)
+        let press: String = try TodaysClassOnTheFrontPageTests.body(of: "func pressPreview(opensAt:", in: view)
         XCTAssertTrue(press.contains("todaysClassOffer()"))
         XCTAssertEqual(view.components(separatedBy: "todaysClassOffer()").count - 1, 2,
                        "todaysClassOffer() is declared once and called only from pressPreview()")
 
-        let start: String = try TodaysClassOnTheFrontPageTests.body(of: "    func startPreview() {", in: view)
+        let start: String = try TodaysClassOnTheFrontPageTests.body(of: "    func startPreview(at request: PreviewStartPage.Request = .frontPage) {", in: view)
         XCTAssertFalse(start.contains("todaysClass"), "startPreview() must never ask")
         XCTAssertFalse(start.contains("pressPreview"), "startPreview() must never ask")
 
@@ -409,23 +409,26 @@ final class TodaysClassOnTheFrontPageTests: XCTestCase {
         // toolbar button and Section ▸ Preview both call — the menu item IS
         // the teacher pressing Preview (#457; class-planning.json →
         // askedFrom names both, and nothing else).
-        XCTAssertEqual(view.components(separatedBy: "pressPreview()").count - 1, 2,
-                       "pressPreview() is declared once and called only from previewButtonPressed()")
-        let pressed: String = try TodaysClassOnTheFrontPageTests.body(of: "func previewButtonPressed()", in: view)
+        // Since #504 each carries the start page the press asked for.
+        XCTAssertEqual(view.components(separatedBy: "pressPreview(opensAt:").count - 1, 2,
+                       "pressPreview(opensAt:) is declared once and called only from previewButtonPressed(opensAt:)")
+        let pressed: String = try TodaysClassOnTheFrontPageTests.body(of: "func previewButtonPressed(opensAt:", in: view)
         let notRunning: String = try XCTUnwrap(pressed.components(separatedBy: "stopPreview()").dropFirst().first)
-        XCTAssertTrue(notRunning.contains("pressPreview()"), "the not-running branch presses")
-        XCTAssertEqual(view.components(separatedBy: "previewButtonPressed()").count - 1, 3,
-                       "previewButtonPressed() is declared once and called by the toolbar button and the Section menu's route")
+        XCTAssertTrue(notRunning.contains("pressPreview(opensAt:"), "the not-running branch presses")
+        XCTAssertEqual(view.components(separatedBy: "previewButtonPressed(opensAt:").count - 1, 4,
+                       "previewButtonPressed(opensAt:) is declared once and called by the toolbar button, the Section menu's route and its Option alternate's (#504)")
         let siteMenu: String = try TodaysClassOnTheFrontPageTests.body(of: "func performSiteMenuItem(", in: view)
-        XCTAssertTrue(siteMenu.contains("previewButtonPressed()"), "Section ▸ Preview presses the same button")
+        XCTAssertTrue(siteMenu.contains("previewButtonPressed(opensAt:"), "Section ▸ Preview presses the same button")
+        let fromTheMenu: String = try TodaysClassOnTheFrontPageTests.body(of: "func previewFromTheSectionMenu(", in: view)
+        XCTAssertTrue(fromTheMenu.contains("previewButtonPressed(opensAt:"), "the Option alternate presses the same button")
 
         // Plan review, 1: the answer never starts the preview from inside the
         // alert's own action; `afterThePreviewAlert` does, once it has gone.
         let answer: String = try TodaysClassOnTheFrontPageTests.body(of: "func answerTodaysClass(", in: view)
-        XCTAssertFalse(answer.contains("startPreview()"), "a refusal raised inside the alert's action is lost")
+        XCTAssertFalse(answer.contains("startPreview("), "a refusal raised inside the alert's action is lost")
         XCTAssertTrue(answer.contains("startPreviewWhenTheQuestionHasGone = true"))
         let after: String = try TodaysClassOnTheFrontPageTests.body(of: "func afterThePreviewAlert()", in: view)
-        XCTAssertTrue(after.contains("startPreview()"))
+        XCTAssertTrue(after.contains("startPreview(at: pendingPreviewRequest)"))
     }
 
     /// T9: the section window still carries three `.alert` modifiers — a

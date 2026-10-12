@@ -11,7 +11,8 @@ import SwiftUI
 /// answer in one list, and the teacher would have to work out which was which
 /// every time they opened it.
 ///
-/// **Two panes, Assistant and Deploying, in a `TabView`** since the HIG sweep
+/// **Three panes since #504 — Assistant, Preview and Deploying.** Two panes,
+/// Assistant and Deploying, in a `TabView` since the HIG sweep
 /// (#457 item 4; Russell, 2026-10-08: the Cloudflare Account ID moves here).
 /// Until then this was one pane with NO `TabView`, and that was a decision:
 /// macOS titles a settings window after the SELECTED TAB, so a one-tab window
@@ -39,6 +40,15 @@ struct PlantoirSettingsView: View {
                     Label("Assistant", systemImage: "sparkles")
                 }
                 .tag(SettingsPane.assistant.rawValue)
+            // Where Preview opens (#504): its own pane, between the two that
+            // were here, because it is neither about the assistant nor about
+            // deploying (decision 504-5).
+            PreviewSettingsView()
+                .frame(minHeight: 200)
+                .tabItem {
+                    Label(PreviewStartPageWording.paneTitle, systemImage: "play.rectangle")
+                }
+                .tag(SettingsPane.preview.rawValue)
             DeployingSettingsView()
                 .frame(minHeight: 240)
                 .tabItem {

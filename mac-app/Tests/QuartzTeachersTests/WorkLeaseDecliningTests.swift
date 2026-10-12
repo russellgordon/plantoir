@@ -572,7 +572,7 @@ final class WorkLeaseDecliningTests: XCTestCase {
         XCTAssertLessThan(claim.lowerBound, stop.lowerBound, "The Deploy stops the preview before claiming the course.")
         XCTAssertNil(deploy.range(of: "CourseActivity.beginPublish("), "A second, later bracket crept back.")
 
-        let preview: String = try WorkLeaseDecliningTests.body(of: "func startPreview()", in: source)
+        let preview: String = try WorkLeaseDecliningTests.body(of: "func startPreview(at request:", in: source)
         let build: Range<String.Index> = try XCTUnwrap(preview.range(of: "previewBuildWait.begin("))
         let lease: Range<String.Index> = try XCTUnwrap(preview.range(of: "PreviewLeases.lease("))
         let look: Range<String.Index> = try XCTUnwrap(preview.range(of: "WorkLeaseRegistry.whatBlocksABuild("))

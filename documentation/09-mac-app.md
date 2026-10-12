@@ -2919,7 +2919,8 @@ onto Course ▸ Save Course Settings.
 | ⇧⌘C | Course ▸ Copy a Page from This Course… (there is no Format menu, so no Show Colors to collide with) |
 | ⌘S | Course ▸ Save Course Settings |
 | ⇧⌘O | Open in Obsidian — Course's, or Section's when a section is selected |
-| ⇧⌘P | Section ▸ Preview / Stop Preview |
+| ⇧⌘P | Section ▸ Preview / Stop Preview — titled "Preview" or "Preview at Last Viewed" by Settings ▸ Preview (#504) |
+| ⌥⇧⌘P | Section ▸ Preview's Option alternate: the other start page (#504; a native `NSMenuItem.isAlternate`, so it is not a second item and `testEachKeyEquivalentMeansOneThing` skips it) |
 | ⇧⌘D | Section ▸ Deploy… |
 | ⇧⌘B | Section ▸ Rebuild Preview (batch B: free in batch A's census; not a macOS system-wide key; Bold only under a Format menu, which Plantoir has none of; `WKWebView` binds nothing to it) |
 
@@ -3319,7 +3320,9 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   its list closed until something is typed, ↓ is pressed or the chevron is
   clicked — the way Copy a Page opens.
 - **The Cloudflare Account ID moved to Plantoir ▸ Settings ▸ Deploying**
-  (Russell: yes), making Settings two panes in a `TabView`. A course's
+  (Russell: yes), making Settings two panes in a `TabView` (three since
+  #504: Assistant · Preview · Deploying — "Opening the preview at the page
+  last viewed (#504)" below). A course's
   Deploying section and the wizard SHOW it read-only with **Open Settings…**,
   which selects the Deploying pane first (`SettingsPane`). With no ID the
   wizard still refuses Create with the contract's existing sentence (unchanged,
@@ -3358,6 +3361,279 @@ sort indicator. **Not captured**: Import Courses for Reference (behind a
 folder chooser), the links checklist (needs a build's offer), Class Dates
 (opened only by the assistant), Special Folders help and the folder-rename
 sheet — the title scan holds their shape.
+
+## Opening the preview at the page last viewed (#504)
+
+**The problem** (#504, v1.7.1): a teacher who stops a preview to change
+something — a setting, a page's `publish:` — and starts it again lands on the
+site's front page, and has to click back to where they were. **Russell's
+comment of 2026-10-11 is the design:** an app-wide setting chooses where a
+press of Preview opens; holding Option does the opposite; and the button and
+the menu item are TITLED by what will happen. Decision 504-2 named the two
+titles: **"Preview"** (the front page) and **"Preview at Last Viewed"** (the
+page left off). The rule, every case and the words are in
+`contracts/shared-rules.json` → `previewStartPage`; the code is
+`Models/PreviewStartPage.swift`, `App/OptionKeyWatcher.swift`,
+`Views/Settings/PreviewSettingsView.swift`, the ledger in
+`WebPreviewController` and the start-page step in `SectionDetailView`'s
+`waitForPreviewServer`.
+
+### What a teacher sees
+
+- **Plantoir ▸ Settings ▸ Preview** (a pane of its own, between Assistant and
+  Deploying — decision 504-5): "When you press Preview, open" — ◉ The site's
+  front page (the default, what Preview always did) ○ The page you last viewed.
+  Stored app-wide (`AppSettings.previewOpensAt`, raw values `frontPage` /
+  `lastViewed`; anything unreadable reads as the front page). It is how a
+  teacher likes to work, not a fact about a class, so it is not in Course
+  Settings.
+- **The toolbar button** reads "Preview" or "Preview at Last Viewed" — the
+  setting's choice, or the other one while Option is held — and "Stop Preview"
+  while a preview runs, when Option changes nothing.
+- **Section ▸ Preview** (⇧⌘P) carries the same title, with an Option
+  **alternate** (⌥⇧⌘P) titled the other way.
+- **A page that has gone** — renamed, deleted, unpublished — opens the front
+  page with **no dialog and no band** (decision 504-3); the trail says why.
+
+### The decision, and where it is made
+
+`opensAt = setting XOR optionHeld`, in ONE pure function
+(`PreviewStartPage.opensAt`), and the title is `buttonTitle(setting:
+optionHeld: previewIsRunning:)` over it — the contract's `titles` table. The
+toolbar's ACTION reads `NSEvent.modifierFlags` at the moment of the press,
+which is the authority; the menu's two items each pass their own start page
+(`previewItem(opensAt:)`), so a menu chosen with Option held is not flipped a
+second time.
+
+**Only the teacher's press asks for anything but the front page.**
+`startPreview(at:)` defaults to `.frontPage`, so the assistant, Rebuild
+Preview, Course Settings' Preview Again, Start of the Year and a repair all
+open the front page as before (504-4; a follow-up may keep Rebuild Preview on
+the page). The request is carried through the question about today's class
+(#397) in `pendingPreviewRequest`, and a **Show on Front Page** answer that
+wrote the page opens the FRONT page whatever was asked (504 plan review,
+finding 6): the teacher has just asked to change it, and taking them to last
+week's lesson would hide the change they confirmed.
+
+### Opening the page: after the server answers, never through the launcher
+
+Measured for the plan (M1): `preview.sh` has no page or `--open` flag and
+opens nothing itself — the app waits for the announced root to answer 200
+(phase 3 of `waitForPreviewServer`) and loads it. So the launcher is never
+told a page and `app-rules.json` is untouched. In phase 3, once the ROOT
+answers 200 and a page was asked for and remembered, the app asks the page's
+address on the same server (`statusOfPage`, redirects followed, 5 s per try):
+
+| Answer | Means | Then |
+|---|---|---|
+| 200 | the page is there | open it |
+| 404 or 410 | gone — renamed, deleted, or unpublished (an unpublished page is never built, so it is a 404) | the front page, trail says "was gone" |
+| anything else, a timeout, an error | not known | ask again, three tries in all, a second apart; then the front page, trail says "did not answer" |
+
+Measured: Quartz v4.5.0's serve handler on serve-handler 6.1.6
+(`scratchpad/504-sh/serve.mjs` over a built site) answers `/` 200,
+`/Help-Sessions` 200, `/Concepts` 302 → 200, `/No-Such-Page` **404**.
+**Why a timeout is retried and not read as "gone"** (504 plan review M-c):
+`handlers.js` builds BEFORE it listens, so a root 200 means the first build
+is done, and every request then takes the build mutex — a request made while
+a save in Obsidian is being rebuilt WAITS for it. Reading silence as "gone"
+would have told a teacher their page had vanished because they saved it.
+
+`previewURL` is then the PAGE, not the root — `WebPreviewView.updateNSView`
+asks for `previewURL` on every redraw, and the root there would throw the
+teacher back to the front page — so the root is kept beside it in
+`previewRoot` (504 plan review, finding 7), cleared wherever `previewURL` is,
+and everything remembered is measured against it. A source scan pins that
+`rememberWhereTheTeacherIs` never passes `previewURL`. The ask may take
+seconds, so the wait checks it is still the same run afterwards
+(`PreviewReachability.isStillTheSameWait`), as the reachability question
+does.
+
+### What is remembered — only the teacher's navigations
+
+**Where:** `LastViewedPages`, one dictionary in `PlantoirDefaults` keyed by
+the working folder's canonical path (`FolderIdentity`), the course code and
+the section (504-1: per section, across quits — a section's window is the
+thing a teacher comes back to). **What:** the PATH below the site's root,
+percent-encoded as it arrived (`URLComponents.percentEncodedPath` — `URL.path`
+DECODES, measured), with no query and no fragment, so `#plantoir-print=` is
+never replayed; `""` for the front page. Never a whole address: the port can
+change between runs. A moved folder or a renamed course starts with nothing
+remembered, and the press then opens the front page and says so.
+
+**When — the blocker the plan review found.** The first design saved every
+address the pane showed. But every load the APP makes lands somewhere the
+teacher did not choose — the first page of a fresh build, Reload, Rebuild
+Preview, the assistant's restart, Preview Again — usually the front page, so
+the first rebuild erased the page being read and "Preview at Last Viewed"
+opened the front page the next morning. Now `WebPreviewController` keeps a
+`PreviewNavigationLedger`: an app load is marked as begun when it is
+requested (`loadIgnoringEverythingCached`, and `reload()`'s fallback) and as
+ended when WebKit COMMITS, finishes or fails THAT navigation
+(`PreviewNavigationWatcher`, a navigation delegate implementing only
+didCommit / didFinish / didFail / didFailProvisional — no policy method, so
+every navigation is allowed exactly as with no delegate). An address change
+in between is not the teacher's.
+
+**Why commit, not only finish** (implementation review, 1, measured):
+didFinish waits for the window's `load` event, and every built page pulls
+KaTeX and fonts from CDNs in its head. With one such resource answering after
+8 s, a teacher's click at 2 s was not remembered — on a slow school network,
+every click until the CDNs answered would have been. Server redirects happen
+BEFORE commit, so `/Concepts` → `/Concepts/` still ends correctly, and no app
+load's address was ever seen to change after its commit (the reviewer's
+`probe-commit`, the same eight-row table below). The
+`url` KVO is handled synchronously on the main thread, as WebKit delivers it,
+so it is judged against the ledger as it stood at that moment.
+
+REJECTED: comparing the address with the one the app asked for — a teacher's
+own click on the site's Home link would be ignored too, and a redirected page
+(`/Concepts` → `/Concepts/`) never matches, so the ledger would wait for ever.
+
+**Measured, 2026-10-11, macOS 26.5**, the REAL `PreviewStartPage.swift`,
+`WebPreviewController.swift` and `PreviewBrowserHandoff.swift` compiled into
+an offscreen probe (never Plantoir) against the serve handler above
+(`scratchpad/504-impl/ledger-probe.txt`):
+
+| Step | Counted as the teacher's | Remembered |
+|---|---|---|
+| app opens the root (`showFreshBuild`) | no | — |
+| teacher clicks a link (Quartz pushState, no didFinish) | yes | `Help-Sessions` |
+| app Reload | no | `Help-Sessions` |
+| app opens the root again (Rebuild Preview) | no | `Help-Sessions` |
+| teacher presses Back | yes | `Help-Sessions` |
+| app opens `Concepts` (302 → `/Concepts/`) | no — and the ledger ENDED | `Help-Sessions` |
+| teacher clicks a link on it | yes | `Concepts/Biotic-and-Abiotic-Factors` |
+| teacher follows a fragment | yes | the same, fragment dropped |
+
+The review's own probe (M-a) had already shown the `url` KVO firing for
+Quartz's pushState navigation, fragments, `history.back()` and the native
+`goBack()`, and walking `http://localhost:1/Gone` → nil → `about:blank` for a
+dead server — which is why another port, nil and `about:blank` are IGNORED
+(keep what was remembered) rather than clearing it.
+
+**Known limits, accepted:**
+
+- **The web browser is not observable.** A page opened with Open in Browser
+  and navigated there is not remembered: the browser's history is another
+  program's private data (the issue bars it), and the server's request log
+  mixes the app, the browser and every asset.
+- **A click before the app's page has started to arrive** — a few hundred
+  milliseconds on this Mac's own server — is not remembered.
+- **A Quartz 404 page the teacher navigates to** is remembered like any page;
+  next time it answers 404 and the front page opens with the "was gone" line.
+- **"Preview at Last Viewed" when nothing is remembered yet** keeps its title
+  and opens the front page, with "no page had been viewed yet" on the trail.
+  REJECTED: titling it "Preview" then — Option would appear to do nothing,
+  which reads as broken.
+- **A first click on an inactive window with Option already held** acts as
+  Option says (the press reads the keyboard) but the title had no
+  `flagsChanged` event to swap on. The same holds for a window of the
+  active app that is not the key window: its button keeps the plain title
+  while Option is held, yet an Option-click there still opens the remembered
+  page, because the press reads the keyboard and only the key window's title
+  follows the watcher. A known limit in 1.7.1.
+
+### Why a watcher for the toolbar and a native alternate for the menu
+
+**The menu** (plan M3, a SwiftUI probe on the macOS 26.5 SDK):
+`Button(…).modifierKeyAlternate(.option) { Button(…) }` with
+`.keyboardShortcut("p", [.command, .shift])` makes a real `NSMenuItem` with
+`isAlternate = true`, key ⌥⇧⌘P, and inherits `.disabled` — so it needs no new
+`SubjectMenuRules.Item` and the 21 `subjectMenus` cases are untouched. While a
+preview runs the item reads Stop Preview and has no alternate. The title
+follows the setting through `SectionSiteCommands.previewOpensAt`, which is in
+its `==`, so the menu is republished when the setting changes.
+`MenuBarTreeTests` reads the pair back in its resting form (front-page
+default) whatever the teacher's setting is, and the golden carries
+`Preview at Last Viewed  [⌥⇧⌘P]  (alternate)`.
+
+**The toolbar** has no native alternate. Whether `modifierKeyAlternate` swaps
+a TOOLBAR label could not be measured headlessly — in a window that was never
+activated, a synthetic Option `flagsChanged` changed nothing visible (504 plan
+review M-b: inconclusive, not negative), and a real measurement needs an
+activated window on a Mac in use. So the title reads `OptionKeyWatcher`: one
+`.flagsChanged` local monitor, installed in
+`applicationDidFinishLaunching`, cleared on `didResignActive` (a key let go
+while another app is in front is never seen) and re-read from
+`NSEvent.modifierFlags` on `didBecomeActive`. It writes only a CHANGE, so
+Shift and Command do not redraw the section window.
+
+**Only the KEY window is re-titled** (implementation review, 4): Option
+typed for é, or for word movement, in the assistant or Course Settings must
+not flip every open section window's button, about twice the width (184 pt against 89 pt). The
+view reads `controlActiveState` FIRST (`optionRetitlesThisWindow`), so a
+window that is not key never reads the watcher and is not redrawn as Option
+comes and goes. **And a menu closing re-reads the keyboard**
+(`NSMenu.didEndTrackingNotification`, implementation review, 3): a menu's
+tracking loop does not pass `flagsChanged` to the monitor, so Option let go
+inside an open Section menu left the title swapped.
+
+**Toolbar width:** "Preview at Last Viewed" is about twice the width of
+"Preview" (184 pt against 89, measured), and the toolbar is a known trap here
+(rebuilding it mis-lays the title area). The item is one stable `Button`
+whose title changes — never two swapped items. Overflow into the chevron at
+the minimum width would be acceptable; truncation would not (director's
+ruling). Neither happens (below).
+
+### Measured live (2026-10-11, the Debug build, a scratch working folder)
+
+Driven through System Events with `--state-dir` and a scratch folder holding
+the Example Course (EXC2O), never a teacher's folder; read back through the
+accessibility tree, the scratch trail and the scratch preferences:
+
+- **Title:** "Preview" (89 pt) became "Preview at Last Viewed" (184 pt)
+  while Option was held and went back on release. With the setting at the
+  page last viewed the two swap. With Settings the key window, Option left
+  the section window's title alone. Option held, the Section menu opened,
+  Option let go inside it, the menu closed: the title read "Preview" again.
+- **Minimum window width (900 × 652 pt), both titles:** every toolbar item
+  present, the button at its full 184 pt, nothing in the overflow chevron,
+  the window title still showing — checked in a capture of that window only,
+  deleted afterwards.
+- **Remembering:** a click in the pane remembered `Concepts/Photosynthesis`;
+  Rebuild Preview (⇧⌘B) landed on the front page and the remembered page was
+  kept; a later click replaced it.
+- **⌥⇧⌘P** (setting: front page) opened the remembered page — trail "started
+  preview at Concepts/Photosynthesis". Accessibility does not expose a menu
+  alternate (the item reads "Preview" even with Option held), so the
+  alternate is proved by what the key DOES, and by the golden that reads
+  `isAlternate` and the key from `NSApp.mainMenu`. (One run where ⌥⇧⌘P did
+  nothing was traced to a stale binary — the bundle a must-fail run had built
+  with the alternate removed — and never recurred on a correct build, in
+  five launches and states.)
+- **Settings ▸ Preview:** choosing "The page you last viewed" stored
+  `lastViewed`, wrote "Settings ▸ Preview — Preview now opens at the page last
+  viewed", and re-titled the open section window's button.
+- **A renamed page:** the page's file renamed, Stop, Preview: the front page
+  opened, no sheet, trail "started preview at the front page because the page
+  was gone (Concepts/Food-Webs-and-Trophic-Levels)".
+- **Quit (⌘Q) and relaunch:** the button read "Preview at Last Viewed" and
+  the press opened `Setup/Safety-Contract`, the page left before quitting.
+
+### REJECTED, in one place (the contract's `rejected` carries the same list)
+
+A launcher flag naming the page; the server's request log; the browser's
+history; capturing the page at STOP (a quit or crash loses it, and a stray
+redraw after a stop reloads the old root) or at the next PRESS; remembering
+every address the pane shows (the blocker above); comparing addresses to tell
+the app's loads apart; keeping the fragment or query; falling back on a
+timeout at once; a dialog or band for a gone page; titling the item "Preview"
+when nothing is remembered; remembering per COURSE across sections (504-1;
+the 404 check would only hide the mismatch); rewording the ten sentences that
+say "press Preview" — "Preview" is the prefix of both titles, and one of them
+is generated assistant wording (`AssistWording.changesAreSavedPreviewShowsTheOldPages`),
+so nothing in `AssistWording` moved.
+
+### Trail
+
+`activityTrail.mustRecord`: **"preview started at the page last viewed"** —
+the slug opened ("started preview at Unit-1/Lesson-3"), or why the front page
+opened instead (gone, did not answer, none viewed yet, the page last viewed
+WAS the front page, today's class was just put on it); written only when the
+press asked for the page last viewed, so a plain press writes nothing new.
+**"preview start page chosen in Settings"** — which choice. Never a page's
+words.
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
