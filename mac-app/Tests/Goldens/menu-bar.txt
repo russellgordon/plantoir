@@ -7,6 +7,10 @@
 # expected only on a Mac that has it: presence follows the Mac.
 # Open in Obsidian's key (Shift-Command-O) is checked on its own: it moves to
 # whichever of the two items is live.
+# Section > Preview and its Option alternate (#504) are read back in their
+# resting form, as if Settings > Preview said "the site's front page": the
+# primary "Preview", the alternate "Preview at Last Viewed". The setting swaps
+# the two titles, and it is the teacher's, not the golden's.
 menus: Plantoir · File · Edit · View · Course · Section · Window · Help
 == File
   New Window  [⌘N]
@@ -55,6 +59,7 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Remove Course…
 == Section
   Preview  [⇧⌘P]
+  Preview at Last Viewed  [⌥⇧⌘P]  (alternate)
   Deploy…  [⇧⌘D]
   Open in Browser
   ----

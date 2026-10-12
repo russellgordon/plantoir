@@ -123,6 +123,25 @@ class AppSettings {
         }
     }
 
+    /// The key holding where Preview opens (#504).
+    static let previewOpensAtKey: String = "previewOpensAt"
+
+    /// Where a teacher's press of Preview opens the site: the front page (the
+    /// default, and what Preview always did) or the page last viewed. Option
+    /// gives the other one (`PreviewStartPage`).
+    ///
+    /// App-wide, not per course: Russell's comment on #504 — it is how this
+    /// teacher likes to work, not a fact about a class. Stored as the raw
+    /// value, so an unreadable one reads as the front page
+    /// (`previewStartPage.setting` in the contract).
+    var previewOpensAt: PreviewOpensAt {
+        didSet {
+            if canRemember {
+                defaults.set(previewOpensAt.rawValue, forKey: AppSettings.previewOpensAtKey)
+            }
+        }
+    }
+
     // MARK: - Computed properties
 
     /// False while the hosted tests drive the real app, so a test run
@@ -141,6 +160,10 @@ class AppSettings {
         self.cloudflareAccountID = defaults.string(forKey: AppSettings.cloudflareAccountIDKey) ?? ""
         let storedChoice: String = defaults.string(forKey: AppSettings.assistantModelChoiceKey) ?? ""
         self.assistantModelChoice = AssistModelChoice(rawValue: storedChoice) ?? .automatic
+
+        self.previewOpensAt = PreviewStartPage.setting(
+            fromStored: defaults.string(forKey: AppSettings.previewOpensAtKey)
+        )
 
         self.plansAccepted = defaults.integer(forKey: AppSettings.plansAcceptedKey)
         self.hasBeenToldAboutTheSetting = defaults.bool(forKey: AppSettings.toldAboutTheSettingKey)

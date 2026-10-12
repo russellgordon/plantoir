@@ -31,6 +31,22 @@ struct SectionDetailView: View {
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
+
+    /// Whether this window is the key window, for the Preview button's
+    /// Option title (#504).
+    @Environment(\.controlActiveState) var controlActiveState
+
+    /// The ROOT of the site this run serves, set beside `previewURL` when the
+    /// server first answers and cleared wherever it is (#504). Kept apart
+    /// because `previewURL` may now be the page last viewed rather than the
+    /// root: what the teacher navigates to is remembered RELATIVE to the
+    /// root, and measured against a page it would come out wrong (504 plan
+    /// review, finding 7).
+    @State var previewRoot: URL?
+
+    /// What the teacher's press asked for (#504), held while the question
+    /// about today's class is up and read once it has gone.
+    @State var pendingPreviewRequest: PreviewStartPage.Request = .frontPage
     /// The wait for this window's preview, and the record ⌘Q reads while it
     /// lasts (issue #232). Cleared only through `previewBuildWait.end()`, so
     /// the record cannot outlive the wait — see `PreviewBuildWait`.
@@ -291,6 +307,17 @@ struct SectionDetailView: View {
         return previewRunner.isRunning || deployRunner.isRunning
     }
 
+    /// Whether Option re-titles THIS window's Preview button (#504): only
+    /// while the window is key. `controlActiveState` is read first, so a
+    /// window that is not key never reads the watcher and is not redrawn as
+    /// Option comes and goes elsewhere (implementation review, 4).
+    var optionRetitlesThisWindow: Bool {
+        if controlActiveState != .key {
+            return false
+        }
+        return OptionKeyWatcher.shared.optionIsHeld
+    }
+
     /// The Preview (or Stop Preview) button's enablement — read by the
     /// button and by Section ▸ Preview alike (#457).
     ///
@@ -375,6 +402,14 @@ struct SectionDetailView: View {
                 // moving it between containers is how that gets thrown away.
                 if let previewURL {
                     WebPreviewView(controller: previewController, url: previewURL)
+                        // The page the teacher navigated to, remembered for
+                        // "Preview at Last Viewed" (#504). Here, on the site
+                        // itself, so nothing is remembered while no site is
+                        // showing; and only the TEACHER's navigations move
+                        // the counter (`PreviewNavigationLedger`).
+                        .onChange(of: previewController.teacherNavigations) { _, _ in
+                            rememberWhereTheTeacherIs()
+                        }
                         .task {
                             // A task rather than an appearance block: the section's
                             // registering appearance block is found by a source scan
@@ -467,11 +502,24 @@ struct SectionDetailView: View {
 
                 // One stable item that changes face, not two swapped
                 // items — swapping rebuilds the toolbar (same glitch).
+                //
+                // #504: the title says what a press will do — "Preview" or
+                // "Preview at Last Viewed", the setting's or, while Option is
+                // held, the other — from the one function Section ▸ Preview
+                // uses too. The watcher only TITLES it; the press reads the
+                // keyboard at the moment it happens, which is the authority.
                 Button(
-                    previewRunner.isRunning ? "Stop Preview" : "Preview",
+                    PreviewStartPage.buttonTitle(
+                        setting: AppSettings.shared.previewOpensAt,
+                        optionHeld: optionRetitlesThisWindow,
+                        previewIsRunning: previewRunner.isRunning
+                    ),
                     systemImage: previewRunner.isRunning ? "stop.fill" : "play.fill"
                 ) {
-                    previewButtonPressed()
+                    previewButtonPressed(opensAt: PreviewStartPage.opensAt(
+                        setting: AppSettings.shared.previewOpensAt,
+                        optionHeld: PreviewStartPage.optionIsHeld(NSEvent.modifierFlags)
+                    ))
                 }
                 // The icon alone doesn't say what these two buttons do, so
                 // they wear their titles; the neighbouring icons are the
@@ -535,7 +583,9 @@ struct SectionDetailView: View {
             previewIsShowing: previewURL != nil,
             lastChangeIsHere: lastMenuChangeIsHere,
             verbIsRunning: verbIsRunningHere,
-            perform: performSiteMenuItem
+            previewOpensAt: AppSettings.shared.previewOpensAt,
+            perform: performSiteMenuItem,
+            preview: previewFromTheSectionMenu
         ))
         // The assistant cannot drive a preview itself — it holds neither the
         // port lease nor the web view — so this window hands it the things it
@@ -1299,7 +1349,7 @@ struct SectionDetailView: View {
         if startPreviewWhenTheQuestionHasGone {
             startPreviewWhenTheQuestionHasGone = false
             if !previewRunner.isRunning {
-                startPreview()
+                startPreview(at: pendingPreviewRequest)
             }
         }
         if previewAlertIsUp, let held = heldPreviewRefusal {
@@ -1328,7 +1378,11 @@ struct SectionDetailView: View {
     /// the teacher at Section ▸ Preview, which IS pressing it (#457). Stops
     /// a running preview; otherwise `pressPreview`, the one way in that may
     /// ask about today's class first.
-    func previewButtonPressed() {
+    ///
+    /// `opensAt` is the start page the press asked for (#504): the
+    /// toolbar's from the setting and the keyboard at that moment, the menu's
+    /// from which of its two items was chosen.
+    func previewButtonPressed(opensAt: PreviewOpensAt) {
         if previewRunner.isRunning {
             stopPreview()
         } else {
@@ -1336,7 +1390,17 @@ struct SectionDetailView: View {
             // menu bar), may ask about today's class first (#397); every
             // other way in calls `startPreview()` and is never held up by a
             // question.
-            pressPreview()
+            pressPreview(opensAt: opensAt)
+        }
+    }
+
+    /// Section ▸ Preview and its Option alternate (#504), each asking for its
+    /// own start page. The button's predicate is asked again, as
+    /// `performSiteMenuItem` does: the menu may have been drawn before
+    /// something started.
+    func previewFromTheSectionMenu(_ opensAt: PreviewOpensAt) {
+        if previewButtonIsEnabled {
+            previewButtonPressed(opensAt: opensAt)
         }
     }
 
@@ -1347,7 +1411,7 @@ struct SectionDetailView: View {
         switch item {
         case .preview:
             if previewButtonIsEnabled {
-                previewButtonPressed()
+                previewButtonPressed(opensAt: AppSettings.shared.previewOpensAt)
             }
         case .deploy:
             if deployButtonIsEnabled && !course.isKeptForReference {
@@ -1373,13 +1437,16 @@ struct SectionDetailView: View {
     /// Course Settings, a repair's rebuild — and a question there would hold
     /// each of them up on a modal nobody may be watching
     /// (`TodaysClassOnTheFrontPageTests.testOnlyThePreviewButtonAsks`).
-    func pressPreview() {
+    func pressPreview(opensAt: PreviewOpensAt) {
+        // Held through the question, which may change it (#504): a Show on
+        // Front Page that wrote the page opens the front page.
+        pendingPreviewRequest = PreviewStartPage.Request(opensAt: opensAt)
         if frontPageQuestionMayBeAsked(), let offer = todaysClassOffer() {
             previewAlert = .todaysClass(offer)
             previewAlertIsUp = true
             return
         }
-        startPreview()
+        startPreview(at: PreviewStartPage.Request(opensAt: opensAt))
     }
 
     /// The question for this section today, or nil.
@@ -1459,6 +1526,11 @@ struct SectionDetailView: View {
         switch outcome {
         case .shown:
             refreshEditedMarker()
+            // The teacher has just asked to change the FRONT page, so that
+            // is what they are shown, even when they asked for the page last
+            // viewed (#504; 504 plan review, finding 6). Said on the trail
+            // by the start-page line.
+            pendingPreviewRequest.frontPageWasJustChanged = true
         case .alreadyRight:
             break
         case .noLongerOffered:
@@ -1718,7 +1790,12 @@ struct SectionDetailView: View {
         return deployStart > previewStart
     }
 
-    func startPreview() {
+    ///
+    /// `request` says where the site opens once the server answers (#504):
+    /// the front page unless the TEACHER's press asked for the page last
+    /// viewed. Every other way in — the assistant, Rebuild Preview, Course
+    /// Settings, Start of the Year, a repair — takes the default.
+    func startPreview(at request: PreviewStartPage.Request = .frontPage) {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
@@ -1792,6 +1869,7 @@ struct SectionDetailView: View {
         }
         previewLease = lease
         previewURL = nil
+        previewRoot = nil
         // ANOTHER program on this Mac — an assistant working from another
         // app, another copy of Plantoir, a deploy set for later — may be
         // building or previewing this course (#156). Asked only NOW, after
@@ -1881,7 +1959,7 @@ struct SectionDetailView: View {
                 arguments: [course.code, String(sectionNumber), "--port", String(lease.port)],
                 workingDirectory: workspaceURL
             )
-            await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas)
+            await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas, startRequest: request)
 
             // A second chance, for the ordinary case where the wait finished
             // quickly and the teacher is now looking at the preview. The
@@ -1929,6 +2007,7 @@ struct SectionDetailView: View {
         }
         previewRunner.stopByUser()
         previewURL = nil
+        previewRoot = nil
         previewBuildWait.end()
         // The next preview reuses this section's port, so its address will be
         // identical to the one already loaded. Without this the web view sees
@@ -1949,6 +2028,7 @@ struct SectionDetailView: View {
         }
         previewRunner.cancelByUser()
         previewURL = nil
+        previewRoot = nil
         previewBuildWait.end()
         previewController.forgetLoadedPage()
         releasePreviewLease()
@@ -2394,6 +2474,95 @@ struct SectionDetailView: View {
         return url
     }
 
+    // MARK: - The page last viewed (#504)
+
+    /// The key this section's page last viewed is kept under: the folder the
+    /// preview's work belongs to (canonical, `FolderIdentity`), the course
+    /// and the section. Nil when no preview has started here.
+    func lastViewedKey() -> String? {
+        guard let folder = folderThisSectionWorksIn else {
+            return nil
+        }
+        return LastViewedPages.key(
+            folderPath: FolderIdentity.canonicalPath(folder.path),
+            courseCode: course.code,
+            sectionNumber: sectionNumber
+        )
+    }
+
+    /// Remembers the page the teacher just navigated to — only while this
+    /// run is showing, and only an address on this run's own site
+    /// (`PreviewStartPage.rememberedPath`). Measured against `previewRoot`,
+    /// NEVER `previewURL`, which may be a page (504 plan review, finding 7).
+    func rememberWhereTheTeacherIs() {
+        guard previewURL != nil, let previewRoot, let key = lastViewedKey() else {
+            return
+        }
+        guard let path = PreviewStartPage.rememberedPath(
+            page: previewController.teacherPage, previewRoot: previewRoot
+        ) else {
+            return
+        }
+        LastViewedPages.shared.remember(path, forKey: key)
+    }
+
+    /// The address the preview opens at once its server has answered — the
+    /// root, or the page last viewed when the request asked for it, one was
+    /// remembered, and it answers — and the decision, whose trail line the
+    /// CALLER writes once it knows the run is still the one this was about
+    /// (implementation review, 2: a line written before that check could
+    /// describe a page a stopped preview never opened). A gone page falls
+    /// back to the front page with NO dialog and no band (decision 504-3):
+    /// the trail says why.
+    func startPageToShow(root: URL, request: PreviewStartPage.Request) async -> (page: URL, decision: PreviewStartPage.Decision) {
+        var remembered: String?
+        if let key = lastViewedKey() {
+            remembered = LastViewedPages.shared.page(forKey: key)
+        }
+        var answer: PreviewStartPage.PageAnswer?
+        var pageAddress: URL?
+        if PreviewStartPage.needsAsking(request, remembered: remembered), let remembered {
+            pageAddress = PreviewStartPage.pageAddress(root: root, path: remembered)
+            if let pageAddress {
+                answer = await PreviewStartPage.askWhetherThePageIsThere(
+                    pageAddress,
+                    attempts: PreviewStartPage.attempts,
+                    fetch: SectionDetailView.statusOfPage,
+                    pause: {
+                        try? await Task.sleep(for: .seconds(1))
+                    }
+                )
+            } else {
+                answer = .didNotAnswer
+            }
+        }
+        let decision: PreviewStartPage.Decision = PreviewStartPage.decide(
+            request, remembered: remembered, answer: answer
+        )
+        if decision.opensRememberedPage, let pageAddress {
+            return (page: pageAddress, decision: decision)
+        }
+        return (page: root, decision: decision)
+    }
+
+    /// One try at a page's address: its status after redirects (a folder
+    /// page answers 302, then 200 — measured), or nil for a timeout or an
+    /// error.
+    nonisolated static func statusOfPage(_ page: URL) async -> Int? {
+        var request: URLRequest = URLRequest(url: page)
+        request.timeoutInterval = PreviewStartPage.secondsPerAttempt
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse {
+                return httpResponse.statusCode
+            }
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
     /// Waits for THIS run's Quartz server, then switches the view from
     /// console output to the embedded website.
     ///
@@ -2415,7 +2584,7 @@ struct SectionDetailView: View {
             .attributesOfItem(atPath: builtIndex.path)[.modificationDate]) as? Date
     }
 
-    func waitForPreviewServer(port: Int, siteAsItWas: Date?) async {
+    func waitForPreviewServer(port: Int, siteAsItWas: Date?, startRequest: PreviewStartPage.Request = .frontPage) async {
         // The launcher announces the real host address — the builder's
         // ports map to a per-folder block, so the port cannot be assumed,
         // and until it has been announced there is NO address: not the
@@ -2605,11 +2774,56 @@ struct SectionDetailView: View {
                 let (_, response) = try await URLSession.shared.data(for: request)
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200 {
+                        // Where the site opens (#504): the front page, or the
+                        // page last viewed when the teacher asked for it and
+                        // it is still there. Asked HERE, after the root has
+                        // answered: Quartz builds before it listens, so a 200
+                        // means the first build is done (504 plan review
+                        // M-c), and the launcher is never told a page.
+                        let theRunThisIsAbout: Date? = previewRunner.startedAt
+                        let startPage: (page: URL, decision: PreviewStartPage.Decision) = await startPageToShow(
+                            root: addressToOpen, request: startRequest
+                        )
+                        let pageToShow: URL = startPage.page
+                        // The question may have taken seconds. A run the
+                        // teacher stopped, or a new one, owns what happens
+                        // now; the SAME run ending by itself is ended here,
+                        // as the other "the run ended" returns are.
+                        if !PreviewReachability.isStillTheSameWait(
+                            startedAt: theRunThisIsAbout,
+                            theRunNowStartedAt: previewRunner.startedAt,
+                            theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+                            theRunIsStillGoing: previewRunner.isRunning
+                        ) {
+                            if PreviewReachability.theSameRunEndedByItself(
+                                startedAt: theRunThisIsAbout,
+                                theRunNowStartedAt: previewRunner.startedAt,
+                                theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+                                theRunIsStillGoing: previewRunner.isRunning
+                            ) {
+                                previewBuildWait.end()
+                                releasePreviewLease()
+                            }
+                            return
+                        }
+                        // Only now, with the run known to be this one, is
+                        // the start page recorded (#504).
+                        if let words = startPage.decision.trailWords {
+                            ActivityTrail.note(
+                                .previewStartedAtLastViewed, words,
+                                course: course.code, section: sectionNumber
+                            )
+                        }
                         previewBuildWait.end()
                         // Serving from here: a later end may be a deploy
                         // elsewhere closing it (#433's stack review).
                         previewRunner.hasBeenServing = true
-                        previewURL = addressToOpen
+                        previewRoot = addressToOpen
+                        // `previewURL` IS the page shown, not the root: the
+                        // view's `updateNSView` asks for it on every redraw,
+                        // and the root there would throw the teacher back to
+                        // the front page.
+                        previewURL = pageToShow
                         // Load the fresh site EXPLICITLY, rather than trusting
                         // the mounting web view's `loadIfNeeded` to do it.
                         //
@@ -2627,7 +2841,7 @@ struct SectionDetailView: View {
                         // is why it does not reintroduce the flicker that made
                         // an unconditional reload-after-load worse than the
                         // problem it addressed.
-                        previewController.showFreshBuild(addressToOpen)
+                        previewController.showFreshBuild(pageToShow)
                         // And a second, later reload ONLY when we never saw
                         // the build finish: the bounded Phase 2 wait ran out,
                         // so what was just loaded may itself predate the
