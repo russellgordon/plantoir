@@ -252,7 +252,7 @@ final class WorkingFolderSelectionTests: XCTestCase {
         // write it down.
         let captures: [(where: String, why: String)] = [
             (
-                "func startPreview()",
+                "func startPreview(at request:",
                 "a preview can start from the model on an appearance that had no folder, and "
                     + "nothing would ever reclaim it"
             ),

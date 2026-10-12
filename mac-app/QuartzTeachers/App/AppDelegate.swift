@@ -34,6 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // open (#457): a window that never appeared must not leave the
         // choice behind for one the teacher opens later.
         WorkspaceModel.folderToOpenInNextNewWindow = nil
+        // A key let go while another app is in front is never seen here, so
+        // the Preview button must not go on saying Option is held (#504).
+        OptionKeyWatcher.shared.appResignedActive()
     }
 
     /// Which outside assistants are installed is asked again whenever the
@@ -41,12 +44,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// — and never while the menu bar is drawn (#457).
     func applicationDidBecomeActive(_ notification: Notification) {
         OutsideAssistantPresence.shared.refresh()
+        OptionKeyWatcher.shared.appBecameActive()
     }
 
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
         ActivityTrail.noteLaunch()
         OutsideAssistantPresence.shared.refresh()
+        // The Preview button's title follows Option while it is held (#504).
+        OptionKeyWatcher.shared.start()
         if !WorkspaceModel.isRunningTests {
             // "It broke after the update" needs to know WHEN the update was
             // (#204) — written by the first launch of a new version, however
