@@ -3469,10 +3469,20 @@ the first rebuild erased the page being read and "Preview at Last Viewed"
 opened the front page the next morning. Now `WebPreviewController` keeps a
 `PreviewNavigationLedger`: an app load is marked as begun when it is
 requested (`loadIgnoringEverythingCached`, and `reload()`'s fallback) and as
-ended when WebKit ends THAT navigation (`PreviewNavigationWatcher`, a
-navigation delegate implementing only didFinish / didFail /
-didFailProvisional — no policy method, so every navigation is allowed exactly
-as with no delegate). An address change in between is not the teacher's. The
+ended when WebKit COMMITS, finishes or fails THAT navigation
+(`PreviewNavigationWatcher`, a navigation delegate implementing only
+didCommit / didFinish / didFail / didFailProvisional — no policy method, so
+every navigation is allowed exactly as with no delegate). An address change
+in between is not the teacher's.
+
+**Why commit, not only finish** (implementation review, 1, measured):
+didFinish waits for the window's `load` event, and every built page pulls
+KaTeX and fonts from CDNs in its head. With one such resource answering after
+8 s, a teacher's click at 2 s was not remembered — on a slow school network,
+every click until the CDNs answered would have been. Server redirects happen
+BEFORE commit, so `/Concepts` → `/Concepts/` still ends correctly, and no app
+load's address was ever seen to change after its commit (the reviewer's
+`probe-commit`, the same eight-row table below). The
 `url` KVO is handled synchronously on the main thread, as WebKit delivers it,
 so it is judged against the ledger as it stood at that moment.
 
@@ -3508,8 +3518,8 @@ dead server — which is why another port, nil and `about:blank` are IGNORED
   and navigated there is not remembered: the browser's history is another
   program's private data (the issue bars it), and the server's request log
   mixes the app, the browser and every asset.
-- **A click while an app load is still under way** is not remembered: it
-  cancels the app's navigation, but the click's address change arrives first.
+- **A click before the app's page has started to arrive** — a few hundred
+  milliseconds on this Mac's own server — is not remembered.
 - **A Quartz 404 page the teacher navigates to** is remembered like any page;
   next time it answers 404 and the front page opens with the "was gone" line.
 - **"Preview at Last Viewed" when nothing is remembered yet** keeps its title
@@ -3545,18 +3555,57 @@ while another app is in front is never seen) and re-read from
 `NSEvent.modifierFlags` on `didBecomeActive`. It writes only a CHANGE, so
 Shift and Command do not redraw the section window.
 
-**Toolbar width:** "Preview at Last Viewed" is about three times the width of
-"Preview", and the toolbar is a known trap here (rebuilding it mis-lays the
-title area). The item is one stable `Button` whose title changes — never two
-swapped items. Overflow into the chevron at the minimum width is acceptable;
-truncation is not (director's ruling).
+**Only the KEY window is re-titled** (implementation review, 4): Option
+typed for é, or for word movement, in the assistant or Course Settings must
+not flip every open section window's button, a threefold width change. The
+view reads `controlActiveState` FIRST (`optionRetitlesThisWindow`), so a
+window that is not key never reads the watcher and is not redrawn as Option
+comes and goes. **And a menu closing re-reads the keyboard**
+(`NSMenu.didEndTrackingNotification`, implementation review, 3): a menu's
+tracking loop does not pass `flagsChanged` to the monitor, so Option let go
+inside an open Section menu left the title swapped.
 
-### Still to measure on a quiet machine (the director arranges it)
+**Toolbar width:** "Preview at Last Viewed" is about twice the width of
+"Preview" (184 pt against 89, measured), and the toolbar is a known trap here
+(rebuilding it mis-lays the title area). The item is one stable `Button`
+whose title changes — never two swapped items. Overflow into the chevron at
+the minimum width would be acceptable; truncation would not (director's
+ruling). Neither happens (below).
 
-- The toolbar title swapping live while Option is held, and back on release.
-- ⌥⇧⌘P and the Option alternate in Section ▸, both settings.
-- The toolbar at the window's minimum width, both titles: no truncation.
-- A renamed page falling back silently; quit and relaunch reopening the page.
+### Measured live (2026-10-11, the Debug build, a scratch working folder)
+
+Driven through System Events with `--state-dir` and a scratch folder holding
+the Example Course (EXC2O), never a teacher's folder; read back through the
+accessibility tree, the scratch trail and the scratch preferences:
+
+- **Title:** "Preview" (89 pt) became "Preview at Last Viewed" (184 pt)
+  while Option was held and went back on release. With the setting at the
+  page last viewed the two swap. With Settings the key window, Option left
+  the section window's title alone. Option held, the Section menu opened,
+  Option let go inside it, the menu closed: the title read "Preview" again.
+- **Minimum window width (900 × 652 pt), both titles:** every toolbar item
+  present, the button at its full 184 pt, nothing in the overflow chevron,
+  the window title still showing — checked in a capture of that window only,
+  deleted afterwards.
+- **Remembering:** a click in the pane remembered `Concepts/Photosynthesis`;
+  Rebuild Preview (⇧⌘B) landed on the front page and the remembered page was
+  kept; a later click replaced it.
+- **⌥⇧⌘P** (setting: front page) opened the remembered page — trail "started
+  preview at Concepts/Photosynthesis". Accessibility does not expose a menu
+  alternate (the item reads "Preview" even with Option held), so the
+  alternate is proved by what the key DOES, and by the golden that reads
+  `isAlternate` and the key from `NSApp.mainMenu`. (One run where ⌥⇧⌘P did
+  nothing was traced to a stale binary — the bundle a must-fail run had built
+  with the alternate removed — and never recurred on a correct build, in
+  five launches and states.)
+- **Settings ▸ Preview:** choosing "The page you last viewed" stored
+  `lastViewed`, wrote "Settings ▸ Preview — Preview now opens at the page last
+  viewed", and re-titled the open section window's button.
+- **A renamed page:** the page's file renamed, Stop, Preview: the front page
+  opened, no sheet, trail "started preview at the front page because the page
+  was gone (Concepts/Food-Webs-and-Trophic-Levels)".
+- **Quit (⌘Q) and relaunch:** the button read "Preview at Last Viewed" and
+  the press opened `Setup/Safety-Contract`, the page left before quitting.
 
 ### REJECTED, in one place (the contract's `rejected` carries the same list)
 
