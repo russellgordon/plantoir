@@ -154,7 +154,7 @@ public sealed class LinksChecklistDialog
 
         // The button counts rows SHOWN ticked (going ∪ coming with).
         _dialog.PrimaryButtonText = _sheet.PublishButton();
-        _dialog.IsPrimaryButtonEnabled = shownTicked.Count > 0;
+        DialogButtons.EnablePrimary(_dialog, shownTicked.Count > 0);
     }
 
     /// <summary>

@@ -214,7 +214,7 @@ internal sealed class SectionVerbDialog
         panel.Children.Add(view._classes);
         panel.Children.Add(view._howMany);
         view.ShowChoosing(panel);
-        view._dialog.IsPrimaryButtonEnabled = view._classRows.Count > 0;
+        DialogButtons.EnablePrimary(view._dialog, view._classRows.Count > 0);
         return view.Show();
     }
 
@@ -297,7 +297,8 @@ internal sealed class SectionVerbDialog
         _dialog.Content = content;
         _dialog.PrimaryButtonText = AssistWording.MenuContinueButton;
         _dialog.CloseButtonText = AssistWording.MenuCancelButton;
-        _dialog.DefaultButton = ContentDialogButton.Primary;
+        // Live until a caller says otherwise (a pick with nothing ticked greys it).
+        DialogButtons.EnablePrimary(_dialog, true);
     }
 
     private void ShowWorking(string said)
@@ -322,9 +323,8 @@ internal sealed class SectionVerbDialog
         AutomationProperties.SetAutomationId(words, "sectionVerbPlan");
         _dialog.Content = new ScrollViewer { Content = words, MaxHeight = 420, MinWidth = 420 };
         _dialog.PrimaryButtonText = _verbButton;
-        _dialog.IsPrimaryButtonEnabled = true;
+        DialogButtons.EnablePrimary(_dialog, true);
         _dialog.CloseButtonText = AssistWording.MenuCancelButton;
-        _dialog.DefaultButton = ContentDialogButton.Primary;
     }
 
     private void ShowResult(string said)
@@ -436,8 +436,7 @@ internal sealed class SectionVerbDialog
         _dialog.Title = _meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle;
         _dialog.Content = panel;
         _dialog.CloseButtonText = AssistWording.MenuCancelButton;
-        _dialog.IsPrimaryButtonEnabled = true;
-        _dialog.DefaultButton = ContentDialogButton.Primary;
+        DialogButtons.EnablePrimary(_dialog, true);
         NameTheLaterClassesButton();
         return true;
     }
@@ -523,7 +522,7 @@ internal sealed class SectionVerbDialog
 
     private void UpdateContinue()
     {
-        if (_stage == Stage.Choose && _rows.Count > 0) _dialog.IsPrimaryButtonEnabled = _rows.Any(row => row.Box.IsChecked == true);
+        if (_stage == Stage.Choose && _rows.Count > 0) DialogButtons.EnablePrimary(_dialog, _rows.Any(row => row.Box.IsChecked == true));
     }
 
     private List<string> Ticked() => _rows.Where(row => row.Box.IsChecked == true).Select(row => row.Page.Name).ToList();

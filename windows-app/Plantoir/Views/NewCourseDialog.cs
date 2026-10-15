@@ -237,8 +237,16 @@ public sealed class NewCourseDialog : ContentDialog
         // thread — so a string that must FAIL when it drifts has to live there.
         PrimaryButtonText = WizardWording.Panel(isClub: false).CreateButton;
         CloseButtonText = "Cancel";
-        DefaultButton = ContentDialogButton.Primary;
+        // Create Course NEVER takes Enter (#491 item 2; measured on the mac,
+        // 2026-10-08): as the default, an Enter typed in the code field created
+        // a course named by the code with the rest of the form unread. It wears
+        // the accent while it can be pressed (RefreshCreateEnabled), and a long
+        // form is finished with a click.
+        DefaultButton = ContentDialogButton.None;
         PrimaryButtonClick += OnPrimaryButton;
+        // The cursor starts in Course code, as on the mac and as Copy a Page
+        // opens; the suggestion list stays closed until something is typed.
+        Opened += (_, _) => _codeBox.Focus(FocusState.Programmatic);
         CloseButtonClick += OnCloseButton;
 
         _validationText = new TextBlock
@@ -355,8 +363,9 @@ public sealed class NewCourseDialog : ContentDialog
         bool codeOk = _codeBox.Text.Trim().Length > 0 && CourseCodeProblem() is null;
         bool sectionsOk = SectionNumbersProblem(_sectionsBox.Text) is null;
         bool publishingOk = _publishingChoice?.Problem is null;   // a bad folder blocks Create (row 102)
-        IsPrimaryButtonEnabled = codeOk && sectionsOk && publishingOk && UnitWordIsUsable
-                                 && (!IsClub || ClubClassFolderProblem() is null);
+        DialogButtons.EnablePrimary(this,
+            codeOk && sectionsOk && publishingOk && UnitWordIsUsable && (!IsClub || ClubClassFolderProblem() is null),
+            PrimaryKind.NeverTakesEnter);
     }
 
     /// <summary>
@@ -1510,13 +1519,14 @@ public sealed class NewCourseDialog : ContentDialog
         // The closing button is present throughout so the footer never
         // reflows; it becomes usable once the work ends.
         PrimaryButtonText = "Close";
-        IsPrimaryButtonEnabled = false;
+        DialogButtons.EnablePrimary(this, false);
         CloseButtonText = "Cancel";
     }
 
     private void FinishProgress()
     {
-        IsPrimaryButtonEnabled = true;
+        // The work is over and nothing is left to type: Close is the default now.
+        DialogButtons.EnablePrimary(this, true);
         CloseButtonText = "";
     }
 

@@ -76,7 +76,7 @@ public sealed class AddSectionDialog : ContentDialog
         string? problem = SectionAdder.EntryProblem(entry, existing, _course.Code);
         _warningSlot.Text = problem ?? " ";
         _warningSlot.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
-        IsPrimaryButtonEnabled = SectionAdder.EntryIsAddable(entry, existing);
+        DialogButtons.EnablePrimary(this, SectionAdder.EntryIsAddable(entry, existing));
     }
 
     private void OnAdd(ContentDialog sender, ContentDialogButtonClickEventArgs args)
