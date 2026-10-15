@@ -34,6 +34,24 @@ public class AcceleratorDialogGateTests
         Assert.Contains("window.Invoke(item, run, name);", Menus);   // every accelerator goes through it
     }
 
+    /// <summary>
+    /// The sidebar's Delete key (#491 item 5) is NOT a menu-item key — on an
+    /// item it would take Delete from every text field — so it lives on the
+    /// tree's KeyDown, which asks the gate itself before it selects or runs
+    /// anything.
+    /// </summary>
+    [Fact]
+    public void TheSidebarsDeleteKeyAsksTheDialogGateFirst()
+    {
+        string sidebar = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SidebarPane.xaml.cs"));
+        int start = sidebar.IndexOf("private void Tree_KeyDown(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int gate = sidebar.IndexOf("DialogGate.Holds(XamlRoot, \"Delete\")", start, StringComparison.Ordinal);
+        int select = sidebar.IndexOf("SelectRow(selection)", start, StringComparison.Ordinal);
+        int run = sidebar.IndexOf("_window.RunFromTheSidebar(item)", start, StringComparison.Ordinal);
+        Assert.True(gate > start && select > gate && run > select, $"gate {gate}, select {select}, run {run}");
+    }
+
     [Fact]
     public void NoKeyIsLeftOnTheWindowsRoot()
     {

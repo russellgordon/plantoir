@@ -3368,6 +3368,19 @@ folder chooser), the links checklist (needs a build's offer), Class Dates
 (opened only by the assistant), Special Folders help and the folder-rename
 sheet — the title scan holds their shape.
 
+**On Windows** (#491 part B, 2026-10-15): the same rules through WinUI's own
+mechanisms — [12 → "The HIG sweep, screen by screen, on Windows (#491 part
+B)"](12-windows-app.md#the-hig-sweep-screen-by-screen-on-windows-491-part-b).
+What a mac reader should KNOW, none of it owed back: Delete on a row whose item
+is greyed does nothing silently there (Windows has no beep for it); the font
+floor is 12 effective pixels, Fluent's Caption, rather than a conversion of 10
+pt; a disabled default button in WinUI keeps the accent slab (#BFBFBF Light,
+#434343 Dark — measured), so Windows needed the same "grey and not the
+default" helper the mac did; an AutoSuggestBox traps Escape the way the mac's
+fields did (measured), so both pickers route through a `PickerEscape` of their
+own; and a failed course or section removal names its act there too ("Could not
+remove EXC2O"), Windows' own addition to `BackupProblemTitle`.
+
 ## Opening the preview at the page last viewed (#504)
 
 **The problem** (#504, v1.7.1): a teacher who stops a preview to change
