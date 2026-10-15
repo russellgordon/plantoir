@@ -448,6 +448,14 @@ public sealed partial class SidebarPane : UserControl
     /// backup an open assistant conversation can restore from as KEPT, and
     /// "together" counts only what will go.
     /// </summary>
+    /// <remarks>
+    /// #491 item 7 (the mac's #457): sorted by Course, Made or Size from the
+    /// header (<see cref="AllBackupsOrder"/>; newest first until a header is
+    /// pressed), a context menu — Restore… for one, Show in File Explorer,
+    /// Delete… last — and the Delete key, which is Delete…. Restore… and
+    /// Delete… close this dialog FIRST and ask once it has gone: WinUI shows
+    /// one ContentDialog per window, and their questions are dialogs too.
+    /// </remarks>
     public async Task ShowAllBackups()
     {
         string? askedIn = Workspace.WorkspacePath;
@@ -472,13 +480,22 @@ public sealed partial class SidebarPane : UserControl
                 TextWrapping = TextWrapping.Wrap,
             });
 
-        var list = new ListView { SelectionMode = ListViewSelectionMode.Extended, MaxHeight = 360 };
-        AutomationProperties.SetAutomationId(list, "allBackupsList");
-        foreach (var (item, bytes) in measured)
+        int[] widths = { 80, 200, 150, 90 };
+        Grid Columns()
         {
             var grid = new Grid { ColumnSpacing = 12 };
-            foreach (var width in new[] { 80, 200, 150, 90 })
+            foreach (var width in widths)
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
+            return grid;
+        }
+
+        var list = new ListView { SelectionMode = ListViewSelectionMode.Extended, MaxHeight = 360 };
+        AutomationProperties.SetAutomationId(list, "allBackupsList");
+        var menu = new MenuFlyout();
+
+        ListViewItem RowFor(BackupItem item, long? bytes)
+        {
+            var grid = Columns();
             string who = item.Maker switch
             {
                 BackupMaker.Assistant a => $"Assistant, Section {a.SectionNumber}",
@@ -494,11 +511,70 @@ public sealed partial class SidebarPane : UserControl
                 Grid.SetColumn(cell, i);
                 grid.Children.Add(cell);
             }
-            var row = new ListViewItem { Content = grid, Tag = item };
+            var row = new ListViewItem { Content = grid, Tag = item, ContextFlyout = menu };
             AutomationProperties.SetAutomationId(row, $"allBackups-{Path.GetFileName(item.FilePath)}");
             AutomationProperties.SetName(row, $"{item.CourseCode} {item.WhenDescription}");
-            list.Items.Add(row);
+            return row;
         }
+
+        // The rows in the order chosen, keeping what was selected (by file).
+        var order = AllBackupsOrder.Opening;
+        void Fill()
+        {
+            var keep = list.SelectedItems.OfType<ListViewItem>().Select(r => ((BackupItem)r.Tag).FilePath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            list.Items.Clear();
+            foreach (var (item, bytes) in AllBackupsOrder.Sorted(measured, order.Column, order.Ascending))
+            {
+                var row = RowFor(item, bytes);
+                list.Items.Add(row);
+                if (keep.Contains(item.FilePath)) row.IsSelected = true;
+            }
+        }
+
+        // The header: Course, Made and Size sort; Made By is a label. The
+        // ids are allBackupsSort…, never allBackups-…, which names a row.
+        var header = Columns();
+        header.Margin = new Thickness(16, 0, 12, 0);   // over the rows' own padding
+        var sortButtons = new List<(Button Button, string Title, AllBackupsOrder.Column Column)>();
+        void TitleTheHeaders()
+        {
+            foreach (var (button, title, column) in sortButtons)
+                button.Content = AllBackupsOrder.Header(title, column, order);
+        }
+        foreach (var (title, column, slot, id) in new[]
+                 {
+                     ("Course", AllBackupsOrder.Column.Course, 0, "allBackupsSortCourse"),
+                     ("Made", AllBackupsOrder.Column.Made, 1, "allBackupsSortMade"),
+                     ("Size", AllBackupsOrder.Column.Size, 3, "allBackupsSortSize"),
+                 })
+        {
+            var button = new Button
+            {
+                Padding = new Thickness(0),
+                Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Left,
+            };
+            AutomationProperties.SetAutomationId(button, id);
+            AutomationProperties.SetName(button, $"Sort by {title}");
+            button.Click += (_, _) =>
+            {
+                order = AllBackupsOrder.AfterPressing(column, order);
+                TitleTheHeaders();
+                Fill();
+            };
+            Grid.SetColumn(button, slot);
+            header.Children.Add(button);
+            sortButtons.Add((button, title, column));
+        }
+        var madeBy = new TextBlock { Text = "Made By", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(madeBy, 2);
+        header.Children.Add(madeBy);
+        TitleTheHeaders();
+        Fill();
+        panel.Children.Add(header);
         panel.Children.Add(list);
 
         var dialog = new ContentDialog
@@ -516,10 +592,68 @@ public sealed partial class SidebarPane : UserControl
             dialog.PrimaryButtonText = DeleteBackupsLabel(list.SelectedItems.Count);
             DialogButtons.EnablePrimary(dialog, list.SelectedItems.Count > 0, PrimaryKind.NotTheDefault);
         };
-        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+
+        List<BackupItem> Chosen() => list.SelectedItems.OfType<ListViewItem>().Select(r => (BackupItem)r.Tag).ToList();
+
+        // What to ask once this dialog has gone: Restore… or Delete… from the
+        // menu or the Delete key, or the Delete button itself.
+        Func<Task>? pending = null;
+        void AskAfterClosing(Func<Task> ask)
+        {
+            pending = ask;
+            dialog.Hide();
+        }
+        void DeleteChosen()
+        {
+            var chosen = Chosen();
+            if (chosen.Count > 0) AskAfterClosing(() => ConfirmDeleteBackups(chosen, sizes, askedIn));
+        }
+
+        var restoreItem = new MenuFlyoutItem { Text = "Restore…", Icon = new FontIcon { Glyph = RestoreGlyph } };
+        restoreItem.Click += (_, _) =>
+        {
+            if (Chosen() is [var only]) AskAfterClosing(() => { ConfirmRestoreBackup(only); return Task.CompletedTask; });
+        };
+        var showItem = new MenuFlyoutItem { Text = "Show in File Explorer", Icon = new FontIcon { Glyph = ExplorerGlyph } };
+        // The dialog stays: nothing is asked. One Explorer window per folder.
+        showItem.Click += (_, _) =>
+        {
+            foreach (var inFolder in Chosen().GroupBy(b => Path.GetDirectoryName(b.FilePath), StringComparer.OrdinalIgnoreCase))
+                FolderActions.ShowInFileExplorer(inFolder.First().FilePath);
+        };
+        var deleteItem = new MenuFlyoutItem { Text = "Delete…", Icon = new FontIcon { Glyph = Glyphs.Remove } };
+        deleteItem.Click += (_, _) => DeleteChosen();
+        menu.Items.Add(restoreItem);
+        menu.Items.Add(showItem);
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(deleteItem);
+        menu.Opening += (_, _) =>
+        {
+            // A right-click on a row that is not selected selects only it, as
+            // in File Explorer; on a selected row it acts on the selection.
+            if (menu.Target is ListViewItem target && !target.IsSelected)
+            {
+                list.SelectedItems.Clear();
+                target.IsSelected = true;
+            }
+            int count = list.SelectedItems.Count;
+            restoreItem.IsEnabled = count == 1;
+            showItem.IsEnabled = count > 0;
+            deleteItem.IsEnabled = count > 0;
+        };
+        list.KeyDown += (_, args) =>
+        {
+            if (args.Key != Windows.System.VirtualKey.Delete) return;
+            args.Handled = true;
+            DeleteChosen();
+        };
+
+        var result = await ShowDialogSafelyAsync(dialog);
+        if (pending is null && result == ContentDialogResult.Primary && Chosen() is { Count: > 0 } pressed)
+            pending = () => ConfirmDeleteBackups(pressed, sizes, askedIn);
+        if (pending is not { } ask) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
-        var chosen = list.SelectedItems.OfType<ListViewItem>().Select(r => (BackupItem)r.Tag).ToList();
-        await ConfirmDeleteBackups(chosen, sizes, askedIn);
+        await ask();
     }
 
     /// <summary>"Delete 2 Backups…" — the one button, carrying the count. With
