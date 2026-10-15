@@ -3470,7 +3470,12 @@ then, in the contract's order (`theDestination.order`):
    wall clock for up to ten minutes, take-then-check with the run's own
    `build` + `publish` leases; still busy, it stands down `courseWasBusy`, its
    leases released first, with `scheduled publish waited for the course` on the
-   trail.
+   trail. **Since #477 the same look also waits for a live copy of the app's
+   tools into the working folder** (another program's
+   `toolchain-copying.<pid>` marker, the run's own never counted), taking no
+   lease while one is live; a copy still live at ten minutes stands it down
+   `couldNotRunAsSetNow` with `wrapperCouldNotBeWritten` — never
+   `courseWasBusy`, which would be false about the course.
 3. **Whether the task still stands**: registered, and its job still naming
    this run's moment. A task cancelled or re-set while the run waited deploys
    nothing and writes nothing.
@@ -3481,9 +3486,75 @@ then, in the contract's order (`theDestination.order`):
    `couldNotRunAsSetNow` with the reason clause; a destination that differs
    from what the teacher was told goes ahead and says so
    (`scheduled publish read the course's settings`).
-5. **The wrapper**, written from those settings under the task's OWN name
-   (#309's trap: never recomputed), and run. The task is then cleared (it is
+5. **The folder's tools, brought up to date (#477), then the wrapper.**
+   Holding both leases, the run copies the recipe beside `Plantoir.exe` into
+   the working folder (`ToolchainReadiness.RefreshWorkspace`: the existing
+   launchers, then `.toolchain\`, through the same `Ensure` and marker the
+   window uses) — so a 06:30 run after an update builds with the tools it
+   carries, not the ones from before an update nobody has opened the app
+   since. A copy that fails, or that is still waiting its turn behind another
+   program's copy when the run's ten minutes (counted from step 2's start)
+   are up, stands down `couldNotRunAsSetNow` with `wrapperCouldNotBeWritten`;
+   a task cancelled or set again during a long copy deploys nothing. Then the
+   wrapper, written from those settings under the task's OWN name (#309's
+   trap: never recomputed), and run. The task is then cleared (it is
    one-shot); the wrapper's record stays.
+
+**Why the run copies, and why before the wrapper (#477, Russell's ruling
+2026-10-15: fix it inside Windows, no contract change).** The run is
+`Plantoir.exe` with no window, and until #477 it never touched `.toolchain\`:
+after an update it built from the OLD recipe until somebody opened the app on
+that folder, and a run that fired while a window was copying built from a mix
+of old and new files. The copy goes after the settings decision (so a deploy
+that stands down for its settings copies nothing) and BEFORE the wrapper
+because the wrapper's fingerprint step (`TaskScheduling.cs`, the
+`section_fingerprint.py` call) and `preview.ps1 --build-only` both read
+`.toolchain\`: written first, the wrapper would bake the new program's
+`SectionPublishState.CurrentRule` beside the old fingerprint script. It holds
+the leases because it is part of the deploy; the WAIT in step 2 holds none,
+as `workLeases.declining.whyTheScheduledPublishWaits` says. The contract's
+order (`theDestination.order`) is unchanged — lateness, wait, still standing,
+settings — and neither `whyTheScheduledPublishWaits` nor the order mentions
+the copy, which is Windows-only by the ruling; this paragraph is where that
+difference is recorded. The stand-down sentence is the contract's own
+`wrapperCouldNotBeWritten` ("Plantoir could not get the deploy ready on this
+computer when the time came"), true for a failed copy and for one still
+running, so no new key; the trail lines are the run's own
+(`scheduled publish waited for the course` — "waited N s for Plantoir to
+finish getting the working folder ready (process P), and went ahead / stood
+down" — and `working folder tools copied`, "got the working folder ready for
+a scheduled deploy — …").
+
+**Copies take turns.** Two copies into one folder at once were measured
+(i5-8365U, 16 GB, Windows 11 Pro 26200, 2026-10-15; 2,004 files, 26.9 MB
+including 1, 2, 3 and 5 MB files; two .NET 9 processes started on the same
+UTC tick, each `File.Copy(src, dst, overwrite: true)` then
+`SetLastWriteTimeUtc`, as `ToolchainMirror` does): in 5 runs, 36 failures
+across 9 of the 10 copier processes (3+1, 2+2, 0+1, 1+2, 12+12), every one an
+`IOException` 0x80070020 sharing violation, the 5 MB file hit in 4 of the 5.
+The destination was byte-identical every time — the other copier had written
+the file — but each copier would have reported a FAILED copy, and a failed
+copy stands a scheduled run down. Writing to a temporary name and
+`File.Move(tmp, dst, overwrite: true)` was WORSE (3 runs): 855 failures, all
+`UnauthorizedAccessException` 0x80070005, with 4, 710 and 141 `.tmp` files
+left behind. So every copy (window or run) writes its marker FIRST, then
+waits while a live marker written BEFORE its own stands — an earlier moment
+on line 3, or the same moment and a lower process id
+(`ToolchainReadiness.MustWaitFor`; a moment not in the one shape both apps
+write counts as NOT earlier, so two copies facing one unreadable marker
+cannot both wait on it). A window waits for as long as it takes, with its
+banner up; the run gives up on its own ten-minute clock. Caveats on the
+numbers: `%TEMP%` with Defender real-time scanning on, and the copies ran
+unconditionally — `ToolchainMirror`'s compare-first skip narrows the window
+on a warm folder, not on the cold one an update leaves.
+
+**Rejected:** standing down `courseWasBusy` for a copy (a false sentence
+about the course); building from whatever `.toolchain\` holds (the mix the
+issue describes); a contract case for both platforms (the ruling — the mac
+is asked whether it has the gap instead); copying to a temporary name and
+renaming (measured above); and capping the WINDOW's wait and then copying
+anyway (it would bring back the two-copies-at-once failure the turn exists
+to prevent).
 
 **Measured end to end on this Windows PC** (Intel Core i5-8365U, 4 cores / 8
 threads, 15.7 GB, NTFS, Windows 11 Pro 25H2 build 26200, 2026-09-30): a real

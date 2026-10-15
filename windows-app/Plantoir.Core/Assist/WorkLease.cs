@@ -291,7 +291,7 @@ public static class WorkLease
         return order < 0 || (order == 0 && other.Pid < claim.Pid);
     }
 
-    private static bool IsMomentShape(string moment) =>
+    internal static bool IsMomentShape(string moment) =>
         System.Text.RegularExpressions.Regex.IsMatch(moment, @"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$");
 
     /// <summary>

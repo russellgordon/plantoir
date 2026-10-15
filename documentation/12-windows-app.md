@@ -4501,10 +4501,49 @@ another — before pressing anything, so a picture never shows the "Cannot
 Preview Yet" dialog; a FAILED copy makes a scene answer `refused: <the
 sentence>` and a hook log `automation hook refused: …` and do nothing.
 
-**The scheduled run is unchanged in this piece.** It never mirrors
-`.toolchain\` at all, and its wrapper's fingerprint reads
-`.toolchain\scripts`, so whether a 06:30 run should wait for a copy the app
-is making is its own question; the director opens it as an issue.
+**The scheduled run copies too, since #477 (2026-10-15).** It used to never
+mirror `.toolchain\` at all, while its wrapper's fingerprint reads
+`.toolchain\scripts` — so after an update a 06:30 run built from the OLD
+recipe until the app was opened, and one that fired while a window was
+copying built from a mix. Now `ScheduledRun.Execute` waits, inside its
+existing ten minutes, while another program's marker is live, and after the
+settings decision it calls `ToolchainReadiness.RefreshWorkspace` with the
+recipe beside `Plantoir.exe` (`World.BundledToolchainRoot`, set by
+`Program.Main`) before it writes the wrapper. The run's copy goes through
+`Ensure` and `CopyNow`, so it writes the same marker: `plantoir-mcp` refuses
+meanwhile and a window's later copy waits its turn. The order, the reasons,
+the stand-down sentence and the measurements are in 07 → "On Windows since
+bundle 3: the scheduled run is Plantoir".
+
+**Two copies take turns (#477).** Measured: two copies into one folder at
+once fail with sharing violations (36 failures in 5 runs, 0x80070020; a
+temp-name-and-rename version failed 855 times with 0x80070005 and left `.tmp`
+files behind — 07 has the numbers). So `CopyNow` writes its marker FIRST and
+then waits while a live marker written before its own stands
+(`ToolchainReadiness.MustWaitFor`: an earlier moment on line 3, or the same
+moment and a lower process id; an unreadable moment counts as NOT earlier,
+so no two copies can both wait on one marker; never itself). `Markers()` now
+reads the moment and `WriteMarker` returns the moment it actually wrote. How
+long to wait is the CALLER's (`ToolchainReadiness.TakingTurns`): the window's
+`WaitUntilDone` looks every half second and never gives up — the folder
+reads Copying, with its banner, meanwhile — and says in startup.log that it
+waited and for which process; the scheduled run passes its own `Sleep` and
+gives up when its ten minutes, counted from its wait for the course, are up,
+leaving `Status.GaveUpWaiting` and writing nothing. `Entry.Writing` is set
+only when the copier really starts (#484 waits only for those). A marker from
+an older Plantoir (1.4.5 and before) has the same body, so it is waited for;
+that program never waits in turn, so copies may still overlap with it, and
+nothing deadlocks. `RefreshWorkspace` (Core) does NOTHING when the recipe's
+`Dockerfile` is not at the root it is given: the mirror deletes what its
+source lacks, so mirroring from a missing bundle would empty the working
+folder's tools. `BundledToolchain.RefreshWorkspace` is now the app's thin
+wrapper around it, and keeps its name (`Reload()`'s body is pinned).
+
+A NOTE on a near-miss when reading the contract: `workLease`'s
+`howToRunACase` ends "On Windows, aBuild and aScheduledPublish also block on
+copy (#413)". That `copy` is the backup-zip LEASE (`WorkLease.Copying`, a
+course being zipped for an assistant), not this tools marker, which is not a
+lease and holds no course.
 
 **3. Whether the mac's equivalent blocks the same way.** It did, and #476
 (the mac, 2026-10-08) measured and then matched this design: the copy held
@@ -4541,8 +4580,8 @@ first file WRITTEN rather than a timer. `documentation/09-mac-app.md` →
   for a deploy, and after #406's today's-class question — a refusal that
   arrives after the window has already acted. So the gates are at the entry
   points and `ScriptRunner` is the backstop.
-- **A wait in the scheduled run.** See above: the run never mirrors, so it is
-  its own issue rather than a patch here.
+- **A wait in the scheduled run** — rejected in #473 as out of scope, and
+  built in #477 (above): the run now waits for a live copy and makes its own.
 - **A modal "please wait" dialog.** It would block exactly what the teacher
   can safely do meanwhile (read and edit pages, settings) and is the shape of
   the freeze this fixes.
