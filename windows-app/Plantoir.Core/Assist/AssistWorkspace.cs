@@ -1849,10 +1849,19 @@ public sealed partial class AssistWorkspace
 
         recording.Done();
 
-        if (!plan.Publishes)
-            return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined), backup);
-
-        // Publishing builds a PREVIEW, and stops there.
+        // Publishing AND hiding build a PREVIEW, and stop there (#479).
+        //
+        // A hide used to return here without building, because since the
+        // first commit this method tied "build the preview" to "the plan
+        // publishes" — nothing chose that. It left an outside assistant's
+        // unpublish_pages saying a page was hidden while the preview still
+        // showed it, and it was the one difference the mac's rebuild after a
+        // hide exposed (shared-rules.json → refusedBuildAnswers, the seventh
+        // case). A hide that changes NOTHING still builds nothing (the
+        // `ChangesNothing && !Publishes` return above); and a hide is still
+        // not refused up front while Plantoir is building
+        // (RefuseIfPlantoirIsBuilding is for publishing): its pages are
+        // written, and only the rebuild is declined below, with its note.
         //
         // Deploying is a separate request with its own tool and its own yes —
         // it is not something publishing does on the way past. That
