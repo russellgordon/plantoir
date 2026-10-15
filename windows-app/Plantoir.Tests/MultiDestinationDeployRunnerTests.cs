@@ -26,6 +26,8 @@ public class MultiDestinationDeployRunnerTests
             new[] { Netlify, Cloudflare }, cloudflareAccountID: "");
         Assert.NotNull(refusal);
         Assert.Contains("Account ID", refusal);
+        // The ID is the teacher's, edited in Settings since #491 — never a course's settings.
+        Assert.EndsWith("Add it in File ▸ Settings ▸ Deploying, then deploy again.", refusal);
     }
 
     [Fact]

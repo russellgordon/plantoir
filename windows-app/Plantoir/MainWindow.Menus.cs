@@ -172,6 +172,9 @@ public sealed partial class MainWindow
 
         // ---- Help
         var help = HelpMenu.Items;
+        // F1 is Windows' Help key, so it is Plantoir Help's (#491). It goes
+        // through Invoke like every other key, so it does nothing under a dialog.
+        Add(help, "Plantoir Help", "helpPlantoirHelp", null, Key(VirtualKey.F1, VirtualKeyModifiers.None, "F1"), OpenPlantoirHelp);
         Add(help, AssistWording.PublishingAndDeployingTitle + "…", "helpPublishingAndDeploying", null, null,
             () => _ = ExplainPublishingAndDeploying());
         help.Add(new MenuFlyoutSeparator());
@@ -502,6 +505,15 @@ public sealed partial class MainWindow
                 OpenWorkingFolder_Click(this, new RoutedEventArgs());
                 return;
         }
+    }
+
+    // ---- Help ▸ Plantoir Help -------------------------------------------------
+
+    /// <summary>The support page, in the browser (#491; the mac's item and address).</summary>
+    private void OpenPlantoirHelp()
+    {
+        if (ExternalLinks.Open(new Uri(PlantoirHelp.SupportPage)))
+            ActivityTrail.Note(ActivityTrail.Event.PlantoirHelpOpened, PlantoirHelp.TrailLine);
     }
 
     // ---- Help ▸ Publishing and Deploying… ---------------------------------

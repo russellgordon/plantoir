@@ -1281,6 +1281,7 @@ public class ContractTests
                             break;
                         case "cloudflareAccountMissing":
                             Assert.Contains("Cloudflare Pages, which needs your Account ID", problem);
+                            Assert.EndsWith("Add it in File ▸ Settings ▸ Deploying, then schedule this again.", problem);   // #491
                             break;
                         case "neverDeployed":
                         case "additionalDestinationNeverDeployed":
@@ -1299,6 +1300,7 @@ public class ContractTests
                             break;
                         case "additionalCloudflareAccountMissing":
                             Assert.Contains("also deploys to Cloudflare Pages, which needs your Account ID", problem);
+                            Assert.EndsWith("Add it in File ▸ Settings ▸ Deploying, then schedule this again.", problem);   // #491
                             break;
                         default:
                             Assert.Fail($"Unknown refusal case: {expectRefusal}");

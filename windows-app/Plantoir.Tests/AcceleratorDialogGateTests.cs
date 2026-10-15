@@ -24,6 +24,7 @@ public class AcceleratorDialogGateTests
     [InlineData("Ctrl+N")]
     [InlineData("Ctrl+Shift+R")]
     [InlineData("F2")]
+    [InlineData("F1")]   // Help ▸ Plantoir Help (#491)
     public void TheKeyIsOnAMenuItemWhoseRunAsksTheDialogGateFirst(string key)
     {
         Assert.Contains($", \"{key}\")", Menus);   // Key(…, "<key>") on an Add(…) line

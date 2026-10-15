@@ -154,7 +154,6 @@ internal static class NamedGapLedger
 
     // Reasons, one per owning issue: the catch-up to mac 1.7.1 lands in
     // batches, and each of these is a later batch's work (2026-10-15).
-    private const string HigSweep = "the HIG sweep (mac #457 item 4) is a later batch of the catch-up to 1.7.1";
     private const string Printing = "printable pages (mac #454) are a later batch of the catch-up to 1.7.1";
     private const string Diagrams = "TikZ diagrams and function graphs (mac #485) are a later batch of the catch-up to 1.7.1";
     private const string LastViewed = "Preview at Last Viewed (mac #504) is a later batch of the catch-up to 1.7.1";
@@ -163,9 +162,6 @@ internal static class NamedGapLedger
     {
         // ---- activityTrail.mustRecord: events this app does not declare yet.
         // Each goes when its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 491, V150, HigSweep,
-            "opened Plantoir Help",
-            "Cloudflare account ID changed in Settings"),
         Owed(ActivityTrailEvents, 496, V160, Printing,
             "preview page opened in the web browser",
             "asked before adding guidance to a file",

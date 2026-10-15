@@ -387,6 +387,9 @@ public partial class App : Application
     private static void QuitTime()
     {
         LogDiagnostic("QuitTime called");
+        // First: Exit below may end the process without raising the Settings
+        // window's Closed, and a changed Account ID would never reach the trail.
+        Views.SettingsWindow.NoteBeforeQuit();
         // atQuit (#337): never refuses; a prepared update is set aside when
         // work is under way, or installed as Plantoir quits without reopening.
         try

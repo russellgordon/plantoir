@@ -58,6 +58,37 @@ public sealed class AppSettings
     /// </summary>
     public string CloudflareAccountId { get; set; } = "";
 
+    /// <summary>
+    /// Raised after <see cref="ChangeCloudflareAccountId"/> stores a new ID, on
+    /// the thread that changed it, so every read-only display (a course's
+    /// Deploying section, the new-course wizard) shows it — and re-validates —
+    /// at once (#491). Static because the ID is app-wide; a subscriber
+    /// unsubscribes when its view unloads.
+    /// </summary>
+    public static event Action? CloudflareAccountIdChanged;
+
+    /// <summary>
+    /// The one way the Account ID is changed (#491): File ▸ Settings ▸ Deploying
+    /// calls it as the teacher types. Saved at once and announced; nothing when
+    /// the value is unchanged. <c>CloudflareAccountInSettingsTests</c> holds every
+    /// write in the app to <c>DeployingSettingsPane</c>.
+    /// </summary>
+    public void ChangeCloudflareAccountId(string id)
+    {
+        if (CloudflareAccountId == id) return;
+        CloudflareAccountId = id;
+        Save();
+        CloudflareAccountIdChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Which section File ▸ Settings… opened on last ("assistant", "deploying"),
+    /// so it opens there again — the mac remembers its pane the same way
+    /// (<c>SettingsPane.storageKey</c>). Open Settings… beside the Account ID
+    /// always asks for Deploying.
+    /// </summary>
+    public string? LastSettingsSection { get; set; }
+
     public List<RememberedWindow> RememberedWindows { get; set; } = new();
 
     /// <summary>
