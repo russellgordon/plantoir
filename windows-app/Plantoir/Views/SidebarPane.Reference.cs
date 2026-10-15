@@ -267,7 +267,6 @@ public sealed partial class SidebarPane
         var warning = new TextBlock { TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
         var addOns = ObsidianAddOns.FoundIn(course.DirectoryPath);
         var notes = new StackPanel { Spacing = 8 };
-        notes.Children.Add(new TextBlock { Text = ReferenceCourse.CopyIsASnapshot(shown), TextWrapping = TextWrapping.Wrap });
         if (!addOns.IsEmpty)
             notes.Children.Add(new TextBlock { Text = ReferenceCourse.KeepACopyLeavesAddOnsBehind(shown), TextWrapping = TextWrapping.Wrap });
         notes.Children.Add(new TextBlock { Text = ReferenceCourse.NeverDeployed(shown) + " " + ReferenceCourse.PagesAreLocked, TextWrapping = TextWrapping.Wrap });
@@ -276,7 +275,13 @@ public sealed partial class SidebarPane
         var dialog = new ContentDialog
         {
             Title = $"Keep a copy of {shown} for reference",
-            Content = new StackPanel { Spacing = 10, Children = { picker, nameBox, warning, notes } },
+            // What the copy IS goes under the title (#491 item 3); what it
+            // leaves behind and why it cannot be deployed stay below the form.
+            Content = new StackPanel
+            {
+                Spacing = 10,
+                Children = { FormBuilders.DialogExplanation(ReferenceCourse.CopyIsASnapshot(shown)), picker, nameBox, warning, notes },
+            },
             PrimaryButtonText = "Keep a Copy",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,

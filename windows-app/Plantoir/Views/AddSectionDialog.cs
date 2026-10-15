@@ -59,7 +59,7 @@ public sealed class AddSectionDialog : ContentDialog
         numberRow.Children.Add(_numberBox);
 
         var panel = new StackPanel { Spacing = 12, MinWidth = 300 };
-        panel.Children.Add(new TextBlock { Text = existingSentence, FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(FormBuilders.DialogExplanation(existingSentence));
         panel.Children.Add(numberRow);
         panel.Children.Add(_warningSlot);
         Content = panel;
