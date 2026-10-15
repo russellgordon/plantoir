@@ -771,32 +771,8 @@ public sealed class AssistAgent
     /// <summary>Provides the human-readable destination for publishing/deploying (e.g. "Netlify", "Cloudflare Pages", "a folder on this computer").</summary>
     public Func<string>? DestinationProvider { get; set; }
 
-    /// <summary>
-    /// Tools that change pages. They run on the server as pure file edits —
-    /// <c>preview: false</c>, so the server builds nothing — and then the
-    /// app's own preview is put on screen to show what changed.
-    /// </summary>
-    private static readonly HashSet<string> EditsPages = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "publish_pages", "unpublish_pages", "publish_class_on", "undo_last_change",
-        "re_date_classes", "roll_over_section", "sync_page_dates",
-        "add_next_class", "add_classes", "make_room_for_classes", "add_curriculum_mentions",
-    };
-
-    /// <summary>
-    /// Tools that must always start a preview in Plantoir after finishing their work,
-    /// even if a preview was not previously active.
-    /// </summary>
-    private static readonly HashSet<string> AlwaysStartsPreview = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "re_date_classes", "roll_over_section",
-    };
-
-    /// <summary>The page-editing tools that accept a preview flag to decline the server's build.</summary>
-    private static readonly HashSet<string> TakesPreviewFlag = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "publish_pages", "unpublish_pages", "publish_class_on",
-    };
+    // Which tools edit pages, always start a preview or take a preview flag
+    // live on AssistToolRunner now (#489), the one entry the menu shares.
 
     private JsonObject? _awaiting;      // a write the teacher has not agreed to yet
 
@@ -2167,17 +2143,7 @@ public sealed class AssistAgent
     /// write happens, the model gets a lap it should not have had, and the
     /// teacher reads a paragraph restating the sentence above it.
     /// </summary>
-    private static readonly HashSet<string> WriteTools = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "publish_pages", "unpublish_pages", "publish_class_on", "undo_last_change",
-        "add_next_class", "add_classes", "make_room_for_classes",
-        "schedule_deploy", "cancel_scheduled_deploy",
-        "rebuild_preview", "deploy_section", "re_date_classes", "roll_over_section",
-        "remember_timetable", "sync_page_dates", "add_curriculum_mentions",
-        "back_up_course",
-    };
-
-    private static bool IsWriteTool(string name) => WriteTools.Contains(name);
+    private static bool IsWriteTool(string name) => AssistToolRunner.IsWriteTool(name);
 
     private bool _handedToApp;
 
@@ -2196,103 +2162,27 @@ public sealed class AssistAgent
         return TakeHandedToApp();
     }
 
+    /// <summary>
+    /// Run one call through the ONE runner entry (<see cref="AssistToolRunner"/>,
+    /// #489) and record its answer for the model: exactly one <c>tool</c>
+    /// message per call, whichever branch answered.
+    /// </summary>
     internal async Task<AssistToolAnswer> RunTool(JsonObject call, List<Line> lines, CancellationToken cancellation)
     {
-        string name = call["function"]?["name"]?.GetValue<string>() ?? "";
-        var arguments = new JsonObject();
-        if (call["function"]?["arguments"]?.GetValue<string>() is { } raw)
+        var runner = new AssistToolRunner(_tools, _courseCode, _section, AssistSurface.LocalWindow)
         {
-            try { arguments = JsonNode.Parse(raw) as JsonObject ?? new JsonObject(); }
-            catch { /* a malformed call is answered, not crashed on */ }
-        }
-
-        // Building and deploying are done by pressing Plantoir's own buttons,
-        // once, where the teacher can watch — never by the server in a hidden
-        // container run whose transcript lands in this chat.
-        // These answers appear in the transcript word for word, so they are
-        // written for the teacher — and they END the turn. Asked "what next?"
-        // after reading one of these, a small model restates it, and the
-        // teacher saw the same sentence twice. There is nothing next: the
-        // main window has the work.
-        if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ThisSectionIsBeingDeployed())
-        {
-            // Before a window is opened, a preview stopped or a no-window
-            // rebuild run (#386): the same publish record the window asks.
-            _handedToApp = true;
-            return Answer(call, SectionIsBeingDeployedSentence);
-        }
-        if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
-        {
-            ShowPreviewInApp.Invoke();
-            _handedToApp = true;
-            return Answer(call, AssistWording.PreviewIsRebuilding(_courseCode, _section.ToString()));
-        }
-        if ((name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase)
-             || name.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase))
-            && CourseIsKeptForReference())
-        {
-            _handedToApp = true;
-            return Answer(call, AssistWording.DeployRefusedForAReferenceCourse(_courseCode));
-        }
-        if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) &&
-            (StartDeployInApp is not null || StartDeployInAppAsync is not null))
-        {
-            if (SectionIsBusy?.Invoke() == true)
-            {
-                if (StartDeployInApp is not null) StartDeployInApp.Invoke();
-                else if (StartDeployInAppAsync is not null) _ = StartDeployInAppAsync.Invoke();
-                _handedToApp = true;
-                return Answer(call, AssistWording.SectionIsBusy(_courseCode, _section.ToString()));
-            }
-
-            if (PreviewIsShowing?.Invoke() == true)
-            {
-                if (StopPreviewInAppAsync is not null)
-                {
-                    await StopPreviewInAppAsync.Invoke();
-                }
-                else
-                {
-                    StopPreviewInApp?.Invoke();
-                }
-            }
-
-            if (StartDeployInAppAsync is not null)
-            {
-                string? outcome = await StartDeployInAppAsync.Invoke();
-                _handedToApp = true;
-                return Answer(call, outcome ?? AssistWording.DeployDidNotFinish(_courseCode, _section.ToString()));
-            }
-            else
-            {
-                StartDeployInApp?.Invoke();
-                _handedToApp = true;
-                // No async wiring available means no way to await the real
-                // outcome — the caller pressed the button and this is all
-                // that can honestly be said about it.
-                return Answer(call, AssistWording.Deployed(_courseCode, _section.ToString()));
-            }
-        }
-
-        // A page edit does what a person would do: stop the preview, change
-        // the files, start the preview again. The server never builds
-        // (preview declined), so the work happens once, in the main window.
-        bool edits = EditsPages.Contains(name);
-        if (TakesPreviewFlag.Contains(name)) arguments["preview"] = false;
-        bool hadPreview = PreviewIsShowing?.Invoke() == true;
-        if (edits && hadPreview)
-        {
-            if (StopPreviewInAppAsync is not null)
-            {
-                await StopPreviewInAppAsync.Invoke();
-            }
-            else
-            {
-                StopPreviewInApp?.Invoke();
-            }
-        }
-
-        var answer = await _tools.CallTool(name, arguments, OnToolProgress, cancellation);
+            OnToolProgress = OnToolProgress,
+            ShowPreviewInApp = ShowPreviewInApp,
+            StartDeployInApp = StartDeployInApp,
+            StartDeployInAppAsync = StartDeployInAppAsync,
+            SectionIsBusy = SectionIsBusy,
+            SectionIsBeingDeployed = SectionIsBeingDeployed,
+            PreviewIsShowing = PreviewIsShowing,
+            StopPreviewInApp = StopPreviewInApp,
+            StopPreviewInAppAsync = StopPreviewInAppAsync,
+            CourseIsKeptForReference = CourseIsKeptForReference,
+        };
+        var (answer, handed) = await runner.Run(call, cancellation);
         if (answer.ConversationBackupPath is { } savedCopy) OnConversationBackup?.Invoke(savedCopy);
         // The MODEL is given the long half; the teacher's line is added by
         // whoever called this, from the short one.
@@ -2302,33 +2192,7 @@ public sealed class AssistAgent
             ["tool_call_id"] = call["id"]?.DeepClone(),
             ["content"] = answer.Detail,
         });
-        if (IsWriteTool(name) || name.Equals("check_section", StringComparison.OrdinalIgnoreCase) || name.Equals("read_remembered_timetable", StringComparison.OrdinalIgnoreCase))
-        {
-            _handedToApp = true;
-        }
-        if (edits && (hadPreview || AlwaysStartsPreview.Contains(name)) && ShowPreviewInApp is not null &&
-            !ThisSectionIsBeingDeployed())
-        {
-            ShowPreviewInApp.Invoke();
-        }
+        if (handed) _handedToApp = true;
         return answer;
-    }
-
-    /// <summary>
-    /// Record a tool's answer without having called the server.
-    ///
-    /// These are <c>AssistWording</c> sentences, written for the teacher and
-    /// short enough for the model to read as they stand — so the two halves
-    /// are the same words, deliberately.
-    /// </summary>
-    private AssistToolAnswer Answer(JsonObject call, string text)
-    {
-        _messages.Add(new JsonObject
-        {
-            ["role"] = "tool",
-            ["tool_call_id"] = call["id"]?.DeepClone(),
-            ["content"] = text,
-        });
-        return AssistToolAnswer.Same(text);
     }
 }
