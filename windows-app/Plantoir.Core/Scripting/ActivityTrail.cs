@@ -649,6 +649,23 @@ public static class ActivityTrail
         /// so this line and a quiet notice are its only record.
         /// </summary>
         GuidanceCouldNotBeWritten,
+
+        // ---- Preview at Last Viewed (#514; the mac's #504), one block ----
+        /// <summary>
+        /// A teacher's press of Preview asked for the page last viewed, or
+        /// the page is opened, or the front page opened instead and why —
+        /// gone, did not answer, nothing remembered, the front page was the
+        /// page last viewed, today's class was just put on it. The page's
+        /// PLACE (its decoded path), never its words. Falling back is silent
+        /// on screen, so this line is its only record.
+        /// </summary>
+        PreviewStartedAtThePageLastViewed,
+        /// <summary>
+        /// File ▸ Settings ▸ Preview changed where a press of Preview opens
+        /// (#514): the front page or the page last viewed. One line per
+        /// change, so "Preview opened somewhere odd" can be answered.
+        /// </summary>
+        PreviewStartPageChosenInSettings,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -773,6 +790,8 @@ public static class ActivityTrail
         Event.PreviewPageOpenedInBrowser => "preview page opened in the web browser",
         Event.GuidanceFileAskedAbout => "asked before adding guidance to a file",
         Event.GuidanceCouldNotBeWritten => "guidance for assistants could not be written",
+        Event.PreviewStartedAtThePageLastViewed => "preview started at the page last viewed",
+        Event.PreviewStartPageChosenInSettings => "preview start page chosen in Settings",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

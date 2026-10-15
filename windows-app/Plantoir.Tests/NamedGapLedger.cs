@@ -150,17 +150,16 @@ internal static class NamedGapLedger
     private static IEnumerable<Entry> Owed(string area, int issue, string milestone, string reason, params string[] keys) =>
         keys.Select(key => new Entry(area, key, issue, milestone, reason));
 
-    // Reasons, one per owning issue: the catch-up to mac 1.7.1 lands in
-    // batches, and each of these is a later batch's work (2026-10-15).
-    private const string LastViewed = "Preview at Last Viewed (mac #504) is a later batch of the catch-up to 1.7.1";
+    // Reasons, one per owning issue, as `private const string` beside the
+    // milestones above. EMPTY since 2026-10-15: the catch-up to mac 1.7.1
+    // (#481) closed its last two entries — #514's two trail events — when
+    // Preview at Last Viewed landed in batch 6.
 
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
-        // ---- activityTrail.mustRecord: events this app does not declare yet.
-        // Each goes when its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 514, V171, LastViewed,
-            "preview started at the page last viewed",
-            "preview start page chosen in Settings"),
+        // ---- activityTrail.mustRecord: none held open. #514's two events
+        // ("preview started at the page last viewed", "preview start page
+        // chosen in Settings") landed with batch 6.
 
         // ---- specialNames.platformWording.keys
 
