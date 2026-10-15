@@ -1606,7 +1606,68 @@ public class AssistWorkspaceTests : IDisposable
             workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
 
         Assert.False(result.Succeeded);
-        Assert.Contains(AssistWording.WhereTheOutputIs, result.Message);
+        // #481: this caller has no window, so it is never pointed at one.
+        Assert.Contains(AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"), result.Message);
+        Assert.DoesNotContain(AssistWording.WhereTheOutputIs, result.Message);
+        Assert.DoesNotContain("Last output:", result.Message);
+    }
+
+    /// <summary>
+    /// #481: a rebuild that fails says one sentence to a caller with no
+    /// window — never "(The launcher exited with code 1.)" and never the log.
+    /// </summary>
+    [Fact]
+    public async Task ARebuildThatFailsSaysOneCleanSentence()
+    {
+        _launcher.FailOn = "preview";
+        _launcher.FailMessage = "(The launcher exited with code 1.)\n\nLast output:\nKeyError: 'x'";
+        var workspace = Open();
+
+        var result = await workspace.RebuildPreview("ICS3U", 1);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Nothing was changed. " + AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"),
+                     result.Message);
+        Assert.DoesNotContain("Last output:", result.Message);
+        Assert.DoesNotContain("exited with code", result.Message);
+    }
+
+    /// <summary>
+    /// #481: when the output has a plain reason, the sentence carries it — the
+    /// same explanation the app's own window would give.
+    /// </summary>
+    [Fact]
+    public async Task ARebuildThatFailsForAReasonSaysTheReason()
+    {
+        const string output = "(The launcher exited with code 1.)\n\nLast output:\ncurl: (6) Could not resolve host: registry.npmjs.org";
+        _launcher.FailOn = "preview";
+        _launcher.FailMessage = output;
+        var workspace = Open();
+
+        var result = await workspace.RebuildPreview("ICS3U", 1);
+
+        string reason = Plantoir.Core.Scripting.FailureExplainer.Explanation(output)!;
+        Assert.NotNull(reason);
+        Assert.Equal("Nothing was changed. " + AssistWording.PreviewDidNotBuildBecause("ICS3U", "1", reason),
+                     result.Message);
+        Assert.DoesNotContain("Last output:", result.Message);
+    }
+
+    /// <summary>#481: a whole unit published with a build that fails says the same sentence after its summary.</summary>
+    [Fact]
+    public async Task AWholeUnitWhoseBuildFailsSaysOneCleanSentence()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        _launcher.FailOn = "preview";
+        _launcher.FailMessage = "(The launcher exited with code 1.)\n\nLast output:\nKeyError: 'x'";
+        var workspace = Open();
+
+        var result = await workspace.ApplyWholeUnit("ICS3U", 1, 2, publishing: true, preview: true);
+
+        Assert.False(result.Succeeded);
+        Assert.NotNull(result.BackupPath);
+        Assert.EndsWith(". " + AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"), result.Message);
+        Assert.DoesNotContain(AssistWording.WhereTheOutputIs, result.Message);
         Assert.DoesNotContain("Last output:", result.Message);
     }
 
@@ -1907,7 +1968,8 @@ public class AssistWorkspaceTests : IDisposable
         var result = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
 
         Assert.False(result.Succeeded);
-        Assert.Contains("the preview couldn’t be built", result.Message);
+        Assert.Equal("1 page was changed and the course was backed up. " +
+                     AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"), result.Message);
         Assert.Single(_launcher.Runs);                       // deploy never ran
         Assert.NotNull(result.BackupPath);                   // and the backup is still there
     }

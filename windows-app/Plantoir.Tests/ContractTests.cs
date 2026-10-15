@@ -48,6 +48,10 @@ public class ContractTests
         Assert.Equal(wording["builtWithNoWindowOpen"]!.ToString(), AssistWording.BuiltWithNoWindowOpen("{course}", "{section}"));
         Assert.Equal(wording["rebuiltForACallerWithNoWindow"]!.ToString(), AssistWording.RebuiltForACallerWithNoWindow("{course}", "{section}"));
         Assert.Equal(wording["previewDidNotBuild"]!.ToString(), AssistWording.PreviewDidNotBuild("{course}", "{section}"));
+        Assert.Equal(wording["previewDidNotBuildForACallerWithNoWindow"]!.ToString(),
+                     AssistWording.PreviewDidNotBuildForACallerWithNoWindow("{course}", "{section}"));
+        Assert.Equal(wording["previewDidNotBuildBecause"]!.ToString(),
+                     AssistWording.PreviewDidNotBuildBecause("{course}", "{section}", "{reason}"));
 
         Assert.Equal(wording["undid"]!.ToString(), AssistWording.Undid("{change}"));
         Assert.Equal(wording["undidPartly"]!.ToString(), AssistWording.UndidPartly("{change}", 2));

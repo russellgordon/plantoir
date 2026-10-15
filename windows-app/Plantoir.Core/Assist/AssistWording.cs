@@ -394,6 +394,22 @@ public static partial class AssistWording
     public static string PreviewDidNotBuild(string course, string section) =>
         $"The preview for {course} Section {section} did not finish building. {WhereTheOutputIs}";
 
+    /// <summary>
+    /// A preview build that failed, said to a caller that has no window and
+    /// so cannot be pointed at the output (#481): an outside assistant over
+    /// <c>rebuild_preview</c>, <c>publish_pages</c> or <c>unpublish_pages</c>.
+    /// Said when nothing in the output has a plainer reason.
+    /// </summary>
+    public static string PreviewDidNotBuildForACallerWithNoWindow(string course, string section) =>
+        $"The preview for {course} Section {section} did not finish building. Build it once from its window in Plantoir to see what stopped it.";
+
+    /// <summary>
+    /// The same failure when <see cref="Plantoir.Core.Scripting.FailureExplainer"/>
+    /// recognises its cause; <paramref name="reason"/> is that explanation (#481).
+    /// </summary>
+    public static string PreviewDidNotBuildBecause(string course, string section, string reason) =>
+        $"The preview for {course} Section {section} did not finish building: {reason}";
+
     // MARK: - Taking something back
 
     public static string Undid(string whatHappened) =>

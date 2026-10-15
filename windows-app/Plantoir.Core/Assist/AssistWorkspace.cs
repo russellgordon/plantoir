@@ -1729,21 +1729,18 @@ public sealed partial class AssistWorkspace
             return new AssistResult(false,
                 AppendingFindings(course, section, build, 
                     AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString())), null);
-        // Refused because the section is still being deployed (#471, the
-        // build half of #467): said as the launcher's own line, which is the
-        // sentence a teacher can act on, rather than as a broken build.
-        if (RefusedWhileItsSectionDeploys(build) is { } refused)
-            return new AssistResult(false,
-                AppendingFindings(course, section, build,
-                    $"Nothing was changed, and the preview couldn’t be built: {refused}"), null);
+        // A failure is one clean sentence (#481): the reason when the output
+        // has a plain one — the launcher's own line when the section is still
+        // being deployed (#471) — and never the raw log, which this caller
+        // has no window to read beside it.
         return build.Succeeded
             ? new AssistResult(true,
-                AppendingFindings(course, section, build, 
+                AppendingFindings(course, section, build,
                     $"Rebuilt the preview of {course.Code} Section {section}. No content was changed. " +
                     "Look it over in Plantoir, and deploy it there when you're happy."), null)
             : new AssistResult(false,
-                AppendingFindings(course, section, build, 
-                    $"Nothing was changed, and the preview couldn’t be built. {build.Message}"), null);
+                AppendingFindings(course, section, build,
+                    "Nothing was changed. " + PreviewDidNotBuildHere(course, section, build)), null);
     }
 
     /// <summary>
@@ -1896,13 +1893,11 @@ public sealed partial class AssistWorkspace
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
             return new AssistResult(false,
-                // Refused while the section is being deployed (#471): the
-                // launcher's own line, and no pointer at a window this
-                // process does not have. Any other failure keeps its one
-                // clean sentence (never the raw log).
-                (RefusedWhileItsSectionDeploys(build) is { } refused
-                    ? $"{WhatSurvived(changed)}, but the preview couldn’t be built: {refused}"
-                    : $"{WhatSurvived(changed)}, but the preview couldn’t be built. {AssistWording.WhereTheOutputIs}") +
+                // One clean sentence, never the raw log, and no pointer at a
+                // window this caller does not have (#481); the reason when
+                // the output has one, the launcher's own line among them
+                // when the section is being deployed (#471).
+                $"{WhatSurvived(changed)}. {PreviewDidNotBuildHere(course, section, build)}" +
                 (declined.Count > 0 ? " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : ""), backup);
 
         return new AssistResult(true, Summary(changed, previewed: true, course.Code, section, plan.Hiding, declined), backup);
@@ -2144,31 +2139,45 @@ public sealed partial class AssistWorkspace
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (build.Succeeded) return new AssistResult(true, summary, backup);
-        // As in Apply (#471): a refusal is said as the launcher's own line.
-        return RefusedWhileItsSectionDeploys(build) is { } refusal
-            ? new AssistResult(false, $"{summary} But the preview couldn’t be built: {refusal}", backup)
-            : new AssistResult(false, $"{summary} But the preview couldn’t be built. {AssistWording.WhereTheOutputIs}", backup);
+        // As in Apply (#481, #471).
+        return new AssistResult(false, $"{summary} {PreviewDidNotBuildHere(course, section, build)}", backup);
     }
 
     /// <summary>
-    /// The launcher's own sentence when a <c>--build-only</c> was refused
-    /// because the same section is still being deployed, or null for any
-    /// other outcome (#471; contracts/shared-rules.json →
-    /// <c>deployWhileItsSectionDeploys.refusedBuildAnswers</c>).
+    /// A preview build that failed, in one sentence for a caller with no
+    /// window (#481): <c>wording.previewDidNotBuildBecause</c> with the reason
+    /// when <see cref="FailureExplainer.Explanation"/> recognises one, else
+    /// <c>wording.previewDidNotBuildForACallerWithNoWindow</c>. Callers say
+    /// <see cref="AssistWording.PreviewBuildNeedsAnAnswer"/> first for exit 3.
     /// </summary>
     /// <remarks>
-    /// The LIFTED line ("… so it cannot be built until that has finished."),
-    /// not <c>wording.deployRefusedWhileItsSectionDeploys</c>: that sentence
-    /// says the section "was not deployed again", which is false of a
-    /// rebuild, and a new wording key can only be added on the mac, where
-    /// assist-wording.json is generated. The launcher's line is contract data
-    /// already (<c>failureExplanationCases</c>), and its build flavour exists
-    /// precisely because an assistant's rebuild runs the same leg.
+    /// <para>A build refused because the same section is still being deployed
+    /// (#471; <c>contracts/shared-rules.json</c> →
+    /// <c>deployWhileItsSectionDeploys.refusedBuildAnswers</c>) is one of
+    /// those reasons: <c>Explanation</c> reaches it through
+    /// <c>SectionDeployRefusalOf</c>, which LIFTS the launcher's own line ("…
+    /// so it cannot be built until that has finished.") with its cross and
+    /// any mojibake taken off. That line, not
+    /// <c>wording.deployRefusedWhileItsSectionDeploys</c>, because that
+    /// sentence says the section "was not deployed again", which is false of
+    /// a rebuild; the launcher's line is contract data already
+    /// (<c>failureExplanationCases</c>), and its build flavour exists
+    /// precisely because an assistant's rebuild runs the same leg.</para>
+    ///
+    /// <para>Never <c>wording.whereTheOutputIs</c> and never the raw log:
+    /// this is said to a caller that has no window, and a log handed to a
+    /// model gets restated line by line in its reply. The mac says the same
+    /// two sentences (#481, its <c>AssistSiteWork</c>). Accepted, as on the
+    /// mac: <c>Explanation</c> can lift a sentence written for a deploy ("…
+    /// then deploy again") into a preview build's answer.</para>
     /// </remarks>
-    private static string? RefusedWhileItsSectionDeploys(LaunchOutcome build) =>
-        build.Succeeded || build.NeededAnAnswer
-            ? null
-            : FailureExplainer.SectionDeployRefusalOf(build.Message)?.Sentence;
+    private static string PreviewDidNotBuildHere(Course course, int section, LaunchOutcome build)
+    {
+        string number = section.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return FailureExplainer.Explanation(build.Message) is { } reason
+            ? AssistWording.PreviewDidNotBuildBecause(course.Code, number, reason)
+            : AssistWording.PreviewDidNotBuildForACallerWithNoWindow(course.Code, number);
+    }
 
     /// <summary>
     /// Point the section's front page at its most recent published class, and
