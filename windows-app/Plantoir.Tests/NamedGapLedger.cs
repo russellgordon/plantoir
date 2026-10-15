@@ -154,7 +154,6 @@ internal static class NamedGapLedger
 
     // Reasons, one per owning issue: the catch-up to mac 1.7.1 lands in
     // batches, and each of these is a later batch's work (2026-10-15).
-    private const string Menus = "the persistent Course and Section menus (mac #457) are a later batch of the catch-up to 1.7.1";
     private const string MenuAssist = "the assistant's functions from the menu bar (mac #457 item 3) and the question about classes dated after the next class at Deploy (mac #475) are a later batch of the catch-up to 1.7.1";
     private const string HigSweep = "the HIG sweep (mac #457 item 4) is a later batch of the catch-up to 1.7.1";
     private const string Printing = "printable pages (mac #454) are a later batch of the catch-up to 1.7.1";
@@ -165,8 +164,6 @@ internal static class NamedGapLedger
     {
         // ---- activityTrail.mustRecord: events this app does not declare yet.
         // Each goes when its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 488, V150, Menus,
-            "recent working folders cleared"),
         Owed(ActivityTrailEvents, 489, V150, MenuAssist,
             "ran from a menu",
             "section menu backed up a course",
@@ -216,7 +213,7 @@ internal static class NamedGapLedger
 
         // ---- assist-wording.json → wording: sentences with no same-named
         // member here, each held open by the issue that owns the feature
-        // that says it. All 72 are the menu bar's and the Deploy question's
+        // that says it. All 70 are the menu bar's and the Deploy question's
         // (mac #457 item 3 and #475, commits e4b4b8272 and 75a4be324).
         Owed(AssistWordingKeys, 489, V150, MenuAssist,
             "changedWhileSavingACopyFromTheMenu", "couldNotUndoFromTheMenu", "courseIsBeingCopiedFromTheMenu",
@@ -241,8 +238,7 @@ internal static class NamedGapLedger
             "pagesAChangeCouldNotFinishFromTheMenuNamingSeveral", "pagesWhoseNewDatesCouldNotBeSetFromTheMenu",
             "pagesWhoseSettingsCannotBeAddedToFromTheMenu",
             "pagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral",
-            "pageWhoseNewDateCouldNotBeSetFromTheMenu", "publishingAndDeployingExplained",
-            "publishingAndDeployingTitle", "publishThemAllButton", "restoreFromBackupPutsItBack",
+            "pageWhoseNewDateCouldNotBeSetFromTheMenu", "publishThemAllButton", "restoreFromBackupPutsItBack",
             "sectionIsChangingFromTheMenu", "undidFromTheMenu", "undidPartlyFromTheMenu",
             "undoIsStillAvailableFromTheMenu"),
     }.SelectMany(group => group).ToArray();

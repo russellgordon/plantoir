@@ -928,4 +928,20 @@ public static partial class AssistWording
     public const string WhereTheOutputIs = "The output is in that section's window in Plantoir.";
 
     public const string NothingToDo = "I am not sure what to do with that.";
+
+    // MARK: - Help ▸ Publishing and Deploying… (#488; the mac's #457 batch B)
+
+    /// <summary>The Help menu item's own title, and its dialog's.</summary>
+    public const string PublishingAndDeployingTitle = "Publishing and Deploying";
+
+    /// <summary>
+    /// What the two words mean, said TO the teacher (the assistant's own
+    /// <c>whatPublishingMeans</c> says "the teacher"). Shown with or without
+    /// a course selected.
+    /// </summary>
+    public const string PublishingAndDeployingExplained =
+        "Publishing a page decides whether students can see it in this section's website. Deploying sends the whole " +
+        "website out to the web. They are different acts: a page can be published for days and still not be online, " +
+        "and deploying puts everything already published in front of students straight away. Preview after a change " +
+        "to look it over first, which is the safer order.";
 }

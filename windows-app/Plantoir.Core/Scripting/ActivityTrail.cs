@@ -565,6 +565,13 @@ public static class ActivityTrail
         /// same files with only an os_log line.
         /// </summary>
         WorkingFolderToolsCopied,
+        /// <summary>
+        /// File ▸ Open Recent ▸ Clear Menu emptied the list of working folders
+        /// opened (#488, the mac's #457): how many it held. The list is only
+        /// ever added to otherwise, so "Open Recent is empty and I never cleared
+        /// it" has no answer without this line.
+        /// </summary>
+        RecentWorkingFoldersCleared,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -678,6 +685,7 @@ public static class ActivityTrail
         Event.UpdateSetAside => "update set aside",
         Event.UpdateStopped => "update stopped",
         Event.WorkingFolderToolsCopied => "working folder tools copied",
+        Event.RecentWorkingFoldersCleared => "recent working folders cleared",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
