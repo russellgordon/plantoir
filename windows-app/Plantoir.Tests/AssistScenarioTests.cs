@@ -119,6 +119,29 @@ public class AssistScenarioTests : IDisposable
     public async Task AssistCases_Scenario_MatchesContract(string scenarioName, string caseJson)
     {
         Assert.NotEmpty(scenarioName);
+
+        // A scenario this app owes (the Deploy question about classes dated
+        // after the next class, #489) is held open by name: it must still
+        // FAIL, and the day it passes this says to delete its ledger entry.
+        // Each case is its own test here, so the ledger's "it now passes"
+        // direction is checked case by case rather than through GapsIn.
+        if (NamedGapLedger.Holding(NamedGapLedger.AssistScenarios, scenarioName) is { } owed)
+        {
+            var failure = await Record.ExceptionAsync(() => Play(scenarioName, caseJson));
+            Assert.True(failure is not null, NamedGapLedger.ClosedMessage(owed));
+            return;
+        }
+
+        await Play(scenarioName, caseJson);
+    }
+
+    /// <summary>The ledger's other direction for scenarios: every one it holds open is still in the contract.</summary>
+    [Fact]
+    public void TheLedgeredScenariosAreStillInTheContract() =>
+        NamedGapLedger.StillNamed(NamedGapLedger.AssistScenarios, Cases().Select(c => c!["name"]!.ToString()));
+
+    private async Task Play(string scenarioName, string caseJson)
+    {
         var scenario = JsonNode.Parse(caseJson)!.AsObject();
         var given = scenario["given"]?.AsObject();
         string when = scenario["when"]!.ToString();
