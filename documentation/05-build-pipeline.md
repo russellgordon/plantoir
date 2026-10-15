@@ -1636,7 +1636,7 @@ read-only commands for him are in the #128 hand-over.
 **Adding a second curriculum.** Nothing ships the College Board's pages — the
 framework's text is the teacher's to bring. A teacher makes the folder
 (`College Board Curriculum`), ticks it under Course Settings → "Curriculum
-folders", and asks "Revise with Claude…" to draft one page per code from the
+folders", and asks Revise With ▸ Claude… to draft one page per code from the
 framework they have; the next build draws its map.
 
 

@@ -421,7 +421,7 @@ expectations; a map with none leaves out every sentence about them.
 Nothing Plantoir ships contains the College Board's pages: the framework's
 text is the teacher's to bring. A teacher makes a folder such as
 `College Board Curriculum`, ticks it under Course Settings → "Curriculum
-folders", and asks "Revise with Claude…" to draft one page per expectation
+folders", and asks Revise With ▸ Claude… to draft one page per expectation
 code from the framework they have — `1.A`, `CRD-1.A` and so on, one page
 each, named by the code alone. The next preview or publish draws a second
 coverage map for it, linked from Key Links under that folder's entry.

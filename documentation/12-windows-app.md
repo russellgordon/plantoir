@@ -11,7 +11,7 @@ deploys, a New Course wizard, and the same on-device assistant.
 
 **This page is architecture and platform difference.** For what is BUILT and
 what is still missing, read [`windows-app/PROGRESS.md`](../windows-app/PROGRESS.md),
-which carries the live parity table; for the reasoning behind decisions,
+whose first section says where the app stands, and the open `windows` issues; for the reasoning behind decisions,
 the rest of this folder. Those are maintained as work
 happens. This page is not a status report and should not be read as one.
 
@@ -751,7 +751,10 @@ each case on its own; two Section-menu names against #489) and
 ledgered scenario must still FAIL, checked per case through
 `NamedGapLedger.Holding`/`ClosedMessage`, and
 `TheLedgeredScenariosAreStillInTheContract` checks the other direction; three
-Deploy-question scenarios against #489). The ledger file is the live list.
+Deploy-question scenarios against #489). The ledger file is the live list, and
+it has been **empty** since batch 6 (#514) closed its last two entries the same
+day; `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
+keeps the rule exercised on made-up entries meanwhile.
 
 **From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
 BURN-DOWN LIST** (Russell: no Windows release before parity, so an entry could
@@ -1534,7 +1537,8 @@ in [`windows-app/PROGRESS.md`](../windows-app/PROGRESS.md), which is maintained
 as work happens:
 
 - **The embedded preview** — WebView2, and the `127.0.0.1` question that was
-  measured and found to be a no-op here.
+  measured and found to be a no-op here. (How its navigations are told apart
+  for Preview at Last Viewed IS here: "Preview at Last Viewed on Windows".)
 - **The assistant's own window**, the model running natively with Vulkan, and
   the OUTSIDE doors: `ClaudeCodeLauncher` writes an MCP configuration and starts
   `claude` with `--strict-mcp-config`, so a teacher's own servers are neither
@@ -5815,8 +5819,9 @@ raising any `NavigationStarting` holds the ledger open until the 15 s backstop.
 `ContentLoading` is the mac's didCommit: ending at Completed instead would
 lose a click made while a page's fonts and KaTeX load (the mac measured a
 resource answering after 8 s). An app load's own SourceChanged lands before
-its ContentLoading, so it is ignored. `Remember` refuses only an address on
-another host or port — `about:blank`, or a dead port elsewhere; a dead port at
+its ContentLoading, so it is ignored. `Remember` refuses only an address that is
+not the preview's own scheme, host and port — `about:blank`, or a dead port
+elsewhere; a dead port at
 the preview's OWN address would be remembered, which is why the press gives up
 before loading when the preview stopped during the ask.
 
