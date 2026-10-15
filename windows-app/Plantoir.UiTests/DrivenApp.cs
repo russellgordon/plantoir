@@ -271,11 +271,14 @@ public sealed class DrivenApp : IDisposable
         buildCourses(Path.Combine(WorkspacePath, "courses"));
         beforeLaunch?.Invoke(WorkspacePath);
 
-        File.WriteAllText(Path.Combine(stateDir, "settings.json"), new JsonObject
-        {
-            ["WorkspacePath"] = WorkspacePath,
-            ["RestoreWindowsOnLaunch"] = false,
-        }.ToJsonString(), new UTF8Encoding(false));
+        // Over whatever beforeLaunch put there (a setting a test seeds, #514):
+        // the folder and the no-restore are always this harness's.
+        string settingsPath = Path.Combine(stateDir, "settings.json");
+        var settings = File.Exists(settingsPath) && JsonNode.Parse(File.ReadAllText(settingsPath)) is JsonObject seeded
+            ? seeded : new JsonObject();
+        settings["WorkspacePath"] = WorkspacePath;
+        settings["RestoreWindowsOnLaunch"] = false;
+        File.WriteAllText(settingsPath, settings.ToJsonString(), new UTF8Encoding(false));
 
         // UseShellExecute = TRUE, and this is not a detail: it is the one line
         // that decides whether a test can drive anything the app SHELLS OUT to

@@ -85,8 +85,19 @@ public sealed partial class SectionDetailView : UserControl
     /// quit question counts (#231). Ends with the build claim.
     /// </summary>
     private IDisposable? _previewBuildRecord;
+    /// <summary>
+    /// The site's ROOT, as the launcher announced it, while it is shown —
+    /// never the page on screen (#514): the capture resolves pages against
+    /// it, and the remembered path is cut from it. (The mac calls its root
+    /// <c>previewRoot</c> and the page <c>previewURL</c>; here the root kept
+    /// the old name.)
+    /// </summary>
     private Uri? _previewUrl;
     private Uri? _lastLoadedUrl;
+
+    /// <summary>The app's own loads in the pane, told from the teacher's (#514).</summary>
+    private readonly PreviewNavigationLedger _ledger = new();
+    private bool _ledgerWired;
     private bool _isWaitingForServer;
     private CancellationTokenSource? _serverWait;
 
@@ -186,7 +197,7 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>Menu-bar equivalents of Back_Click/Forward_Click/Reload_Click, for the Preview menu.</summary>
     public void PreviewGoBack() { if (Preview.CanGoBack) Preview.GoBack(); }
     public void PreviewGoForward() { if (Preview.CanGoForward) Preview.GoForward(); }
-    public void PreviewReload() { if (HasPreview) Preview.Reload(); }
+    public void PreviewReload() { if (HasPreview) _ = ReloadAsAppAsync(); }
 
     internal bool IsBusy => _previewRunner.IsRunning || _deployRunner.IsRunning;
     // What "busy" means to a DEPLOY since the deploy-during-preview port: a
@@ -277,7 +288,12 @@ public sealed partial class SectionDetailView : UserControl
                     ReleaseTheHeldLinksFinding();
             }
         };
-        Preview.CoreWebView2Initialized += (_, args) => { if (args.Exception is null) HandPagesToTheBrowser(); };
+        Preview.CoreWebView2Initialized += (_, args) =>
+        {
+            if (args.Exception is not null) return;
+            HandPagesToTheBrowser();
+            WatchTheTeachersNavigations();
+        };
         Preview.NavigationCompleted += (_, args) =>
         {
             // The print shim again, on the page now showing (#496): a
@@ -298,6 +314,10 @@ public sealed partial class SectionDetailView : UserControl
             RefreshChrome();
         };
         _window.Activated += OnWindowActivated;
+        // #514: the pointer has to reach the button, or focus it, to press
+        // it — so Alt is read again there too (MainWindow.Modifier.cs).
+        PreviewButton.PointerEntered += (_, _) => _window.ReadTheModifierAgain();
+        PreviewButton.GotFocus += (_, _) => _window.ReadTheModifierAgain();
         // Anything last night's scheduled deploy found. It ran with the app
         // closed, so this is the first moment there is anywhere to say it.
         // On Loaded rather than in the constructor: presenting needs a
@@ -310,6 +330,9 @@ public sealed partial class SectionDetailView : UserControl
             // change of selection, so one left subscribed is rooted for good.
             ToolchainReadiness.Changed -= OnReadinessChanged;
             ToolchainReadiness.Changed += OnReadinessChanged;
+            // #514: the button's title follows File ▸ Settings ▸ Preview live.
+            AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
+            AppSettings.PreviewOpensAtChanged += OnPreviewOpensAtChanged;
             RefreshChrome();
             TakeAnythingTheScheduledDeployFound();
             OfferTheLinksChecklistIfWaiting();
@@ -318,6 +341,7 @@ public sealed partial class SectionDetailView : UserControl
         {
             _isTornDown = true;
             ToolchainReadiness.Changed -= OnReadinessChanged;
+            AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
             StopPreview();
             _window.Activated -= OnWindowActivated;
         };
@@ -391,6 +415,23 @@ public sealed partial class SectionDetailView : UserControl
         });
     }
 
+    /// <summary>The setting changed, on the thread that changed it: redraw the title on this view's own.</summary>
+    private void OnPreviewOpensAtChanged()
+    {
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            if (_isTornDown) return;
+            RefreshChrome();
+        });
+    }
+
+    /// <summary>Alt went down or up in this view's window (#514): only the button's title can change.</summary>
+    internal void RefreshPreviewTitle()
+    {
+        if (_isTornDown) return;
+        RefreshChrome();
+    }
+
     private void RefreshChrome()
     {
         bool previewShown = _previewUrl is not null;
@@ -425,7 +466,10 @@ public sealed partial class SectionDetailView : UserControl
             ToolTipService.SetToolTip(DeployButton, "Deploy this section's website");
 
         bool running = _previewRunner.IsRunning;
-        PreviewLabel.Text = running ? "Stop Preview" : "Preview";
+        // #514: titled by what a press will do — the setting, or the other
+        // while Alt is held in THIS window (the one function, titles.cases).
+        PreviewLabel.Text = PreviewStartPage.Words(PreviewStartPage.TitleFor(
+            PreviewStartPage.Read(App.Settings.PreviewOpensAt), _window.ModifierHeldForTitles, running));
         AutomationProperties.SetName(PreviewButton, PreviewLabel.Text);
         PreviewIcon.Glyph = running ? Glyphs.Stop : Glyphs.Play;
         ToolTipService.SetToolTip(PreviewButton,
@@ -810,15 +854,17 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>While today's-class question is up, findings and the links checklist wait behind it (#406).</summary>
     private bool _todaysClassQuestionUp;
 
-    private async Task OfferTodaysClassAsync(string folder)
+    /// <returns>True only when Show on Front Page WROTE the page (#514: the
+    /// press then opens the front page, whatever it asked for).</returns>
+    private async Task<bool> OfferTodaysClassAsync(string folder)
     {
         var askedOn = DateOnly.FromDateTime(DateTime.Now);
         var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
             { Surface = AssistSurface.LocalWindow };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
         TodaysClassOnTheFrontPage.Offering? offer;
         try { offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn); }
-        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return; }
-        if (offer is null) return;
+        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
+        if (offer is null) return false;
 
         var noun = _course.Configuration.ClassNoun;
         _todaysClassQuestionUp = true;
@@ -834,11 +880,11 @@ public sealed partial class SectionDetailView : UserControl
                 CloseButtonText = TodaysClassOnTheFrontPage.NotToday,   // Escape is Not Today
                 DefaultButton = ContentDialogButton.Primary,
             });
-            if (answer is null) return;   // never shown: nothing was answered, nothing is written
+            if (answer is null) return false;   // never shown: nothing was answered, nothing is written
             if (answer != ContentDialogResult.Primary)
             {
                 workspace.DeclineTodaysClass(_course.Code, _sectionNumber, askedOn, offer);
-                return;
+                return false;
             }
 
             // Busy checks again, then decided again for the day ASKED.
@@ -861,8 +907,9 @@ public sealed partial class SectionDetailView : UserControl
                     Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
                     CloseButtonText = "OK",
                 });
+            return outcome == TodaysClassOnTheFrontPage.Outcome.Written;
         }
-        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); }
+        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
         finally { _todaysClassQuestionUp = false; }
     }
 
@@ -1141,8 +1188,12 @@ public sealed partial class SectionDetailView : UserControl
 
     // ---- Preview ---------------------------------------------------------
 
-    /// <summary>Smoke-test entry: the same path the Preview button takes.</summary>
-    public void StartPreviewForAutomation() => PreviewOrStop_Click(this, new RoutedEventArgs());
+    /// <summary>
+    /// Smoke-test entry: the same path the Preview button takes — at the
+    /// FRONT page, whatever the setting says (#514): a smoke run or a
+    /// marketing picture must not depend on what a teacher last read.
+    /// </summary>
+    public void StartPreviewForAutomation() => _ = PressPreviewAsync(atLastViewed: false);
 
     /// <summary>
     /// Start the preview if nothing is currently previewing. If a preview
@@ -1391,7 +1442,23 @@ public sealed partial class SectionDetailView : UserControl
             _course.Code, _sectionNumber);
     }
 
+    /// <summary>
+    /// The toolbar button. Where the press opens is read HERE, at the click
+    /// and before any question (#514: the setting, or the other while Alt —
+    /// and not Ctrl+Alt, which is AltGr — is held); the menu's two items pass
+    /// their own instead and never read the keyboard.
+    /// </summary>
     private async void PreviewOrStop_Click(object sender, RoutedEventArgs e)
+    {
+        bool atLastViewed = PreviewStartPage.OpensAtLastViewed(
+            PreviewStartPage.Read(App.Settings.PreviewOpensAt),
+            PreviewStartPage.ModifierHeld(MainWindow.KeyIsDown(Windows.System.VirtualKey.Menu),
+                                          MainWindow.KeyIsDown(Windows.System.VirtualKey.Control)));
+        await PressPreviewAsync(atLastViewed);
+    }
+
+    /// <summary>A teacher's press of Preview (or of Stop Preview), asking for the page last viewed or not.</summary>
+    private async Task PressPreviewAsync(bool atLastViewed)
     {
         try
         {
@@ -1410,7 +1477,7 @@ public sealed partial class SectionDetailView : UserControl
             // (a preview that is going to be refused is refused with no
             // question first) and BEFORE anything is taken. The preview starts
             // after the question has gone, whatever the answer.
-            await OfferTodaysClassAsync(workspacePath);
+            bool frontPageWasJustChanged = await OfferTodaysClassAsync(workspacePath);
             if (_isTornDown) return;
 
             // Decided here, so the stop that follows names the same folder.
@@ -1465,11 +1532,11 @@ public sealed partial class SectionDetailView : UserControl
                 workspacePath);
             SayIfThePreviewUsesSavedSettings();
             RefreshChrome();
-            await WaitForPreviewServer();
+            await WaitForPreviewServer(new StartPageRequest(atLastViewed, frontPageWasJustChanged));
         }
         catch (Exception ex)
         {
-            App.LogDiagnostic($"PreviewOrStop_Click exception: {ex}");
+            App.LogDiagnostic($"PressPreviewAsync exception: {ex}");
         }
     }
 
@@ -1492,7 +1559,10 @@ public sealed partial class SectionDetailView : UserControl
     /// contract's sentence. A preview the teacher stopped meanwhile gets
     /// neither.</para>
     /// </summary>
-    private async Task WaitForPreviewServer()
+    /// <summary>What a teacher's press asked for (#514), carried to the moment the site answers. Every other start passes none: the front page.</summary>
+    private sealed record StartPageRequest(bool AtLastViewed, bool FrontPageWasJustChanged);
+
+    private async Task WaitForPreviewServer(StartPageRequest? request = null)
     {
         _serverWait?.Cancel();
         var cancel = new CancellationTokenSource();
@@ -1536,14 +1606,11 @@ public sealed partial class SectionDetailView : UserControl
                                 // The site is up, so the build is over: the assistant
                                 // may build again from here on, while this preview
                                 // stays on screen for the teacher to read.
-                                _isWaitingForServer = false;
                                 ReleaseBuildClaim();
                                 // Serving from here: a later end may be another
                                 // program's deploy closing it (#436).
                                 _previewRunner.HasBeenServing = true;
-                                _previewUrl = announced;
-                                LoadIfNeeded(announced);
-                                RefreshChrome();
+                                await OpenTheSiteAsync(announced, request, cancel);
                                 return;
                             }
                             lastAttempt = null;
@@ -1587,12 +1654,132 @@ public sealed partial class SectionDetailView : UserControl
         await ShowDialogSafelyAsync(dialog);
     }
 
+    /// <summary>
+    /// The site answered: open the front page, or — when the teacher's press
+    /// asked for it — the page last viewed, after asking this run's server
+    /// whether it is still there (#514; <see cref="PreviewStartPage"/>).
+    /// "Preparing the preview…" stays up while it asks (up to three tries of
+    /// five seconds: a request made during a rebuild WAITS for it). Falling
+    /// back is silent on screen and says why on the trail.
+    /// </summary>
+    private async Task OpenTheSiteAsync(Uri root, StartPageRequest? request, CancellationTokenSource thisWait)
+    {
+        string? remembered = null;
+        PreviewStartPage.Answer? answer = null;
+        Uri? page = null;
+        if (request is not null)
+        {
+            // Read at the root's answer, as the mac does.
+            if (_folderThisSectionWorksIn is { } folder)
+                remembered = LastViewedPages.PageFor(folder, _course.Code, _sectionNumber);
+            if (PreviewStartPage.PathToAsk(request.AtLastViewed, request.FrontPageWasJustChanged, remembered) is { } path)
+            {
+                page = PreviewStartPage.PageAddress(root, path);
+                if (page is null) answer = PreviewStartPage.Answer.Gone;   // not a page of this site
+                else
+                {
+                    using var asker = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+                    try
+                    {
+                        var address = page;
+                        answer = await PreviewStartPage.AskAsync(
+                            ask => PreviewStartPage.StatusOfAsync(asker, address, ask),
+                            (pause, ask) => Task.Delay(pause, ask),
+                            thisWait.Token);
+                    }
+                    catch (OperationCanceledException) { return; }   // stopped while asking: nothing opens
+                }
+            }
+        }
+
+        // The same run, still: a stop, another start or a view torn down
+        // while it asked opens nothing and writes nothing.
+        if (thisWait.IsCancellationRequested || _serverWait != thisWait || _isTornDown) return;
+
+        var opens = PreviewStartPage.Opens.FrontPage;
+        string? trail = null;
+        if (request is not null)
+            (opens, trail) = PreviewStartPage.Decide(request.AtLastViewed, remembered, answer, request.FrontPageWasJustChanged);
+
+        _isWaitingForServer = false;
+        _previewUrl = root;   // the ROOT, always — never the page opened
+        // The line and the chrome BEFORE the navigation runs, so a teardown
+        // during it cannot lose either.
+        if (trail is not null)
+            ActivityTrail.Note(ActivityTrail.Event.PreviewStartedAtThePageLastViewed, trail, _course.Code, _sectionNumber);
+        RefreshChrome();
+        LoadIfNeeded(opens == PreviewStartPage.Opens.RememberedPage && page is not null ? page : root);
+    }
+
     /// <summary>Interface updates must never yank the teacher back from a page they navigated to.</summary>
     private void LoadIfNeeded(Uri url)
     {
         if (_lastLoadedUrl == url) return;
         _lastLoadedUrl = url;
-        Preview.Source = url;
+        _ = NavigateAsAppAsync(url);
+    }
+
+    // ---- The app's own loads, told from the teacher's (#514) --------------
+    //
+    // Every load the APP makes goes through these two: the site's first page,
+    // Reload, the marketing capture. Each is marked in the ledger from its
+    // request until its content starts to arrive (ContentLoading, WebView2's
+    // counterpart of the mac's didCommit), and an address change meanwhile is
+    // not the teacher's, so it is not remembered. CoreWebView2.Navigate rather
+    // than setting Preview.Source: one route for every app load. (Measured on
+    // WebView2 155, setting the same address again DOES navigate, so this is
+    // not about a trap: documentation/12 → "Preview at Last Viewed on Windows".)
+
+    private async Task NavigateAsAppAsync(Uri url)
+    {
+        try
+        {
+            await Preview.EnsureCoreWebView2Async();
+            WatchTheTeachersNavigations();
+            _ledger.AppLoadRequested(DateTime.UtcNow);
+            Preview.CoreWebView2.Navigate(url.AbsoluteUri);
+        }
+        catch (Exception ex) { App.LogDiagnostic($"NavigateAsAppAsync: {ex.Message}"); }
+    }
+
+    private async Task ReloadAsAppAsync()
+    {
+        try
+        {
+            await Preview.EnsureCoreWebView2Async();
+            WatchTheTeachersNavigations();
+            _ledger.AppLoadRequested(DateTime.UtcNow);
+            Preview.CoreWebView2.Reload();
+        }
+        catch (Exception ex) { App.LogDiagnostic($"ReloadAsAppAsync: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Feeds the ledger from the pane's own events and remembers where the
+    /// teacher goes: a click, Back, Forward, Quartz's own pushState links and
+    /// fragments (SourceChanged with IsNewDocument false), all of them. Once.
+    /// </summary>
+    private void WatchTheTeachersNavigations()
+    {
+        if (_ledgerWired || Preview.CoreWebView2 is not { } core) return;
+        _ledgerWired = true;
+        core.NavigationStarting += (_, args) => _ledger.NavigationStarting(args.NavigationId, args.IsRedirected);
+        core.ContentLoading += (_, args) => _ledger.ContentLoading(args.NavigationId);
+        core.NavigationCompleted += (_, args) => _ledger.NavigationCompleted(args.NavigationId);
+        core.SourceChanged += (_, _) => RememberWhereTheTeacherIs(core.Source);
+    }
+
+    /// <summary>
+    /// The page the pane shows now, remembered for this section when it was
+    /// the teacher's doing. Nothing while no site is shown (during the ask,
+    /// after a stop), and only against the folder this section decided on,
+    /// never the window's live one.
+    /// </summary>
+    private void RememberWhereTheTeacherIs(string? address)
+    {
+        if (_isTornDown || _previewUrl is not { } root || _folderThisSectionWorksIn is not { } folder) return;
+        if (PreviewStartPage.Remember(address, root, _ledger.AppLoadUnderWay(DateTime.UtcNow)) is { } path)
+            LastViewedPages.Remember(folder, _course.Code, _sectionNumber, path);
     }
 
     // ---- Teardown ---------------------------------------------------------
@@ -2259,7 +2446,7 @@ public sealed partial class SectionDetailView : UserControl
 
     private void Back_Click(object sender, RoutedEventArgs e) { if (Preview.CanGoBack) Preview.GoBack(); }
     private void Forward_Click(object sender, RoutedEventArgs e) { if (Preview.CanGoForward) Preview.GoForward(); }
-    private void Reload_Click(object sender, RoutedEventArgs e) => Preview.Reload();
+    private void Reload_Click(object sender, RoutedEventArgs e) => _ = ReloadAsAppAsync();
 
     // ---- The preview hands pages to the browser (#496) ---------------------
 
@@ -2342,10 +2529,22 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>A preview of this section is building, waiting for its server, or showing (subjectMenus.previewIsRunning).</summary>
     internal bool PreviewIsRunning => _previewRunner.IsRunning || _isWaitingForServer || HasPreview;
 
-    /// <summary>Section > Preview / Stop Preview: the toolbar button's own handler, so today's-class question (#406) is asked from the menu too.</summary>
-    internal void PressPreview()
+    /// <summary>
+    /// Section > Preview / Stop Preview (<paramref name="opposite"/> false)
+    /// and its second item, which opens at the other start page (#514): the
+    /// toolbar button's own path, so today's-class question (#406) is asked
+    /// from the menu too. Each item passes its own start page; neither reads
+    /// the keyboard. The second item NEVER stops a preview (a menu drawn
+    /// before a preview started elsewhere could otherwise offer it): it
+    /// answers false, so the menu is redrawn instead.
+    /// </summary>
+    internal bool PressPreview(bool opposite)
     {
-        if (PreviewButton.IsEnabled) PreviewOrStop_Click(PreviewButton, new RoutedEventArgs());
+        if (!PreviewButton.IsEnabled) return true;
+        if (opposite && _previewRunner.IsRunning) return false;
+        bool atLastViewed = PreviewStartPage.OpensAtLastViewed(PreviewStartPage.Read(App.Settings.PreviewOpensAt), opposite);
+        _ = PressPreviewAsync(atLastViewed);
+        return true;
     }
 
     /// <summary>Section > Deploy…: the toolbar button's own handler, on its own predicate, asked again now.</summary>
@@ -2385,7 +2584,7 @@ public sealed partial class SectionDetailView : UserControl
         Preview.NavigationCompleted += Done;
         try
         {
-            Preview.Source = target;
+            await NavigateAsAppAsync(target);
             if (await Task.WhenAny(loaded.Task, Task.Delay(TimeSpan.FromSeconds(45))) != loaded.Task) return $"{target} did not finish loading";
             if (loaded.Task.Result is { } failed) return failed;
         }

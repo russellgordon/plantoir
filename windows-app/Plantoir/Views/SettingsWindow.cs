@@ -16,15 +16,15 @@ namespace Plantoir.Views;
 public enum SettingsSection
 {
     Assistant,
-    /// <summary>Where Preview opens (#514) — named now, drawn by a later batch of the catch-up.</summary>
+    /// <summary>Where Preview opens (#514).</summary>
     Preview,
     Deploying,
 }
 
 /// <summary>
 /// File ▸ Settings… (#491; Russell's ruling of 2026-10-15): ONE Settings
-/// window with a section per subject — Assistant, Deploying, and Preview when
-/// #514 lands — matching the mac's Plantoir ▸ Settings.
+/// window with a section per subject — Assistant, Preview (#514) and
+/// Deploying — matching the mac's Plantoir ▸ Settings.
 /// </summary>
 /// <remarks>
 /// <para><b>A window, not a ContentDialog</b> (what it was until #491, as
@@ -51,16 +51,17 @@ public sealed class SettingsWindow : Window
 
     private readonly NavigationView _navigation;
     private readonly NavigationViewItem _assistantItem;
+    private readonly NavigationViewItem _previewItem;
     private readonly NavigationViewItem _deployingItem;
     private readonly AssistantSettingsPane _assistant;
+    private readonly PreviewSettingsPane _preview;
     private readonly DeployingSettingsPane _deploying;
     private SettingsSection _shown;
     private bool _shownOnce;
 
     /// <summary>
     /// Opens Settings on <paramref name="section"/>, or brings the open window
-    /// forward and shows that section. A section not drawn yet (Preview) opens
-    /// on Assistant.
+    /// forward and shows that section.
     /// </summary>
     public static void Show(SettingsSection section)
     {
@@ -80,6 +81,7 @@ public sealed class SettingsWindow : Window
     public static SettingsSection LastChosen() => App.Settings.LastSettingsSection switch
     {
         "deploying" => SettingsSection.Deploying,
+        "preview" => SettingsSection.Preview,
         _ => SettingsSection.Assistant,
     };
 
@@ -104,6 +106,7 @@ public sealed class SettingsWindow : Window
         try { SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop(); } catch { }
 
         _assistant = new AssistantSettingsPane(App.Settings);
+        _preview = new PreviewSettingsPane(App.Settings);
         _deploying = new DeployingSettingsPane(App.Settings);
 
         _assistantItem = new NavigationViewItem
@@ -113,6 +116,13 @@ public sealed class SettingsWindow : Window
             Tag = SettingsSection.Assistant,
         };
         AutomationProperties.SetAutomationId(_assistantItem, "settingsAssistant");
+        _previewItem = new NavigationViewItem
+        {
+            Content = Plantoir.Core.Models.PreviewStartPage.PaneTitle,
+            Icon = new FontIcon { Glyph = Glyphs.Play },
+            Tag = SettingsSection.Preview,
+        };
+        AutomationProperties.SetAutomationId(_previewItem, "settingsPreview");
         _deployingItem = new NavigationViewItem
         {
             Content = "Deploying",
@@ -131,6 +141,7 @@ public sealed class SettingsWindow : Window
             IsTitleBarAutoPaddingEnabled = false,
         };
         _navigation.MenuItems.Add(_assistantItem);
+        _navigation.MenuItems.Add(_previewItem);
         _navigation.MenuItems.Add(_deployingItem);
         _navigation.SelectionChanged += (_, args) =>
         {
@@ -172,13 +183,16 @@ public sealed class SettingsWindow : Window
 
     private void Select(SettingsSection section)
     {
-        // Preview is not drawn yet: it opens on Assistant.
-        var drawn = section == SettingsSection.Deploying ? SettingsSection.Deploying : SettingsSection.Assistant;
-        var item = drawn == SettingsSection.Deploying ? _deployingItem : _assistantItem;
+        var item = section switch
+        {
+            SettingsSection.Deploying => _deployingItem,
+            SettingsSection.Preview => _previewItem,
+            _ => _assistantItem,
+        };
         if (!ReferenceEquals(_navigation.SelectedItem, item)) _navigation.SelectedItem = item;
         // Directly as well: SelectionChanged is not promised before the view
         // has loaded, and showing the same section twice changes nothing.
-        ShowSection(drawn);
+        ShowSection(section);
     }
 
     private void ShowSection(SettingsSection section)
@@ -188,9 +202,18 @@ public sealed class SettingsWindow : Window
         // Leaving Deploying is leaving the field: its change is recorded now.
         if (_shown == SettingsSection.Deploying && section != SettingsSection.Deploying) _deploying.NoteTheChange();
         _shown = section;
-        _navigation.Header = section == SettingsSection.Deploying ? "Deploying" : "Assistant";
-        _navigation.Content = section == SettingsSection.Deploying ? _deploying.Root : _assistant.Root;
-        string remembered = section == SettingsSection.Deploying ? "deploying" : "assistant";
+        (_navigation.Header, _navigation.Content) = section switch
+        {
+            SettingsSection.Deploying => ((object)"Deploying", (object)_deploying.Root),
+            SettingsSection.Preview => (Plantoir.Core.Models.PreviewStartPage.PaneTitle, _preview.Root),
+            _ => ("Assistant", _assistant.Root),
+        };
+        string remembered = section switch
+        {
+            SettingsSection.Deploying => "deploying",
+            SettingsSection.Preview => "preview",
+            _ => "assistant",
+        };
         if (App.Settings.LastSettingsSection != remembered)
         {
             App.Settings.LastSettingsSection = remembered;

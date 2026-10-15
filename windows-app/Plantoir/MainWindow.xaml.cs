@@ -153,6 +153,7 @@ public sealed partial class MainWindow : Window
         }
         ToolchainReadiness.Changed += ReadinessChanged;
         AttachGuidance();   // #496: MainWindow.Guidance.cs
+        AttachTheModifier();   // #514: MainWindow.Modifier.cs
 
         // #489: a menu change or the assistant's work on a section greys the
         // Section menu's functions in every window. Static, so let go on close.

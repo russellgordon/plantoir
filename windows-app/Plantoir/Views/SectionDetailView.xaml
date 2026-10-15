@@ -26,8 +26,12 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
+                <!-- The title takes what is left, and gives it up first: since #514
+                     the Preview button can read "Preview at Last Viewed", and at the
+                     window's narrowest a long section title must shorten rather than
+                     push the buttons out of view. The button never truncates. -->
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -55,7 +59,7 @@
                     AutomationProperties.AutomationId="previewReloadButton">
                 <FontIcon Glyph="&#xE72C;" FontSize="14" />
             </Button>
-            <TextBlock Grid.Column="3" x:Name="SectionTitle" VerticalAlignment="Center"
+            <TextBlock Grid.Column="3" x:Name="SectionTitle" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                        FontWeight="SemiBold" Margin="10,0,0,0" />
 
             <Button x:Name="ObsidianButton" Grid.Column="5" Click="Obsidian_Click"
