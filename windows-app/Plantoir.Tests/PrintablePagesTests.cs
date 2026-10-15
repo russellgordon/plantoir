@@ -314,4 +314,16 @@ public sealed class PreviewBrowserHandoffTests
         Assert.Contains("messageHandlers.plantoirPrint", PreviewBrowserHandoff.PrintShim);
         Assert.Contains("window.chrome.webview.postMessage({plantoirPrint:m})", PreviewBrowserHandoff.PrintShim);
     }
+
+    [Fact]
+    public void TheShimStaysOffEveryPageThatIsNotThePreviews()
+    {
+        // The hostname check comes before window.webkit is touched, so an
+        // outside site the pane was taken to gains nothing (L-3).
+        string shim = PreviewBrowserHandoff.PrintShim;
+        int gate = shim.IndexOf("location.hostname", StringComparison.Ordinal);
+        Assert.True(gate > 0, "the shim does not look at the page's host");
+        Assert.True(gate < shim.IndexOf("window.webkit", StringComparison.Ordinal), "the shim touches window.webkit before it checks the host");
+        Assert.Contains("h!=='localhost'&&h!=='127.0.0.1')return;", shim);
+    }
 }

@@ -35,6 +35,8 @@ public sealed partial class MainWindow
 {
     private ContentDialog? _guidanceDialog;
     private bool _guidanceDialogTakenDown;
+    /// <summary>Set from just before the guidance question is taken down for the quit question until that question has closed (H-1).</summary>
+    private bool _quitQuestionUp;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _guidanceTimer;
 
     private void AttachGuidance()
@@ -74,7 +76,11 @@ public sealed partial class MainWindow
         if (_guidanceDialog is not null || IsClosed || _waitingForCopies) return;
         string? folder = Workspace.WorkspacePath;
         if (string.IsNullOrEmpty(folder) || !ToolchainReadiness.HasPending(folder)) { _guidanceTimer?.Stop(); return; }
-        if (Content?.XamlRoot is null || DialogGate.IsOpen(Content.XamlRoot))
+        // The quit question is about to be shown, or is up (the batch 5B
+        // review's H-1): the question taken down for it must not come back
+        // inside its 50 ms waits, or its ShowAsync throws and the close does
+        // nothing. The timer asks again once it has gone.
+        if (_quitQuestionUp || Content?.XamlRoot is null || DialogGate.IsOpen(Content.XamlRoot))
         {
             LookAgainSoon();
             return;
@@ -134,7 +140,11 @@ public sealed partial class MainWindow
         _guidanceDialog = null;
         if (IsClosed || _guidanceDialogTakenDown)
         {
+            // PutBack raises GuidanceChanged, which comes back here and,
+            // while the quit question is up, only starts the timer: the
+            // re-ask is the timer's, after that question has gone.
             ToolchainReadiness.PutBack(folder, pending);
+            if (!IsClosed) LookAgainSoon();
             return;
         }
         bool add = answer == ContentDialogResult.Primary;

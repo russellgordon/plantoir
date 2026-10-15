@@ -95,8 +95,13 @@ public class GuidanceAskUiTests
         Assert.True(Retry.WhileFalse(() => app.FindOrNull("guidanceAskDialog", TimeSpan.Zero) is null, TimeSpan.FromSeconds(5)).Result);
 
         Assert.Equal(Own, File.ReadAllText(claude));
-        Assert.True(File.Exists(Path.Combine(app.StateDirectory, "agent-guidance-declined.json")), "Not Now was not remembered");
-        Assert.Contains("asked before adding Plantoir's section to CLAUDE.md in the working folder — not now", MenuBar.Trail(app));
+        // The answer is recorded on a task of its own after the dialog closes
+        // (ToolchainReadiness.Answer runs on Task.Run): give it a moment (M-2).
+        Assert.True(Retry.WhileFalse(() => File.Exists(Path.Combine(app.StateDirectory, "agent-guidance-declined.json")),
+                                     TimeSpan.FromSeconds(5)).Result, "Not Now was not remembered");
+        const string asked = "asked before adding Plantoir's section to CLAUDE.md in the working folder — not now";
+        Assert.True(Retry.WhileFalse(() => MenuBar.Trail(app).Contains(asked), TimeSpan.FromSeconds(5)).Result,
+                    "the trail never said what was asked: " + asked);
         Assert.True(File.Exists(Path.Combine(app.WorkspacePath, ".claude", "skills", "plantoir-printing", "SKILL.md")),
                     "the skills are written whatever the answer");
     }

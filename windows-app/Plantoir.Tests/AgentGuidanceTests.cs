@@ -345,6 +345,28 @@ public sealed class AgentGuidanceTests : IDisposable
     }
 
     [Fact]
+    public void ABundledBodyWithCrlfIsFingerprintedAsTheLfOne()
+    {
+        string lf = "## Plantoir\n\nLine one.\nLine two.\n";
+        string path = Path.Combine(_folder, "crlf-body.md");
+        File.WriteAllText(path, lf.Replace("\n", "\r\n"), new System.Text.UTF8Encoding(false));
+        string read = AgentGuidance.ReadBundledBody(path);
+        Assert.DoesNotContain("\r", read);
+        Assert.Equal(AgentGuidance.Signature(lf), AgentGuidance.Signature(read));
+    }
+
+    [Fact]
+    public void APassThatSucceedsAfterOneThatFailedClearsTheNotice()
+    {
+        var failed = new AgentGuidance.Outcome();
+        failed.Note("AGENTS.md", "it is read-only");
+        ToolchainReadiness.ApplyGuidance(_folder, failed);
+        Assert.NotNull(ToolchainReadiness.GuidanceNoticeFor(_folder));
+        ToolchainReadiness.ApplyGuidance(_folder, new AgentGuidance.Outcome());
+        Assert.Null(ToolchainReadiness.GuidanceNoticeFor(_folder));
+    }
+
+    [Fact]
     public void AFilesQuestionIsTakenByOneWindowAndPutBackWhenNotAnswered()
     {
         var outcome = new AgentGuidance.Outcome();

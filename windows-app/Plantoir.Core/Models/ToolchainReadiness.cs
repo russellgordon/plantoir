@@ -253,6 +253,13 @@ public static class ToolchainReadiness
                 GuidanceNotices[key] = AgentGuidanceWording.CouldNotWrite(outcome.FirstReason ?? AgentGuidance.CouldNotBeWritten);
                 GuidanceRan.Remove(key);
             }
+            else
+            {
+                // A later pass that succeeded clears the notice an earlier
+                // failure left (the mac's applyGuidance, the batch 5B
+                // review's L-1): it no longer describes the folder.
+                GuidanceNotices.Remove(key);
+            }
             if (outcome.Pending.Count > 0)
             {
                 if (!PendingAppends.TryGetValue(key, out var queue)) PendingAppends[key] = queue = [];

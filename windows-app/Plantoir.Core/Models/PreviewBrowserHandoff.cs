@@ -53,10 +53,14 @@ public static class PreviewBrowserHandoff
     /// Injected into every document the preview pane loads, before the
     /// page's own scripts: the mac's message-handler shape, forwarding to
     /// WebView2's own channel. Only where WebView2's channel exists, and
-    /// never over a <c>window.webkit</c> the page already has.
+    /// never over a <c>window.webkit</c> the page already has — and only on
+    /// the preview's own pages (localhost or 127.0.0.1), so a site the pane
+    /// was navigated to does not gain a <c>window.webkit</c> it never had
+    /// (the batch 5B review's L-3).
     /// </summary>
     public const string PrintShim =
         "(function(){try{if(!window.chrome||!window.chrome.webview)return;" +
+        "var h=location.hostname;if(h!=='localhost'&&h!=='127.0.0.1')return;" +
         "var w=window.webkit=window.webkit||{};w.messageHandlers=w.messageHandlers||{};" +
         "if(w.messageHandlers.plantoirPrint)return;" +
         "w.messageHandlers.plantoirPrint={postMessage:function(m){window.chrome.webview.postMessage({plantoirPrint:m});}};" +

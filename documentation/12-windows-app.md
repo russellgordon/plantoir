@@ -1409,8 +1409,18 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   every 2 s while a file waits. **The quit question takes it DOWN first**
   (WinUI throws on a second ContentDialog — plan review M8), and a question
   taken down that way, or by the window closing, is PUT BACK unanswered:
-  closing a window is not a Not Now. Each file is asked about in one window
-  only, AGENTS.md first. Not Now answers are kept in
+  closing a window is not a Not Now. From just before the quit question is
+  put up until it closes, the question taken down STAYS down and the re-ask
+  is the 2 s timer's (the batch 5B review's H-1: putting it back raised
+  `GuidanceChanged`, the question came back inside the quit question's
+  50 ms waits, the quit question's `ShowAsync` threw, and the close did
+  nothing). A question up at launch also makes `UpdatePrompts` and the
+  assistant's later-classes question hold back, through the `DialogGate`
+  check each already makes. A later pass that succeeds clears the notice an
+  earlier failure left, as the mac's `applyGuidance` does, and the bundled
+  bodies are read with LF endings, so an autocrlf checkout writes and
+  fingerprints the same section as the mac. Each file is asked about in one
+  window only, AGENTS.md first. Not Now answers are kept in
   `%LOCALAPPDATA%\Plantoir\agent-guidance-declined.json` (path,
   case-insensitive, → the section's signature), deliberately out of
   `AppSettings`, which other code rewrites whole.
@@ -1437,7 +1447,10 @@ the mac's port; the wiring is `SectionDetailView.HandPagesToTheBrowser`):
   finds `window.webkit.messageHandlers.plantoirPrint`, which WebKit gives the
   mac. Windows INJECTS exactly that shape
   (`PreviewBrowserHandoff.PrintShim`, by `AddScriptToExecuteOnDocumentCreatedAsync`
-  and again on every completed navigation), forwarding to
+  and again on every completed navigation) — on the preview's own pages
+  only, `location.hostname` `localhost` or `127.0.0.1`, so an outside site
+  the pane was taken to never gains a `window.webkit` (the batch 5B
+  review's L-3) — forwarding to
   `window.chrome.webview.postMessage({plantoirPrint: …})`; the app accepts
   only a message from the preview's own origin, a mode from
   `printablePages.modes.list` and a paper from `paper.cases` (none =
