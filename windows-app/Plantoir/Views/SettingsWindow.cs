@@ -152,6 +152,16 @@ public sealed class SettingsWindow : Window
             ActivityTrail.Event.AppSettingsOpened,
             $"opened Settings — the assistant is set to {AssistModelChoice.Label(App.Settings.AssistantModelChoice).ToLowerInvariant()}");
 
+        // Settings is MODELESS: a teacher who types an ID and clicks back into
+        // the main window raises no LostFocus on the field (focus within this
+        // window has not moved), so without this no line would be written
+        // until Settings closed — perhaps hours later, or never before a crash.
+        // Leaving the window is leaving the field.
+        Activated += (_, e) =>
+        {
+            if (e.WindowActivationState == WindowActivationState.Deactivated) _deploying.NoteTheChange();
+        };
+
         Closed += (_, _) =>
         {
             _deploying.NoteTheChange();

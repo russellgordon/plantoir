@@ -120,18 +120,29 @@ public class CloudflareAccountInSettingsTests
     /// <c>WindowThemeSourceTests</c> does, because the views live in the WinUI
     /// project this suite cannot load.
     /// </summary>
+    /// <remarks>
+    /// The pattern takes the property name on a word boundary, NOT only after a
+    /// dot, so an object initialiser (<c>new AppSettings { CloudflareAccountId = … }</c>)
+    /// counts too; and it reads all three projects that ship (the app, Core and
+    /// the MCP server), since a writer in Core would bypass the pane just as
+    /// surely. <c>Plantoir.Core/Models/AppSettings.cs</c> is the one allowed
+    /// exception: it is where <c>ChangeCloudflareAccountId</c> lives, and the
+    /// assignment inside it is the store the pane calls.
+    /// </remarks>
     [Fact]
     public void OnlyTheDeployingPane_WritesTheId()
     {
-        string app = Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir");
-        var writes = new Regex(@"\.CloudflareAccountId\s*=(?!=)|ChangeCloudflareAccountId\(");
-        var writers = Directory.EnumerateFiles(app, "*.cs", SearchOption.AllDirectories)
+        string root = Path.Combine(ContractLoader.RepositoryRoot, "windows-app");
+        var writes = new Regex(@"\bCloudflareAccountId\s*=(?!=)|ChangeCloudflareAccountId\(");
+        var writers = new[] { "Plantoir", "Plantoir.Core", "Plantoir.Mcp" }
+            .SelectMany(project => Directory.EnumerateFiles(Path.Combine(root, project), "*.cs", SearchOption.AllDirectories))
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
                            && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
             .Where(file => writes.IsMatch(File.ReadAllText(file)))
-            .Select(file => Path.GetRelativePath(app, file).Replace('\\', '/'))
+            .Select(file => Path.GetRelativePath(root, file).Replace('\\', '/'))
+            .Where(file => file != "Plantoir.Core/Models/AppSettings.cs")
             .ToList();
-        Assert.Equal(new[] { "Views/DeployingSettingsPane.cs" }, writers);
+        Assert.Equal(new[] { "Plantoir/Views/DeployingSettingsPane.cs" }, writers);
     }
 
     // ---- The refusals that send the teacher there -------------------------------

@@ -3342,7 +3342,7 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   again." (`documentation/07-deployment.md`; pinned by
   `scripts/test_deploy_non_interactive.py`). The app's own in-app refusals —
   `MultiDestinationDeployRunner.swift` and `ScheduledDeployWording.swift` —
-  still said "this course's settings" when that landed; a `mac` issue owns
+  still said "this course's settings" when that landed; a `mac` issue (#534) owns
   them.
 - **Assistant window**: "May I ask for your class dates?" puts its buttons on
   the trailing end with Yes last, as every other card and sheet does.
