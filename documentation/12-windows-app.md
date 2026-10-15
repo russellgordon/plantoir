@@ -4555,11 +4555,85 @@ and a banner once a file is written; it marks a folder fresh only after a
 copy with nothing failed (the same defect, fixed the same way); its MCP
 server and headless rebuilds wait for their own copy; it writes the same
 `working folder tools copied` line; and ⌘Q waits for a running copy, which
-this side does not (a `windows` issue). Two differences, both on purpose: no
+this side now does too (#484, below). Two differences, both on purpose: no
 cross-process marker (every file is written atomically from the same bundle,
 so two copies at once write the same bytes), and the banner follows the
 first file WRITTEN rather than a timer. `documentation/09-mac-app.md` →
 "Getting a folder ready after an update, off the main actor (#476)".
+
+### Closing waits for a copy that is writing (#484)
+
+Since 2026-10-15 (Russell's ruling on #484: wait on close, matching the mac's
+#476). Before, closing the last window while the copy ran ended it part-way:
+each file is written whole, so nothing was torn, but `.toolchain\` was left
+half old and half new until the app next ran — and a launcher typed at a
+prompt, or (before #477) a scheduled run, hashed and built from that mix.
+
+**What it does.** `MainWindow.AskBeforeQuittingThroughWork` (the Closing
+handler) asks the #231 quit question FIRST, unchanged — Keep Working leaves
+everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
+the last window) and a copy is WRITING (`ToolchainReadiness.AnyCopyIsWriting`),
+it cancels the close synchronously, before any await, opens the "Getting this
+folder ready…" banner at once (the one-second delay treated as passed), awaits
+`ToolchainReadiness.WhenWritingCopiesFinish()` — every folder's writing copy in
+the process, the mac's `waitForAllCopies()` — and closes again; `Closed` then
+runs `App.QuitTime()` as before, so a prepared update still installs at quit,
+after the copy. The decision is the pure
+`ToolchainReadiness.ClosingWaitsForTheCopy(closingQuits, aCopyIsWriting,
+systemIsEnding, alreadyWaited)`.
+
+**Three bugs the plan review found in the first design, and what fixed them.**
+(H1) the old handler began `if (_quitConfirmed || …) return;`, so Quit Anyway's
+own `Close()` skipped any wait: `_quitConfirmed` now skips only the QUESTION.
+(H2) a "second close does nothing" guard on `_waitingForCopies` would have
+cancelled the handler's own final `Close()`: the flag is cleared before it.
+(M3) waiting only for copies already writing could miss one still waiting its
+turn behind another program's copy, which then starts and is cut by the exit:
+`WhenWritingCopiesFinish` HOLDS BACK every copy not yet writing, under the
+same lock a copy takes to mark itself writing, and takes its snapshot again
+after each wait. A held-back copy has written nothing; if the close turns out
+not to quit (a window was opened meanwhile), `ReleaseWaitingCopies` lets it go.
+
+**What it does not do, and why.**
+- **Not while Windows is ending the session** (`SessionEnding.IsEnding`).
+  Windows ends the process at sign-out whatever the window does; holding the
+  close only produces "this app is preventing shutdown". A Windows-only
+  difference from the mac, and a cheaper one since #477: the scheduled run now
+  brings the tools up to date itself before it builds.
+- **Not for a window that is not the last.** Closing it does not end the
+  process, so the copy carries on in the windows that remain.
+- **Not twice.** A second X while the window waits does nothing new.
+- **The update installer's quit** goes through `Application.Exit()`, which
+  raises no window's Closing, and the installer overwrites `{app}\Toolchain` —
+  the files the copy READS. So `UpdatePrompts.QuitForInstall` awaits
+  `WhenWritingCopiesFinish()` itself before it starts the installer (a
+  fire-and-forget helper; `IUpdatePrompts` stays `void`). The menu bar has no
+  Exit item (2A), so the window's X / Alt+F4 and the installer are the only
+  quits.
+
+**Measured** (i5-8365U, 16 GB, Windows 11 Pro 26200, x64 Debug, 2026-10-15,
+`GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits`, which deletes
+`.toolchain\support` — 12,660 files — before launch): window 3.5 s after
+launch, closed at 3.6 s, still up and copying 0.7 s later with its banner,
+quit at 18.9 s — 15.3 s held open — with every one of the bundle's support
+files in place and the trail line ending ", and Plantoir waited for it before
+closing". Must-fail: with `ClosingWaitsForTheCopy` forced false, the same test
+quit at 5.3 s with the support folder short, and failed.
+
+Tests: `ToolchainReadinessTests.ClosingWaitsOnlyForAWritingCopyWhenItQuits`
+(the decision table), `ClosingWaitsForEveryFoldersWritingCopy`,
+`ACopyStillWaitingItsTurnIsNotWaitedForAndDoesNotStartOnceTheCloseBegins`
+(M3), `ACopyAClosingWindowWaitedForSaysSoOnTheTrail`; the UI test above. H1
+(Quit Anyway, then the wait) is window logic no unit test reaches and was
+not driven through the window: it needs a build under way and a copy writing
+at once.
+
+**Rejected:** quitting anyway after a time limit (the copy is bounded by
+itself — seconds warm, about two minutes cold — and a cut copy is the fault);
+a dialog asking whether to wait (there is nothing to decide: the copy finishes
+on its own and the window says so); and doing nothing and recording the gap,
+the other answer #484 allowed — the mac waits, and the difference would have
+been one more thing to explain.
 
 ### What was rejected
 

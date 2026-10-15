@@ -607,4 +607,60 @@ public static class ToolchainReadiness
 
     /// <summary>Set by a closing window: copies still waiting their turn do not start.</summary>
     private static bool _holdingBack;
+
+    /// <summary>Whether any folder's copy in this process has started writing and not finished.</summary>
+    public static bool AnyCopyIsWriting
+    {
+        get { lock (Gate) return Folders.Values.Any(entry => entry.State == State.Copying && entry.Writing); }
+    }
+
+    /// <summary>
+    /// For a close that quits (#484; the mac's <c>waitForAllCopies</c>, #476):
+    /// hold back every copy still WAITING its turn — it has written nothing and
+    /// must not start now — and finish when every copy that has started
+    /// writing, in every folder of this process, has finished. The hold and the
+    /// snapshot are taken under the same lock a copy takes to mark itself
+    /// writing, and the snapshot is taken again after each wait, so no copy can
+    /// start between the look and the exit (the plan review's M3). A copy that
+    /// finishes this way says on the trail that Plantoir waited for it. Never
+    /// throws.
+    /// </summary>
+    public static async Task WhenWritingCopiesFinish()
+    {
+        while (true)
+        {
+            Task[] writing;
+            lock (Gate)
+            {
+                _holdingBack = true;
+                var entries = Folders.Values.Where(entry => entry.State == State.Copying && entry.Writing).ToList();
+                foreach (var entry in entries) entry.WaitedForBeforeClosing = true;
+                writing = entries.Select(entry => entry.Copy).ToArray();
+            }
+            if (writing.Length == 0) return;
+            try { await Task.WhenAll(writing).ConfigureAwait(false); }
+            catch { /* a copy that threw has finished too */ }
+        }
+    }
+
+    /// <summary>
+    /// Let held-back copies go again: the close that held them did not quit
+    /// after all (another window was opened while it waited).
+    /// </summary>
+    public static void ReleaseWaitingCopies()
+    {
+        lock (Gate) _holdingBack = false;
+    }
+
+    /// <summary>
+    /// Whether this close keeps the window up until the copy has finished
+    /// (#484). PURE. Only a close that QUITS (the last window), only while a
+    /// copy is WRITING, never twice, and never while Windows is ending the
+    /// session: Windows ends the process at sign-out whatever the window does,
+    /// and holding the close only brings up "this app is preventing shutdown"
+    /// — a Windows-only difference from the mac, made cheaper by #477 (the
+    /// scheduled run gets the folder ready itself before it builds).
+    /// </summary>
+    public static bool ClosingWaitsForTheCopy(bool closingQuits, bool aCopyIsWriting, bool systemIsEnding, bool alreadyWaited) =>
+        closingQuits && aCopyIsWriting && !systemIsEnding && !alreadyWaited;
 }

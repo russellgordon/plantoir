@@ -7483,8 +7483,10 @@ folder ready after an update (#473)"), with the mac's differences named:**
   `.terminateLater`): the synchronous copy could not be quit through; off
   the main actor it could, leaving `.toolchain/` half old and half new for a
   scheduled run or a command-line launcher to build from (finding 8). Bounded
-  by the copy. Windows has this gap and does not wait — a `windows` issue
-  says so.
+  by the copy. Windows waits too since #484 (2026-10-15): the window stays up
+  with its banner until the copy has finished — but not while Windows is
+  ending the session, which ends the process regardless; 12 → "Closing waits
+  for a copy that is writing (#484)".
 - **The trail line** `working folder tools copied` is written on both
   platforms now (its contract entry lost `appliesOn: ["windows"]`): once per
   copy that changed or failed something, the counts, the seconds, and the
