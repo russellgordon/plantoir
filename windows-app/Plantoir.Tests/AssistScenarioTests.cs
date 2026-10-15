@@ -5,6 +5,7 @@ using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Models;
 using Plantoir.Mcp;
 
 namespace Plantoir.Tests;
@@ -120,9 +121,9 @@ public class AssistScenarioTests : IDisposable
     {
         Assert.NotEmpty(scenarioName);
 
-        // A scenario this app owes (the Deploy question about classes dated
-        // after the next class, #489) is held open by name: it must still
-        // FAIL, and the day it passes this says to delete its ledger entry.
+        // A scenario this app owes is held open by name: it must still FAIL,
+        // and the day it passes this says to delete its ledger entry. (None
+        // is held today: #475's three landed with #489's 2C.)
         // Each case is its own test here, so the ledger's "it now passes"
         // direction is checked case by case rather than through GapsIn.
         if (NamedGapLedger.Holding(NamedGapLedger.AssistScenarios, scenarioName) is { } owed)
@@ -186,7 +187,26 @@ public class AssistScenarioTests : IDisposable
             "menu" => AssistSurface.Menu,
             _ => AssistSurface.LocalWindow,
         };
-        var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()) { Surface = surface });
+        // #475: `given.classesDatedLater` lays out three published classes —
+        // today's, the next class day's and one two days after that — around
+        // a PINNED today, so the case cannot flake at midnight; the server is
+        // handed the same day.
+        bool classesDatedLater = given?["classesDatedLater"]?.GetValue<bool>() == true;
+        if (classesDatedLater)
+        {
+            Class("Unit 2, Day 3", Iso(PinnedToday), published: true);
+            Class("Unit 2, Day 4", Iso(PinnedToday.AddDays(1)), published: true);
+            Class("Unit 2, Day 5", Iso(PinnedToday.AddDays(3)), published: true);
+        }
+        // `given.laterClassesKeptAll`: Keep All and Deploy, answered before.
+        if (given?["laterClassesKeptAll"]?.GetValue<bool>() == true)
+        {
+            var course = Workspace.DiscoverCourses(_folder).Single(found => found.Code == Course);
+            LaterClassesKept.Keep(course.DirectoryPath, SectionNumber,
+                                  ClassesDatedLater.FlaggedIn(course, SectionNumber, PinnedToday));
+        }
+        var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory())
+            { Surface = surface, Today = () => PinnedToday });
         var model = new ScriptedModel(given?["modelReply"] as JsonObject);
         // The contract's LOCAL schemas, as the window's own narrowed surface
         // declares them (#440 scenario "an empty add_next_class from the model
@@ -199,6 +219,23 @@ public class AssistScenarioTests : IDisposable
             PreviewIsShowing = () => previewRunning,
             SectionIsBusy = () => sectionBusy,
         };
+
+        // `given.laterClassesAnswer`: what the section window's question
+        // answers, noted as `askAboutClassesDatedLater` (#475). Absent, the
+        // window has nothing to ask, and no such event is recorded.
+        if (given?["laterClassesAnswer"]?.ToString() is { } laterAnswer)
+        {
+            agent.AskAboutClassesDatedLaterInApp = () =>
+            {
+                _window.Note("askAboutClassesDatedLater");
+                return Task.FromResult<LaterClassesAtADeploy>(laterAnswer switch
+                {
+                    "goAhead" => LaterClassesAnswer.GoAhead,
+                    "cancelled" => LaterClassesAnswer.Cancelled,
+                    var other => throw new InvalidOperationException($"{scenarioName}: laterClassesAnswer {other}"),
+                });
+            };
+        }
 
         if (sectionWindowOpen)
         {
@@ -331,6 +368,11 @@ public class AssistScenarioTests : IDisposable
                 "typed in by hand", new DateOnly(2026, 9, 8));
         }
     }
+
+    /// <summary>The day the #475 cases are laid out around — the mac fixture's own.</summary>
+    private static readonly DateOnly PinnedToday = new(2026, 10, 8);
+
+    private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     private string PagePath(string title) =>
         Path.Combine(_folder, "courses", Course, $"section{SectionNumber}", "All Classes", title + ".md");

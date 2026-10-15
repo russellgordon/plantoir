@@ -464,8 +464,37 @@ public sealed partial class AssistWorkspace
         var course = Course(sheet.CourseCode);
         LinksChecklist.WriteAnswered(course.DirectoryPath, sheet.Section, sheet.Rows.Select(r => r.Place),
                                      result.RememberedUnticked, DateTime.UtcNow);
+        // A class dated after the next class that the teacher published from
+        // here is one they chose: kept at its date (#475), or the next Deploy
+        // would offer to hide it again and the two questions would undo each
+        // other (the mac's batch B implementation review, finding 2).
+        KeepTheClassesItPublished(course, sheet.Section, result.Written);
         NotePublished(sheet, result);
         return result;
+    }
+
+    /// <summary>
+    /// Records as kept (<see cref="LaterClassesKept"/>) any class among
+    /// <paramref name="places"/> the question at Deploy would now ask about:
+    /// a class published from the links checklist, or by naming its date
+    /// (Publish Class for a Date…, <c>publish_class_on</c>). A class that
+    /// would not be asked about — tomorrow's — leaves no record.
+    /// </summary>
+    internal void KeepTheClassesItPublished(Course course, int section, IEnumerable<string> places)
+    {
+        var published = places.Select(ClassesDatedLater.PlaceKey).ToHashSet(StringComparer.Ordinal);
+        var kept = ClassesDatedLater.FlaggedIn(course, section, Today())
+            .Where(page => published.Contains(page.Place))
+            .ToList();
+        LaterClassesKept.Keep(course.DirectoryPath, section, kept);
+    }
+
+    /// <summary>The classes a publish by DATE published, kept at that date (#475): the teacher named the day.</summary>
+    public void KeepTheClassesPublishedByTheirDate(PublishPlan plan)
+    {
+        var course = Course(plan.CourseCode);
+        KeepTheClassesItPublished(course, plan.SectionNumber, plan.NamedPages.Select(page =>
+            ClassesDatedLater.PlaceOf(course.DirectoryPath, PagePaths.ResolveInside(_folder, page.RelativePath))));
     }
 
     /// <summary>Not Now: nothing written but the answer; every row left (0 followers, since the press leaves every row).</summary>

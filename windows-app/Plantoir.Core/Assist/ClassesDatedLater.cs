@@ -207,4 +207,22 @@ public enum LaterClassesAnswer
 
     /// <summary>Something is already up on the window, so this could not be asked (never waited on).</summary>
     CannotAsk,
+
+    /// <summary>
+    /// The in-app assistant's deploy only: classes are flagged and no window
+    /// could show the section to ask in. Refused with
+    /// <c>deployHasClassesDatedLaterAndNoWindow</c>, naming
+    /// <see cref="LaterClassesAtADeploy.Unasked"/>.
+    /// </summary>
+    NoWindow,
+}
+
+/// <summary>
+/// What the in-app assistant's deploy met at the question (#475): the answer,
+/// and — for <see cref="LaterClassesAnswer.NoWindow"/> — the classes nobody
+/// could be asked about, by title, for the sentence that names them.
+/// </summary>
+public readonly record struct LaterClassesAtADeploy(LaterClassesAnswer Answer, IReadOnlyList<string>? Unasked = null)
+{
+    public static implicit operator LaterClassesAtADeploy(LaterClassesAnswer answer) => new(answer);
 }

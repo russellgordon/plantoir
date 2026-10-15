@@ -1856,6 +1856,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             if (plan.NothingToDoSentence is { } already) return Answering(already);
 
             var result = await workspace.Apply(plan, preview, Relay(progress), cancellation);
+            // The teacher NAMED the day, so a class this published that the
+            // question at Deploy would ask about is kept at that date (#475).
+            if (result.Succeeded) workspace.KeepTheClassesPublishedByTheirDate(plan);
 
             var text = new StringBuilder(result.Message);
             if (plan.Index is { WillChange: true } index)

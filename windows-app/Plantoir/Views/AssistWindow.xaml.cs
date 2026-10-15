@@ -117,6 +117,26 @@ public sealed partial class AssistWindow : Window
     }
 
     /// <summary>
+    /// The in-app assistant's deploy meets the question about classes dated
+    /// after the next class (#475) in the section's window. Nothing flagged:
+    /// nothing to ask, and no window is brought forward for it. No window that
+    /// can show the section: the deploy is held back, the classes named.
+    /// </summary>
+    private async Task<LaterClassesAtADeploy> AskAboutClassesDatedLaterInTheWindow()
+    {
+        var course = Workspace.DiscoverCourses(_folder)
+            .FirstOrDefault(found => found.Code.Equals(_course.Code, StringComparison.OrdinalIgnoreCase)) ?? _course;
+        var flagged = ClassesDatedLater.FlaggedIn(course, _section, DateOnly.FromDateTime(DateTime.Now));
+        if (flagged.Count == 0) return LaterClassesAnswer.NothingToAsk;
+        if (MainWindowForBuilds() is { } main &&
+            await main.AskAboutClassesDatedLaterFor(_folder, _course.Code, _section) is { } answer)
+            return answer;
+        ActivityTrail.Note(ActivityTrail.Event.LaterClassesHeldADeployBack,
+            ClassesDatedLater.HeldBackLine(flagged.Count), _course.Code, _section);
+        return new LaterClassesAtADeploy(LaterClassesAnswer.NoWindow, flagged.Select(page => page.Title).ToList());
+    }
+
+    /// <summary>
     /// Where a build or a deploy this conversation asked for is carried out —
     /// a window on this section's own folder, opened if there is none.
     /// </summary>
@@ -510,6 +530,12 @@ public sealed partial class AssistWindow : Window
             // The Section menu's claim (#489): this window's change to a
             // section the menu is changing right now is refused, never interleaved.
             SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, _course.Code, _section),
+            // #475: the question about classes dated after the next class, in
+            // the section's window, before the deploy stops anything. On this
+            // side the assistant always gets a window (MainWindowForBuilds
+            // opens one), so "no window" is reached only when none can show
+            // the section — and is said, never thrown.
+            AskAboutClassesDatedLaterInApp = AskAboutClassesDatedLaterInTheWindow,
             StartDeployInApp = () => MainWindowForBuilds()?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {

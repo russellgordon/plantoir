@@ -67,7 +67,7 @@ public class ReferenceRefusalTests : IDisposable
         // The window cannot be built in a unit test; its flow's FIRST check is
         // asserted in the source, before anything else is asked or stopped.
         string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"));
-        int start = source.IndexOf("private async Task<string?> DeployAsync()", StringComparison.Ordinal);
+        int start = source.IndexOf("private async Task<string?> DeployAsync(", StringComparison.Ordinal);
         int refusal = source.IndexOf("ReferenceCourse.KeptOnDisk(_course.DirectoryPath)", start, StringComparison.Ordinal);
         int firstOther = source.IndexOf("AnotherProgramStandsInTheWay", start, StringComparison.Ordinal);
         int stop = source.IndexOf("StopPreview", start, StringComparison.Ordinal);

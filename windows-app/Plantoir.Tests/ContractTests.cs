@@ -290,6 +290,27 @@ public class ContractTests
         Assert.Equal(wording["menuNoVisiblePages"]!.ToString(), AssistWording.MenuNoVisiblePages("{course}", "{section}"));
         Assert.Equal(wording["menuSavingACopy"]!.ToString(), AssistWording.MenuSavingACopy("{course}"));
 
+        // #475 (the rest of #489): the question about classes dated after the
+        // next class, with the generator's own examples — the next class on
+        // Friday, 2026-10-09, a row on Wednesday, 2026-10-14, Unit 2, Day 5
+        // (and Day 6) named, two ticked to stay hidden.
+        Pair("laterClassesAtDeploy", AssistWording.LaterClassesAtDeploy(new DateOnly(2026, 10, 9)),
+             AssistWording.LaterClassesAtDeployForAMeeting(new DateOnly(2026, 10, 9)));
+        Pair("laterClassesAtPublish", AssistWording.LaterClassesAtPublish(new DateOnly(2026, 10, 9)),
+             AssistWording.LaterClassesAtPublishForAMeeting(new DateOnly(2026, 10, 9)));
+        Assert.Equal(wording["laterClassesDay"]!.ToString(), AssistWording.LaterClassesDay(new DateOnly(2026, 10, 14)));
+        Assert.Equal(wording["leaveOutAndContinueButton"]!.ToString(), AssistWording.LeaveOutAndContinueButton(2));
+        Assert.Equal(wording["deployHasClassesDatedLater"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLater("{course}", "{section}", new[] { "Unit 2, Day 5" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterNamingSeveral"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLater("{course}", "{section}", new[] { "Unit 2, Day 5", "Unit 2, Day 6" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterNamingSeveral"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterNamingSeveral("{course}", "{section}", new[] { "Unit 2, Day 5", "Unit 2, Day 6" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterAndNoWindow"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterAndNoWindow("{course}", "{section}", new[] { "Unit 2, Day 5" }));
+        Assert.Equal(wording["deployWaitsForAnOpenQuestion"]!.ToString(),
+                     AssistWording.DeployWaitsForAnOpenQuestion("{course}", "{section}"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();

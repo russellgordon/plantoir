@@ -671,6 +671,13 @@ public sealed class AssistAgent
     /// <summary>Whether the Section menu is changing this section right now (#489's claim, <c>SectionMenuActivity</c>).</summary>
     public Func<bool>? SectionIsChangingFromTheMenu { get; set; }
 
+    /// <summary>
+    /// The question about classes dated after the next class, put in the
+    /// section's window before the deploy stops anything (#475) — see
+    /// <see cref="AssistToolRunner.AskAboutClassesDatedLaterInApp"/>.
+    /// </summary>
+    public Func<Task<LaterClassesAtADeploy>>? AskAboutClassesDatedLaterInApp { get; set; }
+
     /// <summary>Deploy through the main window's own flow, console and all. Any thread.</summary>
     public Action? StartDeployInApp { get; set; }
 
@@ -2206,6 +2213,7 @@ public sealed class AssistAgent
             SectionIsChangingFromTheMenu = SectionIsChangingFromTheMenu,
             StartDeployInApp = StartDeployInApp,
             StartDeployInAppAsync = StartDeployInAppAsync,
+            AskAboutClassesDatedLaterInApp = AskAboutClassesDatedLaterInApp,
             SectionIsBusy = SectionIsBusy,
             SectionIsBeingDeployed = SectionIsBeingDeployed,
             PreviewIsShowing = PreviewIsShowing,

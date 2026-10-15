@@ -1630,6 +1630,24 @@ public sealed partial class AssistWorkspace
                   "there once from Plantoir, and I can do it after that.");
         }
 
+        // #475, after the deploy's own refusals and before anything runs:
+        // classes dated after the next class with no answer on file. Nobody
+        // here can be asked, so the deploy is held back until the question
+        // has been answered once in the section's window, where the answer
+        // is remembered (laterClassesKept). An assistant in another program
+        // is told so in the shape of deployNeedsAnAnswer; Plantoir's own
+        // assistant, reaching this only with no window to ask in, is told to
+        // deploy from the window.
+        if (ClassesDatedLater.FlaggedIn(course, section, Today()) is { Count: > 0 } later)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.LaterClassesHeldADeployBack,
+                ClassesDatedLater.HeldBackLine(later.Count), course.Code, section);
+            var titles = later.Select(page => page.Title).ToList();
+            throw new AssistRefusal(IsOutside
+                ? AssistWording.DeployHasClassesDatedLater(course.Code, section.ToString(), titles)
+                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles));
+        }
+
         progress?.Report($"Building Section {section} of {course.Code}…");
         using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy", asker);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
@@ -2368,6 +2386,14 @@ public sealed partial class AssistWorkspace
     /// #289's rule, as the mac's in-app assistant keeps #156's.
     /// </summary>
     public bool IsOutside => !ServesTheLocalWindow;
+
+    /// <summary>
+    /// The teacher's calendar day on this computer's clock, for the question
+    /// about classes dated after the next class (#475). Injectable so the
+    /// contract's scenarios, which lay out classes around a pinned today,
+    /// cannot flake at midnight (12-windows-app.md, "Three testing lessons").
+    /// </summary>
+    public Func<DateOnly> Today { get; init; } = () => DateOnly.FromDateTime(DateTime.Now);
 
     /// <summary>
     /// Claim the build for as long as it runs, so Plantoir's own Preview and

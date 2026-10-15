@@ -319,7 +319,17 @@ public static class ScheduledRun
                 StandDown(job, world, ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, WrapperCouldNotBeWritten);
                 return Ending.StoodDown;
             }
+            // #475: nobody is awake at half six to be asked about classes dated
+            // after the next class, so the deploy goes out as it is — read
+            // here, from the settings and pages it is about to deploy, on the
+            // run's own day, and recorded below only once it HAS deployed.
+            var later = ClassesDatedLater.FlaggedIn(course, job.Section, DateOnly.FromDateTime(world.Now().LocalDateTime));
+            // The wrapper's success record is read against the REAL clock that
+            // dates its file, never world.Now (a test's pinned morning), so
+            // both sides of the comparison are this computer's local time.
+            var ranAt = DateTime.Now;
             world.RunWrapper(script);
+            NoteTheClassesThatWentOut(job, world, later, ranAt);
         }
         finally
         {
@@ -331,6 +341,25 @@ public static class ScheduledRun
         // mistaken for one still to come. The wrapper's record stays.
         ClearIfStillMine(job, TaskScheduling.JobPath(job.TaskName));
         return Ending.Deployed;
+    }
+
+    /// <summary>
+    /// "deployed with classes dated after the next class: …" (#475,
+    /// <c>laterClassesWentOut</c>) — written only when the wrapper left its
+    /// SUCCESS record during this run. Never on the wrapper's exit code: it is
+    /// 0 whether or not the deploy got through (the mac measured gating on it
+    /// writing the line after a failed deploy, its fixes review A), and a
+    /// record older than this run is an earlier night's.
+    /// </summary>
+    private static void NoteTheClassesThatWentOut(Job job, World world, IReadOnlyList<ClassesDatedLater.Page> later,
+                                                  DateTime ranAt)
+    {
+        if (ClassesDatedLater.WentOutLine(later) is not { } line) return;
+        if (ScheduledPublishOutcome.ReadFrom(world.OutcomeDirectory, job.CourseCode, job.Section, job.WorkingFolder)
+                is not { Outcome: ScheduledPublishOutcome.Kind.Succeeded } record) return;
+        // A second's slack for the file system's clock against this one.
+        if (record.When < ranAt.AddSeconds(-1)) return;
+        ActivityTrail.Note(ActivityTrail.Event.LaterClassesWentOut, line, job.CourseCode, job.Section);
     }
 
     /// <summary>

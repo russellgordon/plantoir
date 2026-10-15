@@ -589,6 +589,28 @@ public static class ActivityTrail
         /// come from" and "why did Publish take ten seconds".
         /// </summary>
         SectionMenuBackedUpACourse,
+        /// <summary>
+        /// The question about classes dated after the next class (#475):
+        /// where it was asked (Deploy, the in-app assistant's deploy, Section ▸
+        /// Publish Pages…), how many were flagged, and the answer — how many
+        /// hidden, how many kept published, or cancelled. Counts, never a
+        /// title. Answers "why did my class disappear from the site?" and "why
+        /// does it keep asking me?".
+        /// </summary>
+        LaterClassesAsked,
+        /// <summary>
+        /// A scheduled deploy went out with classes dated after the next class
+        /// (#475): nobody is awake to ask, so it goes as it is, and this
+        /// records the PLACES (at most ten, then how many more). Written only
+        /// once the wrapper's success record says it deployed.
+        /// </summary>
+        LaterClassesWentOut,
+        /// <summary>
+        /// An assistant's deploy was refused while classes dated after the next
+        /// class wait on an answer in the section's window (#475): how many.
+        /// Without it, "why didn't Claude deploy it?" has no answer on the trail.
+        /// </summary>
+        LaterClassesHeldADeployBack,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -705,6 +727,9 @@ public static class ActivityTrail
         Event.RecentWorkingFoldersCleared => "recent working folders cleared",
         Event.RanFromAMenu => "ran from a menu",
         Event.SectionMenuBackedUpACourse => "section menu backed up a course",
+        Event.LaterClassesAsked => "asked about classes dated after the next class",
+        Event.LaterClassesWentOut => "deployed with classes dated after the next class",
+        Event.LaterClassesHeldADeployBack => "a deploy was held back for classes dated after the next class",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

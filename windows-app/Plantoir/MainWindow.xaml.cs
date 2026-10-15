@@ -520,6 +520,53 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
+    /// The in-app assistant's deploy asks about classes dated after the next
+    /// class HERE, in the section's window (#475), before it stops anything:
+    /// the section is shown, the window comes forward if it was hidden, and
+    /// the window's own question is put. Null when this window cannot show
+    /// the section — it is on another folder, or the section is not there —
+    /// which the caller answers as "no window", never by throwing.
+    /// </summary>
+    public async Task<LaterClassesAnswer?> AskAboutClassesDatedLaterFor(string folder, string courseCode, int section)
+    {
+        var answered = new TaskCompletionSource<LaterClassesAnswer?>();
+        if (!DispatcherQueue.TryEnqueue(() => _ = AskOnTheInterfaceThread())) return null;
+        return await answered.Task;
+
+        async Task AskOnTheInterfaceThread()
+        {
+            try
+            {
+                if (IsClosed || !WorkingFolder.IsTheSame(Workspace.WorkspacePath, folder))
+                {
+                    answered.TrySetResult(null);
+                    return;
+                }
+                if (DetailHost.Content is not SectionDetailView existing ||
+                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    existing.SectionNumber != section)
+                {
+                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                }
+                if (DetailHost.Content is not SectionDetailView detail ||
+                    !string.Equals(detail.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    detail.SectionNumber != section)
+                {
+                    answered.TrySetResult(null);
+                    return;
+                }
+                ComeForwardIfHidden();
+                answered.TrySetResult(await detail.AskAboutClassesDatedLaterForTheAssistantAsync());
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"AskAboutClassesDatedLaterFor exception: {ex}");
+                answered.TrySetResult(null);
+            }
+        }
+    }
+
+    /// <summary>
     /// Deploy through the section's own flow and AWAIT the real outcome —
     /// success, failure, or a multi-destination partial — rather than only
     /// the moment the click was dispatched. Returns null if no section view
