@@ -82,7 +82,29 @@ public sealed class AppSettings
     }
 
     /// <summary>
-    /// Which section File ▸ Settings… opened on last ("assistant", "deploying"),
+    /// Where a teacher's press of Preview opens the site (#514; the mac's
+    /// <c>previewOpensAt</c>): the contract's raw value, <c>frontPage</c> or
+    /// <c>lastViewed</c>. Kept RAW, so a value this build does not know reads
+    /// as the front page (<see cref="PreviewStartPage.Read"/>) without being
+    /// lost from the file. Changed only through <see cref="ChangePreviewOpensAt"/>.
+    /// </summary>
+    public string PreviewOpensAt { get; set; } = "frontPage";
+
+    /// <summary>Raised after <see cref="ChangePreviewOpensAt"/> stores a new choice. Static, as the setting is app-wide; a subscriber unsubscribes when it goes.</summary>
+    public static event Action? PreviewOpensAtChanged;
+
+    /// <summary>File ▸ Settings ▸ Preview's change: saved at once and announced, so every window's titles follow; nothing when unchanged.</summary>
+    public void ChangePreviewOpensAt(PreviewStartPage.Setting choice)
+    {
+        string stored = PreviewStartPage.Stored(choice);
+        if (PreviewOpensAt == stored) return;
+        PreviewOpensAt = stored;
+        Save();
+        PreviewOpensAtChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Which section File ▸ Settings… opened on last ("assistant", "preview", "deploying"),
     /// so it opens there again — the mac remembers its pane the same way
     /// (<c>SettingsPane.storageKey</c>). Open Settings… beside the Account ID
     /// always asks for Deploying.

@@ -55,8 +55,31 @@ public class NamedGapLedgerTests
     [Fact]
     public void EveryEntryIsOwedByAMilestoneLaterThanThisBuild()
     {
-        var thisBuild = ThisBuild();
-        var problems = NamedGapLedger.All
+        var problems = Problems(NamedGapLedger.All, ThisBuild());
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+    }
+
+    /// <summary>
+    /// The rule itself, against entries made up here: the ledger is EMPTY
+    /// since #514 closed its last two (2026-10-15), and a rule that only ever
+    /// runs over nothing would stay green however it broke.
+    /// </summary>
+    [Fact]
+    public void TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion()
+    {
+        var build = new Version(1, 7, 1);
+        NamedGapLedger.Entry Owed(string milestone) =>
+            new(NamedGapLedger.ActivityTrailEvents, "an event", 1, milestone, "made up for this test");
+        Assert.Empty(Problems(new[] { Owed("v1.8.0") }, build));
+        Assert.Single(Problems(new[] { Owed("v1.7.1") }, build));
+        Assert.Single(Problems(new[] { Owed("v1.5.0") }, build));
+        Assert.Single(Problems(new[] { Owed("Windows: parity with mac v1.4.0") }, build));
+    }
+
+    private static System.Collections.Generic.List<string> Problems(
+        System.Collections.Generic.IEnumerable<NamedGapLedger.Entry> entries, Version thisBuild)
+    {
+        return entries
             .Select(entry =>
             {
                 string milestone = entry.Milestone;
@@ -70,11 +93,10 @@ public class NamedGapLedgerTests
                            $"this build is {thisBuild}. A ledger entry may only hold open work a LATER " +
                            "release owns: build it, or move the issue (and this entry) to a later milestone " +
                            "with Russell's say-so — never cut a release over it.";
-                return null;
+                return (string?)null;
             })
             .Where(problem => problem is not null)
+            .Select(problem => problem!)
             .ToList();
-
-        Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 }
