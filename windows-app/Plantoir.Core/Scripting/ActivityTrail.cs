@@ -611,6 +611,21 @@ public static class ActivityTrail
         /// Without it, "why didn't Claude deploy it?" has no answer on the trail.
         /// </summary>
         LaterClassesHeldADeployBack,
+        /// <summary>
+        /// File ▸ Settings ▸ Deploying changed the Cloudflare Account ID (#491,
+        /// the mac's #457 item 4): cleared, changed, or changed to something not
+        /// yet a valid ID — NEVER the ID. Written when the teacher leaves the
+        /// field, switches section, closes Settings or quits, so typing writes
+        /// one line rather than one per key. A deploy to Cloudflare that suddenly
+        /// fails for every course is answered by this line.
+        /// </summary>
+        CloudflareAccountIdChangedInSettings,
+        /// <summary>
+        /// Help ▸ Plantoir Help (or F1) opened the support page in the browser
+        /// (#491). A teacher who looked for help just before something went
+        /// wrong is a teacher whose report should say so.
+        /// </summary>
+        PlantoirHelpOpened,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -730,6 +745,8 @@ public static class ActivityTrail
         Event.LaterClassesAsked => "asked about classes dated after the next class",
         Event.LaterClassesWentOut => "deployed with classes dated after the next class",
         Event.LaterClassesHeldADeployBack => "a deploy was held back for classes dated after the next class",
+        Event.CloudflareAccountIdChangedInSettings => "Cloudflare account ID changed in Settings",
+        Event.PlantoirHelpOpened => "opened Plantoir Help",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

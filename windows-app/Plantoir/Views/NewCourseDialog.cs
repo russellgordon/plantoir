@@ -616,11 +616,16 @@ public sealed class NewCourseDialog : ContentDialog
                 _additionalDeployTargets = CourseConfiguration.PruningAdditionalTargets(_additionalDeployTargets, v);
             },
             () => _deployFolderPath, v => _deployFolderPath = v,
+            // Shown, not edited: the ID is changed in File ▸ Settings ▸
+            // Deploying (#491), and Open Settings… beside it raises that
+            // window while this one stays open, so nothing typed is lost.
             () => _window.Workspace.Settings.CloudflareAccountId,
-            v => { _window.Workspace.Settings.CloudflareAccountId = v; _window.Workspace.Settings.Save(); },
             () => _additionalDeployTargets,
             v => _additionalDeployTargets = v.ToList());
         _publishingChoice.Changed += RefreshCreateEnabled;
+        // With no ID, Create stays refused with the contract's sentence beside
+        // Open Settings…; an ID typed in Settings enables it at once.
+        _publishingChoice.AccountRefreshed += RefreshCreateEnabled;
         form.Children.Add(_publishingChoice.Root);
 
         // -------- Structure (long lists stay collapsed) --------

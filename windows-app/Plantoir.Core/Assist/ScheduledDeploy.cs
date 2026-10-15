@@ -220,7 +220,7 @@ public sealed class ScheduledDeploy
                 Models.CourseConfiguration.DeployFolderProblem(course.Configuration.DeployFolderPath),
             "cloudflareAccountMissing" =>
                 $"{course.Code} deploys to Cloudflare Pages, which needs your Account ID. " +
-                $"{Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID)} Add it in this course’s settings, under Deploying, then schedule this again.",
+                $"{Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID)} {Models.DeployingSettings.AddItThenScheduleAgain}",
             "additionalDeployFolderNeedsAttention" =>
                 $"{course.Code} also deploys to a folder, and that folder needs attention first: " +
                 course.Configuration.AdditionalDeployTargets
@@ -229,7 +229,7 @@ public sealed class ScheduledDeploy
                     .First(problem => problem is not null),
             "additionalCloudflareAccountMissing" =>
                 $"{course.Code} also deploys to Cloudflare Pages, which needs your Account ID. " +
-                $"{Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID)} Add it in this course’s settings, under Deploying, then schedule this again.",
+                $"{Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID)} {Models.DeployingSettings.AddItThenScheduleAgain}",
             "neverDeployed" =>
                 // Names the destination (#344 / mac #322): a teacher who
                 // expected somewhere else sees the disagreement at once.

@@ -34,7 +34,26 @@ public sealed partial class CourseSettingsView : UserControl
         ObsidianButton.IsEnabled = FolderActions.ObsidianIsInstalled;
         BuildForm();
         RefreshDirtyState();
+
+        // An Account ID changed in Settings can free a held-back Save, or hold
+        // one back (#491). Re-read the buttons only: it is not an unsaved edit
+        // to this course, so never MarkChanged. Static event, so let go of it
+        // when the view leaves the screen.
+        Loaded += (_, _) => ListenForTheAccount(true);
+        Unloaded += (_, _) => ListenForTheAccount(false);
     }
+
+    private bool _listeningForTheAccount;
+
+    private void ListenForTheAccount(bool listen)
+    {
+        if (listen == _listeningForTheAccount) return;
+        _listeningForTheAccount = listen;
+        if (listen) AppSettings.CloudflareAccountIdChanged += OnAccountChangedInSettings;
+        else AppSettings.CloudflareAccountIdChanged -= OnAccountChangedInSettings;
+    }
+
+    private void OnAccountChangedInSettings() => DispatcherQueue?.TryEnqueue(RefreshDirtyState);
 
     private void MarkChanged()
     {
@@ -775,11 +794,10 @@ public sealed partial class CourseSettingsView : UserControl
         _publishingChoice = new PublishingChoiceView(_window,
             () => Config.DeployTarget, v => Config.DeployTarget = v,
             () => Config.DeployFolderPath, v => Config.DeployFolderPath = v,
-            // The account identifies the teacher, not the course, so it is
-            // kept in app settings and saved as it is typed — a teacher
-            // should never enter it twice.
+            // The account identifies the teacher, not the course: kept in app
+            // settings, shown here read-only and changed in File ▸ Settings ▸
+            // Deploying (#491) — typed here, it changed every other course too.
             () => _window.Workspace.Settings.CloudflareAccountId,
-            v => { _window.Workspace.Settings.CloudflareAccountId = v; _window.Workspace.Settings.Save(); },
             () => Config.AdditionalDeployTargets, v => Config.AdditionalDeployTargets = v.ToList());
         _publishingChoice.Changed += MarkChanged;
         Form.Children.Add(_publishingChoice.Root);
