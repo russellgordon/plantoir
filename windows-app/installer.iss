@@ -43,6 +43,15 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
+; Inno never removes a file a newer version no longer carries, and the TikZ
+; engine's node_modules (#503) is installed from a lockfile: after a lockfile
+; change, a package the new tree dropped would stay beside the new ones and
+; Node could resolve it. So the folder is emptied before [Files] puts the
+; current tree back. (runtime\quartz\node_modules has always had the same
+; exposure; its tree has not changed since Quartz v4.5.0 was pinned.)
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\runtime\vendor\tikz-engine\node_modules"
+
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
