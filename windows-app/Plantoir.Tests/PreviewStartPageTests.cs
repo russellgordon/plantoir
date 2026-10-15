@@ -96,6 +96,24 @@ public class PreviewNavigationLedgerTests
     }
 
     [Fact]
+    public void TwoAppLoadsAskedForInOneTurnEachWaitForTheirOwnNavigation()
+    {
+        // Both requests before either navigation starts (one dispatcher turn):
+        // the cancelled first one's Completed must not end the second, so the
+        // second's SourceChanged is not remembered as the teacher's.
+        var ledger = new PreviewNavigationLedger();
+        ledger.AppLoadRequested(T0);
+        ledger.AppLoadRequested(T0);
+        ledger.NavigationStarting(30, false);
+        ledger.NavigationCompleted(30);              // the first, cancelled
+        Assert.True(ledger.AppLoadUnderWay(T0));
+        ledger.NavigationStarting(31, false);
+        Assert.True(ledger.AppLoadUnderWay(T0));     // the second's SourceChanged: ignored
+        ledger.ContentLoading(31);
+        Assert.False(ledger.AppLoadUnderWay(T0));
+    }
+
+    [Fact]
     public void ALoadThatNeverStartedEndsByItselfAfterTheBackstop()
     {
         var ledger = new PreviewNavigationLedger();

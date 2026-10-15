@@ -1695,6 +1695,14 @@ public sealed partial class SectionDetailView : UserControl
         // The same run, still: a stop, another start or a view torn down
         // while it asked opens nothing and writes nothing.
         if (thisWait.IsCancellationRequested || _serverWait != thisWait || _isTornDown) return;
+        // The server ended during the ask without anybody pressing Stop: there
+        // is nothing to open, and loading its dead port would put the blame on
+        // the page in the trail. Left the way the wait leaves a run that is over.
+        if (!_previewRunner.IsRunning || _previewRunner.WasStoppedByUser)
+        {
+            if (!_previewRunner.WasStoppedByUser) AbandonWait();
+            return;
+        }
 
         var opens = PreviewStartPage.Opens.FrontPage;
         string? trail = null;

@@ -3632,8 +3632,8 @@ naming every phrasing.
   Two `given` flags decide the interesting cases: `sectionWindowOpen: false`
   is the headless path (`Plantoir.Mcp`, and a scheduled deploy), and
   `previewRunning: true` is the case Windows currently gets wrong.
-- **An assistant's `startPreview` opens the FRONT page**, whatever File ▸
-  Settings ▸ Preview says: only a teacher's own press of Preview can ask for
+- **An assistant's `startPreview` opens the FRONT page**, whatever the
+  Preview setting says: only a teacher's own press of Preview can ask for
   the page last viewed (#504 on the mac, #514 on Windows;
   `shared-rules.json` → `previewStartPage.rule`), and the assistant's
   restart is one of the app's own loads, so it never changes the page

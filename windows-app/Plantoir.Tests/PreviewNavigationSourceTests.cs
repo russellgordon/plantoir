@@ -66,4 +66,18 @@ public class PreviewNavigationSourceTests
         Assert.Contains("await WaitForPreviewServer();", Body(code, "private async void StartAutomatedPreview("));
         Assert.Contains("PressPreviewAsync(atLastViewed: false)", code);
     }
+
+    [Fact]
+    public void ARunThatEndedDuringTheAskOpensNothing()
+    {
+        // L-b of batch 6's review: the server can die while the page is being
+        // asked about, with no cancel. The press must check the run itself,
+        // after the ask and before any load, or it loads a dead port.
+        string open = Body(WithoutComments(Source), "private async Task OpenTheSiteAsync(");
+        int check = open.IndexOf("if (!_previewRunner.IsRunning || _previewRunner.WasStoppedByUser)", StringComparison.Ordinal);
+        Assert.True(check >= 0, "OpenTheSiteAsync no longer checks that the run is still going after the ask");
+        Assert.True(check > open.IndexOf("PreviewStartPage.AskAsync(", StringComparison.Ordinal));
+        Assert.True(check < open.IndexOf("LoadIfNeeded(", StringComparison.Ordinal));
+        Assert.True(check < open.IndexOf("ActivityTrail.Note(", StringComparison.Ordinal));
+    }
 }

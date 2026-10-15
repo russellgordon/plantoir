@@ -5806,13 +5806,19 @@ MEASURED event orders (WebView2 runtime 155.0.4283.45, SDK 1.0.3179.45):
 So an app load ends at the `ContentLoading` of the NavigationId CAPTURED from
 the first `NavigationStarting` after the request — never "the next id", which
 pushState consumes — with that id's `NavigationCompleted` as the backstop for
-a failure and 15 s when no navigation ever started. A new request forgets the
-old id, so the first of two app loads back to back cannot end the second.
+a failure and 15 s when no navigation ever started. Each request captures an
+id of its own — the ledger counts requests still waiting for a
+`NavigationStarting` — so the first of two app loads back to back cannot end
+the second, even when both are asked for in one dispatcher turn before
+either has started (`TwoAppLoadsAskedForInOneTurnEachWaitForTheirOwnNavigation`). The cost, chosen over ending a load early: a request WebView2 cancels before
+raising any `NavigationStarting` holds the ledger open until the 15 s backstop.
 `ContentLoading` is the mac's didCommit: ending at Completed instead would
 lose a click made while a page's fonts and KaTeX load (the mac measured a
 resource answering after 8 s). An app load's own SourceChanged lands before
-its ContentLoading, so it is ignored; an address on another site or port,
-`about:blank` and a dead port's address are refused by `Remember` anyway.
+its ContentLoading, so it is ignored. `Remember` refuses only an address on
+another host or port — `about:blank`, or a dead port elsewhere; a dead port at
+the preview's OWN address would be remembered, which is why the press gives up
+before loading when the preview stopped during the ask.
 
 **CoreWebView2.Navigate, and why — corrected.** The plan said setting
 `WebView2.Source` to the address already shown does not navigate. MEASURED,
