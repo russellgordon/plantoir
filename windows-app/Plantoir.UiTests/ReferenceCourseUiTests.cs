@@ -177,8 +177,10 @@ public class ReferenceCourseUiTests
         Assert.NotNull(item);
         // The withheld items are not in the menu at all.
         var desktop = app.Window.Automation.GetDesktop();
-        foreach (string withheld in new[] { "Rename", "Add Section…", "Keep a Copy for Reference…", "Revise with local AI assistant…" })
+        foreach (string withheld in new[] { "Rename", "Revise With", "Add Section…", "Keep a Copy for Reference…" })
             Assert.Null(desktop.FindFirstDescendant(cf => cf.ByName(withheld).And(cf.ByControlType(ControlType.MenuItem))));
+        // Removing the whole course stays, last (#491 item 6).
+        Assert.NotNull(desktop.FindFirstDescendant(cf => cf.ByName("Remove Course…").And(cf.ByControlType(ControlType.MenuItem))));
         if (!item!.IsEnabled)
         {
             Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
@@ -192,4 +194,35 @@ public class ReferenceCourseUiTests
         var cancel = desktop.FindFirstDescendant(cf => cf.ByName("Cancel").And(cf.ByControlType(ControlType.Button)));
         cancel?.AsButton().Invoke();
     }
+
+    /// <summary>
+    /// A reference course's SECTION offers no Remove Section… (#491 item 6;
+    /// <c>interface.whatIsWithheld</c> — "removing the whole course stays"),
+    /// while the live course's section row offers it, last.
+    /// </summary>
+    [UiFact]
+    public void AReferenceSectionOffersNoRemoveSection()
+    {
+        using var app = new DrivenApp(WriteCourses);
+        var desktop = app.Desktop;
+        MenuItemNamed MenuOf(string rowId)
+        {
+            app.RightClickMiddleOf(app.Find(rowId, $"the row {rowId}"));
+            Assert.NotNull(Retry.WhileNull(() => desktop.FindFirstDescendant(cf => cf.ByName("Open in Obsidian").And(cf.ByControlType(ControlType.MenuItem))),
+                                           TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result);
+            return name => desktop.FindFirstDescendant(cf => cf.ByName(name).And(cf.ByControlType(ControlType.MenuItem)));
+        }
+
+        var live = MenuOf("sidebar-ICS3U-section1");
+        Assert.NotNull(live("Remove Section…"));
+        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+        Thread.Sleep(500);
+
+        var reference = MenuOf($"sidebar-{Folder}-section1");
+        Assert.Null(reference("Remove Section…"));
+        Assert.Null(reference("Remove Course…"));
+        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+    }
+
+    private delegate AutomationElement? MenuItemNamed(string name);
 }

@@ -289,6 +289,15 @@ public sealed partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// A ruled item run from the sidebar — the − button, the Delete key, a
+    /// row menu's Remove… (#491 items 5–6) — through the menu bar's own guard:
+    /// a dialog up stops it (and, with <paramref name="keyName"/>, the #191
+    /// record notes the key's arrival), and an item the rule greys does
+    /// NOTHING, silently, as a greyed menu item's key does on the mac.
+    /// </summary>
+    internal void RunFromTheSidebar(Item item, string? keyName = null) => Invoke(item, null, keyName);
+
     /// <summary>The window's own items here; every one that acts on a row goes to the sidebar, which calls the context menus' own code.</summary>
     private void Run(Item item)
     {
@@ -329,27 +338,38 @@ public sealed partial class MainWindow
     /// the course's activity, the section window's own buttons and Course
     /// Settings' own Save — so the menu and the button cannot disagree.
     /// </summary>
-    internal SubjectMenuRules.Situation CurrentSituation()
+    internal SubjectMenuRules.Situation CurrentSituation() => SituationFor(Workspace.Selection);
+
+    /// <summary>
+    /// The situation for <paramref name="selection"/> — the selected row, or a
+    /// row whose context menu is opening (#491: its Remove… item is greyed by
+    /// the same rule). The section window's and Course Settings' own buttons
+    /// are read only for the row they belong to, the selected one; for any
+    /// other row they read as not offered, which no removal depends on.
+    /// </summary>
+    internal SubjectMenuRules.Situation SituationFor(SidebarSelection? selection)
     {
         string? folder = Workspace.WorkspacePath;
         bool hasFolder = folder is not null && Workspace.State == WorkspaceState.Ready && Workspace.WorkspaceProblem is null;
-        var row = !hasFolder ? Row.None : Workspace.Selection switch
+        var row = !hasFolder ? Row.None : SidebarDeleteKey.RowOf(selection, isTheBackupsGroup: false);
+        string? selectedCode = selection switch
         {
-            SidebarSelection.CourseItem => Row.Course,
-            SidebarSelection.SectionItem => Row.Section,
-            SidebarSelection.BackupEntry => Row.Backup,
-            SidebarSelection.ArchivedEntry => Row.Archived,
-            _ => Row.None,
+            SidebarSelection.CourseItem(var c) => c,
+            SidebarSelection.SectionItem(var c, _) => c,
+            _ => null,
         };
-        var course = hasFolder ? Workspace.SelectedCourse : null;
+        var course = hasFolder && selectedCode is not null ? Workspace.Courses.FirstOrDefault(c => c.Code == selectedCode) : null;
         if (row is Row.Course or Row.Section && course is null) row = Row.None;   // a selection that names nothing here
-        string? code = course?.Code ?? (row == Row.Backup ? Workspace.SelectedBackupItem?.CourseCode : null);
-        int? sectionNumber = (Workspace.Selection as SidebarSelection.SectionItem)?.Number;
+        var backup = row == Row.Backup && selection is SidebarSelection.BackupEntry(var backupId)
+            ? Workspace.BackupItems.FirstOrDefault(b => b.Id == backupId) : null;
+        string? code = course?.Code ?? backup?.CourseCode;
+        int? sectionNumber = (selection as SidebarSelection.SectionItem)?.Number;
+        bool isTheSelection = Equals(selection, Workspace.Selection);
 
         bool copying = folder is not null && code is not null &&
                        (WorkLease.IsHeld(folder, code, WorkLease.Copying) || SidebarPane.IsZipping(folder, code));
-        var detail = row == Row.Section ? SelectedSectionDetail() : null;
-        var settings = row == Row.Course ? DetailHost.Content as CourseSettingsView : null;
+        var detail = row == Row.Section && isTheSelection ? SelectedSectionDetail() : null;
+        var settings = row == Row.Course && isTheSelection ? DetailHost.Content as CourseSettingsView : null;
         bool assisting = folder is not null && course is not null && CourseActivity.IsAssisting(folder, course.Code);
 
         return new SubjectMenuRules.Situation
@@ -402,6 +422,8 @@ public sealed partial class MainWindow
         }
         var enabled = SubjectMenuRules.Enabled(situation);
         foreach (var (item, view) in _ruled) view.IsEnabled = enabled.Contains(item);
+        // The sidebar's − follows the same rule (#491 item 5).
+        Sidebar.RefreshMinusButton(situation);
 
         // Section ▸ Preview says what the button says.
         if (_ruled.TryGetValue(Item.Preview, out var preview) && preview is MenuFlyoutItem previewItem)

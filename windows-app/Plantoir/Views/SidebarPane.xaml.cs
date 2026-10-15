@@ -187,6 +187,40 @@ public sealed partial class SidebarPane : UserControl
             new Microsoft.UI.Xaml.Input.KeyEventHandler((_, _) => _lastTreeInteraction = DateTime.UtcNow), true);
         Tree.Collapsed += Tree_Collapsed;
         Tree.Expanding += Tree_Expanding;
+        Tree.KeyDown += Tree_KeyDown;
+    }
+
+    /// <summary>
+    /// Delete on the selected row asks to remove (or delete) it, by running the
+    /// menu item <c>sidebarDeleteKey</c> names under that item's OWN enablement
+    /// (#491 item 5): the same question the menu bar, the row's menu and the −
+    /// button ask, and nothing at all where the item is greyed — a reference
+    /// section, a course being copied — silently, as a greyed menu item's key
+    /// is on the mac (Windows has no beep for it, and a dialog explaining why
+    /// would be a door the menu says is shut). The row is <c>Tree.SelectedItem</c>,
+    /// which arrow keys move WITHOUT raising ItemInvoked (measured, batch 3's
+    /// spike), so it is selected for the window first. Not a key on the menu
+    /// item: the filter box is outside the tree, and a field must keep Delete.
+    /// </summary>
+    private void Tree_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Delete) return;
+        e.Handled = true;
+        if (DialogGate.Holds(XamlRoot, "Delete")) return;
+        var row = Tree.SelectedItem as SidebarRow;
+        var kind = SidebarDeleteKey.RowOf(row?.Selection, isTheBackupsGroup: row is not null && ReferenceEquals(row, _backupsGroup));
+        if (SidebarDeleteKey.ItemFor(kind) is not { } item) return;
+        if (row?.Selection is { } selection && !Equals(Workspace.Selection, selection)) SelectRow(selection);
+        _window.RunFromTheSidebar(item);
+    }
+
+    /// <summary>The − button greys exactly when its menu item would (#491 item 5; <c>SidebarDeleteKey.MinusButtonIsEnabled</c>).</summary>
+    internal void RefreshMinusButton(SubjectMenuRules.Situation situation)
+    {
+        // Not greyed for a dialog: the dialog's own overlay already covers it,
+        // and a − left grey after the dialog closed would wait for the next
+        // refresh. The click asks the rule again, dialog included.
+        RemoveButton.IsEnabled = SidebarDeleteKey.MinusButtonIsEnabled(situation with { SheetIsUp = false });
     }
 
     /// <summary>
@@ -270,7 +304,7 @@ public sealed partial class SidebarPane : UserControl
         window.Workspace.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection))
-                RemoveButton.IsEnabled = Workspace.SelectedCourse is not null;
+                RefreshMinusButton(_window.CurrentSituation());
         };
     }
 
@@ -833,6 +867,7 @@ public sealed partial class SidebarPane : UserControl
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(course.DirectoryPath))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(course.DirectoryPath))));
+        AddRemoval(menu, row, SubjectMenuRules.Item.RemoveCourse, "Remove Course…");
         return menu;
     }
 
@@ -957,6 +992,7 @@ public sealed partial class SidebarPane : UserControl
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
+        AddRemoval(menu, row, SubjectMenuRules.Item.RemoveSection, "Remove Section…");
 
         // Read when the menu OPENS, never captured at render — the staleness
         // lesson from row 104, which cost a live debugging session.
@@ -1279,29 +1315,45 @@ public sealed partial class SidebarPane : UserControl
 
     private void Add_Click(object sender, RoutedEventArgs e) => _ = OpenNewCourseWizard();
 
+    /// <summary>
+    /// The − button runs Remove Course… or Remove Section… through the menu
+    /// bar's guard (#491 item 5): greyed where the item is, so on a section of
+    /// a course kept for reference it does nothing — it used to remove the
+    /// whole course there. A backup or an archive is never −'s to delete.
+    /// </summary>
     private void Remove_Click(object sender, RoutedEventArgs e)
     {
-        // An archived item is already put away — nothing for this button to do.
-        if (Workspace.SelectedCourse is not { } course) return;
-        _ = ConfirmRemove(course, (Workspace.Selection as SidebarSelection.SectionItem)?.Number);
+        var kind = SidebarDeleteKey.RowOf(Workspace.Selection, isTheBackupsGroup: false);
+        if (SidebarDeleteKey.MinusButtonItem(kind) is { } item) _window.RunFromTheSidebar(item);
     }
+
+    /// <summary>Remove Course… — from the menu bar, the row's menu, the − button and the Delete key alike.</summary>
+    internal Task ConfirmRemoveCourse(Course course) => ConfirmRemove(course, null);
+
+    /// <summary>Remove Section… — from the menu bar, the row's menu, the − button and the Delete key alike.</summary>
+    internal Task ConfirmRemoveSection(Course course, int section) => ConfirmRemove(course, section);
 
     /// <summary>
     /// Remove a course, or one of its sections, after asking: the footer's
-    /// minus button, Course > Remove Course… and Section > Remove Section…
-    /// (#488) all come here, so they ask the same question.
+    /// minus button, the Delete key, the rows' menus, Course > Remove Course…
+    /// and Section > Remove Section… (#488, #491) all come here, so they ask
+    /// the same question.
     /// </summary>
-    internal async Task ConfirmRemove(Course course, int? sectionNumber)
+    private async Task ConfirmRemove(Course course, int? sectionNumber)
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
         if (askedIn is null) return;
 
+        // A reference course's section is never removed on its own
+        // (interface.whatIsWithheld: "Remove Section N (removing the whole
+        // course stays)"). Every route greys Remove Section… there; this guards
+        // a caller that skipped the rule. Until #491 the − button turned a
+        // section's removal into the WHOLE course's here, silently.
+        if (sectionNumber is not null && ReferenceCourse.IsKeptForReference(course)) return;
+
         string title;
         string message;
-        // A reference course's section is never removed on its own (#241,
-        // staysAsItIs): the footer's Remove means the whole course there.
-        if (ReferenceCourse.IsKeptForReference(course)) sectionNumber = null;
         if (sectionNumber is int n && course.SectionNumbers.Count > 1)
         {
             title = $"Remove Section {n} of {course.Code}?";

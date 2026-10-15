@@ -103,9 +103,10 @@ public sealed partial class SidebarPane
 
     /// <summary>
     /// <c>interface.whatIsOffered</c> and nothing else: Obsidian (with the calm
-    /// note first), Set School Year…, Back Up Now, the folder items. No Rename,
-    /// Add Section, Keep a Copy or Revise — not greyed, not drawn. Remove stays,
-    /// on the footer, and unlocks first.
+    /// note first), Set School Year…, Back Up Now, the folder items, and Remove
+    /// Course… last (#491 item 6; removing the whole course stays — it unlocks
+    /// the pages first, <c>CourseArchiver.ArchiveAndRemoveCourse</c>). No
+    /// Rename, Add Section, Keep a Copy or Revise — not greyed, not drawn.
     /// </summary>
     private MenuFlyout ReferenceCourseMenu(Course course)
     {
@@ -120,6 +121,7 @@ public sealed partial class SidebarPane
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(course.DirectoryPath))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(course.DirectoryPath))));
+        AddRemoval(menu, row, SubjectMenuRules.Item.RemoveCourse, "Remove Course…");
         return menu;
     }
 
@@ -153,6 +155,9 @@ public sealed partial class SidebarPane
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
         menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
+        // No Remove Section…, deliberately: interface.whatIsWithheld lists
+        // "Remove Section N (removing the whole course stays)", and the mac's
+        // row offering it was a bug #457 fixed. The course's row removes it all.
         return menu;
     }
 

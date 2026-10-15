@@ -12,7 +12,7 @@ namespace Plantoir.Tests;
 /// </summary>
 public class SubjectMenusContractTests
 {
-    private static JsonNode Rule => ContractLoader.LoadJson("shared-rules.json")["subjectMenus"]!;
+    internal static JsonNode Rule => ContractLoader.LoadJson("shared-rules.json")["subjectMenus"]!;
 
     [Fact]
     public void EveryItemTheContractNamesIsAnItemHere_AndTheOtherWayRound()
@@ -62,7 +62,7 @@ public class SubjectMenusContractTests
     }
 
     /// <summary>The contract's defaults, overlaid with one case's situation, as a <see cref="SubjectMenuRules.Situation"/>.</summary>
-    private static SubjectMenuRules.Situation Situation(JsonObject overrides)
+    internal static SubjectMenuRules.Situation Situation(JsonObject overrides)
     {
         var merged = new Dictionary<string, JsonNode?>();
         foreach (var (key, value) in Rule["situationDefaults"]!.AsObject()) merged[key] = value;
