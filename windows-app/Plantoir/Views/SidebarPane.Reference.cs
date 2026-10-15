@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 using Plantoir.Services;
 
 namespace Plantoir.Views;
@@ -184,6 +185,24 @@ public sealed partial class SidebarPane
     /// </summary>
     private async Task OpenReferenceInObsidian(Course course, string revealFolder)
     {
+        // Lock the pages again FIRST, on every route (#491 item 4; the mac's
+        // OpenInObsidianRoute does lockAgain before anything): a page unlocked
+        // since the folder was last read — by hand, by a sync client, by a
+        // restore — must not open in Obsidian as editable. Off the UI thread:
+        // a large course is thousands of access-rule reads.
+        try
+        {
+            var outcome = await Task.Run(() => ReferenceLock.EnsureLocked(course));
+            if (!outcome.IsQuiet)
+                ActivityTrail.Note(ActivityTrail.Event.ReferenceCoursePagesLockedAgain,
+                    ReferenceCourseUpkeep.TrailLine(outcome, ReferenceCourse.ShownCode(course)));
+        }
+        catch (Exception error)
+        {
+            // The pages may already be locked; opening is still the teacher's call.
+            App.LogDiagnostic($"Open in Obsidian: locking {course.Code} again failed: {error.Message}");
+        }
+
         if (!NoteWasShown(course))
         {
             var note = new ContentDialog
