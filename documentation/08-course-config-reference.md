@@ -237,7 +237,11 @@ edited inside a course's settings — the same app-wide value, so changing it in
 one course changed it for every course, which is why it moved. The stored key
 did not change (`cloudflareAccountID` in the app's preferences), so nothing was
 migrated. Windows stores it app-wide too (`AppSettings.CloudflareAccountId`)
-and has no Settings window; where Windows edits it is its own decision. The API tokens for Netlify and Cloudflare never touch this
+and EDITS it in File ▸ Settings ▸ Deploying since the 1.7.1 catch-up (#491;
+a Settings window of its own, `documentation/12-windows-app.md` → "The
+Settings window, Plantoir Help and the Account ID's refusals"); a course's
+Deploying section and the wizard show it read-only with Open Settings…, as on
+the mac. Nothing was migrated there either. The API tokens for Netlify and Cloudflare never touch this
 file — or any file in the working folder.
 
 ## Files that travel alongside it
