@@ -130,7 +130,6 @@ internal static class NamedGapLedger
     // there. (Until 2026-10-15 every entry named one milestone, "Windows:
     // parity with mac v1.4.0", and the ledger was its burn-down list.)
     private const string V150 = "v1.5.0";
-    private const string V160 = "v1.6.0";
     private const string V171 = "v1.7.1";
 
     /// <summary>
@@ -153,17 +152,12 @@ internal static class NamedGapLedger
 
     // Reasons, one per owning issue: the catch-up to mac 1.7.1 lands in
     // batches, and each of these is a later batch's work (2026-10-15).
-    private const string Printing = "printable pages (mac #454) are a later batch of the catch-up to 1.7.1";
     private const string LastViewed = "Preview at Last Viewed (mac #504) is a later batch of the catch-up to 1.7.1";
 
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
         // ---- activityTrail.mustRecord: events this app does not declare yet.
         // Each goes when its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 496, V160, Printing,
-            "preview page opened in the web browser",
-            "asked before adding guidance to a file",
-            "guidance for assistants could not be written"),
         Owed(ActivityTrailEvents, 514, V171, LastViewed,
             "preview started at the page last viewed",
             "preview start page chosen in Settings"),

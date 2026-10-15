@@ -277,8 +277,14 @@ public sealed partial class SectionDetailView : UserControl
                     ReleaseTheHeldLinksFinding();
             }
         };
+        Preview.CoreWebView2Initialized += (_, args) => { if (args.Exception is null) HandPagesToTheBrowser(); };
         Preview.NavigationCompleted += (_, args) =>
         {
+            // The print shim again, on the page now showing (#496): a
+            // registration made while the very first navigation was already
+            // under way may miss that one document.
+            if (args.IsSuccess && Preview.CoreWebView2 is { } core)
+                core.ExecuteScriptAsync(PreviewBrowserHandoff.PrintShim).AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
             // For a test run ONLY (--state-dir): what the preview pane actually
             // loaded, readable through UI Automation, so the UI suite can tell
             // the teacher's page from a blank one, an error page or another
@@ -2254,6 +2260,50 @@ public sealed partial class SectionDetailView : UserControl
     private void Back_Click(object sender, RoutedEventArgs e) { if (Preview.CanGoBack) Preview.GoBack(); }
     private void Forward_Click(object sender, RoutedEventArgs e) { if (Preview.CanGoForward) Preview.GoForward(); }
     private void Reload_Click(object sender, RoutedEventArgs e) => Preview.Reload();
+
+    // ---- The preview hands pages to the browser (#496) ---------------------
+
+    /// <summary>
+    /// The preview pane's two doors to the teacher's web browser
+    /// (<see cref="PreviewBrowserHandoff"/>): a link that asks for a new
+    /// window, and the page's own Print, which posts through the injected
+    /// <c>plantoirPrint</c> shim. Each hand-over is one trail line naming the
+    /// page the teacher was on and only the KIND of link
+    /// (<c>preview page opened in the web browser</c>).
+    /// </summary>
+    private void HandPagesToTheBrowser()
+    {
+        var core = Preview.CoreWebView2;
+        if (core is null) return;
+        _ = core.AddScriptToExecuteOnDocumentCreatedAsync(PreviewBrowserHandoff.PrintShim);
+        core.NewWindowRequested += (_, args) =>
+        {
+            // Never a bare popup owned by Plantoir: handled, and opened in the
+            // teacher's own browser, or dropped (any scheme but http, https
+            // and mailto).
+            args.Handled = true;
+            if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out var target)) return;
+            if (!PreviewBrowserHandoff.IsHandedOver(target)) return;
+            Uri? page = Preview.Source;
+            HandOver(PreviewBrowserHandoff.ForTheBrowser(target),
+                PreviewBrowserHandoff.TrailWords(page, target, PreviewBrowserHandoff.Why.NewWindow));
+        };
+        core.WebMessageReceived += (_, args) =>
+        {
+            // Only the preview's own pages may ask (served from this PC).
+            if (!Uri.TryCreate(args.Source, UriKind.Absolute, out var source) || !PreviewBrowserHandoff.IsThePreviews(source)) return;
+            if (PreviewBrowserHandoff.FromMessage(args.WebMessageAsJson) is not { } request) return;
+            HandOver(PreviewBrowserHandoff.ForTheBrowser(request.Address),
+                PreviewBrowserHandoff.TrailWords(request.Address, request.Address,
+                    PreviewBrowserHandoff.Why.PrintHandout, request.Mode, request.Paper));
+        };
+    }
+
+    private void HandOver(Uri address, string trailWords)
+    {
+        if (!Plantoir.Services.ExternalLinks.Open(address)) return;
+        ActivityTrail.Note(ActivityTrail.Event.PreviewPageOpenedInBrowser, trailWords, _course.Code, _sectionNumber);
+    }
 
     private void OpenInBrowser_Click(object sender, RoutedEventArgs e)
     {
