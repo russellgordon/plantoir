@@ -53,6 +53,71 @@ public sealed partial class AssistWorkspace
         return slash >= 0 ? forward[(slash + 1)..] : forward;
     }
 
+    // ---- What the menu's dialogs offer (#489) ------------------------------
+
+    /// <summary>One page a teacher may tick in Publish Pages… or Hide Pages….</summary>
+    /// <param name="Name">What the call sends: its place in the course, <c>section1/All Classes/Unit 2, Day 3</c>.</param>
+    /// <param name="Title">What the teacher reads.</param>
+    /// <param name="Folder">Its folder in the course, to tell apart two pages of one title.</param>
+    public sealed record MenuPage(string Name, string Title, string Folder, bool IsClass, DateOnly? Date);
+
+    /// <summary>
+    /// The pages Publish Pages… (hidden ones) or Hide Pages… (visible ones)
+    /// offers for a section: classes first, by date then title, then the rest
+    /// by folder then title — never the How I Teach page. A page whose flag
+    /// cannot be read is offered to Publish Pages… too: publishing it writes
+    /// the flag out in full, which is how such a page is mended (the mac's
+    /// <c>SectionVerbSheetModel.rows</c>). Read in-process, changing nothing.
+    /// </summary>
+    public IReadOnlyList<MenuPage> PagesToOffer(string courseCode, int section, bool publishing)
+    {
+        var course = Course(courseCode);
+        int number = Section(course, section);
+        var classes = new List<MenuPage>();
+        var others = new List<MenuPage>();
+        foreach (string page in PagePaths.MarkdownPages(course.DirectoryPath, number).Where(p => ListsAsAPage(course, p)))
+        {
+            string text;
+            try { text = File.ReadAllText(page); } catch { continue; }
+            bool visible = !PageFrontmatter.IsDraft(text, number);
+            bool certain = PageFrontmatter.Visibility(text, number) != PageVisibility.CannotTell;
+            bool offered = publishing ? (!visible || !certain) : visible;
+            if (!offered) continue;
+            var planned = Plan(course, number, page, draft: !publishing, viaLink: false);
+            string name = SectionVerbs.PageName(course.DirectoryPath, page);
+            int slash = name.LastIndexOf('/');
+            var row = new MenuPage(name, planned.DisplayTitle ?? planned.Title, slash > 0 ? name[..slash] : "",
+                                   planned.IsClassPage, planned.Date);
+            (row.IsClass ? classes : others).Add(row);
+        }
+        var orderedClasses = classes
+            .OrderBy(row => row.Date is null)
+            .ThenBy(row => row.Date ?? default)
+            .ThenBy(row => row.Title, StringComparer.OrdinalIgnoreCase);
+        var orderedOthers = others
+            .OrderBy(row => row.Folder, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(row => row.Title, StringComparer.OrdinalIgnoreCase);
+        return orderedClasses.Concat(orderedOthers).ToList();
+    }
+
+    /// <summary>A class Make Room for Classes… can make room in front of.</summary>
+    public sealed record MenuClass(string Title, int Unit, int Day);
+
+    /// <summary>The section's class pages the course's naming can read, in unit and day order.</summary>
+    public IReadOnlyList<MenuClass> ClassesToMakeRoomBefore(string courseCode, int section)
+    {
+        var course = Course(courseCode);
+        int number = Section(course, section);
+        var naming = course.Configuration.Naming;
+        var found = new List<MenuClass>();
+        foreach (string page in ClassPages(course, number))
+        {
+            string title = Path.GetFileNameWithoutExtension(page);
+            if (naming.Parse(title) is { } position) found.Add(new MenuClass(title, position.Unit, position.Day));
+        }
+        return found.OrderBy(row => row.Unit).ThenBy(row => row.Day).ToList();
+    }
+
     // ---- Where the last change was made (#489) ----------------------------
 
     /// <summary>

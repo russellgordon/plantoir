@@ -936,6 +936,20 @@ public sealed partial class SidebarPane : UserControl
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
+        // Four of the assistant's functions (#489, the mac's #457 batch B),
+        // selecting the row first and then meeting the menu bar's own check at
+        // the click (MainWindow.RunSectionVerbFromARow) — this menu does not
+        // consult the rule when it is drawn.
+        menu.Items.Add(MenuItem("Publish Pages…", "",
+            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishPages))));
+        menu.Items.Add(MenuItem("Hide Pages…", "",
+            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.HidePages))));
+        menu.Items.Add(MenuItem("Publish Class for a Date…", "",
+            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.PublishClassForADate))));
+        menu.Items.Add(MenuItem("Add Next Class", "",
+            Selecting(row, () => _window.RunSectionVerbFromARow(SubjectMenuRules.Item.AddNextClass))));
+        menu.Items.Add(new MenuFlyoutSeparator());
+
         // The vault is the COURSE folder even for a section — the section is
         // a subfolder within it, and Obsidian reveals the SECTION's folder.
         menu.Items.Add(ObsidianItem(course, number, row));

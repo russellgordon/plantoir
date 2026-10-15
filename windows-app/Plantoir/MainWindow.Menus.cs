@@ -126,6 +126,27 @@ public sealed partial class MainWindow
         Add(section, "Deploy…", "sectionDeploy", Item.Deploy, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
         Add(section, "Open in Browser", "sectionOpenInBrowser", Item.OpenInBrowser);
         section.Add(new MenuFlyoutSeparator());
+        // The assistant's own functions (#489, the mac's #457 batch B), run
+        // through the tools' own code — never a model, so a teacher who
+        // declined the assistant has every one (MainWindow.Verbs.cs). The
+        // ellipsis items show the plan before anything changes; Rebuild
+        // Preview, Undo Last Change and Add Next Class act at once.
+        Add(section, "Publish Pages…", "sectionPublishPages", Item.PublishPages);
+        Add(section, "Hide Pages…", "sectionHidePages", Item.HidePages);
+        Add(section, "Publish Class for a Date…", "sectionPublishClassForADate", Item.PublishClassForADate);
+        // Ctrl+Shift+B, the mac's Shift+Cmd+B: kept free for it by #488's key census.
+        Add(section, "Rebuild Preview", "sectionRebuildPreview", Item.RebuildPreview,
+            Key(VirtualKey.B, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+B"));
+        // No key: Ctrl+Z belongs to text editing, and a key that took back a
+        // page change from inside a text field would be a surprise nobody
+        // could undo (the mac's reason for no Cmd+Z).
+        Add(section, "Undo Last Change", "sectionUndoLastChange", Item.UndoLastChange);
+        section.Add(new MenuFlyoutSeparator());
+        Add(section, "Add Next Class", "sectionAddNextClass", Item.AddNextClass);
+        Add(section, "Re-date Classes…", "sectionReDateClasses", Item.ReDateClasses);
+        Add(section, "Make Room for Classes…", "sectionMakeRoomForClasses", Item.MakeRoomForClasses);
+        Add(section, "Class Dates…", "sectionClassDates", Item.ClassDates);
+        section.Add(new MenuFlyoutSeparator());
         Add(section, "Schedule Deploy…", "sectionScheduleDeploy", Item.ScheduleDeploy);
         Add(section, "Cancel Scheduled Deploy…", "sectionCancelScheduledDeploy", Item.CancelScheduledDeploy);
         section.Add(new MenuFlyoutSeparator());
@@ -133,13 +154,6 @@ public sealed partial class MainWindow
         Add(section, StartOfYearWording.UndoMenuItem, "sectionUndoGettingReady", Item.UndoGettingReady);
         Add(section, LinksChecklistWording.MenuItem, "sectionPublishPagesLinksLeadTo", Item.PublishPagesLinksLeadTo);
         section.Add(new MenuFlyoutSeparator());
-        // #489 (batch 2B) adds the assistant's own functions HERE, as their own
-        // two groups after Open in Browser's neighbours: Publish Pages…, Hide
-        // Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B),
-        // Undo Last Change · Add Next Class, Re-date Classes…, Make Room for
-        // Classes…, Class Dates… — Item.PublishPages … Item.ClassDates, already
-        // in SubjectMenuRules. Nothing is drawn for them before they work: a
-        // greyed item a teacher could see and never use is a promise broken.
         AddReviseWith(section, "section", Item.SectionReviseWithClaude, Item.SectionReviseWithCodex, Item.SectionReviseWithLocalAssistant);
         var sectionObsidian = Add(section, "Open in Obsidian", "sectionOpenInObsidian", Item.SectionOpenInObsidian);
         _sectionObsidianKey = Key(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+O")!.Value.Make(this, Item.SectionOpenInObsidian);
@@ -288,6 +302,11 @@ public sealed partial class MainWindow
             case Item.Back: detail?.PreviewGoBack(); return;
             case Item.Forward: detail?.PreviewGoForward(); return;
             case Item.ReloadPage: detail?.PreviewReload(); return;
+            case Item.PublishPages or Item.HidePages or Item.PublishClassForADate or Item.RebuildPreview
+                or Item.UndoLastChange or Item.AddNextClass or Item.ReDateClasses or Item.MakeRoomForClasses
+                or Item.ClassDates:
+                _ = RunSectionVerb(item);
+                return;
         }
         if (!Sidebar.Perform(item)) App.LogDiagnostic($"menu item {item} has no route yet");
     }
@@ -357,10 +376,11 @@ public sealed partial class MainWindow
             DeployButtonEnabled = detail?.DeployButtonIsEnabled == true,
             PreviewIsShowing = detail?.HasPreview == true,
             PreviewIsRunning = detail?.PreviewIsRunning == true,
-            // The assistant's functions arrive with #489 (batch 2B); until then
-            // nothing has been changed from the menu, and nothing is running.
-            LastChangeIsHere = false,
-            VerbIsRunning = false,
+            // #489: where this window's last menu change was made, and whether
+            // the menu (any window's) or the assistant is changing the section.
+            LastChangeIsHere = course is not null && sectionNumber is int changedIn && LastMenuChangeIsIn(course.Code, changedIn),
+            VerbIsRunning = folder is not null && course is not null && sectionNumber is int runningIn
+                            && AVerbIsRunningOn(folder, course.Code, runningIn),
             CanGoBack = detail?.CanGoBack == true,
             CanGoForward = detail?.CanGoForward == true,
         };
@@ -499,6 +519,8 @@ public sealed partial class MainWindow
             XamlRoot = root,
         };
         AutomationProperties.SetAutomationId(dialog, "publishingAndDeployingExplained");
+        // "ran from a menu" (#489): the mac's line, word for word.
+        ActivityTrail.Note(ActivityTrail.Event.RanFromAMenu, "Help ▸ Publishing and Deploying… — shown");
         try { await dialog.ShowAsync(); }
         catch (Exception ex) { App.LogDiagnostic($"Publishing and Deploying could not be shown: {ex.Message}"); }
     }
