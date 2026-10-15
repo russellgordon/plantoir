@@ -200,6 +200,7 @@ python website/shots/capture_windows.py                  # every Windows picture
 python website/shots/capture_windows.py --sites          # the class-site shots, in Edge windows
 python website/shots/capture_windows.py --figures        # the hero and the two colour figures
 python website/shots/capture_windows.py --app [a,b]      # the app's own scenes, How I Teach and schedule
+python website/shots/capture_windows.py --print-set      # what printing does: print-page and print-handout
 python website/shots/capture_windows.py --provision-demo <folder>   # no pictures: a demo folder's state (#445)
 ```
 
@@ -402,7 +403,9 @@ prints its Questions only handout in Chrome for Testing the way the Print
 button does (`handout_pdf.mjs`), and shows that PDF in the same kind of
 window. Both are whole window captures with their own corners and shadow.
 A payload page changed since the folder was made is not in it: delete the
-folder and run again.
+folder and run again. Windows takes the same two shots with
+`capture_windows.py --print-set` (`print_set_windows.py`; the course is
+`print_set.py`'s, shared by both): `SCREENSHOTS.md` → "Windows Capture".
 
 **Before starting:** the screen unlocked and left alone for about an hour,
 Focus off, Plantoir's notifications allowed, the Safari profile `⎚` present,

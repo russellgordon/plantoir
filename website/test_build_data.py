@@ -415,10 +415,13 @@ class ReleaseReadinessTests(unittest.TestCase):
 # ruling, 2026-10-04) — until v1.7.0's two print pictures, below.
 WINDOWS_PICTURE_OWED: dict = {
     # v1.7.0, mac only (DECISIONS 15): what printing does, and a drawn
-    # diagram, photographed from a Mac preview. Windows owes the features
-    # first (#496 printing, #485 E1's windows issue), then the pictures.
-    "print-page": "#496 and #485 E1 (Windows has neither printing nor figures yet)",
-    "print-handout": "#496 (Windows has no Print button yet)",
+    # diagram, photographed from a Mac preview. Windows' harness takes both
+    # since the 1.7.1 catch-up (`capture_windows.py --print-set`,
+    # print_set_windows.py), but the shutter needs an UNLOCKED desktop; the
+    # run marks both `windows: true` when it has them, and these two lines
+    # come off then.
+    "print-page": "capture_windows.py --print-set, on an unlocked desktop",
+    "print-handout": "capture_windows.py --print-set, on an unlocked desktop",
 }
 
 
