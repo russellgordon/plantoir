@@ -445,7 +445,12 @@ public sealed partial class SidebarPane : UserControl
             var grid = new Grid { ColumnSpacing = 12 };
             foreach (var width in new[] { 80, 200, 150, 90 })
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
-            string who = item.Maker is BackupMaker.Assistant a ? $"Assistant, Section {a.SectionNumber}" : "You";
+            string who = item.Maker switch
+            {
+                BackupMaker.Assistant a => $"Assistant, Section {a.SectionNumber}",
+                BackupMaker.Menu m => $"Section menu, Section {m.SectionNumber}",
+                _ => "You",
+            };
             string[] cells = { item.CourseCode, item.WhenDescription, who,
                                bytes is { } b ? BackupSizes.Describe(b) : AssistWording.BackupSizeCouldNotBeReadShort };
             for (int i = 0; i < cells.Length; i++)
