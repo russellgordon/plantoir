@@ -142,7 +142,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    version series" above, and the `cut-release` skill's step 5). For v1.4.0,
    a mac-only cut: `MARKETING_VERSION` goes to 1.4.0 before `publish.sh
    -Sign`, and the csproj stays at 1.1.0. (The csproj went to 1.4.2 on
-   2026-10-03, when the Windows installer joined that release.)
+   2026-10-03, when the Windows installer joined that release.) **When the
+   csproj's version changes, run `dotnet test` in `windows-app/` AGAIN** —
+   `NamedGapLedgerTests` compares every ledger entry's milestone with that
+   `<Version>`, and the run in step 1 compared it with the OLD number, so it
+   passes with entries left that this cut must not carry.
 3. **Build the signed Windows bundle**: `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
@@ -190,13 +194,16 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > Since 2026-09-18, `windows-app/Plantoir.Tests/NamedGapLedger.cs` lets a
    > contract key the Windows app has not built yet be held open by name
    > instead of sitting red — each entry carrying the key, its GitHub issue and
-   > its MILESTONE. **Open that file before cutting and check every entry: its
-   > milestone must be LATER than the release you are cutting, and its issue
-   > must still be open.** An entry whose milestone IS this release means the
-   > work is owed NOW — build it, or move the issue to a later milestone as a
-   > deliberate decision. Never cut over one. The boundary and the reasoning
-   > are in `contracts/README.md` → "Named gaps"; the point of checking here is
-   > that this is the one moment the milestone on an entry means anything.
+   > its MILESTONE. **Every entry's milestone must be LATER than the release you
+   > are cutting, and its issue must still be open.** The first half is a test
+   > since 2026-10-15: `NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild`
+   > reads `<Version>` from `Plantoir.csproj` and fails for any entry that is not
+   > — which is why the suite is re-run AFTER the version is set (step 2). The
+   > second half is still yours: open the file and check each entry's issue is
+   > open. An entry whose milestone IS this release means the work is owed
+   > NOW — build it, or move the issue (and the entry) to a later milestone as
+   > a deliberate decision. Never cut over one. The boundary and the reasoning
+   > are in `contracts/README.md` → "Named gaps".
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries
    > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, `contracts/`,

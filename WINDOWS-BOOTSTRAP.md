@@ -153,9 +153,13 @@ reasons rather than tasks:
   carries one entry per key — the key, the issue, the milestone, the reason.
   It began (2026-09-18) with two, the unit-word rename's trail event and
   sentence owed under [#158](https://github.com/russellgordon/plantoir/issues/158);
-  since the parity run's bundle 1 (2026-09-30) it is the parity milestone's
-  burn-down list, holding every debt the suite can name — the table is in
-  `documentation/12-windows-app.md` → "Named gaps". Everything not in it is asserted as before, and the ledger fails
+  from the parity run's bundle 1 (2026-09-30) to the v1.4.0 cut it was the
+  parity milestone's burn-down list. Since 2026-10-15 (the catch-up to mac
+  1.7.1, #481) every entry carries its OWN milestone, and
+  `NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild` fails
+  for any entry whose milestone is not later than `Plantoir.csproj`'s
+  `<Version>` — so an entry left at the cut it names is a red suite, not a
+  memory — `documentation/12-windows-app.md` → "Named gaps". Everything not in it is asserted as before, and the ledger fails
   the moment a ledgered thing starts existing here or stops being in the
   contract, so an entry cannot outlive either. **It is allowed only while an
   open issue milestoned LATER than the release being cut owns the work, and

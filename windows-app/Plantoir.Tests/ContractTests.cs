@@ -1254,7 +1254,7 @@ public class ContractTests
         string source = File.ReadAllText(Path.Combine(repoRoot, "windows-app", "Plantoir.Core", "Models", "CourseConfiguration.cs"));
 
         // A key this app does not carry yet is held open by name against the
-        // issue that owns it (NamedGapLedger, the parity burn-down list), and
+        // issue that owns it (NamedGapLedger, on that issue's milestone), and
         // the ledger fails the day the key appears in CourseConfiguration.cs.
         var here = keys.Where(key => source.Contains($"\"{key}\"")).ToList();
         var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CourseConfigKeys, keys, here);

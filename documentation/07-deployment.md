@@ -577,6 +577,18 @@ local time and when the window resets (converted to the teacher's timezone
 via `HOST_TZ_OFFSET`). Vendor-specific values like `Retry-After` counts are
 deliberately omitted to avoid confusion.
 
+Both apps turn that into one sentence for the teacher ("Netlify is limiting how
+often websites can be deployed right now…") only when the output carries
+deploy.py's own phrase, `Netlify API error 429`, or the words `rate limit` —
+never a bare `429` (#482, mac commit cb1b13e77, Windows 2026-10-15). The bare
+match fired on the eight-digit image tag every build prints (about one tag in
+seven hundred carries the digits), on a "Built in 429ms" timing, and on a
+Cloudflare 429, each time telling the teacher Netlify was limiting deploys. A
+Cloudflare 429 is deliberately NOT explained yet — the sentence names Netlify —
+so it falls back to the raw output until Cloudflare has a sentence of its own;
+matching the nameless `API error 429` was rejected for exactly that case.
+`app-rules.json` → `failureExplanations.cases` pins all three.
+
 ## Cloudflare Pages (`--target cloudflare`)
 
 Chosen with `deploy_target: "cloudflare_pages"`. Each section becomes its

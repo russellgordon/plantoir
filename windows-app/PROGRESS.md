@@ -1,5 +1,18 @@
 # Plantoir for Windows — Progress
 
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 1
+
+Branch `issue/windows-catch-up-1.7.1`. The first batch of catching Windows up from 1.4.5 to the mac's 1.7.1: the suite is green again, with every debt a later batch owns held open by name.
+
+- **The ledger** (#481): each `NamedGapLedger` entry carries its own milestone (v1.5.0–v1.7.1), and `NamedGapLedgerTests` fails for any entry not LATER than `Plantoir.csproj`'s `<Version>`, so the 1.7.1 cut cannot go out over one. Four more lists are wired in: runtime pins, zip names, prune cases and assistant scenarios. Held open: 13 trail events, 72 wording keys, 4 config keys, 3 runtime pins, 3 scenarios, 1 prune case and 2 zip names, against #488, #489, #491, #496, #503 and #514.
+- **#481**: an outside assistant's failed preview build says `previewDidNotBuildBecause` or `previewDidNotBuildForACallerWithNoWindow` — never the raw log, never a pointer at a window it does not have.
+- **#479**: hiding a page rebuilds the preview, as publishing one does; the seventh `refusedBuildAnswers` case runs green.
+- **#478**: a publish's, hide's or unit's rebuild that stops for a question says so.
+- **#482**: the Netlify rate-limit sentence only for "Netlify API error 429" or "rate limit".
+- **`scripts/figures.py`**: a cache write Windows refuses no longer leaves its temporary file behind.
+
+Gates on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200): `dotnet test` Failed 0, Passed 2470, Skipped 0, Total 2470 (5 m 44 s), from Failed 13 at the start; `python scripts/test_figures.py` 35 OK; `python scripts/test_deploy_words.py` 6 OK.
+
 ## 2026-10-07 — the 1.4.3 release branch
 
 Branch `issue/windows-1.4.3-release`. The Windows version is 1.4.3 (`<Version>` in `Plantoir.csproj`, `AppVersion` in `installer.iss`), and `PlantoirSetup.exe` joins the EXISTING v1.4.3 release, which the mac cut on 2026-10-04 with its DMG — no new tag. It is the first version the Windows updater installs (1.4.2 offers it). `website/updates/windows.xml` gains a 1.4.3 item (built with `--reparse-existing --change-log-path`, notes in `windows-app/release-notes/1.4.3.md`) and the Windows download card is unpinned. `WINDOWS-DIRECTOR-PROMPT.md` is deleted.
