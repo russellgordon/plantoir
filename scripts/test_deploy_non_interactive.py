@@ -335,6 +335,32 @@ class TheFlagIsAccepted(unittest.TestCase):
             for key in ("where", "question", "reachedWhen", "refuse"):
                 self.assertIn(key, refusal)
 
+    def test_both_launchers_point_at_settings_for_the_account_id(self):
+        """#490: the "no Account ID" refusal names Plantoir ▸ Settings ▸
+        Deploying, in BOTH launchers, in the same words. The ID is the
+        teacher's and has been edited only in Settings since #457 (mac) and
+        #491 (Windows); a refusal that pointed at a course's settings sent the
+        teacher to a field that is now read-only.
+
+        `deploy.ps1` carries the ▸ as `[char]0x25B8` through `-f`, because it
+        has no byte-order mark and Windows PowerShell 5.1 reads it in the
+        system code page — so it is matched in that form, not as text.
+        """
+        sentence = "Add your Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying, then deploy again."
+        sh = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        self.assertIn('assert_can_ask "Paste Cloudflare Account ID" "%s"' % sentence, sh)
+
+        ps1 = (REPOSITORY_ROOT / "deploy.ps1").read_text(encoding="utf-8")
+        templated = sentence.replace("▸", "{0}")
+        self.assertIn(
+            'Assert-CanAsk "Paste Cloudflare Account ID" ("%s" -f [char]0x25B8)' % templated, ps1)
+        self.assertEqual(templated.replace("{0}", chr(0x25B8)), sentence,
+                         "the -f form renders the same sentence deploy.sh prints")
+
+        for text in (sh, ps1):
+            self.assertNotIn("Add the Account ID in this course's settings", text,
+                             "the pre-#490 sentence is gone from both launchers")
+
     def test_the_scheduled_deploy_is_what_passes_it(self):
         """A case in `deployArguments` carries it, so both apps build the
         same command line for a scheduled publish."""
