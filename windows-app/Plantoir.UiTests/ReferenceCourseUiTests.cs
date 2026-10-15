@@ -25,7 +25,7 @@ public class ReferenceCourseUiTests
     private readonly Xunit.Abstractions.ITestOutputHelper _output;
     public ReferenceCourseUiTests(Xunit.Abstractions.ITestOutputHelper output) => _output = output;
 
-    private static void WriteCourses(string coursesDir)
+    internal static void WriteCourses(string coursesDir)
     {
         foreach (var (folder, config) in new[]
                  {
