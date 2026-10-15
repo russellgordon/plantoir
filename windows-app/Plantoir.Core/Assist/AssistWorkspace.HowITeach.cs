@@ -238,7 +238,7 @@ public sealed partial class AssistWorkspace
 
         int? wordsBefore = planned.ExistingIsWritten ? HowITeachPage.WordCount(planned.ExistingText!) : null;
         ActivityTrail.Note(ActivityTrail.Event.HowITeachPageWritten,
-            $"{planned.Course.Code} Â· " + HowITeachPage.TrailLineForAWrite(
+            $"{planned.Course.Code} · " + HowITeachPage.TrailLineForAWrite(
                 wordsBefore, HowITeachPage.WordCount(newText), backup is null ? null : Path.GetFileName(backup)));
 
         return new AssistResult(true, AssistWording.HowITeachSaved(planned.Course.Code), backup);
@@ -249,5 +249,5 @@ public sealed partial class AssistWorkspace
         !HowITeachPage.IsTheHowITeachPage(fullPath, course.DirectoryPath);
 
     private static void NoteHowITeachRead(Course course, string line) =>
-        ActivityTrail.Note(ActivityTrail.Event.HowITeachPageRead, $"{course.Code} Â· {line}");
+        ActivityTrail.Note(ActivityTrail.Event.HowITeachPageRead, $"{course.Code} · {line}");
 }
