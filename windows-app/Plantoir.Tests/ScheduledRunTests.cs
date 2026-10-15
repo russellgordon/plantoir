@@ -687,6 +687,17 @@ public class ScheduledRunTests : IDisposable
     }
 
     [Fact]
+    public void AWaitForTheCourseAndForACopyNamesTheCopysProcessInOneLine()
+    {
+        // shared-rules.json -> activityTrail.mustRecord "scheduled publish
+        // waited for the course": "that copy's process id, or both obstacles
+        // in one line" — the mixed line names the copy's process too.
+        Assert.Equal("waited 90 s for another program on this computer to finish with the course " +
+                     "and for Plantoir to finish getting the working folder ready (process 4242), and went ahead",
+                     ScheduledRun.WaitedLine(90, metTheCourse: true, metACopy: true, copier: 4242));
+    }
+
+    [Fact]
     public void ACopyStillRunningAfterTenMinutesStandsDownWithoutBlamingTheCourse()
     {
         string folder = Folder();

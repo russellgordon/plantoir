@@ -440,7 +440,7 @@ public static class ScheduledRun
         (metTheCourse, metACopy) switch
         {
             (true, true) => $"waited {seconds} s for another program on this computer to finish with the course " +
-                            "and for Plantoir to finish getting the working folder ready, and went ahead",
+                            $"and for Plantoir to finish getting the working folder ready (process {copier}), and went ahead",
             (false, true) => $"waited {seconds} s for Plantoir to finish getting the working folder ready (process {copier}), and went ahead",
             _ => $"waited {seconds} s for another program on this computer to finish with the course, and went ahead",
         };

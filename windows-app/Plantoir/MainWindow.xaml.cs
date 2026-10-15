@@ -252,7 +252,11 @@ public sealed partial class MainWindow : Window
         AutomationProperties.SetItemStatus(AppMenuBar, ToolchainReadiness.AutomationStatus(state));
 
         bool pastTheDelay = _shownAt is { } shown && DateTime.UtcNow - shown >= ToolchainReadiness.BannerDelay;
-        var banner = ToolchainReadiness.BannerFor(state, pastTheDelay);
+        // A close held open for a copy says so whichever folder is copying
+        // (the batch 4 review's M2): the copy waited for may be another
+        // window's folder, and this one would otherwise show nothing.
+        var banner = _waitingForCopies ? ToolchainReadiness.BannerWhileClosing(state)
+                                       : ToolchainReadiness.BannerFor(state, pastTheDelay);
         GettingReadyNotice.Title = banner.Title ?? "";
         GettingReadyNotice.Message = banner.Message ?? "";
         GettingReadyNotice.Severity = banner.IsError ? InfoBarSeverity.Error : InfoBarSeverity.Informational;
@@ -438,7 +442,15 @@ public sealed partial class MainWindow : Window
                     };
                     bool quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
                     ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
-                    if (!quit) return;
+                    if (!quit)
+                    {
+                        // Asked again after the wait (a preview began meanwhile)
+                        // and the teacher kept working: the copies held back
+                        // for that quit go ahead, and a later close waits again
+                        // (the batch 4 review's M1).
+                        LetHeldCopiesGo();
+                        return;
+                    }
                     _quitConfirmed = true;
                     Close();   // comes back through here, past the question, to the wait
                     return;
@@ -464,13 +476,34 @@ public sealed partial class MainWindow : Window
             App.LogDiagnostic("closing: the tools copy has finished");
             // A window opened while this one waited: this close no longer
             // quits, so copies held back for the quit go ahead after all.
-            if (!App.ClosingThisQuits(this)) ToolchainReadiness.ReleaseWaitingCopies();
+            if (!App.ClosingThisQuits(this)) LetHeldCopiesGo();
             Close();
         }
         catch (Exception ex)
         {
             App.LogDiagnostic($"AskBeforeQuittingThroughWork exception: {ex}");
+            // Whatever failed, the window is still up: a hold left set would
+            // keep every later copy waiting for the life of the process.
+            _waitingForCopies = false;
+            LetHeldCopiesGo();
         }
+    }
+
+    /// <summary>
+    /// A close that waited for the copy did not quit after all (Keep Working
+    /// when asked again, another window opened meanwhile, or the handler
+    /// failed): release the copies its wait held back, and let a later close
+    /// wait again. Without this the hold stays set for the life of the process
+    /// — every later copy waits its turn for ever, the banner stays up, Preview,
+    /// Deploy and New Course stay greyed, and the folder's marker stays live
+    /// (the batch 4 review's M1).
+    /// </summary>
+    private void LetHeldCopiesGo()
+    {
+        if (!_copiesWaitedFor) return;
+        _copiesWaitedFor = false;
+        ToolchainReadiness.ReleaseWaitingCopies();
+        if (!IsClosed) RefreshReadiness();
     }
 
     /// <summary>True once this window has closed; a closed window cannot show anything.</summary>

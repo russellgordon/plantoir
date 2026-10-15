@@ -330,7 +330,7 @@ public static class ToolchainReadiness
         }
         finally
         {
-            if (marker is not null) { try { File.Delete(marker); } catch { } }
+            if (marker is not null) DeleteMarker(workspacePath, marker);
         }
         clock.Stop();
 
@@ -439,6 +439,30 @@ public static class ToolchainReadiness
         State.Copying when pastTheDelay => new Banner(true, false, GettingReadyTitle, GettingReadyMessage),
         State.Failed => new Banner(true, true, null, CouldNotGetReady),
         _ => new Banner(false, false, null, null),
+    };
+
+    /// <summary>
+    /// The banner's title while a closing window waits for ANOTHER folder's
+    /// copy (#484; the batch 4 review's M2): this folder is ready, so "Getting
+    /// this folder ready…" would be false, but the window staying up must
+    /// still say why.
+    /// </summary>
+    public const string FinishingAnotherFolderTitle = "Finishing getting a folder ready…";
+
+    /// <summary>The message under <see cref="FinishingAnotherFolderTitle"/>.</summary>
+    public const string FinishingAnotherFolderMessage =
+        "Plantoir is copying what it needs into another working folder, and will close when it has finished.";
+
+    /// <summary>
+    /// The banner while a closing window is held open for the copy (#484): this
+    /// folder's own copying banner when it is the one being copied (the delay
+    /// treated as passed), a failure as ever, and otherwise the words above —
+    /// the copy being waited for is another folder's. PURE.
+    /// </summary>
+    public static Banner BannerWhileClosing(State state) => state switch
+    {
+        State.Copying or State.Failed => BannerFor(state, pastTheDelay: true),
+        _ => new Banner(true, false, FinishingAnotherFolderTitle, FinishingAnotherFolderMessage),
     };
 
     /// <summary>The banner: open or not, an error or not, and its words.</summary>
@@ -576,6 +600,43 @@ public static class ToolchainReadiness
                 return marker.Pid;
         return null;
     }
+
+    /// <summary>
+    /// Take a finished copy's marker away, trying a few times: a live marker
+    /// left behind by a process that is still running holds every other
+    /// program's copy of this folder (and plantoir-mcp, and a scheduled run)
+    /// until this process ends — a virus scanner or an indexer holding the
+    /// file open for a moment is the usual cause (the batch 4 review's L1).
+    /// What still fails after the last try is said in startup.log, and the
+    /// marker then stands until this process exits, when it reads as stale.
+    /// </summary>
+    private static void DeleteMarker(string workspacePath, string marker)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Delete(marker);
+                return;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= MarkerDeleteAttempts)
+                {
+                    Diagnostic?.Invoke($"tools copy for '{workspacePath}': its marker could not be removed " +
+                                       $"after {attempt} tries ({error.Message})");
+                    return;
+                }
+                Thread.Sleep(MarkerDeleteRetryPause);
+            }
+        }
+    }
+
+    /// <summary>How many times a finished copy tries to remove its marker.</summary>
+    internal const int MarkerDeleteAttempts = 5;
+
+    /// <summary>The pause between those tries.</summary>
+    internal static readonly TimeSpan MarkerDeleteRetryPause = TimeSpan.FromMilliseconds(200);
 
     // ---- The refresh: the window's and the scheduled run's (#477) ----------
 
