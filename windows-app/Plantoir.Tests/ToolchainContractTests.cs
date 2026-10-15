@@ -134,6 +134,42 @@ public class ToolchainContractTests
             "The two fetch paths can drift again the moment nothing holds them together.");
     }
 
+    /// <summary>
+    /// fetch-runtime.ps1 decides whether runtime\vendor is current by
+    /// comparing the manifest against its <c>$&lt;Name&gt;Version</c>
+    /// variables, while the addresses it fetches are written out in full. A
+    /// pin bump that edited one and not the other would never fetch the new
+    /// bytes, or record old bytes under the new version (batch 5A review,
+    /// L2). The script refuses when an address and its variable disagree;
+    /// this holds each variable against the version in the contract's
+    /// <c>windowsRuntimeContains</c>.
+    /// </summary>
+    [Fact]
+    public void TheWindowsRuntimeRecipesVendorVersionsAreTheContracts()
+    {
+        var doc = ContractLoader.LoadJson("toolchain.json");
+        string recipe = File.ReadAllText(
+            Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
+        var vendorPins = new[] { "pagedjs", "latinModern", "functionPlot", "nodeTikzjax" };
+
+        foreach (string name in vendorPins)
+        {
+            var pin = doc["pins"]!.AsArray().First(p => p?["pin"]?.ToString() == name)!;
+            string contains = pin["windowsRuntimeContains"]!.ToString();
+            string variable = "$" + char.ToUpperInvariant(name[0]) + name[1..] + "Version";
+            var match = System.Text.RegularExpressions.Regex.Match(recipe,
+                System.Text.RegularExpressions.Regex.Escape(variable) + @"\s*=\s*""([^""]*)""");
+            Assert.True(match.Success, $"fetch-runtime.ps1 no longer sets {variable}.");
+            // The version is the one inside the contract's
+            // windowsRuntimeContains (latinModern's `value` is the apt
+            // package's NAME, fonts-lmodern; its version lives only there).
+            string version = match.Groups[1].Value;
+            Assert.True(version.Length > 0 && contains.Contains(version, StringComparison.Ordinal),
+                $"fetch-runtime.ps1 sets {variable} = \"{version}\", but the contract's windowsRuntimeContains " +
+                $"for {name} is \"{contains}\": the two name different versions.");
+        }
+    }
+
     [Fact]
     public void Wrangler_StaysBelowVersionThatNeedsNode22()
     {

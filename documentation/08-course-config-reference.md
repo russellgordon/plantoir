@@ -1164,8 +1164,9 @@ every working folder rebuilds its image once after updating.
 site is really built by.** `windows-app/Vendor/fetch-runtime.ps1` builds the
 native Windows runtime; nothing on that machine builds the Docker image at all.
 It did an unpinned `pip install python-frontmatter Pillow` until 2026-09-19 —
-PyYAML arriving as a dependency, unnamed. It carries the same three pins now,
-and each pin in `contracts/toolchain.json` names both places it must appear
+PyYAML arriving as a dependency, unnamed. It carries the same three pins now —
+and, since #503 (2026-10-15), the four page-feature pins too (Paged.js, Latin
+Modern, function-plot, node-tikzjax), seven in all — and each pin in `contracts/toolchain.json` names both places it must appear
 (`dockerfileContains`, `windowsRuntimeContains`), with a test on each side
 holding its own file against them, so the two cannot drift apart again. Neither
 test RUNS a fetch — the Windows one is ~600 MB — so both assert the recipe.

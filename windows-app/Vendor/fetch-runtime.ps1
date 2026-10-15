@@ -60,6 +60,26 @@ $PagedjsVersion      = "0.4.3"
 $LatinModernVersion  = "2.005-1"
 $FunctionPlotVersion = "1.25.4"
 $NodeTikzjaxVersion  = "1.0.5"
+# The literal addresses, beside the versions they must carry. A bump that
+# edits a version and not its address would compare the manifest against
+# the new version while fetching the old bytes (or never fetch at all), so
+# the run refuses at once when the two disagree; ToolchainContractTests
+# holds each version above against the contract as well (5A review, L2).
+$PagedjsUrl      = "https://registry.npmjs.org/pagedjs/-/pagedjs-0.4.3.tgz"
+$LatinModernUrl  = "https://deb.debian.org/debian/pool/main/l/lmodern/fonts-lmodern_2.005-1_all.deb"
+$LatinModernSnapshotUrl = "https://snapshot.debian.org/archive/debian/20230101T000000Z/pool/main/l/lmodern/fonts-lmodern_2.005-1_all.deb"
+$FunctionPlotUrl = "https://registry.npmjs.org/function-plot/-/function-plot-1.25.4.tgz"
+$NodeTikzjaxSpec = "node-tikzjax@1.0.5"
+foreach ($pair in @(
+        @($PagedjsUrl, "pagedjs-$PagedjsVersion.tgz"),
+        @($LatinModernUrl, "fonts-lmodern_${LatinModernVersion}_all.deb"),
+        @($LatinModernSnapshotUrl, "fonts-lmodern_${LatinModernVersion}_all.deb"),
+        @($FunctionPlotUrl, "function-plot-$FunctionPlotVersion.tgz"),
+        @($NodeTikzjaxSpec, "node-tikzjax@$NodeTikzjaxVersion"))) {
+    if (-not $pair[0].EndsWith($pair[1], [StringComparison]::Ordinal)) {
+        throw "$($pair[0]) does not carry $($pair[1]): a version above was changed without its address."
+    }
+}
 
 # SHA-256 of each fixed download (#356, after the mac's #312 pinned its
 # helpers). A version pin says WHICH file is asked for; a hash says the file
@@ -153,6 +173,38 @@ function Assert-Sha256([string]$Path, [string]$Sha256, [long]$Length = -1) {
     if ($got -ne $Sha256.ToLowerInvariant()) { throw "$Path : its SHA-256 is $got, the pin is $Sha256" }
     $size = (Get-Item -LiteralPath $Path).Length
     if ($Length -ge 0 -and $size -ne $Length) { throw "$Path : $size bytes, the pin says $Length" }
+}
+
+# Written the way it always was (Set-Content -Encoding utf8, which under
+# Windows PowerShell 5.1 starts with a BOM; ConvertFrom-Json takes it).
+function Write-RuntimeManifest($Fields) {
+    $Fields.made = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    [pscustomobject]$Fields | ConvertTo-Json | Set-Content $Manifest -Encoding utf8
+}
+
+# The manifest as it should read while runtimeendor is absent or being
+# made: every key found (or the five base keys on a fresh run) WITHOUT the
+# four vendor keys. Written BEFORE the vendor folder is touched, so a run
+# that dies part-way leaves a manifest the app's build refuses
+# (CheckNativeRuntimeManifest) and the next run repairs by the vendor-only
+# path, rather than one naming engines that are not there (5A review, L1
+# and L3).
+function Get-BaseFields {
+    $fields = [ordered]@{}
+    if ($existing) {
+        foreach ($p in $existing.PSObject.Properties) {
+            if ($VendorPins.Contains($p.Name) -or $p.Name -eq "made") { continue }
+            $fields[$p.Name] = $p.Value
+        }
+    }
+    else {
+        $fields.node     = $NodeVersion
+        $fields.python   = $PythonVersion
+        $fields.quartz   = $QuartzTag
+        $fields.wrangler = $WranglerVersion
+        $fields.emoji    = $EmojiFontTag
+    }
+    return $fields
 }
 
 function Fetch([string]$Url, [string]$To, [string]$Sha256 = "") {
@@ -293,6 +345,12 @@ try {
     # PLANTOIR_QUARTZ_DIR's parent + "vendor", and the launchers set
     # PLANTOIR_QUARTZ_DIR to runtime\quartz. Always made from nothing: a
     # half-made vendor folder from a crashed run is never trusted.
+    #
+    # The manifest loses its vendor keys FIRST (on a fresh run this is the
+    # first manifest written, right after the base phases): from here until
+    # the end, a failure leaves a runtime the build refuses and a re-run
+    # finishes by fetching runtimeendor alone.
+    Write-RuntimeManifest (Get-BaseFields)
     if (Test-Path $VendorOut) { Remove-Item $VendorOut -Recurse -Force }
     New-Item -ItemType Directory -Force $VendorOut | Out-Null
     $vendorClock = [Diagnostics.Stopwatch]::StartNew()
@@ -301,7 +359,7 @@ try {
     $pagedjsDir = Join-Path $VendorOut "pagedjs"
     New-Item -ItemType Directory -Force $pagedjsDir | Out-Null
     $pagedjsTgz = Join-Path $Temp "pagedjs.tgz"
-    Fetch "https://registry.npmjs.org/pagedjs/-/pagedjs-0.4.3.tgz" $pagedjsTgz $PagedjsTgzSha256
+    Fetch $PagedjsUrl $pagedjsTgz $PagedjsTgzSha256
     $pagedjsTmp = Join-Path $Temp "pagedjs"
     New-Item -ItemType Directory -Force $pagedjsTmp | Out-Null
     & $Tar -xzf $pagedjsTgz -C $pagedjsTmp package/dist/paged.min.js package/LICENSE.md
@@ -325,11 +383,11 @@ try {
     New-Item -ItemType Directory -Force $fontsOut | Out-Null
     $lmDeb = Join-Path $Temp "fonts-lmodern.deb"
     try {
-        Fetch "https://deb.debian.org/debian/pool/main/l/lmodern/fonts-lmodern_2.005-1_all.deb" $lmDeb $LatinModernDebSha256
+        Fetch $LatinModernUrl $lmDeb $LatinModernDebSha256
     }
     catch {
         Write-Host "deb.debian.org did not serve it ($($_.Exception.Message)); trying snapshot.debian.org" -ForegroundColor Yellow
-        Fetch "https://snapshot.debian.org/archive/debian/20230101T000000Z/pool/main/l/lmodern/fonts-lmodern_2.005-1_all.deb" $lmDeb $LatinModernDebSha256
+        Fetch $LatinModernSnapshotUrl $lmDeb $LatinModernDebSha256
     }
     $lmTmp = Join-Path $Temp "lmodern"
     New-Item -ItemType Directory -Force $lmTmp | Out-Null
@@ -365,7 +423,7 @@ if missing:
     $fpDir = Join-Path $VendorOut "function-plot"
     New-Item -ItemType Directory -Force $fpDir | Out-Null
     $fpTgz = Join-Path $Temp "function-plot.tgz"
-    Fetch "https://registry.npmjs.org/function-plot/-/function-plot-1.25.4.tgz" $fpTgz $FunctionPlotTgzSha256
+    Fetch $FunctionPlotUrl $fpTgz $FunctionPlotTgzSha256
     $fpTmp = Join-Path $Temp "function-plot"
     New-Item -ItemType Directory -Force $fpTmp | Out-Null
     & $Tar -xzf $fpTgz -C $fpTmp package/dist/function-plot.js package/LICENSE
@@ -389,8 +447,8 @@ if missing:
     try {
         & "$nodeDir\npm.cmd" ci --omit=dev --no-audit --no-fund --silent
         if ($LASTEXITCODE -ne 0) { throw "npm ci of the TikZ engine failed" }
-        & "$nodeDir\npm.cmd" ls node-tikzjax@1.0.5 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "npm ls node-tikzjax@1.0.5 failed: the lockfile did not install the pinned engine" }
+        & "$nodeDir\npm.cmd" ls $NodeTikzjaxSpec | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "npm ls $NodeTikzjaxSpec failed: the lockfile did not install the pinned engine" }
         $installed = @(& "$nodeDir\npm.cmd" ls --all --parseable --omit=dev)
     }
     finally { Pop-Location }
@@ -404,21 +462,10 @@ if missing:
     Write-Host ("Vendor phase took {0:N0} s." -f $vendorClock.Elapsed.TotalSeconds)
 
     # ---- Manifest ------------------------------------------------------------
-    # Merged: a vendor-only run keeps the base keys it found. Written the way
-    # it always was (Set-Content -Encoding utf8, which under Windows
-    # PowerShell 5.1 starts with a BOM; ConvertFrom-Json takes it).
-    $fields = [ordered]@{}
-    if ($existing) { foreach ($p in $existing.PSObject.Properties) { $fields[$p.Name] = $p.Value } }
-    else {
-        $fields.node     = $NodeVersion
-        $fields.python   = $PythonVersion
-        $fields.quartz   = $QuartzTag
-        $fields.wrangler = $WranglerVersion
-        $fields.emoji    = $EmojiFontTag
-    }
+    # Merged: a vendor-only run keeps the base keys it found.
+    $fields = Get-BaseFields
     foreach ($key in $VendorPins.Keys) { $fields[$key] = $VendorPins[$key] }
-    $fields.made = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-    [pscustomobject]$fields | ConvertTo-Json | Set-Content $Manifest -Encoding utf8
+    Write-RuntimeManifest $fields
 
     Write-Host ""
     Write-Host "[OK] Native runtime ready at $Runtime" -ForegroundColor Green
