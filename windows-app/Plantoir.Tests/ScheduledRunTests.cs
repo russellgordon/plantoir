@@ -504,6 +504,78 @@ public class ScheduledRunTests : IDisposable
         Assert.Empty(_scheduler.Deleted);
     }
 
+    // ---- #470: a start queued behind the run still working --------------------
+
+    /// <summary>
+    /// The first run sets the section again while it works, for a moment five
+    /// minutes on (token 2); under <c>Queue</c> Task Scheduler starts the second
+    /// instance when the first ends — here forty minutes after its moment — with
+    /// the task's NEWEST definition (measured, #470). The first run leaves the
+    /// new task alone; the queued one passes the lateness window, finds no
+    /// leases, still stands, deploys and clears the task.
+    /// </summary>
+    [Fact]
+    public void AQueuedRunStartedAfterTheFirstFinishedStillDeploys()
+    {
+        string folder = Folder();
+        var first = DateTime.Now.AddMinutes(1);
+        var second = first.AddMinutes(5);
+        Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, first, [new("netlify", "")]));
+        string name = TaskScheduling.NameFor("ICS3U", 1, folder);
+        string jobPath = TaskScheduling.JobPath(name);
+        string token1 = ScheduledRun.ReadJob(jobPath)!.Token;
+        var clock = new Clock { Now = new DateTimeOffset(first) };
+        var ran = new List<string>();
+        var world = new ScheduledRun.World
+        {
+            Now = () => clock.Now, Sleep = span => clock.Now += span, CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            RunWrapper = script =>
+            {
+                ran.Add(script);
+                if (ran.Count == 1)
+                    Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, second, [new("netlify", "")]));
+                return 0;
+            },
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(jobPath, world, taskToken: token1));
+        Assert.Contains(name, _scheduler.Tasks.Keys);   // the first run left the deploy just set
+        string token2 = ScheduledRun.ReadJob(jobPath)!.Token;
+        Assert.NotEqual(token1, token2);
+        Assert.Empty(Directory.GetFiles(Path.Combine(folder, "courses", ".internal", "activity"), "*.lease"));
+
+        clock.Now = new DateTimeOffset(second).AddMinutes(40);   // the queued start, after the first ended
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(jobPath, world, taskToken: token2));
+        Assert.Equal(2, ran.Count);
+        Assert.DoesNotContain(name, _scheduler.Tasks.Keys);   // one-shot: cleared after it ran
+        Assert.Null(ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder));
+    }
+
+    /// <summary>
+    /// A queued start that comes later than the course's window allows (the
+    /// first run worked for days, or the computer slept) stands down as too
+    /// late, in the run's own words — the lateness check, not the queue, decides.
+    /// </summary>
+    [Fact]
+    public void AQueuedRunStartedLaterThanTheCoursesWindowStandsDownTooLate()
+    {
+        string folder = Folder();
+        var second = DateTime.Now.AddMinutes(5);
+        Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, second, [new("netlify", "")]));
+        string name = TaskScheduling.NameFor("ICS3U", 1, folder);
+        string jobPath = TaskScheduling.JobPath(name);
+        var clock = new Clock { Now = new DateTimeOffset(second).AddDays(CourseConfiguration.DefaultMayRunLateDays + 1) };
+        var ran = new List<string>();
+
+        Assert.Equal(ScheduledRun.Ending.StoodDown,
+            ScheduledRun.Execute(jobPath, World(clock, ran), taskToken: ScheduledRun.ReadJob(jobPath)!.Token));
+        Assert.Empty(ran);
+        Assert.DoesNotContain(name, _scheduler.Tasks.Keys);
+        var record = ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder);
+        Assert.Equal(ScheduledPublishOutcome.Kind.TooLateToRun, record!.Outcome);
+    }
+
     [Fact]
     public void ARunWhoseTaskWasCancelledMeanwhileDeploysNothing()
     {
