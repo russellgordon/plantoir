@@ -240,13 +240,16 @@ public sealed partial class MainWindow
     /// this computer, decided now, never greyed (subjectMenus.rule); the local
     /// assistant is always drawn and greyed where it does not apply.
     /// </summary>
+    /// <summary>The local assistant's title inside Revise With ▸ — the menu bar's and every row's.</summary>
+    internal const string LocalAssistantMenuItemTitle = "Local AI Assistant…";
+
     private void AddReviseWith(IList<MenuFlyoutItemBase> into, string prefix, Item claude, Item codex, Item local)
     {
         var sub = new MenuFlyoutSubItem { Text = "Revise With" };
         AutomationProperties.SetAutomationId(sub, prefix + "ReviseWith");
-        if (ClaudeCodeLauncher.IsAvailable) Add(sub.Items, "Claude…", prefix + "ReviseWithClaude", claude);
-        if (CodexLauncher.IsAvailable) Add(sub.Items, "Codex…", prefix + "ReviseWithCodex", codex);
-        Add(sub.Items, "Local AI Assistant…", prefix + "ReviseWithLocalAssistant", local);
+        if (ClaudeCodeLauncher.IsAvailable) Add(sub.Items, ClaudeCodeLauncher.MenuItemTitle, prefix + "ReviseWithClaude", claude);
+        if (CodexLauncher.IsAvailable) Add(sub.Items, CodexLauncher.MenuItemTitle, prefix + "ReviseWithCodex", codex);
+        Add(sub.Items, LocalAssistantMenuItemTitle, prefix + "ReviseWithLocalAssistant", local);
         into.Add(sub);
     }
 

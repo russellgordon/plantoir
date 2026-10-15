@@ -969,8 +969,11 @@ public sealed partial class SidebarPane : UserControl
         menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, Selecting(row, () => _ = OpenCopyAPage(course))));
 
         var reviseItems = ReviseItems(course, section: null, row);
-        if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
-        foreach (var item in reviseItems) menu.Items.Add(item);
+        if (reviseItems.Count > 0)
+        {
+            menu.Items.Add(new MenuFlyoutSeparator());
+            menu.Items.Add(ReviseWith(reviseItems));
+        }
         var reviseNote = ReviseNote();
         menu.Items.Add(reviseNote);
         // The staleness lesson from the mac (row 104): menu content is built
@@ -1021,7 +1024,7 @@ public sealed partial class SidebarPane : UserControl
             "If Claude Code was updated or moved recently, restarting Plantoir may be enough.");
     }
 
-    /// <summary>"Revise with Codex…": the second outside door (#210, mac #205).</summary>
+    /// <summary>Revise With ▸ Codex…: the second outside door (#210, mac #205).</summary>
     private void ReviseWithCodex(Course course)
     {
         if (Workspace.WorkspacePath is not { } folder) return;
@@ -1055,7 +1058,7 @@ public sealed partial class SidebarPane : UserControl
         // a question about one. The window opens separately so the section's
         // preview can stay on screen beside the conversation changing it.
         var reviseItems = ReviseItems(course, number, row);
-        foreach (var item in reviseItems) menu.Items.Add(item);
+        if (reviseItems.Count > 0) menu.Items.Add(ReviseWith(reviseItems));
         // Once under them, while an assistant holds the course (#468): the
         // section menu greyed them with nothing said until then.
         var sectionReviseNote = ReviseNote();
@@ -1393,6 +1396,18 @@ public sealed partial class SidebarPane : UserControl
     }
 
     /// <summary>
+    /// The row's Revise items under one Revise With ▸, titled as the menu
+    /// bar's (Claude…, Codex…, Local AI Assistant…) — one name per command
+    /// (#491 item 8; the mac at the cost of one level, Russell: yes).
+    /// </summary>
+    private static MenuFlyoutSubItem ReviseWith(List<MenuFlyoutItem> items)
+    {
+        var sub = new MenuFlyoutSubItem { Text = "Revise With", Icon = new FontIcon { Glyph = Glyphs.Star } };
+        foreach (var item in items) sub.Items.Add(item);
+        return sub;
+    }
+
+    /// <summary>
     /// The two ways to revise, built once for both the course menu and every
     /// section menu.
     ///
@@ -1413,13 +1428,13 @@ public sealed partial class SidebarPane : UserControl
         // present. A teacher who has neither should not be shown a door that
         // opens onto an error about something they have never heard of.
         if (ClaudeCodeLauncher.IsAvailable)
-            items.Add(MenuItem("Revise with Claude…", Glyphs.Star,
+            items.Add(MenuItem(ClaudeCodeLauncher.MenuItemTitle, Glyphs.Star,
                 Selecting(row, () => ReviseWithClaude(course))));
 
         // Hidden independently when Codex is not installed
         // (outsideAgents.hiddenWhenNotInstalled, #210).
         if (CodexLauncher.IsAvailable)
-            items.Add(MenuItem("Revise with Codex…", Glyphs.Star,
+            items.Add(MenuItem(CodexLauncher.MenuItemTitle, Glyphs.Star,
                 Selecting(row, () => ReviseWithCodex(course))));
 
         // "Local" is the word doing the work: it is what separates this from
@@ -1431,7 +1446,7 @@ public sealed partial class SidebarPane : UserControl
         // every section row still offers it, and so does Section > Revise With
         // > Local AI Assistant… in the menu bar.
         if (section is int number)
-            items.Add(MenuItem("Revise with local AI assistant…", Glyphs.Star,
+            items.Add(MenuItem(MainWindow.LocalAssistantMenuItemTitle, Glyphs.Star,
                 Selecting(row, () => ReviseWithAi(course, number))));
 
         return items;
@@ -1942,7 +1957,7 @@ public sealed partial class SidebarPane : UserControl
 
     public async Task OpenNewCourseWizard(string? autoCreateCode = null, string? autoSections = null)
     {
-        // #473: every way in (the + button, the empty pane's "Add a Course…",
+        // #473: every way in (the + button, the empty pane's "New Course…",
         // the automation hooks) — the button is greyed, this is what the
         // others meet. Before the wizard opens, so nothing is typed in vain.
         if (ToolchainReadiness.Refusal(Workspace.WorkspacePath) is { } notReady)
