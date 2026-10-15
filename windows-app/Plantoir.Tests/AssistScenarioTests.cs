@@ -176,7 +176,17 @@ public class AssistScenarioTests : IDisposable
         // what the window holds for a conversation: the backup taken before the
         // first change is per-server, so a fresh one per call would back the
         // course up again on every turn.
-        var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()));
+        // The server's surface (#489, the plan review's H2): OUTSIDE unless a
+        // case says otherwise — every scenario before #475's has run that way,
+        // and flipping the default would change the asker, the sentences and
+        // the lease rules under them. `surface: "mcp"` is named explicitly.
+        var surface = given?["surface"]?.ToString() switch
+        {
+            "mcp" or null => AssistSurface.Outside,
+            "menu" => AssistSurface.Menu,
+            _ => AssistSurface.LocalWindow,
+        };
+        var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()) { Surface = surface });
         var model = new ScriptedModel(given?["modelReply"] as JsonObject);
         // The contract's LOCAL schemas, as the window's own narrowed surface
         // declares them (#440 scenario "an empty add_next_class from the model
@@ -745,10 +755,12 @@ public class AssistScenarioTests : IDisposable
     internal sealed class RealTools : IToolServer
     {
         private readonly PlantoirTools _tools;
+        private readonly AssistWorkspace _workspace;
         private readonly Dictionary<string, MethodInfo> _served = new(StringComparer.Ordinal);
 
         public RealTools(AssistWorkspace workspace)
         {
+            _workspace = workspace;
             _tools = new PlantoirTools(workspace);
             foreach (var method in typeof(PlantoirTools).GetMethods(BindingFlags.Public | BindingFlags.Instance))
             {
@@ -770,6 +782,7 @@ public class AssistScenarioTests : IDisposable
                     $"The contract asks for a tool this server does not serve: {name}");
 
             object? returned;
+            var topBefore = _workspace.TopOfTheUndoList;
             try { returned = method.Invoke(_tools, Bind(method, arguments, cancellation)); }
             catch (TargetInvocationException wrapped) when (wrapped.InnerException is not null)
             {
@@ -784,7 +797,10 @@ public class AssistScenarioTests : IDisposable
 
             return returned switch
             {
-                CallToolResult result => Answer(result),
+                // What plantoir-mcp's request filter adds after every call (#489).
+                CallToolResult result => Answer(PlantoirTools.AfterCall(_workspace, topBefore,
+                    arguments["course"]?.GetValue<string>(),
+                    arguments["section"] is JsonValue number && number.TryGetValue<int>(out int n) ? n : null, result)),
                 string said => AssistToolAnswer.Same(said),
                 null => throw new InvalidOperationException(
                     $"{name} answered with nothing this runner can read."),

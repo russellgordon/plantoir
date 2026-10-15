@@ -56,7 +56,7 @@ public class PublishStoppedPartWayTests : IDisposable
     public async Task APageThatCannotBeWrittenIsAnsweredAndTheCopyIsNamedOnlyInTheWindow(
         string asked, string what, bool inTheWindow)
     {
-        var workspace = new AssistWorkspace(_folder, new FakeLauncher()) { ServesTheLocalWindow = inTheWindow };
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher()) { Surface = inTheWindow ? AssistSurface.LocalWindow : AssistSurface.Outside };
         var tools = new PlantoirTools(workspace);
         var progress = new Progress<ProgressNotificationValue>(_ => { });
 

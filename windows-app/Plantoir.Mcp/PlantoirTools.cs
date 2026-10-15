@@ -678,9 +678,16 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             var noun = workspace.NounForCourse(course);
-            return plan.ChangesNothing
-                ? Answering(plan.Describe())
-                : Proposing(plan.Describe(), plan.Describe(noun));
+            if (plan.ChangesNothing) return Answering(plan.Describe());
+            string card = plan.Describe(noun);
+            // The menu's card says, before Make Room is pressed, that Undo
+            // Last Change will not take this back once other classes move
+            // (#489, the mac's makeRoomPlan(fromTheMenu:)).
+            if (workspace.SpeaksFromTheMenu && (plan.Renames.Count > 0 || plan.Moves.Count > 0))
+                card += "\n\n" + (noun == ClassNoun.Meeting
+                    ? AssistWording.MakingRoomCannotBeUndoneFromTheMenuForAMeeting
+                    : AssistWording.MakingRoomCannotBeUndoneFromTheMenu);
+            return Proposing(plan.Describe(), card);
         });
 
     [McpServerTool(Name = "make_room_for_classes", Title = "Make room for classes",
@@ -1759,12 +1766,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "a hurry.")]
     public CallToolResult UndoLastChange()
     {
+        // The Section menu's undo speaks in its own voice (#489): nobody said
+        // "undo that", and its way out is Section ▸ Undo Last Change.
+        bool menu = workspace.SpeaksFromTheMenu;
+        string nothingToUndo = menu ? AssistWording.NothingToUndoFromTheMenu : AssistWording.NothingToUndo;
+        string stillAvailable = menu ? AssistWording.UndoIsStillAvailableFromTheMenu : AssistWording.UndoIsStillAvailable;
         if (workspace.History is not { } history)
-            return Answering(AssistWording.NothingToUndo);
+            return Answering(nothingToUndo);
 
         var result = history.Undo();
         if (!result.Succeeded && result.Restored.Count == 0 && result.Skipped.Count == 0)
-            return Answering(AssistWording.NothingToUndo);
+            return Answering(nothingToUndo);
         // #355: an undo of getting a section ready leaves its own line.
         AssistWorkspace.NoteIfItUndidAStartOfYear(result, StartOfYearAskedFrom.AnOutsideAssistant);
 
@@ -1773,9 +1785,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // exactly like one when the count is zero.
         if (result.Restored.Count == 0)
         {
-            string refusal = AssistWording.CouldNotUndo(result.Description, result.Skipped.Count) +
+            string refusal = (menu ? AssistWording.CouldNotUndoFromTheMenu(result.Description, result.Skipped.Count)
+                                   : AssistWording.CouldNotUndo(result.Description, result.Skipped.Count)) +
                              "\n\n" + Listing(result.Skipped) +
-                             "\n\n" + AssistWording.UndoIsStillAvailable;
+                             "\n\n" + stillAvailable;
             return Answering(refusal);
         }
 
@@ -1783,14 +1796,15 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // told about an undo is one of the sentences both apps must say
         // identically — see contracts/assist-wording.json.
         string summary = result.Skipped.Count == 0
-            ? AssistWording.Undid(result.Description)
-            : AssistWording.UndidPartly(result.Description, result.Skipped.Count);
+            ? (menu ? AssistWording.UndidFromTheMenu(result.Description) : AssistWording.Undid(result.Description))
+            : (menu ? AssistWording.UndidPartlyFromTheMenu(result.Description, result.Skipped.Count)
+                    : AssistWording.UndidPartly(result.Description, result.Skipped.Count));
 
         var detail = new StringBuilder(summary);
         if (result.Skipped.Count > 0)
         {
             detail.Append("\n\nThe ones I left alone:\n").Append(Listing(result.Skipped));
-            detail.Append("\n\n").Append(AssistWording.UndoIsStillAvailable);
+            detail.Append("\n\n").Append(stillAvailable);
         }
         detail.Append("\n\n").Append(AssistWording.UndoDoesNotReachTheLiveSite);
         return Answering(summary, detail.ToString());
@@ -2030,6 +2044,26 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     // ---- Shared ----------------------------------------------------------
 
+    /// <summary>
+    /// After every call, in the request filter every client meets: where the
+    /// change at the top of the undo list was made, recorded per undo entry
+    /// from the call's own course and section, and — on the Section menu's
+    /// server only (#489) — sent in <c>_meta</c> as
+    /// <see cref="AssistWorkspace.LastChangeKey"/> and
+    /// <see cref="AssistWorkspace.ChangesToUndoKey"/>, so the window greys Undo
+    /// Last Change everywhere but the section the last change was made to.
+    /// </summary>
+    public static CallToolResult AfterCall(AssistWorkspace workspace, UndoHistory.Entry? topBefore,
+                                           string? course, int? section, CallToolResult result)
+    {
+        workspace.NoteWhereTheLastChangeWasMade(topBefore, course, section);
+        if (!workspace.SpeaksFromTheMenu) return result;
+        result.Meta ??= new JsonObject();
+        result.Meta[AssistWorkspace.LastChangeKey] = workspace.LastChangePlace;
+        result.Meta[AssistWorkspace.ChangesToUndoKey] = workspace.History?.Entries.Count ?? 0;
+        return result;
+    }
+
     private async Task<CallToolResult> Act(string course, int section, string[]? pages,
                                            bool draft, bool preview, string onOrAfter, string before,
                                            IProgress<ProgressNotificationValue> progress,
@@ -2104,7 +2138,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             ? "Plantoir doesn’t have permission to change one of them."
             : error.Message;
         string said = AssistWording.PublishStoppedPartWay(what, reason);
-        if (workspace.ServesTheLocalWindow && workspace.ConversationBackupPath is not null)
+        // The menu has no Restore banner; its way back is the copy it made
+        // just before this change, in the course's Backups (#489).
+        if (workspace.SpeaksFromTheMenu && workspace.ConversationBackupPath is not null)
+            said += " " + AssistWording.RestoreFromBackupPutsItBack;
+        else if (workspace.ServesTheLocalWindow && workspace.ConversationBackupPath is not null)
             said += " " + AssistWording.RestoreSectionPutsItBack(section.ToString(System.Globalization.CultureInfo.InvariantCulture));
         return said;
     }

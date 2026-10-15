@@ -173,7 +173,7 @@ public sealed class LinksChecklistDialog
                 new Dictionary<string, string> { ["course"] = course.Code });
 
         var workspace = new AssistWorkspace(workspacePath, new NoLauncher(), undo: new UndoHistory())
-            { ServesTheLocalWindow = true };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
+            { Surface = AssistSurface.LocalWindow };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
         var sheet = workspace.OpenLinksChecklist(offer);
         if (sheet.Rows.Count == 0) return LinksChecklistWording.NothingLeftToPublish;
 

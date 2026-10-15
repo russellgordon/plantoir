@@ -247,6 +247,49 @@ public class ContractTests
         Assert.Equal(wording["deployRefusedWhileItsSectionDeploys"]!.ToString(),
                      AssistWording.DeployRefusedWhileItsSectionDeploys("{course}", "{section}"));
 
+        // #489 (mac #457 batch B): the Section menu's twins and its dialog's
+        // words, rendered with the contract's placeholders and the generator's
+        // own example titles, counts and day (Monday, 2026-09-14).
+        Assert.Equal(wording["undidFromTheMenu"]!.ToString(), AssistWording.UndidFromTheMenu("{change}"));
+        Assert.Equal(wording["undidPartlyFromTheMenu"]!.ToString(), AssistWording.UndidPartlyFromTheMenu("{change}", 2));
+        Assert.Equal(wording["couldNotUndoFromTheMenu"]!.ToString(), AssistWording.CouldNotUndoFromTheMenu("{change}", 2));
+        Assert.Equal(wording["changedWhileSavingACopyFromTheMenu"]!.ToString(),
+                     AssistWording.ChangedWhileSavingACopyFromTheMenu("{course}", "{section}"));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToFromTheMenu"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedToFromTheMenu(new[] { "Unit 2, Day 4" }));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral(five));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedToFromTheMenu(five));
+        Assert.Equal(wording["pageWhoseNewDateCouldNotBeSetFromTheMenu"]!.ToString(),
+                     AssistWording.PageWhoseNewDateCouldNotBeSetFromTheMenu("Unit 2, Day 4"));
+        Assert.Equal(wording["pagesWhoseNewDatesCouldNotBeSetFromTheMenu"]!.ToString(),
+                     AssistWording.PagesWhoseNewDatesCouldNotBeSetFromTheMenu(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
+        Assert.Equal(wording["noPageCalledFromTheMenu"]!.ToString(), AssistWording.NoPageCalledFromTheMenu("{page}", "{course}", "{section}"));
+        Assert.Equal(wording["noPagesCalledFromTheMenu"]!.ToString(), AssistWording.NoPagesCalledFromTheMenu("{pages}", "{course}", "{section}"));
+        Pair("noClassOnFromTheMenu",
+             AssistWording.NoClassOnFromTheMenu(new DateOnly(2026, 9, 14), "{course}", "{section}"),
+             AssistWording.NoClassOnFromTheMenuForAMeeting(new DateOnly(2026, 9, 14), "{course}", "{section}"));
+        Assert.Equal(wording["courseIsBeingCopiedFromTheMenu"]!.ToString(), AssistWording.CourseIsBeingCopiedFromTheMenu("{course}"));
+        Assert.Equal(wording["pagesAChangeCouldNotFinishFromTheMenu"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinishFromTheMenu(new[] { "Unit 1, Day 3" }));
+        Assert.Equal(wording["pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinishFromTheMenu(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
+        Assert.Equal(wording["pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinishFromTheMenuNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
+        Assert.Equal(wording["sectionIsChangingFromTheMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMenu("{course}", "{section}"));
+        Assert.Equal(wording["menuPublishPagesTitle"]!.ToString(), AssistWording.MenuPublishPagesTitle("{course}", "{section}"));
+        Assert.Equal(wording["menuHidePagesTitle"]!.ToString(), AssistWording.MenuHidePagesTitle("{course}", "{section}"));
+        Pair("menuPublishClassTitle", AssistWording.MenuPublishClassTitle("{course}", "{section}"),
+             AssistWording.MenuPublishClassTitleForAMeeting("{course}", "{section}"));
+        Pair("menuReDateTitle", AssistWording.MenuReDateTitle("{course}", "{section}"),
+             AssistWording.MenuReDateTitleForAMeeting("{course}", "{section}"));
+        Pair("menuMakeRoomTitle", AssistWording.MenuMakeRoomTitle("{course}", "{section}"),
+             AssistWording.MenuMakeRoomTitleForAMeeting("{course}", "{section}"));
+        Assert.Equal(wording["menuNoHiddenPages"]!.ToString(), AssistWording.MenuNoHiddenPages("{course}", "{section}"));
+        Assert.Equal(wording["menuNoVisiblePages"]!.ToString(), AssistWording.MenuNoVisiblePages("{course}", "{section}"));
+        Assert.Equal(wording["menuSavingACopy"]!.ToString(), AssistWording.MenuSavingACopy("{course}"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
