@@ -122,6 +122,17 @@ public sealed class CopyAPageDialog
             _chosenPage = _offered.FirstOrDefault(p => Shown(p).Equals(box.Text, StringComparison.Ordinal));
             RefreshAsk();
         };
+        // Escape is never trapped (#491 item 1): measured, the AutoSuggestBox
+        // swallows every Escape, list open or not. While its list is drawn the
+        // press closes the list (WinUI's own handling); otherwise the dialog
+        // closes, as its Cancel would.
+        _picker.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key != Windows.System.VirtualKey.Escape) return;
+            if (PickerEscape.For(_picker.IsSuggestionListOpen) != PickerEscape.Result.LetTheDialogHaveIt) return;
+            args.Handled = true;
+            _dialog.Hide();
+        };
         _picker.SuggestionChosen += (_, args) =>
         {
             _chosenPage = _offered.FirstOrDefault(p => Shown(p) == args.SelectedItem as string);

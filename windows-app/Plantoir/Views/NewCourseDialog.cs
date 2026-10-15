@@ -228,6 +228,18 @@ public sealed class NewCourseDialog : ContentDialog
         {
             if (args.SelectedItem is CourseCodeSuggestion chosen) sender.Text = chosen.Code;
         };
+        // Escape is never trapped (#491 item 1): measured, the AutoSuggestBox
+        // swallows every Escape. With its list drawn the press closes the list;
+        // otherwise the wizard closes by its Cancel route, discarding what was
+        // typed (the HIG's answer for a Cancel with no question; the mac's too).
+        _codeBox.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key != Windows.System.VirtualKey.Escape) return;
+            if (PickerEscape.For(_codeBox.IsSuggestionListOpen) != PickerEscape.Result.LetTheDialogHaveIt) return;
+            args.Handled = true;
+            if (_creator.IsCreating) _creator.Runner.StopByUser();   // what OnCloseButton does
+            Hide();
+        };
 
         Title = "New Course or Club";
         // From Plantoir.Core, not a literal, so an ordinary `dotnet test` run

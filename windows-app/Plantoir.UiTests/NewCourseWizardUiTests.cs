@@ -306,6 +306,41 @@ public class NewCourseWizardUiTests
                     $"{describedAs} never turned off");
     }
 
+    /// <summary>
+    /// Escape is never trapped (#491 item 1): the wizard opens with the cursor
+    /// in Course code (the mac's order), typing draws the list, the first
+    /// Escape closes only the list, and the next closes the wizard — which,
+    /// measured before the fix, no Escape could do. See CopyAPageEscapeUiTests
+    /// for why each press brings the app to the front first.
+    /// </summary>
+    [UiFact]
+    public void EscapeClosesTheCodeListThenTheWizard()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        OpenWizard(app);
+        var box = app.Find("newCourseCodeBox", "the course-code picker");
+        var edit = Retry.WhileNull(() => box.FindFirstDescendant(cf => cf.ByControlType(ControlType.Edit)),
+                                   TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result!;
+        Assert.True(Retry.WhileFalse(() => edit.Properties.HasKeyboardFocus.ValueOrDefault, TimeSpan.FromSeconds(5),
+                                     TimeSpan.FromMilliseconds(200)).Result,
+                    "the wizard did not open with the cursor in Course code");
+        Assert.False(CopyAPageEscapeUiTests.ListIsDrawn(app), "the code list was drawn before anything was typed");
+
+        app.ClickMiddleOf(edit);
+        FlaUI.Core.Input.Keyboard.Type("MFM");
+        Assert.True(Retry.WhileFalse(() => CopyAPageEscapeUiTests.ListIsDrawn(app), TimeSpan.FromSeconds(5),
+                                     TimeSpan.FromMilliseconds(200)).Result, "typing a code drew no list");
+
+        CopyAPageEscapeUiTests.PressEscape(app);
+        Assert.False(CopyAPageEscapeUiTests.ListIsDrawn(app), "the first Escape left the code list drawn");
+        Assert.NotNull(app.FindOrNull("newCourseDialog", TimeSpan.FromSeconds(1)));
+
+        CopyAPageEscapeUiTests.PressEscape(app);
+        Assert.True(Retry.WhileFalse(() => app.FindOrNull("newCourseDialog", TimeSpan.FromMilliseconds(300)) is null,
+                                     TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result,
+                    "Escape with no list drawn did not close the wizard (the code field trapped it)");
+    }
+
     // ---- Driving the wizard -----------------------------------------------
 
     /// <summary>Press the button in the course list and wait for the wizard.</summary>
