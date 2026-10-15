@@ -154,7 +154,6 @@ internal static class NamedGapLedger
 
     // Reasons, one per owning issue: the catch-up to mac 1.7.1 lands in
     // batches, and each of these is a later batch's work (2026-10-15).
-    private const string MenuAssist = "the assistant's functions from the menu bar (mac #457 item 3) and the question about classes dated after the next class at Deploy (mac #475) are a later batch of the catch-up to 1.7.1";
     private const string HigSweep = "the HIG sweep (mac #457 item 4) is a later batch of the catch-up to 1.7.1";
     private const string Printing = "printable pages (mac #454) are a later batch of the catch-up to 1.7.1";
     private const string Diagrams = "TikZ diagrams and function graphs (mac #485) are a later batch of the catch-up to 1.7.1";
@@ -164,10 +163,6 @@ internal static class NamedGapLedger
     {
         // ---- activityTrail.mustRecord: events this app does not declare yet.
         // Each goes when its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 489, V150, MenuAssist,
-            "asked about classes dated after the next class",
-            "deployed with classes dated after the next class",
-            "a deploy was held back for classes dated after the next class"),
         Owed(ActivityTrailEvents, 491, V150, HigSweep,
             "opened Plantoir Help",
             "Cloudflare account ID changed in Settings"),
@@ -195,25 +190,12 @@ internal static class NamedGapLedger
 
         // ---- app-rules.json → modelTiers.requirements
 
-        // ---- assist-cases.json → scenarios.cases: the deploy's question about
-        // classes dated after the next class (mac #475) is #489's.
-        Owed(AssistScenarios, 489, V150, MenuAssist,
-            "the in-app assistant's deploy asks about classes dated later in the window, BEFORE the preview is stopped",
-            "the in-app assistant's deploy, cancelled at the question about classes dated later, stops nothing and deploys nothing",
-            "an outside assistant's deploy with a class dated after the next class is held back before anything runs"),
+        // ---- assist-wording.json → wording: none held open. The Section
+        // menu's sentences landed with #489's 2B, and the Deploy question's
+        // seventeen (mac #475) with 2C.
 
-        // ---- assist-wording.json → wording: sentences with no same-named
-        // member here, each held open by the issue that owns the feature
-        // that says it. The 17 left are the Deploy question's (mac #475, commit
-        // 75a4be324) — batch 2C's; the Section menu's own landed with #489's 2B.
-        Owed(AssistWordingKeys, 489, V150, MenuAssist,
-            "deployHasClassesDatedLater", "deployHasClassesDatedLaterAndNoWindow",
-            "deployHasClassesDatedLaterNamingSeveral", "deployWaitsForAnOpenQuestion",
-            "hideTickedAndDeployButton", "keepAllAndDeployButton",
-            "laterClassesAtDeploy", "laterClassesAtDeployForAMeeting", "laterClassesAtPublish",
-            "laterClassesAtPublishForAMeeting", "laterClassesDay", "laterClassesKeptNote",
-            "laterClassesKeptNoteForAMeeting", "laterClassesTitle", "laterClassesTitleForAMeeting",
-            "leaveOutAndContinueButton", "publishThemAllButton"),
+        // ---- assist-cases.json → scenarios.cases: none held open. #475's
+        // three landed with #489's 2C.
     }.SelectMany(group => group).ToArray();
 
     /// <summary>Every entry, for <c>NamedGapLedgerTests</c>.</summary>

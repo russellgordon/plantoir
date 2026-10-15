@@ -298,6 +298,38 @@ public class SectionVerbsTests : IDisposable
         Assert.Equal(1, rebuilt);
     }
 
+    private sealed class NoModel : IChatModel
+    {
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
+            Task.FromResult<ModelReply?>(null);
+    }
+
+    /// <summary>
+    /// "rebuild the preview", answered in code without the model, stops the
+    /// preview — so it meets the Section menu's claim as the runner's
+    /// rebuild_preview does (2B's implementation review, L3). Showing a
+    /// preview ("preview") changes nothing and is never held.
+    /// </summary>
+    [Fact]
+    public async Task ThePlainRebuild_MeetsTheMenusClaim_ButShowingAPreviewDoesNot()
+    {
+        int rebuilt = 0, shown = 0;
+        var agent = new AssistAgent(new NoModel(), new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher())),
+                                    new JsonArray(), "ICS3U", 1)
+        {
+            ShowPreviewInApp = () => shown++,
+            RebuildPreviewInApp = () => rebuilt++,
+            SectionIsChangingFromTheMenu = () => true,
+        };
+
+        var refused = await agent.Say("rebuild the preview", CancellationToken.None);
+        Assert.Contains(refused, line => line.Text == AssistWording.SectionIsChangingFromTheMenu("ICS3U", "1"));
+        Assert.Equal(0, rebuilt);
+
+        await agent.Say("preview", CancellationToken.None);
+        Assert.Equal((0, 1), (rebuilt, shown));
+    }
+
     [Fact]
     public void TheAssistantsWindowReportsWork_AndTheMenuCanSeeIt()
     {

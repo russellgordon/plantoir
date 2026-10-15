@@ -171,9 +171,19 @@ public sealed class SectionVerbs : IAsyncDisposable
     /// The dialog shows that line only while it is TRUE (2B's implementation
     /// review, M2): Undo never saves a copy, and a refusal comes before one.
     /// </param>
+    /// <param name="previewFollows">
+    /// False for the hide the question at Deploy makes (#475): no preview is
+    /// stopped before it or started after it (<see cref="AssistToolRunner.PreviewFollowsAChange"/>).
+    /// </param>
+    /// <param name="noteOnTheTrail">
+    /// False when the caller writes its own line — the question at Deploy
+    /// records its answer, counts included, as "asked about classes dated
+    /// after the next class", and this was not run from a menu.
+    /// </param>
     public async Task<AssistToolAnswer> Perform(JsonObject call, string item, string course, int section,
                                                 string? counts = null, CancellationToken cancellation = default,
-                                                Action<string>? progress = null)
+                                                Action<string>? progress = null, bool previewFollows = true,
+                                                bool noteOnTheTrail = true)
     {
         string name = call["function"]?["name"]?.GetValue<string>() ?? "";
         bool writes = AssistToolRunner.IsWriteTool(name);
@@ -198,21 +208,23 @@ public sealed class SectionVerbs : IAsyncDisposable
                 }
                 var server = _server ?? (needsTheServer ? null : NoServer.Instance);
                 if (server is null) return AssistToolAnswer.Same(CouldNotBeDone);
-                (answer, _) = await _runnerFor(course, section, progress is null ? server : new Relaying(server, progress))
-                    .Run(call, cancellation);
+                var runner = _runnerFor(course, section, progress is null ? server : new Relaying(server, progress));
+                runner.PreviewFollowsAChange = previewFollows;
+                (answer, _) = await runner.Run(call, cancellation);
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
                 // The server went away under the call: forgotten, so the next
                 // item starts a fresh one. Its undo list went with it.
                 await ForgetTheServer();
-                Plantoir.Core.Scripting.ActivityTrail.Note(ActivityTrail.Event.RanFromAMenu,
-                    $"{item} — could not be done: {error.Message}", course, section);
+                if (noteOnTheTrail)
+                    ActivityTrail.Note(ActivityTrail.Event.RanFromAMenu,
+                        $"{item} — could not be done: {error.Message}", course, section);
                 return AssistToolAnswer.Same(CouldNotBeDone);
             }
             if (answer.CarriesLastChange) LastChange = answer.LastChange;
             if (answer.ChangesToUndo is { } now) _changesToUndo = now;
-            if (writes)
+            if (writes && noteOnTheTrail)
                 ActivityTrail.Note(ActivityTrail.Event.RanFromAMenu,
                     TrailLine(item, Ending(name, answer, before, _changesToUndo, course, section), counts), course, section);
             return answer;

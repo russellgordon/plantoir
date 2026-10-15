@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -90,6 +91,23 @@ public sealed partial class MainWindow
                 .Any(c => c.Code.Equals(code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
             CourseIsBeingCopied = () => WorkLease.IsHeld(folder, code, WorkLease.Copying) || SidebarPane.IsZipping(folder, code),
         };
+
+    /// <summary>
+    /// The hide the question about classes dated after the next class makes at
+    /// Deploy (#475): Hide Pages…'s OWN call, through this window's runner —
+    /// a copy of the course first, Section ▸ Undo Last Change takes it back,
+    /// and pages only those classes link to are hidden with them — with no
+    /// preview stopped or started either side, since the deploy builds the
+    /// site straight after. Null when the window has no folder.
+    /// </summary>
+    internal async Task<AssistToolAnswer?> HideClassesForTheDeploy(string code, int section, IReadOnlyList<string> places)
+    {
+        if (Verbs() is not { } verbs) return null;
+        var answer = await verbs.Perform(SectionVerbs.HidePages(code, section, places, plan: false),
+                                         "Deploy", code, section, previewFollows: false, noteOnTheTrail: false);
+        ApplyMenuEnablement();
+        return answer;
+    }
 
     /// <summary>Whether Undo Last Change applies to this section here (<c>lastChangeIsHere</c>).</summary>
     private bool LastMenuChangeIsIn(string code, int section) => _verbs?.LastChangeIsIn(code, section) == true;

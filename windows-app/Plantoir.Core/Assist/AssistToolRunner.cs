@@ -84,6 +84,25 @@ public sealed class AssistToolRunner
     public Func<bool> CourseIsKeptForReference { get; init; } = () => false;
 
     /// <summary>
+    /// The in-app assistant's deploy puts the question about classes dated
+    /// after the next class (#475) to the section's window — after the
+    /// deploy's own refusals and BEFORE the preview is stopped, so a Cancel
+    /// leaves the preview the teacher was reading. Null: nobody is asked here
+    /// (the server's deploy holds back what it cannot ask about).
+    /// </summary>
+    public Func<Task<LaterClassesAtADeploy>>? AskAboutClassesDatedLaterInApp { get; init; }
+
+    /// <summary>
+    /// Whether a page change stops a showing preview first and starts it again
+    /// after (the default). False for the hide the question at Deploy makes
+    /// (#475): no preview either side — the deploy builds the site straight
+    /// after, and a hide that failed must not leave the teacher with no
+    /// preview for a deploy that never happened (the plan review's M1; the
+    /// mac's <c>previewFollowsAChange</c>).
+    /// </summary>
+    public bool PreviewFollowsAChange { get; set; } = true;
+
+    /// <summary>
     /// Whether the Section menu is changing this section right now
     /// (<c>SectionMenuActivity</c>). Asked on <see cref="AssistSurface.LocalWindow"/>
     /// before any write, so the assistant's change and the menu's never
@@ -208,6 +227,24 @@ public sealed class AssistToolRunner
                 return Handed(AssistWording.SectionIsBusy(_courseCode, _section.ToString()));
             }
 
+            // #475: the question, in the section's window, before anything is
+            // stopped. The window runs the deploy's own refusals first and
+            // asks nothing when one of them will refuse.
+            if (AskAboutClassesDatedLaterInApp is not null)
+            {
+                var asked = await AskAboutClassesDatedLaterInApp.Invoke();
+                switch (asked.Answer)
+                {
+                    case LaterClassesAnswer.Cancelled:
+                        return Handed(AssistWording.DeployWasCancelled);
+                    case LaterClassesAnswer.CannotAsk:
+                        return Handed(AssistWording.DeployWaitsForAnOpenQuestion(_courseCode, _section.ToString()));
+                    case LaterClassesAnswer.NoWindow:
+                        return Handed(AssistWording.DeployHasClassesDatedLaterAndNoWindow(
+                            _courseCode, _section.ToString(), asked.Unasked ?? Array.Empty<string>()));
+                }
+            }
+
             if (PreviewIsShowing?.Invoke() == true)
             {
                 if (StopPreviewInAppAsync is not null)
@@ -237,7 +274,7 @@ public sealed class AssistToolRunner
         // (preview declined), so the work happens once, in the main window.
         bool edits = EditsPages.Contains(name);
         if (TakesPreviewFlag.Contains(name)) arguments["preview"] = false;
-        bool hadPreview = PreviewIsShowing?.Invoke() == true;
+        bool hadPreview = PreviewFollowsAChange && PreviewIsShowing?.Invoke() == true;
         if (edits && hadPreview)
         {
             if (StopPreviewInAppAsync is not null)
@@ -254,7 +291,7 @@ public sealed class AssistToolRunner
         bool handed = IsWriteTool(name)
                       || name.Equals("check_section", StringComparison.OrdinalIgnoreCase)
                       || name.Equals("read_remembered_timetable", StringComparison.OrdinalIgnoreCase);
-        if (edits && (hadPreview || AlwaysStartsPreview.Contains(name)) && ShowPreviewInApp is not null &&
+        if (edits && PreviewFollowsAChange && (hadPreview || AlwaysStartsPreview.Contains(name)) && ShowPreviewInApp is not null &&
             !ThisSectionIsBeingDeployed())
         {
             ShowPreviewInApp.Invoke();

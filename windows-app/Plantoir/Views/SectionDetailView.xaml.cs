@@ -407,7 +407,7 @@ public sealed partial class SectionDetailView : UserControl
         // queued (Russell's decision), with the banner's own sentence as the
         // reason. Read from the folder on screen, like `building` above.
         string? notReady = ToolchainReadiness.Refusal(_window.Workspace.WorkspacePath);
-        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !building && notReady is null;
+        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !_isAskingAboutLaterClasses && !building && notReady is null;
         if (notReady is not null)
             ToolTipService.SetToolTip(DeployButton, notReady);
         else if (building)
@@ -1265,7 +1265,13 @@ public sealed partial class SectionDetailView : UserControl
     /// already running, to nudge the app forward) gets its OWN outcome and
     /// can never steal or orphan another caller's pending await.
     /// </summary>
-    public Task<string?> StartDeployForAutomationAsync() => DeployAsync();
+    /// <remarks>
+    /// The assistant's runner has ALREADY put the question about classes
+    /// dated after the next class (#475) through
+    /// <see cref="AskAboutClassesDatedLaterForTheAssistantAsync"/>, before it
+    /// stopped the preview — so it is not asked twice here (the plan review's M4).
+    /// </remarks>
+    public Task<string?> StartDeployForAutomationAsync() => DeployAsync(alreadyAsked: true);
 
     /// <summary>
     /// Refuse to start a build while the assistant is running one.
@@ -1745,6 +1751,186 @@ public sealed partial class SectionDetailView : UserControl
 
     // ==== END TEARDOWN REGION =============================================
 
+    // ---- Classes dated after the next class (#475) ---------------------------
+
+    /// <summary>
+    /// Whether this section's deploy would be refused right now — the
+    /// deploy's own refusals, read WITHOUT claiming anything, showing anything
+    /// or writing a line (the mac's <c>deployWillBeRefused</c>; the plan
+    /// review's H1), in the order <see cref="DeployAsync"/> meets them: a
+    /// deploy already preparing or running (or this question already up), a
+    /// course kept for reference, a folder still getting ready, another
+    /// program building the course, saved settings that cannot be read, a
+    /// destination that cannot be deployed to.
+    /// </summary>
+    /// <remarks>
+    /// The in-app assistant's deploy asks the question about classes dated
+    /// later BEFORE it presses Deploy, so without this a teacher could Hide
+    /// Ticked — a copy of the course and a write — and then be refused, which
+    /// breaks "a refusal never follows a change". When one of these will
+    /// refuse, nothing is asked: the deploy goes on to its own refusal, which
+    /// shows its dialog here and is the sentence the assistant relays.
+    /// <see cref="DeployAsync"/> itself meets the same refusals, with their
+    /// dialogs, before it asks, so the button needs no second reading.
+    /// </remarks>
+    internal bool DeployWillBeRefused()
+    {
+        if (_deployRunner.IsRunning || _isPreparingDeploy || _isAskingAboutLaterClasses) return true;
+        if (ReferenceCourse.KeptOnDisk(_course.DirectoryPath) is not null) return true;
+        if (ToolchainReadiness.Refusal(_window.Workspace.WorkspacePath) is not null) return true;
+        if (_window.Workspace.WorkspacePath is not { } folder) return true;
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, folder, _course.Code, claim: null) is not null) return true;
+        if (SavedSettings.Read(_course) is not { } saved) return true;
+        return MultiDestinationDeployRunner.RefusalReason(saved.Configuration.AllDeployDestinations,
+                   _window.Workspace.Settings.CloudflareAccountId.Trim()) is not null;
+    }
+
+    /// <summary>True from the moment the question is put until it is answered: a second Deploy waits for it.</summary>
+    private bool _isAskingAboutLaterClasses;
+
+    /// <summary>Where the trail says the in-app assistant's deploy was asked (<c>activityTrail</c> → "asked about classes…").</summary>
+    internal const string TheInAppAssistantsDeploy = "the in-app assistant's deploy";
+
+    /// <summary>
+    /// The in-app assistant's deploy asks here, BEFORE it stops the preview.
+    /// Nothing is asked when the deploy will be refused anyway (its own
+    /// refusal then speaks), and a window with a dialog already up is not
+    /// waited on.
+    /// </summary>
+    internal async Task<LaterClassesAnswer> AskAboutClassesDatedLaterForTheAssistantAsync()
+    {
+        if (DeployWillBeRefused()) return LaterClassesAnswer.NothingToAsk;
+        return await AskAboutClassesDatedLaterAsync(TheInAppAssistantsDeploy);
+    }
+
+    /// <summary>
+    /// The question about classes dated after the next class (#475;
+    /// <c>shared-rules.json</c> → <c>classesDatedLater</c>), put in this
+    /// window. Every flagged class is listed, ticked to hide, with two buttons
+    /// beside Cancel, always: Hide Ticked and Deploy (the default) and Keep All
+    /// and Deploy.
+    /// </summary>
+    /// <param name="route">Where it was asked, as the trail line names it: "Deploy", or the in-app assistant's deploy.</param>
+    /// <returns>
+    /// <see cref="LaterClassesAnswer.NothingToAsk"/> when nothing is flagged;
+    /// <see cref="LaterClassesAnswer.GoAhead"/> once answered;
+    /// <see cref="LaterClassesAnswer.Cancelled"/> for Cancel, Escape, or a hide
+    /// that left a ticked class visible; <see cref="LaterClassesAnswer.CannotAsk"/>
+    /// when a dialog is already up.
+    /// </returns>
+    /// <remarks>
+    /// <para>The list is decided ONCE, when the question is put, on this
+    /// computer's day: an answer given after midnight acts on the classes it
+    /// listed, never on a list worked out afresh.</para>
+    /// <para>Hide Ticked and Deploy records the unticked as kept at their dates
+    /// (<see cref="LaterClassesKept"/>) and hides the ticked with Hide
+    /// Pages…'s OWN call through this window's runner
+    /// (<see cref="MainWindow.HideClassesForTheDeploy"/>) — backed up,
+    /// undoable — with no preview either side. A ticked class still visible
+    /// afterwards stops the deploy, and the teacher is shown what the hide
+    /// said. Keep All and Deploy keeps every listed class and hides nothing.</para>
+    /// </remarks>
+    internal async Task<LaterClassesAnswer> AskAboutClassesDatedLaterAsync(string route)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var pages = ClassesDatedLater.ClassPages(_course, _sectionNumber);
+        IReadOnlyList<ClassesDatedLater.Page> flagged = ReferenceCourse.IsKeptForReference(_course)
+            ? Array.Empty<ClassesDatedLater.Page>()
+            : ClassesDatedLater.Flagged(pages, today, LaterClassesKept.Read(_course.DirectoryPath, _sectionNumber));
+        if (flagged.Count == 0 || ClassesDatedLater.NextClassDay(today, pages) is not { } nextDay)
+            return LaterClassesAnswer.NothingToAsk;
+        if (DialogGate.IsOpen(EffectiveXamlRoot)) return LaterClassesAnswer.CannotAsk;
+
+        bool meeting = _course.Configuration.ClassNoun == ClassNoun.Meeting;
+        string title = meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle;
+        var boxes = new List<(ClassesDatedLater.Page Page, CheckBox Box)>();
+        var list = new StackPanel { Spacing = 2 };
+        int index = 0;
+        foreach (var page in flagged)
+        {
+            string shown = $"{page.Title} — {AssistWording.LaterClassesDay(page.Date!.Value)}";
+            var box = new CheckBox { Content = shown, IsChecked = true };
+            AutomationProperties.SetName(box, shown);
+            AutomationProperties.SetAutomationId(box, $"laterClass{index++}");
+            boxes.Add((page, box));
+            list.Children.Add(box);
+        }
+        var content = new StackPanel { Spacing = 12, MinWidth = 460 };
+        content.Children.Add(new TextBlock
+        {
+            Text = meeting ? AssistWording.LaterClassesAtDeployForAMeeting(nextDay) : AssistWording.LaterClassesAtDeploy(nextDay),
+            TextWrapping = TextWrapping.Wrap, MaxWidth = 520,
+        });
+        content.Children.Add(new ScrollViewer { Content = list, MaxHeight = 320 });
+        content.Children.Add(new TextBlock
+        {
+            Text = meeting ? AssistWording.LaterClassesKeptNoteForAMeeting : AssistWording.LaterClassesKeptNote,
+            TextWrapping = TextWrapping.Wrap, MaxWidth = 520, Opacity = 0.8,
+        });
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = content,
+            PrimaryButtonText = AssistWording.HideTickedAndDeployButton,
+            SecondaryButtonText = AssistWording.KeepAllAndDeployButton,
+            CloseButtonText = AssistWording.MenuCancelButton,
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        AutomationProperties.SetAutomationId(dialog, "laterClassesDialog");
+
+        _isAskingAboutLaterClasses = true;
+        RefreshChrome();
+        try
+        {
+            var chosen = await ShowDialogSafelyAsync(dialog);
+            if (chosen is not (ContentDialogResult.Primary or ContentDialogResult.Secondary))
+            {
+                ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
+                    ClassesDatedLater.CancelledLine(route, flagged.Count), _course.Code, _sectionNumber);
+                return LaterClassesAnswer.Cancelled;
+            }
+
+            var ticked = chosen == ContentDialogResult.Secondary
+                ? new List<ClassesDatedLater.Page>()
+                : boxes.Where(row => row.Box.IsChecked == true).Select(row => row.Page).ToList();
+            var keeping = flagged.Where(page => !ticked.Contains(page)).ToList();
+            LaterClassesKept.Keep(_course.DirectoryPath, _sectionNumber, keeping);
+
+            if (ticked.Count > 0)
+            {
+                var hid = await _window.HideClassesForTheDeploy(_course.Code, _sectionNumber,
+                                                                 ticked.Select(page => page.Place).ToList());
+                bool stillVisible = ClassesDatedLater.ClassPages(_course, _sectionNumber)
+                    .Any(page => page.Visible && ticked.Any(asked => asked.Place == page.Place));
+                if (hid is null || stillVisible)
+                {
+                    ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
+                        ClassesDatedLater.CancelledLine(route, flagged.Count), _course.Code, _sectionNumber);
+                    await ShowDialogSafelyAsync(new ContentDialog
+                    {
+                        Title = title,
+                        Content = new TextBlock
+                        {
+                            Text = hid?.Summary ?? SectionVerbs.CouldNotBeDone,
+                            TextWrapping = TextWrapping.Wrap, MaxWidth = 520, IsTextSelectionEnabled = true,
+                        },
+                        CloseButtonText = AssistWording.MenuDoneButton,
+                    });
+                    return LaterClassesAnswer.Cancelled;
+                }
+            }
+
+            ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
+                ClassesDatedLater.AskedLine(route, flagged.Count, ticked.Count, keeping.Count), _course.Code, _sectionNumber);
+            return LaterClassesAnswer.GoAhead;
+        }
+        finally
+        {
+            _isAskingAboutLaterClasses = false;
+            RefreshChrome();
+        }
+    }
+
     // ---- Deploy ----------------------------------------------------------
 
     private async void Deploy_Click(object sender, RoutedEventArgs e) => await DeployAsync();
@@ -1759,7 +1945,12 @@ public sealed partial class SectionDetailView : UserControl
     /// outcome) can safely both be in flight at once without one starving
     /// or stealing the other's answer.
     /// </summary>
-    private async Task<string?> DeployAsync()
+    /// <param name="alreadyAsked">
+    /// True when the in-app assistant's deploy has already asked about classes
+    /// dated after the next class (#475); the button and Section ▸ Deploy… ask
+    /// here, after every refusal below and before anything is claimed or stopped.
+    /// </param>
+    private async Task<string?> DeployAsync(bool alreadyAsked = false)
     {
         // Overwritten only on the path that actually calls RunAsync and
         // gets a real outcome back — every early return and the catch block
@@ -1779,7 +1970,9 @@ public sealed partial class SectionDetailView : UserControl
             // sweep) — a second click there would race its own
             // stop-preview-then-deploy sequence against the first's
             // (row 318a).
-            if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
+            // _isAskingAboutLaterClasses: the question below is up, and nothing
+            // is claimed yet — a second press waits for its answer (M4).
+            if (_deployRunner.IsRunning || _isPreparingDeploy || _isAskingAboutLaterClasses) return outcomeMessage;
             // FIRST, before anything is stopped, built or uploaded (#241, door
             // 1): a course kept for reference is never deployed. The button is
             // not drawn on one; this is what the assistant's hand-back, or a
@@ -1820,16 +2013,6 @@ public sealed partial class SectionDetailView : UserControl
                 });
                 return SavedSettings.CouldNotBeReadToDeploy(_course.Code);
             }
-            string? savedNotice = null;
-            if (Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(_course.ConfigFilePath))
-            {
-                savedNotice = SavedSettings.DeployUsesSavedSettings;
-                ShowSettingsNotice(savedNotice);
-                ActivityTrail.Note(ActivityTrail.Event.DeployUsedTheSavedSettings,
-                    SavedSettings.DeployUsedTheSavedSettingsLine("deployed from the section window", saved, _course),
-                    _course.Code, _sectionNumber);
-            }
-
             var destinations = saved.Configuration.AllDeployDestinations;
             string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
 
@@ -1847,6 +2030,32 @@ public sealed partial class SectionDetailView : UserControl
                 };
                 await ShowDialogSafelyAsync(problemDialog);
                 return outcomeMessage;
+            }
+
+            // #475: AFTER every refusal above, so a refusal never follows a
+            // change (hiding is one), and BEFORE the console is claimed or the
+            // preview stopped, so Cancel leaves the preview the teacher was
+            // reading. The in-app assistant's deploy asked already (M4).
+            if (!alreadyAsked)
+            {
+                var answer = await AskAboutClassesDatedLaterAsync("Deploy");
+                if (answer is LaterClassesAnswer.Cancelled or LaterClassesAnswer.CannotAsk)
+                    return AssistWording.DeployWasCancelled;
+                // Another deploy may have begun while the question was up.
+                if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
+            }
+
+            // After the question, never before it (M4): a deploy cancelled
+            // there must not leave "deployed using the saved settings" on the
+            // trail, or the notice on screen.
+            string? savedNotice = null;
+            if (Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(_course.ConfigFilePath))
+            {
+                savedNotice = SavedSettings.DeployUsesSavedSettings;
+                ShowSettingsNotice(savedNotice);
+                ActivityTrail.Note(ActivityTrail.Event.DeployUsedTheSavedSettings,
+                    SavedSettings.DeployUsedTheSavedSettingsLine("deployed from the section window", saved, _course),
+                    _course.Code, _sectionNumber);
             }
 
             // Claim the console for the deploy panel BEFORE touching the

@@ -286,6 +286,94 @@ public class ScheduledRunTests : IDisposable
         OutcomeDirectory = Path.Combine(_root, "outcomes"),
     };
 
+    // ---- #475: classes dated after the next class, on a scheduled deploy ------
+
+    /// <summary>
+    /// A section whose class on the 5th is published while the next class is
+    /// the 2nd (the run's day is the 1st): flagged, and nobody to ask.
+    /// </summary>
+    private string FolderWithAClassPublishedEarly()
+    {
+        string folder = FakeScheduler.WorkingFolderWith(_root, "early", "ICS3U",
+            """{ "course_code": "ICS3U", "section_numbers": [1], "deploy_target": "netlify", "per_section_folders": ["All Classes"] }""");
+        string course = Path.Combine(folder, "courses", "ICS3U");
+        Directory.CreateDirectory(Path.Combine(course, ".netlify_sites"));
+        File.WriteAllText(Path.Combine(course, ".netlify_sites", "section1.json"), "{}");
+        string classes = Path.Combine(course, "section1", "All Classes");
+        Directory.CreateDirectory(classes);
+        File.WriteAllText(Path.Combine(classes, "Unit 1, Day 1.md"), "---\npublish: true\ncreated: 2026-10-01T07:00:00.000-0400\n---\n");
+        File.WriteAllText(Path.Combine(classes, "Unit 1, Day 2.md"), "---\npublish: true\ncreated: 2026-10-02T07:00:00.000-0400\n---\n");
+        File.WriteAllText(Path.Combine(classes, "Unit 1, Day 3.md"), "---\npublish: true\ncreated: 2026-10-05T07:00:00.000-0400\n---\n");
+        return folder;
+    }
+
+    [Fact]
+    public void AScheduledDeployThatWentOut_RecordsTheClassesDatedLater()
+    {
+        string folder = FolderWithAClassPublishedEarly();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var world = new ScheduledRun.World
+        {
+            Now = () => clock.Now,
+            Sleep = span => clock.Now += span,
+            CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            // What the real wrapper does when the deploy got through.
+            RunWrapper = _ =>
+            {
+                ScheduledPublishOutcome.Record(Path.Combine(_root, "outcomes"), "ICS3U", 1,
+                    ScheduledPublishOutcome.Kind.Succeeded, "Netlify", folder);
+                return 0;
+            },
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        Assert.Contains("ICS3U/1 · deployed with classes dated after the next class: section1/All Classes/Unit 1, Day 3",
+                        File.ReadAllText(_trail));
+    }
+
+    /// <summary>
+    /// The wrapper exits 0 whether or not the deploy got through, so the exit
+    /// code means nothing: a run that left no success record, or one from an
+    /// earlier night, writes no line (the mac's fixes review, A).
+    /// </summary>
+    [Theory]
+    [InlineData("did not finish")]
+    [InlineData("an earlier night's success")]
+    public void AScheduledDeployThatDidNotGoOut_RecordsNoClasses(string how)
+    {
+        string folder = FolderWithAClassPublishedEarly();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        string outcomes = Path.Combine(_root, "outcomes");
+        if (how == "an earlier night's success")
+        {
+            ScheduledPublishOutcome.Record(outcomes, "ICS3U", 1, ScheduledPublishOutcome.Kind.Succeeded, "Netlify", folder);
+            foreach (string record in Directory.GetFiles(outcomes))
+                File.SetLastWriteTime(record, DateTime.Now.AddDays(-1));
+        }
+        var world = new ScheduledRun.World
+        {
+            Now = () => clock.Now,
+            Sleep = span => clock.Now += span,
+            CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            RunWrapper = _ =>
+            {
+                if (how == "did not finish")
+                    ScheduledPublishOutcome.Record(outcomes, "ICS3U", 1, ScheduledPublishOutcome.Kind.DidNotFinish, "Netlify", folder);
+                return 0;
+            },
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        string trail = File.Exists(_trail) ? File.ReadAllText(_trail) : "";
+        Assert.DoesNotContain("deployed with classes dated after the next class", trail);
+    }
+
     [Fact]
     public void AJobTooLateStandsDownDeploysNothingAndClearsItsTask()
     {
