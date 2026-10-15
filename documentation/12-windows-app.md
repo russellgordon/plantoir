@@ -5221,8 +5221,13 @@ event, so the trimmed value is never echoed back under the teacher's cursor.
 The trail line (`Cloudflare account ID changed in Settings`; the mac's three
 lines verbatim from `DeployingSettings.TrailLine`, never the ID) is written by
 `NoteTheChange()` on Enter, on leaving the field, on switching section, when
-the window closes and at quit, comparing with the ID as it was at the last
-line — one line for a change, none for a visit.
+the teacher switches to another window, when the window closes and at quit,
+comparing with the ID as it was at the last line — one line for a change, none
+for a visit. *Switching windows is its own trigger* (3A's implementation
+review, M1): Settings is modeless, so a teacher who types an ID and clicks
+back into the main window moves no focus INSIDE Settings and raises no
+`LostFocus`; until the window's `Activated` with `Deactivated` was added, no
+line was written until Settings closed — possibly hours later.
 
 **Three read-only displays** (`PublishingChoiceView`: the primary Cloudflare
 block, the additional-destination row; the wizard shares the view): "Kept in
@@ -5254,13 +5259,29 @@ false. Course Settings uses the same check.
 Settings ▸ Deploying, then deploy again."; Schedule a Deploy's two
 (`ScheduledDeploy`, `cloudflareAccountMissing` and its additional twin) say
 "… then schedule this again." Constants in `Core/Models/DeployingSettings.cs`.
-The mac's three still say "this course's settings" — a `mac` issue.
+The mac's three still say "this course's settings" — a `mac` issue, #534.
 
 **The deliberate wording split.** The app's sentences say **File ▸ Settings ▸
 Deploying**, where the item IS on Windows. The launchers' non-interactive
 refusal (#490) says **Plantoir ▸ Settings ▸ Deploying** in both `deploy.sh` and
 `deploy.ps1` — Russell's ruling: one launcher sentence for both platforms.
 Do not "fix" either to match the other.
+
+**Display labels, mirrored by hand and contracted on neither side.** The
+words around the ID — `DeployingSettings.KeptIn` ("Kept in File ▸ Settings ▸
+Deploying, for every course…"), `ShownWhenEmpty` ("Not set yet"), the
+"Open Settings…" button, the instructions' `Expander` header, the field's
+placeholder ("32 letters and digits") and the pane's two footer captions —
+were copied from the mac's `DeployingSettingsView` / `CloudflareDetailFields`
+by reading them, and no contract key holds them on either platform. That is
+deliberate rather than an oversight: they are labels a teacher reads in
+passing, not a rule with inputs and outputs, and `KeptIn` cannot be shared
+as one string anyway — it names the place the setting lives, which is File ▸
+on Windows and the app menu on the mac. What IS contracted is unchanged: the
+problem sentence (`configurationRules.cloudflareAccountID[].expectProblem`)
+and the trail event (`activityTrail.mustRecord`). If the mac rewords a
+label, nothing here goes red; the way it reaches Windows is the `windows`
+issue that rewording owes (CLAUDE.md rule 3).
 
 **#490 in the launchers.** "Add your Cloudflare Account ID in Plantoir ▸
 Settings ▸ Deploying, then deploy again." `deploy.ps1` has no byte-order mark
@@ -5295,7 +5316,13 @@ window titled Settings; the ID typed in Deploying reaches the run's
 `settings.json`, the trail says "…was changed" without the ID, and a
 Cloudflare course shows it read-only with no field; the wizard refuses Create
 with no ID, Open Settings… raises Settings on Deploying while the wizard stays
-open, and a valid ID typed there enables Create. `PlantoirHelpUiTests` —
+open, and a valid ID typed there enables Create; and (since 3B) a course moved
+to Cloudflare with no ID holds Save back until an ID typed in Settings frees
+it, after which moving the course back leaves nothing to save or revert — the
+ID was not counted as an edit to the course
+(`CourseSettingsSaveFollowsTheIdTypedInSettings`). The single-writer scan
+reads Plantoir, Core and the MCP server and matches the property on a word
+boundary, so an object initialiser counts. `PlantoirHelpUiTests` —
 `links-opened.txt` and the line. `DrivenApp.FindTopLevel(automationId)` finds
 another top-level window of the run's own process.
 

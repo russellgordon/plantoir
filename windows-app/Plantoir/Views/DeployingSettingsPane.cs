@@ -21,8 +21,11 @@ namespace Plantoir.Views;
 /// <para><b>Saved as it is typed, recorded when the teacher leaves the field.</b>
 /// Every keystroke is stored (a wizard waiting on the ID enables Create the
 /// moment it is valid), but the trail line is written once — on Enter, when
-/// the field loses focus, when another section is chosen, when the window
-/// closes, and at quit (<see cref="SettingsWindow.NoteBeforeQuit"/>) — by
+/// the field loses focus, when another section is chosen, when the teacher
+/// switches to another window (Settings is modeless, so going back to the main
+/// window moves no focus INSIDE this one and raises no LostFocus — the window's
+/// Deactivated stands in for it), when the window closes, and at quit
+/// (<see cref="SettingsWindow.NoteBeforeQuit"/>) — by
 /// comparing with the ID as it was when the last line was written. A line per
 /// key would bury everything else on the trail; no line at all would leave
 /// "every Cloudflare deploy started failing on Tuesday" with no answer.</para>

@@ -42,7 +42,11 @@ public sealed partial class CourseSettingsView : UserControl
         // (An Unloaded that finds the view still loaded is WinUI's late one
         // after a re-host — measured in the wizard; see PublishingChoiceView.)
         Loaded += (_, _) => ListenForTheAccount(true);
-        Unloaded += (_, _) => { if (!IsLoaded) ListenForTheAccount(false); };
+        Unloaded += (_, _) =>
+        {
+            if (!IsLoaded) ListenForTheAccount(false);
+            else App.LogDiagnostic("Course Settings: a late Unloaded while still loaded was ignored (still listening for the Account ID)");
+        };
     }
 
     private bool _listeningForTheAccount;

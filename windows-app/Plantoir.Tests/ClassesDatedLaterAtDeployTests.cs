@@ -267,15 +267,6 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
     // ---- The window's order, read from its source --------------------------------
 
     /// <summary>
-    /// The window cannot be built in a unit test, so the ORDER in
-    /// <c>SectionDetailView.DeployAsync</c> is read from the source, as
-    /// <c>ReferenceRefusalTests</c> reads the reference refusal: every refusal
-    /// first (the last of them the destinations'), then the question, then the
-    /// saved-settings notice (a Cancel must not leave "deployed using the saved
-    /// settings" on the trail), and only then the console claimed and the
-    /// preview stopped.
-    /// </summary>
-    /// <summary>
     /// The in-app assistant's question reads "already asking, or a dialog up"
     /// BEFORE <c>DeployWillBeRefused()</c>, which also counts the open question
     /// as a refusal: read the other way round, the window answered "nothing to
@@ -299,6 +290,15 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Assert.Contains("WillBeRefused: true", body);
     }
 
+    /// <summary>
+    /// The window cannot be built in a unit test, so the ORDER in
+    /// <c>SectionDetailView.DeployAsync</c> is read from the source, as
+    /// <c>ReferenceRefusalTests</c> reads the reference refusal: every refusal
+    /// first (the last of them the destinations'), then the question, then the
+    /// saved-settings notice (a Cancel must not leave "deployed using the saved
+    /// settings" on the trail), and only then the console claimed and the
+    /// preview stopped.
+    /// </summary>
     [Fact]
     public void TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything()
     {

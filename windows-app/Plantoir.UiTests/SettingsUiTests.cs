@@ -132,6 +132,39 @@ public class SettingsUiTests
         MenuBar.CloseDialog(app);   // the wizard's Cancel: nothing is created
         Thread.Sleep(1000);
     }
+
+    /// <summary>
+    /// Course Settings follows the ID LIVE and re-reads Save only (3A's
+    /// implementation review, L3): a course moved to Cloudflare Pages with no
+    /// ID holds Save back; a valid ID typed in Settings frees it with the course
+    /// window still open; and the ID is NOT an edit to the course — moving the
+    /// course back to where it was leaves nothing to save or revert, which it
+    /// would not if the Settings change had marked the course changed.
+    /// </summary>
+    [UiFact]
+    public void CourseSettingsSaveFollowsTheIdTypedInSettings()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBothAndAClub);
+        app.SelectCourse(CourseFixtures.NeverAsked);
+
+        app.Find("deployTargetPicker", "Deploy to").AsComboBox().Select(1);   // Cloudflare Pages, no ID on this PC
+        Assert.True(Retry.WhileFalse(() => app.Find("revertButton", "Revert").IsEnabled, TimeSpan.FromSeconds(3)).Result,
+                    "moving to Cloudflare Pages left nothing to revert");
+        Assert.False(app.Find("saveButton", "Save").IsEnabled, "Save was offered for Cloudflare Pages with no Account ID");
+
+        app.Find("cloudflareAccountOpenSettings", "Open Settings…").AsButton().Invoke();
+        var settings = app.FindTopLevel("settingsWindow", "the Settings window");
+        Field(settings).Patterns.Value.Pattern.SetValue(AnId);
+        Assert.True(Retry.WhileFalse(() => app.Find("saveButton", "Save").IsEnabled, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
+                    "a valid ID typed in Settings never freed the course's Save");
+        Assert.Equal(AnId, app.Find("cloudflareAccountValue", "the course's Account ID").Name);
+        settings.AsWindow().Close();
+
+        app.Find("deployTargetPicker", "Deploy to").AsComboBox().Select(0);   // back to Netlify
+        Assert.True(Retry.WhileFalse(() => !app.Find("revertButton", "Revert").IsEnabled, TimeSpan.FromSeconds(3)).Result,
+                    "the ID typed in Settings was counted as an unsaved edit to the course");
+        Assert.False(app.Find("saveButton", "Save").IsEnabled, "Save stayed enabled with nothing changed in the course");
+    }
 }
 
 /// <summary>

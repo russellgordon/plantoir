@@ -245,9 +245,15 @@ public sealed class PublishingChoiceView
         // content. Unsubscribing on it left the wizard deaf to Settings, and
         // Create never followed a valid ID. An Unloaded that finds the view
         // still loaded is that stale one, and is ignored; the real one, when
-        // the wizard was cancelled, measured IsLoaded false.
+        // the wizard was cancelled, measured IsLoaded false. The ignored one is
+        // written to the diagnostic log, so that if it ever turned out to be a
+        // real departure (and the view leaked its subscription) it would show.
         Root.Loaded += (_, _) => ListenForTheAccount(true);
-        Root.Unloaded += (_, _) => { if (!Root.IsLoaded) ListenForTheAccount(false); };
+        Root.Unloaded += (_, _) =>
+        {
+            if (!Root.IsLoaded) ListenForTheAccount(false);
+            else App.LogDiagnostic("Account ID display: a late Unloaded while still loaded was ignored (still listening)");
+        };
     }
 
     private void ListenForTheAccount(bool listen)
