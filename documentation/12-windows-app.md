@@ -719,11 +719,36 @@ can see at the current milestone. Softening the contract instead — an
 — was rejected there and the reasoning is worth reading before proposing it
 again.
 
-**Since 2026-09-30 the ledger is the parity milestone's BURN-DOWN LIST**
-(Russell: no Windows release before parity, so an entry may name an open issue
-on "Windows: parity with mac v1.4.0" itself; `contracts/README.md` → "Named
-gaps"). Bundle 1 of the parity run widened it from two entries to every debt
-the suite could name, so that a red run means something again:
+**Since 2026-10-15 every entry carries its OWN milestone, and a test holds the
+cut to it (#481).** Windows is catching up from 1.4.5 to the mac's 1.7.1 in
+batches, and an entry may name work a LATER BATCH owns, on the milestone that
+work shipped in on the mac — `Owed(area, issue, milestone, reason, keys…)`, with
+`V150` … `V171` spelled exactly as the GitHub milestone titles.
+`NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild` reads
+`<Version>` from `Plantoir/Plantoir.csproj` and fails for any entry whose
+milestone is not LATER than it — so setting 1.7.1 turns every v1.5.0–v1.7.1
+entry still there red, while an entry owed by a genuinely later release
+survives the cut. It is "later than this build", not "empty at the cut", on
+purpose; a milestone that is not a version fails, because it cannot be
+compared. Batch 1 (2026-10-15) also wired four more lists into the ledger, in
+the same shape as the ones below: `toolchain.json` → `pins` with a
+`windowsRuntimeContains` (`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`
+— the contract-agrees-with-itself check still runs for every pin; pagedjs
+against #496, functionPlot and nodeTikzjax against #503),
+`course-management.json` → `zipNames.cases` (`ContractTests.CourseManagement_ZipNames_MatchesContract`,
+each case on its own; two Section-menu names against #489) and
+`backups.pruneCases` (`BackupsContractTests`; one case against #489), and
+`assist-cases.json` → `scenarios.cases` (`AssistScenarioTests` — a theory, so a
+ledgered scenario must still FAIL, checked per case through
+`NamedGapLedger.Holding`/`ClosedMessage`, and
+`TheLedgeredScenariosAreStillInTheContract` checks the other direction; three
+Deploy-question scenarios against #489). The ledger file is the live list.
+
+**From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
+BURN-DOWN LIST** (Russell: no Windows release before parity, so an entry could
+name an open issue on "Windows: parity with mac v1.4.0" itself). Bundle 1 of
+the parity run widened it from two entries to every debt the suite could name,
+so that a red run means something again:
 
 | Area | What is held open | Wired into |
 |---|---|---|
@@ -1495,41 +1520,72 @@ What replaces the old container concepts:
     assistant's `rebuild_preview`, `publish_pages` (a page or a whole unit)
     and `unpublish_pages` (a whole unit) rebuild with the same
     `--build-only` leg, so they meet the same refusal.
-    `AssistWorkspace.RebuildPreview`, `Apply` and `ApplyWholeUnit` now ask
-    `RefusedWhileItsSectionDeploys` inside their failed-build branch and say
-    what was already done, then the launcher's own line, lifted as the window
-    lifts it ("…, but the preview couldn’t be built: ICS4U section 2 is
-    already being deployed, so it cannot be built until that has finished.").
-    Not `DeployRefusedWhileItsSectionDeploys`, which says the section "was not
-    deployed again" — false of a rebuild — and not a new wording key, which
-    only the mac can add (assist-wording.json is generated there). The lifted
-    line is contract data already, and its build flavour exists because a
-    rebuild runs that leg. Pinned by `shared-rules.json` →
+    `AssistWorkspace.RebuildPreview`, `Apply` and `ApplyWholeUnit` said what
+    was already done, then the launcher's own line, lifted as the window lifts
+    it ("ICS4U section 2 is already being deployed, so it cannot be built until
+    that has finished."). Not `DeployRefusedWhileItsSectionDeploys`, which says
+    the section "was not deployed again" — false of a rebuild. The lifted line
+    is contract data already, and its build flavour exists because a rebuild
+    runs that leg. Pinned by `shared-rules.json` →
     `deployWhileItsSectionDeploys.refusedBuildAnswers`, run here by
-    `RefusedBuildAnswersTests` through the real `PlantoirTools`.
+    `RefusedBuildAnswersTests` through the real `PlantoirTools`. (Since #481,
+    below, the line arrives inside `wording.previewDidNotBuildBecause`.)
     - **The cross.** `plantoir-mcp`'s `LauncherRunner` reads the launcher
       without naming an encoding, so the cross arrives as `?` or as three
       characters of mojibake. Detection never cared (the markers are ASCII);
       since these answers SAY the sentence, `SectionDeployRefusalOf` now takes
       off everything before the course code's first letter or digit. The
       runner's encoding was deliberately left alone in this piece.
-    - **What is left as it was.** An ORDINARY build failure in `Apply` and
-      `ApplyWholeUnit` still ends with `WhereTheOutputIs`, which points at a
-      window the server does not have. Dropping it would leave "the preview
-      couldn't be built" with no reason, and pasting the raw log back is the
-      bug `APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog` exists to
-      prevent; the right answer is a headless variant of `previewDidNotBuild`,
-      which is a wording key, so it was the mac's to add — and it did, the same day: `previewDidNotBuildForACallerWithNoWindow` and `previewDidNotBuildBecause` are in `assist-wording.json` now, and #481 is Windows' issue to declare them (or `ContractTests` stays red) and then say them here. The same
-      key would cover a THIRD gap, pre-existing and also left alone:
-      `RebuildPreview`'s ordinary failure still appends `build.Message`
-      whole, so an outside assistant's `rebuild_preview` hands back the raw
-      launcher output — "(The launcher exited with code 1.)" and "Last
-      output:" included, a machinery word in a teacher's answer. A headless
-      `previewDidNotBuild` should replace that too. An exit 3 (a
-      question) in those two paths is still read as a failed build — a
-      separate gap. Unpublishing single PAGES never rebuilds on this side
-      (`Apply` returns before the build when the plan hides), so it cannot
-      meet the refusal at all. The contract HAS that case since the mac's half landed (the seventh `refusedBuildAnswers` case, added from the mac, which rebuilds after hiding one page): it is red here until #479 decides whether a hide rebuilds, and this side owes holding it open by name in `NamedGapLedger` against #479 until then (or implementing the rebuild) — not marking it `appliesOn`.
+    - **What was left as it was on 2026-10-08, and closed on 2026-10-15
+      (batch 1 of the catch-up to 1.7.1).** Three gaps were recorded here, all
+      now closed:
+      - **An ordinary build failure (#481).** `Apply` and `ApplyWholeUnit`
+        ended it with `WhereTheOutputIs`, a pointer at a window plantoir-mcp
+        does not have, and `RebuildPreview` appended `build.Message` whole —
+        "(The launcher exited with code 1.)" and "Last output:" handed to an
+        outside assistant. The mac added the two headless keys the same day,
+        and Windows now declares and says them: `PreviewDidNotBuildHere`
+        (which replaced `RefusedWhileItsSectionDeploys`) says
+        `wording.previewDidNotBuildBecause` with `FailureExplainer.Explanation`'s
+        reason when there is one — the #471 refusal among them, reached through
+        `SectionDeployRefusalOf` — and
+        `wording.previewDidNotBuildForACallerWithNoWindow` otherwise. A
+        rebuild's answer is "Nothing was changed. " and that sentence; a page or
+        unit's is what was already done and that sentence. `WhereTheOutputIs`
+        is said nowhere in `AssistWorkspace` any more. Accepted, as on the mac:
+        `Explanation` can lift a sentence written for a deploy ("… then deploy
+        again") into a preview build's answer. Rejected: a Windows-only
+        sentence, because a wording key is the mac's to add and it had.
+        Tests: `AssistWorkspaceTests.ARebuildThatFailsSaysOneCleanSentence`,
+        `ARebuildThatFailsForAReasonSaysTheReason`,
+        `AWholeUnitWhoseBuildFailsSaysOneCleanSentence`, and the two older
+        tests whose expectations moved.
+      - **Exit 3 in `Apply` and `ApplyWholeUnit` (#478).** A question was read
+        as a failed build there, while `RebuildPreview` and `Deploy` said
+        `PreviewBuildNeedsAnAnswer`/`DeployNeedsAnAnswer`. Both now check
+        `NeededAnAnswer` first and say what was done, then
+        `PreviewBuildNeedsAnAnswer` (`APublishOrHideWhoseRebuildStopsForAQuestionSaysSo`).
+        The mac's own runner has the matching gap one level up — its
+        `carryOut` counts the headless failure sentences as "the preview was
+        left as it was" but not the question — and owes it as a `mac` issue.
+      - **Unpublishing single PAGES never rebuilt (#479).** `Apply` returned
+        before the build whenever the plan hid pages (`if (!plan.Publishes)`).
+        Nothing chose that: since the first commit (b3b7fc040) `Apply` tied
+        "build the preview" to "the plan publishes", and the mac rebuilds
+        after a hide. The return is gone, so a hide takes the publish's path —
+        the window's `preview: false` return (its own visible rebuild covers
+        it), `ClaimTheRebuildAfterAWrite`, then `--build-only` — and the
+        seventh `refusedBuildAnswers` case runs green with no ledger entry
+        (`HidingAPageRebuildsThePreviewAndStopsThere`,
+        `HidingWithPreviewFalseBuildsNothing`). Left alone on purpose: a hide
+        that changes NOTHING still builds nothing, while a publish that changes
+        nothing does (the `ChangesNothing && !Publishes` return); and a hide is
+        still not refused up front while Plantoir is building
+        (`RefuseIfPlantoirIsBuilding` stays publish-only) — its pages are
+        written and only the rebuild is declined, with its note. No new trail
+        event: a hide's rebuild meets the existing "build declined, course busy
+        elsewhere" and "outside assistant worked while a preview was open"
+        lines, whose `carries` already say "a change it made".
     - **No new trail event (rule 5).** The launcher already writes "build
       declined, course busy elsewhere" for the refusal (`launcherLines`).
   - **The kind.** `ScheduledPublishOutcome.Kind.EarlierDeployStillWorking` is

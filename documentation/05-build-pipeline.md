@@ -1714,7 +1714,12 @@ cases: `contracts/shared-rules.json` → `figureFences`.
    `--full-rebuild` clears this engine's. Writes go to a temporary file and
    are moved into place, and a missing or half-written entry is a miss
    (review S7: previewing one section while publishing another is the
-   supported way of working). A build whose figures are all cached never
+   supported way of working). Windows refuses that move onto a file another
+   build has open or is replacing at the same moment; the entry is then
+   simply not cached (another writer has stored the same key) and the
+   writer removes its own temporary file rather than leaving it beside the
+   entry (2026-10-15; retrying was rejected, since it adds build time to store
+   what is already stored). A build whose figures are all cached never
    starts Node: "📐 Drew 0 diagrams (12 from before)".
 5. **The helper.** `support/figures/plantoir-figures.mjs`, one process per
    build, JSON lines each way (protocol at the top of the file). It says

@@ -4429,18 +4429,20 @@ real path uses, a second test in `HeadlessDeployAnswersTests` runs
 echoes the contract's refusal and exits 1 — so the wiring from runner text to
 answer is exercised, not only the reading (the plan review's finding 4).
 
-**The seventh case, and why it is not `appliesOn`.** The mac rebuilds after
-hiding ONE page; Windows does not (#479, open). The single-page
-`unpublish_pages` case was added to the contract from the mac, and it is red on
-Windows until #479 decides whether a hide rebuilds. It is deliberately NOT
+**The seventh case, and why it was never `appliesOn`.** The mac rebuilds after
+hiding ONE page; Windows did not until #479. The single-page
+`unpublish_pages` case was added to the contract from the mac, and was red on
+Windows until #479 settled whether a hide rebuilds. It was deliberately NOT
 marked `appliesOn: ["mac"]`: `contracts/README.md`'s "four ways out" rejects
 recording as chosen a difference one side still owes, and `appliesOn` has no
-mend-check — the day Windows fixed #479 nobody would be told the case could
-run. Windows holds it open by name in `NamedGapLedger` against #479 instead
-(the plan review's finding 1; a comment on #479 says so).
+mend-check — the day Windows fixed #479 nobody would have been told the case
+could run. Windows has rebuilt after a hide since 2026-10-15 (#479; nothing had
+chosen the old behaviour, see `documentation/12-windows-app.md` → the #471
+bullet), and the case runs green on both.
 
 **Rejected.** Mirroring Windows' "Nothing was changed, and the preview
-couldn't be built: …" word for word: on the page and unit paths that phrase
+couldn't be built: …" word for word (a sentence Windows itself stopped saying on
+2026-10-15, when it adopted the two keys below): on the page and unit paths that phrase
 would follow "Done: …" and be false, and one key serving all three mac paths
 is worth more than identical text on one of them. The contract pins only
 that the lifted line is said whole, without the cross and without
@@ -4449,9 +4451,14 @@ that the lifted line is said whole, without the cross and without
 and taken out again: nothing read it, since `bringThePreviewUpToDate` returns
 only the message.
 
-**What Windows owes (#481):** declare the two new wording keys with identical
-text, or `ContractTests` fails on a key it lacks; then say them where its
-server still composes these answers inline. **Rename:** the mac has no
+**What Windows owed (#481), done 2026-10-15:** it declares the two new wording
+keys with identical text and says them from `AssistWorkspace.RebuildPreview`,
+`Apply` and `ApplyWholeUnit` through one helper, `PreviewDidNotBuildHere` — the
+detail is in `documentation/12-windows-app.md` → the #471 bullet. One
+difference stays the mac's to close: Windows also says a rebuild that stopped
+for a question (exit 3) as `previewBuildNeedsAnAnswer` on the page and unit
+paths (#478), and the mac's `carryOut` does not yet count that sentence as
+"the preview was left as it was". **Rename:** the mac has no
 unit-rename assistant tool, so the issue's fourth bullet has nothing to meet
 here. **No new trail event:** the launcher's refusal line is already recorded.
 

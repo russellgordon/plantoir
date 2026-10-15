@@ -3092,8 +3092,8 @@ at the click, as `MenuRoute` does, and the context menu's items, which do not
 consult the rule, meet the same check.
 
 **Every menu write rebuilds the preview**, as the tool does today (the
-director kept it: the menu must not disagree with the tool; Windows' gap is
-#479). The one exception is the classes hidden at Deploy (#475, below), where
+director kept it: the menu must not disagree with the tool; Windows matches
+it since #479, 2026-10-15, when its hides began rebuilding too). The one exception is the classes hidden at Deploy (#475, below), where
 the deploy builds straight after.
 
 REJECTED: lifting each tool's private function into a shared typed one (the
