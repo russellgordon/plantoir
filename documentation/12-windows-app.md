@@ -5799,6 +5799,26 @@ node and python already there (both paths set before any phase), and the
 manifest is merged. The plan review's M4 found the first draft would have
 called `npm.cmd` with an empty `$nodeDir` on that path.
 
+**A run that dies part-way leaves a runtime the build refuses and the next
+run repairs** (the 5A implementation review's L1 and L3). Before
+`runtimeendor` is touched, the manifest is rewritten WITHOUT the four vendor
+keys — on a fresh clone that is the first manifest written, the five base keys
+right after the base phases. So a vendor phase that fails (a download, `npm
+ci`, a hash) leaves base keys only: `CheckNativeRuntimeManifest` stops the
+build, and a re-run takes the vendor-only path instead of trying to move Node
+onto a `runtime
+ode` that is already there. REJECTED: keeping the old
+manifest until the end, which is what 5A did — after a pin bump a failed
+vendor-only run left all four keys (old values) beside no `vendor` folder, a
+runtime the build accepted and `publish.ps1` shipped without engines; and
+checking for the folder in `CheckNativeRuntimeManifest`, which is the "decide
+from folders" the script exists to avoid. **A version and its address cannot
+part either (L2):** the vendor addresses are literals beside the
+`$<Name>Version` variables, the script refuses at start when an address does
+not end with its version, and
+`ToolchainContractTests.TheWindowsRuntimeRecipesVendorVersionsAreTheContracts`
+holds each variable against the contract's pin.
+
 **The build refuses a runtime without them (the plan review's M5).**
 `publish.ps1` never runs `fetch-runtime.ps1`, and robocopy `/MIR` copies
 whatever `Vendor\runtime` holds — so a build PC with a 2026-08-19 runtime
