@@ -5008,12 +5008,140 @@ cross processes), so a UI test's copy line lands in the PC's own trail.
 **Testing it**: unit — `SectionVerbsTests` (calls, the runner entry, Undo's
 place, the trail, the claim, Rebuild's two answers), `SectionMenuServerTests`
 (folder-named pages, a copy per change, the voice, the surface variables),
-the wording walk (55 keys declared, 17 #475 keys still ledgered for 2C).
+the wording walk (55 keys declared; the 17 #475 keys were ledgered for 2C,
+which declared them).
 Through the window (`SectionVerbsUiTests`, 2026-10-15, this PC, both
 passing, 2 min 5 s): Publish Pages… → tick → plan → Publish → the flag
 changes on disk, one `_menu-section1` zip, Undo Last Change live and putting
 the page back; and Rebuild Preview with the REAL launcher — a serving
 preview, an edit on disk, Rebuild Preview, and the edit served.
+
+### Classes dated after the next class, at Deploy (2C, 2026-10-15)
+
+The mac's #475 ([09 → "Classes dated after the next class, at Deploy
+(#475)"](09-mac-app.md), [10 → "#475 at the assistants' deploy"](10-local-ai-assistant.md)):
+a class page students can see, dated after the NEXT class day, is caught
+before it goes out. The rule is `class-planning.json` → `futureDatedClasses`
+(`ClassesDatedLater` in Core; `FutureDatedClassesContractTests` runs the 24
+cases on real files, which were unrun here until now); where and in what order
+the teacher is asked is `shared-rules.json` → `classesDatedLater`; the answer is
+remembered in `.publish_state/section<N>.later-classes-kept.json`
+(`file-formats.json` → `laterClassesKept`, `LaterClassesKept`, released on
+rollover with the links checklist's answer under the same undo entry). This
+part is what Windows did differently, and why.
+
+**Two readings that would pass review and are wrong.** The date is the first
+ten characters of `created` AS WRITTEN — never `AssistWorkspace.DateOf`, whose
+`DateTimeOffset` parse is the same day today but is a moment, not a day, and is
+one refactor away from converting. And "today" is never read inside the rule:
+`ClassesDatedLater` takes it from the caller, `AssistWorkspace.Today` is
+injectable, and the scenario runner pins 2026-10-08 — a fixture laid out around
+the real clock is the "Three testing lessons" trap, which turned dev red for a
+morning once already.
+
+**The order in `SectionDetailView.DeployAsync`, and why.** Every refusal
+first — reference course, the folder still getting ready, another program
+building, saved settings that cannot be read, a destination that cannot be
+deployed to — then the question, then the saved-settings notice, and only then
+the console claimed and the preview stopped. Hiding is a change (a copy of the
+course and a write), so a question before a refusal would let a refusal follow
+a change; a question after the stop would make Cancel cost the teacher the
+preview they were reading. The saved-settings notice and its "deployed using
+the saved settings" line moved AFTER the question (the plan review's M4): a
+Cancel must not leave either behind. A second Deploy press while the question
+is up returns at once (`_isAskingAboutLaterClasses`; `_isPreparingDeploy` is
+still false at that point). `ClassesDatedLaterAtDeployTests.TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything`
+reads that order from the source, as `ReferenceRefusalTests` already did for the
+reference refusal — the window cannot be built in a unit test.
+
+**`DeployWillBeRefused()` (the plan review's H1).** The in-app assistant asks
+BEFORE it presses Deploy, and on this side most of the deploy's refusals live
+in the window, not in the runner. So the window offers a side-effect-free
+reading of all of them — nothing claimed, shown or written — and
+`AskAboutClassesDatedLaterForTheAssistantAsync` asks NOTHING when one will
+refuse: the deploy then goes on to its own refusal, which shows its dialog and
+is the sentence the assistant relays. The alternative — returning the refusal
+sentence from the seam — was rejected: the window's dialog would never be
+shown, and the window and the assistant would word the same refusal from two
+places.
+
+**The answer, in the window.** Every flagged class is listed ticked, and two
+buttons always sit beside Cancel: Hide Ticked and Deploy (the default) and
+Keep All and Deploy. Hide Ticked records the unticked as kept, then hides the
+ticked with Hide Pages…'s OWN call through this window's `plantoir-mcp`
+(`MainWindow.HideClassesForTheDeploy` → `SectionVerbs.Perform`) — so it is
+backed up as `_menu-section<N>`, Section ▸ Undo Last Change takes it back, and
+pages only those classes link to go with them — with NO preview either side:
+`AssistToolRunner.PreviewFollowsAChange = false` skips the stop as well as the
+restart (the plan review's M1; a hide that failed would otherwise leave the
+teacher with no preview for a deploy that never happened). Its "ran from a
+menu" line names Hide Pages…, whose call it is, with "N classes dated later,
+at Deploy" as its counts — the mac's own line. A ticked class still visible
+afterwards stops the deploy, and the teacher is shown what the hide said. The
+"asked about…" line is written AFTER the hide, so a hide that left a class
+visible is recorded as cancelled rather than as hidden (the mac writes it
+before the hide, so its line can count a class as hidden that is not).
+
+**The in-app assistant always gets a window here.** `AssistWindow.MainWindowForBuilds`
+opens a main window on the section's folder when none shows it, so
+`deployHasClassesDatedLaterAndNoWindow` is reachable only when no window CAN
+show the section (it would not open, or the window ended up on another folder);
+the seam then returns `LaterClassesAnswer.NoWindow` with the titles, never
+throws. The seam is `AssistToolRunner.AskAboutClassesDatedLaterInApp`
+(`Func<Task<LaterClassesAtADeploy>>`): a small record rather than the bare
+answer, because the no-window sentence names the classes and only the app side
+can read them. Nothing flagged: nothing asked, and no window is brought forward
+for it. The window's route on the trail is the contract's "the in-app
+assistant's deploy", and `StartDeployForAutomationAsync` passes
+`alreadyAsked: true`, so the question is never put twice (M4).
+
+**The server's deploy** (`AssistWorkspace.Deploy`), after its own refusals
+and before anything runs: an outside assistant is refused with
+`deployHasClassesDatedLater` until the window's answer is on file; Plantoir's
+own assistant reaches it only with no window seams at all, and is told
+`…AndNoWindow`. The trail line is the contract's: "a deploy was held back for
+classes dated after the next class — {N} with no answer" — no "by an outside
+assistant" (the mac adds who asked; the contract's line does not, and the plan
+review ruled for the contract). `publish_class_on`, from any client, and the
+links checklist's Publish (`PublishAndRemember`) record a later class they
+published as kept: a date the teacher named is not a mistake to catch, and
+without it the two questions undid each other (the mac's batch B review,
+finding 2).
+
+**A scheduled deploy** reads the classes in `ScheduledRun.Execute` after the
+settings decision and before the wrapper runs, on the run's own day, and
+writes "deployed with classes dated after the next class: …" only when the
+wrapper's record is SUCCEEDED and newer than the run. Never on the exit code,
+which is 0 either way (the mac measured gating on it writing the line after a
+failed deploy). The record's time is its file's write time, so it is compared
+with the real clock read just before the wrapper ran — not `World.Now`, which
+tests pin to a morning — with a second's slack; both are local time.
+`ScheduledRunTests` runs it both ways, and with an earlier night's success
+record that must not count.
+
+**Section ▸ Publish Pages…** asks about the ticked classes after the choice
+and before the plan, in the same dialog (a `LaterClasses` stage): the ticked
+are left out and stay hidden ("Leave N Hidden and Continue", or "Publish Them
+All" with none ticked), the unticked are kept, and with nothing left nothing is
+published and the dialog closes.
+
+**Testing it**: unit — `FutureDatedClassesContractTests` (24 cases, the
+record's shape, the rollover undo), the four `assist-cases.json` scenarios
+(green; the three ledgered ones left the ledger), `ClassesDatedLaterAtDeployTests`
+(an open dialog not waited on, no window, the hide with no preview, the server's
+hold, what is kept, the window's order), `ScheduledRunTests` (both ways), the
+wording walk (17 keys declared). Through the window: `LaterClassesAtDeployUiTests`
+— Cancel deploys nothing and leaves the preview serving; Hide Ticked hides one
+class, keeps the unticked one and deploys to a folder; Keep All and Deploy, then
+a second Deploy that asks nothing.
+
+REJECTED, with the reason:
+- **Asking before the window's refusals, or after the assistant's stop**: see
+  the order above (the contract's own `rejected`).
+- **The seam returning the refusal sentence** when the deploy will be refused:
+  see `DeployWillBeRefused()` above.
+- **Comparing the success record with `World.Now`**: tests pin it to a morning
+  that is not the file's clock, and a real run's two clocks agree anyway.
 
 ## Diagrams and graphs (#485 E1, v1.7.0): what the runtime must carry
 
