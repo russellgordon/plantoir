@@ -297,7 +297,8 @@ public static class PreviewStartPage
 /// </summary>
 /// <remarks>
 /// <para>An app load is marked when the app REQUESTS it; the first
-/// <c>NavigationStarting</c> after that names its NavigationId, and that
+/// <c>NavigationStarting</c> after that names its NavigationId — one id per
+/// request, so two requests in one dispatcher turn wait for two — and that
 /// id's <c>ContentLoading</c> — WebView2's counterpart of the mac's
 /// didCommit — ends it, with its <c>NavigationCompleted</c> as the backstop
 /// for a failure. Matched on the CAPTURED id, never "the next one":
@@ -314,46 +315,44 @@ public sealed class PreviewNavigationLedger
     public static readonly TimeSpan Backstop = TimeSpan.FromSeconds(15);
 
     private DateTime? _requestedAt;
-    private ulong? _id;
+    private int _awaitingStart;
+    private readonly HashSet<ulong> _ids = [];
 
-    /// <summary>The app asked for a load. A second request replaces the first: its id is forgotten, so the first load's late end cannot end this one.</summary>
+    /// <summary>
+    /// The app asked for a load. Each request waits for a navigation of its
+    /// own: two asked for in one dispatcher turn (Request, Request, Starting)
+    /// capture TWO ids, so the cancelled first one's end cannot end the second.
+    /// </summary>
     public void AppLoadRequested(DateTime now)
     {
         _requestedAt = now;
-        _id = null;
+        _awaitingStart++;
     }
 
-    /// <summary>A navigation started; the first one after an app's request is that load.</summary>
+    /// <summary>A navigation started; while a request is waiting for one, it is that load.</summary>
     public void NavigationStarting(ulong id, bool isRedirected)
     {
-        if (_requestedAt is null) return;
-        if (_id is null && !isRedirected) _id = id;
+        if (isRedirected || _awaitingStart == 0 || _ids.Contains(id)) return;
+        _ids.Add(id);
+        _awaitingStart--;
     }
 
-    /// <summary>The content of a navigation began to arrive: the app's load, if it is its id, is over.</summary>
-    public void ContentLoading(ulong id) => EndIfItIs(id);
+    /// <summary>The content of a navigation began to arrive: the app's load, if it is one of its ids, is over.</summary>
+    public void ContentLoading(ulong id) => _ids.Remove(id);
 
     /// <summary>A navigation finished or failed: the backstop for a load that never committed.</summary>
-    public void NavigationCompleted(ulong id) => EndIfItIs(id);
+    public void NavigationCompleted(ulong id) => _ids.Remove(id);
 
     /// <summary>Whether an address change now would be the app's, not the teacher's.</summary>
     public bool AppLoadUnderWay(DateTime now)
     {
-        if (_requestedAt is not { } requested) return false;
-        if (_id is null && now - requested > Backstop)
-        {
-            _requestedAt = null;
-            return false;
-        }
-        return true;
-    }
-
-    private void EndIfItIs(ulong id)
-    {
-        if (_requestedAt is not null && _id == id)
-        {
-            _requestedAt = null;
-            _id = null;
-        }
+        if (_ids.Count > 0) return true;
+        if (_awaitingStart == 0) return false;
+        if (_requestedAt is { } requested && now - requested <= Backstop) return true;
+        // A request whose navigation never started — WebView2 may cancel a
+        // Navigate before raising anything — ends by itself after the backstop.
+        _awaitingStart = 0;
+        _requestedAt = null;
+        return false;
     }
 }
