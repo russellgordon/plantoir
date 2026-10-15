@@ -128,15 +128,9 @@ public sealed class SectionScheduleDialog : ContentDialog
     {
         var main = new StackPanel { Spacing = 14, MinWidth = 460, MaxWidth = 560 };
 
-        var intro = new TextBlock
-        {
-            Text = "Give Plantoir the class dates once, so it can date new class pages for you. " +
-                   "They are kept inside the course folder, so they travel with it through backup, archive and restore.",
-            FontSize = 13,
-            Opacity = 0.8,
-            TextWrapping = TextWrapping.Wrap,
-        };
-        main.Children.Add(intro);
+        main.Children.Add(FormBuilders.DialogExplanation(
+            "Give Plantoir the class dates once, so it can date new class pages for you. " +
+            "They are kept inside the course folder, so they travel with it through backup, archive and restore."));
 
         if (!string.IsNullOrWhiteSpace(reason))
         {
