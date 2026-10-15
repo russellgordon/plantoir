@@ -142,6 +142,40 @@ public sealed partial class AssistWorkspace
     /// </summary>
     public const string ChangesToUndoKey = "plantoir.app/changesToUndo";
 
+    /// <summary>
+    /// The <c>_meta</c> key saying whether the call CHANGED anything — sent by
+    /// the menu's server only, beside <see cref="LastChangeKey"/>, so the
+    /// window's "ran from a menu" line says "carried out" or "changed nothing"
+    /// from a fact the server knows rather than from the undo list's depth.
+    /// </summary>
+    /// <remarks>
+    /// The depth alone was wrong twice over (2B's implementation review, M1):
+    /// Make Room for Classes records NO undo entry on purpose (see
+    /// <c>ApplyInsertClasses</c>), so a room really made read as "changed
+    /// nothing"; and the list keeps at most twenty, so from the twenty-first
+    /// change on the depth stays at twenty and every change read the same way.
+    /// A call changed something when the top of the undo list is a different
+    /// entry afterwards — a new one, however deep the list, or one taken back —
+    /// or when a change that keeps no undo entry said it wrote something.
+    /// </remarks>
+    public const string ChangedKey = "plantoir.app/changed";
+
+    private bool _changedWithNoUndoEntry;
+
+    /// <summary>A change that records no undo entry (Make Room for Classes) wrote something.</summary>
+    internal void NoteAChangeWithNoUndoEntry() => _changedWithNoUndoEntry = true;
+
+    /// <summary>
+    /// After a call: whether it changed anything (see <see cref="ChangedKey"/>).
+    /// Reading it clears the no-undo-entry note, so the next call starts clean.
+    /// </summary>
+    public bool TakeWhetherTheCallChangedAnything(UndoHistory.Entry? topBefore)
+    {
+        bool changed = !ReferenceEquals(topBefore, TopOfTheUndoList) || _changedWithNoUndoEntry;
+        _changedWithNoUndoEntry = false;
+        return changed;
+    }
+
     private readonly Dictionary<UndoHistory.Entry, string> _placeOfEntry = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>

@@ -3954,6 +3954,9 @@ public sealed partial class AssistWorkspace
         if (plan.Renames.Count > 0 || plan.Moves.Count > 0)
             said += "\n\n" + ClassChangeWording.OtherClassesMoved(backup);
 
+        // No undo entry says so, so the menu's trail line is told here (#489, M1).
+        if (created.Count > 0 || renamed.Count > 0 || moved > 0 || linksUpdated > 0) NoteAChangeWithNoUndoEntry();
+
         return new AssistResult(true, said, backup);
     }
 

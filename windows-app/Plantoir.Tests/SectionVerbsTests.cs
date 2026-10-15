@@ -1,5 +1,9 @@
+using System.Diagnostics;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Models;
+using Plantoir.Mcp;
 using Plantoir.Core.Scripting;
 using Xunit;
 
@@ -50,9 +54,9 @@ public class SectionVerbsTests : IDisposable
 
     private string Page(string title) => Path.Combine(_course, "section1", "All Classes", title + ".md");
 
-    private SectionVerbs Verbs(out AssistWorkspace workspace)
+    private SectionVerbs Verbs(out AssistWorkspace workspace, UndoHistory? history = null)
     {
-        var server = new AssistWorkspace(_folder, new FakeLauncher(), undo: new UndoHistory()) { Surface = AssistSurface.Menu };
+        var server = new AssistWorkspace(_folder, new FakeLauncher(), undo: history ?? new UndoHistory()) { Surface = AssistSurface.Menu };
         workspace = server;
         var tools = new AssistScenarioTests.RealTools(server);
         return new SectionVerbs(_folder, _ => Task.FromResult<IToolServer?>(tools),
@@ -129,6 +133,111 @@ public class SectionVerbsTests : IDisposable
 
         Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — changed nothing, 1 page ticked", File.ReadAllText(_trail));
         Assert.False(verbs.LastChangeIsIn("ICS3U", 1));
+    }
+
+    /// <summary>
+    /// Make Room for Classes keeps no undo entry, on purpose — and it CHANGED
+    /// the section, which the trail must say (2B's implementation review, M1:
+    /// the undo list's depth said "changed nothing").
+    /// </summary>
+    [Fact]
+    public async Task MakingRoom_IsCarriedOut_ThoughItKeepsNoUndoEntry()
+    {
+        TimetableMemory.Write(_folder, "ICS3U", 1,
+            new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 9), new DateOnly(2026, 9, 10), new DateOnly(2026, 9, 11) },
+            "typed in by hand", new DateOnly(2026, 9, 8));
+        var history = new UndoHistory();
+        await using var verbs = Verbs(out _, history);
+
+        await verbs.Perform(SectionVerbs.MakeRoomForClasses("ICS3U", 1, unit: 1, atDay: 2, howMany: 1, plan: false),
+                            "Section ▸ Make Room for Classes…", "ICS3U", 1, "room for 1");
+
+        Assert.True(File.Exists(Page("Unit 1, Day 3")), "the class after the new one was renamed");
+        Assert.Empty(history.Entries);
+        Assert.Contains("ICS3U/1 · Section ▸ Make Room for Classes… — carried out, room for 1", File.ReadAllText(_trail));
+    }
+
+    /// <summary>
+    /// From the twenty-first change on, the undo list stays at twenty, so its
+    /// depth no longer grows — and the change was still made (M1).
+    /// </summary>
+    [Fact]
+    public async Task TheTwentyFirstChange_IsCarriedOut_ThoughTheListStaysAtTwenty()
+    {
+        var history = new UndoHistory();
+        for (int i = 0; i < 20; i++)
+        {
+            string earlier = Path.Combine(_folder, $"earlier{i}.txt");
+            history.Begin($"an earlier change {i}");
+            history.Touch(earlier, null);
+            history.Wrote(earlier, "written");
+            history.End();
+        }
+        Assert.Equal(20, history.Entries.Count);
+        await using var verbs = Verbs(out _, history);
+
+        foreach (string title in new[] { "Unit 1, Day 1", "Unit 1, Day 2" })
+            await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "section1/All Classes/" + title }, plan: false),
+                                "Section ▸ Publish Pages…", "ICS3U", 1, "1 page ticked");
+
+        Assert.Equal(20, history.Entries.Count);
+        Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 2")));
+        string trail = File.ReadAllText(_trail);
+        Assert.Equal(2, trail.Split('\n').Count(line => line.Contains("Section ▸ Publish Pages… — carried out, 1 page ticked")));
+        Assert.DoesNotContain("changed nothing", trail);
+    }
+
+    [Fact]
+    public void TheEnding_PrefersWhatTheServerSays_OverTheDepth()
+    {
+        var changed = AssistToolAnswer.Same("Done.") with { Changed = true };
+        var unchanged = AssistToolAnswer.Same("Nothing to do.") with { Changed = false };
+        Assert.Equal("carried out", SectionVerbs.Ending("publish_pages", changed, 20, 20, "ICS3U", 1));
+        Assert.Equal("changed nothing", SectionVerbs.Ending("publish_pages", unchanged, 3, 4, "ICS3U", 1));
+        Assert.Equal("took the last change back", SectionVerbs.Ending("undo_last_change", changed, 20, 20, "ICS3U", 1));
+        // Not told: the depth, as before.
+        Assert.Equal("changed nothing", SectionVerbs.Ending("publish_pages", AssistToolAnswer.Same("x"), 2, 2, "ICS3U", 1));
+    }
+
+    /// <summary>
+    /// The menu's server meets the same request filter every client does
+    /// (2B's implementation review, L8): a course kept for reference is still
+    /// refused a write on the Menu surface, and the outside-change hold —
+    /// for an assistant in ANOTHER program, while a build runs — never holds
+    /// the menu at the door, though it holds an outside assistant in the
+    /// same moment.
+    /// </summary>
+    [Fact]
+    public void TheMenusServer_IsRefusedAReferenceCoursesWrite_ButNotHeldAtTheDoor()
+    {
+        string kept = Path.Combine(_folder, "courses", "ICS3U-2025");
+        Directory.CreateDirectory(Path.Combine(kept, "section1"));
+        File.WriteAllText(Path.Combine(kept, "course_config.json"),
+            """{"course_code":"ICS3U","kept_for_reference":true,"reference_school_year":2025,"section_numbers":[1],"num_sections":1,"deploy_target":"netlify"}""");
+        var menu = new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.Menu };
+        var outside = new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.Outside };
+        static IReadOnlyDictionary<string, JsonElement> Arguments(string json) =>
+            JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)!;
+
+        Assert.Equal(ReferenceCourse.StaysAsItIs("ICS3U"),
+            ReferenceWriteGate.Refusal("publish_pages", Arguments("""{"course":"ICS3U-2025","section":1,"pages":["x"]}"""), menu));
+
+        // Another program building ICS3U: an outside assistant is held, the menu is not.
+        using var other = Process.Start(new ProcessStartInfo("cmd.exe", "/c pause")
+        {
+            CreateNoWindow = true, UseShellExecute = false, RedirectStandardInput = true,
+        })!;
+        try
+        {
+            string leases = Path.Combine(_folder, "courses", ".internal", "activity");
+            Directory.CreateDirectory(leases);
+            File.WriteAllText(Path.Combine(leases, $"ICS3U.build.{other.Id}.lease"),
+                $"{other.Id}\n{other.ProcessName}\n2026-08-13T00:00:00Z\n");
+            var change = Arguments("""{"course":"ICS3U","section":1,"pages":["section1/All Classes/Unit 1, Day 1"]}""");
+            Assert.NotNull(OutsideChangeGate.Refusal("publish_pages", change, outside));
+            Assert.Null(OutsideChangeGate.Refusal("publish_pages", change, menu));
+        }
+        finally { try { other.Kill(entireProcessTree: true); } catch { } }
     }
 
     [Fact]

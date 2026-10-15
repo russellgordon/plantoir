@@ -962,10 +962,16 @@ public sealed class AssistAgent
             }
             if (match.ToolName.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
             {
-                string said = ThisSectionIsBeingDeployed()
+                // The Section menu's claim, as the runner meets it (2B's
+                // implementation review, L3): a rebuild would stop the preview
+                // under a change the menu is making.
+                bool menuIsChanging = SectionIsChangingFromTheMenu?.Invoke() == true;
+                string said = menuIsChanging
+                    ? AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString())
+                    : ThisSectionIsBeingDeployed()
                     ? SectionIsBeingDeployedSentence
                     : "The preview is opening in Plantoir's main window — the build shows its progress there.";
-                if (!ThisSectionIsBeingDeployed()) (RebuildPreviewInApp ?? ShowPreviewInApp).Invoke();
+                if (!menuIsChanging && !ThisSectionIsBeingDeployed()) (RebuildPreviewInApp ?? ShowPreviewInApp).Invoke();
                 _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
                 _messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = said });
                 return new List<Line> { new("assistant", said) };
@@ -1724,8 +1730,14 @@ public sealed class AssistAgent
         // "rebuild / refresh / update the preview" rebuild a serving preview
         // (#489, Q1); "preview", "show me the preview" and the rest show it.
         bool rebuild = RebuildWords.Any(word => Plainly(text).StartsWith(word, StringComparison.Ordinal));
-        if (!deploying) (rebuild && RebuildPreviewInApp is not null ? RebuildPreviewInApp : ShowPreviewInApp).Invoke();
-        string said = deploying
+        // A REBUILD stops the preview, so it meets the Section menu's claim as
+        // the runner's rebuild_preview does (L3); showing one changes nothing.
+        bool menuIsChanging = rebuild && SectionIsChangingFromTheMenu?.Invoke() == true;
+        if (!deploying && !menuIsChanging)
+            (rebuild && RebuildPreviewInApp is not null ? RebuildPreviewInApp : ShowPreviewInApp).Invoke();
+        string said = menuIsChanging
+            ? AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString())
+            : deploying
             ? SectionIsBeingDeployedSentence
             : "The preview is opening in Plantoir's main window — the build shows its progress there.";
         // The exchange still goes in the transcript the model sees, so a

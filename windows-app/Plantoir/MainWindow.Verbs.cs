@@ -63,7 +63,9 @@ public sealed partial class MainWindow
         old.Changed -= VerbsChanged;
         _verbs = null;
         _verbsFolder = null;
-        _ = old.DisposeAsync().AsTask();
+        // Once any change running now has finished, and off this thread: the
+        // server's stop waits up to three seconds for it to exit (L4).
+        _ = Task.Run(old.DisposeWhenIdleAsync);
     }
 
     private void VerbsChanged() => DispatcherQueue.TryEnqueue(() => { if (!IsClosed) ApplyMenuEnablement(); });

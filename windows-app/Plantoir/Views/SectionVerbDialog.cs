@@ -44,6 +44,7 @@ internal sealed class SectionVerbDialog
     private Func<JsonObject>? _planCall;
     private JsonObject? _pendingCall;
     private string _verbButton = AssistWording.MenuContinueButton;
+    private TextBlock? _workingWords;
 
     // Choose: Publish Pages… / Hide Pages…
     private readonly List<(AssistWorkspace.MenuPage Page, CheckBox Box)> _rows = new();
@@ -301,6 +302,7 @@ internal sealed class SectionVerbDialog
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, MinWidth = 420 };
         panel.Children.Add(new ProgressRing { IsActive = true, Width = 20, Height = 20 });
         var words = Words(said);
+        _workingWords = words;
         AutomationProperties.SetAutomationId(words, "sectionVerbWorking");
         panel.Children.Add(words);
         _dialog.Content = panel;
@@ -359,10 +361,22 @@ internal sealed class SectionVerbDialog
         ShowResult(answer.Summary);
     }
 
+    /// <summary>
+    /// A change: "Working…", and "Saving a copy of ICS3U first…" only while the
+    /// server SAYS it is saving one (2B's implementation review, M2). It used
+    /// to say so for every change from the first moment — Undo, which never
+    /// saves a copy, and a change refused before its copy, included.
+    /// </summary>
     private async Task RunChange(JsonObject call)
     {
-        ShowWorking(AssistWording.MenuSavingACopy(_course.Code));
-        var answer = await _verbs.Perform(call, MenuPath(_item), _course.Code, _section, Counts());
+        ShowWorking(AssistWording.MenuWorking);
+        string savingACopy = AssistWording.MenuSavingACopy(_course.Code);
+        var answer = await _verbs.Perform(call, MenuPath(_item), _course.Code, _section, Counts(),
+            progress: note => _dialog.DispatcherQueue?.TryEnqueue(() =>
+            {
+                if (_stage == Stage.Working && _workingWords is not null)
+                    _workingWords.Text = note == savingACopy ? savingACopy : AssistWording.MenuWorking;
+            }));
         ShowResult(answer.Summary);
     }
 

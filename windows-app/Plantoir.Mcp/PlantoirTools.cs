@@ -2051,16 +2051,21 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// server only (#489) — sent in <c>_meta</c> as
     /// <see cref="AssistWorkspace.LastChangeKey"/> and
     /// <see cref="AssistWorkspace.ChangesToUndoKey"/>, so the window greys Undo
-    /// Last Change everywhere but the section the last change was made to.
+    /// Last Change everywhere but the section the last change was made to —
+    /// and <see cref="AssistWorkspace.ChangedKey"/>, whether this call changed
+    /// anything at all.
     /// </summary>
     public static CallToolResult AfterCall(AssistWorkspace workspace, UndoHistory.Entry? topBefore,
                                            string? course, int? section, CallToolResult result)
     {
+        // Read for every client, so the no-undo-entry note never outlives its call.
+        bool changed = workspace.TakeWhetherTheCallChangedAnything(topBefore);
         workspace.NoteWhereTheLastChangeWasMade(topBefore, course, section);
         if (!workspace.SpeaksFromTheMenu) return result;
         result.Meta ??= new JsonObject();
         result.Meta[AssistWorkspace.LastChangeKey] = workspace.LastChangePlace;
         result.Meta[AssistWorkspace.ChangesToUndoKey] = workspace.History?.Entries.Count ?? 0;
+        result.Meta[AssistWorkspace.ChangedKey] = changed;
         return result;
     }
 

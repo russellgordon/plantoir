@@ -89,6 +89,13 @@ public sealed partial class SidebarPane
     {
         var row = FindRow(_roots, new SidebarSelection.SectionItem(courseCode, section));
         if (row is not null) return row.ScheduledDeploy;
+        // The fallback runs `schtasks /Query` — another process — on the
+        // interface thread, and waits for it. It is reached only for a section with no row, which is rare, and
+        // TaskScheduling keeps the list it read for two seconds, so a menu
+        // refreshed on every pointer movement asks the scheduler at most once
+        // in that time (2B's implementation review, L6). Moving it off the
+        // thread would make the menu bar's rule asynchronous, which the
+        // click-time check depends on it not being.
         string? folder = Workspace.WorkspacePath;
         return folder is null ? null : Plantoir.Core.Assist.TaskScheduling.NextRun(folder, courseCode, section);
     }

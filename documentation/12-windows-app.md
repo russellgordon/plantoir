@@ -4858,7 +4858,11 @@ window's lease apart from an outside session's, and this server holds none).
 The server's request filter — `ReferenceWriteGate`, `OutsideChangeGate` — is
 the same entry every client meets. Its undo list is the window's Undo Last
 Change; `DropVerbs` stops it when the window opens another folder or closes,
-and its undo list goes with it (the mac's decision 4). **Measured cold start**
+and its undo list goes with it (the mac's decision 4) — once any change
+running then has finished, and off the interface thread
+(`SectionVerbs.DisposeWhenIdleAsync`): stopping it at once killed the server
+three seconds later, mid-write, with `WaitForExit` blocking the window's
+thread (2B's implementation review, L4). **Measured cold start**
 on this PC (Intel i5-8365U, Windows 11 Pro 26200, Debug x64 build,
 2026-10-15): spawn to the `initialize` answer **476–490 ms** over six runs,
 `tools/list` answered 20 ms later — so the first menu item of a window's
@@ -4879,11 +4883,33 @@ owns), so the server records the call's own course and section against each
 new top entry (`AssistWorkspace.NoteWhereTheLastChangeWasMade`, called by
 `PlantoirTools.AfterCall` from the request filter), and the menu's server
 sends `plantoir.app/lastChange` (`"CODE/N"`, or null) and
-`plantoir.app/changesToUndo` on every answer. `SectionVerbs.LastChange` greys
-Undo Last Change everywhere but that section (`lastChangeIsHere`), and the
-depth before and after decides the trail's ending — "carried out", "changed
-nothing", "took the last change back" — without parsing a sentence. Neither
-key is sent to an outside client.
+`plantoir.app/changesToUndo` on every answer, and `plantoir.app/changed`,
+whether the call changed anything. `SectionVerbs.LastChange` greys Undo Last
+Change everywhere but that section (`lastChangeIsHere`), and `changed`
+decides the trail's ending — "carried out", "changed nothing", "took the last
+change back". It was the undo list's DEPTH before and after until 2B's
+implementation review (M1) found it wrong twice: Make Room for Classes keeps
+no undo entry, on purpose, so a room really made read "changed nothing"; and
+`UndoHistory` keeps twenty, so from the twenty-first change the depth stops
+growing and every change read the same way. The server knows: a call changed
+something when the top of its undo list is a different entry afterwards (a
+new one however deep the list, or one taken back), or when Make Room says it
+wrote (`AssistWorkspace.NoteAChangeWithNoUndoEntry`); the depth is only the
+fallback for an answer without the key. Not entirely free of sentences, and
+said so: Rebuild Preview's ending compares the answer with
+`AssistWording.PreviewIsRebuilding`, and Undo's also counts an answer
+containing "is put back". None of the three keys is sent to an outside
+client. Pinned by `SectionVerbsTests.MakingRoom_IsCarriedOut_ThoughItKeepsNoUndoEntry`
+and `TheTwentyFirstChange_IsCarriedOut_ThoughTheListStaysAtTwenty`.
+
+**One sentence outside the contract, deliberately: `SectionVerbs.CouldNotBeDone`**
+("That could not be done just now. Try again in a moment."). It is what a
+menu item ends with when this window's `plantoir-mcp` could not be started or
+went away under the call — a Windows mechanic (one server process per window,
+Option B above) that the mac, whose runner is in-process, cannot meet. A
+contract key would be a sentence one platform could never say; the trail's
+"ran from a menu … could not be done: <reason>" line carries the reason
+(2B's implementation review, L5).
 
 **Pages by folder and name — a server fix (the plan's finding 0.8, review
 M3).** The menu sends `section1/All Classes/Unit 2, Day 3` as a JSON array.
@@ -4955,7 +4981,9 @@ client: a showing preview is stopped, the tool runs with `preview: false`,
 and the preview starts again.
 
 **The dialog is ONE `ContentDialog`** (`Views/SectionVerbDialog.cs`) moving
-through Choose → Plan → Working → Result: a stage changes by cancelling the
+through Choose → Plan → Working → Result (Working says "Working…", and "Saving a
+copy of ICS3U first…" only while the server's progress line says so — Undo
+never saves a copy, and a refusal comes before one; review M2): a stage changes by cancelling the
 button's own close and doing the work under its deferral, because WinUI shows
 one dialog at a time and refuses a second asked for while the first closes.
 While a call runs no button is drawn and Escape does not close it. A plan
