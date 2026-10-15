@@ -97,6 +97,51 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Assert.Empty(happened);
     }
 
+    /// <summary>
+    /// The window read that its own deploy will refuse: nothing was asked, the
+    /// preview is KEPT, and Deploy is pressed only so the window's refusal is
+    /// what the assistant relays (2C's implementation review, L-1).
+    /// </summary>
+    [Fact]
+    public async Task ADeployTheWindowWillRefuse_KeepsThePreview_AndLetsTheRefusalSpeak()
+    {
+        var happened = new List<string>();
+        var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
+                                          "ICS3U", 1, AssistSurface.LocalWindow)
+        {
+            AskAboutClassesDatedLaterInApp = () => Task.FromResult(
+                new LaterClassesAtADeploy(LaterClassesAnswer.NothingToAsk, WillBeRefused: true)),
+            PreviewIsShowing = () => true,
+            StopPreviewInAppAsync = () => { happened.Add("stop"); return Task.CompletedTask; },
+            StartDeployInAppAsync = () => { happened.Add("deploy"); return Task.FromResult<string?>("the window's refusal"); },
+        };
+
+        var (answer, handed) = await runner.Run(DeployCall(), default);
+
+        Assert.True(handed);
+        Assert.Equal("the window's refusal", answer.Summary);
+        Assert.Equal(new[] { "deploy" }, happened);
+    }
+
+    /// <summary>Nothing to ask and nothing refused: the preview is stopped first, as before #475.</summary>
+    [Fact]
+    public async Task NothingToAsk_StopsThePreviewThenDeploys()
+    {
+        var happened = new List<string>();
+        var runner = new AssistToolRunner(new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, _launcher)),
+                                          "ICS3U", 1, AssistSurface.LocalWindow)
+        {
+            AskAboutClassesDatedLaterInApp = () => Task.FromResult<LaterClassesAtADeploy>(LaterClassesAnswer.NothingToAsk),
+            PreviewIsShowing = () => true,
+            StopPreviewInAppAsync = () => { happened.Add("stop"); return Task.CompletedTask; },
+            StartDeployInAppAsync = () => { happened.Add("deploy"); return Task.FromResult<string?>("deployed"); },
+        };
+
+        await runner.Run(DeployCall(), default);
+
+        Assert.Equal(new[] { "stop", "deploy" }, happened);
+    }
+
     /// <summary>No window could show the section: refused, the classes named, nothing stopped.</summary>
     [Fact]
     public async Task NoWindowToAskIn_IsRefusedNamingTheClasses()
@@ -230,6 +275,30 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
     /// settings" on the trail), and only then the console claimed and the
     /// preview stopped.
     /// </summary>
+    /// <summary>
+    /// The in-app assistant's question reads "already asking, or a dialog up"
+    /// BEFORE <c>DeployWillBeRefused()</c>, which also counts the open question
+    /// as a refusal: read the other way round, the window answered "nothing to
+    /// ask", the runner stopped the preview and the deploy returned at once —
+    /// against <c>classesDatedLater.whenTheWindowIsBusy</c> (2C's
+    /// implementation review, M-A).
+    /// </summary>
+    [Fact]
+    public void TheAssistantsQuestion_ChecksForAnOpenQuestionBeforeTheRefusals()
+    {
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"));
+        int start = source.IndexOf("Task<LaterClassesAtADeploy> AskAboutClassesDatedLaterForTheAssistantAsync()", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("WillBeRefused: true", start, StringComparison.Ordinal) + "WillBeRefused: true".Length;
+        string body = source[start..end];
+        int open = body.IndexOf("_isAskingAboutLaterClasses || DialogGate.IsOpen(EffectiveXamlRoot)", StringComparison.Ordinal);
+        int cannotAsk = body.IndexOf("LaterClassesAnswer.CannotAsk", StringComparison.Ordinal);
+        int refused = body.IndexOf("DeployWillBeRefused()", StringComparison.Ordinal);
+        Assert.True(open > 0 && cannotAsk > open && refused > cannotAsk,
+            $"the open-question check must come first: open {open}, CannotAsk {cannotAsk}, DeployWillBeRefused {refused}");
+        Assert.Contains("WillBeRefused: true", body);
+    }
+
     [Fact]
     public void TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything()
     {

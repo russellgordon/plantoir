@@ -230,9 +230,11 @@ public sealed class AssistToolRunner
             // #475: the question, in the section's window, before anything is
             // stopped. The window runs the deploy's own refusals first and
             // asks nothing when one of them will refuse.
+            bool deployWillBeRefused = false;
             if (AskAboutClassesDatedLaterInApp is not null)
             {
                 var asked = await AskAboutClassesDatedLaterInApp.Invoke();
+                deployWillBeRefused = asked.WillBeRefused;
                 switch (asked.Answer)
                 {
                     case LaterClassesAnswer.Cancelled:
@@ -245,7 +247,11 @@ public sealed class AssistToolRunner
                 }
             }
 
-            if (PreviewIsShowing?.Invoke() == true)
+            // A deploy the window will refuse keeps the preview: the window's
+            // own refusal speaks (its dialog, and the sentence relayed), and
+            // the page the teacher was reading is not lost for a deploy that
+            // never starts (2C's implementation review, L-1).
+            if (!deployWillBeRefused && PreviewIsShowing?.Invoke() == true)
             {
                 if (StopPreviewInAppAsync is not null)
                 {

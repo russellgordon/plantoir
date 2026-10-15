@@ -222,7 +222,15 @@ public enum LaterClassesAnswer
 /// and — for <see cref="LaterClassesAnswer.NoWindow"/> — the classes nobody
 /// could be asked about, by title, for the sentence that names them.
 /// </summary>
-public readonly record struct LaterClassesAtADeploy(LaterClassesAnswer Answer, IReadOnlyList<string>? Unasked = null)
+/// <param name="WillBeRefused">
+/// The window read that its own deploy will refuse (nothing was asked): the
+/// runner must then leave the preview running and press Deploy only so the
+/// window's refusal speaks — stopping the preview for a deploy that never
+/// starts would cost the teacher the page they were reading for nothing (2C's
+/// implementation review, L-1).
+/// </param>
+public readonly record struct LaterClassesAtADeploy(LaterClassesAnswer Answer, IReadOnlyList<string>? Unasked = null,
+                                                    bool WillBeRefused = false)
 {
     public static implicit operator LaterClassesAtADeploy(LaterClassesAnswer answer) => new(answer);
 }

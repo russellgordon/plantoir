@@ -277,6 +277,19 @@ public class ScheduledRunTests : IDisposable
         public DateTimeOffset Now = new(2026, 10, 1, 6, 30, 0, TimeSpan.FromHours(-4));
     }
 
+    /// <summary>
+    /// Half six on the 1st in THIS computer's time zone. The run reads the
+    /// classes on <c>world.Now().LocalDateTime</c>'s day, so a clock pinned
+    /// at −04:00 was the 2nd on a machine at UTC+14 (and the 30th at UTC−12),
+    /// and the #475 tests below would flag a different class there (2C's
+    /// implementation review, L-4).
+    /// </summary>
+    private static Clock HalfSixOnTheFirstHere()
+    {
+        var local = new DateTime(2026, 10, 1, 6, 30, 0, DateTimeKind.Unspecified);
+        return new Clock { Now = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)) };
+    }
+
     private ScheduledRun.World World(Clock clock, List<string> ran) => new()
     {
         Now = () => clock.Now,
@@ -311,7 +324,7 @@ public class ScheduledRunTests : IDisposable
     public void AScheduledDeployThatWentOut_RecordsTheClassesDatedLater()
     {
         string folder = FolderWithAClassPublishedEarly();
-        var clock = new Clock();
+        var clock = HalfSixOnTheFirstHere();
         string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
         var world = new ScheduledRun.World
         {
@@ -345,7 +358,7 @@ public class ScheduledRunTests : IDisposable
     public void AScheduledDeployThatDidNotGoOut_RecordsNoClasses(string how)
     {
         string folder = FolderWithAClassPublishedEarly();
-        var clock = new Clock();
+        var clock = HalfSixOnTheFirstHere();
         string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
         string outcomes = Path.Combine(_root, "outcomes");
         if (how == "an earlier night's success")

@@ -5060,7 +5060,22 @@ in the window, not in the runner. So the window offers a side-effect-free
 reading of all of them — nothing claimed, shown or written — and
 `AskAboutClassesDatedLaterForTheAssistantAsync` asks NOTHING when one will
 refuse: the deploy then goes on to its own refusal, which shows its dialog and
-is the sentence the assistant relays. The alternative — returning the refusal
+is the sentence the assistant relays — and the preview is KEPT. The seam's
+record says so (`LaterClassesAtADeploy.WillBeRefused`) and the runner skips its
+stop: stopping the preview for a deploy that never starts would cost the
+teacher the page they were reading (2C's implementation review, L-1;
+`ClassesDatedLaterAtDeployTests.ADeployTheWindowWillRefuse_KeepsThePreview_AndLetsTheRefusalSpeak`).
+`IsSectionBusy` counts a deploy being prepared (`_isPreparingDeploy`) as well
+as one running. One check comes BEFORE that reading: a window already asking
+this question, or with any dialog up, answers `CannotAsk`, refused with
+`deployWaitsForAnOpenQuestion` and nothing stopped
+(`classesDatedLater.whenTheWindowIsBusy`). `DeployWillBeRefused()` also counts
+the open question as a refusal, so read the other way round the window said
+"nothing to ask", the runner stopped the preview and the deploy returned at
+once — the review's M-A, pinned by a source-order assertion
+(`TheAssistantsQuestion_ChecksForAnOpenQuestionBeforeTheRefusals`). When
+nothing is flagged the assistant window never asks the section's window, so
+that path still stops the preview first, as it did before #475. The alternative — returning the refusal
 sentence from the seam — was rejected: the window's dialog would never be
 shown, and the window and the assistant would word the same refusal from two
 places.
