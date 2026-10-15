@@ -177,7 +177,7 @@ public class ReferenceCourseUiTests
         Assert.NotNull(item);
         // The withheld items are not in the menu at all.
         var desktop = app.Window.Automation.GetDesktop();
-        foreach (string withheld in new[] { "Rename Course", "Add Section…", "Keep a Copy for Reference…", "Revise with local AI assistant…" })
+        foreach (string withheld in new[] { "Rename", "Add Section…", "Keep a Copy for Reference…", "Revise with local AI assistant…" })
             Assert.Null(desktop.FindFirstDescendant(cf => cf.ByName(withheld).And(cf.ByControlType(ControlType.MenuItem))));
         if (!item!.IsEnabled)
         {

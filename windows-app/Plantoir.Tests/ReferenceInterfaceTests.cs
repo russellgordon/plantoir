@@ -54,7 +54,11 @@ public class ReferenceInterfaceTests
     [Fact]
     public void EveryRenameRouteAsksTheSameQuestion()
     {
-        Assert.Contains("!ReferenceCourse.IsKeptForReference(course) ? course : null", Source("Plantoir", "MainWindow.xaml.cs"));
+        // Since #488 the menu bar's Rename (and F2) is greyed by subjectMenus on a
+        // course kept for reference, asked again at the click, and runs the
+        // dialog every other route runs — which refuses one itself.
+        Assert.Contains("!SubjectMenuRules.Enabled(CurrentSituation()).Contains(ruled)", Source("Plantoir", "MainWindow.Menus.cs"));
+        Assert.Contains("case Item.Rename: _ = OpenRenameCourseDialog(course);", Source("Plantoir", "Views", "SidebarPane.Menus.cs"));
         string dialog = Between(Source("Plantoir", "Views", "SidebarPane.xaml.cs"), "public async Task OpenRenameCourseDialog(", "string? askedIn");
         Assert.Contains("ReferenceCourse.IsKeptForReference(course)", dialog);
     }

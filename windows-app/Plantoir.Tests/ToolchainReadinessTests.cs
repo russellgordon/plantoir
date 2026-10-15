@@ -346,9 +346,9 @@ public sealed class ToolchainReadinessTests : IDisposable
         }
         Assert.Contains("Preview and Deploy", ToolchainReadiness.GettingReadyMessage);
         Assert.Contains("Reload Courses", ToolchainReadiness.CouldNotGetReady);
-        // The failure sentence names the real menu item.
-        string xaml = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "MainWindow.xaml"));
-        Assert.Contains("Text=\"Reload Courses\"", xaml);
+        // The failure sentence names the real menu item — built in code since #488.
+        string menus = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "MainWindow.Menus.cs"));
+        Assert.Contains("Add(file, \"Reload Courses\"", menus);
     }
 
     // ---- The backstop -------------------------------------------------------
