@@ -93,7 +93,7 @@ public sealed class CourseSettingsSaveTests : IDisposable
     public void AFreshlyOpenedCourseIsClean()
     {
         var cases = WhatEnablesSave["freshOpenCases"]!.AsArray();
-        Assert.Equal(8, cases.Count);
+        Assert.Equal(9, cases.Count);
         foreach (var c in cases)
         {
             var state = SettingsSaveState.Decide(Opened(c!), "");
