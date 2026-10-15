@@ -54,6 +54,17 @@ public static class SiteHealthRepair
     /// A button naming the one thing it will do is worth more than a generic
     /// one, and with two problems there is no short way to name both.</para>
     /// </summary>
+    /// <summary>
+    /// The dismissing button's title (#491 item 9; the mac's HIG sweep): OK
+    /// only when it is the ONLY answer. Beside a repair it is "Not Now" — the
+    /// repair is the other answer, and OK would read as agreeing to it; beside
+    /// Preview Again, after a repair, it is "Close".
+    /// </summary>
+    /// <param name="besideAnotherButton">The dialog also offers the repair, or Preview Again.</param>
+    /// <param name="isARepair">The dialog says what a repair DID (rather than what the build found).</param>
+    public static string CloseTitle(bool besideAnotherButton, bool isARepair) =>
+        !besideAnotherButton ? "OK" : isARepair ? "Close" : "Not Now";
+
     public static string? ButtonTitle(IReadOnlyList<SiteHealthFinding> findings)
     {
         var repairable = Repairable(findings);

@@ -69,8 +69,8 @@ public sealed class SectionScheduleDialog : ContentDialog
 
     private readonly StackPanel _orderingPanel = new() { Spacing = 8, Visibility = Visibility.Collapsed };
     private readonly TextBlock _orderingPrompt = new() { FontSize = 13, TextWrapping = TextWrapping.Wrap };
-    private readonly Button _dayFirstBtn = new() { Content = "Day first" };
-    private readonly Button _monthFirstBtn = new() { Content = "Month first" };
+    private readonly Button _dayFirstBtn = new() { Content = "Day First" };
+    private readonly Button _monthFirstBtn = new() { Content = "Month First" };
     private OrderingQuestion? _pendingQuestion;
 
     private readonly TextBlock _statusBlock = new()
@@ -170,7 +170,7 @@ public sealed class SectionScheduleDialog : ContentDialog
             Opacity = 0.7,
         });
         var chooseFileRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        var chooseBtn = new Button { Content = "Choose a file…" };
+        var chooseBtn = new Button { Content = "Choose a File…" };
         chooseBtn.Click += OnChooseFileClicked;
         chooseFileRow.Children.Add(chooseBtn);
         chooseFileRow.Children.Add(_chosenFileLabel);
@@ -197,7 +197,7 @@ public sealed class SectionScheduleDialog : ContentDialog
         _sheetPanel.Children.Add(new TextBlock
         {
             Text = "The sheet has to be shared: in the sheet, Share ▸ General access ▸ “Anyone with the link”.",
-            FontSize = 11,
+            FontSize = 12,
             Opacity = 0.6,
             TextWrapping = TextWrapping.Wrap,
         });
@@ -399,8 +399,8 @@ public sealed class SectionScheduleDialog : ContentDialog
             {
                 _pendingQuestion = q.OrderingQuestion;
                 _orderingPrompt.Text = q.OrderingQuestion.Prompt;
-                _dayFirstBtn.Content = $"Day first ({q.OrderingQuestion.DayFirstShort})";
-                _monthFirstBtn.Content = $"Month first ({q.OrderingQuestion.MonthFirstShort})";
+                _dayFirstBtn.Content = $"Day First ({q.OrderingQuestion.DayFirstShort})";
+                _monthFirstBtn.Content = $"Month First ({q.OrderingQuestion.MonthFirstShort})";
                 _orderingPanel.Visibility = Visibility.Visible;
                 return false;
             }

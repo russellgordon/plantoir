@@ -1229,7 +1229,7 @@ public sealed class NewCourseDialog : ContentDialog
                 <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}"
                         CornerRadius="8" Padding="6,1,6,1" VerticalAlignment="Center"
                         Visibility="{Binding BadgeVisibility}">
-                  <TextBlock Text="Example content" FontSize="10" Foreground="White"/>
+                  <TextBlock Text="Example content" FontSize="12" Foreground="White"/>
                 </Border>
               </Grid>
             </DataTemplate>

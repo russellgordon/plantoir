@@ -39,7 +39,7 @@ public static class FolderProblemsDialog
         {
             Title = Title(findings),
             Content = Body(findings),
-            CloseButtonText = "OK",
+            CloseButtonText = SiteHealthRepair.CloseTitle(besideAnotherButton: false, isARepair: false),
         };
         // A course kept for reference is told its findings and offered no
         // repair (#241): a repair CREATES files inside the course, and the
@@ -49,6 +49,7 @@ public static class FolderProblemsDialog
         {
             dialog.PrimaryButtonText = repairLabel;
             dialog.DefaultButton = ContentDialogButton.Primary;
+            dialog.CloseButtonText = SiteHealthRepair.CloseTitle(besideAnotherButton: true, isARepair: false);
         }
         return dialog;
     }
@@ -70,12 +71,13 @@ public static class FolderProblemsDialog
         {
             Title = outcome.Headline,
             Content = Paragraph(outcome.Detail),
-            CloseButtonText = "OK",
+            CloseButtonText = SiteHealthRepair.CloseTitle(besideAnotherButton: false, isARepair: true),
         };
         if (outcome.CanRebuild)
         {
             dialog.PrimaryButtonText = "Preview Again";
             dialog.DefaultButton = ContentDialogButton.Primary;
+            dialog.CloseButtonText = SiteHealthRepair.CloseTitle(besideAnotherButton: true, isARepair: true);
         }
         return dialog;
     }

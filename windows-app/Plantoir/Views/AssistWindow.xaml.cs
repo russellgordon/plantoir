@@ -411,7 +411,7 @@ public sealed partial class AssistWindow : Window
                     Content = "The assistant runs on this computer — nothing you write is sent anywhere. " +
                               "It needs a one-time download of about 1.1 GB, and then it works offline.",
                     PrimaryButtonText = "Download",
-                    CloseButtonText = "Not now",
+                    CloseButtonText = "Not Now",
                     DefaultButton = ContentDialogButton.Primary,
                     XamlRoot = Root.XamlRoot,
                 };
@@ -760,7 +760,7 @@ public sealed partial class AssistWindow : Window
                 App.Settings.ConfirmationMentioned = true;
                 try { App.Settings.Save(); } catch { }
                 lines.Add(new AssistAgent.Line("assistant",
-                    "The assistant shows what it is about to do before doing it. You can change that in Settings."));
+                    "The assistant shows what it is about to do before doing it. You can change that in File ▸ Settings, under Assistant."));
             }
             return lines;
         });
@@ -1105,7 +1105,8 @@ public sealed partial class AssistWindow : Window
 
     /// <summary>
     /// Presents an inline card asking whether the teacher would like to enter class dates,
-    /// with "Enter class dates" (opens SectionScheduleDialog) and "Not now" buttons.
+    /// with "Enter Class Dates" (opens SectionScheduleDialog) and "Not Now" buttons, title case
+    /// and on the trailing end (#491 item 9), the commit button first as Windows orders them.
     /// </summary>
     private void ShowDatesOffer()
     {
@@ -1130,21 +1131,23 @@ public sealed partial class AssistWindow : Window
         };
         box.Children.Add(subtext);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        // On the trailing end, as every other card and dialog puts its buttons
+        // (#491 item 9; the mac moved Yes last on its side of the same sweep).
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
         var enterBtn = new Button
         {
-            Content = "Enter class dates",
+            Content = "Enter Class Dates",
             Style = (Style)Application.Current.Resources["AccentButtonStyle"],
         };
         var notNowBtn = new Button
         {
-            Content = "Not now",
+            Content = "Not Now",
         };
 
         enterBtn.Click += async (_, _) =>
         {
             buttons.Visibility = Visibility.Collapsed;
-            Say("You", "Enter class dates");
+            Say("You", "Enter Class Dates");
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             var xamlRoot = Root.XamlRoot ?? Content?.XamlRoot;
             if (xamlRoot is null)
@@ -1178,7 +1181,7 @@ public sealed partial class AssistWindow : Window
         notNowBtn.Click += (_, _) =>
         {
             buttons.Visibility = Visibility.Collapsed;
-            Say("You", "Not now");
+            Say("You", "Not Now");
             Say("Assistant", "No class dates recorded. You can add them anytime.");
         };
 

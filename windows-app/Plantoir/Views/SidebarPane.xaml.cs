@@ -719,7 +719,7 @@ public sealed partial class SidebarPane : UserControl
             other.SidebarPane.Refresh();
         }
         if (outcome.Failed.Count > 0)
-            await ShowError("Some backups could not be deleted",
+            await ShowError(BackupProblemTitle.DeletingBackups(outcome.Failed.Count),
                 string.Join("\n", outcome.Failed.Select(f => $"{f.Item.CourseCode}, {f.Item.WhenDescription}: {f.Problem}")));
         // After the delete, what a Claude or Codex session kept, and how to let it go.
         var sessionKept = outcome.Kept.Where(k => madeBySessions.Contains(Path.GetFullPath(k.FilePath))).ToList();
@@ -1551,7 +1551,7 @@ public sealed partial class SidebarPane : UserControl
         }
         catch (Exception error)
         {
-            await ShowError("Could not remove", error.Message);
+            await ShowError(BackupProblemTitle.Removing(course.Code), error.Message);
         }
     }
 
@@ -1594,7 +1594,7 @@ public sealed partial class SidebarPane : UserControl
         }
         catch (Exception error)
         {
-            await ShowError("Could not back up", error.Message);
+            await ShowError(BackupProblemTitle.BackingUp(course.Code), error.Message);
             return;
         }
         Workspace.IsShowingBackups = true;   // the new backup should be visible
@@ -1664,7 +1664,7 @@ public sealed partial class SidebarPane : UserControl
         }
         catch (Exception error)
         {
-            await ShowError("Could not restore", error.Message);
+            await ShowError(BackupProblemTitle.Restoring(item.CourseCode), error.Message);
         }
     }
 
@@ -1724,7 +1724,7 @@ public sealed partial class SidebarPane : UserControl
         else if (outcome.Kept.Count > 0 && KeptSentence(item, askedIn) is { } keptNow)
             await ShowError("This backup is kept", keptNow);
         if (outcome.Failed.Count > 0)
-            await ShowError("Could not delete", outcome.Failed[0].Problem);
+            await ShowError(BackupProblemTitle.DeletingBackups(1), outcome.Failed[0].Problem);
     }
 
     /// <summary>
@@ -1773,7 +1773,7 @@ public sealed partial class SidebarPane : UserControl
         }
         catch (Exception error)
         {
-            await ShowError("Could not delete", error.Message);
+            await ShowError(BackupProblemTitle.DeletingArchive, error.Message);
         }
     }
 
@@ -1807,7 +1807,7 @@ public sealed partial class SidebarPane : UserControl
         }
         catch (Exception error)
         {
-            await ShowError("Could not restore", error.Message);
+            await ShowError(BackupProblemTitle.Restoring(item.CourseCode), error.Message);
         }
     }
 

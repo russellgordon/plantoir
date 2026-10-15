@@ -25,6 +25,18 @@ public class SiteHealthRepairTests : IDisposable
     private readonly string _trailPath;
     private readonly string _root;
 
+    /// <summary>
+    /// #491 item 9: the dismissing button says OK only when it is the only
+    /// answer — Not Now beside a repair, Close beside Preview Again.
+    /// </summary>
+    [Theory]
+    [InlineData(false, false, "OK")]
+    [InlineData(true, false, "Not Now")]
+    [InlineData(false, true, "OK")]
+    [InlineData(true, true, "Close")]
+    public void TheCloseButton_SaysOkOnlyWhenItIsTheOnlyAnswer(bool besideAnotherButton, bool isARepair, string expected) =>
+        Assert.Equal(expected, SiteHealthRepair.CloseTitle(besideAnotherButton, isARepair));
+
     public SiteHealthRepairTests()
     {
         _trailPath = Path.Combine(Path.GetTempPath(), $"plantoir-trail-{Guid.NewGuid():N}.txt");
