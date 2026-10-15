@@ -95,6 +95,15 @@ public static class AgentGuidance
     /// <summary>A sentence without its final full stop, to sit inside brackets.</summary>
     public static string WithoutFinalStop(string text) => text.Trim().TrimEnd('.');
 
+    /// <summary>
+    /// A bundled body, with line endings made LF: a checkout with autocrlf
+    /// holds it as CRLF, and the section would then be written with mixed
+    /// endings and fingerprinted differently from the mac's (the batch 5B
+    /// review's L-2).
+    /// </summary>
+    internal static string ReadBundledBody(string path) =>
+        File.ReadAllText(path, StrictUtf8).Replace("\r\n", "\n");
+
     /// <summary>The section, markers included.</summary>
     public static string Block(string body) => SectionStart + "\n" + body.TrimEnd('\n') + "\n" + SectionEnd;
 
@@ -177,7 +186,7 @@ public static class AgentGuidance
         foreach (string name in RootFiles)
         {
             string body;
-            try { body = File.ReadAllText(Path.Combine(guidanceSource, name), StrictUtf8); }
+            try { body = ReadBundledBody(Path.Combine(guidanceSource, name)); }
             catch { continue; }
             string filePath = Path.Combine(workspacePath, name);
             string? existing = null;

@@ -433,20 +433,28 @@ public sealed partial class MainWindow : Window
                 {
                     args.Cancel = true;
                     // The guidance question (#496), if it is up, comes down
-                    // unanswered first: one ContentDialog per window (M8).
-                    TakeTheGuidanceQuestionDown();
-                    for (int look = 0; look < 20 && DialogGate.IsOpen(Content.XamlRoot); look++) await Task.Delay(50);
-                    var (title, message) = QuitConfirmation.Question(underWay);
-                    var dialog = new ContentDialog
+                    // unanswered first: one ContentDialog per window (M8) —
+                    // and stays down until this question has closed (H-1).
+                    bool quit;
+                    _quitQuestionUp = true;
+                    try
                     {
-                        Title = title,
-                        Content = message,
-                        PrimaryButtonText = QuitConfirmation.QuitAnyway,
-                        CloseButtonText = QuitConfirmation.KeepWorking,
-                        DefaultButton = ContentDialogButton.Close,
-                        XamlRoot = Content.XamlRoot,
-                    };
-                    bool quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
+                        TakeTheGuidanceQuestionDown();
+                        for (int look = 0; look < 20 && DialogGate.IsOpen(Content.XamlRoot); look++) await Task.Delay(50);
+                        var (title, message) = QuitConfirmation.Question(underWay);
+                        var dialog = new ContentDialog
+                        {
+                            Title = title,
+                            Content = message,
+                            PrimaryButtonText = QuitConfirmation.QuitAnyway,
+                            CloseButtonText = QuitConfirmation.KeepWorking,
+                            DefaultButton = ContentDialogButton.Close,
+                            XamlRoot = Content.XamlRoot,
+                        };
+                        AutomationProperties.SetAutomationId(dialog, "quitQuestionDialog");
+                        quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
+                    }
+                    finally { _quitQuestionUp = false; }
                     ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
                     if (!quit)
                     {

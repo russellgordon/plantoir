@@ -228,6 +228,10 @@ reasons rather than tasks:
   is the folder nothing in the daily rhythm points at. `GUI-IMPROVEMENTS.md`
   rows and completed `TODO.md` entries are the exception: append-only records
   of what was true on their day, never edited.
+- **Opening this repository in Plantoir asks about its own `CLAUDE.md` and
+  `AGENTS.md`** (it is a working folder; #496). The answer here is always
+  **Not Now** — and Enter means Add, so press Escape or click Not Now
+  (`documentation/12-windows-app.md` → "Printable pages").
 
 ---
 
