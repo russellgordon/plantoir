@@ -383,39 +383,88 @@ public sealed partial class MainWindow : Window
     /// <summary>Set once the teacher chose Quit Anyway, so the close that follows is not asked about again.</summary>
     private bool _quitConfirmed;
 
+    /// <summary>This window is being held open until the folder's tools copy has finished (#484).</summary>
+    private bool _waitingForCopies;
+
+    /// <summary>The wait above has been done once; the close that follows does not wait again.</summary>
+    private bool _copiesWaitedFor;
+
     /// <summary>
     /// The quit question (#231; <c>quittingWhileWorkIsUnderWay</c>). Only when
     /// closing THIS window quits the app, only for the teacher's own quit, and
     /// only for a publish or a preview being BUILT — never a preview merely
     /// open. Keep Working is the default: Return without reading keeps the work.
+    ///
+    /// <para>Then, since #484 (Russell's ruling 2026-10-15, the mac's #476): a
+    /// close that quits while the tools are being COPIED into a folder keeps
+    /// the window up, with its "Getting this folder ready…" banner, until the
+    /// copy has finished, and then quits. Ended part-way, the copy leaves
+    /// <c>.toolchain\</c> half old and half new for a scheduled run or a
+    /// launcher typed at a prompt to build from. The question comes FIRST, so
+    /// Keep Working still leaves everything as it was; Quit Anyway skips only
+    /// the question, never the wait (the plan review's H1). Never while
+    /// Windows is ending the session: it ends the process at sign-out whatever
+    /// the window does, and holding the close only shows "this app is
+    /// preventing shutdown". A window that is not the last never waits — the
+    /// copy carries on in the windows that remain.</para>
     /// </summary>
     private async void AskBeforeQuittingThroughWork(Microsoft.UI.Windowing.AppWindow sender,
                                                     Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
         try
         {
-            if (_quitConfirmed || !App.ClosingThisQuits(this)) return;
-            var underWay = CourseActivity.UnderWay();
-            var reason = Services.SessionEnding.IsEnding
-                ? QuitConfirmation.Reason.TheSystemIsEnding
-                : QuitConfirmation.Reason.TheTeacherAskedToQuit;
-            if (!QuitConfirmation.ShouldAsk(underWay, reason)) return;
+            // A second close while this one waits does nothing new.
+            if (_waitingForCopies) { args.Cancel = true; return; }
+            if (!App.ClosingThisQuits(this)) return;
 
-            args.Cancel = true;
-            var (title, message) = QuitConfirmation.Question(underWay);
-            var dialog = new ContentDialog
+            if (!_quitConfirmed)
             {
-                Title = title,
-                Content = message,
-                PrimaryButtonText = QuitConfirmation.QuitAnyway,
-                CloseButtonText = QuitConfirmation.KeepWorking,
-                DefaultButton = ContentDialogButton.Close,
-                XamlRoot = Content.XamlRoot,
-            };
-            bool quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
-            ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
-            if (!quit) return;
-            _quitConfirmed = true;
+                var underWay = CourseActivity.UnderWay();
+                var reason = Services.SessionEnding.IsEnding
+                    ? QuitConfirmation.Reason.TheSystemIsEnding
+                    : QuitConfirmation.Reason.TheTeacherAskedToQuit;
+                if (QuitConfirmation.ShouldAsk(underWay, reason))
+                {
+                    args.Cancel = true;
+                    var (title, message) = QuitConfirmation.Question(underWay);
+                    var dialog = new ContentDialog
+                    {
+                        Title = title,
+                        Content = message,
+                        PrimaryButtonText = QuitConfirmation.QuitAnyway,
+                        CloseButtonText = QuitConfirmation.KeepWorking,
+                        DefaultButton = ContentDialogButton.Close,
+                        XamlRoot = Content.XamlRoot,
+                    };
+                    bool quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
+                    ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
+                    if (!quit) return;
+                    _quitConfirmed = true;
+                    Close();   // comes back through here, past the question, to the wait
+                    return;
+                }
+            }
+
+            if (!ToolchainReadiness.ClosingWaitsForTheCopy(closingQuits: true, ToolchainReadiness.AnyCopyIsWriting,
+                                                           Services.SessionEnding.IsEnding, _copiesWaitedFor))
+                return;
+
+            // Cancelled synchronously, before any await, or the close goes ahead.
+            args.Cancel = true;
+            _waitingForCopies = true;
+            App.LogDiagnostic("closing waits for the tools copy to finish");
+            // The banner shows at once, delay or no delay: the window staying
+            // up is the thing the teacher must be able to read.
+            _shownAt = DateTime.UtcNow - ToolchainReadiness.BannerDelay;
+            RefreshReadiness();
+            try { await ToolchainReadiness.WhenWritingCopiesFinish(); }
+            catch (Exception ex) { App.LogDiagnostic($"closing: waiting for the tools copy: {ex.Message}"); }
+            _copiesWaitedFor = true;
+            _waitingForCopies = false;   // before Close(), or the close below cancels itself (the review's H2)
+            App.LogDiagnostic("closing: the tools copy has finished");
+            // A window opened while this one waited: this close no longer
+            // quits, so copies held back for the quit go ahead after all.
+            if (!App.ClosingThisQuits(this)) ToolchainReadiness.ReleaseWaitingCopies();
             Close();
         }
         catch (Exception ex)

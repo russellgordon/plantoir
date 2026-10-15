@@ -688,4 +688,95 @@ public sealed class ToolchainReadinessTests : IDisposable
         Assert.Equal(ToolchainReadiness.State.NotStarted, ToolchainReadiness.StateOf(_folder));
         Assert.Equal("old", File.ReadAllText(Path.Combine(tools, "build_site.py")));
     }
+
+    // ---- Closing while a copy writes (#484) --------------------------------
+
+    [Theory]
+    [InlineData(true, true, false, false, true)]     // the last window, a copy writing: wait
+    [InlineData(false, true, false, false, false)]   // not the last window: the copy goes on in the others
+    [InlineData(true, false, false, false, false)]   // nothing writing (none, or only waiting its turn)
+    [InlineData(true, true, true, false, false)]     // Windows is ending the session: never hold it
+    [InlineData(true, true, false, true, false)]     // already waited once: the close that follows goes
+    public void ClosingWaitsOnlyForAWritingCopyWhenItQuits(bool quits, bool writing, bool ending, bool waited, bool waits) =>
+        Assert.Equal(waits, ToolchainReadiness.ClosingWaitsForTheCopy(quits, writing, ending, waited));
+
+    [Fact]
+    public async Task ClosingWaitsForEveryFoldersWritingCopy()
+    {
+        string second = Path.Combine(_root, "second");
+        Directory.CreateDirectory(Path.Combine(second, "courses"));
+        File.WriteAllText(Path.Combine(second, Workspace.MarkerLauncher), "# stub");
+        var first = new HeldCopy();
+        var other = new HeldCopy();
+        ToolchainReadiness.Copier = (folder, bundled) =>
+            folder == _folder ? first.Copy(folder, bundled) : other.Copy(folder, bundled);
+        var a = ToolchainReadiness.Ensure(_folder, "bundled");
+        var b = ToolchainReadiness.Ensure(second, "bundled");
+        Assert.True(SpinWait.SpinUntil(() => first.Runs == 1 && other.Runs == 1, TimeSpan.FromSeconds(10)));
+        Assert.True(ToolchainReadiness.AnyCopyIsWriting);
+
+        var closing = ToolchainReadiness.WhenWritingCopiesFinish();
+        first.LetGo();
+        await a;
+        Assert.False(closing.IsCompleted, "the close went ahead with the second folder's copy still writing");
+        other.LetGo();
+        await b;
+        await closing.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(ToolchainReadiness.AnyCopyIsWriting);
+    }
+
+    [Fact]
+    public async Task ACopyStillWaitingItsTurnIsNotWaitedForAndDoesNotStartOnceTheCloseBegins()
+    {
+        using var other = StartALiveChild();
+        try
+        {
+            WriteMarker(other.Id, $"{other.Id}\n{other.ProcessName}\n{DateTime.UtcNow.AddMinutes(-1):O}\n");
+            int looks = 0;
+            ToolchainReadiness.Pause = _ => { Interlocked.Increment(ref looks); Thread.Sleep(20); };
+            var copy = new HeldCopy();
+            copy.LetGo();
+            ToolchainReadiness.Copier = copy.Copy;
+            var running = ToolchainReadiness.Ensure(_folder, "bundled");
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref looks) >= 2, TimeSpan.FromSeconds(10)));
+            Assert.False(ToolchainReadiness.AnyCopyIsWriting);   // waiting is not writing
+
+            await ToolchainReadiness.WhenWritingCopiesFinish().WaitAsync(TimeSpan.FromSeconds(5));   // nothing to wait for
+
+            // The other program finishes AFTER the close began (the review's M3):
+            // the waiting copy must not start now, or the exit would cut it.
+            File.Delete(ToolchainReadiness.MarkerPath(_folder, other.Id));
+            int at = Volatile.Read(ref looks);
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref looks) >= at + 3, TimeSpan.FromSeconds(10)));
+            Assert.Equal(0, copy.Runs);
+
+            // The close did not quit after all (a new window): it goes ahead.
+            ToolchainReadiness.ReleaseWaitingCopies();
+            await running.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(1, copy.Runs);
+        }
+        finally { try { other.Kill(); } catch { } }
+    }
+
+    [Fact]
+    public async Task ACopyAClosingWindowWaitedForSaysSoOnTheTrail()
+    {
+        var copy = new HeldCopy { Result = new(40, 0) };
+        ToolchainReadiness.Copier = copy.Copy;
+        string ownTrail = Path.Combine(_root, "activity.txt");
+        ActivityTrail.SetCustomLogPathForTesting(ownTrail);
+        try
+        {
+            var running = ToolchainReadiness.Ensure(_folder, "bundled");
+            Assert.True(SpinWait.SpinUntil(() => copy.Runs == 1, TimeSpan.FromSeconds(10)));
+            var closing = ToolchainReadiness.WhenWritingCopiesFinish();
+            copy.LetGo();
+            await running;
+            await closing.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally { ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
+
+        Assert.Contains("got the working folder ready — 40 files brought up to date in", File.ReadAllText(ownTrail));
+        Assert.Contains(", and Plantoir waited for it before closing — ", File.ReadAllText(ownTrail));
+    }
 }

@@ -65,6 +65,9 @@ public sealed class DrivenApp : IDisposable
 
     public Window Window { get; } = null!;
 
+    /// <summary>Whether this run's app has exited (a test that quits it through its own window, #484).</summary>
+    public bool HasExited => _app is null || _app.HasExited;
+
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr window);
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr window);
