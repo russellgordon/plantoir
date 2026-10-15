@@ -7458,10 +7458,16 @@ folder ready after an update (#473)"), with the mac's differences named:**
   copy; the mac does not, because every file is written atomically from the
   same bundle, so two copies at once write the same bytes and the worse
   outcome is wasted work, not a broken recipe.
-- **The scheduled run is unchanged**, as on Windows: `ScheduledDeploy`
-  starts its own `Process`, never a `ScriptRunner`, and never mirrors; a
-  `--stop` (`PreviewStopper`) is its own process too, so neither meets the
-  backstop (finding 1).
+- **The scheduled run is unchanged**: `ScheduledDeploy` starts its own
+  `Process`, never a `ScriptRunner`, and never mirrors; a `--stop`
+  (`PreviewStopper`) is its own process too, so neither meets the backstop
+  (finding 1). **Windows' run is no longer the same** (#477, 2026-10-15):
+  it waits for a live copy of the folder's tools and makes its own before it
+  builds, and its copies take turns, because two copies at once were
+  MEASURED to fail there with sharing violations (07 → "On Windows since
+  bundle 3: the scheduled run is Plantoir"). Whether the mac's run builds
+  from an out-of-date or half-copied `.toolchain/` after an update is a
+  `mac` issue.
 - **The banner** (`ToolchainReadinessNoticeView`, above the path bar beside
   the synced-folder notice) appears only once the copy has actually written
   or removed its first file (`syncDirectory` says so once, for a write or a

@@ -23,16 +23,18 @@ public static class BundledToolchain
     /// that failed is started again only when <paramref name="retryAFailedCopy"/>.
     /// The copy's start and finish are logged to startup.log ("tools copy
     /// started" / "tools copy finished") by the app's own subscription.
+    /// The work is <see cref="ToolchainReadiness.RefreshWorkspace"/>, the same
+    /// entry the scheduled run uses (#477) — which does nothing when the
+    /// recipe is not beside the program, rather than mirror an empty folder
+    /// over the working folder's tools.
     /// </summary>
     public static void RefreshWorkspace(string workspacePath, bool retryAFailedCopy = false)
     {
         App.LogDiagnostic($"BundledToolchain.RefreshWorkspace starting for '{workspacePath}'");
         try
         {
-            App.LogDiagnostic("BundledToolchain.RefreshWorkspace: calling RefreshLaunchers");
-            ToolchainMirror.RefreshLaunchers(workspacePath, Root);
-            App.LogDiagnostic("BundledToolchain.RefreshWorkspace: handing the tools copy to the background");
-            _ = ToolchainReadiness.Ensure(workspacePath, Root, retryAFailedCopy);
+            App.LogDiagnostic("BundledToolchain.RefreshWorkspace: refreshing the launchers, handing the tools copy to the background");
+            _ = ToolchainReadiness.RefreshWorkspace(workspacePath, Root, retryAFailedCopy);
             App.LogDiagnostic($"BundledToolchain.RefreshWorkspace: done (tools copy {ToolchainReadiness.StateOf(workspacePath)})");
         }
         catch (Exception ex)
