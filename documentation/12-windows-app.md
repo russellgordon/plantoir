@@ -2046,6 +2046,25 @@ own text box.** Match whatever ITS standard height is, with every field in
 the wizard and in Copy a Page the same height — never 24pt, which this
 section used to tell you to match. The `windows` issue from #456 says so.
 
+**Checked on Windows for #483 (2026-10-15): nothing was forced, and the
+fields are WinUI's own 32.** No single-line field in the wizard or Copy a Page
+sets a `Height` (`NewCourseDialog.cs`, `CopyAPageDialog.cs`, `FormBuilders.cs`
+— the one `MinHeight` is the multi-line footer box, 60); the course code is a
+real `AutoSuggestBox`, the rest plain `TextBox`es and `ComboBox`es at their
+theme height. Measured once through UI Automation's `BoundingRectangle` with
+the real app (`--state-dir`, the wizard scrolled through by its own scroll
+pattern so each field was on screen; Intel i5-8365U, Windows 11 Pro 26200,
+display at 144 dpi, values in the 96-dpi units the test process is given —
+the deploy picker's `MinWidth` of 300 reads 300): **the wizard's Course code
+32, Course name 32, Timetable section numbers 33, Deploy to 32** (the 33 and
+one 31 among ten samples of the picker are rounding of a 150% scale). **Copy a
+Page**'s three fields carry their label as a `Header`, so UI Automation's box
+includes it: Page 59, Copy into 64, Folder 64, each label 19 high — the edit
+parts are the same theme control; the 5-point difference is the header's
+spacing in a `ComboBox` against an `AutoSuggestBox`'s, not the field. Nothing
+to change; no permanent test was added (a one-off measurement, per the
+batch's plan review).
+
 ## Reading a page's visibility: four .NET defaults that get it wrong
 
 The rule itself — what the BUILT SITE does with a `publish:` line, and why
@@ -4049,6 +4068,19 @@ replaces the toast by tag).
 
 ### Accelerators under a dialog (#191)
 
+**Since #488 (2026-10-15) these keys are on MENU ITEMS, not the root Grid**:
+Ctrl+O on File ▸ Open Working Folder…, Ctrl+N on New Window, Ctrl+Shift+R on
+Reload Courses, F2 on Course ▸ Rename, and every new menu key besides. Each
+item's key still asks `DialogGate.Holds(root, "<key>")` before it runs (in
+`MainWindow.Invoke`), so the record and the test below are unchanged; what
+changed is where WinUI looks for the key. Re-measured with the keys on items,
+2026-10-15, verbatim: "Ctrl+Shift+R / F2 / Ctrl+N / Ctrl+O: not delivered
+(the dialog kept it); control (no dialog): all four arrived at their
+handlers" — and a probe measured the same for an item's Ctrl+Shift+D and a
+root-scoped key ("Menus, the Section menu's functions and #475 on Windows",
+above). `MenuGreysUnderADialogUiTests` adds Ctrl+Shift+D with the same
+control. The history below is what was true of the root-scoped keys.
+
 Ctrl+O, Ctrl+N, Ctrl+Shift+R and F2 now return at once while a
 `ContentDialog` is open (`Services/DialogGate`: the open popups whose child
 IS a ContentDialog, so a context menu or tooltip does not block Ctrl+O).
@@ -4320,7 +4352,8 @@ and editable; what builds from the copied tools waits:
   automation help text (a screen reader reads the second; it does not read a
   tooltip) saying `ToolchainReadiness.GettingReadyMessage`.
 - **New Course** (the sidebar's `+`) is greyed the same way, and every other way
-  into the wizard (the empty pane's "Add a Course…", the automation hooks) is
+  into the wizard (the empty pane's "New Course…" — "Add a Course…" until
+  #488 — File ▸ New Course…, the automation hooks) is
   refused by `SidebarPane.OpenNewCourseWizard` with the same sentence. Inside
   the wizard, Create and Add Example Course ask again before the progress view
   replaces the form, and `NewCourseCreator` refuses BEFORE `course_config.json`
@@ -4539,6 +4572,233 @@ test now waits for `ready` in `DrivenApp`'s constructor (up to 90 s): on a
 fixture `InitializeWorkspace` has already brought up to date that is the
 ordinary half-second pass, and without the wait a test pressing Preview the
 moment the sidebar appears would meet the disabled button.
+
+## Menus, the Section menu's functions and #475 on Windows (#488, #489, #483)
+
+The mac's #457 put every action on a course or a section into two persistent
+menus, **Course** and **Section**, with keys on menu items only, File ▸ Open
+Recent, and context menus that select their row first
+([09 → "Mac conventions: the menu bar, keys and text fields (#457)"](09-mac-app.md#mac-conventions-the-menu-bar-keys-and-text-fields-457)).
+Windows' catch-up to 1.7.1 lands it in three pieces: **2A** (this part, #488
+and #483) is the menu bar, Open Recent, the context menus and the Obsidian
+route; **2B** adds the assistant's nine functions to the Section menu (#489
+items 1–2) and **2C** the question about classes dated after the next class
+at Deploy (#475, the rest of #489). Their parts of this section are written
+when they land.
+
+### The menu bar (2A, 2026-10-15)
+
+| Menu | Items (Windows key) |
+|---|---|
+| File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings…, Check for Updates… (only while the updater has a feed) |
+| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
+| Section | Preview / Stop Preview (Ctrl+Shift+P), Deploy… (Ctrl+Shift+D), Open in Browser · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · (2B's functions go here) · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
+| Help | Publishing and Deploying… · Report a Problem… · About Plantoir |
+
+**One table, in code** (`Plantoir/MainWindow.Menus.cs`): every item is built
+by one `Add(…)` that carries its contract item (`SubjectMenuRules.Item`), its
+key and its AutomationId, so an item cannot exist without its rule or its id.
+The menu bar's XAML holds five empty `MenuBarItem`s and nothing else.
+
+**Which items can be used** is `Plantoir.Core/Models/SubjectMenuRules.cs`, a
+port of the mac's `SubjectMenuRules.enabledItems`, run by
+`SubjectMenusContractTests` against `shared-rules.json` → `subjectMenus` (21
+cases, 51 items, 24 situation keys; the names map both ways by camel-casing
+the enum, so "Finder" and "NewTerminalAtFolder" in two names are the mac's
+neutral words for Show in File Explorer and Open in Terminal). Items GREY,
+never hide — except Revise With ▸ Claude… and Codex…, LEFT OUT when not
+installed (`ClaudeCodeLauncher.IsAvailable`, `CodexLauncher.IsAvailable`,
+decided when the window is built: a fact about the PC, not the selection).
+Local AI Assistant… is always drawn, greyed on a course row.
+
+**What the rule is fed** is `MainWindow.CurrentSituation()`, read from the
+owner that already decides each fact, so the menu and the button cannot
+disagree: Preview and Deploy from the section window's own buttons
+(`SectionDetailView.PreviewButtonIsEnabled`, `DeployButtonIsEnabled`), Save
+and Revert from Course Settings' (`SaveIsEnabled`, `RevertIsEnabled`), the
+schedule from the sidebar row's clock (`ScheduledDeployShownFor` — the tree
+already re-reads Task Scheduler on every refresh, and asking it again per
+menu refresh would spawn work on every hover), copying from the work lease
+plus this app's own Back Up Now (`SidebarPane.IsZipping`), the dialog from
+`DialogGate.IsOpen`. Two facts are gathered the Windows way: **any**
+assistant on the course greys all three Revise targets (Windows' #468 hold,
+which the context menus already used), and `lastChangeIsHere` /
+`verbIsRunning` are false until 2B. A `mac` issue records both.
+
+**Each item runs the SAME code as its other routes.** `SidebarPane.Perform`
+(`SidebarPane.Menus.cs`) dispatches the row items to the functions the
+context menus call (`OpenAddSectionDialog`, `KeepACopy`, `BackUpCourse`,
+`ConfirmRestoreBackup`, `AskWhenToDeploy`, …); Section ▸ Preview and Deploy…
+press the toolbar's own handlers on its own predicates (so today's-class
+question, #406, is asked from the menu too); Save Course Settings presses
+Save. Remove Course… and Remove Section… share the footer button's question
+(`SidebarPane.ConfirmRemove`, factored out of `Remove_Click`). The selection
+is read when the item RUNS, never captured when the menu was drawn.
+
+### WinUI's menu bar has no Opening event — measured, and what fills the gap
+
+Measured with a probe app (MenuBar, three menus, a TextBox and a WebView2;
+keys sent with `keybd_event`, the pointer with `SetCursorPos`/`mouse_event`;
+two runs, Windows App SDK 1.8.260921001, **Intel i5-8365U, Windows 11 Pro
+26200**, 2026-10-15):
+
+| What | Measured |
+|---|---|
+| An item's key with its menu CLOSED, focus in a TextBox | fires; `Invoked` 11–14 ms after the key-down, then the item's `Click` (2 ms later) unless `Invoked` is marked handled |
+| One key on a DISABLED item earlier in the bar and an ENABLED one later | the ENABLED one fires (3–7 ms); the disabled one neither fires nor swallows the key — the OPPOSITE of AppKit, where the disabled item ate it |
+| One key on two ENABLED items | the FIRST in the bar fires, the second never |
+| The key on a disabled item alone | nothing |
+| Ctrl+, (`VirtualKey` 188, the comma) on an item | never fires (both runs) |
+| Focus in the WebView2 (given programmatically, or by a real click in the page): Ctrl+Shift+D, Ctrl+Shift+O, Ctrl+R, Alt+Left on items, and Ctrl+Shift+G on the root Grid | NONE fires — the page takes the keys (the WebView2's own browser keys are left on, so Ctrl+R and Alt+Left are its own reload and back; that half was not measured) |
+| A ContentDialog up: Ctrl+Shift+D on an item, Ctrl+Shift+G on the root Grid | neither fires |
+| Pointer onto a MenuBarItem, then a click | `PointerEntered` at once; `PointerPressed` (handled-events-too) at the press; `Tapped` 26–88 ms later; the flyout's items `Loaded` 3–4 ms after `Tapped` — so everything a refresh can hang on comes BEFORE the flyout draws |
+| F10, Right, Down from a TextBox | did not open a menu in the probe |
+
+So enablement is applied AHEAD of time (`ApplyMenuEnablement`) on every change
+the window hears — the selection, the folder's state, the section window's
+`PreviewChromeChanged`, Course Settings' new `SaveStateChanged`, the tools
+getting ready (#473), activation, a sidebar refresh, a backup starting and
+ending — and again on `PointerEntered` and `PointerPressed` of each menu
+title, on `AppMenuBar.GotFocus`, and on the `Loaded` of each menu's first item
+(a flyout opened from the keyboard or by UI Automation). Whatever the menu
+showed, `Invoke` asks `DialogGate` and the rule AGAIN at the click; that is the
+guard that counts, as the mac's `MenuRoute.run` is.
+
+**Keys live on the menu items, and nowhere else.** The root Grid's seven
+accelerators are gone, Course Settings' Save button lost Ctrl+S (now Course ▸
+Save Course Settings), and the section window's three view-scoped
+accelerators (Ctrl+R, Alt+Left, Alt+Right) are gone too: the measurement shows
+no XAML key fires with the page focused, whatever its scope, and with focus
+anywhere else the items' keys fire — so the view-scoped copies added nothing.
+Every accelerator's `Invoked` is marked handled (an unhandled one goes on to
+raise `Click`, which would run the item twice), and asks
+`DialogGate.Holds(root, "<key>")`, so the #191 record still notes every
+arrival. F2 does nothing while a text field has focus.
+
+**Ctrl+Shift+O sits on ONE Open in Obsidian item** — Course's unless a section
+row is selected, then Section's; `ApplyMenuEnablement` moves the accelerator
+object between the two items' `KeyboardAccelerators`. WinUI would in fact have
+coped with the key on both (the enabled one fires, measured), but the key
+would then be DRAWN on both, and one key means one thing.
+
+**Why the keys are these.** Ctrl+O, Ctrl+N, Ctrl+Shift+R and F2 were already
+Windows' own; Ctrl+S is Save everywhere on Windows; Alt+Left/Right and Ctrl+R
+are every Windows browser's Back, Forward and Reload. Ctrl+Shift+N, P, D and
+O follow the mac's ⇧⌘ letters. **Not Ctrl+Alt+anything**: on many European
+layouts AltGr IS Ctrl+Alt, so a Ctrl+Alt key fires while a teacher types @,
+€ or { — so Add Section… has no key here (the mac's ⌥⌘N). **Not Ctrl+Shift+C**
+for Copy a Page: it is the browser's inspect-element key and a teacher who has
+used one expects that; Copy a Page has no key. **Settings… lost its "Ctrl+,"
+label**: it was drawn with nothing behind it, and a comma key measured above
+does not fire. Ctrl+Shift+B is kept free for 2B's Rebuild Preview.
+
+### What does NOT exist here: File with no window
+
+The mac's File menu works with no window open. A WinUI menu bar lives INSIDE a
+window, and closing the last window quits (`App.ClosingThisQuits`), so there
+is no "no window" state to serve. The nearest thing is a window on the folder
+picker (`WorkspacePickerView`): there `hasFolder` is false and the contract's
+first case holds — Open Working Folder… and Open Recent live, everything else
+greyed. Nothing to build; written down so nobody goes looking for it.
+
+### File ▸ Open Recent
+
+`RecentWorkingFolders` (Core) is the rule, run by `OpenRecentContractTests`
+(cap 10, the five adding cases for Windows — the mac's case of one folder in
+two spellings is `appliesOn: ["mac"]`, and Windows' own form of it, case and
+a trailing separator, is pinned beside it — the three title cases and the
+wording). The list is kept in `settings.json` → `RecentWorkingFolders`, null
+until first read, then seeded from the last working folder and the
+remembered windows so the menu is not empty after the update. It is recorded
+on OPEN only — `WorkspaceViewModel.ChooseWorkspace` (Open Working Folder…,
+Open Recent, the picker) and `AdoptRestoredPath` (the launch-time reopen) —
+never on activation, and never by Ctrl+N's window, which inherits a folder.
+`OpenRecentList.Changed` is static, so every window's submenu is rebuilt from
+the one list (and each window lets go of it on Closed).
+
+Titles join extra parents with "/" exactly as the contract's cases do, on
+Windows paths too ("Courses — A/2025"); a folder at the top of a drive is told
+apart by its letter ("Courses — C:"), Windows' own case. Choosing a folder
+asks `LastWorkingFolder.WhyItCannotBeReopened` first: gone, drive not
+connected or unreadable get `OpenRecentWording`'s title and sentence in a
+dialog over a window that KEEPS its folder, and the trail says "working folder
+not reopened (gone) — a folder chosen from Open Recent, <path>". The mac's
+`inTrash` and `privacyDenied` cannot happen on a computer that remembers a
+path, so they have no member here. Otherwise the synced-folder question runs
+as for a picked folder, and "working folder opened — <path> from File ▸ Open
+Recent". Clear Menu writes "recent working folders cleared — N folders".
+REJECTED: the taskbar's jump list as the list (a second place to keep in
+step, outside the window where the menu is), and recording on activation
+(see above).
+
+### Context menus select their row first, and one Obsidian route
+
+Every row menu's item now SELECTS its row before it acts (`SidebarPane.Selecting`,
+which sets the selection and the tree's highlight), so what is selected
+afterwards is what the item acted on. **Rename too**, unlike the mac: there a
+rename field opened in the same turn as a selection change lost focus and
+closed (#293); here Rename is a dialog, so nothing is lost. The row's item is
+**Rename** (no "Course"), as in the menu bar.
+
+**Open in Obsidian is one route**, `SidebarPane.OpenInObsidian(course,
+section)`, called by the section window's toolbar, Course Settings' toolbar,
+every row's menu and both menu-bar items: a section reveals the SECTION's
+folder, and a course kept for reference gets its calm note first — which the
+section window's toolbar used to skip, going straight to
+`FolderActions.OpenInObsidian` (the plan's finding 0.9).
+
+**The course row lost "Revise with local AI assistant…"**: the contract greys
+`courseReviseWithLocalAssistant` on a course row, a context menu hides what
+does not apply, and the item opened section 1 without saying so. Not a
+teacher's only route: every section row offers it, and so does Section ▸
+Revise With ▸ Local AI Assistant….
+
+**Two deliberate disagreements with the contract's reasoning, both in the
+row, both in the `mac` issue:** the section row keeps **Change Deploy Time
+(…)…**, which `subjectMenus` has no item for (the menu bar follows the
+contract: Schedule Deploy… greyed while one is set, Cancel live), and a
+reference section's row keeps **Cancel Scheduled Deploy…**, which the menu bar
+greys, because Windows does not yet turn such a schedule off itself (the
+mac's `ScheduledDeployCleanup`) and the row is the teacher's only way to stop
+it.
+
+### REJECTED, with the reason
+
+- **XAML for the 50-odd items**: each would need its item, key and id kept in
+  step by hand in two files; the code table keeps them in one line.
+- **One key on two items** — see Ctrl+Shift+O above.
+- **Keeping the view-scoped preview keys "in case"**: measured to add nothing.
+- **Greying items in an `Opening` handler**: there is none on `MenuBarItem`.
+- **Hiding what does not apply in the menu bar**: the contract's rule; items
+  would come and go with every click.
+- **A "Change Deploy Time…" in the menu bar** before the contract has the
+  item: it would be Windows' private command in a menu the two apps share.
+
+### Testing it
+
+`SubjectMenusContractTests` and `OpenRecentContractTests` (unit, every run).
+Through the real window, `[UiFact]`s (2026-10-15, this PC, all passing):
+`MenuBarReachUiTests` (Course ▸ Add Section… and Copy a Page…, Section ▸
+Schedule Deploy…, Help ▸ Publishing and Deploying… in the contract's words);
+`MenuGreysUnderADialogUiTests` (every Course and Section item greyed with a
+dialog up; Ctrl+Shift+D's control arrives with no dialog and the deploy
+refuses — its folder does not exist — and the same key under that refusal
+arrives nowhere); `OpenRecentUiTests` (a second folder opened, listed first;
+the first chosen back; the second deleted and chosen, the dialog, the window
+keeping its folder, the trail line; Clear Menu and its line). Section ▸ Class
+Dates… does not exist yet (2B). `AcceleratorUnderDialogUiTests` (#191) still
+passes with the keys on items: "Ctrl+Shift+R / F2 / Ctrl+N / Ctrl+O: not
+delivered (the dialog kept it); control (no dialog): all four arrived at
+their handlers" (2026-10-15). One of three runs that day failed on its own
+Ctrl+N control ("the second window would not close") and passed twice since,
+alone and paired — recorded as a flake, not chased.
+The neighbouring UI tests the change touches (reference courses, Copy a Page,
+import for reference, Course Settings' Save, the sidebar's names) ran 13 of
+14; `ImportForReferenceUiTests.AnOldWorkingFolderIsImportedShelvedByYearAndLocked`
+failed first in the batch ("the import sheet never opened") and passed alone
+straight after. **#483** (the wizard's and Copy a Page's field heights) is
+measured in "The chrome is shared, and that was a trade — reversed by #456".
 
 ## Diagrams and graphs (#485 E1, v1.7.0): what the runtime must carry
 

@@ -1,5 +1,11 @@
 # Plantoir for Windows — Progress
 
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 2A (#488, #483)
+
+Same branch. The menu bar the mac grew in #457: File, Course, Section, View and Help, every course and section action greyed by `SubjectMenuRules` (the contract's `subjectMenus`, 21 cases run by `SubjectMenusContractTests`), each running its row's or toolbar's own code; keys on menu items only (the root Grid's, Save's Ctrl+S and the section window's view-scoped keys are gone — measured to add nothing); File ▸ Open Recent (`openRecent`, `OpenRecentContractTests`; "recent working folders cleared" on the trail); row menus select their row first; one Open in Obsidian route; Help ▸ Publishing and Deploying…. #483 measured: every wizard field 32, nothing forced. The Section menu's functions (#489) are 2B, the Deploy question (#475) 2C. Details, numbers and what was rejected: documentation/12, "Menus, the Section menu's functions and #475 on Windows".
+
+Gates (Intel i5-8365U, Windows 11 Pro 26200): `dotnet test` Failed 1, Passed 2480, Total 2481 — the one, `ConPtyRedirectedParentTests`, passed alone straight after and in the run before; UI: `MenuBarReachUiTests`, `MenuGreysUnderADialogUiTests`, `OpenRecentUiTests`, `AcceleratorUnderDialogUiTests` pass; `python scripts/test_deploy_words.py` 6 OK.
+
 ## 2026-10-15 — Windows catch-up to 1.7.1, batch 1
 
 Branch `issue/windows-catch-up-1.7.1`. The first batch of catching Windows up from 1.4.5 to the mac's 1.7.1: the suite is green again, with every debt a later batch owns held open by name.
@@ -657,8 +663,11 @@ kind of session can do, measured on the day and written for the next one:
   enforced at 900×600 (`MainWindow.xaml.cs`, `PreferredMinimumWidth` /
   `PreferredMinimumHeight`); the opening size is not 900×600 but a share of
   the display's work area, clamped, so it looks right at any scale.
-- The preview accelerators exist — Ctrl+R, Alt+Left, Alt+Right, declared at
-  view scope in `Views/SectionDetailView.xaml` and handled in its code-behind.
+- The preview accelerators exist — Ctrl+R, Alt+Left, Alt+Right — on View ▸
+  Reload Page, Back and Forward since #488 (2026-10-15; they were declared at
+  view scope in `Views/SectionDetailView.xaml` until then, and a measurement
+  showed that scope added nothing: documentation/12, "Menus, the Section
+  menu's functions and #475 on Windows").
   ~~What is missing is a **Preview menu-bar item**~~ — added 2026-08-22
   (`MainWindow.xaml`, handoff item 1). Corrected 2026-09-06: this paragraph
   outlived the work by a fortnight, and anyone planning from it would have
