@@ -39,8 +39,10 @@ public sealed partial class CourseSettingsView : UserControl
         // one back (#491). Re-read the buttons only: it is not an unsaved edit
         // to this course, so never MarkChanged. Static event, so let go of it
         // when the view leaves the screen.
+        // (An Unloaded that finds the view still loaded is WinUI's late one
+        // after a re-host — measured in the wizard; see PublishingChoiceView.)
         Loaded += (_, _) => ListenForTheAccount(true);
-        Unloaded += (_, _) => ListenForTheAccount(false);
+        Unloaded += (_, _) => { if (!IsLoaded) ListenForTheAccount(false); };
     }
 
     private bool _listeningForTheAccount;
