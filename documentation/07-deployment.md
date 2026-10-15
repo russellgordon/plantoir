@@ -3522,7 +3522,9 @@ computer when the time came"), true for a failed copy and for one still
 running, so no new key; the trail lines are the run's own
 (`scheduled publish waited for the course` — "waited N s for Plantoir to
 finish getting the working folder ready (process P), and went ahead / stood
-down" — and `working folder tools copied`, "got the working folder ready for
+down", and when both stood in the way "waited N s for another program on this
+computer to finish with the course and for Plantoir to finish getting the
+working folder ready (process P), and went ahead" — and `working folder tools copied`, "got the working folder ready for
 a scheduled deploy — …").
 
 **Copies take turns.** Two copies into one folder at once were measured

@@ -124,17 +124,25 @@ public sealed class UpdatePrompts : IUpdatePrompts
 
     private static async Task QuitForInstallAfterTheCopy(string installerPath, string arguments)
     {
+        bool held = false;
         try
         {
             if (ToolchainReadiness.AnyCopyIsWriting)
             {
                 App.LogDiagnostic("update install waits for the tools copy to finish");
+                held = true;
                 await ToolchainReadiness.WhenWritingCopiesFinish();
             }
             Process.Start(new ProcessStartInfo(installerPath, arguments) { UseShellExecute = false });
             App.QuitForUpdate();
         }
-        catch (Exception error) { App.LogDiagnostic("update install: " + error.Message); }
+        catch (Exception error)
+        {
+            App.LogDiagnostic("update install: " + error.Message);
+            // The installer did not start, so the app carries on: the copies
+            // the wait held back go ahead (the batch 4 review's M1).
+            if (held) ToolchainReadiness.ReleaseWaitingCopies();
+        }
     }
 
     // ---- What the gate reads -------------------------------------------------

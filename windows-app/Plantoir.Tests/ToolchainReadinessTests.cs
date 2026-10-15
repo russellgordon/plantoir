@@ -759,6 +759,71 @@ public sealed class ToolchainReadinessTests : IDisposable
     }
 
     [Fact]
+    public async Task AHoldReleasedAfterACloseThatDidNotQuitLetsALaterCopyFinish()
+    {
+        // The batch 4 review's M1: a close that waited (and so held copies
+        // back) and then did not quit — Keep Working when asked again, or an
+        // installer that would not start — must release the hold, or every
+        // later copy waits its turn for the life of the process.
+        int looks = 0;
+        ToolchainReadiness.Pause = _ => { Interlocked.Increment(ref looks); Thread.Sleep(20); };
+        var copy = new HeldCopy();
+        copy.LetGo();
+        ToolchainReadiness.Copier = copy.Copy;
+
+        await ToolchainReadiness.WhenWritingCopiesFinish().WaitAsync(TimeSpan.FromSeconds(5));   // the hold is now set
+        var later = ToolchainReadiness.Ensure(_folder, "bundled");
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref looks) >= 3, TimeSpan.FromSeconds(10)));
+        Assert.False(later.IsCompleted, "a copy started while a closing window held copies back");
+        Assert.Equal(0, copy.Runs);
+
+        ToolchainReadiness.ReleaseWaitingCopies();
+        await later.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(1, copy.Runs);
+        Assert.Equal(ToolchainReadiness.State.Ready, ToolchainReadiness.StateOf(_folder));
+    }
+
+    [Fact]
+    public void AClosingWindowSaysWhyItIsStillUpWhicheverFolderIsCopying()
+    {
+        // The batch 4 review's M2: the copy being waited for may be another
+        // folder's, and this folder is Ready — the window still says why.
+        var own = ToolchainReadiness.BannerWhileClosing(ToolchainReadiness.State.Copying);
+        Assert.True(own.IsOpen);
+        Assert.Equal(ToolchainReadiness.GettingReadyTitle, own.Title);
+
+        foreach (var state in new[] { ToolchainReadiness.State.Ready, ToolchainReadiness.State.NotStarted })
+        {
+            var other = ToolchainReadiness.BannerWhileClosing(state);
+            Assert.True(other.IsOpen);
+            Assert.False(other.IsError);
+            Assert.Equal(ToolchainReadiness.FinishingAnotherFolderTitle, other.Title);
+            Assert.Equal(ToolchainReadiness.FinishingAnotherFolderMessage, other.Message);
+        }
+        Assert.True(ToolchainReadiness.BannerWhileClosing(ToolchainReadiness.State.Failed).IsError);
+    }
+
+    [Fact]
+    public async Task AMarkerHeldOpenForAMomentIsStillTakenAwayAfterTheCopy()
+    {
+        // The batch 4 review's L1: a marker a scanner holds open when the copy
+        // finishes would otherwise stay live for the life of the process.
+        var copy = new HeldCopy();
+        ToolchainReadiness.Copier = copy.Copy;
+        var running = ToolchainReadiness.Ensure(_folder, "bundled");
+        Assert.True(SpinWait.SpinUntil(() => copy.Runs == 1, TimeSpan.FromSeconds(10)));
+        string marker = ToolchainReadiness.MarkerPath(_folder, Environment.ProcessId);
+        Assert.True(File.Exists(marker));
+
+        var holder = new FileStream(marker, FileMode.Open, FileAccess.Read, FileShare.Read);   // no FileShare.Delete
+        var letGoOfTheMarker = Task.Delay(ToolchainReadiness.MarkerDeleteRetryPause * 2).ContinueWith(_ => holder.Dispose());
+        copy.LetGo();
+        await running.WaitAsync(TimeSpan.FromSeconds(10));
+        await letGoOfTheMarker;
+        Assert.False(File.Exists(marker), "the marker outlived its copy");
+    }
+
+    [Fact]
     public async Task ACopyAClosingWindowWaitedForSaysSoOnTheTrail()
     {
         var copy = new HeldCopy { Result = new(40, 0) };

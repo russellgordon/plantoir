@@ -4573,8 +4573,14 @@ prompt, or (before #477) a scheduled run, hashed and built from that mix.
 handler) asks the #231 quit question FIRST, unchanged — Keep Working leaves
 everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
 the last window) and a copy is WRITING (`ToolchainReadiness.AnyCopyIsWriting`),
-it cancels the close synchronously, before any await, opens the "Getting this
-folder ready…" banner at once (the one-second delay treated as passed), awaits
+it cancels the close synchronously, before any await, opens the banner at
+once (the one-second delay treated as passed) — the "Getting this folder
+ready…" banner when the copy is this window's folder's, and
+`ToolchainReadiness.BannerWhileClosing`'s "Finishing getting a folder ready…"
+when the copy being waited for is ANOTHER folder's and this one is ready (the
+batch 4 implementation review's M2: `RefreshReadiness` read only this
+folder's state, so a last window on folder Y waiting for folder X's copy
+showed nothing at all) — awaits
 `ToolchainReadiness.WhenWritingCopiesFinish()` — every folder's writing copy in
 the process, the mac's `waitForAllCopies()` — and closes again; `Closed` then
 runs `App.QuitTime()` as before, so a prepared update still installs at quit,
@@ -4592,7 +4598,30 @@ turn behind another program's copy, which then starts and is cut by the exit:
 `WhenWritingCopiesFinish` HOLDS BACK every copy not yet writing, under the
 same lock a copy takes to mark itself writing, and takes its snapshot again
 after each wait. A held-back copy has written nothing; if the close turns out
-not to quit (a window was opened meanwhile), `ReleaseWaitingCopies` lets it go.
+not to quit, `ReleaseWaitingCopies` lets it go.
+
+**A close that waited and then did not quit releases the hold (the batch 4
+implementation review's M1).** The hold is process-wide and nothing else
+clears it, so a close that ends without quitting after the wait would leave
+every later copy waiting its turn for the life of the process — banner up,
+Preview, Deploy and New Course greyed, the folder's marker live so
+`plantoir-mcp` refuses and a scheduled run stands down. Three ways that
+happens, all handled by `MainWindow.LetHeldCopiesGo` (which also clears
+`_copiesWaitedFor`, so a later close waits again): the quit question is
+asked AGAIN after the wait (a preview began meanwhile) and the teacher keeps
+working; a window was opened meanwhile, so the close no longer quits; or the
+handler itself threw. `UpdatePrompts.QuitForInstallAfterTheCopy` releases
+it too when the installer does not start. Test:
+`ToolchainReadinessTests.AHoldReleasedAfterACloseThatDidNotQuitLetsALaterCopyFinish`.
+
+**A finished copy tries five times to take its marker away** (200 ms apart,
+the batch 4 implementation review's L1): a scanner or indexer holding the
+file for a moment would otherwise leave a LIVE marker for as long as this
+process runs, holding every other program's copy of the folder. The limit
+that remains: a marker still undeletable after the fifth try is said in
+`startup.log` ("its marker could not be removed after 5 tries") and stands
+until this process exits, when it reads as stale and is swept. Test:
+`AMarkerHeldOpenForAMomentIsStillTakenAwayAfterTheCopy`.
 
 **What it does not do, and why.**
 - **Not while Windows is ending the session** (`SessionEnding.IsEnding`).
