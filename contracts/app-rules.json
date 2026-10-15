@@ -1958,7 +1958,7 @@
         {
           "question" : "Paste Cloudflare Account ID",
           "reachedWhen" : "Cloudflare is the destination, the app passed no --account, the token cannot list its own account, and nothing was remembered.",
-          "refuse" : "Say the Account ID is not saved, and to add it in the course's settings under Deploying — the same words the app already uses when it refuses to SCHEDULE for this reason.",
+          "refuse" : "Say the Account ID is not saved, and to add it in Plantoir ▸ Settings ▸ Deploying, then deploy again (#490: the ID is the teacher's, kept in Settings since #457/#491, not in a course's settings) — the same place the app already names when it refuses to SCHEDULE for this reason ('…then schedule this again'; on Windows the app's own sentences say File ▸ Settings ▸ Deploying, where the item is there).",
           "where" : "launcher"
         },
         {

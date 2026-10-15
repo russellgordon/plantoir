@@ -1637,7 +1637,7 @@ MSG
     # launchd wrapper the mac is being asked to build would read it as an
     # ordinary failure and leave no note. Found by review; the other three
     # guards in this file are at the top level and are unaffected.
-    assert_can_ask "Paste Cloudflare Account ID" "Add the Account ID in this course's settings in Plantoir, under Deploying."
+    assert_can_ask "Paste Cloudflare Account ID" "Add your Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying, then deploy again."
     CF_ACCOUNT="$(prompt_for_cf_account)" || exit 1
     set_cf_account_keychain "$CF_ACCOUNT"
   fi

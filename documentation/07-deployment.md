@@ -621,7 +621,16 @@ Two things are needed, and only one comes from the teacher directly:
   up front, because an app publishing in the background has nothing attached
   that could answer a console prompt — and under `--non-interactive` that
   last "asking once" is a refusal instead, naming the Account ID and pointing
-  at the course's own settings.
+  at Plantoir ▸ Settings ▸ Deploying (#490). Both launchers say the same
+  sentence — "Add your Cloudflare Account ID in Plantoir ▸ Settings ▸
+  Deploying, then deploy again." — because the ID is the teacher's, not a
+  course's: it moved to the app's Settings on the mac in #457 and on Windows
+  in #491, and a refusal pointing at a course's settings sent the teacher to a
+  read-only display. `deploy.ps1` spells the ▸ as `[char]0x25B8`: it has no
+  byte-order mark and Windows PowerShell 5.1 would read a literal one
+  garbled. (On Windows the app's own sentences say File ▸ Settings ▸
+  Deploying, where the item is there; the launchers keep one sentence for
+  both platforms, Russell's ruling on #490.)
 
 ### Asking once, and the subshell that ate the question (2026-09-09)
 
