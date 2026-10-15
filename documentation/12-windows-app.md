@@ -3928,7 +3928,7 @@ Two things the redirect cannot see, and what covers each:
 - **A real Task Scheduler registration.** The initializer also sets
   `TaskScheduling.RealSchtasksGuardForTests`, which throws on any real
   `schtasks.exe` call other than `/Query`. It caught one on its first run:
-  `TaskDefinitionTests.TheRegisteredTaskKeepsTheThreeSettingsAndCarriesItsToken`
+  `TaskDefinitionTests.TheRegisteredTaskKeepsTheFourSettingsAndCarriesItsToken`
   registers a real probe task ON PURPOSE (ruling 7 of an earlier bundle) and
   now lifts the guard for itself, by name.
 
@@ -4642,9 +4642,13 @@ been one more thing to explain.
   changed — the in-place mirror only writes what differs, and the launchers
   hash the folder, so a whole new tree buys nothing. The residual risk is
   recorded instead: a preview ALREADY RUNNING from another process (a
-  command-line launcher, a scheduled run) while the app copies can read a mix
-  of old and new files. That is unchanged from before #473 — the copy was
-  never atomic — and the app's own builds now wait for it.
+  command-line launcher) while the app copies can read a mix of old and new
+  files. That is unchanged from before #473 — the copy was never atomic — and
+  the app's own builds now wait for it; since #477 a scheduled run does too
+  (it waits for a live copy and makes its own). Measured on 2026-10-15, a
+  temp-name-and-rename per FILE is worse still when two copies meet: 855
+  failures in 3 runs (07 → "On Windows since bundle 3: the scheduled run is
+  Plantoir").
 - **Queueing** Preview and Deploy until the copy finishes. Russell chose
   disabled with a reason: a queued press is invisible work that starts on its
   own minutes later, and a teacher who pressed Deploy and walked away cannot
@@ -4667,14 +4671,24 @@ been one more thing to explain.
 ### The trail, and measuring it
 
 `working folder tools copied` (`ActivityTrail.Event.WorkingFolderToolsCopied`;
-`shared-rules.json` → `activityTrail.mustRecord`, `appliesOn: ["windows"]` —
-its `appliesOnWhy` says why it is permanent rather than a gap) is written once
-per copy that changed or failed something, never for the ordinary pass:
+`shared-rules.json` → `activityTrail.mustRecord` — `appliesOn: ["windows"]`
+until the mac's #476 wrote it too) is written once per copy that changed or
+failed something, never for the ordinary pass:
 
 ```
 … · got the working folder ready — 2389 files brought up to date in 5.3 s — C:\…\workspace
 … · could not finish getting the working folder ready — 2 files could not be copied or removed (first: .toolchain\scripts\build_site.py, <its error>), 40 files brought up to date in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
 ```
+
+Since #477 the scheduled run's own copy writes it with the course and
+section, "got the working folder ready for a scheduled deploy — …", and a
+failure there ends "; the scheduled deploy stood down" (nobody is there to
+choose Reload Courses). Since #484 a copy a closing window waited for ends
+", and Plantoir waited for it before closing". A copy that waited for another
+program's copy says so in `startup.log` ("tools copy for '<folder>' waited
+N s for another copy (process P) to finish first", or "did not start" when the
+scheduled run gave up), not on the trail: the run's own `scheduled publish
+waited for the course` line carries that.
 
 It does not say "after an update": the same copy fills a folder the picker sets
 up from nothing, and refreshes any stale one. And a pass that changed NOTHING
