@@ -299,10 +299,14 @@ the section, builds it, deploys to each destination un-chained (one failing
 must not stop the others), and writes a record the app picks up.
 
 The task is registered from XML (`TaskScheduling.TaskXml`) so that it carries
-three settings the command-line switches cannot set: it may start on battery
+four settings the command-line switches cannot set: it may start on battery
 (`DisallowStartIfOnBatteries` false), is not stopped by going onto battery
-(`StopIfGoingOnBatteries` false) and starts as soon as possible after a missed
-start (`StartWhenAvailable` true). The older description here — a task that
+(`StopIfGoingOnBatteries` false), starts as soon as possible after a missed
+start (`StartWhenAvailable` true), and — since #470 — QUEUES a start that
+comes while the earlier run still works (`MultipleInstancesPolicy` `Queue`;
+it was `IgnoreNew`, which refused that start and lost the deploy). The
+measurements and what was rejected are in 07 → "Set again while the run
+works (#409)". The older description here — a task that
 runs `powershell.exe -File "<wrapper>"` — is how a task set before bundle 3
 still runs until it drains; do not read it as the current design.
 
@@ -1601,10 +1605,13 @@ What replaces the old container concepts:
     run of the section does not wait: its leases look free, its build leg is
     refused, and it is recorded as `buildDidNotFinish`. Rare enough to record
     rather than build.
-  - **Measured: a re-set whose moment arrives while the earlier run still
-    works never runs** (Task Scheduler `IgnoreNew`). The numbers are in 07 →
-    "Set again while the run works (#409)", and the fix is
-    [#470](https://github.com/russellgordon/plantoir/issues/470).
+  - **Measured: a re-set whose moment arrived while the earlier run still
+    worked never ran** (Task Scheduler `IgnoreNew`). Fixed by
+    [#470](https://github.com/russellgordon/plantoir/issues/470) on
+    2026-10-15: the task's policy is `Queue`, the queued start runs 2.1 s
+    after the first ends with the newest definition, and the run's own
+    checks decide whether it still deploys. The numbers for both are in 07 →
+    "Set again while the run works (#409)".
   - **Known limits.** A deploy run inside another process (typed at a prompt,
     or `-Command`) is not seen, and neither is an elevated one; the
     self-relaunch that would see the first was rejected (03).

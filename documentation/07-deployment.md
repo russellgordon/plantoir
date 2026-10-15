@@ -3101,7 +3101,8 @@ them needs anything done on the mac.
   contract's authored half; no mac test reads the field.
 - **The thirty-minute wait has no Windows counterpart, and none is built.** A
   re-set leaves the running instance alone (`ClearIfStillMine`), so no
-  leftover run exists. Its leases stay live for the whole run, because its
+  leftover run exists; since #470 the re-set's own start waits in Task
+  Scheduler's queue instead (below). Its leases stay live for the whole run, because its
   `Plantoir.exe` holds them across the wrapper.
 - **What Task Scheduler does with the new moment was MEASURED, and it is
   worse than "the new run waits".** The test machine was RUSSELL_WINDOWS, an
@@ -3122,6 +3123,55 @@ them needs anything done on the mac.
     earlier run still works is silently not deployed, and no outcome record
     is written. That is a separate fault and is not fixed under #467; it is
     [#470](https://github.com/russellgordon/plantoir/issues/470).
+- **Fixed by #470 (2026-10-15): the task QUEUES a second start.**
+  `TaskScheduling.TaskXml` now registers `<MultipleInstancesPolicy>Queue`
+  (Russell's ruling). The new start waits in Task Scheduler until the earlier
+  instance ends, and then the run's OWN checks decide: the token (a start
+  that is not the job's does nothing), the lateness window (#239), the lease
+  wait (#289), whether the task still stands, and the settings at the run.
+  Measured the same way on the same machine (RUSSELL_WINDOWS, i5-8365U,
+  16 GB, Windows 11 Pro 26200, 2026-10-15; task `PlantoirMeasure470`, a
+  120-second sleeper that logs its token):
+  - **A queued start runs, 2.1 s after the first ends, with the NEWEST
+    definition.** A registered 11:06:21.0 for 11:06:45, started 11:06:47.3;
+    set again (token B) at 11:06:50.7 for 11:07:15. At 11:07:15 Last Run
+    Time moved to 11:07:15 and Next Run read N/A, but Status stayed
+    `Running` — it never reads "Queued", and only A is listed as an instance.
+    A ended 11:08:47.5; B started 11:08:49.6, logging token B.
+  - **Setting it again while a start is queued REPLACES the queued start.**
+    With B queued, re-registering token C for ten minutes on (11:10:21.1)
+    threw B away: after A ended (11:11:47.5) nothing started under either
+    token within 40 s, and Next Run read C's moment. So a queued start can
+    never carry a newer token than the setting it was queued for, and the
+    guard the plan held in reserve for that case (a run that starts early
+    against a newer job) was not built.
+  - **Deleting the task while a start is queued throws it away** (`schtasks
+    /Delete /F`): A kept running, B never started. So Cancel Scheduled
+    Deploy… while a start is queued is clean.
+  - The running instance survived `/Create /F` and `/Delete` every time.
+  What a queued run sees, then: a start well after its moment (the earlier
+  run's length later), its own token, no leases (the earlier run released
+  them on its way out), a task that still stands. It deploys if that is
+  inside the course's window, and stands down `tooLateToRun` otherwise
+  (`ScheduledRunTests.AQueuedRunStartedAfterTheFirstFinishedStillDeploys`,
+  `AQueuedRunStartedLaterThanTheCoursesWindowStandsDownTooLate`;
+  `TaskDefinitionTests.SchedulingRegistersATaskThatQueuesASecondStart`, and
+  `TheRegisteredTaskKeepsTheFourSettingsAndCarriesItsToken` reads the policy
+  back from the real Task Scheduler).
+  **No Windows line for `scheduled deploy waited for its earlier deploy`.**
+  On the mac that line is written by the run that waits; on Windows the
+  waiting happens inside Task Scheduler, before any Plantoir code runs, so
+  there is nothing for the run to time. The entry keeps its
+  `appliesOn: ["mac"]`. A version that read the task's Status column and
+  flagged the job "set while its run worked" was planned and CUT on review:
+  no issue asked for it, the Status text is localised, and an ordinary start
+  is already ~16 s late (above), which would have triggered a "waited" line
+  on any threshold short enough to be useful.
+  **Rejected:** `Parallel` — two runs of one task at once, the second waiting
+  up to ten minutes on the first's leases and standing down `courseWasBusy`
+  for a deploy that was merely queued; and leaving `IgnoreNew` and refusing
+  the re-set with a sentence ("is deploying now; set it again once it has
+  finished") — it hands the teacher a chore the scheduler can do.
 
 ### The window's acts read the saved settings too (#335)
 
