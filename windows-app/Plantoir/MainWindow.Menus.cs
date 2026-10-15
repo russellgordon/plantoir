@@ -123,6 +123,14 @@ public sealed partial class MainWindow
         // ---- Section
         var section = SectionMenu.Items;
         Add(section, "Preview", "sectionPreview", Item.Preview, Key(VirtualKey.P, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+P"));
+        // #514: the mac's Option alternate, as a second visible item (a WinUI
+        // menu has no modifier alternates): always titled the opposite of the
+        // first, absent while a preview runs, and the SAME item for the rule
+        // (Item.Preview, re-checked by Invoke) without taking the first's
+        // place in _ruled. No key: Ctrl+Alt+Shift+P is AltGr+Shift+P on many
+        // keyboards, a character a teacher may be typing.
+        _previewAlternate = Add(section, "Preview at Last Viewed", "sectionPreviewAlternate", Item.Preview,
+                                run: PressThePreviewAlternate, rules: false);
         Add(section, "Deploy…", "sectionDeploy", Item.Deploy, Key(VirtualKey.D, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Ctrl+Shift+D"));
         Add(section, "Open in Browser", "sectionOpenInBrowser", Item.OpenInBrowser);
         section.Add(new MenuFlyoutSeparator());
@@ -196,7 +204,14 @@ public sealed partial class MainWindow
         // re-reads the situation once, not once per item.
         foreach (var title in new[] { FileMenu, CourseMenu, SectionMenu, ViewMenu })
             if (title.Items.FirstOrDefault() is FrameworkElement first)
+            {
                 first.Loaded += (_, _) => ApplyMenuEnablement();
+                // #514: a menu closing, however (Escape, a click outside, an
+                // item chosen) — measured, the first item's Unloaded fires on
+                // every close: Alt released inside it was never seen, so the
+                // button's title reads the keyboard again.
+                first.Unloaded += (_, _) => ReadTheModifierAgain();
+            }
 
         RebuildOpenRecent();
         OpenRecentList.Changed += OpenRecentChanged;
@@ -222,16 +237,32 @@ public sealed partial class MainWindow
 
     private static MenuKey? Key(VirtualKey key, VirtualKeyModifiers modifiers, string name) => new MenuKey(key, modifiers, name);
 
+    /// <param name="rules">False for a second item on an item already ruled
+    /// (Section's Preview alternate, #514): it is asked of the rule when it
+    /// runs, but greyed by hand, so the first keeps its place in <c>_ruled</c>.</param>
     private MenuFlyoutItem Add(IList<MenuFlyoutItemBase> into, string text, string automationId, Item? item,
-                               MenuKey? key = null, Action? run = null)
+                               MenuKey? key = null, Action? run = null, bool rules = true)
     {
         var view = new MenuFlyoutItem { Text = text };
         AutomationProperties.SetAutomationId(view, automationId);
         view.Click += (_, _) => Invoke(item, run, null);
         if (key is { } k) view.KeyboardAccelerators.Add(k.Make(this, item, run));
         into.Add(view);
-        if (item is { } ruled) _ruled[ruled] = view;
+        if (rules && item is { } ruled) _ruled[ruled] = view;
         return view;
+    }
+
+    /// <summary>Section ▸'s second Preview item (#514).</summary>
+    private MenuFlyoutItem? _previewAlternate;
+
+    /// <summary>
+    /// The alternate, pressed: the other start page — and never a stop. A
+    /// menu drawn before a preview started elsewhere still shows it; the
+    /// press is refused and the menu redrawn (the plan review's M2).
+    /// </summary>
+    private void PressThePreviewAlternate()
+    {
+        if (SelectedSectionDetail() is { } detail && !detail.PressPreview(opposite: true)) ApplyMenuEnablement();
     }
 
     /// <summary>
@@ -311,7 +342,7 @@ public sealed partial class MainWindow
             case Item.ReloadCourses: Workspace.ReloadTryingAgain(); ApplyState(); return;
             case Item.SaveCourseSettings: (DetailHost.Content as CourseSettingsView)?.SaveFromTheMenu(); return;
             case Item.RevertCourseSettings: (DetailHost.Content as CourseSettingsView)?.RevertFromTheMenu(); return;
-            case Item.Preview: detail?.PressPreview(); return;
+            case Item.Preview: detail?.PressPreview(opposite: false); return;
             case Item.Deploy: detail?.PressDeploy(); return;
             case Item.OpenInBrowser: detail?.PressOpenInBrowser(); return;
             case Item.Back: detail?.PreviewGoBack(); return;
@@ -428,9 +459,20 @@ public sealed partial class MainWindow
         // The sidebar's − follows the same rule (#491 item 5).
         Sidebar.RefreshMinusButton(situation);
 
-        // Section ▸ Preview says what the button says.
+        // Section ▸ Preview says what the button says with no key held, and
+        // its second item the other start page (#514, the contract's titles
+        // function): the setting decides both even with no section selected,
+        // when both are greyed. The second is absent while Stop Preview shows.
+        var opensAt = PreviewStartPage.Read(App.Settings.PreviewOpensAt);
+        bool stops = SelectedSectionDetail()?.PreviewButtonStops == true;
         if (_ruled.TryGetValue(Item.Preview, out var preview) && preview is MenuFlyoutItem previewItem)
-            previewItem.Text = SelectedSectionDetail()?.PreviewButtonStops == true ? "Stop Preview" : "Preview";
+            previewItem.Text = PreviewStartPage.Words(PreviewStartPage.TitleFor(opensAt, modifierHeld: false, stops));
+        if (_previewAlternate is { } alternate)
+        {
+            alternate.Text = PreviewStartPage.Words(PreviewStartPage.TitleFor(opensAt, modifierHeld: true, previewIsRunning: false));
+            alternate.IsEnabled = enabled.Contains(Item.Preview);
+            alternate.Visibility = stops ? Visibility.Collapsed : Visibility.Visible;
+        }
 
         // Ctrl+Shift+O sits on the ONE Open in Obsidian item that can be live.
         bool onSection = situation.Row == Row.Section;
