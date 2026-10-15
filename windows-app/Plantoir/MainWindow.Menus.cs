@@ -247,7 +247,13 @@ public sealed partial class MainWindow
         var root = Content?.XamlRoot;
         bool held = keyName is not null ? DialogGate.Holds(root, keyName) : DialogGate.IsOpen(root);
         if (held) return;
-        // F2 renames — unless the teacher is typing: a text field keeps its F2.
+        // F2 renames — unless the teacher is typing, when it does NOTHING. The
+        // key is spent either way (MenuKey.Make marks it handled before it gets
+        // here, so an unhandled key cannot go on to raise the item's Click and
+        // rename anyway); a WinUI text field gives F2 no meaning of its own, so
+        // nothing is taken from the teacher (2A's implementation review, L4).
+        // A Rename held back by the rule's re-check below is silent too, as the
+        // mac's key on a disabled item is — see 12-windows-app.md (L5).
         if (keyName == "F2" && root is not null &&
             FocusManager.GetFocusedElement(root) is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
         if (item is { } ruled && !SubjectMenuRules.Enabled(CurrentSituation()).Contains(ruled))

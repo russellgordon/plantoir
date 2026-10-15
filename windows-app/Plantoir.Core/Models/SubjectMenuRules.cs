@@ -19,7 +19,7 @@ namespace Plantoir.Core.Models;
 /// Measured on this PC for #488 (documentation/12-windows-app.md → "Menus, the
 /// Section menu's functions and #475 on Windows"): WinUI did NOT deliver a menu
 /// item's key with a ContentDialog up, unlike the mac, where a menu key fired
-/// behind a sheet — but the rule is the contract's, and <c>MenuRoute.Run</c>
+/// behind a sheet — but the rule is the contract's, and <c>MainWindow.Invoke</c> (the mac's <c>MenuRoute.run</c>)
 /// asks the window again at the click whatever this said, which is the guard
 /// that counts.</para>
 ///
