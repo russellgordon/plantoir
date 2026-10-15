@@ -5266,8 +5266,11 @@ Two details that make the backups usable rather than merely present:
   can tell what made each one and why — Plantoir before an assistant chat
   about a particular section, or themselves on purpose. A list of five
   identical-looking timestamps is not a choice anybody can make.
-- **Prune only the ASSISTANT's own backups**, keeping its five most recent
-  per course — and, since 2026-09-10, only those whose stamp could be true.
+- **Prune only the ASSISTANT's and the Section menu's own backups**, keeping
+  the five most recent of EACH per course, counted apart (the menu's
+  `_menu-section<N>` copies since #457 batch B on the mac and #489 on
+  Windows, so a busy afternoon of menu changes never prunes away the
+  assistant's copy from before a chat) — and, since 2026-09-10, only those whose stamp could be true.
   The date lives in the file NAME, this list is sorted by it and its tail is
   thrown away, so a name stamped in another machine's calendar (2569, on a
   zip carried from a pre-fix Thai Mac) would sort as the newest thing in the
@@ -5278,9 +5281,10 @@ Two details that make the backups usable rather than merely present:
   they were about to do something they were unsure of — and deleting it on a
   schedule they never agreed to is the app overruling them about their own
   work. The assistant's are different in kind: it saves one per conversation
-  whether or not anybody asked, so clearing up after itself is its job. A
-  teacher with twenty of their own keeps all twenty, and they never crowd out
-  the assistant's five, because the two are counted separately.
+  whether or not anybody asked, so clearing up after itself is its job — and
+  so are the menu's, which it saves before every change. A teacher with
+  twenty of their own keeps all twenty, and they never crowd out the
+  assistant's five or the menu's five, because each is counted separately.
 - And prune ONLY backups at that: archives and the wizard's own zips live in
   the same folder and their parsers deliberately reject each other's forms.
 - **The zip runs off the main actor, and the window says what the wait is**

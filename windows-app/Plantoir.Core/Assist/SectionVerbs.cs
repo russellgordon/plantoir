@@ -165,8 +165,15 @@ public sealed class SectionVerbs : IAsyncDisposable
     /// </summary>
     /// <param name="item">Where the item is in the menus: "Section ▸ Publish Pages…".</param>
     /// <param name="counts">What the line adds after how it ended — "3 pages ticked" — never a page's title.</param>
+    /// <param name="progress">
+    /// What the server says it is doing while the call runs — "Saving a copy
+    /// of ICS3U first…" while the menu's copy is made — on whatever thread.
+    /// The dialog shows that line only while it is TRUE (2B's implementation
+    /// review, M2): Undo never saves a copy, and a refusal comes before one.
+    /// </param>
     public async Task<AssistToolAnswer> Perform(JsonObject call, string item, string course, int section,
-                                                string? counts = null, CancellationToken cancellation = default)
+                                                string? counts = null, CancellationToken cancellation = default,
+                                                Action<string>? progress = null)
     {
         string name = call["function"]?["name"]?.GetValue<string>() ?? "";
         bool writes = AssistToolRunner.IsWriteTool(name);
@@ -191,7 +198,8 @@ public sealed class SectionVerbs : IAsyncDisposable
                 }
                 var server = _server ?? (needsTheServer ? null : NoServer.Instance);
                 if (server is null) return AssistToolAnswer.Same(CouldNotBeDone);
-                (answer, _) = await _runnerFor(course, section, server).Run(call, cancellation);
+                (answer, _) = await _runnerFor(course, section, progress is null ? server : new Relaying(server, progress))
+                    .Run(call, cancellation);
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
@@ -220,6 +228,14 @@ public sealed class SectionVerbs : IAsyncDisposable
 
     private int? _changesToUndo;
 
+    /// <summary>Hands the server's progress lines to the caller of one <see cref="Perform"/>, as well as to the runner's own.</summary>
+    private sealed class Relaying(IToolServer inner, Action<string> progress) : IToolServer
+    {
+        public Task<AssistToolAnswer> CallTool(string name, JsonObject arguments, Action<string>? said = null,
+                                               CancellationToken cancellation = default) =>
+            inner.CallTool(name, arguments, note => { said?.Invoke(note); progress(note); }, cancellation);
+    }
+
     /// <summary>Stands in for the server where the window answers on its own; a call reaching it is a fault.</summary>
     private sealed class NoServer : IToolServer
     {
@@ -245,16 +261,32 @@ public sealed class SectionVerbs : IAsyncDisposable
     public static string TrailLine(string item, string ending, string? counts) =>
         $"{item} — {ending}" + (string.IsNullOrWhiteSpace(counts) ? "" : ", " + counts);
 
-    /// <summary>How a change ended, read from what the server's undo list did — never from a sentence.</summary>
+    /// <summary>
+    /// How a change ended. Not "without parsing a sentence" everywhere, and
+    /// said so: Rebuild Preview's ending compares the answer with the one
+    /// sentence the window says when it rebuilds, and Undo Last Change also
+    /// counts an answer containing "is put back" as taking the change back.
+    /// </summary>
+    /// <remarks>
+    /// The server says whether the call changed anything
+    /// (<see cref="AssistToolAnswer.Changed"/>, the <c>plantoir.app/changed</c>
+    /// key). It used to be read off the undo list's DEPTH alone, which was wrong
+    /// for Make Room for Classes — it keeps no undo entry, on purpose — and for
+    /// every change after the twentieth, when the list is full and its depth
+    /// stops growing (2B's implementation review, M1). The depth is kept as the
+    /// fallback for an answer that does not carry the key.
+    /// </remarks>
     internal static string Ending(string tool, AssistToolAnswer answer, int? before, int? after, string course, int section)
     {
         if (tool.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase))
             return answer.Summary == AssistWording.PreviewIsRebuilding(course, section.ToString()) ? "rebuilt" : "not rebuilt";
-        if (before is not { } was || after is not { } now) return "carried out";
-        if (tool.Equals("undo_last_change", StringComparison.OrdinalIgnoreCase))
-            return now < was || answer.Summary.Contains("is put back", StringComparison.Ordinal)
+        bool undo = tool.Equals("undo_last_change", StringComparison.OrdinalIgnoreCase);
+        bool? changed = answer.Changed;
+        if (changed is null && before is { } was && after is { } now) changed = undo ? now < was : now > was;
+        if (undo)
+            return changed == true || answer.Summary.Contains("is put back", StringComparison.Ordinal)
                 ? "took the last change back" : "changed nothing";
-        return now > was ? "carried out" : "changed nothing";
+        return changed == false ? "changed nothing" : "carried out";
     }
 
     private async Task ForgetTheServer()
@@ -275,4 +307,19 @@ public sealed class SectionVerbs : IAsyncDisposable
 
     /// <summary>Stops this window's server; its undo list goes with it.</summary>
     public async ValueTask DisposeAsync() => await ForgetTheServer();
+
+    /// <summary>
+    /// Stops this window's server once the call running now has finished — for
+    /// a window closing, or opening another folder, part way through a change
+    /// (2B's implementation review, L4). Stopping it at once would kill the
+    /// server mid-write three seconds later and leave the change half made;
+    /// waiting here, off the interface thread, lets it finish and keeps the
+    /// window's thread free of the server's <c>WaitForExit</c>.
+    /// </summary>
+    public async Task DisposeWhenIdleAsync()
+    {
+        await _oneAtATime.WaitAsync();
+        try { await ForgetTheServer(); }
+        finally { _oneAtATime.Release(); }
+    }
 }
