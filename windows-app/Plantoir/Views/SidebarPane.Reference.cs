@@ -108,16 +108,17 @@ public sealed partial class SidebarPane
     /// </summary>
     private MenuFlyout ReferenceCourseMenu(Course course)
     {
+        var row = new SidebarSelection.CourseItem(course.Code);
         var menu = new MenuFlyout();
-        menu.Items.Add(ReferenceObsidianItem(course, course.DirectoryPath));
+        menu.Items.Add(ObsidianItem(course, null, row));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem(ReferenceCourse.SetSchoolYearMenuItem, Glyphs.Clock, () => _ = SetSchoolYear(course)));
+        menu.Items.Add(MenuItem(ReferenceCourse.SetSchoolYearMenuItem, Glyphs.Clock, Selecting(row, () => _ = SetSchoolYear(course))));
         // Copy a Page only READS this course (#247): offered on every row.
-        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, () => _ = OpenCopyAPage(course)));
-        menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, () => _ = BackUpCourse(course)));
+        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, Selecting(row, () => _ = OpenCopyAPage(course))));
+        menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, Selecting(row, () => _ = BackUpCourse(course))));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(course.DirectoryPath)));
-        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, () => FolderActions.OpenTerminal(course.DirectoryPath)));
+        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(course.DirectoryPath))));
+        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(course.DirectoryPath))));
         return menu;
     }
 
@@ -126,29 +127,32 @@ public sealed partial class SidebarPane
     /// but Cancel Scheduled Deploy… whenever one exists, because the act that
     /// STOPS a deploy is never withheld (gate by direction).
     /// </summary>
+    /// <remarks>
+    /// The menu bar does NOT offer that Cancel (#488): <c>subjectMenus</c>
+    /// greys cancelScheduledDeploy on a course kept for reference, because the
+    /// mac's row has no Cancel and the mac turns such a schedule off by itself
+    /// (<c>ScheduledDeployCleanup</c>). Windows does not turn it off by itself
+    /// yet, so this row keeps the teacher's one way to stop it — written up for
+    /// the mac (documentation/12-windows-app.md → "Menus, the Section menu's
+    /// functions and #475 on Windows").
+    /// </remarks>
     private MenuFlyout ReferenceSectionMenu(Course course, int number)
     {
         string sectionDir = course.SectionDirectory(number);
+        var row = new SidebarSelection.SectionItem(course.Code, number);
         var menu = new MenuFlyout();
         if (Workspace.WorkspacePath is { } scheduledIn
             && Plantoir.Core.Assist.TaskScheduling.NextRun(scheduledIn, course.Code, number) is { } when)
         {
             menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
-                () => ConfirmCancelScheduledDeploy(course, number, when)));
+                Selecting(row, () => ConfirmCancelScheduledDeploy(course, number, when))));
             menu.Items.Add(new MenuFlyoutSeparator());
         }
-        menu.Items.Add(ReferenceObsidianItem(course, sectionDir));
+        menu.Items.Add(ObsidianItem(course, number, row));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(sectionDir)));
-        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, () => FolderActions.OpenTerminal(sectionDir)));
+        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
+        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
         return menu;
-    }
-
-    private MenuFlyoutItem ReferenceObsidianItem(Course course, string revealFolder)
-    {
-        var item = MenuItem("Open in Obsidian", ObsidianGlyph, () => _ = OpenReferenceInObsidian(course, revealFolder));
-        item.IsEnabled = FolderActions.ObsidianIsInstalled;
-        return item;
     }
 
     // ---- The calm note, before Obsidian opens, once per course ----------------

@@ -587,6 +587,30 @@ public sealed partial class CourseSettingsView : UserControl
             if (SaveStatus.Text == _heldBackShown) SaveStatus.Text = "";
             _heldBackShown = null;
         }
+        SaveStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ---- The menu bar's Save and Revert (#488) ------------------------------
+
+    /// <summary>Save or Revert may have changed whether it can be pressed: the menu bar re-reads them.</summary>
+    public event EventHandler? SaveStateChanged;
+
+    /// <summary>Course > Save Course Settings is live exactly when this Save button is (subjectMenus.settingsMaySave).</summary>
+    internal bool SaveIsEnabled => SaveButton.IsEnabled;
+
+    /// <summary>Course > Revert Course Settings is live exactly when this Revert button is.</summary>
+    internal bool RevertIsEnabled => RevertButton.IsEnabled;
+
+    /// <summary>The menu item (and its Ctrl+S) presses Save itself, on the button's own predicate, asked again now.</summary>
+    internal void SaveFromTheMenu()
+    {
+        if (SaveButton.IsEnabled) Save_Click(SaveButton, new RoutedEventArgs());
+    }
+
+    /// <summary>The menu item presses Revert itself, on the button's own predicate, asked again now.</summary>
+    internal void RevertFromTheMenu()
+    {
+        if (RevertButton.IsEnabled) Revert_Click(RevertButton, new RoutedEventArgs());
     }
 
     /// <summary>The trail line: the course and WHICH check — never the path or the ID. Worded as a hold, not a failure.</summary>
@@ -1268,7 +1292,7 @@ public sealed partial class CourseSettingsView : UserControl
         }
     }
 
+    /// <summary>The one Obsidian route (#488), as every row and menu item takes it.</summary>
     private void Obsidian_Click(object sender, RoutedEventArgs e) =>
-        _ = FolderActions.OpenInObsidian(_course.DirectoryPath, _course.DirectoryPath,
-            BundledToolchain.SupportPath("obsidian_defaults/.obsidian"));
+        _ = _window.SidebarPane.OpenInObsidian(_course, null);
 }

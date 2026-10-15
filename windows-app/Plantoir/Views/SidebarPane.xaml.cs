@@ -311,6 +311,8 @@ public sealed partial class SidebarPane : UserControl
 
         RefreshNoMatches();
         ReassertExpansion();
+        // A schedule set or cancelled, a backup added: the menu bar follows the tree (#488).
+        _window.ApplyMenuEnablement();
     }
 
     /// <summary>
@@ -770,26 +772,29 @@ public sealed partial class SidebarPane : UserControl
     private MenuFlyout CourseMenu(Course course)
     {
         // The mac's order: Obsidian, Add Section, Back Up Now, folder items.
+        // Every item selects its row first (#488, mac #457 item 4).
+        var row = new SidebarSelection.CourseItem(course.Code);
         var menu = new MenuFlyout();
-        menu.Items.Add(ObsidianItem(course.DirectoryPath, course.DirectoryPath));
+        menu.Items.Add(ObsidianItem(course, null, row));
         menu.Items.Add(new MenuFlyoutSeparator());
-        var renameItem = MenuItem("Rename Course", Glyphs.Edit, () => _ = OpenRenameCourseDialog(course));
+        // "Rename", no "Course" and no ellipsis: the menu bar's own word (#488, mac #491 item 8).
+        var renameItem = MenuItem("Rename", Glyphs.Edit, Selecting(row, () => _ = OpenRenameCourseDialog(course)));
         menu.Items.Add(renameItem);
         menu.Items.Add(new MenuFlyoutSeparator());
-        var addItem = MenuItem("Add Section…", AddSectionGlyph, () => _ = OpenAddSectionDialog(course));
+        var addItem = MenuItem("Add Section…", AddSectionGlyph, Selecting(row, () => _ = OpenAddSectionDialog(course)));
         var busyNote = new MenuFlyoutItem { IsEnabled = false, Visibility = Visibility.Collapsed };
         menu.Items.Add(addItem);
         menu.Items.Add(busyNote);
         menu.Items.Add(new MenuFlyoutSeparator());
         // Backing up stays available mid-preview — it only reads (row 106).
-        menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, () => _ = BackUpCourse(course)));
+        menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, Selecting(row, () => _ = BackUpCourse(course))));
         // #241: a frozen copy, kept beside the live course. Offered on a live
         // course only; a copy of a frozen copy has no purpose.
-        menu.Items.Add(MenuItem(ReferenceCourse.KeepACopyMenuItem, Glyphs.Star, () => _ = KeepACopy(course)));
+        menu.Items.Add(MenuItem(ReferenceCourse.KeepACopyMenuItem, Glyphs.Star, Selecting(row, () => _ = KeepACopy(course))));
         // On EVERY course row, a reference course's included: it only reads (#247).
-        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, () => _ = OpenCopyAPage(course)));
+        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, Selecting(row, () => _ = OpenCopyAPage(course))));
 
-        var reviseItems = ReviseItems(course, section: null);
+        var reviseItems = ReviseItems(course, section: null, row);
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
         foreach (var item in reviseItems) menu.Items.Add(item);
         var reviseNote = ReviseNote();
@@ -820,8 +825,8 @@ public sealed partial class SidebarPane : UserControl
             ShowReviseHold(reviseItems, reviseNote, course);
         };
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(course.DirectoryPath)));
-        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, () => FolderActions.OpenTerminal(course.DirectoryPath)));
+        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(course.DirectoryPath))));
+        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(course.DirectoryPath))));
         return menu;
     }
 
@@ -855,24 +860,26 @@ public sealed partial class SidebarPane : UserControl
 
     private MenuFlyout BackupMenu(BackupItem item)
     {
+        var row = new SidebarSelection.BackupEntry(item.Id);
         var menu = new MenuFlyout();
-        menu.Items.Add(MenuItem("Restore…", RestoreGlyph, () => ConfirmRestoreBackup(item)));
-        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(item.FilePath)));
+        menu.Items.Add(MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestoreBackup(item))));
+        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(item.FilePath))));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem("Delete Backup…", Glyphs.Remove, () => ConfirmDeleteBackup(item)));
+        menu.Items.Add(MenuItem("Delete Backup…", Glyphs.Remove, Selecting(row, () => ConfirmDeleteBackup(item))));
         return menu;
     }
 
     private MenuFlyout SectionMenu(Course course, int number)
     {
         string sectionDir = course.SectionDirectory(number);
+        var row = new SidebarSelection.SectionItem(course.Code, number);
         var menu = new MenuFlyout();
 
         // Revising from the SECTION is the common case: a class is published
         // for one section at a time, and "publish tomorrow's class" is always
         // a question about one. The window opens separately so the section's
         // preview can stay on screen beside the conversation changing it.
-        var reviseItems = ReviseItems(course, number);
+        var reviseItems = ReviseItems(course, number, row);
         foreach (var item in reviseItems) menu.Items.Add(item);
         // Once under them, while an assistant holds the course (#468): the
         // section menu greyed them with nothing said until then.
@@ -893,40 +900,43 @@ public sealed partial class SidebarPane : UserControl
             : null;
         if (scheduled is { } when)
         {
+            // Windows' own: the menu bar has no Change Deploy Time… (the
+            // contract's subjectMenus names none, and a `mac` issue asks which
+            // side moves), so the row keeps the one route to it.
             menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
-                                     () => AskWhenToDeploy(course, number, existing: when)));
+                                     Selecting(row, () => AskWhenToDeploy(course, number, existing: when))));
             menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
-                                     () => ConfirmCancelScheduledDeploy(course, number, when)));
+                                     Selecting(row, () => ConfirmCancelScheduledDeploy(course, number, when))));
         }
         else
         {
             menu.Items.Add(MenuItem("Schedule Deploy…", Glyphs.Clock,
-                                     () => AskWhenToDeploy(course, number, existing: null)));
+                                     Selecting(row, () => AskWhenToDeploy(course, number, existing: null))));
         }
 
         // The links checklist on demand (#392, linksChecklist.offeredWhen.onDemand):
         // whenever an offer exists, so Not Now is not a one-way door.
         if (Plantoir.Core.Assist.LinksChecklistShowing.Offer(course, number) is not null)
             menu.Items.Add(MenuItem(Plantoir.Core.Assist.LinksChecklistWording.MenuItem, Glyphs.Star,
-                                     () => _ = OpenLinksChecklist(course, number)));
+                                     Selecting(row, () => _ = OpenLinksChecklist(course, number))));
 
         // Get Ready for the Start of the Year (#355, mac #96), and its undo
         // BESIDE it — never in its place — while one is held for this section.
         menu.Items.Add(MenuItem(Plantoir.Core.Assist.StartOfYearWording.MenuItem, "\uE787",
-                                 () => _ = OpenStartOfYear(course, number)));
+                                 Selecting(row, () => _ = OpenStartOfYear(course, number))));
         if (Workspace.WorkspacePath is { } undoIn
             && Plantoir.Core.Assist.StartOfYearSessionUndo.For(undoIn, course.Code, number) is not null)
             menu.Items.Add(MenuItem(Plantoir.Core.Assist.StartOfYearWording.UndoMenuItem, "\uE7A7",
-                                     () => _ = UndoStartOfYear(course, number)));
+                                     Selecting(row, () => _ = UndoStartOfYear(course, number))));
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
         // The vault is the COURSE folder even for a section — the section is
-        // a subfolder within it, and Obsidian lands at its landing page.
-        menu.Items.Add(ObsidianItem(sectionDir, course.DirectoryPath));
+        // a subfolder within it, and Obsidian reveals the SECTION's folder.
+        menu.Items.Add(ObsidianItem(course, number, row));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(sectionDir)));
-        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, () => FolderActions.OpenTerminal(sectionDir)));
+        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
+        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
 
         // Read when the menu OPENS, never captured at render — the staleness
         // lesson from row 104, which cost a live debugging session.
@@ -1161,19 +1171,19 @@ public sealed partial class SidebarPane : UserControl
 
     private MenuFlyout ArchivedMenu(ArchivedItem item)
     {
+        var row = new SidebarSelection.ArchivedEntry(item.Id);
         var menu = new MenuFlyout();
-        menu.Items.Add(MenuItem("Restore…", RestoreGlyph, () => ConfirmRestore(item)));
-        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(item.FilePath)));
+        menu.Items.Add(MenuItem("Restore…", RestoreGlyph, Selecting(row, () => ConfirmRestore(item))));
+        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(item.FilePath))));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem("Delete Archive…", Glyphs.Remove, () => ConfirmDeleteArchive(item)));
+        menu.Items.Add(MenuItem("Delete Archive…", Glyphs.Remove, Selecting(row, () => ConfirmDeleteArchive(item))));
         return menu;
     }
 
-    private MenuFlyoutItem ObsidianItem(string revealFolder, string vaultPath)
+    /// <summary>Open in Obsidian on a row: the one route (<see cref="OpenInObsidian"/>), after selecting the row.</summary>
+    private MenuFlyoutItem ObsidianItem(Course course, int? section, SidebarSelection row)
     {
-        var item = MenuItem("Open in Obsidian", ObsidianGlyph,
-            () => _ = FolderActions.OpenInObsidian(revealFolder, vaultPath,
-                BundledToolchain.SupportPath("obsidian_defaults/.obsidian")));
+        var item = MenuItem("Open in Obsidian", ObsidianGlyph, Selecting(row, () => _ = OpenInObsidian(course, section)));
         item.IsEnabled = FolderActions.ObsidianIsInstalled;
         return item;
     }
@@ -1205,7 +1215,7 @@ public sealed partial class SidebarPane : UserControl
     /// locked to the COURSE either way — its session covers every section —
     /// so the section only changes which one the built-in assistant opens on.
     /// </summary>
-    private List<MenuFlyoutItem> ReviseItems(Course course, int? section)
+    private List<MenuFlyoutItem> ReviseItems(Course course, int? section, SidebarSelection row)
     {
         var items = new List<MenuFlyoutItem>();
 
@@ -1214,18 +1224,25 @@ public sealed partial class SidebarPane : UserControl
         // opens onto an error about something they have never heard of.
         if (ClaudeCodeLauncher.IsAvailable)
             items.Add(MenuItem("Revise with Claude…", Glyphs.Star,
-                () => ReviseWithClaude(course)));
+                Selecting(row, () => ReviseWithClaude(course))));
 
         // Hidden independently when Codex is not installed
         // (outsideAgents.hiddenWhenNotInstalled, #210).
         if (CodexLauncher.IsAvailable)
             items.Add(MenuItem("Revise with Codex…", Glyphs.Star,
-                () => ReviseWithCodex(course)));
+                Selecting(row, () => ReviseWithCodex(course))));
 
         // "Local" is the word doing the work: it is what separates this from
         // the Claude item above, and it is the privacy promise in one word.
-        items.Add(MenuItem("Revise with local AI assistant…", Glyphs.Star,
-            () => ReviseWithAi(course, section ?? course.SectionNumbers.First())));
+        // SECTION rows only since #488: the local assistant works per section,
+        // and subjectMenus greys courseReviseWithLocalAssistant on a course
+        // row; a context menu HIDES what does not apply. The course row's old
+        // item opened section 1 without saying so. Not a teacher's only route:
+        // every section row still offers it, and so does Section > Revise With
+        // > Local AI Assistant… in the menu bar.
+        if (section is int number)
+            items.Add(MenuItem("Revise with local AI assistant…", Glyphs.Star,
+                Selecting(row, () => ReviseWithAi(course, number))));
 
         return items;
     }
@@ -1242,17 +1259,26 @@ public sealed partial class SidebarPane : UserControl
 
     private void Add_Click(object sender, RoutedEventArgs e) => _ = OpenNewCourseWizard();
 
-    private async void Remove_Click(object sender, RoutedEventArgs e)
+    private void Remove_Click(object sender, RoutedEventArgs e)
+    {
+        // An archived item is already put away — nothing for this button to do.
+        if (Workspace.SelectedCourse is not { } course) return;
+        _ = ConfirmRemove(course, (Workspace.Selection as SidebarSelection.SectionItem)?.Number);
+    }
+
+    /// <summary>
+    /// Remove a course, or one of its sections, after asking: the footer's
+    /// minus button, Course > Remove Course… and Section > Remove Section…
+    /// (#488) all come here, so they ask the same question.
+    /// </summary>
+    internal async Task ConfirmRemove(Course course, int? sectionNumber)
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
-        // An archived item is already put away — nothing for this button to do.
-        var course = Workspace.SelectedCourse;
-        if (course is null || Workspace.WorkspacePath is null) return;
+        if (askedIn is null) return;
 
         string title;
         string message;
-        int? sectionNumber = (Workspace.Selection as SidebarSelection.SectionItem)?.Number;
         // A reference course's section is never removed on its own (#241,
         // staysAsItIs): the footer's Remove means the whole course there.
         if (ReferenceCourse.IsKeptForReference(course)) sectionNumber = null;
@@ -1331,7 +1357,18 @@ public sealed partial class SidebarPane : UserControl
             // Off the UI thread (ruling 10): zipping takes seconds, and a backup
             // landing in the same second waits up to a second for the next (#187).
             string courses = Workspace.CoursesDirectory();
-            string zipPath = await Task.Run(() => CourseArchiver.BackUpCourse(course, courses));
+            // Marked while it zips, so Back Up Now and Remove Course grey in
+            // the menu bar meanwhile (subjectMenus.situationKeys.copying, #488).
+            string zipKey = ZipKey(Workspace.WorkspacePath!, course.Code);
+            lock (_zipping) _zipping.Add(zipKey);
+            _window.ApplyMenuEnablement();
+            string zipPath;
+            try { zipPath = await Task.Run(() => CourseArchiver.BackUpCourse(course, courses)); }
+            finally
+            {
+                lock (_zipping) _zipping.Remove(zipKey);
+                _window.ApplyMenuEnablement();
+            }
             when = BackupItem.From(zipPath, course.Code)?.WhenDescription ?? "just now";
         }
         catch (Exception error)

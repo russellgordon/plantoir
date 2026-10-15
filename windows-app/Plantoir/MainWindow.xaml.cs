@@ -74,7 +74,7 @@ public sealed partial class MainWindow : Window
 
         Picker.Attach(this);
         Sidebar.Attach(this);
-        ShowUpdateMenuItemIfActive();
+        BuildMenuBar();   // MainWindow.Menus.cs (#488)
 
         Activated += (_, args) =>
         {
@@ -95,7 +95,7 @@ public sealed partial class MainWindow : Window
                 // window on the same section, would otherwise sit invisible
                 // here until something else happened to reload the tree.
                 if (Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
-                RefreshRenameCourseItem();
+                ApplyMenuEnablement();
             }
         };
         // Covers app launch itself, in case the window's first Activated
@@ -160,14 +160,14 @@ public sealed partial class MainWindow : Window
             Views.SectionDetailView.SectionOutcomeDismissed -= OutcomeDismissed;
             // The event is static: a subscription left behind would root this window.
             Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged -= ScheduledRecordsChanged;
+            OpenRecentList.Changed -= OpenRecentChanged;   // static too (#488)
             Workspace.UnregisterWindow();
         };
 
-        // The Preview menu tracks whichever section is currently shown —
-        // one callback registered once, rather than a refresh call threaded
-        // through every place DetailHost.Content is assigned.
-        DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForPreviewMenu());
-        RefreshPreviewMenu();
+        // The menu bar tracks whichever section window or Course Settings is
+        // shown — one callback registered once, rather than a refresh call
+        // threaded through every place DetailHost.Content is assigned.
+        DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForMenus());
 
         Workspace.PropertyChanged += (_, args) =>
         {
@@ -175,7 +175,7 @@ public sealed partial class MainWindow : Window
                 or nameof(WorkspaceViewModel.WorkspacePath)
                 or nameof(WorkspaceViewModel.WorkspaceProblem)) ApplyState();
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)
-                or nameof(WorkspaceViewModel.Courses)) { ShowDetailForSelection(); RefreshRenameCourseItem(); }
+                or nameof(WorkspaceViewModel.Courses)) { ShowDetailForSelection(); ApplyMenuEnablement(); }
             // The selection is part of the window's memory (row 99).
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)) App.RememberOpenWindows();
         };
@@ -254,6 +254,7 @@ public sealed partial class MainWindow : Window
         }
 
         Sidebar.ShowWhetherCoursesCanBeAdded(ToolchainReadiness.Refusal(Workspace.WorkspacePath));
+        ApplyMenuEnablement();   // New Course… waits for the copy too (subjectMenus.folderGettingReady)
     }
 
     private void BannerDelayRanOut(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
@@ -778,9 +779,7 @@ public sealed partial class MainWindow : Window
             ShowDetailForSelection();
         }
         RefreshPathBar();
-        RestoreFromArchiveItem.IsEnabled = Workspace.SelectedArchivedItem is not null;
-        RefreshRenameCourseItem();
-        RefreshReadiness();
+        RefreshReadiness();   // and with it the menu bar's enablement
         App.RememberOpenWindows();
     }
 
@@ -840,7 +839,6 @@ public sealed partial class MainWindow : Window
 
     public void ShowDetailForSelection()
     {
-        RestoreFromArchiveItem.IsEnabled = Workspace.SelectedArchivedItem is not null;
         switch (Workspace.Selection)
         {
             case SidebarSelection.SectionItem(var code, var number)
@@ -894,7 +892,8 @@ public sealed partial class MainWindow : Window
             case null when Workspace.Courses.Count == 0:
                 DetailHost.Content = EmptyState("No Courses Yet",
                     "Add your first course, or start from the example course to see how everything fits together.",
-                    "Add a Course…", () => _ = SidebarPane.OpenNewCourseWizard());
+                    // File ▸ New Course…'s own words (#488, mac #491 item 8): one name per command.
+                    "New Course…", () => _ = SidebarPane.OpenNewCourseWizard());
                 break;
             case null:
                 DetailHost.Content = EmptyState("Select a Course or Section",
@@ -1205,92 +1204,6 @@ public sealed partial class MainWindow : Window
         RememberSyncAccepted(path, service, "dismissed the note about the working folder");
     }
 
-    private void NewWindow_Click(object sender, RoutedEventArgs e) => App.OpenNewWindow();
-
-    private void ReloadCourses_Click(object sender, RoutedEventArgs e)
-    {
-        Workspace.ReloadTryingAgain();
-        ApplyState();
-    }
-
-    // ---- Rename Course, from the File menu and F2 -------------------------
-
-    /// <summary>
-    /// The course a rename would apply to: the selected course, or the
-    /// parent of the selected section — a teacher who has clicked into a
-    /// section has not stopped meaning the course (the mac's
-    /// <c>courseThatCanBeRenamed</c>).
-    /// </summary>
-    private Course? CourseThatCanBeRenamed =>
-        // Never a course kept for reference, by ANY route (#241): its folder
-        // carries the year and course_code the real code, and a rename would
-        // collapse the two. The menu item, F2 and the context menu all ask here.
-        Workspace.SelectedCourse is { } course && !ReferenceCourse.IsKeptForReference(course) ? course : null;
-
-    /// <summary>
-    /// Read at the moment of asking, never captured earlier (the staleness
-    /// lesson, row 104): a preview that started since the menu was drawn
-    /// still counts.
-    /// </summary>
-    private string? WhyRenameIsUnavailable(Course course) =>
-        Workspace.WorkspacePath is { } folder ? CourseActivity.BusyReason(folder, course.Code) : null;
-
-    /// <summary>
-    /// The File menu has no Opening event to hang this on, so the item is
-    /// redrawn when the selection changes and whenever the window's state is
-    /// re-applied; the accelerator re-checks live regardless.
-    /// </summary>
-    private void RefreshRenameCourseItem()
-    {
-        var course = CourseThatCanBeRenamed;
-        string? reason = course is null ? null : WhyRenameIsUnavailable(course);
-        RenameCourseItem.IsEnabled = course is not null && reason is null;
-        // Withheld, not greyed, when the selection is a reference course.
-        RenameCourseItem.Visibility = Workspace.SelectedCourse is { } selected && ReferenceCourse.IsKeptForReference(selected)
-            ? Visibility.Collapsed : Visibility.Visible;
-        RenameCourseItem.Text = course is null ? "Rename Course…" : $"Rename {course.Code}…";
-        RenameCourseReason.Text = reason ?? "";
-        RenameCourseReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
-    }
-
-    private void RenameCourse_Click(object sender, RoutedEventArgs e) => RenameSelectedCourse();
-
-    /// <summary>
-    /// No busy guard here on purpose: the dialog re-checks and EXPLAINS ("…is
-    /// previewing or deploying right now. Stop that first, then rename."),
-    /// and the menu item can be stale — the MenuBar has no Opening event and
-    /// nothing redraws it when a preview starts — so a silent return here
-    /// would be a dead click with no answer, where the sidebar's route gives
-    /// one.
-    /// </summary>
-    private void RenameSelectedCourse()
-    {
-        if (CourseThatCanBeRenamed is not { } course) return;
-        _ = Sidebar.OpenRenameCourseDialog(course);
-    }
-
-    /// <summary>
-    /// F2 renames the selected course — unless the teacher is typing. A
-    /// root-scoped accelerator fires wherever focus is, so it asks what has
-    /// focus first: any text-entry control keeps its F2, and the key is left
-    /// unhandled so nothing else swallows it either.
-    /// </summary>
-    private void RenameCourseAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (Services.DialogGate.Holds(Content?.XamlRoot, "F2")) return;   // #191: never under a dialog
-        var focused = FocusManager.GetFocusedElement(Content.XamlRoot);
-        if (focused is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
-        RenameSelectedCourse();
-        args.Handled = true;
-    }
-
-    private void ImportForReference_Click(object sender, RoutedEventArgs e) => _ = Sidebar.OpenImportForReference();
-
-    private void RestoreFromArchive_Click(object sender, RoutedEventArgs e)
-    {
-        if (Workspace.SelectedArchivedItem is { } item) Sidebar.ConfirmRestore(item);
-    }
-
     private async void ReportProblem_Click(object sender, RoutedEventArgs e)
     {
         var store = ProblemReportStore.Standard;
@@ -1404,99 +1317,26 @@ public sealed partial class MainWindow : Window
         await dialog.ShowAsync();
     }
 
-    private void OpenWorkingFolderAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    // ---- Following what the detail pane shows (#488) -----------------------
+
+    private SectionDetailView? _trackedDetail;
+    private CourseSettingsView? _trackedSettings;
+
+    /// <summary>
+    /// The menu bar's Preview, Deploy, View and Save items follow the section
+    /// window or Course Settings on screen: one subscription to whichever is
+    /// shown, let go of when it is replaced.
+    /// </summary>
+    private void TrackDetailForMenus()
     {
-        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+O")) return;   // #191: never under a dialog
-        OpenWorkingFolder_Click(sender, null!);
-        args.Handled = true;
+        if (_trackedDetail is { } previous) previous.PreviewChromeChanged -= DetailChanged;
+        if (_trackedSettings is { } previousSettings) previousSettings.SaveStateChanged -= DetailChanged;
+        _trackedDetail = DetailHost.Content as SectionDetailView;
+        _trackedSettings = DetailHost.Content as CourseSettingsView;
+        if (_trackedDetail is { } current) current.PreviewChromeChanged += DetailChanged;
+        if (_trackedSettings is { } settings) settings.SaveStateChanged += DetailChanged;
+        ApplyMenuEnablement();
     }
 
-    /// <summary>Check for Updates… (#337): shown only when the engine has a feed to read.</summary>
-    private void CheckForUpdates_Click(object sender, RoutedEventArgs e)
-    {
-        if (App.Updater is { } updater) _ = updater.CheckAsync(teacherAsked: true);
-    }
-
-    private void ShowUpdateMenuItemIfActive()
-    {
-        CheckForUpdatesItem.Text = Plantoir.Core.Assist.UpdateWording.MenuItem;
-        CheckForUpdatesItem.Visibility = App.Updater?.IsActive == true ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void NewWindowAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+N")) return;   // #191: never under a dialog
-        App.OpenNewWindow();
-        args.Handled = true;
-    }
-
-    private void ReloadCoursesAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+Shift+R")) return;   // #191: never under a dialog
-        Workspace.ReloadTryingAgain();
-        ApplyState();
-        args.Handled = true;
-    }
-
-    // ---- Preview menu ------------------------------------------------
-    //
-    // Mirrors mac's PreviewCommands (mac-app/QuartzTeachers/App/PreviewCommands.swift):
-    // a top-level Back/Forward/Reload menu that tracks whichever section's
-    // preview is currently shown, discoverable even though the same actions
-    // already have working keyboard shortcuts scoped to SectionDetailView.
-
-    private SectionDetailView? _previewMenuTrackedDetail;
-
-    private void TrackDetailForPreviewMenu()
-    {
-        if (_previewMenuTrackedDetail is { } previous)
-            previous.PreviewChromeChanged -= PreviewChromeChanged_RefreshMenu;
-
-        _previewMenuTrackedDetail = DetailHost.Content as SectionDetailView;
-
-        if (_previewMenuTrackedDetail is { } current)
-            current.PreviewChromeChanged += PreviewChromeChanged_RefreshMenu;
-
-        RefreshPreviewMenu();
-    }
-
-    private void PreviewChromeChanged_RefreshMenu(object? sender, EventArgs e) => RefreshPreviewMenu();
-
-    private void RefreshPreviewMenu()
-    {
-        var detail = DetailHost.Content as SectionDetailView;
-        PreviewBackItem.IsEnabled = detail?.CanGoBack == true;
-        PreviewForwardItem.IsEnabled = detail?.CanGoForward == true;
-        PreviewReloadItem.IsEnabled = detail?.HasPreview == true;
-    }
-
-    private void PreviewBack_Click(object sender, RoutedEventArgs e) =>
-        (DetailHost.Content as SectionDetailView)?.PreviewGoBack();
-
-    private void PreviewForward_Click(object sender, RoutedEventArgs e) =>
-        (DetailHost.Content as SectionDetailView)?.PreviewGoForward();
-
-    private void PreviewReload_Click(object sender, RoutedEventArgs e) =>
-        (DetailHost.Content as SectionDetailView)?.PreviewReload();
-
-    // Global counterparts to SectionDetailView's own scoped BackAccelerator/
-    // ForwardAccelerator/ReloadAccelerator — see the comment on Root's
-    // KeyboardAccelerators in MainWindow.xaml for why both scopes exist.
-    private void PreviewBackAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        (DetailHost.Content as SectionDetailView)?.PreviewGoBack();
-        args.Handled = true;
-    }
-
-    private void PreviewForwardAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        (DetailHost.Content as SectionDetailView)?.PreviewGoForward();
-        args.Handled = true;
-    }
-
-    private void PreviewReloadAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        (DetailHost.Content as SectionDetailView)?.PreviewReload();
-        args.Handled = true;
-    }
+    private void DetailChanged(object? sender, EventArgs e) => ApplyMenuEnablement();
 }
