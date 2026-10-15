@@ -96,7 +96,14 @@ public sealed class CourseSettingsSaveTests : IDisposable
         Assert.Equal(9, cases.Count);
         foreach (var c in cases)
         {
-            var state = SettingsSaveState.Decide(Opened(c!), "");
+            var opened = Opened(c!);
+            // Reading every printing setting, the way the form does, must
+            // write nothing (#496; case 9 is an unknown blank and place).
+            _ = opened.PrintSchoolName;
+            _ = opened.PrintBlanks;
+            _ = opened.PrintSchoolNameAt;
+            _ = opened.PrintCourseCodeAt;
+            var state = SettingsSaveState.Decide(opened, "");
             Assert.False(state.SaveEnabled, $"{c!["name"]}: Save enabled on a fresh open");
             Assert.False(state.RevertEnabled, $"{c["name"]}: Revert enabled on a fresh open");
         }

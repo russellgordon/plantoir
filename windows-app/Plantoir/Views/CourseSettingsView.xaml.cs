@@ -824,6 +824,8 @@ public sealed partial class CourseSettingsView : UserControl
         footerBox.TextChanged += (_, _) => { Config.FooterHtml = footerBox.Text; MarkChanged(); };
         Form.Children.Add(footerBox);
 
+        BuildPrintingSection();
+
         // -------- Content Structure --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Content Structure", null));
         Form.Children.Add(FormBuilders.StringListEditor("Shared folders (all sections)", false,
@@ -1179,6 +1181,111 @@ public sealed partial class CourseSettingsView : UserControl
         HeaderName.Text = Config.CourseName;
     }
 
+    /// <summary>
+    /// Course Settings → Printing (#496; mac #454, <c>PrintSettingsView</c>):
+    /// what a printed handout carries in its corners. Course-wide, because a
+    /// handout is the same paper for every section; the build composes the
+    /// corners from these four keys on every build, and the sketch follows
+    /// the same rule (<see cref="PrintCorners"/>).
+    /// </summary>
+    /// <remarks>
+    /// Every control's value is set BEFORE its handler is attached, and the
+    /// setters are no-ops for the value they would read back: WinUI raises
+    /// TextChanged for text set in code, later, so a stored "   " school name
+    /// would otherwise be tidied away the moment the form opened, and the
+    /// course would open with Save lit (plan review L9).
+    /// </remarks>
+    private void BuildPrintingSection()
+    {
+        Form.Children.Add(FormBuilders.SectionHeaderWithCaption(CourseSettingsWording.PrintingHeader, null));
+
+        var sketchTopLeft = new TextBlock { FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
+        var sketchTopRight = new TextBlock { FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Right };
+        var sketchBottomLeft = new TextBlock { FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
+        var sketchBottomRight = new TextBlock { FontSize = 12, Opacity = 0.7, HorizontalAlignment = HorizontalAlignment.Right };
+        void RefreshSketch()
+        {
+            var sketch = PrintCorners.Sketch(Config, ReferenceCourse.ShownCode(_course));
+            sketchTopLeft.Text = sketch.TopLeft;
+            sketchTopRight.Text = sketch.TopRight;
+            sketchBottomLeft.Text = sketch.BottomLeft;
+            sketchBottomRight.Text = sketch.BottomRight;
+        }
+
+        var schoolNameField = new TextBox { Text = Config.PrintSchoolName, MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left };
+        AutomationProperties.SetAutomationId(schoolNameField, "printSchoolNameField");
+        schoolNameField.TextChanged += (_, _) =>
+        {
+            if (schoolNameField.Text == Config.PrintSchoolName) return;
+            Config.PrintSchoolName = schoolNameField.Text;
+            RefreshSketch();
+            MarkChanged();
+        };
+        Form.Children.Add(FormBuilders.LabeledRow(CourseSettingsWording.PrintingSchoolName, schoolNameField));
+
+        var blanksRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 24 };
+        foreach (string blank in CourseConfiguration.PrintBlankOrder)
+        {
+            var toggle = new ToggleSwitch { IsOn = Config.PrintBlanks.Contains(blank), OnContent = "", OffContent = "" };
+            AutomationProperties.SetAutomationId(toggle, "printBlank_" + blank);
+            toggle.Toggled += (_, _) =>
+            {
+                var chosen = Config.PrintBlanks.Where(existing => existing != blank).ToList();
+                if (toggle.IsOn) chosen.Add(blank);
+                Config.PrintBlanks = chosen;
+                RefreshSketch();
+                MarkChanged();
+            };
+            blanksRow.Children.Add(FormBuilders.LabeledRow(CourseSettingsWording.PrintingBlank(blank), toggle));
+        }
+        var blanksPanel = new StackPanel { Spacing = 2, Margin = new Thickness(0, 6, 0, 0) };
+        blanksPanel.Children.Add(new TextBlock { Text = CourseSettingsWording.PrintingBlanks, FontSize = 13 });
+        blanksPanel.Children.Add(blanksRow);
+        Form.Children.Add(blanksPanel);
+
+        ComboBox PlacePicker(string automationId, Func<string> get, Action<string> set)
+        {
+            var picker = new ComboBox { MinWidth = 200 };
+            foreach (string place in CourseConfiguration.PrintPlaces) picker.Items.Add(CourseSettingsWording.PrintingPlace(place));
+            picker.SelectedIndex = CourseConfiguration.PrintPlaces.ToList().IndexOf(get());
+            AutomationProperties.SetAutomationId(picker, automationId);
+            picker.SelectionChanged += (_, _) =>
+            {
+                if (picker.SelectedIndex < 0) return;
+                string chosen = CourseConfiguration.PrintPlaces[picker.SelectedIndex];
+                if (chosen == get()) return;
+                set(chosen);
+                RefreshSketch();
+                MarkChanged();
+            };
+            return picker;
+        }
+        Form.Children.Add(FormBuilders.LabeledRow(CourseSettingsWording.PrintingSchoolNameGoes,
+            PlacePicker("printSchoolNameAtPicker", () => Config.PrintSchoolNameAt, v => Config.PrintSchoolNameAt = v)));
+        Form.Children.Add(FormBuilders.LabeledRow(CourseSettingsWording.PrintingCourseCodeGoes,
+            PlacePicker("printCourseCodeAtPicker", () => Config.PrintCourseCodeAt, v => Config.PrintCourseCodeAt = v)));
+
+        var sketchGrid = new Grid { RowSpacing = 28, ColumnSpacing = 16 };
+        sketchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        sketchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        sketchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        sketchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetColumn(sketchTopRight, 1);
+        Grid.SetRow(sketchBottomLeft, 1);
+        Grid.SetRow(sketchBottomRight, 1);
+        Grid.SetColumn(sketchBottomRight, 1);
+        sketchGrid.Children.Add(sketchTopLeft);
+        sketchGrid.Children.Add(sketchTopRight);
+        sketchGrid.Children.Add(sketchBottomLeft);
+        sketchGrid.Children.Add(sketchBottomRight);
+        var sketchBox = FormBuilders.SampleBox(sketchGrid);
+        sketchBox.Margin = new Thickness(0, 10, 0, 0);
+        AutomationProperties.SetAutomationId(sketchBox, "printCornersSketch");
+        RefreshSketch();
+        Form.Children.Add(sketchBox);
+        Form.Children.Add(FormBuilders.ExampleCaption(CourseSettingsWording.PrintingCaption));
+    }
+
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -1186,8 +1293,17 @@ public sealed partial class CourseSettingsView : UserControl
             // Where the course deployed BEFORE this Save, off disk (#347): a
             // scheduled deploy goes where the course deploys when it RUNS, so a
             // Save that moves or breaks one is said now, while somebody is awake.
+            // The printing settings are taken from the same read (#496): the
+            // trail line compares what the FILE said with what this Save
+            // wrote, as the mac does; unreadable compares with the defaults.
             IReadOnlyList<CourseConfiguration.DeployDestination> before;
-            try { before = CourseConfiguration.FromBytes(File.ReadAllBytes(_course.ConfigFilePath)).AllDeployDestinations; }
+            SettingsSavedLine.PrintingSnapshot? printingBefore = null;
+            try
+            {
+                var onDisk = CourseConfiguration.FromBytes(File.ReadAllBytes(_course.ConfigFilePath));
+                before = onDisk.AllDeployDestinations;
+                printingBefore = SettingsSavedLine.PrintingSnapshot.From(onDisk);
+            }
             catch { before = Config.AllDeployDestinations; }
 
             var report = Config.Write(_course.ConfigFilePath);
@@ -1199,12 +1315,11 @@ public sealed partial class CourseSettingsView : UserControl
             RefreshDirtyState();
             // The mac's wording, so the two trails read the same. Declared
             // when the trail was built and emitted by nobody until 2026-09-07.
-            // Since #272 it also says what it kept or replaced from elsewhere.
-            string fromElsewhere =
-                (report.KeptFromElsewhere.Count > 0 ? "; kept from elsewhere: " + string.Join(", ", report.KeptFromElsewhere) : "") +
-                (report.ReplacedChangesFromElsewhere.Count > 0 ? "; replaced a change made elsewhere to: " + string.Join(", ", report.ReplacedChangesFromElsewhere) : "");
+            // Since #272 it also says what it kept or replaced from elsewhere,
+            // and since #496 what the Save changed about printing.
             ActivityTrail.Note(ActivityTrail.Event.SettingsSaved,
-                "saved the settings for " + _course.Code + fromElsewhere);
+                SettingsSavedLine.Compose(_course.Code, report, printingBefore,
+                    SettingsSavedLine.PrintingSnapshot.From(Config)));
 
             IReadOnlyList<string> aboutScheduled = Array.Empty<string>();
             string? workingFolder = Path.GetDirectoryName(Path.GetDirectoryName(_course.DirectoryPath));
