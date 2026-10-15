@@ -46,6 +46,9 @@ namespace Plantoir.Core.Assist;
 /// </remarks>
 public static class CodexLauncher
 {
+    /// <summary>The item's title inside Revise With ▸ (<c>outsideAgents.agents[codex].menuItem</c>; #491 item 8).</summary>
+    public const string MenuItemTitle = "Codex…";
+
     /// <summary>Both halves: the assistant, and the server it drives.</summary>
     public static bool IsAvailable => FindCodex() is not null && ClaudeCodeLauncher.FindServer() is not null;
 

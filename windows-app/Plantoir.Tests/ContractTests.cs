@@ -1347,7 +1347,20 @@ public class ContractTests
         public Task<AssistToolAnswer> CallTool(string name, JsonObject arguments, Action<string>? progress = null, CancellationToken cancellation = default) =>
             Task.FromResult(AssistToolAnswer.Same("OK"));
     }
+
+    /// <summary>
+    /// <c>app-rules.json</c> → <c>outsideAgents.agents[].menuItem</c> (#491 item 8;
+    /// <c>menuItemWhy</c>): the item's title inside Revise With ▸, in the menu bar
+    /// and every row's menu. Until #491 no Windows test read this key, so the
+    /// mac's rename from "Revise with Claude…" to "Claude…" turned nothing red.
+    /// </summary>
+    [Fact]
+    public void TheOutsideAgentsMenuTitles_AreTheContracts()
+    {
+        var agents = ContractLoader.LoadJson("app-rules.json")["outsideAgents"]!["agents"]!.AsArray();
+        string Title(string key) => agents.Single(a => a!["key"]!.ToString() == key)!["menuItem"]!.ToString();
+        Assert.Equal(Title("claude"), ClaudeCodeLauncher.MenuItemTitle);
+        Assert.Equal(Title("codex"), CodexLauncher.MenuItemTitle);
+        Assert.Equal(2, agents.Count);
+    }
 }
-
-
-
