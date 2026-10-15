@@ -170,9 +170,186 @@ public static class ToolchainReadiness
         {
             Folders.Clear();
             _holdingBack = false;
+            GuidanceRan.Clear();
+            GuidanceNotices.Clear();
+            PendingAppends.Clear();
         }
         Copier = ToolchainMirror.RefreshToolchain;
+        GuidanceWriter = WriteGuidance;
         Pause = Thread.Sleep;
+    }
+
+    // ---- Guidance for assistants (#496; the mac's #454) -------------------
+    //
+    // Written AFTER the copy, on a task of its OWN, whatever the copy's
+    // outcome, and never chained to entry.Copy: the window's refusals
+    // (RefusedWhileTheFolderIsGettingReady) and InitializeWorkspace await
+    // that task, so a slow or failing guidance pass cannot hold Preview,
+    // Deploy or New Course back (the mac's implementation review S1). Its
+    // failure is a log line, a trail line and a dismissable notice; the
+    // folder's State is untouched. Once per folder per process, as on the mac
+    // ("the pass runs once per folder per launch"), unless the pass failed,
+    // when the next copy of the folder tries again.
+
+    /// <summary>The pass itself. A seam for tests; the app never changes it.</summary>
+    internal static Func<string, string, AgentGuidance.Outcome> GuidanceWriter { get; set; } = WriteGuidance;
+
+    private static readonly HashSet<string> GuidanceRan = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, string> GuidanceNotices = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, List<AgentGuidance.PendingAppend>> PendingAppends = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Raised with the folder's path when its guidance notice or its files
+    /// waiting for a yes change. ON ANY THREAD; a window that subscribes
+    /// unsubscribes when it goes, as with <see cref="Changed"/>.
+    /// </summary>
+    public static event Action<string>? GuidanceChanged;
+
+    private static AgentGuidance.Outcome WriteGuidance(string workspacePath, string bundledRoot) =>
+        AgentGuidance.Write(Path.Combine(bundledRoot, "support", "agent_guidance"), workspacePath,
+                            AgentGuidanceDeclined.SignatureFor, AgentGuidanceDeclined.Forget);
+
+    /// <summary>The task of the last guidance pass started, for tests that wait for it.</summary>
+    internal static Task? LastGuidancePass { get; private set; }
+
+    private static void StartGuidance(string workspacePath, string key, string bundledRoot)
+    {
+        lock (Gate)
+        {
+            if (!GuidanceRan.Add(key)) return;
+        }
+        var writer = GuidanceWriter;
+        LastGuidancePass = Task.Run(() =>
+        {
+            AgentGuidance.Outcome outcome;
+            try { outcome = writer(workspacePath, bundledRoot); }
+            catch (Exception error)
+            {
+                outcome = new AgentGuidance.Outcome();
+                outcome.Note("the working folder", AgentGuidance.SystemReason(error));
+            }
+            ApplyGuidance(workspacePath, outcome);
+        });
+    }
+
+    /// <summary>
+    /// What a pass found, made known: a failure is logged, recorded on the
+    /// trail and becomes the folder's notice; the files waiting for a yes are
+    /// queued for a window to ask about. Never touches the folder's State.
+    /// </summary>
+    internal static void ApplyGuidance(string workspacePath, AgentGuidance.Outcome outcome)
+    {
+        string key = Key(workspacePath);
+        if (outcome.Failures.Count > 0)
+        {
+            string line = AgentGuidance.CouldNotWriteLine(outcome.Failures);
+            Diagnostic?.Invoke($"guidance for assistants in '{workspacePath}': {line}");
+            try { ActivityTrail.Note(ActivityTrail.Event.GuidanceCouldNotBeWritten, line); } catch { }
+        }
+        lock (Gate)
+        {
+            if (outcome.Failures.Count > 0)
+            {
+                GuidanceNotices[key] = AgentGuidanceWording.CouldNotWrite(outcome.FirstReason ?? AgentGuidance.CouldNotBeWritten);
+                GuidanceRan.Remove(key);
+            }
+            if (outcome.Pending.Count > 0)
+            {
+                if (!PendingAppends.TryGetValue(key, out var queue)) PendingAppends[key] = queue = [];
+                foreach (var pending in outcome.Pending)
+                    if (!queue.Any(waiting => string.Equals(waiting.FilePath, pending.FilePath, StringComparison.OrdinalIgnoreCase)))
+                        queue.Add(pending);
+            }
+        }
+        RaiseGuidanceChanged(workspacePath);
+    }
+
+    /// <summary>The notice for this folder (<c>words.couldNotWrite</c>), or null.</summary>
+    public static string? GuidanceNoticeFor(string? workspacePath)
+    {
+        if (string.IsNullOrEmpty(workspacePath)) return null;
+        lock (Gate) return GuidanceNotices.TryGetValue(Key(workspacePath), out var notice) ? notice : null;
+    }
+
+    /// <summary>The teacher closed the notice: it stays closed until a pass fails again.</summary>
+    public static void DismissGuidanceNotice(string workspacePath)
+    {
+        lock (Gate) GuidanceNotices.Remove(Key(workspacePath));
+        RaiseGuidanceChanged(workspacePath);
+    }
+
+    /// <summary>
+    /// The next file to ask about, TAKEN, so each file is asked about in
+    /// exactly one window, AGENTS.md before CLAUDE.md. Null when none waits.
+    /// </summary>
+    public static AgentGuidance.PendingAppend? TakeNextPending(string? workspacePath)
+    {
+        if (string.IsNullOrEmpty(workspacePath)) return null;
+        lock (Gate)
+        {
+            if (!PendingAppends.TryGetValue(Key(workspacePath), out var queue) || queue.Count == 0) return null;
+            var next = queue[0];
+            queue.RemoveAt(0);
+            return next;
+        }
+    }
+
+    /// <summary>Whether a file still waits to be asked about in this folder.</summary>
+    public static bool HasPending(string? workspacePath)
+    {
+        if (string.IsNullOrEmpty(workspacePath)) return false;
+        lock (Gate) return PendingAppends.TryGetValue(Key(workspacePath), out var queue) && queue.Count > 0;
+    }
+
+    /// <summary>
+    /// A question never answered (its window closed while it was up, or the
+    /// quit path took the dialog down) goes back to the FRONT of the queue.
+    /// Closing a window is not a Not Now.
+    /// </summary>
+    public static void PutBack(string workspacePath, AgentGuidance.PendingAppend pending)
+    {
+        lock (Gate)
+        {
+            string key = Key(workspacePath);
+            if (!PendingAppends.TryGetValue(key, out var queue)) PendingAppends[key] = queue = [];
+            queue.Insert(0, pending);
+        }
+        RaiseGuidanceChanged(workspacePath);
+    }
+
+    /// <summary>
+    /// The teacher's answer. Add appends the section (reading the file again)
+    /// and forgets any earlier Not Now; a file it cannot read or write is
+    /// refused, recorded and shown as the notice. Not Now is remembered for
+    /// this file and these words. Either way the trail says what was asked
+    /// and answered (<c>asked before adding guidance to a file</c>).
+    /// </summary>
+    public static void Answer(string workspacePath, AgentGuidance.PendingAppend pending, bool add)
+    {
+        try { ActivityTrail.Note(ActivityTrail.Event.GuidanceFileAskedAbout, AgentGuidance.AskedLine(pending.FileName, add)); }
+        catch { }
+        if (!add)
+        {
+            AgentGuidanceDeclined.Remember(pending);
+            return;
+        }
+        AgentGuidanceDeclined.Forget(pending.FilePath);
+        if (AgentGuidance.AppendAfterYes(pending) is { } reason)
+        {
+            var failed = new AgentGuidance.Outcome();
+            failed.Note(pending.FileName, reason);
+            ApplyGuidance(workspacePath, failed);
+        }
+    }
+
+    private static void RaiseGuidanceChanged(string workspacePath)
+    {
+        var handlers = GuidanceChanged;
+        if (handlers is null) return;
+        foreach (Action<string> handler in handlers.GetInvocationList())
+        {
+            try { handler(workspacePath); } catch { }
+        }
     }
 
     private static string Key(string workspacePath)
@@ -311,6 +488,7 @@ public static class ToolchainReadiness
                 }
             }
             RaiseChanged(workspacePath);
+            StartGuidance(workspacePath, key, bundledRoot);
             return;
         }
         if (waitedFor is not null)
@@ -367,6 +545,7 @@ public static class ToolchainReadiness
             catch { }
         }
         RaiseChanged(workspacePath);
+        StartGuidance(workspacePath, key, bundledRoot);
     }
 
     /// <summary>

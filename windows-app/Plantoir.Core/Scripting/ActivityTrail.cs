@@ -626,6 +626,29 @@ public static class ActivityTrail
         /// wrong is a teacher whose report should say so.
         /// </summary>
         PlantoirHelpOpened,
+
+        // ---- Printable pages (#496; the mac's #454), one block ----
+        /// <summary>
+        /// The preview handed a page to the teacher's web browser (#496): the
+        /// course and section, the page the teacher was ON, and why — to print
+        /// it (the way of printing and, when landscape, the paper) or a link
+        /// that opens in a new window, by its KIND only (the page's own PDF,
+        /// another page of the site, another site). Never where a link led.
+        /// </summary>
+        PreviewPageOpenedInBrowser,
+        /// <summary>
+        /// Plantoir asked before adding its section to a teacher's own
+        /// AGENTS.md or CLAUDE.md at the working folder's root (#496): the
+        /// file's NAME and the answer, added or not now.
+        /// </summary>
+        GuidanceFileAskedAbout,
+        /// <summary>
+        /// The guidance for assistants could not be written into a working
+        /// folder (#496): how many problems, and the first (a file or a
+        /// skill's folder, and the system's reason). It holds nothing back,
+        /// so this line and a quiet notice are its only record.
+        /// </summary>
+        GuidanceCouldNotBeWritten,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -747,6 +770,9 @@ public static class ActivityTrail
         Event.LaterClassesHeldADeployBack => "a deploy was held back for classes dated after the next class",
         Event.CloudflareAccountIdChangedInSettings => "Cloudflare account ID changed in Settings",
         Event.PlantoirHelpOpened => "opened Plantoir Help",
+        Event.PreviewPageOpenedInBrowser => "preview page opened in the web browser",
+        Event.GuidanceFileAskedAbout => "asked before adding guidance to a file",
+        Event.GuidanceCouldNotBeWritten => "guidance for assistants could not be written",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

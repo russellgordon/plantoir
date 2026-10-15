@@ -152,6 +152,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(() => { if (!IsClosed) RefreshReadiness(); });
         }
         ToolchainReadiness.Changed += ReadinessChanged;
+        AttachGuidance();   // #496: MainWindow.Guidance.cs
 
         // #489: a menu change or the assistant's work on a section greys the
         // Section menu's functions in every window. Static, so let go on close.
@@ -275,6 +276,7 @@ public sealed partial class MainWindow : Window
 
         Sidebar.ShowWhetherCoursesCanBeAdded(ToolchainReadiness.Refusal(Workspace.WorkspacePath));
         ApplyMenuEnablement();   // New Course… waits for the copy too (subjectMenus.folderGettingReady)
+        RefreshGuidance();       // #496: the folder on screen may have changed
     }
 
     private void BannerDelayRanOut(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
@@ -430,6 +432,10 @@ public sealed partial class MainWindow : Window
                 if (QuitConfirmation.ShouldAsk(underWay, reason))
                 {
                     args.Cancel = true;
+                    // The guidance question (#496), if it is up, comes down
+                    // unanswered first: one ContentDialog per window (M8).
+                    TakeTheGuidanceQuestionDown();
+                    for (int look = 0; look < 20 && DialogGate.IsOpen(Content.XamlRoot); look++) await Task.Delay(50);
                     var (title, message) = QuitConfirmation.Question(underWay);
                     var dialog = new ContentDialog
                     {
