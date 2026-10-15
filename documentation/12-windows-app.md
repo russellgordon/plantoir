@@ -1335,10 +1335,12 @@ as work happens:
 - **The assistant's own window**, the model running natively with Vulkan, and
   the OUTSIDE doors: `ClaudeCodeLauncher` writes an MCP configuration and starts
   `claude` with `--strict-mcp-config`, so a teacher's own servers are neither
-  used nor disturbed. There are TWO of those doors on the mac since 2026-09-19
-  — "Revise with Claude…" and "Revise with Codex…" — and this app has only the
-  first; both are described as data in `contracts/app-rules.json` →
-  `outsideAgents`, which nothing here reads yet. See
+  used nor disturbed. There are TWO of those doors — Revise With ▸ Claude… and
+  Codex… (on Windows since #210, 2026-09-30; inside the Revise With ▸ submenu
+  on every row since #491, where they were "Revise with Claude…" and "Revise
+  with Codex…" at the top level) — both described as data in
+  `contracts/app-rules.json` → `outsideAgents`, read here by
+  `CodexLauncherTests` and, for the menu titles, `ContractTests`. See
   [the assistant](10-local-ai-assistant.md) for what the assistant IS, and
   [its "other doors" section](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has)
   for what each door launches, what was measured and what was rejected.
@@ -4082,7 +4084,10 @@ replaces the toast by tag).
 Ctrl+O on File ▸ Open Working Folder…, Ctrl+N on New Window, Ctrl+Shift+R on
 Reload Courses, F2 on Course ▸ Rename, and every new menu key besides — F1 on
 Help ▸ Plantoir Help since #491, with its own `InlineData` in
-`AcceleratorDialogGateTests`. Each
+`AcceleratorDialogGateTests`. (The sidebar's Delete key, #491 part B, is the
+one key that is deliberately NOT on a menu item — there it would take Delete
+from every text field — so the tree's `KeyDown` asks `DialogGate.Holds(root,
+"Delete")` itself; `AcceleratorDialogGateTests.TheSidebarsDeleteKeyAsksTheDialogGateFirst`.) Each
 item's key still asks `DialogGate.Holds(root, "<key>")` before it runs (in
 `MainWindow.Invoke`), so the record and the test below are unchanged; what
 changed is where WinUI looks for the key. Re-measured with the keys on items,
@@ -4646,7 +4651,10 @@ context menus call (`OpenAddSectionDialog`, `KeepACopy`, `BackUpCourse`,
 press the toolbar's own handlers on its own predicates (so today's-class
 question, #406, is asked from the menu too); Save Course Settings presses
 Save. Remove Course… and Remove Section… share the footer button's question
-(`SidebarPane.ConfirmRemove`, factored out of `Remove_Click`). The selection
+(`SidebarPane.ConfirmRemove`, factored out of `Remove_Click`; since #491
+`ConfirmRemoveCourse` / `ConfirmRemoveSection`, which the − button, the Delete
+key and the rows' new Remove… items reach through `MainWindow.RunFromTheSidebar`).
+The selection
 is read when the item RUNS, never captured when the menu was drawn.
 
 ### WinUI's menu bar has no Opening event — measured, and what fills the gap
@@ -4771,7 +4779,9 @@ folder, and a course kept for reference gets its calm note first — which the
 section window's toolbar used to skip, going straight to
 `FolderActions.OpenInObsidian` (the plan's finding 0.9).
 
-**The course row lost "Revise with local AI assistant…"**: the contract greys
+**The course row lost its local-assistant item** (then "Revise with local AI
+assistant…"; since #491 the rows' Revise items sit in Revise With ▸ as Claude…,
+Codex… and Local AI Assistant…, the menu bar's titles): the contract greys
 `courseReviseWithLocalAssistant` on a course row, a context menu hides what
 does not apply, and the item opened section 1 without saying so. Not a
 teacher's only route: every section row offers it, and so does Section ▸
@@ -5325,6 +5335,239 @@ reads Plantoir, Core and the MCP server and matches the property on a word
 boundary, so an object initialiser counts. `PlantoirHelpUiTests` —
 `links-opened.txt` and the line. `DrivenApp.FindTopLevel(automationId)` finds
 another top-level window of the run's own process.
+
+## The HIG sweep, screen by screen, on Windows (#491 part B)
+
+Batch 3B of the catch-up to mac 1.7.1 (2026-10-15): items 1–9 of #491, the
+Windows half of the mac's #457 batch C ([09 → "The HIG sweep, screen by
+screen"](09-mac-app.md#the-hig-sweep-screen-by-screen-457-item-4-batch-c)).
+WinUI is a different animal, so each item takes the mac's RULE and finds the
+WinUI mechanism for it. Measurements are from batch 3's spike (Intel i5-8365U,
+Windows 11 Pro 26200, 150% scaling, Windows App SDK 1.8.260921001).
+
+### A button that cannot be pressed never looks like the default (item 2)
+
+**Measured.** A DISABLED button that is still a ContentDialog's default keeps
+the accent slab: #BFBFBF with white text in Light (about 1.8:1), #434343 with
+#A7A7A7 text in Dark — it still reads as the primary slot, where a disabled
+plain button is #F5F5F5 on #F3F3F3 (Light) or #2A2A2A on #202020 (Dark). And a
+trap: the same disabled default in a dialog with NO focusable content loses
+its accent, initial focus lands on Close, and Enter presses Close — the dialog
+dismisses. With a focused text box, a disabled default takes no Enter.
+
+**So enablement, the default and the accent change together.** The rule is
+`Plantoir.Core/Models/PrimaryButtonLook.For(enabled, PrimaryKind)`; one helper,
+`Views/DialogButtons.EnablePrimary(dialog, enabled, kind)`, applies it:
+while disabled the main button is not the default (`DefaultButton` None — only
+if it WAS Primary, so a dialog whose default is Close or Secondary keeps it)
+and carries no accent style; when it can be pressed it is the default again.
+Three kinds: `TakesEnterWhenEnabled` (every ordinary dialog),
+`NeverTakesEnter` (the wizard, below — the accent style explicitly, never the
+default) and `NotTheDefault` (All Backups' Delete…, destructive beside a Done
+that keeps Enter: only enablement changes). `DefaultButtonScanTests` holds
+every `IsPrimaryButtonEnabled` write under `Plantoir/` to `DialogButtons.cs`
+— object initialisers and bare writes inside a `ContentDialog` subclass
+included, which is how All Backups' initialiser was found — so a new dialog
+cannot grey its main button by hand. The 21 sites the plan listed, plus 2B's
+section-verb dialog, all go through it.
+
+**The wizard's Create Course NEVER takes Enter** — measured on the mac
+(2026-10-08): as the default, an Enter typed in the Course code field created
+a course named by the code with the rest of the form unread. `DefaultButton`
+is None from the start; the button wears the accent while it can be pressed;
+the cursor starts in Course code (`Opened` focuses it; the suggestion list
+opens only on typing). After the work, its Close is the ordinary kind and
+takes Enter — there is nothing left to type.
+
+**Class Dates reads, THEN remembers.** "Read the Dates" (Secondary) and
+"Remember These Dates" (Primary), the mac's words. Remember is live only once
+dates have been read (`_parsedDates`), so it never sits greyed in the default
+slot; the primary handler's own re-read stays as a safety net. Before a read,
+Read the Dates is the default — EXCEPT on the typed route, where no button is:
+the box needs Enter for a new line. Measured here, Enter in a multi-line box
+inserts a line and presses nothing even with a default button, but the rule
+is kept (the mac's `isTheDefault: route != .typed`) so it does not depend on
+that. A read that fails clears what was read before.
+
+### Escape is never trapped (item 1)
+
+**Measured: an AutoSuggestBox in a ContentDialog TRAPS Escape.** With its list
+closed, the inner TextBox marks Escape handled and a second Escape is
+swallowed too; with it open, the first closes the list and the second is
+swallowed. So Copy a Page — which opens with the cursor in its page field —
+and the wizard could not be closed from the keyboard at all. A ComboBox
+already behaves (closed: Escape closes the dialog in about 3 ms; open: the
+first closes the drop-down, the second the dialog) and is left alone.
+
+`Core/Models/PickerEscape.For(listWasOpen)` is the mac's rule; both
+AutoSuggestBoxes (`CopyAPageDialog._picker`, the wizard's `_codeBox`) ask it in
+`PreviewKeyDown` — which tunnels, so it runs before the inner TextBox marks the
+key handled — and, with no list drawn, mark it handled and `Hide()` the dialog
+(the wizard through its Cancel route: a running creation is stopped by the
+teacher, as `OnCloseButton` does). With a list drawn, WinUI's own handling
+closes it. `PickerEscapeTests` pins the rule and that both pickers route
+through it; `CopyAPageEscapeUiTests` and
+`NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` press real
+Escapes (list, then dialog), each after `BringToFront` and failing with "the
+app did not hold the foreground" rather than blaming the app when another
+window has it — the flake `SpecialFoldersHelpUiTests` records.
+
+### One dialog title shape (item 3)
+
+Every title was already a plain string in WinUI's own title style; what
+differed was the explanation under it in the five dialogs that carry one — 12
+at 70%, 13 at 80%, the default at 70%, and Keep a Copy's at the BOTTOM.
+`FormBuilders.DialogExplanation(text)` (14, `TextFillColorSecondaryBrush`,
+wrapped at 460, 12 below) is now FIRST in the content of Add Section, Keep a
+Copy for Reference (what the copy IS moved to the top; what it leaves behind
+and why it never deploys stay below the form), Class Dates, Special Folders
+and every credential request (`CredentialRequestPanel`, so the Deploying
+pane's inline instructions use it too). Titles stay in sentence case — and
+stay as they were: "Add a Section to ICS3U" is the mac's title too.
+`DialogTitleScanTests` holds a per-file census of every ContentDialog made (64
+on 2026-10-15) the way the mac's `SheetTitleScanTests` censuses sheets, so a
+new dialog arrives having been looked at; it also refuses a `TitleTemplate` or
+an element as a title, and checks the five call the helper.
+
+### Open in Obsidian locks a reference course again first (item 4)
+
+2A made Open in Obsidian one route (`SidebarPane.OpenInObsidian`, above). The
+mac's route also LOCKS the pages again before anything, so a page unlocked
+since the folder was read — by hand, by a sync client, by a restore — never
+opens editable; `OpenReferenceInObsidian` now runs
+`ReferenceLock.EnsureLocked` off the UI thread first (a large course is
+thousands of access-rule reads) and writes the existing "reference course
+pages locked again" line through `ReferenceCourseUpkeep.TrailLine` when it did
+anything; a failure is logged and the teacher may still open. The note is
+shown on the sidebar's `XamlRoot` — the sidebar always exists in a window
+(there is no collapsed-sidebar state here as on the mac, where the note had to
+move to the main window). `ObsidianRouteSourceTests` holds
+`FolderActions.OpenInObsidian(` to the sidebar's two branches plus ONE named
+exception, Course Settings' How I Teach row, which opens a PAGE of a LIVE
+course. Verified by hand once (2026-10-15, a throwaway UI test, Obsidian's
+vault registry backed up and restored byte for byte): a page unlocked by hand,
+the section toolbar's button, the page locked again BEFORE the note, "locked 1
+page of ICS3U again — it is kept for reference" on the trail, Obsidian opened.
+
+### Delete and the − button run the menu's removal (items 5–6)
+
+**The Delete key** on a selected sidebar row runs the item
+`shared-rules.json` → `sidebarDeleteKey` names — Remove Course…, Remove
+Section…, Delete Backup…, Delete Archive… — through the menu bar's own guard
+(`MainWindow.RunFromTheSidebar` → `Invoke`), so it asks the menu's question,
+and where the item is greyed (a section of a course kept for reference, a
+course being copied) it does NOTHING. **Silently**: the mac beeps, Windows has
+no beep for a greyed command, and a dialog explaining why would be a door the
+menu says is shut — the same reasoning as F2 on a greyed Rename (above). It is
+the tree's `KeyDown`, never a key on the menu item (which would take Delete
+from every text field; the filter box is outside the tree), and it asks
+`DialogGate.Holds(root, "Delete")` first (`AcceleratorDialogGateTests`).
+**Which row**: `Tree.SelectedItem` — measured, arrow keys move it (and focus)
+WITHOUT raising `ItemInvoked`, which is how the window's own selection is
+normally set — so the row is selected for the window first, and the item acts
+on what the teacher sees highlighted. Measured too: Delete reaches
+`Tree.KeyDown` unhandled with the item as its source.
+
+**The − button** follows the same rule for removal only
+(`Core/Models/SidebarDeleteKey.MinusButtonIsEnabled`, refreshed with the menu
+bar's enablement — every trigger `ApplyMenuEnablement` hears — and not greyed
+for a dialog, whose overlay covers it anyway): greyed on a backup, an archive
+and a section of a course kept for reference. **It used to remove the WHOLE
+COURSE there**: `ConfirmRemove` turned a reference section's removal into the
+course's, silently. That coercion is now an early `return` — a guard for any
+caller that skips the rule — and the "removing the only section removes the
+course" branch stays, as on the mac. `ConfirmRemoveCourse` /
+`ConfirmRemoveSection` are the entry points.
+
+**Every row menu's removal is last, behind a separator**: course, section and
+reference-course rows gained Remove Course… / Remove Section…, greyed by the
+rule for THAT row read when the menu opens (`MainWindow.SituationFor(selection)`,
+the generalisation of `CurrentSituation`; the section window's and Course
+Settings' own buttons are read only for the selected row, and no removal
+depends on them). A reference SECTION offers none
+(`interface.whatIsWithheld`); backup and archived rows already ended with
+their Delete….
+
+`SidebarDeleteKeyContractTests` runs the 6 cases and checks the − button
+against every `subjectMenus` case whose row is a course or a section. **No
+`minusButtonCases` key was proposed** (decided on the plan review): those
+cases already pin it, and the mac implements and tests the same rule
+(`SidebarMinusButtonTests`). Through the window: `SidebarDeleteKeyUiTests`
+(Delete on ICS3U asks "Remove ICS3U?" and Cancel removes nothing; on a
+reference section nothing opens and − is greyed) and
+`ReferenceCourseUiTests.AReferenceSectionOffersNoRemoveSection`.
+
+### All Backups (item 7)
+
+A header over the list: **Course**, **Made** and **Size** sort
+(`allBackupsSortCourse` / `…Made` / `…Size` — never `allBackups-…`, which
+names a row), with ▲/▼ on the sorted one; **Made By** is a label. Newest first
+until a header is pressed; a new column sorts ascending, the same one flips;
+the selection is kept by file. `Core/Models/AllBackupsOrder` (ties newest
+first, an unmeasured size the smallest) is unit-tested. Each row's context
+menu: **Restore…** (exactly one chosen), **Show in File Explorer** (one window
+per folder; the dialog stays), and **Delete…** last behind a separator; a
+right-click on an unselected row selects only it (the menu's `Target`, as in
+File Explorer). Delete in the list is Delete…. Restore… and Delete… close All
+Backups FIRST and ask once it has gone — WinUI shows one ContentDialog per
+window, and their questions are dialogs — through the same
+`ConfirmRestoreBackup` / `ConfirmDeleteBackups` as before.
+`AllBackupsUiTests.TheListSortsAndOffersAMenu` drives the order, the header's
+ids and the menu.
+
+### One name per command (item 8)
+
+The course and section rows' Revise items sit in **Revise With ▸**, titled as
+the menu bar's: Claude…, Codex…, Local AI Assistant…. The outside agents'
+titles are `ClaudeCodeLauncher.MenuItemTitle` / `CodexLauncher.MenuItemTitle`,
+which the menu bar and the rows share, and
+`ContractTests.TheOutsideAgentsMenuTitles_AreTheContracts` reads
+`app-rules.json` → `outsideAgents.agents[].menuItem` by key — until now
+nothing on Windows read it, so the mac's rename turned nothing red. "Rename"
+and the empty pane's "New Course…" came with 2A.
+
+### The words (item 9), and a 12 epx floor
+
+- Class Dates: **Choose a File…**, **Day First** / **Month First** (keeping
+  the "(…)" example).
+- Site health: the dismissing button says **OK** only when it is the only
+  answer — **Not Now** beside a repair, **Close** beside Preview Again
+  (`SiteHealthRepair.CloseTitle`).
+- A backup, restore, deletion or removal problem names its act
+  (`Core/Models/BackupProblemTitle`, the mac's words: "Could not back up
+  EXC2O", "Could not restore EXC2O", "Could not delete the backup(s)", "Could
+  not delete the archive"), plus Windows' own **Removing(code)** — a failed
+  removal has a dialog of its own here, the mac's has none.
+- Title case on buttons: "Not Now" (the model download prompt), the
+  class-dates card's **Enter Class Dates** / **Not Now** — moved to the
+  trailing end, commit button first as Windows orders a pair — and **Save and
+  Continue**. The assistant's one-time reminder now says where: "…in File ▸
+  Settings, under Assistant."
+- **Nothing below 12 effective pixels.** Why 12 and not a conversion: 12 is
+  Fluent's **Caption**, the smallest style in Windows' type ramp and the size
+  the app's captions already use. Points on the mac are logical pixels (body
+  13 pt there, 14 epx here), so the mac's "nothing below 10 pt" is about 10–11
+  epx — a floor below Windows' own smallest style would have allowed text
+  Windows never draws (plan review, M4). Raised: About (11 → 12, three
+  places), the wizard's Example content badge (10 → 12 — XAML held in a C#
+  string), Class Dates' sharing note (11 → 12). `FontSizeFloorScanTests`
+  reads every `.cs` and `.xaml`, XAML inside strings included (an attribute
+  belongs to the nearest `<Tag`, an assignment to the innermost open
+  `new Type {`); glyphs in a `FontIcon` are icons and exempt. Checked to fail
+  on a size put back.
+
+### Not done, and why
+
+- **"Just Do It" / "Keep Checking"** (item 9's list): Windows has no such
+  buttons — the assistant appends a line after fifteen accepted plans instead
+  of offering the choice — so there is nothing to title-case; the missing
+  buttons are a parity gap outside #491's words, recorded rather than built.
+- **"Use This ID"**: Windows' Deploying pane edits the ID in place, with the
+  instructions inline (3A), so there is no dialog to carry the button.
+- **Sentence-case repair buttons** ("Put the Media folder back"): the
+  repair's own titles, `SiteHealthRepair.ButtonTitle`, were left as they are —
+  #491 named the dismissing button, and the mac's repair titles are the same
+  words, left as they were by its sweep.
 
 ## Diagrams and graphs (#485 E1, v1.7.0): what the runtime must carry
 

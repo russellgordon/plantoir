@@ -1,5 +1,9 @@
 # Plantoir for Windows — Progress
 
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 3B (#491 items 1–9)
+
+Same branch. The rest of #491, the mac's HIG sweep: a disabled main button is never the default (`PrimaryButtonLook` / `DialogButtons.EnablePrimary`, every dialog by source scan; the wizard's Create Course never takes Enter; Class Dates reads, then remembers); Escape is never trapped by Copy a Page's or the wizard's picker (`PickerEscape`; measured, the AutoSuggestBox swallowed every Escape); one explanation shape under a dialog title (`FormBuilders.DialogExplanation`, a census of every dialog); Open in Obsidian locks a reference course again first; Delete and − run the menu's removal under its own enablement (a reference section's − used to remove the whole course), and every row menu ends with Remove…; All Backups sorts, has a context menu and takes Delete; the rows' Revise With ▸ with the menu bar's titles (`outsideAgents.menuItem` now read here); title-case buttons, problem titles that name the act, OK only alone, and a 12 epx font floor. Also 3A's review fixes (the ID's trail line when the teacher switches windows; a tighter single-writer scan; Course Settings' Save following the ID live, by UI test). `sidebarDeleteKey` is now run here. Details: documentation/12, "The HIG sweep, screen by screen, on Windows (#491 part B)".
+
 ## 2026-10-15 — Windows catch-up to 1.7.1, batch 3A (#491 part A, #490)
 
 Same branch. File ▸ Settings… is ONE window (`SettingsWindow`: Assistant and Deploying; Preview comes with #514), not a dialog — WinUI allows one ContentDialog per window, measured per XamlRoot, and the wizard is one. The Cloudflare Account ID is edited only in Settings ▸ Deploying (a source scan holds every write to `DeployingSettingsPane`); a course's Deploying section and the wizard show it read-only with Open Settings… and follow it live. The in-app deploy's and Schedule a Deploy's refusals name File ▸ Settings ▸ Deploying. Help ▸ Plantoir Help (F1) opens plantoir.app/support. #490: both launchers' non-interactive refusal says "Add your Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying, then deploy again." (`deploy.ps1` via `[char]0x25B8`). Also 2C's review fixes (M-A: an open question refuses the assistant's deploy and stops nothing; L-1: a deploy the window will refuse keeps the preview; L-2; L-4). The #491 ledger entry is gone; the ledger holds #496, #503 and #514. Details: documentation/12, "The Settings window, Plantoir Help and the Account ID's refusals (#491 part A, #490)".
@@ -540,9 +544,11 @@ remembered. The honest way to keep this list right is
 - **Claude Code integration.** `Services/ClaudeCodeLauncher.cs` writes
   `%LOCALAPPDATA%\Plantoir\assist\mcp-<CODE>.json` and launches `claude` with
   `--mcp-config … --strict-mcp-config`, so a teacher's own MCP servers are
-  neither used nor disturbed. Both doors sit on a course's context menu:
-  **Revise with Claude…** (only when Claude Code and the server are both
-  present) and **Revise with local AI assistant…**.
+  neither used nor disturbed. The doors sit on the rows' context menus, under
+  **Revise With ▸** since #491 (2026-10-15): **Claude…** (only when Claude
+  Code and the server are both present), **Codex…** (#210) and, on a section
+  row, **Local AI Assistant…** — until #491 "Revise with Claude…" and
+  "Revise with local AI assistant…" at the top level.
 - **A cross-process lease protocol**, `Plantoir.Core/Assist/WorkLease.cs`.
   Four kinds — `assist`, `preview`, `publish`, `build` — as files under
   `courses/.internal/activity/`, so the app and the server can see each

@@ -6827,8 +6827,10 @@ asks them to sign in).
 
 ### On Windows (#210, 2026-09-30)
 
-"Revise with Codex…" is in the section and course menus beside "Revise with
-Claude…", each hidden independently (`CodexLauncher.IsAvailable`,
+Codex… is in the section and course menus beside Claude… — inside Revise
+With ▸ since #491 (2026-10-15), with the menu bar's titles; until then
+"Revise with Codex…" and "Revise with Claude…" at the top level — each hidden
+independently (`CodexLauncher.IsAvailable`,
 `Plantoir.Core/Assist/CodexLauncher.cs`). It finds `codex.exe`, `codex.cmd` or
 `codex.bat` on PATH, then `%USERPROFILE%\.local\bin\codex.exe`,
 `%APPDATA%\npm\codex.cmd` and `%USERPROFILE%\.bun\bin\codex.exe`, and passes the
