@@ -1496,6 +1496,40 @@ public class AssistWorkspaceTests : IDisposable
     }
 
     /// <summary>
+    /// #478: the rebuild after a publish, a hide or a whole unit stops for a
+    /// question the same way RebuildPreview's does — said as a question, after
+    /// what was already done, never as a broken build.
+    /// </summary>
+    [Fact]
+    public async Task APublishOrHideWhoseRebuildStopsForAQuestionSaysSo()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 4.md", draft: false);
+        Page("ICS3U", "section1/All Classes/Unit 3, Day 1.md", draft: true);
+        _launcher.QuestionOn = "preview";
+        var workspace = Open();
+        string folder = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes");
+
+        var published = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
+        var hidden = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 4" }, draft: true));
+        var unit = await workspace.ApplyWholeUnit("ICS3U", 1, 3, publishing: true, preview: true);
+
+        foreach (var (name, result) in new[] { ("publish", published), ("hide", hidden), ("whole unit", unit) })
+        {
+            Assert.False(result.Succeeded, name);
+            Assert.Contains(AssistWording.PreviewBuildNeedsAnAnswer("ICS3U", "1"), result.Message);
+            Assert.DoesNotContain(AssistWording.WhereTheOutputIs, result.Message);
+            Assert.DoesNotContain(AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"), result.Message);
+            Assert.NotNull(result.BackupPath);
+        }
+        Assert.StartsWith("1 page was changed and the course was backed up. ", published.Message);
+        Assert.Contains("publish: true", File.ReadAllText(Path.Combine(folder, "Unit 2, Day 3.md")));
+        Assert.Contains("publish: false", File.ReadAllText(Path.Combine(folder, "Unit 2, Day 4.md")));
+        Assert.Contains("publish: true", File.ReadAllText(Path.Combine(folder, "Unit 3, Day 1.md")));
+        Assert.Equal(3, _launcher.Runs.Count(run => run.Launcher == "preview"));
+    }
+
+    /// <summary>
     /// #467 (mac #439): a deploy whose legs were refused because the section
     /// was still being deployed says so - for a refused BUILD leg instead of
     /// "the build failed", and for refused deploy legs instead of "did not
