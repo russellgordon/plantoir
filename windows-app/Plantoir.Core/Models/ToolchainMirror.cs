@@ -44,15 +44,20 @@ public static class ToolchainMirror
     /// half-copied recipe was taken for a fresh one for the rest of the run.
     /// </summary>
     public readonly record struct CopyResult(int Changed, int Failed,
-                                             string? FirstFailedPath = null, string? FirstProblem = null)
+                                             string? FirstFailedPath = null, string? FirstProblem = null,
+                                             Exception? FirstError = null)
     {
         public static CopyResult operator +(CopyResult a, CopyResult b) =>
             new(a.Changed + b.Changed, a.Failed + b.Failed,
                 a.FirstFailedPath ?? b.FirstFailedPath,
-                a.FirstFailedPath is not null ? a.FirstProblem : b.FirstProblem);
+                a.FirstFailedPath is not null ? a.FirstProblem : b.FirstProblem,
+                a.FirstFailedPath is not null ? a.FirstError : b.FirstError);
 
-        /// <summary>One file that could not be copied or removed, and why.</summary>
-        public static CopyResult OneFailure(string path, Exception error) => new(0, 1, path, error.Message);
+        /// <summary>One file that could not be copied or removed, and why.
+        /// The exception itself is kept for a reader that must say the reason
+        /// WITHOUT the path .NET puts in its message (the guidance notice,
+        /// <see cref="AgentGuidance.SystemReason"/>).</summary>
+        public static CopyResult OneFailure(string path, Exception error) => new(0, 1, path, error.Message, error);
     }
 
     /// <summary>

@@ -73,6 +73,13 @@
         <InfoBar x:Name="GettingReadyNotice" Margin="12,8,12,0"
                  IsOpen="False" Severity="Informational" IsClosable="False"
                  AutomationProperties.AutomationId="gettingReadyNotice" />
+        <!-- #496: the guidance for assistants could not be written into this
+             folder (printablePages.agentGuidance.words.couldNotWrite). Quiet
+             and closable: it holds nothing back, and it comes back at the
+             next launch while its cause remains. MainWindow.Guidance.cs. -->
+        <InfoBar x:Name="GuidanceNotice" Margin="12,8,12,0"
+                 IsOpen="False" Severity="Informational" IsClosable="True"
+                 AutomationProperties.AutomationId="guidanceNotice" />
         </StackPanel>
 
         <views:WorkspacePickerView x:Name="Picker" Grid.Row="2" Visibility="Collapsed" />
