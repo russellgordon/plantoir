@@ -103,8 +103,12 @@ public sealed partial class MainWindow
     internal async Task<AssistToolAnswer?> HideClassesForTheDeploy(string code, int section, IReadOnlyList<string> places)
     {
         if (Verbs() is not { } verbs) return null;
+        // Its "ran from a menu" line names Hide Pages…, whose call it is, and
+        // says where it came from, as the mac's does.
         var answer = await verbs.Perform(SectionVerbs.HidePages(code, section, places, plan: false),
-                                         "Deploy", code, section, previewFollows: false, noteOnTheTrail: false);
+                                         SectionVerbDialog.MenuPath(Item.HidePages), code, section,
+                                         places.Count == 1 ? "1 class dated later, at Deploy" : $"{places.Count} classes dated later, at Deploy",
+                                         previewFollows: false);
         ApplyMenuEnablement();
         return answer;
     }

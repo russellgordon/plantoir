@@ -175,15 +175,9 @@ public sealed class SectionVerbs : IAsyncDisposable
     /// False for the hide the question at Deploy makes (#475): no preview is
     /// stopped before it or started after it (<see cref="AssistToolRunner.PreviewFollowsAChange"/>).
     /// </param>
-    /// <param name="noteOnTheTrail">
-    /// False when the caller writes its own line — the question at Deploy
-    /// records its answer, counts included, as "asked about classes dated
-    /// after the next class", and this was not run from a menu.
-    /// </param>
     public async Task<AssistToolAnswer> Perform(JsonObject call, string item, string course, int section,
                                                 string? counts = null, CancellationToken cancellation = default,
-                                                Action<string>? progress = null, bool previewFollows = true,
-                                                bool noteOnTheTrail = true)
+                                                Action<string>? progress = null, bool previewFollows = true)
     {
         string name = call["function"]?["name"]?.GetValue<string>() ?? "";
         bool writes = AssistToolRunner.IsWriteTool(name);
@@ -217,14 +211,13 @@ public sealed class SectionVerbs : IAsyncDisposable
                 // The server went away under the call: forgotten, so the next
                 // item starts a fresh one. Its undo list went with it.
                 await ForgetTheServer();
-                if (noteOnTheTrail)
-                    ActivityTrail.Note(ActivityTrail.Event.RanFromAMenu,
-                        $"{item} — could not be done: {error.Message}", course, section);
+                ActivityTrail.Note(ActivityTrail.Event.RanFromAMenu,
+                    $"{item} — could not be done: {error.Message}", course, section);
                 return AssistToolAnswer.Same(CouldNotBeDone);
             }
             if (answer.CarriesLastChange) LastChange = answer.LastChange;
             if (answer.ChangesToUndo is { } now) _changesToUndo = now;
-            if (writes && noteOnTheTrail)
+            if (writes)
                 ActivityTrail.Note(ActivityTrail.Event.RanFromAMenu,
                     TrailLine(item, Ending(name, answer, before, _changesToUndo, course, section), counts), course, section);
             return answer;
