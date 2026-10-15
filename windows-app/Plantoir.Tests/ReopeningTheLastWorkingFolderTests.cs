@@ -127,7 +127,7 @@ public class ReopeningTheLastWorkingFolderTests : IDisposable
         // in the app project this suite cannot reference.
         string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot,
             "windows-app", "Plantoir", "ViewModels", "WorkspaceViewModel.cs"));
-        int choose = source.IndexOf("public void ChooseWorkspace(string path)", StringComparison.Ordinal);
+        int choose = source.IndexOf("public void ChooseWorkspace(string path", StringComparison.Ordinal);
         string chooseBody = source.Substring(choose, source.IndexOf("NoteBecameKey();", choose, StringComparison.Ordinal) - choose);
         Assert.Contains("NotReopenedSentence = null;", chooseBody);
         Assert.Contains("Settings.WorkspacePath = path;", chooseBody);
