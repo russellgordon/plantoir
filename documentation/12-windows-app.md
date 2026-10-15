@@ -2488,7 +2488,8 @@ Five things about it are decisions rather than details.
   if anything goes wrong, which fails the NEXT build with a lock error reading
   "the app is open" when the app is not open at all. `AssistSurfaceContractTests`
   made the same trade. The binder drops an argument the tool does not declare,
-  as the SDK's own binder does — `AssistAgent.RunTool` sets `preview` on tools
+  as the SDK's own binder does — `AssistToolRunner.Run` (reached through
+  `AssistAgent.RunTool` since #489) sets `preview` on tools
   that do not all take it — but everything else about it fails LOUDLY, because
   a runner that quietly drops an argument is #141 again: a declared argument
   that cannot be converted throws, a required one nobody sent throws rather
@@ -3941,7 +3942,11 @@ and invisible on the mac reading the same folder. `CourseArchiver.Archive` now
 waits for the next second (at most three tries) and stamps again. Rejected:
 teaching both readers a `-N` suffix (the mac's reader would hide a zip Windows
 wrote until it learned it too), and a millisecond stamp (it changes the frozen
-`zipNames` format). `ContractTests.CourseManagement_ZipNames` also takes each
+`zipNames` format). **Since #489 (2B) the READER takes `-N`** (N ≥ 2): the
+mac began writing `<time>-2` for a second copy in one second and reading it,
+so the reason above expired in that direction, and a copy the mac made must
+be listed and counted here. The WRITER still waits — see "The Section menu's
+functions". `ContractTests.CourseManagement_ZipNames` also takes each
 case's `moment` apart field by field against `GregorianCalendar` (#161 part 2);
 re-formatting with our own writer would stay green while both halves were
 wrong.
@@ -4595,7 +4600,7 @@ when they land.
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings…, Check for Updates… (only while the updater has a feed) |
 | Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
-| Section | Preview / Stop Preview (Ctrl+Shift+P), Deploy… (Ctrl+Shift+D), Open in Browser · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · (2B's functions go here) · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| Section | Preview / Stop Preview (Ctrl+Shift+P), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Publishing and Deploying… · Report a Problem… · About Plantoir |
 
@@ -4626,8 +4631,9 @@ menu refresh would spawn work on every hover), copying from the work lease
 plus this app's own Back Up Now (`SidebarPane.IsZipping`), the dialog from
 `DialogGate.IsOpen`. Two facts are gathered the Windows way: **any**
 assistant on the course greys all three Revise targets (Windows' #468 hold,
-which the context menus already used), and `lastChangeIsHere` /
-`verbIsRunning` are false until 2B. A `mac` issue records both.
+which the context menus already used), and — since 2B — `lastChangeIsHere`
+and `verbIsRunning` come from the window's own runner and the in-process
+claims ("The Section menu's functions", below). A `mac` issue records the first.
 
 **Each item runs the SAME code as its other routes.** `SidebarPane.Perform`
 (`SidebarPane.Menus.cs`) dispatches the row items to the functions the
@@ -4704,7 +4710,7 @@ layouts AltGr IS Ctrl+Alt, so a Ctrl+Alt key fires while a teacher types @,
 for Copy a Page: it is the browser's inspect-element key and a teacher who has
 used one expects that; Copy a Page has no key. **Settings… lost its "Ctrl+,"
 label**: it was drawn with nothing behind it, and a comma key measured above
-does not fire. Ctrl+Shift+B is kept free for 2B's Rebuild Preview.
+does not fire. Ctrl+Shift+B was kept free for 2B's Rebuild Preview, which has it now.
 
 ### What does NOT exist here: File with no window
 
@@ -4800,7 +4806,7 @@ refuses — its folder does not exist — and the same key under that refusal
 arrives nowhere); `OpenRecentUiTests` (a second folder opened, listed first;
 the first chosen back; the second deleted and chosen, the dialog, the window
 keeping its folder, the trail line; Clear Menu and its line). Section ▸ Class
-Dates… does not exist yet (2B). `AcceleratorUnderDialogUiTests` (#191) still
+Dates… did not exist yet on that day (it arrived with 2B, below). `AcceleratorUnderDialogUiTests` (#191) still
 passes with the keys on items: "Ctrl+Shift+R / F2 / Ctrl+N / Ctrl+O: not
 delivered (the dialog kept it); control (no dialog): all four arrived at
 their handlers" (2026-10-15). One of three runs that day failed on its own
@@ -4812,6 +4818,174 @@ import for reference, Course Settings' Save, the sidebar's names) ran 13 of
 failed first in the batch ("the import sheet never opened") and passed alone
 straight after. **#483** (the wizard's and Copy a Page's field heights) is
 measured in "The chrome is shared, and that was a trade — reversed by #456".
+
+### The Section menu's functions (2B, 2026-10-15)
+
+The nine items the mac's #457 batch B put in the Section menu, after Open in
+Browser and in two groups: **Publish Pages…, Hide Pages…, Publish Class for a
+Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class,
+Re-date Classes…, Make Room for Classes…, Class Dates…** (AutomationIds
+`sectionPublishPages` … `sectionClassDates`). The section ROW's context menu
+carries Publish Pages…, Hide Pages…, Publish Class for a Date… and Add Next
+Class, selects the row first, and meets the menu bar's own check at the click
+(`MainWindow.RunSectionVerbFromARow`), because a context menu does not
+consult the rule when it is drawn. What each item opens is the mac's table
+([09 → "The assistant's functions in the Section menu"](09-mac-app.md)); the
+deep dive on the third client is
+[10 → "The Section menu, a third client"](10-local-ai-assistant.md). This
+section is what Windows did differently, and why.
+
+**One runner entry.** `AssistAgent.RunTool`'s body is now
+`Plantoir.Core/Assist/AssistToolRunner.cs` — the preview, deploy and
+reference rules every client's call meets on this side of the server. Not a
+pure move (the plan review's H3): the seams stay on `AssistAgent`, where both
+windows and five test classes set them, and are handed to a runner per call;
+the runner RETURNS whether the work was handed to the app instead of setting
+the agent's flag, and the agent appends exactly one `tool` message for
+whatever came back. Gated on `AssistScenarioTests`, `ReferenceRefusalTests`,
+`AssistAgentTests`, `PreviewWhileDeployingTests` and
+`RelativeDayFreshnessTests` unchanged and green (118 of 118) before anything
+else moved. `AssistSurface { Outside, LocalWindow, Menu }` is in Core.
+
+**Behind the runner: one `plantoir-mcp` per main window (Option B).**
+`SectionVerbs` (Core) builds each call in code and runs it through
+`AssistToolRunner` on the Menu surface; behind it is a server the window
+starts on first use, `McpClient.StartForTheMenu(serverPath, folder)` — no
+`--course` and no door variable, so it takes NO assist lease
+(`Program.cs` takes one only when it holds a course), `PLANTOIR_SURFACE=menu`,
+and it is NOT registered in `WindowServers` (that list tells the assistant
+window's lease apart from an outside session's, and this server holds none).
+The server's request filter — `ReferenceWriteGate`, `OutsideChangeGate` — is
+the same entry every client meets. Its undo list is the window's Undo Last
+Change; `DropVerbs` stops it when the window opens another folder or closes,
+and its undo list goes with it (the mac's decision 4). **Measured cold start**
+on this PC (Intel i5-8365U, Windows 11 Pro 26200, Debug x64 build,
+2026-10-15): spawn to the `initialize` answer **476–490 ms** over six runs,
+`tools/list` answered 20 ms later — so the first menu item of a window's
+life pays half a second once, behind the dialog's "Working…".
+REJECTED, with the reason:
+- **The tools in-process** (`PlantoirTools` inside the app): the app would
+  reference the server's executable and the SDK, and the two gates live in
+  `Program.cs`'s filter lambda, so a second path would skip them — the mac's
+  own reason for one entry.
+- **`AssistAgent` with a null model**: drags a conversation, a transcript and
+  a system prompt into a menu click, for nothing.
+- **Sharing the assistant window's server**: a teacher with no assistant has
+  no such window, and it would interleave two undo lists.
+
+**Where the last change was made travels in `_meta`.** `UndoHistory.Entry`
+carries files, not a section (a shared page's flag lives in a file no section
+owns), so the server records the call's own course and section against each
+new top entry (`AssistWorkspace.NoteWhereTheLastChangeWasMade`, called by
+`PlantoirTools.AfterCall` from the request filter), and the menu's server
+sends `plantoir.app/lastChange` (`"CODE/N"`, or null) and
+`plantoir.app/changesToUndo` on every answer. `SectionVerbs.LastChange` greys
+Undo Last Change everywhere but that section (`lastChangeIsHere`), and the
+depth before and after decides the trail's ending — "carried out", "changed
+nothing", "took the last change back" — without parsing a sentence. Neither
+key is sent to an outside client.
+
+**Pages by folder and name — a server fix (the plan's finding 0.8, review
+M3).** The menu sends `section1/All Classes/Unit 2, Day 3` as a JSON array.
+`PlanPublish` already read a course-relative path; `AssistWorkspace.Page`
+(re-date's and the read tools' lookup) did not — it resolved a slashed name
+against the WORKING folder only. It now also resolves it INSIDE the course
+(`PagePaths.ResolveInside(course.DirectoryPath, …)`), treats a
+`section<M>/` prefix that is not this section as no page, keeps the How I
+Teach refusal, and answers only a page this section lists. Pinned by
+`SectionMenuServerTests.APageNamedByItsFolderIsTheOneTicked_NotItsDuplicateTemplate`
+(a `_DUPLICATE ME` page named by folder) and
+`PageByFolder_ResolvesInsideTheCourse_AndRefusesAnotherSectionsPrefix`.
+`AssistSurfaceContractTests` and both digests (`scripts/test_tool_surface_digest.py`)
+did not move: no schema or description changed.
+
+**The menu's voice, on the server.** `AssistWorkspace.Surface` replaces the
+bool `ServesTheLocalWindow`, which stays as the question most callers ask
+(`Surface != Outside`); `SpeaksFromTheMenu` picks the twins (helpers in
+`AssistWorkspace.Menu.cs`): the undo five in `UndoLastChange`, pages whose
+settings cannot be added to (including the plan's own sentence, through
+`PublishPlan.FromTheMenu`), new dates not set, pages a change could not
+finish, no page / no pages called (by the name TICKED — the part after the
+last slash — joined with "and"), no class on a day (`"Monday, 2026-09-14"`,
+weekday and ISO day, invariant and Gregorian, `AssistWording.MenuDay`), Make
+Room's card line, and `restoreFromBackupPutsItBack` after a publish that
+stopped part way. App side, the runner composes two: `sectionIsChangingFromTheMenu`
+(the in-app assistant's write refused) and `courseIsBeingCopiedFromTheMenu`
+(Rebuild Preview under a copy lease). `changedWhileSavingACopyFromTheMenu` is
+declared and has no Windows call site: Windows re-plans after saving a copy
+only for Get Ready for the Start of the Year, which the menu does not run
+through the tools. The scenario runner's default surface stays OUTSIDE and
+`surface: "mcp"` is mapped explicitly (review H2), so no green scenario moved.
+
+**A copy before EVERY change.** On the Menu surface
+`BackUpOnceForThisConversation` makes a fresh `_menu-section<N>` zip each
+time, under the same `copying` lease as the assistant's, with a "section menu
+backed up a course" line, never recorded as held; `PruneBackups` keeps five
+of the assistant's and five of the menu's, counted apart. **The same-second
+name is now READ, and the writer still waits.** #187 (above) rejected `-N`
+because the mac's reader would hide a zip Windows wrote; the mac now writes
+`<time>-2` itself and reads it, so that reason has expired in one direction:
+`BackupItem.From` reads `-N` (N ≥ 2; `-1` and `-x` still unread) so a copy
+the mac made is listed, counted and restorable here. Windows' own writer
+keeps waiting for the next second — it never collides, and changing it buys
+nothing a teacher sees. Two menu changes in one second measured as two zips a
+second apart (`SectionMenuServerTests.EveryChangeSavesItsOwnMenuCopy_AndSaysSoOnTheTrail`).
+
+**The claim is in-process.** `SectionMenuActivity` (Core, static) holds a
+section while a menu CHANGE runs (plans only read); the in-app assistant's
+write to it is refused before anything is backed up. `AssistActivity.ReportWork`
+is set by the assistant window around every turn, approval and decline, and
+`verbIsRunning` is this window's runner, any window's claim, or the
+assistant working. Both windows are this app, so a static set answers in a
+microsecond and needs no file; another program's work is the work leases'.
+The menu does not hold the assistant's backups.
+
+**Rebuild Preview really rebuilds — and so does the assistant now (Q1).**
+Before, `rebuild_preview` reached `StartPreviewIfIdle`, which returns at once
+while a preview serves, and still said "rebuilding" (the plan's finding 0.7).
+`SectionDetailView.RebuildPreviewAsync` stops a serving preview and starts it
+again; `MainWindow.RebuildPreviewFor` is the seam (`RebuildPreviewInApp`),
+used by Section ▸ Rebuild Preview, by the in-app assistant's
+`rebuild_preview`, by the fixed phrasing matched as `rebuild_preview`, and
+by "rebuild / refresh / update the preview" (plain "preview" and "show me the
+preview" still only show one). A behaviour change for the assistant, written
+up for the mac as a question (does its `rebuild_preview` restart a serving
+preview?). A page change from the menu follows the runner's rule for every
+client: a showing preview is stopped, the tool runs with `preview: false`,
+and the preview starts again.
+
+**The dialog is ONE `ContentDialog`** (`Views/SectionVerbDialog.cs`) moving
+through Choose → Plan → Working → Result: a stage changes by cancelling the
+button's own close and doing the work under its deferral, because WinUI shows
+one dialog at a time and refuses a second asked for while the first closes.
+While a call runs no button is drawn and Escape does not close it. A plan
+twin that refuses ends with its sentence and OK alone. Publish Pages… and
+Hide Pages… list classes first (by date), then the rest by folder, two pages
+of one title told apart by their folder; Publish Class for a Date… offers the
+next class day from the section's dates (tomorrow with none) in a
+`CalendarDatePicker`; Make Room… asks the class and 1–10. Class dates first:
+Add Next Class, Re-date Classes… and Make Room… open THIS window's
+`SectionScheduleDialog` with the reason (`datesForTheNextPage`,
+`datesToReDate`, `datesToMakeRoom`, club twins) when none are on file, and
+run once they are written; the dialog after it retries while the dates
+dialog is still closing, rather than drop the change's answer.
+
+**Trail**: `RanFromAMenu` ("UIVERB/1 · Section ▸ Publish Pages… — carried
+out, 1 page ticked"; endings carried out, changed nothing, took the last change
+back, cancelled at the plan, rebuilt, not rebuilt, opened) and
+`SectionMenuBackedUpACourse`. The second is written by the window's
+`plantoir-mcp`, which `--state-dir` does not reach (`AppDataRoot` does not
+cross processes), so a UI test's copy line lands in the PC's own trail.
+
+**Testing it**: unit — `SectionVerbsTests` (calls, the runner entry, Undo's
+place, the trail, the claim, Rebuild's two answers), `SectionMenuServerTests`
+(folder-named pages, a copy per change, the voice, the surface variables),
+the wording walk (55 keys declared, 17 #475 keys still ledgered for 2C).
+Through the window (`SectionVerbsUiTests`, 2026-10-15, this PC, both
+passing, 2 min 5 s): Publish Pages… → tick → plan → Publish → the flag
+changes on disk, one `_menu-section1` zip, Undo Last Change live and putting
+the page back; and Rebuild Preview with the REAL launcher — a serving
+preview, an edit on disk, Rebuild Preview, and the edit served.
 
 ## Diagrams and graphs (#485 E1, v1.7.0): what the runtime must carry
 
