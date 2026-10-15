@@ -6,10 +6,10 @@ class — Unit 2, Day 3 in ICS3U section 1 — and everything it links to"* and
 have it happen, after confirming a plain-words summary of what will change.
 
 It holds no AI model of its own: it is the tool surface, driven from two items
-on a course's context menu (`Plantoir/Views/SidebarPane.xaml.cs`) — **Revise
-with Claude…**, which launches Claude Code and appears only when Claude Code
-and this server are both present, and **Revise with local AI assistant…**,
-Plantoir's own assistant, which starts this same binary as a subprocess
+on a row's **Revise With ▸** submenu (`Plantoir/Views/SidebarPane.xaml.cs`) —
+**Claude…**, which launches Claude Code and appears only when Claude Code and
+this server are both present, and **Local AI Assistant…** (on section rows
+only), Plantoir's own assistant, which starts this same binary as a subprocess
 (`Plantoir/Services/McpClient.cs`). A change here reaches both.
 
 **Status: on `main`, and it ships** — `publish.ps1` publishes this project,

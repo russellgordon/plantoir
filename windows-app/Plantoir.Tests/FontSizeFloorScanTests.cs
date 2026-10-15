@@ -18,7 +18,11 @@ namespace Plantoir.Tests;
 /// held in C# strings (the wizard's "Example content" badge is a DataTemplate
 /// in a raw string, and was 10): an attribute <c>FontSize="N"</c> belongs to
 /// the nearest <c>&lt;Tag</c> before it, an assignment <c>FontSize = N</c> to the
-/// nearest <c>new Type {</c> whose braces are still open.
+/// nearest <c>new Type {</c> whose braces are still open, and a style's
+/// <c>&lt;Setter Property="FontSize" Value="N"/&gt;</c> (either attribute order)
+/// to the <c>TargetType</c> of the nearest <c>&lt;Style</c> before it. A C#
+/// literal may carry a type suffix (<c>9d</c>, <c>9.5f</c>, <c>9m</c>) and is
+/// still read.
 /// </remarks>
 public class FontSizeFloorScanTests
 {
@@ -30,7 +34,9 @@ public class FontSizeFloorScanTests
     public void NoTextIsSmallerThanTheFloor()
     {
         var attribute = new Regex(@"\bFontSize=""(?<n>[0-9]+(?:\.[0-9]+)?)""");
-        var assignment = new Regex(@"\bFontSize\s*=\s*(?<n>[0-9]+(?:\.[0-9]+)?)\b");
+        var assignment = new Regex(@"\bFontSize\s*=\s*(?<n>[0-9]+(?:\.[0-9]+)?)[dDfFmM]?\b");
+        var setter = new Regex(@"<Setter\b(?=[^>]*\bProperty=""FontSize"")[^>]*\bValue=""(?<n>[0-9]+(?:\.[0-9]+)?)""");
+        var style = new Regex(@"<Style\b[^>]*\bTargetType=""(?<type>[^""]+)""");
         var creation = new Regex(@"\bnew\s+(?<type>[A-Za-z_][\w.]*)\s*(?:\(\s*\))?\s*\{");
         var tag = new Regex(@"<(?<type>[A-Za-z_][\w:.]*)");
         var offenders = new List<string>();
@@ -57,6 +63,11 @@ public class FontSizeFloorScanTests
             {
                 var owner = tag.Matches(source[..match.Index]).LastOrDefault();
                 Check(match, owner?.Groups["type"].Value ?? "?");
+            }
+            foreach (Match match in setter.Matches(source))
+            {
+                var owner = style.Matches(source[..match.Index]).LastOrDefault();
+                Check(match, owner?.Groups["type"].Value ?? "Setter");
             }
             foreach (Match match in assignment.Matches(source))
             {

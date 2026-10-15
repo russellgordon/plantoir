@@ -1231,7 +1231,7 @@ Check the five things nothing pins:
    `QuestionParser.SeparateDefaultAnswer`.
 3. **Cancel cancels**, and does not hang. The run should end as cancelled
    rather than sit waiting on a question nobody can answer.
-4. "Save and continue" sends what you typed: the site Netlify creates carries
+4. "Save and Continue" sends what you typed: the site Netlify creates carries
    **that** address, not the pre-filled one.
 5. The breadcrumb trail records the ask — `asked for a publishing credential`,
    with the field named.
@@ -3738,8 +3738,13 @@ Deploy…, Rename (the File menu item, F2 and the context menu all ask
 the Site Health REPAIR button (and `SiteHealthRepair.OutcomeOfRepairing`
 refuses on its own), and the Course Settings form, replaced by
 `ReferenceSummaryView`. Cancel Scheduled Deploy… stays (gate by direction).
-The footer's Remove on a reference course's section removes the whole course;
-`ArchiveAndRemoveSection` refuses with `staysAsItIs` for any other caller.
+On a reference course's SECTION, the − button, the Delete key and the
+section's menu offer no removal at all (− is greyed, Delete does nothing, the
+menu has no Remove Section…); the course row's Remove Course… removes it all.
+`ArchiveAndRemoveSection` still refuses with `staysAsItIs` for any caller that
+skips that rule. (Until batch 3B the footer's Remove there silently removed the
+whole course; see "Delete and the − button run the menu's removal (items 5–6)"
+under "The HIG sweep, screen by screen, on Windows (#491 part B)".)
 Import Courses for Reference… is on the File menu, beside Restore from
 Archive…. The calm note is shown before Obsidian opens, once per course,
 remembered in the state folder.

@@ -196,6 +196,49 @@ public class ReferenceCourseUiTests
     }
 
     /// <summary>
+    /// Open in Obsidian locks the pages again FIRST (#491 item 4): a page
+    /// unlocked since the folder was read is locked before anything opens, and
+    /// the trail says so. Never launches Obsidian — the line is written before
+    /// the calm note, and the note is cancelled. Returns early where Obsidian is
+    /// not installed, as the test above does (the route is reached only
+    /// through it).
+    /// </summary>
+    [UiFact]
+    public void OpenInObsidianLocksAnUnlockedPageAgainFirst()
+    {
+        using var app = new DrivenApp(WriteCourses);
+        string kept = Path.Combine(app.WorkspacePath, "courses", Folder, "Concepts", "Recursion.md");
+        Assert.True(Retry.WhileFalse(() => EndToEnd.WritingIsRefused(kept), TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(500)).Result,
+                    $"the reference course was never locked: {kept}");
+        ReferenceLock.Unlock(kept);
+        Assert.False(EndToEnd.WritingIsRefused(kept), "unlocking the page by hand did not take");
+        const string line = "locked 1 page of ICS3U again";
+        Assert.DoesNotContain(line, MenuBar.Trail(app));
+
+        var row = app.Find("sidebar-" + Folder, "the reference course's row");
+        app.RightClickMiddleOf(row);
+        var desktop = app.Window.Automation.GetDesktop();
+        var item = Retry.WhileNull(
+            () => desktop.FindFirstDescendant(cf => cf.ByName("Open in Obsidian").And(cf.ByControlType(ControlType.MenuItem))),
+            TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
+        Assert.NotNull(item);
+        if (!item!.IsEnabled)
+        {
+            Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+            _output.WriteLine("no Obsidian on this machine: the route is reached only through it");
+            return;
+        }
+        DrivenApp.PressMenuItem(item);
+        var note = app.FindOrNull("referenceCalmNote", TimeSpan.FromSeconds(10));
+        Assert.NotNull(note);   // shown once per course, and this run's state folder is new
+        Assert.True(EndToEnd.WritingIsRefused(kept), "the page was still writable when the note came up");
+        Assert.Contains(line, MenuBar.Trail(app));
+        var cancel = desktop.FindFirstDescendant(cf => cf.ByName("Cancel").And(cf.ByControlType(ControlType.Button)));
+        Assert.NotNull(cancel);
+        cancel!.AsButton().Invoke();   // Obsidian is never launched
+    }
+
+    /// <summary>
     /// A reference course's SECTION offers no Remove Section… (#491 item 6;
     /// <c>interface.whatIsWithheld</c> — "removing the whole course stays"),
     /// while the live course's section row offers it, last.
