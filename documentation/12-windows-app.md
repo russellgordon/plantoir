@@ -3078,7 +3078,10 @@ the state to go with them.
 MENU route to the folder picker is genuinely shut while a dialog is up:
 `MainWindow.OpenWorkingFolder_Click` is a `MenuFlyoutItem`, and the dialog's
 overlay covers the menu bar. **Ctrl+O is not obviously shut.** It is a
-`KeyboardAccelerator` declared on `MainWindow.xaml`'s `Root` grid; WinUI
+`KeyboardAccelerator` declared on `MainWindow.xaml`'s `Root` grid (as it was
+when this was written; since #488 every key is on its menu item — see
+"Accelerators under a dialog (#191)" and "Menus, the Section menu's functions
+and #475 on Windows"); WinUI
 searches for accelerators window-wide unless a `ScopeOwner` narrows them, none
 is set, and `OpenWorkingFolderAccelerator` has no guard of its own. Whether the
 key actually reaches it under a modal dialog cannot be settled by reading —
@@ -4674,7 +4677,17 @@ anywhere else the items' keys fire — so the view-scoped copies added nothing.
 Every accelerator's `Invoked` is marked handled (an unhandled one goes on to
 raise `Click`, which would run the item twice), and asks
 `DialogGate.Holds(root, "<key>")`, so the #191 record still notes every
-arrival. F2 does nothing while a text field has focus.
+arrival. F2 does nothing while a text field has focus: the key is marked
+handled at the accelerator, so it is spent rather than passed to the field
+(which gives F2 no meaning of its own) — passing it on would raise the item's
+`Click` and rename anyway. **A Rename held back by `Invoke`'s re-check is
+silent too** — F2 on a course whose Rename the rule greys (a reference
+course, a section row, a course being copied) does nothing and says nothing,
+which is what the mac's key on a disabled menu item does. Before #488 F2 opened
+the rename dialog and let it explain the refusal; do not restore that route:
+the reason is on the greyed Course ▸ Rename's own reason line, and a key that
+opens a dialog the menu says cannot be used is the disagreement the one rule
+exists to prevent.
 
 **Ctrl+Shift+O sits on ONE Open in Obsidian item** — Course's unless a section
 row is selected, then Section's; `ApplyMenuEnablement` moves the accelerator

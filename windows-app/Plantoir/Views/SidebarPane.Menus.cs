@@ -79,10 +79,19 @@ public sealed partial class SidebarPane
     /// The scheduled deploy the sidebar is showing for a section (its clock
     /// badge), or null. Read from the row rather than from Task Scheduler: the
     /// menu bar is refreshed often, and the tree re-reads the scheduler on every
-    /// Refresh — which each activation already does.
+    /// Refresh — which each activation already does. A section with NO row (the
+    /// filter hid it, or the tree has not caught up) asks Task Scheduler
+    /// itself: "no row" is not "no schedule", and reading it as one would let
+    /// Schedule Deploy… silently replace a deploy the teacher had set (2A's
+    /// implementation review, L1).
     /// </summary>
-    internal DateTime? ScheduledDeployShownFor(string courseCode, int section) =>
-        FindRow(_roots, new SidebarSelection.SectionItem(courseCode, section))?.ScheduledDeploy;
+    internal DateTime? ScheduledDeployShownFor(string courseCode, int section)
+    {
+        var row = FindRow(_roots, new SidebarSelection.SectionItem(courseCode, section));
+        if (row is not null) return row.ScheduledDeploy;
+        string? folder = Workspace.WorkspacePath;
+        return folder is null ? null : Plantoir.Core.Assist.TaskScheduling.NextRun(folder, courseCode, section);
+    }
 
     /// <summary>Courses this app is zipping right now from Back Up Now, by folder and code (#351's "copying").</summary>
     private static readonly HashSet<string> _zipping = new(StringComparer.OrdinalIgnoreCase);
