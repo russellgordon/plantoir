@@ -3654,6 +3654,12 @@ press asked for the page last viewed, so a plain press writes nothing new.
 **"preview start page chosen in Settings"** — which choice. Never a page's
 words.
 
+**On Windows** (#514): the same contract, with a second Section item in place
+of the Option alternate, Alt read at the click, WebView2's `SourceChanged` and
+`ContentLoading` in place of KVO and didCommit, and the page kept in its own
+file — `12-windows-app.md` → "Preview at Last Viewed on Windows (#514, the
+mac's #504)".
+
 ## Two programs, one course: the build, preview and publish leases (#156)
 
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
