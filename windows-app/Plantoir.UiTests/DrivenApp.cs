@@ -404,6 +404,28 @@ public sealed class DrivenApp : IDisposable
             $"Never found {describedAs} (automation id '{automationId}').");
     }
 
+    /// <summary>
+    /// Another top-level window of THIS run's app — File ▸ Settings… (#491) is
+    /// a window of its own, not a dialog inside <see cref="Window"/> — found by
+    /// an automation id somewhere inside it, and returned whole. Waited for.
+    /// </summary>
+    public AutomationElement FindTopLevel(string automationId, string describedAs)
+    {
+        int pid = _app?.ProcessId ?? throw new InvalidOperationException("the app was never launched");
+        var found = Retry.WhileNull(() =>
+        {
+            try
+            {
+                foreach (var top in Desktop.FindAllChildren(cf => cf.ByProcessId(pid)))
+                    if (top.FindFirstDescendant(cf => cf.ByAutomationId(automationId)) is not null) return top;
+            }
+            catch (System.Runtime.InteropServices.COMException) { }
+            return null;
+        }, Patience, TimeSpan.FromMilliseconds(250)).Result;
+        return found ?? throw new InvalidOperationException(
+            $"Never found {describedAs} (a window holding automation id '{automationId}').");
+    }
+
     public AutomationElement? FindOrNull(string automationId, TimeSpan? within = null) =>
         Retry.WhileNull(() => FirstOrNullOnce(automationId),
                         within ?? TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(200)).Result;

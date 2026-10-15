@@ -237,8 +237,17 @@ public sealed class PublishingChoiceView
         // A change made in Settings shows here at once. Static event, so the
         // view lets go of it when it leaves the screen: a wizard or a course
         // closed must not be kept alive, or refreshed, by the app's settings.
+        //
+        // MEASURED, and the reason for the IsLoaded check: inside the wizard's
+        // ContentDialog, Unloaded arrives about 70 ms AFTER Loaded with the
+        // view still on screen (IsLoaded true, parent unchanged) and no second
+        // Loaded follows — WinUI's late Unloaded when the dialog re-hosts its
+        // content. Unsubscribing on it left the wizard deaf to Settings, and
+        // Create never followed a valid ID. An Unloaded that finds the view
+        // still loaded is that stale one, and is ignored; the real one, when
+        // the wizard was cancelled, measured IsLoaded false.
         Root.Loaded += (_, _) => ListenForTheAccount(true);
-        Root.Unloaded += (_, _) => ListenForTheAccount(false);
+        Root.Unloaded += (_, _) => { if (!Root.IsLoaded) ListenForTheAccount(false); };
     }
 
     private void ListenForTheAccount(bool listen)
