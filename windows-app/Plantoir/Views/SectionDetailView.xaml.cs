@@ -194,6 +194,9 @@ public sealed partial class SectionDetailView : UserControl
     // so only a deploy already running does. Mac parity: deployAndWait()'s
     // check is deployRunner.isRunning, evaluated after the stop.
     internal bool IsDeploying => _deployRunner.IsRunning;
+
+    /// <summary>A deploy running, or one between the press and its runner starting (<c>_isPreparingDeploy</c>).</summary>
+    internal bool IsDeployingOrPreparing => _deployRunner.IsRunning || _isPreparingDeploy;
     private string TitleText => $"{ReferenceCourse.ShownCode(_course)}-S{_sectionNumber}";
 
     public SectionDetailView(MainWindow window, Course course, int sectionNumber)
@@ -1793,13 +1796,21 @@ public sealed partial class SectionDetailView : UserControl
 
     /// <summary>
     /// The in-app assistant's deploy asks here, BEFORE it stops the preview.
-    /// Nothing is asked when the deploy will be refused anyway (its own
-    /// refusal then speaks), and a window with a dialog already up is not
-    /// waited on.
+    /// A window with a dialog (or this very question) already up is not
+    /// waited on: <see cref="LaterClassesAnswer.CannotAsk"/>, refused with
+    /// <c>deployWaitsForAnOpenQuestion</c>, nothing stopped
+    /// (<c>shared-rules.json</c> → <c>classesDatedLater.whenTheWindowIsBusy</c>).
+    /// That check comes FIRST: <see cref="DeployWillBeRefused"/> also reads
+    /// the open question as a refusal, and answering it there let the runner
+    /// stop the preview and press a Deploy that returned at once (2C's
+    /// implementation review, M-A). Nothing is asked when the deploy will be
+    /// refused anyway; the answer says so, so the preview is kept and the
+    /// deploy's own refusal speaks.
     /// </summary>
-    internal async Task<LaterClassesAnswer> AskAboutClassesDatedLaterForTheAssistantAsync()
+    internal async Task<LaterClassesAtADeploy> AskAboutClassesDatedLaterForTheAssistantAsync()
     {
-        if (DeployWillBeRefused()) return LaterClassesAnswer.NothingToAsk;
+        if (_isAskingAboutLaterClasses || DialogGate.IsOpen(EffectiveXamlRoot)) return LaterClassesAnswer.CannotAsk;
+        if (DeployWillBeRefused()) return new LaterClassesAtADeploy(LaterClassesAnswer.NothingToAsk, WillBeRefused: true);
         return await AskAboutClassesDatedLaterAsync(TheInAppAssistantsDeploy);
     }
 

@@ -527,9 +527,9 @@ public sealed partial class MainWindow : Window
     /// the section — it is on another folder, or the section is not there —
     /// which the caller answers as "no window", never by throwing.
     /// </summary>
-    public async Task<LaterClassesAnswer?> AskAboutClassesDatedLaterFor(string folder, string courseCode, int section)
+    public async Task<LaterClassesAtADeploy?> AskAboutClassesDatedLaterFor(string folder, string courseCode, int section)
     {
-        var answered = new TaskCompletionSource<LaterClassesAnswer?>();
+        var answered = new TaskCompletionSource<LaterClassesAtADeploy?>();
         if (!DispatcherQueue.TryEnqueue(() => _ = AskOnTheInterfaceThread())) return null;
         return await answered.Task;
 
@@ -665,9 +665,12 @@ public sealed partial class MainWindow : Window
         // port, mac commit "Allow Deploy button to stop active preview
         // before publishing"), so reporting a preview as busy here made the
         // assistant refuse — and say so — while the deploy went ahead.
+        // _isPreparingDeploy counts too (2C's implementation review, L-1): a
+        // deploy between its press and its runner starting is already on its
+        // way, and a second one would only be refused by the window.
         if (DetailHost.Content is SectionDetailView detail)
         {
-            return detail.IsDeploying;
+            return detail.IsDeployingOrPreparing;
         }
         return false;
     }

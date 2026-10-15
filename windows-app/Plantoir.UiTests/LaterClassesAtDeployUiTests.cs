@@ -1,3 +1,4 @@
+using Plantoir.Core.Assist;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Tools;
 using Xunit.Abstractions;
@@ -27,7 +28,7 @@ namespace Plantoir.UiTests;
 public class LaterClassesAtDeployUiTests
 {
     private const string Code = "UILATE";
-    private const string Title = "Hide classes dated later?";
+    private const string Title = AssistWording.LaterClassesTitle;
     private static readonly TimeSpan LongEnough = TimeSpan.FromMinutes(15);
 
     private readonly ITestOutputHelper _output;
