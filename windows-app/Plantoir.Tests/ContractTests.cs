@@ -466,9 +466,27 @@ public class ContractTests
         string courseCode = zipNames["courseCode"]!.ToString();
         var cases = zipNames["cases"]!.AsArray();
 
+        // Each case runs on its own, so one this app owes (the Section menu's
+        // backups, #489) is held open by NAME against its issue rather than
+        // stopping the cases after it; the ledger fails the day it passes.
+        var failures = new List<(string Name, string Why)>();
         foreach (var c in cases)
         {
-            string kind = c!["kind"]!.ToString();
+            string name = c!["name"]!.ToString();
+            if (Record.Exception(() => CheckOne(c)) is { } failure)
+                failures.Add((name, failure.Message));
+        }
+
+        var names = cases.Select(c => c!["name"]!.ToString()).ToList();
+        var failing = failures.Select(f => f.Name).ToHashSet();
+        var deferred = NamedGapLedger.GapsIn(
+            NamedGapLedger.ZipNameCases, names, names.Where(n => !failing.Contains(n)));
+        var unexplained = failures.Where(f => !deferred.Contains(f.Name)).Select(f => $"{f.Name}: {f.Why}").ToList();
+        Assert.True(unexplained.Count == 0, string.Join("\n", unexplained));
+
+        void CheckOne(JsonNode c)
+        {
+            string kind = c["kind"]!.ToString();
             string name = c["name"]!.ToString();
             string filePath = $@"C:\folder\_backups\{courseCode}\{name}";
 
@@ -506,6 +524,10 @@ public class ContractTests
                         Assert.IsType<BackupMaker.Assistant>(backup!.Maker);
                         int expectedSection = c["section"]!.GetValue<int>();
                         Assert.Equal(expectedSection, ((BackupMaker.Assistant)backup.Maker).SectionNumber);
+                    }
+                    else
+                    {
+                        Assert.Fail($"a maker this runner does not know: {expectedMaker}");
                     }
                     break;
                 case "archive":

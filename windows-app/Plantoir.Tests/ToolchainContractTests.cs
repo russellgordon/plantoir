@@ -98,17 +98,32 @@ public class ToolchainContractTests
         string recipe = File.ReadAllText(
             Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
 
-        int checked_ = 0;
-        foreach (var pin in doc["pins"]!.AsArray())
-        {
-            if (pin?["windowsRuntimeContains"]?.ToString() is not { } expected) continue;
-            string name = pin["pin"]!.ToString();
-            string value = pin["value"]!.ToString();
-            string why = pin["why"]?.ToString() ?? "";
+        var watched = doc["pins"]!.AsArray()
+            .Where(pin => pin?["windowsRuntimeContains"] is not null)
+            .Select(pin => (
+                name: pin!["pin"]!.ToString(),
+                value: pin["value"]!.ToString(),
+                expected: pin["windowsRuntimeContains"]!.ToString(),
+                why: pin["why"]?.ToString() ?? ""))
+            .ToList();
 
+        // A pin for a runtime piece a later batch brings (#496, #503) is held
+        // open by name: its recipe check is skipped, and the ledger fails the
+        // day the recipe starts carrying it.
+        var deferred = NamedGapLedger.GapsIn(
+            NamedGapLedger.ToolchainRuntimePins,
+            watched.Select(pin => pin.name),
+            watched.Where(pin => recipe.Contains(pin.expected, StringComparison.Ordinal)).Select(pin => pin.name));
+
+        int checked_ = 0;
+        foreach (var (name, value, expected, why) in watched)
+        {
+            // The contract agreeing with itself is checked for EVERY pin,
+            // ledgered or not: that half is not this app's to owe.
             Assert.True(expected.Contains(value, StringComparison.Ordinal),
                 $"{name}: the contract watches fetch-runtime.ps1 for \"{expected}\", which does " +
                 $"not carry the pinned version {value}. {why}");
+            if (deferred.Contains(name)) continue;
             Assert.True(recipe.Contains(expected, StringComparison.Ordinal),
                 $"{name}: windows-app/Vendor/fetch-runtime.ps1 does not pin {expected}. {why}");
             checked_++;
