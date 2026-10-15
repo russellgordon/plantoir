@@ -449,7 +449,11 @@ dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 Skip the fetch and everything still BUILDS — and then every launcher refuses
 with "This copy of Plantoir is missing its website builder", which reads like a
 broken install rather than a missing step. (`Vendor/fetch-llama.ps1` is the
-same arrangement for the assistant's engine.)
+same arrangement for the assistant's engine.) **Re-run it after pulling a
+change to its vendor pins**: since #503 (2026-10-15) a runtime made before
+`runtime\vendor` existed STOPS the app's build ("predates the page
+features … Re-run windows-app\Vendor\fetch-runtime.ps1"), and the re-run
+fetches only that folder — "Diagrams and graphs" below.
 
 **Stop any running copy before building** — a running app holds
 `Plantoir.Core.dll` open and the build fails with `MSB3027 … file is locked
@@ -738,7 +742,8 @@ compared. Batch 1 (2026-10-15) also wired four more lists into the ledger, in
 the same shape as the ones below: `toolchain.json` → `pins` with a
 `windowsRuntimeContains` (`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`
 — the contract-agrees-with-itself check still runs for every pin; pagedjs
-against #496, functionPlot and nodeTikzjax against #503),
+against #496, functionPlot and nodeTikzjax against #503, all three closed by
+#503's batch 5A the same day),
 `course-management.json` → `zipNames.cases` (`ContractTests.CourseManagement_ZipNames_MatchesContract`,
 each case on its own; two Section-menu names against #489) and
 `backups.pruneCases` (`BackupsContractTests`; one case against #489), and
@@ -1319,10 +1324,12 @@ bindings), `Plantoir/MainWindow.xaml.cs`.
 The build, the site and the shared Python do everything for a printed page,
 and Windows inherits them unchanged (`support/quartz`, `scripts/page_features.py`,
 `scripts/print_settings.py`, the skill under `support/agent_guidance`). What the
-Windows app owes — fetching Paged.js into `runtime\vendor\pagedjs`, Course
-Settings' Printing section, the widened `settings saved` line, writing the
+Windows app owes — Course Settings' Printing section, the widened
+`settings saved` line, writing the
 guidance into the working folder's root, and measuring WebView2's preview pane
-and Edge — is the `windows` issue for #454. The design and every measurement:
+and Edge — is the `windows` issue for #454. Paged.js and Latin Modern are
+already in `runtime\vendor\pagedjs` (since 2026-10-15, fetched with the
+figure engines: "Diagrams and graphs" below). The design and every measurement:
 [06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200),
 [05 → Printable pages](05-build-pipeline.md#printable-pages-what-the-build-does-454-v200),
 [09 → Printing](09-mac-app.md#printing-454-v200).
@@ -1761,7 +1768,7 @@ Windows figures are the v1.1.0 release assets.
 | Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
-| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine); `get-pip.py` deliberately not (below) |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine), and since 2026-10-15 (#503) the Paged.js and function-plot tarballs and the Debian Latin Modern package, with the files kept from each checked again; `get-pip.py` deliberately not (below) |
 | When the building downloads happen (bundle B) | at the first preview | in the BACKGROUND at first launch, and again when the recipe changes (`setup.sh --prepare-builder`; one sidebar line, four trail events) | nothing to get ready: `builderWarmUp` and its trail events are `appliesOn: ["mac"]` |
 | The image itself (#334, bundle B) | full Quartz history, a spare scaffold copy, base tag unpinned | Quartz at depth 1 (≈342 MB first download), no `/opt/quartz-site`, base pinned by digest | no image; the runtime is bundled |
 
@@ -5737,24 +5744,145 @@ and the empty pane's "New Course…" came with 2A.
   #491 named the dismissing button, and the mac's repair titles are the same
   words, left as they were by its sweep.
 
-## Diagrams and graphs (#485 E1, v1.7.0): what the runtime must carry
+## Diagrams and graphs (#485 E1, v1.7.0): the runtime carries the engines (#503)
 
 The build's figure pass (`scripts/figures.py`), its helper
 (`support/figures/plantoir-figures.mjs`), the site's transformer and the
 contract (`figureFences`) are shared and reach Windows unchanged; the Python
-half is tested there by `scripts/test_figures.py`, which needs no Node. What
-the RUNTIME owes is two engines under `runtime\vendor`: `function-plot\`
-(function-plot 1.25.4's `function-plot.js` and `LICENSE`, by the tarball's
-SHA-256) and `tikz-engine\` (`npm ci --omit=dev` from
-`support\figures\package-lock.json` — node-tikzjax 1.0.5, 133 packages,
-5,445 files, 39.8 MB). Until `fetch-runtime.ps1` fetches them,
-`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` holds
-`functionPlot` and `nodeTikzjax` open by name in `NamedGapLedger` (area
-`ToolchainRuntimePins`, against #503, since 2026-10-15) and fails the day the
-recipe carries them, and a Windows build reports every figure as
-`engineMissing` without failing. The
-why, the measurements and what was rejected are in
+half is tested there by `scripts/test_figures.py`, which needs no Node. The
+why, the mac's measurements and what was rejected are in
 [02](02-docker-image.md#optvendorfunction-plot-and-optvendortikz-engine-485-e1-v170),
 [05](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170)
-and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170);
-the work is the `windows` issue opened with E1.
+and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170).
+This section is what Windows does differently, and what it measured.
+
+**What the runtime carries, since 2026-10-15 (#503, the catch-up's batch
+5A).** `fetch-runtime.ps1` has a vendor phase that mirrors the Dockerfile's
+`/opt/vendor` into `runtime\vendor`:
+
+| Folder | What | How it is checked |
+|---|---|---|
+| `pagedjs\` | Paged.js 0.4.3's `paged.min.js` + `LICENSE.md` (#454) | the tarball's SHA-256, then the file's (`fileSha256`) and its 502,617 bytes |
+| `pagedjs\fonts\` | Latin Modern's six OTFs + `LICENSE-Latin-Modern.txt` (#499) | the `.deb`'s SHA-256, then each font against `latinModern.files` |
+| `function-plot\` | function-plot 1.25.4's `function-plot.js` + `LICENSE` | the tarball's SHA-256, then the file's and its 202,953 bytes |
+| `tikz-engine\` | node-tikzjax 1.0.5 from `support\figures\package-lock.json` (`npm ci --omit=dev`) | `npm ls node-tikzjax@1.0.5`, then the three `tex\*.gz` against `nodeTikzjax.files` |
+
+Each URL is written out in full in the script, because
+`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` reads it as
+TEXT for every pin's `windowsRuntimeContains` — `latinModern` gained one
+(`fonts-lmodern_2.005-1_all.deb`) with this change; nothing on the mac reads
+that field. The `NamedGapLedger` entries that held `pagedjs`, `functionPlot`
+and `nodeTikzjax` open went in the same commit. Tarballs are unpacked with
+`%SystemRoot%\System32\tar.exe` by full path (Git's GNU tar may be first on
+PATH, and reads `C:` as a remote host).
+
+**Latin Modern comes from the same Debian package the image installs**,
+`fonts-lmodern_2.005-1_all.deb` from deb.debian.org (snapshot.debian.org as
+the fallback), SHA-256 `027cd4dd…c58398`, 4,540,004 bytes, measured
+2026-10-15 — so the six fonts are byte-for-byte the image's (all six matched
+`latinModern.files` on the first run). The `.deb` is an `ar` archive, which
+Windows' bsdtar reads; its `data.tar.xz` is unpacked with the runtime's own
+Python (`tarfile` + `lzma`) rather than bsdtar. MEASURED: this PC's bsdtar
+(3.8.9, liblzma 5.8.3) does read xz — but an older Windows 10's bsdtar is not
+known to, and the build PC is the only place this runs, so the dependency
+that is certainly there was chosen. REJECTED: GUST's zip (a second network
+host, the same reason the image rejects it) and converting to woff2 (the
+licence asks a changed font be renamed).
+
+**A runtime made before the vendor folder is brought up to date without
+fetching ~600 MB again.** What runs is decided from `manifest.json`'s KEYS,
+never from folders (a crashed `npm ci` leaves a `node_modules` that looks
+done): no manifest, everything; a manifest whose vendor keys (`pagedjs`,
+`latinModern`, `functionPlot`, `nodeTikzjax`) are missing or differ from the
+pins, `runtime\vendor` is deleted and only the vendor phase runs, against the
+node and python already there (both paths set before any phase), and the
+manifest is merged. The plan review's M4 found the first draft would have
+called `npm.cmd` with an empty `$nodeDir` on that path.
+
+**The build refuses a runtime without them (the plan review's M5).**
+`publish.ps1` never runs `fetch-runtime.ps1`, and robocopy `/MIR` copies
+whatever `Vendor\runtime` holds — so a build PC with a 2026-08-19 runtime
+would have published an installer with no engines, silently.
+`Plantoir.csproj` → `CheckNativeRuntimeManifest` now runs before
+`CopyNativeRuntime` and `PublishNativeRuntime` and fails the build, saying to
+re-run `fetch-runtime.ps1`, when the manifest lacks any of the four keys.
+Must-fail measured: with `nodeTikzjax` removed from the manifest the x64
+Debug build stopped with that error; restored, it built. No runtime at all is
+still allowed, as before (the targets are skipped).
+
+**Installing over an older version.** Inno never removes a file a newer
+version drops, and the engine's `node_modules` is a lockfile tree, so
+`installer.iss` → `[InstallDelete]` empties
+`{app}\runtime\vendor\tikz-engine\node_modules` before `[Files]` puts the
+current tree back. `runtime\quartz\node_modules` has always had the same
+exposure (its tree has not changed since v4.5.0 was pinned).
+
+**How the build finds them: no new variable.** The launchers set
+`PLANTOIR_QUARTZ_DIR` to `<runtime>\quartz` and put `<runtime>\node` first on
+PATH (`Enter-NativeRuntime`); `toolchain_paths.VENDOR_DIR` is that folder's
+parent + `vendor`; `figures.helper_command` runs `node` from PATH.
+
+**Measured** (i5-8365U, 16 GB, Windows 11 Pro 26200, 2026-10-15; Node
+20.18.1, the image's is 20.20.2):
+
+- The vendor phase alone: **42 s** on a fresh run against the existing
+  runtime (downloads 1.05 MB + 4.33 MB + 0.19 MB, then `npm ci`).
+- `tikz-engine\`: **133 packages, 5,450 files** (5,448 under `node_modules`,
+  plus the folder's own `package.json` and lockfile; the mac counted 5,445 in
+  the image), **40,838,241 bytes** (38.9 MiB). The whole `vendor\`: 5,461
+  files, 42.2 MB. Latin Modern: 631,940 bytes for the six, as the image.
+- **memfs's `/tex_files/` works under win32 paths** — the open question in
+  #503 (review N7). The contract's triangle (`figureFences.cacheKey.cases[0]`)
+  drawn through `plantoir-figures.mjs` in two processes: byte-identical,
+  **1,540 bytes, SHA-256 `8c68b085…6827b37`**
+  (`8c68b08531cee21b507a3edb31e9346c9294defa63a0a0d04c5dde05a6827b37`). The
+  mac has not yet printed its own SHA-256 for the same SVG, so whether Node
+  20.18.1 and 20.20.2 draw the same bytes is not known (the `mac` issue from
+  this batch asks).
+- The engine's load: **1.6 s** the first time after the fetch (Defender
+  scanning 5,450 new files was not visible in it), 1.4–1.8 s after; the
+  triangle drawn in 0.33–0.45 s. Nowhere near `figures.START_SECONDS` (120 s).
+- A build (`preview.ps1 --build-only`, a fresh section, one page with three
+  diagrams, a graph and `printable: true`): **19.2 s** first, **5.7 s** again
+  with every figure from the cache ("📐 Drew 0 diagrams (4 from before)").
+  With one diagram the first build was 18.6 s, so most of the first build is
+  the section's Quartz scaffold, not TeX.
+- **A runtime under a path with spaces** (`…\Plantoir Runtime With Spaces`,
+  a junction to the runtime, given as `PLANTOIR_RUNTIME`): every test below
+  passed through it, so `node.exe` and the engine resolve there.
+- **A diagram that never ends** (`\def\x{\x}\x`) through `figures.run_jobs`:
+  answered `tookTooLong` and the next diagram still drawn, both in **23.5 s**
+  — the 20-second clock plus the helper's restart and the engine's second
+  load.
+- **Path length.** The longest path under `tikz-engine\` is 134 characters
+  (`…\@jsonjoy.com\json-pack\lib\nfs\v4\server\operations\node\Nfsv4OperationsNode.js.map`;
+  the longest code file is 130). Installed at
+  `C:\Users\<name>\AppData\Local\Programs\Plantoir\runtime\vendor\tikz-engine\`,
+  that stays under 260 for an account name up to 56 characters. A Debug
+  build from a worktree goes past it (149 + 134), and works here because
+  this PC has `LongPathsEnabled` = 1 — so this PC cannot show what a
+  machine without it does in a deep folder; the installed path is the one
+  that matters, and `publish.ps1` compiles through a short subst drive.
+- **In the browser** (headless Edge 155.0.4283.45 — the same Chromium build
+  as this PC's WebView2 Runtime, 155.0.4283.45 — over HTTP from the built
+  site, light and dark): the graph draws, the triangle's lettering is
+  Computer Modern (the page fetched `static/tikz/fonts.css`, `cmmi10.ttf` and
+  `cmr10.ttf` from the site itself, and `static/function-plot/function-plot.js`;
+  nothing from another address), and in dark mode the drawing turns light on
+  the dark page. NOT driven inside Plantoir's own preview pane; Print in the
+  pane, and WebView2's own measurements, belong to #496.
+
+Tests: `NativeFiguresTests` (`[NativeVendorFact]`: skipped, with the reason,
+on a runtime without `vendor\tikz-engine`) —
+`TheContractsTriangleIsDrawnTheSameInTwoProcesses`,
+`ADiagramThatNeverEndsIsStoppedAndTheNextOneIsStillDrawn` (the runtime's
+Python with `-I -X utf8` and the scripts folder put on `sys.path` by hand:
+`-I` drops both), and
+`ABuildWithADiagramAGraphAndAPrintablePageCarriesAllThree` (the real launcher,
+the section's site read back: `static\pagedjs\paged.min.js`,
+`static\function-plot\function-plot.js`, an inline `<svg>` inside
+`pl-figure pl-tikz`, `pl-figure pl-functionplot`, none of the fallback
+sentences, then a second build from the cache). The helper's `--rules`
+argument must be a `figureRules.js` inside a `"type": "module"` package (a
+section's Quartz is one); handed the repository's copy directly, Node reads
+it as CommonJS and the helper dies before it says it is ready.

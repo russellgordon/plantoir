@@ -147,7 +147,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `NamedGapLedgerTests` compares every ledger entry's milestone with that
    `<Version>`, and the run in step 1 compared it with the OLD number, so it
    passes with entries left that this cut must not carry.
-3. **Build the signed Windows bundle**: `az login`, then
+3. **Build the signed Windows bundle**: first **re-run
+   `windows-app\Vendor\fetch-runtime.ps1`** — it returns at once when the
+   runtime is current, and fetches only `runtime\vendor` (Paged.js, Latin
+   Modern, function-plot, the TikZ engine; about 45 MB, under a minute) when
+   the runtime predates them; `publish.ps1` never runs it, and the build now
+   REFUSES a runtime whose manifest lacks those keys rather than ship one
+   without them (#503). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`). **Then build and sign the Windows update feed
@@ -241,8 +247,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > It needs three credentials, the network and about twenty minutes, and it
    > **creates real, globally unique sites that nothing deletes** — so no suite
    > runs it and none should. Delete the sites it made when you are done.
-3. **Build the signed Windows bundle**:
+3. **Build the signed Windows bundle**, after re-running the runtime fetch
+   (it is quick when nothing changed, and the build refuses a runtime made
+   before its `vendor` folder — #503):
 
+       powershell -File Vendor\fetch-runtime.ps1
        powershell -File publish.ps1 -Sign
 
    One-time tooling on a new machine (the Azure account/identity setup itself
