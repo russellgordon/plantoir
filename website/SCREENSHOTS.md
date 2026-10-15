@@ -296,7 +296,7 @@ with Windows' own text recognition (`windowshot --ocr`) and must show
 the run marks both shots `windows: true`; take them off
 `WINDOWS_PICTURE_OWED` in `website/test_build_data.py` in the same commit.
 The preview is stopped with `preview.ps1 MPM2D 1 --stop`; the folder and its
-builds folder (`%LOCALAPPDATA%\Plantoiruilds\<id>`) are kept for the next
+builds folder (`%LOCALAPPDATA%\Plantoir\builds\<id>`) are kept for the next
 run — delete both to start clean. **Everything before the shutter runs on a
 locked desktop; the photographs do not** (Windows.Graphics.Capture sends no
 frame for a window nobody can see, measured 2026-10-15), and the run stops

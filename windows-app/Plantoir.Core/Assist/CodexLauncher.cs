@@ -9,7 +9,7 @@ using Plantoir.Core.Scripting;
 namespace Plantoir.Core.Assist;
 
 /// <summary>
-/// "Revise with Codex…" (#210, mac #205): the second outside door. Finds
+/// Revise With ▸ Codex… (named "Revise with Codex…" until #491 item 8; #210, mac #205): the second outside door. Finds
 /// <c>codex</c>, and starts it in a terminal in the working folder with
 /// Plantoir's server described ON THE COMMAND LINE — five dotted <c>-c</c>
 /// overrides and the greeting — so nothing at all is written for the
