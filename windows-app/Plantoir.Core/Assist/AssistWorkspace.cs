@@ -1900,14 +1900,21 @@ public sealed partial class AssistWorkspace
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
+        string declinedTail = declined.Count > 0 ? " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : "";
+        // The build stopped for a question nobody here can answer (#478,
+        // exit 3 under --non-interactive): said as that, as RebuildPreview
+        // and Deploy say it, never as a broken build.
+        if (build.NeededAnAnswer)
+            return new AssistResult(false,
+                $"{WhatSurvived(changed)}. {AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString(System.Globalization.CultureInfo.InvariantCulture))}" +
+                declinedTail, backup);
         if (!build.Succeeded)
             return new AssistResult(false,
                 // One clean sentence, never the raw log, and no pointer at a
                 // window this caller does not have (#481); the reason when
                 // the output has one, the launcher's own line among them
                 // when the section is being deployed (#471).
-                $"{WhatSurvived(changed)}. {PreviewDidNotBuildHere(course, section, build)}" +
-                (declined.Count > 0 ? " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : ""), backup);
+                $"{WhatSurvived(changed)}. {PreviewDidNotBuildHere(course, section, build)}" + declinedTail, backup);
 
         return new AssistResult(true, Summary(changed, previewed: true, course.Code, section, plan.Hiding, declined), backup);
     }
@@ -2148,7 +2155,11 @@ public sealed partial class AssistWorkspace
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (build.Succeeded) return new AssistResult(true, summary, backup);
-        // As in Apply (#481, #471).
+        // As in Apply: a question (#478), then one clean sentence (#481, #471).
+        if (build.NeededAnAnswer)
+            return new AssistResult(false,
+                $"{summary} {AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString(System.Globalization.CultureInfo.InvariantCulture))}",
+                backup);
         return new AssistResult(false, $"{summary} {PreviewDidNotBuildHere(course, section, build)}", backup);
     }
 
