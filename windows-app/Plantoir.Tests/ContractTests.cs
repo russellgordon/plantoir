@@ -529,6 +529,11 @@ public class ContractTests
                         int expectedSection = c["section"]!.GetValue<int>();
                         Assert.Equal(expectedSection, ((BackupMaker.Assistant)backup.Maker).SectionNumber);
                     }
+                    else if (expectedMaker == "menu")
+                    {
+                        Assert.IsType<BackupMaker.Menu>(backup!.Maker);
+                        Assert.Equal(c["section"]!.GetValue<int>(), ((BackupMaker.Menu)backup.Maker).SectionNumber);
+                    }
                     else
                     {
                         Assert.Fail($"a maker this runner does not know: {expectedMaker}");

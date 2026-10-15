@@ -204,13 +204,6 @@ internal static class NamedGapLedger
             "the in-app assistant's deploy, cancelled at the question about classes dated later, stops nothing and deploys nothing",
             "an outside assistant's deploy with a class dated after the next class is held back before anything runs"),
 
-        // ---- course-management.json: the Section menu's own backups (#489).
-        Owed(BackupPruneCases, 489, V150, MenuAssist,
-            "the Section menu keeps its five most recent, counted apart from the assistant's"),
-        Owed(ZipNameCases, 489, V150, MenuAssist,
-            "ICS3U_backup_2026-08-11_221530_menu-section2.zip",
-            "ICS3U_backup_2026-08-11_221530-2_menu-section2.zip"),
-
         // ---- assist-wording.json → wording: sentences with no same-named
         // member here, each held open by the issue that owns the feature
         // that says it. All 70 are the menu bar's and the Deploy question's
