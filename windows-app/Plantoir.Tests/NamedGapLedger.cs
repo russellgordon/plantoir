@@ -131,7 +131,6 @@ internal static class NamedGapLedger
     // parity with mac v1.4.0", and the ledger was its burn-down list.)
     private const string V150 = "v1.5.0";
     private const string V160 = "v1.6.0";
-    private const string V170 = "v1.7.0";
     private const string V171 = "v1.7.1";
 
     /// <summary>
@@ -155,7 +154,6 @@ internal static class NamedGapLedger
     // Reasons, one per owning issue: the catch-up to mac 1.7.1 lands in
     // batches, and each of these is a later batch's work (2026-10-15).
     private const string Printing = "printable pages (mac #454) are a later batch of the catch-up to 1.7.1";
-    private const string Diagrams = "TikZ diagrams and function graphs (mac #485) are a later batch of the catch-up to 1.7.1";
     private const string LastViewed = "Preview at Last Viewed (mac #504) is a later batch of the catch-up to 1.7.1";
 
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
@@ -176,9 +174,9 @@ internal static class NamedGapLedger
         Owed(CourseConfigKeys, 496, V160, Printing,
             "print_school_name", "print_blanks", "print_school_name_at", "print_course_code_at"),
 
-        // ---- toolchain.json → pins: what fetch-runtime.ps1 does not fetch yet.
-        Owed(ToolchainRuntimePins, 496, V160, Printing, "pagedjs"),
-        Owed(ToolchainRuntimePins, 503, V170, Diagrams, "functionPlot", "nodeTikzjax"),
+        // ---- toolchain.json → pins: none held open. pagedjs, functionPlot
+        // and nodeTikzjax (and latinModern, newly watched) landed in
+        // fetch-runtime.ps1 with #503's batch 5A.
 
         // ---- class-planning.json → sectionIndexPointer.dateCases (pointAt cases)
 

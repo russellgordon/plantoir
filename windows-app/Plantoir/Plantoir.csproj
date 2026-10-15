@@ -88,10 +88,24 @@
        Content items: it holds ~24,000 files (node_modules), and that many
        MSBuild items slows every build. Robocopy exit codes below 8 mean
        success, hence the exit-code laundering. -->
-  <Target Name="CopyNativeRuntime" AfterTargets="Build" Condition="Exists('..\Vendor\runtime\manifest.json')">
+  <!-- A runtime fetched before 2026-10-15 has no runtime\vendor (Paged.js,
+       Latin Modern, function-plot, the TikZ engine: #496, #503), and robocopy
+       would ship it without them, silently: every printable page, graph and
+       diagram would then fall back on a teacher's machine. So a runtime whose
+       manifest lacks any of the vendor keys stops the build and says what to
+       run (the batch 5 plan review's M5). No runtime at all is still allowed:
+       the targets below are skipped, as before. -->
+  <Target Name="CheckNativeRuntimeManifest" Condition="Exists('..\Vendor\runtime\manifest.json')">
+    <PropertyGroup>
+      <_PlantoirRuntimeManifest>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\..\Vendor\runtime\manifest.json'))</_PlantoirRuntimeManifest>
+    </PropertyGroup>
+    <Error Condition="!$(_PlantoirRuntimeManifest.Contains('&quot;pagedjs&quot;')) Or !$(_PlantoirRuntimeManifest.Contains('&quot;latinModern&quot;')) Or !$(_PlantoirRuntimeManifest.Contains('&quot;functionPlot&quot;')) Or !$(_PlantoirRuntimeManifest.Contains('&quot;nodeTikzjax&quot;'))"
+           Text="windows-app\Vendor\runtime predates the page features (Paged.js, Latin Modern, function-plot, the TikZ engine): its manifest.json lacks their keys. Re-run windows-app\Vendor\fetch-runtime.ps1 (it fetches only runtime\vendor) and build again." />
+  </Target>
+  <Target Name="CopyNativeRuntime" AfterTargets="Build" DependsOnTargets="CheckNativeRuntimeManifest" Condition="Exists('..\Vendor\runtime\manifest.json')">
     <Exec Command="robocopy &quot;$(MSBuildProjectDirectory)\..\Vendor\runtime&quot; &quot;$(TargetDir)runtime&quot; /MIR /NFL /NDL /NJH /NJS /NP &amp; if %25errorlevel%25 lss 8 exit /b 0" />
   </Target>
-  <Target Name="PublishNativeRuntime" AfterTargets="Publish" Condition="Exists('..\Vendor\runtime\manifest.json')">
+  <Target Name="PublishNativeRuntime" AfterTargets="Publish" DependsOnTargets="CheckNativeRuntimeManifest" Condition="Exists('..\Vendor\runtime\manifest.json')">
     <Exec Command="robocopy &quot;$(MSBuildProjectDirectory)\..\Vendor\runtime&quot; &quot;$(PublishDir)runtime&quot; /MIR /NFL /NDL /NJH /NJS /NP &amp; if %25errorlevel%25 lss 8 exit /b 0" />
   </Target>
 </Project>
