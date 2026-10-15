@@ -284,7 +284,7 @@ public sealed partial class CourseSettingsView : UserControl
             string? why = UnitWordRenamer.Problem(oldWord, field.Text, interruptedTarget);
             problem.Text = why ?? "";
             problem.Visibility = why is null ? Visibility.Collapsed : Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = why is null;
+            DialogButtons.EnablePrimary(dialog, why is null);
         }
         field.TextChanged += (_, _) => Recheck();
         Recheck();
@@ -305,7 +305,7 @@ public sealed partial class CourseSettingsView : UserControl
                     return;
                 }
                 running = true;
-                dialog.IsPrimaryButtonEnabled = false;
+                DialogButtons.EnablePrimary(dialog, false);
                 problem.Text = UnitWordRenameWording.LookingOver;
                 problem.Visibility = Visibility.Visible;
                 var outcome = await Task.Run(() =>
@@ -333,7 +333,7 @@ public sealed partial class CourseSettingsView : UserControl
             finally
             {
                 running = false;
-                dialog.IsPrimaryButtonEnabled = true;
+                DialogButtons.EnablePrimary(dialog, true);
                 deferral.Complete();
             }
         };
@@ -405,7 +405,7 @@ public sealed partial class CourseSettingsView : UserControl
             string? why = SpecialFolderRenamer.Problem(field.Text, oldName, NamesInScope(scope), Finishing());
             problem.Text = why ?? "";
             problem.Visibility = why is null ? Visibility.Collapsed : Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = why is null;
+            DialogButtons.EnablePrimary(dialog, why is null);
         }
         field.TextChanged += (_, _) => Recheck();
         Recheck();

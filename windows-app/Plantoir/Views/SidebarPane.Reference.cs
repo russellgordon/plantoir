@@ -240,7 +240,7 @@ public sealed partial class SidebarPane
                 ReferenceCourse.Shelf(Workspace.Courses, Today), ignoringFolder: course.Code);
             warning.Text = trouble ?? "";
             warning.Visibility = trouble is null ? Visibility.Collapsed : Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = trouble is null;
+            DialogButtons.EnablePrimary(dialog, trouble is null);
         }
         picker.SelectionChanged += (_, _) => Validate();
         Validate();
@@ -298,7 +298,7 @@ public sealed partial class SidebarPane
                   ?? ReferenceCourse.ShelfTrouble(shown, ChosenYear(picker), ReferenceCourse.Shelf(Workspace.Courses, Today));
             warning.Text = trouble ?? "";
             warning.Visibility = trouble is null ? Visibility.Collapsed : Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = trouble is null && name.Length > 0;
+            DialogButtons.EnablePrimary(dialog, trouble is null && name.Length > 0);
         }
         picker.SelectionChanged += (_, _) => { Propose(); Validate(); };
         nameBox.TextChanged += (_, _) => { if (!settingName) nameEdited = true; Validate(); };
@@ -404,7 +404,7 @@ public sealed partial class SidebarPane
                 trouble.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             }
             tickSomething.Visibility = anyCanCome ? Visibility.Collapsed : Visibility.Visible;
-            importDialog.IsPrimaryButtonEnabled = anyCanCome;
+            DialogButtons.EnablePrimary(importDialog, anyCanCome);
         }
         foreach (var course in source.Courses)
         {

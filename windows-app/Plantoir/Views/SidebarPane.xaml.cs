@@ -472,14 +472,15 @@ public sealed partial class SidebarPane : UserControl
             Title = "All Backups",
             Content = panel,
             PrimaryButtonText = DeleteBackupsLabel(0),
-            IsPrimaryButtonEnabled = false,
             CloseButtonText = "Done",
             DefaultButton = ContentDialogButton.Close,
         };
+        // Delete… is destructive and never the default: Done keeps Enter.
+        DialogButtons.EnablePrimary(dialog, false, PrimaryKind.NotTheDefault);
         list.SelectionChanged += (_, _) =>
         {
             dialog.PrimaryButtonText = DeleteBackupsLabel(list.SelectedItems.Count);
-            dialog.IsPrimaryButtonEnabled = list.SelectedItems.Count > 0;
+            DialogButtons.EnablePrimary(dialog, list.SelectedItems.Count > 0, PrimaryKind.NotTheDefault);
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
@@ -1060,7 +1061,7 @@ public sealed partial class SidebarPane : UserControl
                 : null;
             warning.Text = problem ?? replaces ?? "";
             warning.Visibility = problem is null && replaces is null ? Visibility.Collapsed : Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = problem is null;
+            DialogButtons.EnablePrimary(dialog, problem is null);
 
         }
 
@@ -1898,7 +1899,7 @@ public sealed partial class SidebarPane : UserControl
             var (problem, _) = CourseCodeValidator.Validate(typed, Workspace.Courses.Select(c => c.Code), course.Code);
             warning.Text = problem ?? "";
             warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = problem is null && CourseCodeValidator.Normalize(typed).Length > 0;
+            DialogButtons.EnablePrimary(dialog, problem is null && CourseCodeValidator.Normalize(typed).Length > 0);
         }
 
         codeBox.TextChanged += (_, _) => Validate();

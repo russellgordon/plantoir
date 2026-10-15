@@ -93,15 +93,35 @@ public sealed class SectionScheduleDialog : ContentDialog
         _hwnd = hwnd;
 
         Title = $"When does {course.Code} Section {sectionNumber} meet?";
-        PrimaryButtonText = "Remember dates";
-        SecondaryButtonText = "Check Dates";
+        // The mac's words (#491 item 9). Read, THEN remember (item 2): Remember
+        // These Dates is live only once dates have been read, so it never sits
+        // greyed while looking like the default.
+        PrimaryButtonText = "Remember These Dates";
+        SecondaryButtonText = "Read the Dates";
         CloseButtonText = "Cancel";
-        DefaultButton = ContentDialogButton.Primary;
 
         PrimaryButtonClick += OnPrimaryButtonClick;
         SecondaryButtonClick += OnSecondaryButtonClick;
 
         BuildContent(reason);
+        RefreshButtons();
+    }
+
+    /// <summary>
+    /// Which button can be pressed and which takes Enter (#491 item 2). Before
+    /// a read, Remember These Dates is greyed and Read the Dates is the
+    /// default — EXCEPT while dates are being typed: the box needs Enter for
+    /// a new line, so no button takes it there (the mac's
+    /// <c>isTheDefault: route != .typed</c>; measured here, Enter in a
+    /// multi-line box inserts a line and presses nothing, but the rule is kept
+    /// so it does not depend on that). Once dates are read, Remember These
+    /// Dates is the default.
+    /// </summary>
+    private void RefreshButtons()
+    {
+        bool read = _parsedDates is { Count: > 0 };
+        if (!read) DefaultButton = _routePicker.SelectedIndex == 0 ? ContentDialogButton.None : ContentDialogButton.Secondary;
+        DialogButtons.EnablePrimary(this, read);
     }
 
     private void BuildContent(string reason)
@@ -240,6 +260,7 @@ public sealed class SectionScheduleDialog : ContentDialog
         _chosenOrdering = null;
         _orderingPanel.Visibility = Visibility.Collapsed;
         _statusBlock.Text = "";
+        RefreshButtons();
     }
 
     private async void OnChooseFileClicked(object sender, RoutedEventArgs e)
@@ -272,6 +293,7 @@ public sealed class SectionScheduleDialog : ContentDialog
         {
             args.Cancel = true; // keep dialog open
             await ReadDatesAsync();
+            RefreshButtons();
         }
         finally
         {
@@ -284,9 +306,12 @@ public sealed class SectionScheduleDialog : ContentDialog
         var deferral = args.GetDeferral();
         try
         {
+            // A safety net: the button is greyed until dates are read, but if
+            // it is pressed with none (or they were cleared underneath), read now.
             if (_parsedDates is null || _parsedDates.Count == 0)
             {
                 bool ok = await ReadDatesAsync();
+                RefreshButtons();
                 if (!ok || _parsedDates is null || _parsedDates.Count == 0)
                 {
                     args.Cancel = true;
@@ -328,6 +353,7 @@ public sealed class SectionScheduleDialog : ContentDialog
 
     private async Task<bool> ReadDatesAsync()
     {
+        _parsedDates = null;   // a read that fails leaves nothing to remember
         _statusBlock.Text = "";
         _orderingPanel.Visibility = Visibility.Collapsed;
         _pendingQuestion = null;
@@ -421,5 +447,6 @@ public sealed class SectionScheduleDialog : ContentDialog
         _chosenOrdering = ordering;
         _orderingPanel.Visibility = Visibility.Collapsed;
         await ReadDatesAsync();
+        RefreshButtons();
     }
 }
