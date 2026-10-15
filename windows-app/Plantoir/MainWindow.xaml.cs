@@ -153,9 +153,22 @@ public sealed partial class MainWindow : Window
         }
         ToolchainReadiness.Changed += ReadinessChanged;
 
+        // #489: a menu change or the assistant's work on a section greys the
+        // Section menu's functions in every window. Static, so let go on close.
+        void ActivityChanged()
+        {
+            if (IsClosed) return;
+            DispatcherQueue.TryEnqueue(() => { if (!IsClosed) ApplyMenuEnablement(); });
+        }
+        SectionMenuActivity.Changed += ActivityChanged;
+        AssistActivity.Changed += ActivityChanged;
+
         Closed += (_, _) =>
         {
             IsClosed = true;
+            SectionMenuActivity.Changed -= ActivityChanged;
+            AssistActivity.Changed -= ActivityChanged;
+            DropVerbs();   // this window's menu server stops; its undo list goes with it (#489)
             ToolchainReadiness.Changed -= ReadinessChanged;
             Views.SectionDetailView.SectionOutcomeDismissed -= OutcomeDismissed;
             // The event is static: a subscription left behind would root this window.
@@ -174,6 +187,9 @@ public sealed partial class MainWindow : Window
             if (args.PropertyName is nameof(WorkspaceViewModel.State)
                 or nameof(WorkspaceViewModel.WorkspacePath)
                 or nameof(WorkspaceViewModel.WorkspaceProblem)) ApplyState();
+            // Another folder: the old folder's menu server, and its undo list, go (#489).
+            if (args.PropertyName is nameof(WorkspaceViewModel.WorkspacePath)
+                && _verbs is not null && !WorkingFolder.IsTheSame(_verbsFolder, Workspace.WorkspacePath)) DropVerbs();
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)
                 or nameof(WorkspaceViewModel.Courses)) { ShowDetailForSelection(); ApplyMenuEnablement(); }
             // The selection is part of the window's memory (row 99).

@@ -504,6 +504,12 @@ public sealed partial class AssistWindow : Window
             // Building and deploying automate the main window's own flows —
             // once, on screen — rather than running again behind the chat.
             ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
+            // "Rebuild" means rebuild (#489, Q1): a serving preview is stopped
+            // and started again, where ShowPreviewFor would leave it as it was.
+            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section),
+            // The Section menu's claim (#489): this window's change to a
+            // section the menu is changing right now is refused, never interleaved.
+            SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, _course.Code, _section),
             StartDeployInApp = () => MainWindowForBuilds()?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {
@@ -755,6 +761,10 @@ public sealed partial class AssistWindow : Window
         Input.IsEnabled = false;
         SendButton.IsEnabled = false;
         ShowThinking();
+        // The Section menu's writing items grey while this window works on
+        // its section (#489, verbIsRunning): every turn, approval and decline
+        // comes through here.
+        AssistActivity.ReportWork(_folder, _course.Code, _section, working: true);
         try
         {
             foreach (var line in await exchange())
@@ -771,6 +781,7 @@ public sealed partial class AssistWindow : Window
         }
         finally
         {
+            AssistActivity.ReportWork(_folder, _course.Code, _section, working: false);
             HideThinking();
             // Never re-enable typing under a question that is still waiting —
             // the answer to "shall I go ahead?" is a button, not a sentence.

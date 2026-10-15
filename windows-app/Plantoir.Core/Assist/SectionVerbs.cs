@@ -180,13 +180,16 @@ public sealed class SectionVerbs : IAsyncDisposable
             AssistToolAnswer answer;
             try
             {
-                if (_server is null)
+                // Rebuild Preview is answered by the window alone: no server
+                // is started for it (half a second, measured, on a first use).
+                bool needsTheServer = !name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase);
+                if (_server is null && needsTheServer)
                 {
                     _server = await _startServer(cancellation);
                     // A fresh server's undo list is empty.
                     if (_server is not null) _changesToUndo = before = 0;
                 }
-                var server = _server;
+                var server = _server ?? (needsTheServer ? null : NoServer.Instance);
                 if (server is null) return AssistToolAnswer.Same(CouldNotBeDone);
                 (answer, _) = await _runnerFor(course, section, server).Run(call, cancellation);
             }
@@ -216,6 +219,19 @@ public sealed class SectionVerbs : IAsyncDisposable
     }
 
     private int? _changesToUndo;
+
+    /// <summary>Stands in for the server where the window answers on its own; a call reaching it is a fault.</summary>
+    private sealed class NoServer : IToolServer
+    {
+        public static readonly NoServer Instance = new();
+        public Task<AssistToolAnswer> CallTool(string name, JsonObject arguments, Action<string>? progress = null,
+                                               CancellationToken cancellation = default) =>
+            throw new InvalidOperationException($"{name} reached no server: the window answers it on its own.");
+    }
+
+    /// <summary>A "ran from a menu" line with the ending the caller knows — a plan twin that refused "changed nothing".</summary>
+    public static void NoteRan(string item, string ending, string course, int section, string? counts = null) =>
+        ActivityTrail.Note(ActivityTrail.Event.RanFromAMenu, TrailLine(item, ending, counts), course, section);
 
     /// <summary>A menu item that was cancelled at its plan: the line says so, and nothing ran.</summary>
     public static void NoteCancelled(string item, string course, int section, string? counts = null) =>

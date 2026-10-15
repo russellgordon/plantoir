@@ -1208,6 +1208,29 @@ public sealed partial class SectionDetailView : UserControl
         }
     }
 
+    /// <summary>
+    /// REBUILD the preview (#489, Q1): stop a serving one, then start it
+    /// again — or start one. Section ▸ Rebuild Preview and the in-app
+    /// assistant's rebuild_preview both come here; before, they reached
+    /// <see cref="StartPreviewIfIdle"/>, which returns at once while a preview
+    /// serves, so "rebuilding" was said and nothing was rebuilt.
+    /// </summary>
+    public async Task RebuildPreviewAsync()
+    {
+        try
+        {
+            await StopPreviewIfRunningAsync();
+            // The stop can take a while; a view replaced meanwhile must not
+            // start a preview nobody can see (PreviewAgainAfterRepairAsync's reason).
+            if (_isTornDown || !IsLoaded) return;
+            StartAutomatedPreview();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"RebuildPreviewAsync exception: {ex}");
+        }
+    }
+
     /// <summary>Stop the preview if one is up — the assistant's half of stop, edit, start again.</summary>
     public void StopPreviewIfRunning()
     {
