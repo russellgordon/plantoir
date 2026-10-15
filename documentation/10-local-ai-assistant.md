@@ -3631,7 +3631,8 @@ naming every phrasing.
   `startPreview` / `runLauncherDirectly` onto whatever each app calls them.
   Two `given` flags decide the interesting cases: `sectionWindowOpen: false`
   is the headless path (`Plantoir.Mcp`, and a scheduled deploy), and
-  `previewRunning: true` is the case Windows currently gets wrong.
+  `previewRunning: true` is the case Windows once got wrong (it passes on
+  both platforms now — `AssistScenarioTests` runs it with the flag).
 - **An assistant's `startPreview` opens the FRONT page**, whatever the
   Preview setting says: only a teacher's own press of Preview can ask for
   the page last viewed (#504 on the mac, #514 on Windows;
@@ -7505,9 +7506,11 @@ before changing it:
   with "with no backup, because one could not be made" on the trail. Every other
   Windows write refuses instead; this one follows the mac because the page is
   never on the site and the undo entry still holds the previous text.
-- **No reference-course gate yet**: Windows has no courses kept for reference
-  (#241). When it does, the PLAN must refuse one, as the mac's does, or it
-  promises what the write will refuse.
+- **No reference-course gate on the PLAN yet (#540)**: Windows has had courses
+  kept for reference since #241, and `ReferenceWriteGate` refuses the WRITE on
+  one, but `plan_write_how_i_teach` is read-only and so is never gated — the
+  plan can promise what the write will refuse. The plan must refuse one, as the
+  mac's does; #540 tracks it.
 - **`PLANTOIR_KEPT_OFF:`** is read from a watched console (`ScriptRunner`) and
   from a scheduled publish's record (`ScheduledHealthFindings`, the wrapper's
   scan now keeps the line), and hidden from the console a teacher reads
