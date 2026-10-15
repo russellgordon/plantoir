@@ -1590,6 +1590,44 @@ public class AssistWorkspaceTests : IDisposable
         Assert.Contains("published", result.Message.ToLowerInvariant());
     }
 
+    /// <summary>
+    /// #479: hiding a page rebuilds the preview, as publishing one does, so an
+    /// outside assistant's "unpublished" is not said over a preview that still
+    /// shows the page. It used to return before the build.
+    /// </summary>
+    [Fact]
+    public async Task HidingAPageRebuildsThePreviewAndStopsThere()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
+        var workspace = Open();
+
+        var result = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, draft: true));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(new[] { "preview" }, _launcher.Runs.Select(r => r.Launcher));
+        Assert.Equal(new[] { "ICS3U", "1", "--build-only", "--non-interactive" }, _launcher.Runs[0].Arguments);
+        Assert.Contains("rebuilt the preview", result.Message);
+        Assert.StartsWith("Unpublished", result.Message);
+    }
+
+    /// <summary>
+    /// #479: the window's own visible rebuild still covers a hide — told not
+    /// to build, Apply builds nothing for a hide either.
+    /// </summary>
+    [Fact]
+    public async Task HidingWithPreviewFalseBuildsNothing()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
+        var workspace = Open();
+
+        var result = await workspace.Apply(
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, draft: true), preview: false);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(_launcher.Runs);
+        Assert.DoesNotContain("rebuilt the preview", result.Message);
+    }
+
     [Fact]
     public async Task APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog()
     {
