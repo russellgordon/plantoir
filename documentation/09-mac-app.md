@@ -3333,11 +3333,17 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   `PlantoirSettingsView` was about a SINGLE tab titling the window
   "Assistant"; with two panes a window titled after the chosen pane is how
   every multi-pane Mac settings window reads. Trail: "Cloudflare account ID
-  changed in Settings" (never the ID). **Not changed, and now stale on the
-  mac:** the launchers' non-interactive refusal still says "Add the Account ID
-  in this course's settings in Plantoir, under Deploying" (`deploy.sh`,
+  changed in Settings" (never the ID). **Not changed in this batch, and stale
+  until #490:** the launchers' non-interactive refusal said "Add the Account
+  ID in this course's settings in Plantoir, under Deploying" (`deploy.sh`,
   `deploy.ps1`) — the publishing path, left for a change that runs
-  `verify-deploy.sh`.
+  `verify-deploy.sh`. #490 changed both launchers, from Windows, to "Add your
+  Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying, then deploy
+  again." (`documentation/07-deployment.md`; pinned by
+  `scripts/test_deploy_non_interactive.py`). The app's own in-app refusals —
+  `MultiDestinationDeployRunner.swift` and `ScheduledDeployWording.swift` —
+  still said "this course's settings" when that landed; a `mac` issue owns
+  them.
 - **Assistant window**: "May I ask for your class dates?" puts its buttons on
   the trailing end with Yes last, as every other card and sheet does.
 

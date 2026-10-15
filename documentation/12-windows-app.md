@@ -1898,7 +1898,8 @@ the same day.)
 
 Found 2026-08-22, testing the model-in-use guard written up in
 (`GUI-IMPROVEMENTS.md` row 421):
-`AssistantSettingsDialog`'s
+the Settings dialog's (`AssistantSettingsDialog`, since #491 the Assistant
+section of the Settings window, `AssistantSettingsPane`)
 "On this PC" housekeeping rows put a Stop/Remove/Download button flush against
 the `ScrollViewer`'s right edge, and the vertical scroll bar drew right over
 top of it — reported directly: "the scroll bar goes over the buttons — that
@@ -1914,7 +1915,8 @@ right-hand column of a two-column `Grid` — sits directly underneath it.
 
 **The fix, and the convention going forward**: give the `ScrollViewer` extra
 padding on the trailing side specifically — `Padding = new Thickness(0, 0, 20, 0)`
-in `AssistantSettingsDialog.cs`, 20px being enough to clear the thumb's hit
+in `AssistantSettingsDialog.cs` (now `AssistantSettingsPane.cs`, and the
+Deploying section's `DeployingSettingsPane.cs` keeps the same gutter), 20px being enough to clear the thumb's hit
 target with room to spare. Not a fix specific to Settings: **any `ScrollViewer`
 whose content places an interactive control (a button, a toggle, a link)
 flush against the trailing edge needs the same trailing gutter**, checked at
@@ -4078,7 +4080,9 @@ replaces the toast by tag).
 
 **Since #488 (2026-10-15) these keys are on MENU ITEMS, not the root Grid**:
 Ctrl+O on File ▸ Open Working Folder…, Ctrl+N on New Window, Ctrl+Shift+R on
-Reload Courses, F2 on Course ▸ Rename, and every new menu key besides. Each
+Reload Courses, F2 on Course ▸ Rename, and every new menu key besides — F1 on
+Help ▸ Plantoir Help since #491, with its own `InlineData` in
+`AcceleratorDialogGateTests`. Each
 item's key still asks `DialogGate.Holds(root, "<key>")` before it runs (in
 `MainWindow.Invoke`), so the record and the test below are unchanged; what
 changed is where WinUI looks for the key. Re-measured with the keys on items,
@@ -4598,11 +4602,11 @@ when they land.
 
 | Menu | Items (Windows key) |
 |---|---|
-| File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings…, Check for Updates… (only while the updater has a feed) |
+| File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
 | Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
 | Section | Preview / Stop Preview (Ctrl+Shift+P), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
-| Help | Publishing and Deploying… · Report a Problem… · About Plantoir |
+| Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
 **One table, in code** (`Plantoir/MainWindow.Menus.cs`): every item is built
 by one `Add(…)` that carries its contract item (`SubjectMenuRules.Item`), its
@@ -5157,6 +5161,143 @@ REJECTED, with the reason:
   see `DeployWillBeRefused()` above.
 - **Comparing the success record with `World.Now`**: tests pin it to a morning
   that is not the file's clock, and a real run's two clocks agree anyway.
+
+## The Settings window, Plantoir Help and the Account ID's refusals (#491 part A, #490)
+
+Batch 3A of the catch-up to mac 1.7.1 (2026-10-15). What landed, and why.
+
+**File ▸ Settings… is ONE window** (`Views/SettingsWindow.cs`; Russell's
+ruling on #491, 2026-10-15): a `NavigationView` with Assistant and Deploying,
+and Preview named in `SettingsSection` but not drawn until #514 lands. It
+replaced a `ContentDialog` (`AssistantSettingsDialog`), whose body moved
+unchanged into `AssistantSettingsPane`.
+
+*Why a window and not a dialog.* WinUI shows one `ContentDialog` per window.
+MEASURED in the batch's spike (i5-8365U, Windows 11 26200, 150%, Windows App
+SDK 1.8.260921001): the limit is per XamlRoot, not per thread — a second
+window showed its own dialog while the first window's was up, in either
+order, and a second dialog in the SAME window threw `COMException 0x80000019`
+"Only a single ContentDialog can be open at any time." The new-course wizard
+IS a `ContentDialog`, so a Settings dialog could not open from the wizard's
+Open Settings… without closing the wizard and losing what was typed; a
+modeless window comes forward beside it, and the wizard follows the ID live.
+**Rejected**, on #491 with Russell: a Deploying pane inside the assistant's
+settings dialog; keeping the field in a course's settings with a "for every
+course" label; and Settings as a `ContentDialog` (above). Settings may show
+dialogs of its own for the same reason — but the instructions for finding the
+ID are INLINE (an `Expander` holding `CredentialRequestPanel.Build(
+CredentialRequests.CloudflareAccountIDHelp)`), not a dialog with a second
+field and "Use This ID" as the mac's sheet has: the pane's own field already
+does that job.
+
+*One at a time, never keeping the app alive.* `SettingsWindow.Show(section)`
+brings an open window forward on that section rather than opening a second.
+File ▸ Settings… opens on the section last chosen
+(`AppSettings.LastSettingsSection`, the mac's `SettingsPane.storageKey`);
+Open Settings… beside the ID always opens Deploying. The app still quits when
+its last MAIN window closes; `App.QuitTime` calls
+`SettingsWindow.NoteBeforeQuit()` first (it also covers `QuitForUpdate`),
+because `Application.Exit` may end the process without raising the window's
+`Closed`. The "opened Settings — the assistant is set to …" line is written
+once per opening, as the dialog wrote it.
+
+**The Account ID is edited in ONE place**, `DeployingSettingsPane` — "Cloudflare
+Pages", the field (placeholder "32 letters and digits", AutomationId
+`cloudflareAccountField`, which the course form no longer carries), the inline
+instructions, a problem line only for a NON-EMPTY invalid ID (an empty one is
+not wrong here: a teacher who never deploys to Cloudflare has no reason to
+fill it in), and the mac's footer captions. `CloudflareAccountInSettingsTests.OnlyTheDeployingPane_WritesTheId`
+reads every `.cs` under `Plantoir/` and allows a write of the ID — an
+assignment or `ChangeCloudflareAccountId(` — in that file only. Before #491 a
+course's Deploying section and the wizard each wrote it, and typed in one
+course it changed silently for every other. No data moved: the value was
+always app-wide (`AppSettings.CloudflareAccountId`), so nothing is migrated.
+
+*Saved as typed, recorded on leaving.* Each keystroke calls
+`AppSettings.ChangeCloudflareAccountId(text.Trim())`, which saves and raises
+the static `AppSettings.CloudflareAccountIdChanged` — so a wizard waiting on
+the ID enables Create the moment it is valid. The pane does NOT listen to that
+event, so the trimmed value is never echoed back under the teacher's cursor.
+The trail line (`Cloudflare account ID changed in Settings`; the mac's three
+lines verbatim from `DeployingSettings.TrailLine`, never the ID) is written by
+`NoteTheChange()` on Enter, on leaving the field, on switching section, when
+the window closes and at quit, comparing with the ID as it was at the last
+line — one line for a change, none for a visit.
+
+**Three read-only displays** (`PublishingChoiceView`: the primary Cloudflare
+block, the additional-destination row; the wizard shares the view): "Kept in
+File ▸ Settings ▸ Deploying, for every course that deploys to Cloudflare
+Pages." first, then "Cloudflare Account ID" with the value — or "Not set yet"
+in the secondary colour — selectable, and Open Settings… beside it
+(`cloudflareAccountValue` / `cloudflareAccountOpenSettings`, and
+`additional…` for the row). One private builder, as the mac's
+`CloudflareDetailFields`. The account-finding sentence left the course's
+caption with the field it explains. The view listens to
+`CloudflareAccountIdChanged` while LOADED and raises `AccountRefreshed`, NOT
+`Changed`: an ID changed in Settings is not an edit to the course. The wizard
+re-reads Create on it (with no ID it keeps refusing with the contract's
+"Paste your Cloudflare Account ID." beside Open Settings…); Course Settings
+listens itself and re-reads Save only (`RefreshDirtyState`, never
+`MarkChanged`), so a held-back Save frees itself when a valid ID arrives.
+
+*MEASURED, and why every Unloaded is checked.* Inside the wizard's
+`ContentDialog`, the view's `Unloaded` arrived about 70 ms AFTER its `Loaded`
+with the view still on screen (`IsLoaded` true, parent unchanged) and no
+second `Loaded` followed. Unsubscribing on it left the wizard deaf to
+Settings — `SettingsUiTests.TheWizardWaitsForTheIdTypedInSettings` failed
+exactly so, twice, before the fix. An `Unloaded` that finds the element still
+loaded is ignored; the real one, when the wizard closed, measured `IsLoaded`
+false. Course Settings uses the same check.
+
+**The refusals now name the place.** The in-app deploy
+(`MultiDestinationDeployRunner.RefusalReason`) says "… Add it in File ▸
+Settings ▸ Deploying, then deploy again."; Schedule a Deploy's two
+(`ScheduledDeploy`, `cloudflareAccountMissing` and its additional twin) say
+"… then schedule this again." Constants in `Core/Models/DeployingSettings.cs`.
+The mac's three still say "this course's settings" — a `mac` issue.
+
+**The deliberate wording split.** The app's sentences say **File ▸ Settings ▸
+Deploying**, where the item IS on Windows. The launchers' non-interactive
+refusal (#490) says **Plantoir ▸ Settings ▸ Deploying** in both `deploy.sh` and
+`deploy.ps1` — Russell's ruling: one launcher sentence for both platforms.
+Do not "fix" either to match the other.
+
+**#490 in the launchers.** "Add your Cloudflare Account ID in Plantoir ▸
+Settings ▸ Deploying, then deploy again." `deploy.ps1` has no byte-order mark
+and runs under Windows PowerShell 5.1, which reads it in the system code
+page, so a literal ▸ arrives garbled: the line is
+`("…Plantoir {0} Settings {0} Deploying…" -f [char]0x25B8)`, the convention the
+file already used for · and —. Checked: the file parses under 5.1.26100 with
+no errors, and the expression renders the sentence exactly.
+`scripts/test_deploy_non_interactive.py` →
+`test_both_launchers_point_at_settings_for_the_account_id` pins both (the ps1
+in its `-f` form), and `app-rules.json`'s authored `refuse` prose says the
+same. The publishing path changed, so `verify-deploy.ps1` runs at the cut
+(RELEASING.md), and `./verify-deploy.sh` on the mac before its next release.
+
+**Help ▸ Plantoir Help**, first in Help, with F1 — Windows' Help key —
+through `MainWindow.Invoke` like every menu key, so `DialogGate.Holds(…,
+"F1")` keeps it from acting under a dialog. It opens
+https://plantoir.app/support/ (`Core/Models/PlantoirHelp.cs`, the mac's
+address) through `Services/ExternalLinks.Open`, which in a redirected run
+(`--state-dir`) appends the address to `links-opened.txt` in the state folder
+instead of opening a browser — a UI test reads what WOULD have opened and
+never puts a browser in front of the person at the desk. Trail: `opened
+Plantoir Help`, "Help ▸ Plantoir Help — opened the support page in the
+browser". Both events left the `NamedGapLedger` with this batch.
+
+**Testing it**: unit — `CloudflareAccountInSettingsTests` (the three lines,
+nothing-changed, never the ID, the pane's problem rule, "Not set yet", the
+one writer by source scan, the refusals), `MultiDestinationDeployRunnerTests`,
+`ContractTests`' scheduled-deploy cases, `AcceleratorDialogGateTests` (F1).
+Through the window (`[UiFact]`): `SettingsUiTests` — File ▸ Settings… is a
+window titled Settings; the ID typed in Deploying reaches the run's
+`settings.json`, the trail says "…was changed" without the ID, and a
+Cloudflare course shows it read-only with no field; the wizard refuses Create
+with no ID, Open Settings… raises Settings on Deploying while the wizard stays
+open, and a valid ID typed there enables Create. `PlantoirHelpUiTests` —
+`links-opened.txt` and the line. `DrivenApp.FindTopLevel(automationId)` finds
+another top-level window of the run's own process.
 
 ## Diagrams and graphs (#485 E1, v1.7.0): what the runtime must carry
 
