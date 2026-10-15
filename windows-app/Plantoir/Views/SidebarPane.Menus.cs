@@ -45,6 +45,25 @@ public sealed partial class SidebarPane
         }
     }
 
+    /// <summary>
+    /// A row menu's removal (#491 item 6): LAST, behind a separator, as on the
+    /// mac. Greyed by the menu bar's rule for THAT row, read when the menu
+    /// opens (never when it was built — row 104's staleness lesson); run after
+    /// selecting the row, through the menu bar's own guard, so it asks the
+    /// same question as the menu bar, the − button and the Delete key.
+    /// </summary>
+    private void AddRemoval(MenuFlyout menu, SidebarSelection row, Item item, string text)
+    {
+        var removal = MenuItem(text, Glyphs.Remove, Selecting(row, () => _window.RunFromTheSidebar(item)));
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(removal);
+        menu.Opening += (_, _) =>
+        {
+            try { removal.IsEnabled = SubjectMenuRules.Enabled(_window.SituationFor(row)).Contains(item); }
+            catch (Exception ex) { App.LogDiagnostic($"{text} could not read its rule: {ex.Message}"); }
+        };
+    }
+
     private static SidebarRow? FindRow(IEnumerable<SidebarRow> rows, SidebarSelection selection)
     {
         foreach (var row in rows)
@@ -179,9 +198,9 @@ public sealed partial class SidebarPane
             case Item.SectionNewTerminalAtFolder:
                 if (section is int terminalIn) FolderActions.OpenTerminal(course.SectionDirectory(terminalIn));
                 return true;
-            case Item.RemoveCourse: _ = ConfirmRemove(course, null); return true;
+            case Item.RemoveCourse: _ = ConfirmRemoveCourse(course); return true;
             case Item.RemoveSection:
-                if (section is int removing) _ = ConfirmRemove(course, removing);
+                if (section is int removing) _ = ConfirmRemoveSection(course, removing);
                 return true;
             case Item.ScheduleDeploy:
                 if (section is int scheduling) AskWhenToDeploy(course, scheduling, existing: null);
