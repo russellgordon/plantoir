@@ -4976,7 +4976,7 @@ when they land.
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
 | Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
-| Section | Preview / Stop Preview (Ctrl+Shift+P), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
@@ -5544,8 +5544,9 @@ REJECTED, with the reason:
 Batch 3A of the catch-up to mac 1.7.1 (2026-10-15). What landed, and why.
 
 **File ▸ Settings… is ONE window** (`Views/SettingsWindow.cs`; Russell's
-ruling on #491, 2026-10-15): a `NavigationView` with Assistant and Deploying,
-and Preview named in `SettingsSection` but not drawn until #514 lands. It
+ruling on #491, 2026-10-15): a `NavigationView` with Assistant, Preview
+(since #514, batch 6: "Preview at Last Viewed on Windows" below) and
+Deploying. It
 replaced a `ContentDialog` (`AssistantSettingsDialog`), whose body moved
 unchanged into `AssistantSettingsPane`.
 
@@ -5702,6 +5703,200 @@ reads Plantoir, Core and the MCP server and matches the property on a word
 boundary, so an object initialiser counts. `PlantoirHelpUiTests` —
 `links-opened.txt` and the line. `DrivenApp.FindTopLevel(automationId)` finds
 another top-level window of the run's own process.
+
+## Preview at Last Viewed on Windows (#514, the mac's #504)
+
+Batch 6 of the catch-up to mac 1.7.1 (2026-10-15). The design, the rule and
+every case are the mac's: `contracts/shared-rules.json` → `previewStartPage`,
+and `09-mac-app.md` → "Opening the preview at the page last viewed (#504)"
+for what the mac measured and rejected. This section is what is different
+here and why. Code: `Plantoir.Core/Models/PreviewStartPage.cs` (the rules and
+`PreviewNavigationLedger`), `LastViewedPages.cs` (the store),
+`Views/SectionDetailView.xaml.cs` (`PreviewOrStop_Click` → `PressPreviewAsync`,
+`OpenTheSiteAsync`, `NavigateAsAppAsync`, `ReloadAsAppAsync`,
+`WatchTheTeachersNavigations`), `MainWindow.Modifier.cs` (Alt),
+`MainWindow.Menus.cs` (the second item), `Views/PreviewSettingsPane.cs`.
+
+**What a teacher sees.** File ▸ Settings ▸ **Preview** (Russell's ruling on
+#514: the one Settings window, between Assistant and Deploying) asks "When
+you press Preview, open" — The site's front page (the default) ○ The page you
+last viewed — with `windowsWording.altNote` under it. The toolbar button reads
+"Preview" or "Preview at Last Viewed" by the setting, and the OTHER while Alt
+is held in that window. **Section ▸ has two items**: the first titled as the
+button with no key held (and "Stop Preview" while a preview runs), the second
+(`sectionPreviewAlternate`) always the opposite, absent while a preview runs.
+Every other start — the assistant, Rebuild Preview, Preview Again, Start of
+the Year, a repair, the smoke hook and the marketing capture — opens the
+front page.
+
+### Two items, not one re-titled item — a choice, not a constraint
+
+MEASURED in the batch's probe (i5-8365U, 16 GB, Windows 11 Pro 26200, 150%,
+Windows App SDK 1.8.260921001; the raw logs were the probe's, not committed):
+with a `MenuBarItem` flyout OPEN, Alt down, up or tapped does not dismiss it
+and shows no KeyTips; keys pressed in the flyout bubble to the window's root
+(Alt's KeyDown arrives unhandled); and changing an item's Text while the
+flyout is open re-lays it out (170.7 → 308.0 epx, the flyout 310.7). So live
+re-titling inside the menu WOULD have worked. Two items were chosen anyway
+(the director's ruling on the plan's Q1): a teacher scanning the menu sees
+both choices without knowing a key exists, which is the discoverability the
+mac's Option alternate buys with its own convention and WinUI menus have no
+convention for. `subjectMenus.rule` says the alternate is the SAME item for
+the enablement rule: it is added with `Item.Preview` (so `Invoke` re-checks
+the rule when it runs) but `rules: false`, so it does not take the first
+item's place in `_ruled`, and it is greyed by hand beside it.
+
+**The second item never stops a preview** (the plan review's M2): a menu drawn
+before a preview started elsewhere — the assistant's, say — still shows it,
+and the rule's re-check passes (Preview is enabled while running), so
+`PressPreview(opposite: true)` refuses when the runner is running and the menu
+is redrawn.
+
+**No key on the second item.** The mac's is ⌥⇧⌘P; the counterpart,
+Ctrl+Alt+Shift+P, is AltGr+Shift+P on keyboards with an AltGr (Ctrl+Alt is
+AltGr to Windows), a character a teacher may be typing. REJECTED for that
+reason, as Ctrl+Alt was for #488's keys.
+
+### Alt
+
+MEASURED (same probe): Alt alone, with no `AccessKey` anywhere in the app,
+arrives as `VirtualKey.Menu` KeyDown/KeyUp (unhandled), never raises
+`AccessKeyManager.IsDisplayModeEnabledChanged` (no KeyTips), sends no
+`WM_SYSCOMMAND`/`SC_KEYMENU` to any of the window's HWNDs, and swallows
+nothing — a key typed 1 ms after Alt's release arrived. Alt down → click a
+Button → Alt up: Click fires. So the subclass dropping `SC_KEYMENU` the plan
+held in reserve is NOT needed.
+
+- **The click reads the keyboard** (`InputKeyboardSource.GetKeyStateForCurrentThread`
+  for Menu and Control) and that is the authority; the title is a courtesy.
+  **Ctrl+Alt is not the modifier** (`PreviewStartPage.ModifierHeld`): it is
+  AltGr. The menu items never read the keyboard.
+- **The title follows Alt in the ACTIVE window only**: re-read on any Alt or
+  Ctrl KeyDown/KeyUp at the window's root (`handledEventsToo`), on
+  activation, when a menu closes (the first item's `Unloaded` — measured to
+  fire on EVERY close: Escape 2–6 ms, a click outside 21 ms, an item chosen
+  6 ms after its Click; the mac's lost release was Option let go inside an
+  open menu), and when the pointer reaches the Preview button or it takes
+  focus. **Forced off on deactivation**: a release in another window is never
+  seen, so the state is cleared rather than left stale.
+- The toolbar's title depends on Alt only while no preview runs — when the
+  web view is collapsed, so focus is never inside WebView2 (where #488
+  measured that no XAML key fires) at the moment it matters.
+
+### Remembering only the teacher's navigations
+
+`CoreWebView2.SourceChanged` is the mac's `url` KVO: it fires for a click,
+Back, Forward, and — with `IsNewDocument` false — Quartz's pushState links and
+fragment clicks. Every load the APP makes goes through `NavigateAsAppAsync` or
+`ReloadAsAppAsync`, which mark it in `PreviewNavigationLedger` before calling
+`CoreWebView2.Navigate`/`Reload`; `PreviewNavigationSourceTests` holds every
+`.Navigate(`/`.Reload(` to those two and `Preview.Source =` to nowhere.
+MEASURED event orders (WebView2 runtime 155.0.4283.45, SDK 1.0.3179.45):
+
+| Navigation | What WebView2 raised |
+|---|---|
+| The app's load of the root | NavigationStarting → SourceChanged (IsNewDocument true) → ContentLoading (0–2 ms after) → NavigationCompleted |
+| `/Concepts` (302 → `/Concepts/`) | NavigationStarting, then NavigationStarting again with IsRedirected and the SAME NavigationId; SourceChanged only for the final address |
+| Reload | no SourceChanged |
+| GoBack (a new document) | a full load, IsUserInitiated false |
+| pushState link, fragment click, Back after a fragment | ONLY SourceChanged (IsNewDocument false) + HistoryChanged — and each silently CONSUMES a NavigationId |
+| A 404 | IsSuccess false, status 404; ContentLoading IsErrorPage false |
+| A dead port | ContentLoading IsErrorPage true, status 0; Source names the dead address |
+
+So an app load ends at the `ContentLoading` of the NavigationId CAPTURED from
+the first `NavigationStarting` after the request — never "the next id", which
+pushState consumes — with that id's `NavigationCompleted` as the backstop for
+a failure and 15 s when no navigation ever started. A new request forgets the
+old id, so the first of two app loads back to back cannot end the second.
+`ContentLoading` is the mac's didCommit: ending at Completed instead would
+lose a click made while a page's fonts and KaTeX load (the mac measured a
+resource answering after 8 s). An app load's own SourceChanged lands before
+its ContentLoading, so it is ignored; an address on another site or port,
+`about:blank` and a dead port's address are refused by `Remember` anyway.
+
+**CoreWebView2.Navigate, and why — corrected.** The plan said setting
+`WebView2.Source` to the address already shown does not navigate. MEASURED,
+it does (it reloads, every time: a new Uri, `Source = Source`, or a held
+instance). `Navigate` is kept because it gives every app load ONE route
+through the ledger, not because of a trap. `WebView2.Source` follows
+`CoreWebView2.Navigate` (it always matched `CoreWebView2.Source`, inside
+SourceChanged too), so Open in Browser, the test-run `ItemStatus` mirror and
+the capture's filter, which read `Preview.Source`, are unchanged.
+`EnsureCoreWebView2Async` completed on a COLLAPSED WebView2 in 84 ms (a second
+web view in the process; a cold first one not measured), and the trail line
+and `RefreshChrome` come BEFORE the navigation is started, so a teardown
+during it loses neither.
+
+**A flag, not "the address equals the one asked for"** — the mac's reason
+holds: a teacher's own Home click would be ignored, and a redirect never
+matches. REJECTED, with `Uri.AbsolutePath` for the path (.NET unescapes some
+`%xx` in it; the path is cut from the raw string, as the mac's
+`percentEncodedPath`).
+
+### The root, the ask, and where the page is kept
+
+- **`_previewUrl` stays the ROOT** (the opposite naming from the mac's
+  `previewRoot`/`previewURL`): the capture resolves pages against it, and the
+  remembered path is cut from it. `PreviewNavigationSourceTests` holds its
+  assignments to `root` or `null`. Nothing is remembered while it is null —
+  during the ask, after a stop.
+- **The ask** (`OpenTheSiteAsync`): once the root answers, the build claim is
+  released at once (the assistant may build again) but "Preparing the
+  preview…" stays while the remembered page's address is asked — a GET,
+  redirects followed, 5 s a try, up to 3 tries a second apart, through an
+  HttpClient of its own. A stop cancels it and nothing opens or is written;
+  the same-run check (`_serverWait == thisWait`, not torn down) guards the
+  rest. A stored path whose address would leave the root (`//elsewhere`, an
+  address) is read as gone. The address is built with `UriBuilder.Path`, so a
+  first segment with a colon stays a path.
+- **MEASURED on the real Windows serve handler** (a scratch course previewed
+  with `preview.ps1` from the command line, i5-8365U, Quartz v4.5.0 on the
+  bundled runtime): `/` 200, `/Concepts/Lesson-Marker` 200, `/Concepts` 302 →
+  `/Concepts/` 200, `/No-Such-Page` 404, `/Concepts/No-Such-Page` 404, a query
+  200 — 3–7 ms each. 120 requests fired 30 ms apart across three rebuilds
+  (Quartz's "Detected change, rebuilding…", 15–28 ms on this two-page site)
+  all answered 200, the slowest in 27 ms: none failed and none was read as
+  gone. A rebuild long enough to show the WAIT itself was not reproduced on
+  so small a site; the mac's handlers.js measurement stands for that.
+- **Where the page is kept: `%LOCALAPPDATA%\Plantoir\last-viewed-pages.json`**
+  (the state folder, so `--state-dir` moves it), per working folder
+  (`WorkingFolder.IsTheSame`), course (any case) and section; a path, never
+  an address; written only on a change, through a temporary file; 500 newest
+  kept; nothing pruned for a missing folder (#320: it may be on a drive not
+  plugged in). REJECTED: `settings.json` — every window rewrites it whole and
+  a parse failure resets every setting, so a write on every click would be one
+  more writer racing for it. Not a contract format: only this app reads it.
+
+### Toolbar width
+
+"Preview at Last Viewed" roughly doubles the button. The section title's
+column is now the star column with `TextTrimming="CharacterEllipsis"`, so at
+the window's narrowest a long title shortens and the buttons never leave the
+view — applied without measuring, because the desktop was locked for this
+batch. **MEASURE WHEN UNLOCKED:** at the 900-epx minimum with the sidebar at
+its widest, does the title ellipsize before the Browser button clips?
+
+### Known limits
+
+The teacher's web browser is not observable (Open in Browser's pages are not
+remembered). A click before an app load's content arrives is not
+remembered. The first click on an inactive window acts as Alt says but its
+title did not swap first. Ctrl+R and Alt+Left inside the page are WebView2's
+own, so Chromium's reload counts as the teacher's — harmless, it is the same
+page. A Quartz 404 page the teacher visits is remembered and falls back
+("gone") on the next press.
+
+### Testing
+
+`PreviewStartPageContractTests` (every block of `previewStartPage`, the press's
+own `Decide` through `DecideForCase`), `PreviewStartPageTests` (ledger orders,
+including two app loads back to back; addresses; the store; real statuses
+from a TCP server), `PreviewNavigationSourceTests`. `[UiFact]`s in
+`PreviewStartPageUiTests` (Settings ▸ Preview saves and re-titles the button
+and both items; Alt re-titles; Alt+click opens the page last viewed; a
+teacher's click is remembered and View ▸ Reload Page is not) — written with
+the desktop locked and OWED their first run. `DrivenApp` now keeps a
+`settings.json` a test's `beforeLaunch` seeded, adding its own two keys.
 
 ## The HIG sweep, screen by screen, on Windows (#491 part B)
 
