@@ -114,6 +114,18 @@ public sealed partial class AssistWorkspace
     /// </summary>
     private string BackUpOnceForThisConversation(Course course, int sectionNumber, IProgress<string>? progress = null)
     {
+        // The Section menu saves a FRESH copy before every change (#489, the
+        // director's ruling on the mac's plan review): a server that lives as
+        // long as a window would otherwise make one copy a month, and "the
+        // copy made just before it is in Backups" would be false after the
+        // teacher deleted it. Named for the menu, never recorded as held.
+        if (SpeaksFromTheMenu)
+        {
+            progress?.Report(AssistWording.MenuSavingACopy(course.Code));
+            string fresh = MenuBackup(course, sectionNumber);
+            ConversationBackupPath = fresh;
+            return fresh;
+        }
         // One copy in flight per course: a second write arriving while the
         // first is zipping waits for it and reuses it rather than zipping again.
         lock (_conversationBackups)
@@ -472,6 +484,7 @@ public sealed partial class AssistWorkspace
         {
             string direct = PagePaths.ResolveInside(_folder, wanted);
             if (File.Exists(direct)) return direct;
+            if (InTheCourse(course, sectionNumber, wanted) is { } inCourse) return inCourse;
         }
 
         // Asked for by name, the How I Teach page is never published or
@@ -493,6 +506,34 @@ public sealed partial class AssistWorkspace
         throw new AssistRefusal(
             $"{course.Code} Section {sectionNumber} has {matches.Count} pages called “{wanted}” — " +
             Humanize(matches.Select(Relative)) + ". Say which one you mean.");
+    }
+
+    /// <summary>
+    /// A page named by its place in the COURSE — <c>section1/All Classes/Unit
+    /// 2, Day 3</c>, the shape the Section menu sends (#489, the plan's finding
+    /// 0.8): every shipped course has five to nine <c>_DUPLICATE ME</c> pages,
+    /// which a bare name refuses as ambiguous. Resolved INSIDE the course only;
+    /// a <c>section&lt;M&gt;/</c> prefix naming another section is no page
+    /// here; the How I Teach page is refused as it is by name, and only a page
+    /// this section lists is answered (the plan review's M3). Null for no such
+    /// page, so the caller's own refusal stands.
+    /// </summary>
+    private static string? InTheCourse(Course course, int sectionNumber, string wanted)
+    {
+        string relative = wanted.Replace('\\', '/').Trim('/');
+        string first = relative.Split('/')[0];
+        if (System.Text.RegularExpressions.Regex.IsMatch(first, @"^section\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+            && !string.Equals(first, $"section{sectionNumber}", StringComparison.OrdinalIgnoreCase))
+            return null;
+        string withExtension = relative.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? relative : relative + ".md";
+        string full;
+        try { full = Path.GetFullPath(PagePaths.ResolveInside(course.DirectoryPath, withExtension)); }
+        catch (OutsideWorkspaceException) { return null; }
+        if (!File.Exists(full)) return null;
+        if (HowITeachPage.IsItsTitle(Path.GetFileNameWithoutExtension(full)) || !ListsAsAPage(course, full))
+            throw new AssistRefusal(AssistWording.HowITeachIsNeverPublished(course.Code));
+        return PagePaths.MarkdownPages(course.DirectoryPath, sectionNumber)
+            .FirstOrDefault(page => string.Equals(Path.GetFullPath(page), full, StringComparison.OrdinalIgnoreCase));
     }
 
     public string ReadPage(Course course, int sectionNumber, string title) =>
@@ -819,9 +860,7 @@ public sealed partial class AssistWorkspace
         {
             NoteNamedNoPage(course.Code, section,
                 unknownNames.Count == 1 ? "1 name matched no page" : $"{unknownNames.Count} names matched no page");
-            throw new AssistRefusal(unknownNames.Count == 1
-                ? AssistWording.NoPageCalled(course.Code, section.ToString(), unknownNames[0])
-                : AssistWording.NoPagesCalled(course.Code, section.ToString(), AssistWording.ListingEither(unknownNames)));
+            throw new AssistRefusal(NoPageNamed(course.Code, section, unknownNames));
         }
 
         // Dates choose classes IN CODE. A teacher's "every class from the 15th
@@ -1051,6 +1090,7 @@ public sealed partial class AssistWorkspace
 
         return new PublishPlan
         {
+            FromTheMenu = SpeaksFromTheMenu,
             CourseCode = course.Code,
             SectionNumber = section,
             Publishes = isPublish,
@@ -1506,6 +1546,10 @@ public sealed partial class AssistWorkspace
         string nearby = dated.Count == 0
             ? "None of its classes have dates."
             : $"Its classes run {DateText.Iso(dated[0])} to {DateText.Iso(dated[^1])}.";
+        if (SpeaksFromTheMenu)
+            throw new AssistRefusal(course.Configuration.ClassNoun == ClassNoun.Meeting
+                ? AssistWording.NoClassOnFromTheMenuForAMeeting(date, course.Code, sectionNumber.ToString())
+                : AssistWording.NoClassOnFromTheMenu(date, course.Code, sectionNumber.ToString()));
         throw new AssistRefusal(
             $"{course.Code} Section {sectionNumber} has no class on {DateText.Iso(date)}. {nearby}");
     }
@@ -1900,7 +1944,7 @@ public sealed partial class AssistWorkspace
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
-        string declinedTail = declined.Count > 0 ? " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : "";
+        string declinedTail = declined.Count > 0 ? " " + SettingsCannotBeAddedTo(declined) : "";
         // The build stopped for a question nobody here can answer (#478,
         // exit 3 under --non-interactive): said as that, as RebuildPreview
         // and Deploy say it, never as a broken build.
@@ -1970,7 +2014,7 @@ public sealed partial class AssistWorkspace
                     moving.Add(p.DisplayTitle);
             }
         }
-        string? declinedSentence = declined.Count > 0 ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : null;
+        string? declinedSentence = declined.Count > 0 ? SettingsCannotBeAddedTo(declined) : null;
 
         if (moving.Count == 0 && declinedSentence is not null)
         {
@@ -2129,7 +2173,7 @@ public sealed partial class AssistWorkspace
 
         recording.Done();
         NoteSettingsLeftAsTheyWere(publishing ? "publishing pages" : "hiding pages", declined.Count, course.Code, section);
-        string? declinedSentence = declined.Count > 0 ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : null;
+        string? declinedSentence = declined.Count > 0 ? SettingsCannotBeAddedTo(declined) : null;
 
         if (!changedAnything)
         {
@@ -2233,13 +2277,13 @@ public sealed partial class AssistWorkspace
             ? "No page needed changing, and the course was backed up"
             : $"{changed.Count} page{(changed.Count == 1 ? " was" : "s were")} changed and the course was backed up";
 
-    private static string Summary(IReadOnlyList<string> changed, bool previewed, string code, int section, bool hiding = false,
+    private string Summary(IReadOnlyList<string> changed, bool previewed, string code, int section, bool hiding = false,
                                   IReadOnlyList<string>? declined = null)
     {
         // Pages the writer declined are NAMED (#308): never folded into
         // "Nothing needed changing.", which would say they were already right.
         string? declinedSentence = declined is { Count: > 0 }
-            ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined)
+            ? SettingsCannotBeAddedTo(declined)
             : null;
         if (changed.Count == 0) return declinedSentence ?? "Nothing needed changing.";
         string verb = hiding ? "Unpublished" : "Published";
@@ -2947,8 +2991,8 @@ public sealed partial class AssistWorkspace
         // from a total: "Re-dated 14 classes and -4 pages they use" came from
         // (pages whose date changes) - (every class in the section).
         string summary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials);
-        if (undated.Count > 0) summary += " " + AssistWording.PagesWhoseNewDatesCouldNotBeSet(undated);
-        if (notHidden.Count > 0) summary += " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(notHidden);
+        if (undated.Count > 0) summary += " " + NewDatesCouldNotBeSet(undated);
+        if (notHidden.Count > 0) summary += " " + SettingsCannotBeAddedTo(notHidden);
         NoteSettingsLeftAsTheyWere("re-dating classes", undated.Union(notHidden, StringComparer.OrdinalIgnoreCase).Count(),
             course.Code, section);
         string detail = summary +
@@ -3102,6 +3146,39 @@ public sealed partial class AssistWorkspace
         var course = Course(courseCode);
         int number = Section(course, sectionNumber);
         return Relative(AssistantBackup(course, number));
+    }
+
+    /// <summary>
+    /// The Section menu's copy before one change (#489): under the same
+    /// <c>copying</c> lease as the assistant's, so Preview, Deploy and every
+    /// assistant stand off while it is zipped; one "section menu backed up a
+    /// course" line per zip, with its name, size and seconds, or why it could
+    /// not. Pruned to five of its own, apart from the assistant's.
+    /// </summary>
+    private string MenuBackup(Course course, int sectionNumber)
+    {
+        using var copying = WorkLease.Take(_folder, course.Code, WorkLease.Copying);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        string made;
+        try
+        {
+            made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
+                                               new BackupMaker.Menu(sectionNumber));
+        }
+        catch (Exception error)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
+                $"the Section menu could not back up the course: {error.Message}", course.Code, sectionNumber);
+            throw;
+        }
+        double megabytes = 0;
+        try { megabytes = new FileInfo(made).Length / (1024.0 * 1024.0); } catch { }
+        ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
+            $"the Section menu backed up the course as {Path.GetFileName(made)} " +
+            $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
+            $"{clock.Elapsed.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)",
+            course.Code, sectionNumber);
+        return made;
     }
 
     /// <summary>
@@ -3865,9 +3942,9 @@ public sealed partial class AssistWorkspace
             $"later class days, and updated {linksUpdated} link" +
             $"{(linksUpdated == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
             AssistWording.LookTheSectionOverBeforePublishing;
-        if (undated.Count > 0) said += " " + AssistWording.PagesWhoseNewDatesCouldNotBeSet(undated);
+        if (undated.Count > 0) said += " " + NewDatesCouldNotBeSet(undated);
         if (notFinished.Count > 0)
-            said += " " + AssistWording.PagesAChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+            said += " " + ChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
 
         // Said because it is now TRUE and was not said before: this records no
         // undo entry, so "undo that" afterwards reaches back past it to

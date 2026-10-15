@@ -221,7 +221,7 @@ public class OutsideAssistantWhilePreviewingTests : IDisposable
     public async Task TheInAppWindowKeepsTheOldRule()
     {
         OtherProgramHolds("preview");
-        var workspace = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
+        var workspace = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow };
         var tools = new PlantoirTools(workspace);
         var progress = new Progress<ProgressNotificationValue>(_ => { });
 

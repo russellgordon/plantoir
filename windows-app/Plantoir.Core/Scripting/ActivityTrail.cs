@@ -572,6 +572,23 @@ public static class ActivityTrail
         /// it" has no answer without this line.
         /// </summary>
         RecentWorkingFoldersCleared,
+        /// <summary>
+        /// One of the assistant's functions run from the menu bar (#489, the
+        /// mac's #457 batch B): where the item is (Section ▸ Publish Pages…),
+        /// how it ended — carried out, changed nothing, took the last change
+        /// back, cancelled at the plan, rebuilt, not rebuilt — and counts, never
+        /// a page's title. The assistant's own lines are written by its
+        /// conversation, which the menu does not have; without this a page
+        /// published from the menu is a page nobody can say who published.
+        /// </summary>
+        RanFromAMenu,
+        /// <summary>
+        /// The copy the Section menu saves before EVERY change it makes (#489):
+        /// the backup's FILE NAME (<c>_menu-section&lt;N&gt;</c>), its size and
+        /// seconds; or that it could not, and why. Answers "where did this zip
+        /// come from" and "why did Publish take ten seconds".
+        /// </summary>
+        SectionMenuBackedUpACourse,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -686,6 +703,8 @@ public static class ActivityTrail
         Event.UpdateStopped => "update stopped",
         Event.WorkingFolderToolsCopied => "working folder tools copied",
         Event.RecentWorkingFoldersCleared => "recent working folders cleared",
+        Event.RanFromAMenu => "ran from a menu",
+        Event.SectionMenuBackedUpACourse => "section menu backed up a course",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

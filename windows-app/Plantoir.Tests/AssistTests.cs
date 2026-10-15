@@ -839,7 +839,7 @@ public class AssistWorkspaceTests : IDisposable
                     "section1", "All Classes", "Unit 2, Day 3.md")));   // and never edited
 
             // Plantoir's own window keeps its own sentence (director's ruling).
-            var window = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
+            var window = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow };
             var inTheWindow = Assert.ThrowsAsync<AssistRefusal>(
                 () => window.Apply(window.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }))).Result;
             Assert.Contains("Plantoir is building ICS3U right now", inTheWindow.Message);
@@ -925,7 +925,7 @@ public class AssistWorkspaceTests : IDisposable
         try
         {
             WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
-            var workspace = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
+            var workspace = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow };
 
             var refusal = Assert.ThrowsAsync<AssistRefusal>(() => workspace.RebuildPreview("ICS3U", 1)).Result;
 
@@ -950,7 +950,7 @@ public class AssistWorkspaceTests : IDisposable
         try
         {
             WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
-            var workspace = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
+            var workspace = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow };
             var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
             var result = workspace.Apply(plan).Result;

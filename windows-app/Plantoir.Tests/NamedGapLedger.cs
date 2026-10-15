@@ -165,8 +165,6 @@ internal static class NamedGapLedger
         // ---- activityTrail.mustRecord: events this app does not declare yet.
         // Each goes when its feature lands, and its mend-check says so.
         Owed(ActivityTrailEvents, 489, V150, MenuAssist,
-            "ran from a menu",
-            "section menu backed up a course",
             "asked about classes dated after the next class",
             "deployed with classes dated after the next class",
             "a deploy was held back for classes dated after the next class"),
@@ -206,34 +204,16 @@ internal static class NamedGapLedger
 
         // ---- assist-wording.json → wording: sentences with no same-named
         // member here, each held open by the issue that owns the feature
-        // that says it. All 70 are the menu bar's and the Deploy question's
-        // (mac #457 item 3 and #475, commits e4b4b8272 and 75a4be324).
+        // that says it. The 17 left are the Deploy question's (mac #475, commit
+        // 75a4be324) — batch 2C's; the Section menu's own landed with #489's 2B.
         Owed(AssistWordingKeys, 489, V150, MenuAssist,
-            "changedWhileSavingACopyFromTheMenu", "couldNotUndoFromTheMenu", "courseIsBeingCopiedFromTheMenu",
-            "datesToMakeRoom", "datesToMakeRoomForAMeeting", "deployHasClassesDatedLater",
-            "deployHasClassesDatedLaterAndNoWindow", "deployHasClassesDatedLaterNamingSeveral",
-            "deployWaitsForAnOpenQuestion", "hideTickedAndDeployButton", "keepAllAndDeployButton",
+            "deployHasClassesDatedLater", "deployHasClassesDatedLaterAndNoWindow",
+            "deployHasClassesDatedLaterNamingSeveral", "deployWaitsForAnOpenQuestion",
+            "hideTickedAndDeployButton", "keepAllAndDeployButton",
             "laterClassesAtDeploy", "laterClassesAtDeployForAMeeting", "laterClassesAtPublish",
             "laterClassesAtPublishForAMeeting", "laterClassesDay", "laterClassesKeptNote",
             "laterClassesKeptNoteForAMeeting", "laterClassesTitle", "laterClassesTitleForAMeeting",
-            "leaveOutAndContinueButton", "makingRoomCannotBeUndoneFromTheMenu",
-            "makingRoomCannotBeUndoneFromTheMenuForAMeeting", "menuAddNextClassTitle",
-            "menuAddNextClassTitleForAMeeting", "menuCancelButton", "menuContinueButton", "menuDoneButton",
-            "menuFindAPage", "menuHideButton", "menuHidePagesTitle", "menuMakeRoomAt",
-            "menuMakeRoomAtForAMeeting", "menuMakeRoomButton", "menuMakeRoomTitle",
-            "menuMakeRoomTitleForAMeeting", "menuNoHiddenPages", "menuNoVisiblePages", "menuPickClassDay",
-            "menuPickClassDayForAMeeting", "menuPickPagesToHide", "menuPickPagesToPublish",
-            "menuPublishButton", "menuPublishClassTitle", "menuPublishClassTitleForAMeeting",
-            "menuPublishPagesTitle", "menuRebuildPreviewTitle", "menuReDateButton", "menuReDateTitle",
-            "menuReDateTitleForAMeeting", "menuSavingACopy", "menuUndoLastChangeTitle", "menuWorking",
-            "noClassOnFromTheMenu", "noClassOnFromTheMenuForAMeeting", "noPageCalledFromTheMenu",
-            "noPagesCalledFromTheMenu", "nothingToUndoFromTheMenu", "pagesAChangeCouldNotFinishFromTheMenu",
-            "pagesAChangeCouldNotFinishFromTheMenuNamingSeveral", "pagesWhoseNewDatesCouldNotBeSetFromTheMenu",
-            "pagesWhoseSettingsCannotBeAddedToFromTheMenu",
-            "pagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral",
-            "pageWhoseNewDateCouldNotBeSetFromTheMenu", "publishThemAllButton", "restoreFromBackupPutsItBack",
-            "sectionIsChangingFromTheMenu", "undidFromTheMenu", "undidPartlyFromTheMenu",
-            "undoIsStillAvailableFromTheMenu"),
+            "leaveOutAndContinueButton", "publishThemAllButton"),
     }.SelectMany(group => group).ToArray();
 
     /// <summary>Every entry, for <c>NamedGapLedgerTests</c>.</summary>

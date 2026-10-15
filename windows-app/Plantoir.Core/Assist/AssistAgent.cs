@@ -659,6 +659,18 @@ public sealed class AssistAgent
     /// </summary>
     public Action? ShowPreviewInApp { get; set; }
 
+    /// <summary>
+    /// Really rebuild the section's preview: stop a serving one and start it
+    /// again (#489, Q1). Before this, <c>rebuild_preview</c> and "rebuild the
+    /// preview" pressed <see cref="ShowPreviewInApp"/>, which does nothing while
+    /// a preview is serving, and still said it was rebuilding. Null falls back
+    /// to <see cref="ShowPreviewInApp"/>.
+    /// </summary>
+    public Action? RebuildPreviewInApp { get; set; }
+
+    /// <summary>Whether the Section menu is changing this section right now (#489's claim, <c>SectionMenuActivity</c>).</summary>
+    public Func<bool>? SectionIsChangingFromTheMenu { get; set; }
+
     /// <summary>Deploy through the main window's own flow, console and all. Any thread.</summary>
     public Action? StartDeployInApp { get; set; }
 
@@ -953,7 +965,7 @@ public sealed class AssistAgent
                 string said = ThisSectionIsBeingDeployed()
                     ? SectionIsBeingDeployedSentence
                     : "The preview is opening in Plantoir's main window — the build shows its progress there.";
-                if (!ThisSectionIsBeingDeployed()) ShowPreviewInApp.Invoke();
+                if (!ThisSectionIsBeingDeployed()) (RebuildPreviewInApp ?? ShowPreviewInApp).Invoke();
                 _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
                 _messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = said });
                 return new List<Line> { new("assistant", said) };
@@ -1702,12 +1714,17 @@ public sealed class AssistAgent
         "launch the preview", "rebuild the preview", "refresh the preview", "update the preview",
     };
 
+    private static readonly string[] RebuildWords = { "rebuild", "refresh", "update" };
+
     private List<Line>? PreviewAskedForPlainly(string text)
     {
         if (ShowPreviewInApp is null || !PreviewCommands.Contains(Plainly(text))) return null;
 
         bool deploying = ThisSectionIsBeingDeployed();
-        if (!deploying) ShowPreviewInApp.Invoke();
+        // "rebuild / refresh / update the preview" rebuild a serving preview
+        // (#489, Q1); "preview", "show me the preview" and the rest show it.
+        bool rebuild = RebuildWords.Any(word => Plainly(text).StartsWith(word, StringComparison.Ordinal));
+        if (!deploying) (rebuild && RebuildPreviewInApp is not null ? RebuildPreviewInApp : ShowPreviewInApp).Invoke();
         string said = deploying
             ? SectionIsBeingDeployedSentence
             : "The preview is opening in Plantoir's main window — the build shows its progress there.";
@@ -2173,6 +2190,8 @@ public sealed class AssistAgent
         {
             OnToolProgress = OnToolProgress,
             ShowPreviewInApp = ShowPreviewInApp,
+            RebuildPreviewInApp = RebuildPreviewInApp,
+            SectionIsChangingFromTheMenu = SectionIsChangingFromTheMenu,
             StartDeployInApp = StartDeployInApp,
             StartDeployInAppAsync = StartDeployInAppAsync,
             SectionIsBusy = SectionIsBusy,

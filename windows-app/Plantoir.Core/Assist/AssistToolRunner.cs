@@ -165,15 +165,31 @@ public sealed class AssistToolRunner
         // after reading one of these, a small model restates it, and the
         // teacher saw the same sentence twice. There is nothing next: the
         // main window has the work.
+        // The Section menu's claim (#489): the in-app assistant's change to a
+        // section the menu is changing right now is refused before anything
+        // is backed up or written, so two undo lists never interleave on one
+        // section. The menu itself, and every read, go ahead.
+        if (Surface == AssistSurface.LocalWindow && IsWriteTool(name) && SectionIsChangingFromTheMenu?.Invoke() == true)
+            return Handed(AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString()));
+
         if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ThisSectionIsBeingDeployed())
         {
             // Before a window is opened, a preview stopped or a no-window
             // rebuild run (#386): the same publish record the window asks.
             return Handed(AssistWording.SectionIsBeingDeployed(_courseCode, _section.ToString()));
         }
-        if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
+        // Rebuild Preview from the menu while a copy is being saved: the one
+        // sentence on this path that asks to be asked again (#457, #489).
+        if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && Surface == AssistSurface.Menu
+            && CourseIsBeingCopied?.Invoke() == true)
+            return Handed(AssistWording.CourseIsBeingCopiedFromTheMenu(_courseCode));
+        if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase)
+            && (RebuildPreviewInApp is not null || ShowPreviewInApp is not null))
         {
-            ShowPreviewInApp.Invoke();
+            // REBUILD, not show (#489, Q1): a serving preview is stopped and
+            // started again, so "rebuilding" is true.
+            if (RebuildPreviewInApp is not null) RebuildPreviewInApp.Invoke();
+            else ShowPreviewInApp!.Invoke();
             return Handed(AssistWording.PreviewIsRebuilding(_courseCode, _section.ToString()));
         }
         if ((name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase)

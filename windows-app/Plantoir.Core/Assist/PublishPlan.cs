@@ -81,10 +81,18 @@ public sealed class PublishPlan
     /// </summary>
     public IReadOnlyList<PlannedPage> CannotBeAddedTo { get; init; } = Array.Empty<PlannedPage>();
 
+    /// <summary>
+    /// Whether this plan is read at the Section menu (#489), which speaks in
+    /// its own voice: the <c>…FromTheMenu</c> twins, never "I".
+    /// </summary>
+    public bool FromTheMenu { get; init; }
+
     /// <summary>The sentence naming <see cref="CannotBeAddedTo"/>, or null.</summary>
     public string? CannotBeAddedToSentence => CannotBeAddedTo.Count == 0
         ? null
-        : AssistWording.PagesWhoseSettingsCannotBeAddedTo(CannotBeAddedTo.Select(p => p.DisplayTitle).ToList());
+        : FromTheMenu
+            ? AssistWording.PagesWhoseSettingsCannotBeAddedToFromTheMenu(CannotBeAddedTo.Select(p => p.DisplayTitle).ToList())
+            : AssistWording.PagesWhoseSettingsCannotBeAddedTo(CannotBeAddedTo.Select(p => p.DisplayTitle).ToList());
 
     /// <summary>
     /// The sentence naming the linked classes left alone, or null. Only the

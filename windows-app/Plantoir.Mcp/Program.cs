@@ -54,7 +54,11 @@ try
     // are talking, and nothing accumulates on disk afterwards.
     workspace = new AssistWorkspace(folder, new LauncherRunner(), course, new UndoHistory())
     {
-        ServesTheLocalWindow = Environment.GetEnvironmentVariable(AssistWorkspace.LocalWindowVariable) == "1",
+        // The Section menu's server (#489) sets PLANTOIR_SURFACE=menu and no
+        // --course and no door variable, so it takes no assist lease below.
+        Surface = AssistWorkspace.SurfaceFrom(
+            Environment.GetEnvironmentVariable(AssistWorkspace.SurfaceVariable),
+            Environment.GetEnvironmentVariable(AssistWorkspace.LocalWindowVariable)),
         RecordsHeldBackups = true,
     };
 }
@@ -121,8 +125,20 @@ builder.Services.AddMcpServer(options =>
         // back here, before any backup (#436): OutsideChangeGate.
         if (context.Params?.Name is { } asked && OutsideChangeGate.Refusal(asked, arguments, workspace) is { } heldBack)
             return new CallToolResult { Content = [new TextContentBlock { Text = heldBack }] };
-        return await next(context, cancellation);
+        var topBefore = workspace.TopOfTheUndoList;
+        var result = await next(context, cancellation);
+        return PlantoirTools.AfterCall(workspace, topBefore, Text(arguments, "course"), Number(arguments, "section"), result);
     }));
+
+static string? Text(Dictionary<string, System.Text.Json.JsonElement>? arguments, string key) =>
+    arguments is not null && arguments.TryGetValue(key, out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String
+        ? value.GetString() : null;
+
+static int? Number(Dictionary<string, System.Text.Json.JsonElement>? arguments, string key) =>
+    arguments is not null && arguments.TryGetValue(key, out var value)
+        ? value.ValueKind == System.Text.Json.JsonValueKind.Number && value.TryGetInt32(out int n) ? n
+          : value.ValueKind == System.Text.Json.JsonValueKind.String && int.TryParse(value.GetString(), out int m) ? m : null
+        : null;
 
 try { await builder.Build().RunAsync(); }
 finally

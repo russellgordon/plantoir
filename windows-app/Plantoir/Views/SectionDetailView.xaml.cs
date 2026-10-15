@@ -805,7 +805,7 @@ public sealed partial class SectionDetailView : UserControl
     {
         var askedOn = DateOnly.FromDateTime(DateTime.Now);
         var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
-            { ServesTheLocalWindow = true };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
+            { Surface = AssistSurface.LocalWindow };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
         TodaysClassOnTheFrontPage.Offering? offer;
         try { offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn); }
         catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return; }
