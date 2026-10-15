@@ -170,9 +170,8 @@ internal static class NamedGapLedger
 
         // ---- specialNames.platformWording.keys
 
-        // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
-        Owed(CourseConfigKeys, 496, V160, Printing,
-            "print_school_name", "print_blanks", "print_school_name_at", "print_course_code_at"),
+        // ---- file-formats.json → courseConfigKeys: none held open. The four
+        // print_* keys landed with #496's batch 5B (Course Settings → Printing).
 
         // ---- toolchain.json → pins: none held open. pagedjs, functionPlot
         // and nodeTikzjax (and latinModern, newly watched) landed in
