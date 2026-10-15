@@ -61,6 +61,29 @@ public sealed class AppSettings
     public List<RememberedWindow> RememberedWindows { get; set; } = new();
 
     /// <summary>
+    /// File ▸ Open Recent (#488, <c>shared-rules.json</c> → <c>openRecent</c>):
+    /// the working folders OPENED, newest first, at most
+    /// <see cref="Models.RecentWorkingFolders.Cap"/>. Null until the list is
+    /// first read: <see cref="RecentFolders"/> then seeds it from the last
+    /// working folder and the remembered windows, so the menu is not empty on
+    /// the first launch after the update. Not pruned on load: a folder that has
+    /// gone stays listed, and choosing it says why it could not be opened.
+    /// </summary>
+    public List<string>? RecentWorkingFolders { get; set; }
+
+    /// <summary>The Open Recent list, seeded (in memory) the first time it is read.</summary>
+    [JsonIgnore]
+    public List<string> RecentFolders
+    {
+        get
+        {
+            RecentWorkingFolders ??= Models.RecentWorkingFolders
+                .Seed(WorkspacePath, RememberedWindows.Select(window => window.Path)).ToList();
+            return RecentWorkingFolders;
+        }
+    }
+
+    /// <summary>
     /// Where each SECTION's assistant window was last left, keyed by
     /// <see cref="AssistWindowKey"/>. Per section because a teacher genuinely
     /// puts section 1's assistant on a second monitor and section 2's beside

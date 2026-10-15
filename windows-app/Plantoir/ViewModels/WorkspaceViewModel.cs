@@ -150,7 +150,11 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     /// business — remembering the choice, saying so on the trail, and giving
     /// back the folder that was left.
     /// </summary>
-    public void ChooseWorkspace(string path)
+    /// <param name="fromOpenRecent">
+    /// Chosen from File ▸ Open Recent (#488) rather than in the folder picker:
+    /// the trail line says so, as the mac's does.
+    /// </param>
+    public void ChooseWorkspace(string path, bool fromOpenRecent = false)
     {
         // Choosing another folder replaces the remembered one and takes the
         // sentence away (reopeningTheLastWorkingFolder.memoryCases).
@@ -159,7 +163,9 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         Settings.Save();
         Plantoir.Core.Scripting.ActivityTrail.Note(
             Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
-            $"working folder opened — {path}");
+            $"working folder opened — {path}" + (fromOpenRecent ? " from File ▸ Open Recent" : ""));
+        // Opened, so it heads File ▸ Open Recent (#488) — on OPEN only.
+        Plantoir.Services.OpenRecentList.NoteOpened(Settings, path);
         string? leftBehind = PointAtFolder(path);
         MarkBuildsFolder();
         if (leftBehind is not null) ReleaseFolderIfUnused(leftBehind);
@@ -192,6 +198,8 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
             Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderReopened,
             $"working folder reopened — {LastWorkingFolder.WhichFolder(windowsOwn)}, {path}");
         NotReopenedSentence = null;
+        // The app reopening a folder at launch is an OPEN too (openRecent.rule).
+        Plantoir.Services.OpenRecentList.NoteOpened(Settings, path);
         AdoptFolder(path);
     }
 
