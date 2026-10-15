@@ -182,7 +182,7 @@ function Write-RuntimeManifest($Fields) {
     [pscustomobject]$Fields | ConvertTo-Json | Set-Content $Manifest -Encoding utf8
 }
 
-# The manifest as it should read while runtimeendor is absent or being
+# The manifest as it should read while runtime\vendor is absent or being
 # made: every key found (or the five base keys on a fresh run) WITHOUT the
 # four vendor keys. Written BEFORE the vendor folder is touched, so a run
 # that dies part-way leaves a manifest the app's build refuses
@@ -349,7 +349,7 @@ try {
     # The manifest loses its vendor keys FIRST (on a fresh run this is the
     # first manifest written, right after the base phases): from here until
     # the end, a failure leaves a runtime the build refuses and a re-run
-    # finishes by fetching runtimeendor alone.
+    # finishes by fetching runtime\vendor alone.
     Write-RuntimeManifest (Get-BaseFields)
     if (Test-Path $VendorOut) { Remove-Item $VendorOut -Recurse -Force }
     New-Item -ItemType Directory -Force $VendorOut | Out-Null

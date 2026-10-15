@@ -2720,7 +2720,7 @@ touched (Russell's real folder has a `.claude/settings.local.json`) — and a
 **managed section** in `AGENTS.md` and `CLAUDE.md` naming the skill, between
 `<!-- BEGIN PLANTOIR: … -->` and `<!-- END PLANTOIR -->`. Russell's rulings
 of 2026-10-09 (P1 REVISED AGAIN and ADDENDUM 2), as contract cases
-(`printablePages.agentGuidance.rootFileCases`, nine):
+(`printablePages.agentGuidance.rootFileCases`, ten):
 
 - **no file** → written, holding only the section;
 - **the markers present** → only what is between them is replaced;

@@ -700,7 +700,11 @@ Edge's first launch from a Homebrew cask waits on macOS's "downloaded from
 the Internet" prompt, and until it is answered `requestAnimationFrame` never
 fires, which made Paged.js hang and looked exactly like an Edge bug.
 Not measured here: a site published to Netlify or Cloudflare (the files are
-identical to the preview's), Windows browsers (the `windows` issue asks).
+identical to the preview's). Windows, after #499's look (so not comparable
+row for row with this table): `print_handout.mjs` OK in headless Edge 155 on
+a native build, questions only 12 / answers only 1 / both 13 pages portrait,
+14 / 2 / 16 landscape (#496, 2026-10-15; `12-windows-app.md` → "Printable
+pages", with what is still owed in a headed browser).
 These counts are from before #499's look; F8 has the counts after it.
 
 ### F8. On paper: the look of a handout, and nothing lost (#499, v1.6.0)
@@ -843,8 +847,11 @@ page, and the sentence is conditional, so it is true there too).
 **Not done / open:**
 the answer key has no strand headings; a displayed formula taller than the
 page, or one unbreakable term wider than it, cannot print (refused, with the
-sentence). Windows owes all of this:
-#496.
+sentence). The Windows app's share (Course Settings → Printing, the
+`settings saved` clause, the guidance for assistants, the preview pane's
+hand-over to the browser) landed on 2026-10-15 under #496:
+`12-windows-app.md` → "Printable pages". Its browser measurements are still
+owed there.
 
 ### F9. ⌘P on every other page (#501, v1.7.0)
 
@@ -944,7 +951,12 @@ handout handle them (F8). Mermaid drawn dark prints near-white labels (28
 words on What This Site Can Do).
 
 **Windows inherits it free** — the block is in `support/quartz`, installed by
-`build_site.py` on every build. It owes one measurement: ⌘P → Save as PDF in
+`build_site.py` on every build. It owed one measurement, taken on #496
+(2026-10-15, headless Edge 155 by `print_plain_page.mjs` unchanged, Intel
+i5-8365U, Windows 11 Pro 26200): Plain Long Page 4 pages portrait, 5
+landscape, 40/40 sentinels inked, 0 past the edge, no sidebar on paper,
+light and dark — the same result as Chrome here. Still owed in a headed
+Edge and Chrome by Ctrl+P, if wanted. The measurement as asked was: ⌘P → Save as PDF in
 Edge and Chrome on a long page that is not printable, portrait and landscape,
 light and dark, because Windows' DPI and default margins can put the paper
 width on the other side of 800 px.

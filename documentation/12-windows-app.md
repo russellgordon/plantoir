@@ -1319,20 +1319,199 @@ Reference: `Plantoir/Views/SidebarPane.xaml.cs` (`SidebarRow`,
 `ReconcileSections`), `Plantoir/Views/SidebarPane.xaml` (the three `Mode=OneWay`
 bindings), `Plantoir/MainWindow.xaml.cs`.
 
-## Printable pages (#454, v1.6.0) — a pointer
+## Printable pages (#454 on the mac; #496 here, v1.6.0)
 
 The build, the site and the shared Python do everything for a printed page,
 and Windows inherits them unchanged (`support/quartz`, `scripts/page_features.py`,
-`scripts/print_settings.py`, the skill under `support/agent_guidance`). What the
-Windows app owes — Course Settings' Printing section, the widened
-`settings saved` line, writing the
-guidance into the working folder's root, and measuring WebView2's preview pane
-and Edge — is the `windows` issue for #454. Paged.js and Latin Modern are
-already in `runtime\vendor\pagedjs` (since 2026-10-15, fetched with the
-figure engines: "Diagrams and graphs" below). The design and every measurement:
+`scripts/print_settings.py`, the skills under `support/agent_guidance`).
+Paged.js and Latin Modern are in `runtime\vendor\pagedjs` (since 2026-10-15,
+fetched with the figure engines: "Diagrams and graphs" below). The design
+and every mac measurement:
 [06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200),
 [05 → Printable pages](05-build-pipeline.md#printable-pages-what-the-build-does-454-v200),
-[09 → Printing](09-mac-app.md#printing-454-v200).
+[09 → Printing](09-mac-app.md#printing-454-v200). What the Windows APP does
+(#496, batch 5B of the catch-up to 1.7.1, 2026-10-15):
+
+**Course Settings → Printing**, between Footer and Content Structure, as on
+the mac: the school name, three switches (Name, Date, Class #), two pickers
+(top left / bottom left / not printed) and a sketch of the corners
+(`PrintCorners.Sketch`, the bottom-left corner led by
+`courseSettingsWording.printingSampleTitle` since #499). The four keys are
+`CourseConfiguration.PrintSchoolName` / `PrintBlanks` / `PrintSchoolNameAt`
+/ `PrintCourseCodeAt`. Two rules a reader of the code would not guess:
+
+- **Getters never write, and a setter given what it would read back is a
+  no-op.** `HasUnsavedChanges` compares the raw values, so a getter that
+  tidied `["seat","class_number","name"]` into the file would open the course
+  dirty (`savingSettings.freshOpenCases`, case 9). And WinUI raises
+  `TextChanged` for text set in code, LATER, after the handler is attached —
+  so "set the value before attaching the handler" is no guarantee for a text
+  box, and a stored `"   "` school name would have been removed on open
+  (plan review L9). Both are held by `PrintablePagesTests` and
+  `CourseSettingsSaveTests.AFreshlyOpenedCourseIsClean`, which reads the four
+  getters on every fresh-open case before deciding.
+- **A `print_blanks` of JSON null is Name and Date**, because that is what the
+  BUILD prints (`print_settings._blanks` reads null as absent). The mac read
+  NSNull as no blanks, so its sketch contradicted the paper; the authored
+  corners case "blanks of null are the default" now says which is right, and
+  the mac owes the fix (a `mac` issue). An empty list is still no blanks.
+
+**The `settings saved` line** says what a Save changed about printing
+(`SettingsSavedLine`, unit-tested now; it was built inline in `Save_Click`
+and untested): `; printing: school name set|changed|cleared` (never the
+name), `blanks Name, Date → Name, Date, Class #`, `school name top left →
+not printed`, `course code bottom left → top left`, only the parts that
+changed, before compared from the same disk read the Save already made (a
+file that could not be read compares with the defaults). The clause sits
+where the mac's does, after the course and before what was kept or replaced.
+The rest of the Windows line still differs from the mac's (`; kept from
+elsewhere: X`, no `— sidebar:` part); that predates #496 and is left alone.
+
+**The guidance for assistants** (`AgentGuidance`, a line-for-line port of
+`AgentGuidance.swift`; the rule is `printablePages.agentGuidance`): the
+skills in `support\agent_guidance\skills\` mirrored into `.claude\skills\`
+and `.agents\skills\` (each skill's folder is the app's whole), and the
+managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
+
+- **After the copy, on a task of its own** — `ToolchainReadiness` starts it
+  when a copy of the folder ends, whatever the copy's outcome, and never
+  chains it to the copy's task, which `RefusedWhileTheFolderIsGettingReady`
+  and `InitializeWorkspace` await. A failure is a startup.log line, the trail
+  event `guidance for assistants could not be written` and a closable
+  InfoBar (`guidanceNotice`) with `words.couldNotWrite`; the folder's State
+  is untouched, so Preview, Deploy and New Course never wait on it
+  (`AgentGuidanceTests.AGuidanceFailureNeverHoldsTheFolderBack`, through the
+  real hook with a `.claude` that is a FILE). Once per folder per process,
+  unless it failed.
+- **The notice's reason has no path.** .NET's IO messages carry the full
+  path ("Access to the path 'C:\Users\…\CLAUDE.md' is denied."), so the
+  notice says `Win32Exception`'s sentence for the error code instead
+  ("Access is denied.") — only for a FACILITY_WIN32 code (`0x8007xxxx`:
+  `0x80070005` access denied, `0x800700B7` a file where the folder belongs,
+  `0x80070020` in use), because for any other `Win32Exception` says "Unknown
+  error (0x1620)"; anything else says "could not be written" (plan review
+  M6). The trail line keeps the PLACE (`.claude/skills/plantoir-printing`,
+  forward slashes, from the working folder down); `LogRedactor` takes the
+  account name out of anything else, it does not redact a path.
+- **Writes are atomic** (a temporary file moved over the old), as the mac's
+  `.atomic` is: the pass runs on its own task, which the quit path does not
+  wait for (M7). **A file whose only difference from the current section is
+  its line endings is UNCHANGED**, so an editor that saves CRLF does not have
+  the section rewritten at every launch. **Files are read with a strict
+  UTF-8 decoder**, so a file saved in another encoding is refused, never
+  written over (`addCases` "cannot be read again").
+- **The question** is a ContentDialog (`MainWindow.Guidance.cs`): title
+  `askTitle`, `askFound` as the explanation under it, `askWhat`,
+  `askYoursStays`, an Expander (`showWhatIsAdded`) over a read-only
+  monospace box with the section; Add is the default (Enter), Not Now the
+  close button (Escape). ONE dialog per window: it is asked only when
+  `DialogGate.IsOpen` says none is up, and tried again on activation and
+  every 2 s while a file waits. **The quit question takes it DOWN first**
+  (WinUI throws on a second ContentDialog — plan review M8), and a question
+  taken down that way, or by the window closing, is PUT BACK unanswered:
+  closing a window is not a Not Now. Each file is asked about in one window
+  only, AGENTS.md first. Not Now answers are kept in
+  `%LOCALAPPDATA%\Plantoir\agent-guidance-declined.json` (path,
+  case-insensitive, → the section's signature), deliberately out of
+  `AppSettings`, which other code rewrites whole.
+- **This repository is itself a working folder** (`preview.ps1` and
+  `courses\` at its root), so opening it in Plantoir writes
+  `.claude\skills\plantoir-*` and `.agents\` (all ignored by `.gitignore`;
+  the graphs skill's line was missing until this batch) and ASKS about the
+  repository's own `CLAUDE.md` and `AGENTS.md`. **The answer in a checkout of
+  this repository is always Not Now**: Add would append Plantoir's teacher
+  guidance to the file that briefs every session here.
+
+**The preview pane hands pages to the browser** (`PreviewBrowserHandoff`,
+the mac's port; the wiring is `SectionDetailView.HandPagesToTheBrowser`):
+
+- **A link that opens a new window** — the page's own PDF among them — is
+  handled (`NewWindowRequested`, `Handled = true`) and opened in the
+  teacher's DEFAULT browser, `localhost` rewritten to `127.0.0.1` as Open in
+  Browser does; any scheme but http, https and mailto is dropped. Unhandled,
+  WebView2 opens a bare popup window owned by Plantoir: not the teacher's
+  browser, no address bar or bookmarks, gone when the app closes, and unlike
+  the mac (the director's decision for batch 5). REJECTED: leaving WebView2's
+  popup.
+- **Print**: the shared page code (`print.inline.ts`) asks the app when it
+  finds `window.webkit.messageHandlers.plantoirPrint`, which WebKit gives the
+  mac. Windows INJECTS exactly that shape
+  (`PreviewBrowserHandoff.PrintShim`, by `AddScriptToExecuteOnDocumentCreatedAsync`
+  and again on every completed navigation), forwarding to
+  `window.chrome.webview.postMessage({plantoirPrint: …})`; the app accepts
+  only a message from the preview's own origin, a mode from
+  `printablePages.modes.list` and a paper from `paper.cases` (none =
+  portrait), and opens `#plantoir-print=<mode>&paper=<paper>` in the browser.
+  No shared file changed (the plan's option (i)). The risk named — page code
+  reading `window.webkit` to detect Safari — was checked: nothing in the
+  bundled Quartz, its scripts or KaTeX reads it (Mermaid comes from a CDN
+  and was not checked). REJECTED for now: option (ii), a hook in
+  `print.inline.ts` gated on a Windows-only flag (never on `chrome.webview`
+  alone, which every WebView2 host has) — a shared change for no difference
+  a teacher could see.
+- Each hand-over is one trail line, `preview page opened in the web browser`,
+  naming the page the teacher was ON and only the KIND of link (the page's
+  own PDF, another page of the site, another site) — never where it led.
+- **Ctrl+P in the pane** is WebView2's own print (its browser accelerator
+  keys are on by default), the ⌘P path of `modes.commandP`.
+
+**Measured headless** (2026-10-15; Intel i5-8365U, 16 GB, Windows 11 Pro
+26200; Edge 155.0.4283.45 headless — the same Chromium build as this PC's
+WebView2 Runtime; no Chrome is installed here). The mac's own browser checks
+were run unchanged against a native build of the verify fixtures
+(`preview.ps1 --build-only` of a scratch course holding verify.sh's
+"Printable Fixture" and "Plain Long Page", served from the built `public\`
+over HTTP), with the runtime's Node 20.18.1 `--experimental-websocket` for
+the WebSocket they expect from Node 22, and poppler 24.08.0 for Windows
+(oschwartz10612/poppler-windows, in a scratch folder) for the PDF reading.
+This is the mac's own method for its F7–F9 numbers (headless Chromium,
+`Page.printToPDF`):
+
+- **`browser-checks/print_handout.mjs`: OK.** Every check the mac runs —
+  the print layout ran every time (never the fallback), every piece laid out
+  (212/212 questions-only, 23/23 answers-only, 235/235 both), every word,
+  answer and code line with its own number on paper, Latin Modern in the
+  PDF's fonts, the Curriculum connection nowhere, the menu printing nothing
+  until a way is chosen, in the contract's order, the paper remembered.
+  Pages: questions only **12** portrait / **14** landscape; answers only **1**
+  / **2**; both **13** / **16**. ⌘P: letter, 612 × 792 portrait and 792 × 612
+  landscape, the Curriculum connection off paper, no code line number wrong.
+- **#501, `browser-checks/print_plain_page.mjs`: OK, light and dark** (dark
+  by the same script with `prefers-color-scheme: dark`). Plain Long Page, a
+  1512 × 900 window: **4** pages portrait, **5** landscape; 40 of 40
+  paragraph sentinels INKED, 0 with no ink, 0 words past the paper's edge, 0
+  sidebar lines on paper (of the 6 the screen shows), 0 paragraphs broken.
+  Display scale does not enter: a PDF printed by the browser is laid out at
+  the paper's CSS width, not the screen's.
+- **`printPdf: "WORKSHEET 3.PDF"`** against `Media\Worksheet 3.pdf`
+  (`printPdfCases` "spelled in other capitals"): the built page links
+  `../Media/Worksheet-3.pdf` — the FOLDER's spelling, as Quartz slugs it —
+  and the build reported no `printPdfNotFound`.
+
+**MEASURE WHEN UNLOCKED** (the desktop was locked for all of batch 5B — RDP
+disconnected, LogonUI up — so nothing that needs a window in front, or the
+teacher's own browser, could be done): (1) whether WebView2 would have
+printed the handout itself — a print preview for
+`frame.contentWindow.print()` on the hidden frame, `afterprint`, whether
+`print()` blocks — which decides only whether the hand-over could one day be
+dropped, not whether it works; (2) Ctrl+P in the pane on a printable page
+(page count, corners); (3) that `#plantoir-print=…&paper=…` survives
+ShellExecute into the teacher's Edge (and Chrome, once installed) and prints
+at once; (4) the two checks above in a HEADED Edge and in Chrome, if the
+director wants more than the headless numbers. UI tests written and OWED a
+run on an unlocked desktop (each failed only at `DrivenApp.BringToFront`,
+"could not be brought in front"): `CourseSettingsPrintingUiTests` (2),
+`GuidanceAskUiTests` and `PreviewHandsLinksToTheBrowserUiTests`. The
+guidance test got as far as the real app writing `AGENTS.md` without asking
+and showing the question naming `CLAUDE.md` before it needed the keyboard.
+
+Tests: `PrintablePagesTests` (the getters, the corners cases, the 13
+printing words, the settings-saved clause), `AgentGuidanceTests` (the ten
+`rootFileCases` with a second pass each, the three `addCases`, the failure
+line and a path-free notice, the skills, Not Now, the hook),
+`PreviewBrowserHandoffTests` (modes and papers against the contract, the
+message, the trail words, a link's destination never on the trail, the
+shim's shape against `print.inline.ts`).
 
 ## What this page does not cover
 
@@ -5801,7 +5980,7 @@ called `npm.cmd` with an empty `$nodeDir` on that path.
 
 **A run that dies part-way leaves a runtime the build refuses and the next
 run repairs** (the 5A implementation review's L1 and L3). Before
-`runtimeendor` is touched, the manifest is rewritten WITHOUT the four vendor
+`runtime\vendor` is touched, the manifest is rewritten WITHOUT the four vendor
 keys — on a fresh clone that is the first manifest written, the five base keys
 right after the base phases. So a vendor phase that fails (a download, `npm
 ci`, a hash) leaves base keys only: `CheckNativeRuntimeManifest` stops the
@@ -5890,7 +6069,8 @@ parent + `vendor`; `figures.helper_command` runs `node` from PATH.
   `cmr10.ttf` from the site itself, and `static/function-plot/function-plot.js`;
   nothing from another address), and in dark mode the drawing turns light on
   the dark page. NOT driven inside Plantoir's own preview pane; Print in the
-  pane, and WebView2's own measurements, belong to #496.
+  pane hands the page to the browser since #496 ("Printable pages" above),
+  and WebView2's own print measurements are owed there.
 
 Tests: `NativeFiguresTests` (`[NativeVendorFact]`: skipped, with the reason,
 on a runtime without `vendor\tikz-engine`) —
