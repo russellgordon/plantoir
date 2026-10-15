@@ -2012,18 +2012,6 @@ public sealed partial class SectionDetailView : UserControl
     private void Forward_Click(object sender, RoutedEventArgs e) { if (Preview.CanGoForward) Preview.GoForward(); }
     private void Reload_Click(object sender, RoutedEventArgs e) => Preview.Reload();
 
-    private void ReloadAccelerator(Microsoft.UI.Xaml.Input.KeyboardAccelerator sender,
-        Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
-    { if (_previewUrl is not null) { Preview.Reload(); args.Handled = true; } }
-
-    private void BackAccelerator(Microsoft.UI.Xaml.Input.KeyboardAccelerator sender,
-        Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
-    { if (Preview.CanGoBack) { Preview.GoBack(); args.Handled = true; } }
-
-    private void ForwardAccelerator(Microsoft.UI.Xaml.Input.KeyboardAccelerator sender,
-        Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
-    { if (Preview.CanGoForward) { Preview.GoForward(); args.Handled = true; } }
-
     private void OpenInBrowser_Click(object sender, RoutedEventArgs e)
     {
         // The page currently shown, not the site root; localhost is rewritten
@@ -2039,9 +2027,45 @@ public sealed partial class SectionDetailView : UserControl
         catch { }
     }
 
+    /// <summary>
+    /// The one Obsidian route (#488): the SECTION's folder revealed, and on a
+    /// course kept for reference the calm note first — which this button used
+    /// to skip, going straight to Obsidian (the plan's finding 0.9).
+    /// </summary>
     private void Obsidian_Click(object sender, RoutedEventArgs e) =>
-        _ = FolderActions.OpenInObsidian(_course.SectionDirectory(_sectionNumber), _course.DirectoryPath,
-            BundledToolchain.SupportPath("obsidian_defaults/.obsidian"));
+        _ = _window.SidebarPane.OpenInObsidian(_course, _sectionNumber);
+
+    // ---- What the menu bar reads and presses (#488) ---------------------
+
+    /// <summary>Section > Preview is live exactly when this Preview button is (subjectMenus.previewButtonEnabled).</summary>
+    internal bool PreviewButtonIsEnabled => PreviewButton.IsEnabled;
+
+    /// <summary>Section > Deploy… reads the Deploy button: enabled, and drawn (it is not on a course kept for reference).</summary>
+    internal bool DeployButtonIsEnabled => DeployButton.IsEnabled && DeployButton.Visibility == Visibility.Visible;
+
+    /// <summary>The Preview button reads Stop Preview: the menu item says the same.</summary>
+    internal bool PreviewButtonStops => _previewRunner.IsRunning;
+
+    /// <summary>A preview of this section is building, waiting for its server, or showing (subjectMenus.previewIsRunning).</summary>
+    internal bool PreviewIsRunning => _previewRunner.IsRunning || _isWaitingForServer || HasPreview;
+
+    /// <summary>Section > Preview / Stop Preview: the toolbar button's own handler, so today's-class question (#406) is asked from the menu too.</summary>
+    internal void PressPreview()
+    {
+        if (PreviewButton.IsEnabled) PreviewOrStop_Click(PreviewButton, new RoutedEventArgs());
+    }
+
+    /// <summary>Section > Deploy…: the toolbar button's own handler, on its own predicate, asked again now.</summary>
+    internal void PressDeploy()
+    {
+        if (DeployButtonIsEnabled) Deploy_Click(DeployButton, new RoutedEventArgs());
+    }
+
+    /// <summary>Section > Open in Browser: the toolbar button's own handler.</summary>
+    internal void PressOpenInBrowser()
+    {
+        if (BrowserButton.IsEnabled) OpenInBrowser_Click(BrowserButton, new RoutedEventArgs());
+    }
 
     /// <summary>
     /// For the marketing pictures only (<c>--stage-scene two-maps</c>,
