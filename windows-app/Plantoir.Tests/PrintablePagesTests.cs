@@ -211,3 +211,107 @@ public sealed partial class PrintablePagesTests : IDisposable
             SettingsSavedLine.Compose("ICS3U", new CourseConfiguration.SaveReport([], []), Snapshot("{}"), Snapshot("{}")));
     }
 }
+
+/// <summary>The preview pane hands pages to the browser (#496; the mac's tests, names kept).</summary>
+public sealed class PreviewBrowserHandoffTests
+{
+    private static JsonNode Printable => ContractLoader.LoadJson("shared-rules.json")["printablePages"]!;
+
+    [Fact]
+    public void OnlyThePreviewsOwnPagesAndTheContractsModesAreOpened()
+    {
+        Assert.Equal("http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=questionsOnly&paper=landscape",
+            PreviewBrowserHandoff.PrintAddress("http://localhost:8461/Unit-1/Worksheet-3", "questionsOnly", "landscape")?.AbsoluteUri);
+        Assert.Null(PreviewBrowserHandoff.PrintAddress("https://example.com/x", "questionsOnly", "portrait"));
+        Assert.Null(PreviewBrowserHandoff.PrintAddress("file:///C:/Windows/win.ini", "questionsOnly", "portrait"));
+        Assert.Null(PreviewBrowserHandoff.PrintAddress("http://localhost:8461/x", "everything", "portrait"));
+        Assert.Null(PreviewBrowserHandoff.PrintAddress("http://localhost:8461/x", "questionsOnly", "a4"));
+
+        Assert.Equal(Printable["modes"]!["list"]!.AsArray().Select(m => m!["mode"]!.ToString()), PreviewBrowserHandoff.Modes);
+        var papers = Printable["paper"]!["cases"]!.AsArray()
+            .Where(c => (c!["paper"]!.ToString(), c["size"]!.ToString()) is ("portrait", "letter") or ("landscape", "letter landscape"))
+            .Select(c => c!["paper"]!.ToString());
+        Assert.Equal(papers, PreviewBrowserHandoff.Papers);
+    }
+
+    [Fact]
+    public void ThePrintMessageOpensThePageAndTellsTheTrail()
+    {
+        // What the shim forwards: {plantoirPrint: {mode, paper, url}}.
+        var request = PreviewBrowserHandoff.FromMessage(
+            "{\"plantoirPrint\":{\"mode\":\"withAnswersAtTheEnd\",\"paper\":\"portrait\",\"url\":\"http://localhost:8461/Unit-1/Worksheet-3\"}}");
+        Assert.NotNull(request);
+        Assert.Equal("http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=withAnswersAtTheEnd&paper=portrait", request!.Value.Address.AbsoluteUri);
+        Assert.Equal("preview page opened in the web browser — to print it with the answers at the end (Unit-1/Worksheet-3)",
+            PreviewBrowserHandoff.TrailWords(request.Value.Address, request.Value.Address, PreviewBrowserHandoff.Why.PrintHandout,
+                request.Value.Mode, request.Value.Paper));
+
+        // No paper (a page built before #499) is portrait.
+        var old = PreviewBrowserHandoff.FromMessage("{\"plantoirPrint\":{\"mode\":\"answersOnly\",\"url\":\"http://localhost:8461/x\"}}");
+        Assert.Equal("portrait", old?.Paper);
+        var sideways = PreviewBrowserHandoff.FromMessage(
+            "{\"plantoirPrint\":{\"mode\":\"answersOnly\",\"paper\":\"landscape\",\"url\":\"http://localhost:8461/Unit-1/Worksheet-3\"}}")!.Value;
+        Assert.Equal("preview page opened in the web browser — to print it answers only, on landscape paper (Unit-1/Worksheet-3)",
+            PreviewBrowserHandoff.TrailWords(sideways.Address, sideways.Address, PreviewBrowserHandoff.Why.PrintHandout, sideways.Mode, sideways.Paper));
+
+        // Anything else is refused: another site, another shape, not JSON.
+        Assert.Null(PreviewBrowserHandoff.FromMessage("{\"plantoirPrint\":{\"mode\":\"answersOnly\",\"url\":\"https://example.com/x\"}}"));
+        Assert.Null(PreviewBrowserHandoff.FromMessage("{\"mode\":\"answersOnly\",\"url\":\"http://localhost:8461/x\"}"));
+        Assert.Null(PreviewBrowserHandoff.FromMessage("\"print\""));
+        Assert.Null(PreviewBrowserHandoff.FromMessage("not json"));
+
+        // The browser gets 127.0.0.1, as Open in Browser does; the fragment survives.
+        Assert.Equal("http://127.0.0.1:8461/Unit-1/Worksheet-3#plantoir-print=withAnswersAtTheEnd&paper=portrait",
+            PreviewBrowserHandoff.ForTheBrowser(request.Value.Address).AbsoluteUri);
+    }
+
+    [Fact]
+    public void TheTrailWordsMatchTheContractsExampleLine()
+    {
+        var events = ContractLoader.LoadJson("shared-rules.json")["activityTrail"]!["mustRecord"]!.AsArray();
+        string example = events.First(e => e!["event"]!.ToString() == "preview page opened in the web browser")!["line"]!.ToString();
+        var printed = new Uri("http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=withAnswersAtTheEnd&paper=portrait");
+        Assert.Equal(example, "{course}/{section} · " +
+            PreviewBrowserHandoff.TrailWords(printed, printed, PreviewBrowserHandoff.Why.PrintHandout, "withAnswersAtTheEnd", "portrait"));
+        Assert.Equal("preview page opened in the web browser — the page's own PDF (Unit-1/Worksheet-3)",
+            PreviewBrowserHandoff.TrailWords(new Uri("http://localhost:8461/Unit-1/Worksheet-3"),
+                new Uri("http://localhost:8461/Media/Key.pdf"), PreviewBrowserHandoff.Why.NewWindow));
+        Assert.Equal("preview page opened in the web browser — a link to another page of the site (the front page)",
+            PreviewBrowserHandoff.TrailWords(new Uri("http://127.0.0.1:8461/"),
+                new Uri("http://127.0.0.1:8461/Unit-1"), PreviewBrowserHandoff.Why.NewWindow));
+    }
+
+    [Fact]
+    public void ALinksDestinationNeverReachesTheTrail()
+    {
+        var page = new Uri("http://localhost:8461/Unit-1/Worksheet-3");
+        foreach (string secret in new[]
+                 {
+                     "https://docs.google.com/document/d/1AbcSecretDocId/edit?usp=sharing",
+                     "https://zoom.us/j/81234567890",
+                     "mailto:teacher@school.ca",
+                 })
+        {
+            string line = PreviewBrowserHandoff.TrailWords(page, new Uri(secret), PreviewBrowserHandoff.Why.NewWindow);
+            Assert.Equal("preview page opened in the web browser — a link to another site (Unit-1/Worksheet-3)", line);
+        }
+        Assert.Equal("preview page opened in the web browser — a link to another site (an unknown page)",
+            PreviewBrowserHandoff.TrailWords(new Uri("https://example.com/x"), new Uri("https://example.com/y"), PreviewBrowserHandoff.Why.NewWindow));
+        Assert.True(PreviewBrowserHandoff.IsHandedOver(new Uri("mailto:teacher@school.ca")));
+        Assert.False(PreviewBrowserHandoff.IsHandedOver(new Uri("file:///C:/Windows/win.ini")));
+    }
+
+    [Fact]
+    public void TheShimGivesThePageTheShapeItsPrintCodeLooksFor()
+    {
+        // print.inline.ts checks window.webkit.messageHandlers.plantoirPrint
+        // and posts {mode, paper, url}; the shim must offer exactly that name.
+        string printScript = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot,
+            "support", "quartz", "components", "scripts", "print.inline.ts"));
+        Assert.Contains("messageHandlers", printScript);
+        Assert.Contains(PreviewBrowserHandoff.MessageName, printScript);
+        Assert.Contains("window.webkit", PreviewBrowserHandoff.PrintShim);
+        Assert.Contains("messageHandlers.plantoirPrint", PreviewBrowserHandoff.PrintShim);
+        Assert.Contains("window.chrome.webview.postMessage({plantoirPrint:m})", PreviewBrowserHandoff.PrintShim);
+    }
+}

@@ -31,6 +31,7 @@ public class DialogTitleScanTests
     /// <summary>Where dialogs are made, and how many, on 2026-10-15 (batch 3B of the catch-up to mac 1.7.1).</summary>
     private static readonly Dictionary<string, int> Census = new()
     {
+        ["MainWindow.Guidance.cs"] = 1,
         ["MainWindow.Menus.cs"] = 2,
         ["MainWindow.xaml.cs"] = 6,
         ["Services/UpdatePrompts.cs"] = 1,
