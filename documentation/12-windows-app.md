@@ -4489,6 +4489,27 @@ product question, not a capture one). Fixed on 2026-10-07 — see the next
 section; `Dress` now re-syncs the caption after it sets a scene's theme, so
 pictures taken after that carry a dark bar in the dark scenes.
 
+**What printing does (`capture_windows.py --print-set`, the 1.7.1
+catch-up).** The two print shots are of a PREVIEW, not a published site, so
+they have a pass of their own (`website/shots/print_set_windows.py`): a
+working folder made by the branch's own `setup.ps1`, a preview built by its
+own `preview.ps1` with the bundled runtime, the page taken in an Edge `--app`
+window like every class-site shot, and the handout printed by the page itself
+in headless Edge (`handout_pdf.mjs` under the runtime's Node 20, which needs
+`--experimental-websocket`). Three things met doing it, each measured on
+2026-10-15: `setup_course.py`'s colour-scheme picker reads keys through
+`msvcrt`, so answering `setup.ps1` through a PIPE hangs there for ever — it
+is driven through `PtyDriver` instead, with `q` keeping the scheme the
+written config names; Quartz scrolls the page about 300 px down on load, which
+puts the Print button above the window, so the page is scrolled back to its
+top before the shutter; and Windows.Graphics.Capture sends NO frame for a
+window on a locked or disconnected session ("the window sent no frame in 3
+seconds"), so the pictures need somebody's desktop even though the course,
+the preview and the PDF do not. Text read-back is `windowshot --ocr`
+(Windows.Media.Ocr, which does run locked), the counterpart of the mac's
+`ocr.swift`: on the mac's own `print-*` pictures it reads every `expectText`
+word. `website/SCREENSHOTS.md` → "Windows Capture" is the procedure.
+
 ## The title bar follows dark and light mode (ordered 2026-10-07, ships in Windows v1.4.4)
 
 Russell's order: "The title bar should be in dark mode when the computer is in
