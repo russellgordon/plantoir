@@ -262,10 +262,14 @@ entry owed by a genuinely later release rightly survives the cut — the rule is
 "later than this build", not "empty at the cut". A milestone that is not a
 version fails, because it cannot be compared. `RELEASING.md` re-runs the suite
 AFTER the version is set, since a run before the bump compares against the old
-version and passes with entries left. **The ledger is EMPTY since 2026-10-15**:
-#514 (batch 6 of the catch-up) closed its last two entries, and
-`NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
-runs the rule on made-up entries so it cannot rot while nothing is in it.
+version and passes with entries left. **The ledger was EMPTY from 2026-10-15**, when
+#514 (batch 6 of the catch-up) closed its last two entries, **until
+2026-10-16**: it now holds mac #524's sixteen plan-table wording keys
+(`plan*`, `menuPlan*`) against
+[#548](https://github.com/russellgordon/plantoir/issues/548), milestoned
+v1.7.2. `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
+runs the rule on made-up entries, so it stays exercised whatever the ledger
+holds.
 
 (Before that, from 2026-09-25 to the v1.4.0 cut, an entry could name an open
 issue on the single milestone "Windows: parity with mac v1.4.0", and the ledger
@@ -409,7 +413,7 @@ recounted 2026-09-07.
 
 **Two `pageNaming` sections exist, in different files, and they answer different questions.** `shared-rules.json` → `pageNaming` is what the ASSISTANT calls a page when it talks about one (the frontmatter title, or the folder's name for an `index.md`). `class-planning.json` → `pageNaming` is which class-page TITLES carry unit and day numbers. Grepping for the name alone will send you to the wrong one.
 
-| Deploy/preview order, cards, cancels | `assist-cases.json` → `scenarios` | AssistToolRunner (49), AssistScenario — including "rebuild with a preview serving stops it and starts it again" (#528, authored on the mac 2026-10-16; Section ▸ Rebuild Preview runs the same call, `SectionVerbsTests.testRebuildPreviewFromTheMenuRestartsAServingPreview`). On Windows since [#549](https://github.com/russellgordon/plantoir/issues/549): the runner hands `rebuild_preview` to one fire-and-forget seam, so `AssistScenarioTests` wires a `RebuildPreviewInApp` fake that mirrors `SectionDetailView.RebuildPreviewAsync` and waits for it; the window's real order is pinned by `SectionVerbsUiTests.RebuildPreviewRebuildsAServingPreview` (`documentation/12-windows-app.md` → "Rebuild Preview really rebuilds") |
+| Deploy/preview order, cards, cancels | `assist-cases.json` → `scenarios` | AssistToolRunner (49), AssistScenario — including "rebuild with a preview serving stops it and starts it again" (#528, authored on the mac 2026-10-16; Section ▸ Rebuild Preview runs the same call, `SectionVerbsTests.testRebuildPreviewFromTheMenuRestartsAServingPreview`). On Windows since [#549](https://github.com/russellgordon/plantoir/issues/549): the runner hands `rebuild_preview` to one fire-and-forget seam, so `AssistScenarioTests` wires a `RebuildPreviewInApp` fake that mirrors `SectionDetailView.RebuildPreviewAsync` and waits for it. No test holds the real window's await-then-start order: it lives in `SectionDetailView.RebuildPreviewAsync` and is held by reading the code; `SectionVerbsUiTests.RebuildPreviewRebuildsAServingPreview` (opt-in, part of no gate) proves only that a serving preview ends up showing the edit (`documentation/12-windows-app.md` → "How the shared scenario reaches this seam") |
 | Card phrasings and near misses | `assist-cases.json` → `cardPhrasings` | AssistAgent (8) |
 | Tool lists, approvals, plan twins | `assist-cases.json` → `tools` | AssistToolRunner |
 | Arrow-key history | `assist-cases.json` → `promptHistory` | AssistPromptHistory (15) |

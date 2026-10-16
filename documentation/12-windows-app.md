@@ -3756,7 +3756,8 @@ checked against a real course. (This said counting the course busy while
 the zip runs in `plantoir-mcp` was not built and that `courseIsBeingCopied`
 stayed in the ledger against #360. It was built in parity bundle 6a —
 `AssistWording.CourseIsBeingCopied`, `WorkLease`, `CourseBeingCopiedTests` —
-and `NamedGapLedger` has been empty since bundle 9.)
+and `NamedGapLedger` was empty from bundle 9 until 2026-10-16, when mac
+#524's sixteen plan-table sentences went in against #548, v1.7.2.)
 
 ---
 
@@ -5441,8 +5442,12 @@ Here the runner calls `RebuildPreviewInApp` and returns at once, so the
 runner never awaits the stop itself; `AssistScenarioTests` wires a fake that
 does what `RebuildPreviewAsync` does — await the stop when a preview is up,
 then start — and awaits that work before reading the events. The fake can
-only mirror the order; `SectionVerbsUiTests.RebuildPreviewRebuildsAServingPreview`
-pins the real window's. REJECTED: making the runner await
+only mirror the order, and **no test holds the real window's**: the
+await-then-start lives in `SectionDetailView.RebuildPreviewAsync` and is held
+by reading that code. `SectionVerbsUiTests.RebuildPreviewRebuildsAServingPreview`
+(opt-in, part of no gate) proves something narrower — that a serving preview
+really ends up showing an edit after Section ▸ Rebuild Preview, with its trail
+line — and never sees a stop or the order. REJECTED: making the runner await
 `StopPreviewInAppAsync` and then call `ShowPreviewInApp`, so the harness
 would only note what the runner calls. `RebuildPreviewFor` is more than stop
 and show — it refuses while the folder is getting ready (#473), selects the

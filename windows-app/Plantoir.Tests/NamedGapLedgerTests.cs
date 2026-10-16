@@ -60,9 +60,10 @@ public class NamedGapLedgerTests
     }
 
     /// <summary>
-    /// The rule itself, against entries made up here: the ledger is EMPTY
-    /// since #514 closed its last two (2026-10-15), and a rule that only ever
-    /// runs over nothing would stay green however it broke.
+    /// The rule itself, against entries made up here, so it stays exercised
+    /// whatever the ledger holds: an empty ledger (as from #514, 2026-10-15,
+    /// to 2026-10-16) or one whose entries all happen to be later than this
+    /// build would otherwise leave it green however it broke.
     /// </summary>
     [Fact]
     public void TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion()
