@@ -67,6 +67,14 @@ struct AssistToolOutcome: Sendable, Equatable {
     /// the wrong one of them.
     let forTheCard: String
 
+    /// The plan as rows, for the Section menu's plan sheet (#524) — or nil
+    /// for every outcome that is not a page plan asked for from the menu.
+    ///
+    /// Built from the same plan, in the same call, as `forTheCard`, and read
+    /// by nothing but the sheet: the model's `detail` and the assistant's
+    /// card are exactly what they were.
+    let planTable: AssistPlanTable?
+
     // MARK: - Initializer
 
     init(summary: String,
@@ -74,13 +82,15 @@ struct AssistToolOutcome: Sendable, Equatable {
          shouldContinue: Bool,
          forTheCard: String? = nil,
          teacherDetail: String? = nil,
-         isPlan: Bool = false) {
+         isPlan: Bool = false,
+         planTable: AssistPlanTable? = nil) {
         self.summary = summary
         self.detail = detail
         self.shouldContinue = shouldContinue
         self.forTheCard = forTheCard ?? detail
         self.teacherDetail = teacherDetail
         self.isPlan = isPlan
+        self.planTable = planTable
     }
 
     // MARK: - Functions
@@ -110,13 +120,19 @@ struct AssistToolOutcome: Sendable, Equatable {
     /// where a club says it — and goes ONLY on the card. The model reads
     /// `plan`, rendered with "class" whatever the course says, so a club
     /// changes nothing the model is given; nil means the two are the same.
-    static func planned(_ summary: String, plan: String, card: String? = nil) -> AssistToolOutcome {
+    ///
+    /// `table` is the same plan as rows, for the Section menu's sheet (#524).
+    static func planned(_ summary: String,
+                        plan: String,
+                        card: String? = nil,
+                        table: AssistPlanTable? = nil) -> AssistToolOutcome {
         return AssistToolOutcome(
             summary: summary,
             detail: plan + "\n\n" + AssistToolOutcome.askBeforeGoingAhead,
             shouldContinue: true,
             forTheCard: card ?? plan,
-            isPlan: true
+            isPlan: true,
+            planTable: table
         )
     }
 

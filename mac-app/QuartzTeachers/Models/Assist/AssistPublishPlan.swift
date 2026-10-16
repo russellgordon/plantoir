@@ -427,6 +427,87 @@ struct AssistPublishPlan {
         return lines.joined(separator: "\n")
     }
 
+    /// The plan as rows, for the Section menu's plan sheet (#524): the same
+    /// stored properties `describe()` reads, and the same `AssistWording`
+    /// pieces its lines are made of, so the table and the card cannot say
+    /// two different things.
+    ///
+    /// Rows come in this order: the changes, in plan order (named pages,
+    /// then linked ones); the pages an unpublish keeps; the classes a
+    /// publish left hidden; the pages with no room for a key; the pages
+    /// already the way they were asked to be. None of them is capped.
+    func tabulated(noun: ClassNoun, fromTheMenu: Bool, courseDirectoryURL: URL) -> AssistPlanTable {
+        var rows: [AssistPlanTable.Row] = []
+
+        func addRow(_ page: AssistSectionPage, _ change: AssistPlanTable.Change, _ whatChanges: String) {
+            rows.append(AssistPlanTable.Row(
+                position: rows.count,
+                title: page.displayTitle,
+                folder: StartOfYearPageNaming.folder(
+                    of: page.fileURL, courseDirectoryURL: courseDirectoryURL, courseCode: courseCode
+                ),
+                change: change,
+                whatChanges: whatChanges
+            ))
+        }
+
+        for change in changes {
+            addRow(
+                change.page,
+                change.willBeVisible ? .willBecomeVisible : .willBecomeHidden,
+                AssistWording.planWillBecome(
+                    visible: change.willBeVisible, withTheDatesOf: classesWhoseDatesAreTaken(by: change)
+                )
+            )
+        }
+        for staying in kept {
+            addRow(staying.page, .staysVisible,
+                   AssistWording.planStaysVisibleBecause(staying.reason.finishing(noun: noun)))
+        }
+        for page in linkedClassesLeftAlone {
+            addRow(page, .staysHidden, AssistWording.menuPlanStaysHidden(noun: noun))
+        }
+        for page in noRoomForAKey {
+            addRow(page, .staysExactlyAsItIs, AssistWording.menuPlanStaysExactlyAsItIs)
+        }
+        for page in alreadyRight {
+            if publishes {
+                addRow(page, .alreadyVisible, AssistWording.menuPlanAlreadyVisible)
+            } else {
+                addRow(page, .alreadyHidden, AssistWording.menuPlanAlreadyHidden)
+            }
+        }
+
+        // The card's other sentences, from the same functions it uses.
+        var notes: [String] = []
+        if !noRoomForAKey.isEmpty {
+            notes.append(AssistPublishPlan.sayingPagesWithNoRoomForAKey(noRoomForAKey, fromTheMenu: fromTheMenu))
+        }
+        if !linkedClassesLeftAlone.isEmpty {
+            var names: [String] = []
+            for page in linkedClassesLeftAlone {
+                names.append(page.displayTitle)
+            }
+            notes.append(AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(names), count: names.count, noun: noun
+            ))
+        }
+        for move in orphanedDateMoves() {
+            notes.append(AssistPublishPlan.orphanedDateMoveLine(move))
+        }
+        if !unknownNames.isEmpty {
+            notes.append(AssistPublishPlan.noPageIsCalledLine(unknownNames))
+        }
+
+        return AssistPlanTable(
+            summary: AssistWording.menuPlanSummary(
+                changing: changes.count, already: alreadyRight.count, publishing: publishes
+            ),
+            rows: rows,
+            notes: notes
+        )
+    }
+
     /// "a", "a and b", "a, b and c" — the way a sentence says a list.
     /// The sentence for pages the writer declined, naming a few of them.
     ///

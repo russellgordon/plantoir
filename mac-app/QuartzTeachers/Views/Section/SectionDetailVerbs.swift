@@ -403,6 +403,9 @@ extension SectionDetailView {
             let outcome: AssistToolOutcome = await verbs.plan(planCall)
             if outcome.isPlan {
                 model.body = outcome.forTheCard
+                // The three page plans' rows (#524); nil for Re-date and
+                // Make Room, which keep the card's text.
+                model.planTable = outcome.planTable
                 model.stage = .planned
                 return
             }

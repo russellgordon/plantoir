@@ -7,9 +7,12 @@ import Observation
 /// One sheet for every function that needs one, moving through stages:
 /// CHOOSING (which pages, which day, where to make room), then — for Publish
 /// Pages… only — the question about classes dated later (#475), then the
-/// PLAN (the plan twin's own card, `forTheCard`: the multi-page change is
-/// seen before it happens, which is the assistant's plan card in the
-/// menu's form), then WORKING, then FINISHED (what the tool said). A refusal
+/// PLAN (the multi-page change seen before it happens, which is the
+/// assistant's plan card in the menu's form: for Publish Pages…, Hide
+/// Pages… and Publish Class for a Date…, a summary over a table of every
+/// page, the plan twin's `planTable` (#524); for Re-date and Make Room, the
+/// card's own text, `forTheCard`), then WORKING, then FINISHED (what the
+/// tool said). A refusal
 /// at the plan goes straight to FINISHED with OK alone, as the assistant
 /// shows a refusing twin with no Go.
 ///
@@ -119,6 +122,10 @@ final class SectionVerbSheetModel: Identifiable {
 
     /// The plan's card, or the tool's answer.
     var body: String = ""
+
+    /// The plan as rows, when the plan is a page plan (#524) — shown at
+    /// `.planned` in place of `body`.
+    var planTable: AssistPlanTable?
 
     /// The call waiting on the default button at the plan.
     var pendingCall: AssistToolCall?
@@ -454,7 +461,38 @@ struct SectionVerbSheet: View {
     /// the line follows it.
     var verbs: SectionVerbs?
 
+    /// The plan table's order: plan order to begin with; a column header
+    /// sorts by that column (#524, the `AllBackupsView` precedent).
+    @State var planSortOrder: [KeyPathComparator<AssistPlanTable.Row>] = [KeyPathComparator(\.position)]
+
     static let tallestList: CGFloat = 340
+
+    /// How many plan rows show before the table scrolls inside itself, and
+    /// how tall the notes under it may grow: one height budget for the plan
+    /// stage (#524), so a unit's worth of pages and a long note together
+    /// still leave Cancel and Publish on a 13-inch screen.
+    static let mostPlanRowsShown: Int = 12
+    static let tallestPlanNotes: CGFloat = 120
+
+    // MARK: - Computed properties
+
+    /// The plan table's rows, in the order the teacher sorted them.
+    var sortedPlanRows: [AssistPlanTable.Row] {
+        guard let table = model.planTable else {
+            return []
+        }
+        return table.rows.sorted(using: planSortOrder)
+    }
+
+    /// The table's height: every row up to `mostPlanRowsShown`, then it
+    /// scrolls inside itself. A `Table` has no natural height.
+    var planTableHeight: CGFloat {
+        var shown: Int = model.planTable?.rows.count ?? 0
+        if shown > SectionVerbSheet.mostPlanRowsShown {
+            shown = SectionVerbSheet.mostPlanRowsShown
+        }
+        return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
+    }
 
     // MARK: - Body
 
@@ -499,6 +537,8 @@ struct SectionVerbSheet: View {
             choosing
         case .askingAboutLaterClasses:
             laterClasses
+        case .planned where model.planTable != nil:
+            planTable
         case .planned, .finished:
             CappedScrollArea(cap: SectionVerbSheet.tallestList) {
                 Text(model.body)
@@ -515,6 +555,52 @@ struct SectionVerbSheet: View {
                     Text(AssistWording.menuSavingACopy(course: courseBeingBackedUp))
                 } else {
                     Text(AssistWording.menuWorking)
+                }
+            }
+        }
+    }
+
+    /// The page plan (#524): the summary, a read-only table with a row for
+    /// every page, and the card's other sentences under it.
+    @ViewBuilder
+    var planTable: some View {
+        if let table = model.planTable {
+            Text(table.summary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("sectionVerbSheetPlanSummary")
+            // No `selection:`: the rows are read, not chosen.
+            Table(sortedPlanRows, sortOrder: $planSortOrder) {
+                TableColumn(AssistWording.menuPlanPageColumn, value: \.title) { (row: AssistPlanTable.Row) in
+                    Text(row.title)
+                        .help(row.title)
+                }
+                TableColumn(AssistWording.menuPlanFolderColumn, value: \.folder) { (row: AssistPlanTable.Row) in
+                    Text(row.folder)
+                        .foregroundStyle(.secondary)
+                        .help(row.folder)
+                }
+                TableColumn(AssistWording.menuPlanChangeColumn, value: \.whatChanges) { (row: AssistPlanTable.Row) in
+                    // A date move or a reason is long; the tooltip has it whole.
+                    Text(row.whatChanges)
+                        .help(row.whatChanges)
+                }
+            }
+            .tableStyle(.bordered(alternatesRowBackgrounds: true))
+            .frame(height: planTableHeight)
+            .accessibilityIdentifier("sectionVerbSheetPlanTable")
+            if !table.notes.isEmpty {
+                CappedScrollArea(cap: SectionVerbSheet.tallestPlanNotes) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        // By position: two notes may say the same words.
+                        ForEach(0..<table.notes.count, id: \.self) { (position: Int) in
+                            Text(table.notes[position])
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("sectionVerbSheetPlanNotes")
                 }
             }
         }

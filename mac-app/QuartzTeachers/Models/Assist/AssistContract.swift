@@ -206,6 +206,17 @@ enum AssistContract {
             "linkedClassStaysVisible": AssistPublishPlan.stayingVisibleLine(
                 title: "Unit 2, Day 4", reason: .aClassOfItsOwn, noun: .class
             ),
+            // The plan's one-page pieces (#524): what the card's lines and
+            // the menu's plan table are both made of.
+            "planWillBecomeVisible": AssistWording.planWillBecomeVisible,
+            "planWillBecomeHidden": AssistWording.planWillBecomeHidden,
+            "planWillBecomeVisibleWithTheDateOf": AssistWording.planWillBecome(
+                visible: true, withTheDatesOf: ["Unit 4, Day 24"]
+            ),
+            "planStaysVisibleBecause": AssistWording.planStaysVisibleBecause(
+                AssistPublishKept.Reason.keyLinks.finishing(noun: .class)
+            ),
+            "planNothingWouldChange": AssistWording.planNothingWouldChange,
             "backingUpFirst": AssistWording.backingUpFirst(course: course),
             "changedWhileSavingACopy": AssistWording.changedWhileSavingACopy(course: course, section: section),
             "backedUpCourse": AssistWording.backedUpCourse(
@@ -672,6 +683,19 @@ enum AssistContract {
             "menuMakeRoomButton": AssistWording.menuMakeRoomButton,
             "menuCancelButton": AssistWording.menuCancelButton,
             "menuDoneButton": AssistWording.menuDoneButton,
+            // The Section menu's plan table (#524): the line above it, its
+            // columns, and the cells only the table has.
+            "menuPlanSummary": AssistWording.menuPlanSummary(changing: 8, already: 8, publishing: true),
+            "menuPlanSummaryHiding": AssistWording.menuPlanSummary(changing: 3, already: 2, publishing: false),
+            "menuPlanSummaryOnePage": AssistWording.menuPlanSummary(changing: 1, already: 0, publishing: true),
+            "menuPlanPageColumn": AssistWording.menuPlanPageColumn,
+            "menuPlanFolderColumn": AssistWording.menuPlanFolderColumn,
+            "menuPlanChangeColumn": AssistWording.menuPlanChangeColumn,
+            "menuPlanAlreadyVisible": AssistWording.menuPlanAlreadyVisible,
+            "menuPlanAlreadyHidden": AssistWording.menuPlanAlreadyHidden,
+            "menuPlanStaysHidden": AssistWording.menuPlanStaysHidden(),
+            "menuPlanStaysHiddenForAMeeting": AssistWording.menuPlanStaysHidden(noun: .meeting),
+            "menuPlanStaysExactlyAsItIs": AssistWording.menuPlanStaysExactlyAsItIs,
             "menuSavingACopy": AssistWording.menuSavingACopy(course: course),
             "menuWorking": AssistWording.menuWorking,
             "menuRebuildPreviewTitle": AssistWording.menuRebuildPreviewTitle,
