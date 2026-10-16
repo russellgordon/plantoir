@@ -78,9 +78,13 @@ internal sealed class SectionVerbDialog
         {
             // Wide enough for the plan table's three columns, and the SAME
             // width at every stage: a dialog that widened at the plan would
-            // jump (the mac rejected widening mid-flow for that, #524).
-            _dialog.Resources["ContentDialogMinWidth"] = PlanTableDialogWidth;
-            _dialog.Resources["ContentDialogMaxWidth"] = PlanTableDialogWidth;
+            // jump (the mac rejected widening mid-flow for that, #524). Never
+            // wider than the window less a margin: at 175% and 200% the
+            // default window is 680 and 595 epx wide.
+            if (root.Size.Width > 0)
+                _planWidth = Math.Min(PlanTableDialogWidth, root.Size.Width - 2 * PlanDialogMargin);
+            _dialog.Resources["ContentDialogMinWidth"] = _planWidth;
+            _dialog.Resources["ContentDialogMaxWidth"] = _planWidth;
         }
         _dialog.PrimaryButtonClick += PrimaryPressed;
         _dialog.Closing += (_, args) =>
@@ -343,40 +347,16 @@ internal sealed class SectionVerbDialog
     private static bool ShowsAPlanTable(Item item) =>
         item is Item.PublishPages or Item.HidePages or Item.PublishClassForADate;
 
-    /// <summary>The dialog's width for those three, pinned at construction.</summary>
+    /// <summary>The dialog's width for those three at most, pinned at construction.</summary>
     private const double PlanTableDialogWidth = 680;
 
-    /// <summary>
-    /// The height budget (documentation/12-windows-app.md → "The plan as a
-    /// table"). The mac shows a fixed 12 rows; a Windows window is often much
-    /// shorter (the default window on a 1920 × 1080 screen at 150% is about
-    /// 495 epx tall), and ContentDialog clips its content rather than scrolling
-    /// it, so the rows shown are what fits: between 4 and 12, then the table
-    /// scrolls inside itself and Cancel and Publish stay on screen.
-    /// </summary>
-    private const int MostPlanRowsShown = 12;
-    private const int FewestPlanRowsShown = 4;
+    /// <summary>What the dialog leaves of the window at each side when the window is narrower than that.</summary>
+    private const double PlanDialogMargin = 24;
 
-    /// <summary>One row's height: <c>ListViewItem.MinHeight</c>, which is also its pitch (measured, doc 12).</summary>
-    private const double PlanRowPitch = 32;
+    /// <summary>The ContentDialog's own padding at each side of its content.</summary>
+    private const double DialogPadding = 24;
 
-    /// <summary>
-    /// Everything in the plan stage that is not a row or a note — the title,
-    /// the dialog's padding, the summary, the header, the spacing, the table's
-    /// border and the button row (measured, doc 12).
-    /// </summary>
-    private const double PlanChrome = 230;
-
-    /// <summary>The notes' own cap, as the mac's 120 pt; they scroll past it.</summary>
-    private const double PlanNotesMost = 120;
-
-    /// <summary>ContentDialog's own <c>ContentDialogMaxHeight</c>: it is never taller than this, whatever the window.</summary>
-    private const double DialogMaxHeight = 756;
-
-    /// <summary>How many rows to show at this window's height, before the table scrolls.</summary>
-    internal static int PlanRowsThatFit(double windowHeight, double notesHeight) =>
-        (int)Math.Clamp(Math.Floor((Math.Min(windowHeight, DialogMaxHeight) - PlanChrome - notesHeight) / PlanRowPitch),
-                        FewestPlanRowsShown, MostPlanRowsShown);
+    private double _planWidth = PlanTableDialogWidth;
 
     /// <summary>
     /// The plan stage of the three page items: the summary, a read-only table
@@ -407,7 +387,7 @@ internal sealed class SectionVerbDialog
 
         // The notes first, so their height is known before the rows are counted.
         StackPanel? notes = null;
-        double notesHeight = 0;
+        double notesNatural = 0;
         if (table.Notes.Count > 0)
         {
             notes = new StackPanel { Spacing = 6 };
@@ -419,19 +399,14 @@ internal sealed class SectionVerbDialog
                 AutomationProperties.SetAutomationId(note, $"sectionVerbPlanNote{i}");
                 notes.Children.Add(note);
             }
-            notes.Measure(new Windows.Foundation.Size(PlanTableDialogWidth - 48, double.PositiveInfinity));
-            notesHeight = Math.Min(notes.DesiredSize.Height, PlanNotesMost) + panel.Spacing;
+            notes.Measure(new Windows.Foundation.Size(_planWidth - 2 * DialogPadding, double.PositiveInfinity));
+            notesNatural = notes.DesiredSize.Height;
         }
-        double windowHeight = _dialog.XamlRoot?.Size.Height ?? DialogMaxHeight;
-        int rowsShown = PlanRowsThatFit(windowHeight, notesHeight);
-        App.LogDiagnostic($"Plan table: window {windowHeight:0} epx tall, notes {notesHeight:0} epx, " +
-                          $"{rowsShown} rows shown of {table.Rows.Count}");
 
         var list = new ListView
         {
             SelectionMode = ListViewSelectionMode.None,
             IsItemClickEnabled = false,
-            MaxHeight = rowsShown * PlanRowPitch + 2,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(4),
             TabIndex = 1,
@@ -460,7 +435,7 @@ internal sealed class SectionVerbDialog
                 Grid.SetColumn(cell, i);
                 grid.Children.Add(cell);
             }
-            var item = new ListViewItem { Content = grid, MinHeight = PlanRowPitch, Padding = new Thickness(12, 0, 12, 0) };
+            var item = new ListViewItem { Content = grid, MinHeight = PlanTableLayout.RowPitch, Padding = new Thickness(12, 0, 12, 0) };
             AutomationProperties.SetAutomationId(item, $"sectionVerbPlanRow{row.Position}");
             AutomationProperties.SetName(item, $"{row.Title}, {row.Folder}, {row.WhatChanges}");
             rowItems[row.Position] = item;
@@ -483,7 +458,12 @@ internal sealed class SectionVerbDialog
         void TitleTheHeaders()
         {
             foreach (var (button, title, column) in sortButtons)
+            {
                 button.Content = PlanTableOrder.Header(title, column, order);
+                // The arrow is drawn, so Narrator is TOLD it too.
+                AutomationProperties.SetName(button, column != order.Column ? $"Sort by {title}"
+                    : $"Sort by {title}, sorted {(order.Ascending ? "ascending" : "descending")}");
+            }
         }
         foreach (var (title, column, slot, id) in new[]
                  {
@@ -502,7 +482,6 @@ internal sealed class SectionVerbDialog
                 TabIndex = 2,
             };
             AutomationProperties.SetAutomationId(button, id);
-            AutomationProperties.SetName(button, $"Sort by {title}");
             button.Click += (_, _) =>
             {
                 order = PlanTableOrder.AfterPressing(column, order);
@@ -517,11 +496,43 @@ internal sealed class SectionVerbDialog
         Fill();
         panel.Children.Add(header);
         panel.Children.Add(list);
+        ScrollViewer? scroller = null;
         if (notes is not null)
         {
-            var scroller = new ScrollViewer { Content = notes, MaxHeight = PlanNotesMost };
+            scroller = new ScrollViewer { Content = notes };
             AutomationProperties.SetAutomationId(scroller, "sectionVerbPlanNotes");
             panel.Children.Add(scroller);
+        }
+
+        // Rows and the notes' cap from the window's height (PlanTableLayout),
+        // and again whenever the window changes size while the plan shows —
+        // counted once, a window made shorter would clip what was counted.
+        PlanTableLayout.Fit? fitted = null;
+        void Fit()
+        {
+            double windowHeight = _dialog.XamlRoot?.Size.Height ?? PlanTableLayout.DialogMaxHeight;
+            var fit = PlanTableLayout.For(windowHeight, notesNatural);
+            if (fit == fitted) return;
+            fitted = fit;
+            list.MaxHeight = fit.TableHeight;
+            if (scroller is not null) scroller.MaxHeight = fit.NotesCap;
+            App.LogDiagnostic($"Plan table: window {windowHeight:0} epx tall, notes {notesNatural:0} epx (shown at most " +
+                              $"{fit.NotesCap:0}), {fit.Rows} rows shown of {table.Rows.Count}");
+        }
+        Fit();
+        if (_dialog.XamlRoot is { } root)
+        {
+            Windows.Foundation.TypedEventHandler<XamlRoot, XamlRootChangedEventArgs>? refit = null;
+            refit = (changed, _) =>
+            {
+                if (_stage != Stage.Plan || !ReferenceEquals(_dialog.Content, panel))
+                {
+                    changed.Changed -= refit;
+                    return;
+                }
+                Fit();
+            };
+            root.Changed += refit;
         }
 
         // Return is the verb's button while the table has focus, as it is
@@ -540,7 +551,10 @@ internal sealed class SectionVerbDialog
 
         // The table takes the focus when it appears. Measured (doc 12): the
         // focus was on the stage just replaced, and with it gone Tab went to
-        // the main window BEHIND the dialog, not into the table.
+        // the main window BEHIND the dialog, not into the table. Programmatic,
+        // not Keyboard: Keyboard drew the focus ring on the first row however
+        // Continue was pressed (measured, a picture each way); Programmatic
+        // follows the last input, so a mouse user is not shown a ring.
         list.Loaded += (_, _) => list.Focus(FocusState.Programmatic);
 
         _dialog.Content = panel;

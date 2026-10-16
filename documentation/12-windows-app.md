@@ -5602,30 +5602,55 @@ draws by hand buys nothing a teacher can see — and would be Russell's call).
 the same one flipped; numbers in a title compared as numbers, "Day 2" before
 "Day 10", as the mac's string comparator does; ties by plan order).
 
-**Width: 680 epx, pinned at construction for the three items** (the
+**Width: at most 680 epx, pinned at construction for the three items** (the
 `ContentDialogMinWidth`/`MaxWidth` resources, the `NewCourseDialog`
 precedent), so the dialog is the same width at every stage — the mac rejected
-widening mid-flow because the sheet jumps. The panel stretches to it.
+widening mid-flow because the sheet jumps. On a window narrower than 680 + 2 ×
+24 epx it takes the window's width less 24 at each side (at 175% and 200% a
+1920-pixel screen's default window is about 680 and 595 epx wide). The panel
+stretches to it.
 
-**Height: what fits the window, 4 to 12 rows — a deliberate departure from
-the mac's fixed 12.** ContentDialog's content `ScrollViewer` has its vertical
-scrolling DISABLED in the template, so content taller than the dialog is
-clipped, notes first, and a Windows window is often short: the default window
-on this PC (Windows 11, 1920 × 1080 at 150%) is 793 × 483 epx, a XAML root
-446 epx tall. So `ShowPlanTable` reads `XamlRoot.Size.Height` and shows
-clamp(floor((min(H, 756) − 230 − notes) / 32), 4, 12) rows
-(`SectionVerbDialog.PlanRowsThatFit`; 756 is ContentDialog's own maximum
-height, notes measured and capped at 120), then the table scrolls inside
-itself. MEASURED through UI Automation, 2026-10-16 (`PlanTableUiTests`, the
-19-row fixture with one note): row pitch 32 epx; at the default window 5 rows,
-the table's bottom 157 epx above the window's, the note's 131, Publish's 49;
-the chrome outside the rows and notes measured 220–222 epx against the 230
-budgeted. Dragged to its minimum the window stops at 900 × 600 epx (taller
-than the default), XAML root 563: 9 rows, everything inside. Earlier the
-same day, over a 200% remote session (window 937 × 625 epx), 10 rows. The
-floor of 4 overflows only on a screen whose default window gives a XAML root
-under about 385 epx (the 680-pixel clamp at 175% or more); there the note can
-be clipped, and the buttons still show.
+**Height: what fits the window — a deliberate departure from the mac's fixed
+12 rows.** ContentDialog's content `ScrollViewer` has its vertical scrolling
+DISABLED in the template: content taller than the dialog is clipped from
+OUTSIDE, where no scroll bar can reach it. A Windows window is often short:
+the default window on this PC (Windows 11, 1920 × 1080 at 150%) is 793 × 483
+epx, a XAML root 446 epx tall. So everything on the plan stage has to fit,
+and `PlanTableLayout.For` (Core, unit-tested) decides how much of each part
+shows. The NOTES give way first: their cap is
+clamp(min(H, 756) − 230 − 2 − 8 − 4 × 32, 40, 120) epx, and it is the notes
+scroller's `MaxHeight`, so a note cut short scrolls into view. Then the ROWS:
+clamp(floor((min(H, 756) − 230 − 2 − shown notes − 8) / 32), 4, 12), after
+which the table scrolls inside itself. 756 is ContentDialog's own maximum
+height; 230 is everything else on the stage (measured 220–222). The counts are
+made again on `XamlRoot.Changed` while the plan shows, so a window resized
+under the plan does not clip what was counted for its old size.
+`PlanTableTests.EverythingFitsWheneverFourRowsAndTwoLinesOfNotesCan` pins it:
+whenever the window can hold the chrome, four rows and 40 epx of notes (a XAML
+root of 408), the whole stage fits. Below that the floor of 4 rows wins and the
+bottom is clipped — at 175% or 200% on a 1920 × 1080 screen (a XAML root of
+about 350 or 317 epx; arithmetic, not measured) the table's bottom strip and
+the notes are cut off while the buttons still show. (This replaced a first
+version that capped the notes at a fixed 120 and counted the rows once. The
+#548 implementation review found that it clipped long notes out of reach at
+the default window, the floor of 4 rows winning against notes over about 88
+epx.)
+
+MEASURED through UI Automation, 2026-10-16 (`PlanTableUiTests`; UIA hands the
+non-DPI-aware test process 96-dpi coordinates, so these are epx). Row pitch
+32 epx (UIA rounds it to 31 or 32). The 19-row fixture with one short note, at
+the default window: 5 rows, the table's bottom 157 epx above the window's, the
+note's 131, Publish's 49; the chrome measured 220–222 epx against the 230
+budgeted. The window resized UNDER the open plan, asked for 300 epx, stopped
+at 900 × 600 (XAML root 563), and the table grew from 161 to 290 epx (5 to 9
+rows), with everything inside. Whether that minimum is applied in epx or
+pixels, and why the default window opens below it, is settled under #542, not
+here; these are the numbers this piece saw. The 31-row fixture whose note
+names thirty linked classes (112 epx laid out): 4 rows, the notes given 78
+epx and their viewport showing 70% of them, scrolled to the end with the last
+line inside the notes area and the window; Publish 35 epx above the window's
+bottom. Earlier the same day, over a 200% remote session (window 937 × 625
+epx), 10 rows.
 
 **Return and Escape with the table focused — measured, and one key needed
 handling.** First built with no key handling and driven with real keys. Escape
@@ -5641,23 +5666,37 @@ now awaits it). Handled there, the key never reaches the dialog as well:
 for `PrimaryButton` was rejected (template-dependent). **The focus also had
 to be placed:** on the first drive, Tab went round the main window BEHIND the
 dialog — the element that had the focus was in the stage just replaced — so
-the table takes the focus when it appears (`list.Focus` on `Loaded`). The mac
-needed neither: its table takes neither key, and Tab reached it.
+the table takes the focus when it appears (`list.Focus` on `Loaded`). With
+`FocusState.Programmatic`, not `Keyboard`. A picture of each, after a Continue
+pressed through UI Automation: `Keyboard` drew the focus ring on the first
+row; `Programmatic` drew none, because it follows the last input, so a mouse
+user is not shown a ring they did not ask for. Not measured: `Programmatic`
+after a Continue pressed with a real key. The mac needed neither: its table
+takes neither key, and Tab reached it.
 
 **The sort headers stay in the Tab order, after the table** (`TabIndex` 1 for
 the table, 2 for the headers), so Tab reaches the rows first; Return on a
 focused HEADER sorts, which is what a focused button does on Windows. #548
 asks only that Return publishes while the grid has focus. Rejected: taking
 the headers out of the Tab order, which would leave a keyboard user unable to
-sort.
+sort. Proven, not assumed (`TabIntoTheTable`): from Cancel, Tab reaches the
+table before any header, the next Tab lands on Page's header, and Shift+Tab
+goes back to the table. A header's arrow is drawn, so its automation name
+says it too: "Sort by Page" until it is pressed, then "Sort by Page, sorted
+ascending" (or "descending"), so Narrator hears what a sighted teacher sees.
 
 **Testing it**: unit — `PlanTableTests` (row order publishing and hiding, no
 cap past fifteen, the summary's counts, the card/table anti-drift guards, a
 club's meeting forms, JSON both ways, the sort, the natural order),
 `SectionMenuServerTests` (the table from the menu only, the text content
-unmoved, none on an answer that is not a plan), the `ContractTests` block.
-Through the window (`PlanTableUiTests`, opt-in, 3 of 3 on this PC, 2 min):
-the table, its fit and Escape; Return; the headers and the minimum window.
+unmoved, none on an answer that is not a plan), the `ContractTests` block, and
+the layout (`PlanTableLayout`: everything fits whenever four rows and two
+lines of notes can; long notes scroll at the default window; a tall window
+shows 12). Through the window (`PlanTableUiTests`, opt-in, 4 of 4 on this PC,
+2 min 20 s): the table, its fit, the last row shown inside the table after
+scrolling, the Tab order and Escape; Return; the headers' names and order, and
+the rows recounted when the window is resized under the plan; long notes
+scrolled to their last line.
 `SectionVerbsUiTests.PublishPagesTicksPlansAndPublishes_…` still reads
 `sectionVerbPlan`, which is the summary now.
 

@@ -47,6 +47,24 @@ public class PlanTableUiTests
         EndToEnd.WritePage(ConceptPath(courses, "Seen"), "title: Seen\npublishForSection1: true", "Already up.");
     }
 
+    /// <summary>
+    /// A class linking thirty hidden classes: each is left as it is, so the
+    /// note under the table names all thirty and runs to several lines —
+    /// longer than the notes are given at the default window.
+    /// </summary>
+    private const int LinkedClasses = 30;
+
+    private static void WriteCourseWithLongNotes(string courses)
+    {
+        EndToEnd.WriteCourse(courses, Code, "Plan Table Course", new[] { "Concepts" });
+        string links = string.Join("\n", Enumerable.Range(1, LinkedClasses).Select(i => $"- [[Unit 2, Day {i}]]"));
+        EndToEnd.WritePage(ClassPath(courses, "Unit 1, Day 1"),
+                           "title: Unit 1, Day 1\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400", $"A class.\n\n{links}");
+        for (int i = 1; i <= LinkedClasses; i++)
+            EndToEnd.WritePage(ClassPath(courses, $"Unit 2, Day {i}"),
+                               $"title: Unit 2, Day {i}\npublish: false\ncreated: 2026-09-{9 + (i % 20):00}T07:00:00.000-0400", "A later class.");
+    }
+
     private static string ClassPath(string courses, string title) => Path.Combine(courses, Code, "section1", "All Classes", title + ".md");
     private static string ConceptPath(string courses, string title) => Path.Combine(courses, Code, "Concepts", title + ".md");
     private static string Courses(DrivenApp app) => Path.Combine(app.WorkspacePath, "courses");
@@ -90,14 +108,28 @@ public class PlanTableUiTests
         return WaitFor(app, "sectionVerbPlanTable", "the plan's table");
     }
 
-    /// <summary>Tab until the focus is inside the table; fail saying so if it never gets there.</summary>
+    /// <summary>
+    /// The table takes the focus when it appears; then, from Cancel, Tab
+    /// until the focus is back in the table — reaching it BEFORE any sort
+    /// header, which come after it in the Tab order. Fails saying so if Tab
+    /// never gets there.
+    /// </summary>
     private void TabIntoTheTable(DrivenApp app, AutomationElement table)
     {
+        Assert.True(Retry.WhileFalse(() => FocusIsIn(app, table), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result,
+                    "the table did not take the focus when the plan appeared");
+        CopyAPageEscapeUiTests.Front(app);
+        var cancel = MenuBar.Dialog(app, "the plan").FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))!;
+        cancel.Focus();
+        Assert.True(Retry.WhileFalse(() => !FocusIsIn(app, table), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result,
+                    "the focus would not move to Cancel, so the Tab order below would prove nothing");
         for (int press = 0; press < 12; press++)
         {
             if (FocusIsIn(app, table)) return;
             var at = app.Window.Automation.FocusedElement();
-            _output.WriteLine($"tab {press}: focus on {at?.ControlType} \"{at?.Name}\" ({at?.Properties.AutomationId.ValueOrDefault})");
+            string id = at?.Properties.AutomationId.ValueOrDefault ?? "";
+            _output.WriteLine($"tab {press}: focus on {at?.ControlType} \"{at?.Name}\" ({id})");
+            Assert.False(id.StartsWith("sectionVerbPlanSort"), $"Tab reached the sort header {id} before the table");
             CopyAPageEscapeUiTests.Front(app);
             Keyboard.Press(VirtualKeyShort.TAB);
             Thread.Sleep(250);
@@ -173,7 +205,7 @@ public class PlanTableUiTests
         }
         catch (IOException) { }
 
-        Assert.True(pitch > 0, "the rows do not stack: " + measured);
+        Assert.InRange(pitch, 31, 33);
         Assert.True(box.Bottom <= window.Bottom, "the table runs past the window's bottom edge: " + measured);
         Assert.True(lastNote.Height > 0 && lastNote.Bottom <= window.Bottom && lastNote.Top >= box.Bottom,
                     "the note under the table is cut off or not under it: " + measured);
@@ -188,6 +220,12 @@ public class PlanTableUiTests
         using var app = new DrivenApp(WriteCourse);
         var table = OpenThePlan(app);
 
+        // A picture of the plan as it first appears, the table holding the
+        // focus, for judging how that focus is drawn (doc 12).
+        Thread.Sleep(500);
+        try { FlaUI.Core.Capturing.Capture.Element(app.Window).ToFile(Path.Combine(Path.GetTempPath(), "plantoir-548-plan.png")); }
+        catch (Exception error) { _output.WriteLine("no picture: " + error.Message); }
+
         var summary = WaitFor(app, "sectionVerbPlan", "the plan's summary");
         Assert.Equal(AssistWording.MenuPlanSummary(Ideas + 1, 1, publishing: true), summary.Name);
         Assert.Equal($"Unit 1, Day 1, section1/All Classes, {AssistWording.PlanWillBecomeVisible}",
@@ -201,9 +239,24 @@ public class PlanTableUiTests
         Thread.Sleep(500);
         var last = WaitFor(app, $"sectionVerbPlanRow{Ideas + 2}", "the last row");
         Assert.EndsWith(AssistWording.MenuPlanAlreadyVisible, last.Name);
+        // Every row is in the tree, so finding it proves nothing: it must be SHOWN, inside the table.
+        var lastBox = last.BoundingRectangle;
+        var tableBox = table.BoundingRectangle;
+        Assert.True(lastBox.Height > 0 && lastBox.Top >= tableBox.Top && lastBox.Bottom <= tableBox.Bottom + 1,
+                    $"scrolled to the end, the last row ({lastBox}) is not inside the table ({tableBox})");
         Assert.EndsWith(AssistWording.MenuPlanStaysAsItIs, WaitFor(app, $"sectionVerbPlanRow{Ideas + 1}", "the left-alone row").Name);
 
         TabIntoTheTable(app, table);
+        // The sort headers come next in the Tab order; Shift+Tab goes back to the table.
+        CopyAPageEscapeUiTests.Front(app);
+        Keyboard.Press(VirtualKeyShort.TAB);
+        Thread.Sleep(250);
+        Assert.Equal("sectionVerbPlanSortPage", app.Window.Automation.FocusedElement()?.Properties.AutomationId.ValueOrDefault);
+        Keyboard.Pressing(VirtualKeyShort.SHIFT);
+        Keyboard.Press(VirtualKeyShort.TAB);
+        Keyboard.Release(VirtualKeyShort.SHIFT);
+        Thread.Sleep(250);
+        Assert.True(FocusIsIn(app, table), "Shift+Tab from the first header did not go back to the table");
         CopyAPageEscapeUiTests.Front(app);
         Keyboard.Press(VirtualKeyShort.ESCAPE);
         app.AssertAbsent("sectionVerbDialog", "the Publish Pages… dialog, after Escape with the table focused");
@@ -237,29 +290,35 @@ public class PlanTableUiTests
     }
 
     /// <summary>
-    /// The headers sort (plan order first), and on a window dragged to the
-    /// smallest it allows the table still fits with the note and the buttons.
-    /// (Measured 2026-10-16: that minimum is 900 × 600 epx, TALLER than the
-    /// default window on a 1920 × 1080 screen at 150%, 793 × 483 — so the
-    /// default, in the test above, is the short case.)
+    /// The headers sort (plan order first) and say so to Narrator; and when
+    /// the window changes size WHILE the plan shows, the rows are counted
+    /// again. Dragged to the smallest it allows, the window measured 900 × 600
+    /// epx here, taller than the default 793 × 483 (the units of that minimum
+    /// are #542's question) — so the table grows, and still fits.
     /// </summary>
     [UiFact]
-    public void PressingAHeaderSorts_AndAWindowDraggedToItsMinimumStillFitsIt()
+    public void PressingAHeaderSorts_AndResizingTheWindowRecountsTheRows()
     {
         using var app = new DrivenApp(WriteCourse);
+        var table = OpenThePlan(app);
+        int tableBefore = table.BoundingRectangle.Height;
+
         var window = app.Window;
-        // Asked for less than the window allows, so it stops at its own minimum.
         int before = window.BoundingRectangle.Height;
         window.Patterns.Transform.Pattern.Resize(window.BoundingRectangle.Width, 300);
-        Retry.WhileFalse(() => window.BoundingRectangle.Height < before, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200));
+        Retry.WhileFalse(() => window.BoundingRectangle.Height != before, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200));
         Thread.Sleep(800);
-        var table = OpenThePlan(app);
         AssertItAllFits(app, table);
+        int tableAfter = table.BoundingRectangle.Height;
+        _output.WriteLine($"window {before} -> {window.BoundingRectangle.Height} epx tall; table {tableBefore} -> {tableAfter}");
+        Assert.True(window.BoundingRectangle.Height <= before || tableAfter > tableBefore,
+                    $"the window grew ({before} -> {window.BoundingRectangle.Height}) and the table did not ({tableBefore} -> {tableAfter})");
 
         var sort = WaitFor(app, "sectionVerbPlanSortChange", "the What changes header");
-        Assert.Equal(AssistWording.MenuPlanChangeColumn, sort.Name.Replace("Sort by ", ""));
+        Assert.Equal($"Sort by {AssistWording.MenuPlanChangeColumn}", sort.Name);
         sort.AsButton().Invoke();
         Thread.Sleep(400);
+        Assert.Equal($"Sort by {AssistWording.MenuPlanChangeColumn}, sorted ascending", sort.Name);
         // Ascending by the cell's words: "already visible" first, derived rather than typed.
         string first = new[] { AssistWording.MenuPlanAlreadyVisible, AssistWording.MenuPlanStaysAsItIs, AssistWording.PlanWillBecomeVisible }
             .OrderBy(words => words, StringComparer.CurrentCultureIgnoreCase).First();
@@ -268,6 +327,57 @@ public class PlanTableUiTests
         Thread.Sleep(400);
         _output.WriteLine("after the second press: " + string.Join(" | ", table.FindAllChildren().Take(4).Select(child => child.Name)));
         Assert.Contains(", " + AssistWording.PlanWillBecomeVisible, FirstRow(table).Name);
+        MenuBar.CloseDialog(app);
+    }
+
+    /// <summary>
+    /// The review's finding 1: at the default window, notes longer than they
+    /// can be given scroll inside their own area — the last line is REACHED,
+    /// never cut off below the dialog — and the table, Cancel and Publish stay
+    /// inside the window.
+    /// </summary>
+    [UiFact]
+    public void LongNotesScrollAndTheirLastLineCanBeReached()
+    {
+        using var app = new DrivenApp(WriteCourseWithLongNotes);
+        var table = OpenThePlan(app);
+        var dialog = MenuBar.Dialog(app, "the plan");
+        var window = app.Window.BoundingRectangle;
+        var area = WaitFor(app, "sectionVerbPlanNotes", "the notes");
+        var note = WaitFor(app, "sectionVerbPlanNote0", "the left-alone note");
+        var publish = dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.BoundingRectangle;
+        var cancel = dialog.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))!.BoundingRectangle;
+        string measured = $"window {window.Width}x{window.Height}; table {table.BoundingRectangle.Height}; notes area " +
+                          $"{area.BoundingRectangle.Height} (bottom {window.Bottom - area.BoundingRectangle.Bottom} above the window's); " +
+                          $"note {note.BoundingRectangle.Height} tall; Publish bottom {window.Bottom - publish.Bottom} above";
+        _output.WriteLine("#548 long notes: " + measured);
+        try
+        {
+            _output.WriteLine("the app's own sizing: " + (File.ReadAllLines(Path.Combine(app.StateDirectory, "startup.log"))
+                .LastOrDefault(line => line.Contains("Plan table:")) ?? ""));
+        }
+        catch (IOException) { }
+
+        Assert.True(table.BoundingRectangle.Bottom <= window.Bottom, "the table runs past the window: " + measured);
+        Assert.True(area.BoundingRectangle.Bottom <= window.Bottom, "the notes area runs past the window: " + measured);
+        Assert.True(publish.Bottom <= window.Bottom && cancel.Bottom <= window.Bottom, "a button is outside the window: " + measured);
+        // UI Automation clips the note's rectangle to its viewport, so the
+        // note's own height cannot show it is cut short; the scroll pattern
+        // can: a viewport smaller than the content, which scrolls to its end.
+        Assert.True(area.Patterns.Scroll.IsSupported && area.Patterns.Scroll.Pattern.VerticallyScrollable.Value,
+                    "the notes do not scroll, so this fixture does not exercise them, or they cannot be reached: " + measured);
+        double viewSize = area.Patterns.Scroll.Pattern.VerticalViewSize.Value;
+        _output.WriteLine($"the notes' viewport shows {viewSize:0}% of them");
+        Assert.True(viewSize < 100, "the notes fit whole: " + measured);
+
+        area.Patterns.Scroll.Pattern.SetScrollPercent(-1, 100);
+        Thread.Sleep(500);
+        Assert.True(area.Patterns.Scroll.Pattern.VerticalScrollPercent.Value >= 99.5,
+                    $"the notes would not scroll to their end ({area.Patterns.Scroll.Pattern.VerticalScrollPercent.Value:0}%)");
+        var noteBox = note.BoundingRectangle;
+        var areaBox = area.BoundingRectangle;
+        Assert.True(noteBox.Bottom <= areaBox.Bottom + 1 && noteBox.Bottom > areaBox.Top && areaBox.Bottom <= window.Bottom,
+                    $"scrolled to the end, the note's last line ({noteBox}) is not inside the notes area ({areaBox}) inside the window");
         MenuBar.CloseDialog(app);
     }
 

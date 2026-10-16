@@ -248,6 +248,54 @@ public class PlanTableTests
         Assert.Null(PlanTable.FromJson(json is null ? null : JsonNode.Parse(json)));
     }
 
+    // ---- How much is shown (the #548 implementation review, finding 1) ----------
+
+    private static double Needs(PlanTableLayout.Fit fit, double notesNatural) =>
+        PlanTableLayout.Chrome + fit.TableHeight
+        + (notesNatural > 0 ? Math.Min(notesNatural, fit.NotesCap) + PlanTableLayout.NotesSpacing : 0);
+
+    /// <summary>
+    /// Whenever the window can hold the chrome, four rows and two lines of
+    /// notes, everything fits — so nothing is clipped from outside, where the
+    /// notes' own scroll bar could not reach it. Long notes give way first.
+    /// </summary>
+    [Fact]
+    public void EverythingFitsWheneverFourRowsAndTwoLinesOfNotesCan()
+    {
+        double least = PlanTableLayout.Chrome + PlanTableLayout.TableBorder + PlanTableLayout.FewestRows * PlanTableLayout.RowPitch
+                       + PlanTableLayout.NotesSpacing + PlanTableLayout.NotesFewest;
+        for (double height = least; height <= 1000; height += 7)
+            foreach (double notes in new double[] { 0, 18, 40, 88, 128, 300 })
+            {
+                var fit = PlanTableLayout.For(height, notes);
+                Assert.True(Needs(fit, notes) <= Math.Min(height, PlanTableLayout.DialogMaxHeight),
+                            $"at {height} epx with {notes} epx of notes the stage needs {Needs(fit, notes)}");
+                Assert.InRange(fit.Rows, PlanTableLayout.FewestRows, PlanTableLayout.MostRows);
+            }
+    }
+
+    [Fact]
+    public void AtTheDefaultWindowLongNotesScrollAndFourRowsStay()
+    {
+        // The XAML root of the default window on 1920 x 1080 at 150%, measured 446 epx.
+        var fit = PlanTableLayout.For(446, 128);
+        Assert.Equal(PlanTableLayout.FewestRows, fit.Rows);
+        Assert.InRange(fit.NotesCap, PlanTableLayout.NotesFewest, 127);   // shorter than the notes, so they scroll
+        Assert.True(Needs(fit, 128) <= 446);
+
+        var short1 = PlanTableLayout.For(446, 18);
+        Assert.Equal(18, Math.Min(18, short1.NotesCap));                  // a short note is shown whole
+        Assert.Equal(5, short1.Rows);
+    }
+
+    [Fact]
+    public void ATallWindowShowsTwelveRowsAndTheWholeNotesCap()
+    {
+        Assert.Equal(new PlanTableLayout.Fit(PlanTableLayout.MostRows, 0), PlanTableLayout.For(1000, 0));
+        Assert.Equal(PlanTableLayout.NotesMost, PlanTableLayout.For(1000, 300).NotesCap);
+        Assert.Equal(PlanTableLayout.MostRows, PlanTableLayout.For(1000, 300).Rows);
+    }
+
     // ---- Sorting ---------------------------------------------------------------
 
     private static readonly IReadOnlyList<PlanTable.Row> Rows = new[]
