@@ -93,12 +93,18 @@ public sealed class CourseSettingsSaveTests : IDisposable
     public void AFreshlyOpenedCourseIsClean()
     {
         var cases = WhatEnablesSave["freshOpenCases"]!.AsArray();
-        Assert.Equal(9, cases.Count);
+        // A FLOOR, not an exact count, as the mac's XCTAssertGreaterThanOrEqual
+        // is: the loop below runs every case the contract carries, so a case
+        // proposed from either side is run rather than turning this line red
+        // before it is read. Ten since #537 (2026-10-16): a print_blanks of null
+        // opens clean, because the getter reads null as Name and Date.
+        Assert.True(cases.Count >= 10, $"freshOpenCases has {cases.Count} cases; the contract has carried at least 10 since #537");
         foreach (var c in cases)
         {
             var opened = Opened(c!);
             // Reading every printing setting, the way the form does, must
-            // write nothing (#496; case 9 is an unknown blank and place).
+            // write nothing (#496; case 9 is an unknown blank and place, case 10 a
+            // print_blanks of null, #537).
             _ = opened.PrintSchoolName;
             _ = opened.PrintBlanks;
             _ = opened.PrintSchoolNameAt;
