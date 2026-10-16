@@ -17732,6 +17732,14 @@
           },
           "remove": [],
           "why": "The Printing section reads an unknown blank as nothing and an unknown place as the default place (printablePages.corners), and must do so WITHOUT writing its reading back: a course a newer app or a hand edit gave a value this app does not know opens clean, and keeps that value until the teacher changes the setting."
+        },
+        {
+          "name": "a print_blanks of null opens clean (#537)",
+          "set": {
+            "print_blanks": null
+          },
+          "remove": [],
+          "why": "Proposed from the mac with #537 (2026-10-16). A null list reads as Name and Date, the build's reading (printablePages.corners → \"blanks of null are the default\"), and the reading is never written back: the null stays in the file until the teacher changes the setting, so a course holding it opens clean. Windows' getter already reads null as absent, so it should pass as it stands."
         }
       ],
       "freshOpenExpect": {
