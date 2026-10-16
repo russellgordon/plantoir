@@ -1167,10 +1167,14 @@ nonisolated enum AssistWording {
     static let menuPlanAlreadyVisible: String = "already visible"
     static let menuPlanAlreadyHidden: String = "already hidden"
 
-    /// A class a publish followed a link onto and left hidden — the row
-    /// beside `linkedClassesWereLeftAlone`, which says it for all of them.
-    static func menuPlanStaysHidden(noun: ClassNoun = .class) -> String {
-        return "stays hidden, because " + aLinkedClassStaysBecause(noun: noun)
+    /// A class a publish followed a link onto and left alone — the row
+    /// beside `linkedClassesWereLeftAlone`, which says it for all of them,
+    /// and says it as the card does: "stays as it is", never "stays
+    /// hidden". Such a class is usually hidden, but one whose flag this app
+    /// will not read is listed too, and the app counts that page as visible
+    /// (the #524 implementation review, M1).
+    static func menuPlanStaysAsItIs(noun: ClassNoun = .class) -> String {
+        return "stays as it is, because " + aLinkedClassStaysBecause(noun: noun)
     }
 
     /// A page whose settings have no room for a key — the row beside

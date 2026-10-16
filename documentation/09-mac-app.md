@@ -3127,8 +3127,9 @@ Publish Pages…, Hide Pages… and Publish Class for a Date… — show instead
   `planWillBecomeHidden`, or `planWillBecome(visible:withTheDatesOf:)` when
   the page takes a class's date — every date, as the card says them), then
   the pages an unpublish keeps (`planStaysVisibleBecause` + the kept reason),
-  the classes a publish followed a link onto and left hidden
-  (`menuPlanStaysHidden`), the pages whose settings have no room for a key
+  the classes a publish followed a link onto and left alone
+  (`menuPlanStaysAsItIs` — "as it is", as the card says it, not "hidden": a
+  linked class whose flag the app will not read is listed too), the pages whose settings have no room for a key
   (`menuPlanStaysExactlyAsItIs`), and the pages already right
   (`menuPlanAlreadyVisible` / `menuPlanAlreadyHidden`). The headers sort
   (`KeyPathComparator`, plan order first — the `AllBackupsView` precedent);
@@ -3180,7 +3181,7 @@ metrics were measured on.
   more than 15 kept), each with `fromTheMenu` true and false and with
   `.class` and `.meeting`, plus the menu's three real plan cards and their
   `detail` — 358 lines, identical before and after the move. A one-space
-  change in `planStaysVisibleBecause` turned 176 of them red, so the run
+  change in `planStaysVisibleBecause` changed 80 of them (176 diff lines), so the run
   could see a change. `git diff contracts/` added 16 keys and changed none.
   (The tool-surface digest, `scripts/test_tool_surface_digest.py`, only
   hashes descriptions and schemas, so it is evidence that the tool surface did
