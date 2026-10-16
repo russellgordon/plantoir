@@ -167,3 +167,129 @@ final class RefusedBuildAnswersTests: XCTestCase {
         XCTAssertFalse(result.message.contains(AssistWording.whereTheOutputIs))
     }
 }
+
+/// #522: a publish or a hide of named pages ends by saying it changed the
+/// teacher's files — and "their PREVIEW" ONLY when the preview was restarted
+/// in its window (`previewIsRebuilding`). Every other note the rebuild can
+/// leave means the preview did not change: a headless rebuild that stopped at
+/// a question (exit 3), a site rebuilt with no window to show it, a rebuild
+/// declined because a copy of the course is being zipped or the section is
+/// being deployed. The sentences are named (`AssistToolRunner.changedTheirFiles`
+/// / `changedTheirFilesAndPreview`), never retyped.
+@MainActor
+final class PreviewClaimAfterAChangeTests: XCTestCase {
+
+    // MARK: - Stored properties
+
+    private var root: URL?
+
+    // MARK: - Set up
+
+    override func tearDown() async throws {
+        CourseActivity.reset()
+        FakePreview.shared.forget()
+        SectionWindowControllers.shared.forgetAll()
+        if let root {
+            try? FileManager.default.removeItem(at: root)
+        }
+        root = nil
+    }
+
+    // MARK: - Helpers
+
+    private func makeCourse(surface: AssistToolRunner.Surface, registeringPreview: Bool = false) throws -> AssistFixture.Made {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(
+            registeringPreview: registeringPreview, surface: surface
+        )
+        root = made.root
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
+        return made
+    }
+
+    /// The detail's last paragraph: how the change ends.
+    private func ending(of outcome: AssistToolOutcome) -> String {
+        let paragraphs: [String] = outcome.detail.components(separatedBy: "\n\n")
+        return paragraphs.last ?? ""
+    }
+
+    // MARK: - Tests
+
+    /// The issue as it was: a page publish, and a hide, whose headless rebuild
+    /// stopped at a question. MUST FAIL on the old `previewLeftAsItWas`, which
+    /// did not count `previewBuildNeedsAnAnswer` and claimed the preview.
+    func testARebuildThatStoppedAtAQuestionClaimsNoPreview() async throws {
+        for surface in [AssistToolRunner.Surface.mcp, AssistToolRunner.Surface.local] {
+            let made: AssistFixture.Made = try makeCourse(surface: surface)
+            made.siteWork.rebuildMeetsAQuestion = true
+            let question: String = AssistWording.previewBuildNeedsAnAnswer(course: "ICS3U", section: "1")
+
+            let published: AssistToolOutcome = await AssistFixture.run(
+                "publish_pages", with: ["pages": "Unit 1, Day 1"], on: made.runner
+            )
+            XCTAssertTrue(published.detail.contains("\n\n" + question + "\n\n"), "\(surface): \(published.detail)")
+            XCTAssertEqual(ending(of: published), AssistToolRunner.changedTheirFiles, "\(surface)")
+
+            let hidden: AssistToolOutcome = await AssistFixture.run(
+                "unpublish_pages", with: ["pages": "Unit 1, Day 1"], on: made.runner
+            )
+            XCTAssertTrue(hidden.detail.contains("\n\n" + question + "\n\n"), "\(surface): \(hidden.detail)")
+            XCTAssertEqual(ending(of: hidden), AssistToolRunner.changedTheirFiles, "\(surface)")
+            XCTAssertEqual(made.siteWork.previewRebuilds, 2, "\(surface): both changes reached the rebuild")
+            try? FileManager.default.removeItem(at: made.root)
+        }
+    }
+
+    /// The site rebuilt with no window to show it: no preview exists, so none
+    /// changed (`builtWithNoWindowOpen` says so). MUST FAIL on the old rule.
+    func testASiteRebuiltWithNoWindowClaimsNoPreview() async throws {
+        let made: AssistFixture.Made = try makeCourse(surface: .mcp)
+        let outcome: AssistToolOutcome = await AssistFixture.run(
+            "publish_pages", with: ["pages": "Unit 1, Day 1"], on: made.runner
+        )
+        XCTAssertTrue(
+            outcome.detail.contains(AssistWording.builtWithNoWindowOpen(course: "ICS3U", section: "1")), outcome.detail
+        )
+        XCTAssertEqual(ending(of: outcome), AssistToolRunner.changedTheirFiles)
+    }
+
+    /// A rebuild declined because a copy of the course is being zipped. The
+    /// change itself is written. MUST FAIL on the old rule.
+    func testARebuildDeclinedWhileACopyIsZippedClaimsNoPreview() async throws {
+        let made: AssistFixture.Made = try makeCourse(surface: .local)
+        CourseActivity.beginCopy(folderPath: made.root.path, courseCode: "ICS3U")
+        let outcome: AssistToolOutcome = await AssistFixture.run(
+            "publish_pages", with: ["pages": "Unit 1, Day 1"], on: made.runner
+        )
+        XCTAssertTrue(outcome.detail.contains("Done: "), "the change was refused before carryOut: \(outcome.detail)")
+        XCTAssertTrue(outcome.detail.contains(AssistWording.courseIsBeingCopied(course: "ICS3U")), outcome.detail)
+        XCTAssertEqual(ending(of: outcome), AssistToolRunner.changedTheirFiles)
+    }
+
+    /// A rebuild declined because this copy of Plantoir is deploying the
+    /// section. MUST FAIL on the old rule, if the change reaches carryOut.
+    func testARebuildDeclinedWhileTheSectionDeploysClaimsNoPreview() async throws {
+        let made: AssistFixture.Made = try makeCourse(surface: .local)
+        CourseActivity.beginPublish(folderPath: made.root.path, courseCode: "ICS3U", sectionNumber: 1)
+        let outcome: AssistToolOutcome = await AssistFixture.run(
+            "publish_pages", with: ["pages": "Unit 1, Day 1"], on: made.runner
+        )
+        XCTAssertTrue(outcome.detail.contains("Done: "), "the change was refused before carryOut: \(outcome.detail)")
+        XCTAssertTrue(
+            outcome.detail.contains(AssistWording.sectionIsBeingDeployed(course: "ICS3U", section: "1")), outcome.detail
+        )
+        XCTAssertEqual(ending(of: outcome), AssistToolRunner.changedTheirFiles)
+    }
+
+    /// The other half, so the rule cannot pass by never claiming: with the
+    /// section's window open, its preview is restarted and the claim is made.
+    func testAPreviewRestartedInItsWindowIsClaimed() async throws {
+        let made: AssistFixture.Made = try makeCourse(surface: .local, registeringPreview: true)
+        let outcome: AssistToolOutcome = await AssistFixture.run(
+            "publish_pages", with: ["pages": "Unit 1, Day 1"], on: made.runner
+        )
+        XCTAssertTrue(
+            outcome.detail.contains(AssistWording.previewIsRebuilding(course: "ICS3U", section: "1")), outcome.detail
+        )
+        XCTAssertEqual(ending(of: outcome), AssistToolRunner.changedTheirFilesAndPreview)
+    }
+}

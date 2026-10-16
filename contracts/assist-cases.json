@@ -4232,6 +4232,21 @@
         "why" : "The stop sits beside the WRITES, not beside the start: a preview left serving while the pages beneath it are rewritten serves a half-changed site, and the teacher's next refresh is a race they cannot see they are in. No expectReply on purpose — the reply is about the pages that changed, not about the preview; this case was written claiming the preview sentence, and running it said otherwise."
       },
       {
+        "expectEvents" : [
+          "stopPreview.begins",
+          "stopPreview.ends",
+          "startPreview"
+        ],
+        "expectReply" : "wording.previewIsRebuilding",
+        "given" : {
+          "previewRunning" : true,
+          "sectionWindowOpen" : true
+        },
+        "name" : "rebuild with a preview serving stops it and starts it again",
+        "when" : "rebuild_preview",
+        "why" : "#528, AUTHORED on the mac 2026-10-16 (Windows #489 found its own rebuild returned at once while a preview was serving, and still said it was rebuilding). The served site is a merged COPY and nothing watches the course folder, so a rebuild that leaves a serving preview up shows the teacher the old pages under a sentence that says otherwise. Stop, WAIT for the stop, then start: a stop still finishing when the start begins kills the new build. Section ▸ Rebuild Preview runs this same call, and is enabled only while a preview runs."
+      },
+      {
         "expectTranscriptContains" : [
           "teacher: Deploy at 6:30 AM",
           "assistant: Section 1",

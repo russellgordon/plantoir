@@ -161,11 +161,11 @@ nonisolated enum ScheduledDeployRefusal: Equatable, Sendable {
         case .deployFolderNeedsAttention(let problem):
             return "\(course.code) deploys to a folder, and that folder needs attention first: \(problem)"
         case .cloudflareAccountMissing(let problem):
-            return "\(course.code) deploys to Cloudflare Pages, which needs your Account ID. \(problem) Add it in this course’s settings, under Deploying, then schedule this again."
+            return "\(course.code) deploys to Cloudflare Pages, which needs your Account ID. \(problem) Add it in Plantoir ▸ Settings ▸ Deploying, then schedule this again."
         case .additionalDeployFolderNeedsAttention(let problem):
             return "\(course.code) also deploys to a folder, and that folder needs attention first: \(problem)"
         case .additionalCloudflareAccountMissing(let problem):
-            return "\(course.code) also deploys to Cloudflare Pages, which needs your Account ID. \(problem) Add it in this course’s settings, under Deploying, then schedule this again."
+            return "\(course.code) also deploys to Cloudflare Pages, which needs your Account ID. \(problem) Add it in Plantoir ▸ Settings ▸ Deploying, then schedule this again."
         case .neverDeployed(let destination):
             return ScheduledDeployWording.neverDeployed(course: course.code, section: section, destination: destination)
         case .additionalDestinationNeverDeployed(let destination):

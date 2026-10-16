@@ -3262,7 +3262,8 @@ silence. Check it, and record what you find here; the contract
 case says which of the two you are looking at.
 
 Two more that stay per-platform: the plan's own words (the mac's says what has
-to be true of the Mac — awake, plugged in, lid open — and Windows says something
+to be true of the Mac — awake, lid open, and that on battery it sleeps sooner;
+"plugged in" was dropped by #521 because launchd runs the job on battery — and Windows says something
 different about sleep and Modern Standby), and cancelling, which on the mac is
 `launchctl bootout` plus deleting the plist.
 
@@ -4019,6 +4020,63 @@ false only around the call that hides classes at Deploy (#475), where the
 deploy builds straight after. Every other menu write rebuilds the preview, as
 the tool does — the menu must not disagree with the tool.
 
+**How the trail line ends (#531, 2026-10-16).** `SectionVerbs.perform` writes
+"carried out" when the runner WROTE something, and "changed nothing" only when
+it wrote nothing. "Wrote something" is one signal, not a flag per verb: the
+undo list's depth moved, the change it would take back moved, or
+`AssistToolRunner.writesWithNoNewUndoEntry` moved. Undo Last Change ends "took
+the last change back" when its entry came off the list, and "took part of the
+last change back" when files went back but the entry stayed because others
+were edited since (Undo can be pressed again; the director's ruling L2 — the
+contract's `ran from a menu` `carries` names this ending). The counter covers
+EVERY path that writes files without adding an entry, each pinned in
+`SectionVerbsEndingTests`:
+- **Make Room for Classes** (no entry, on purpose — `makingRoomCannotBeUndone`),
+  counted only when it wrote a file (`ClassChangeOutcome.wroteSomething`):
+  Make Room carries each failed write past rather than throwing, so a run
+  whose every write failed says "changed nothing" (ruling L5);
+- **a partial undo**;
+- **a publish or hide that wrote pages and then stopped part way** (#412),
+  the page list and the whole unit: `AssistPublishPlanner.apply` throws
+  `StoppedAfterWriting` only when at least one file was written, keeping the
+  error's own words;
+- **Re-date Classes… that stopped part way** (ruling M3):
+  `SectionReDatePlanner.apply` writes page by page and now throws its own
+  `StoppedAfterWriting` with the pages written. The teacher is told
+  `publishStoppedPartWay` ("Only part of the section's class dates was
+  changed…") with the pages already re-dated listed — never "Nothing was
+  changed", which it said until then although pages were written.
+
+A first write that fails is still "changed nothing", and "Nothing was
+changed". Until #531 the depth alone decided, so each of these was written as
+"changed nothing" — the line rule 5 calls worse than none. Found by Windows'
+batch 2B review, where Make Room and a full undo list (`UndoHistory.MostRemembered
+= 20`) both read that way. **MEASURED on the mac: no cap.**
+`AssistChangeHistory.record` appends, and only a clean undo removes, so the
+21st change grows the depth. Of the tests, six are must-fail (Make Room,
+partial undo, page list, whole unit, Re-date, and Make Room that wrote
+nothing against the first fix); the publish that wrote nothing and the 21st
+change are guards, green on the old code too. Not covered: duplicating a
+class when it moves others (`duplicateClassRequested`) also writes with no
+entry, and no menu item reaches it. The other menu paths were read: Make
+Room's `apply` throws only before its first write, Add Next Class writes one
+page.
+
+**Rebuild Preview restarts a SERVING preview (#528, checked 2026-10-16).**
+Windows found its own `rebuild_preview` returned at once while a preview was
+serving and still said it was rebuilding (#489). The mac never had that:
+`rebuildPreview` → `bringThePreviewUpToDate(afterAChange: false)` stops a
+preview that is building OR showing (`isPreviewRunning` is `previewState() !=
+.notRunning`), waits for the stop (`stopPreviewAndWait`), and starts it again,
+whose start waits for the built index to CHANGE before it serves. The menu's
+`.menu` runner has no branch of its own on that path (`menuChangeHeldBack` is
+nil for it). An outside assistant (`.mcp`) is the deliberate exception, #433.
+Now held by the contract: `assist-cases.json` → "rebuild with a preview
+serving stops it and starts it again" (authored here), and on the menu by
+`SectionVerbsTests.testRebuildPreviewFromTheMenuRestartsAServingPreview` — a
+guard, green on dev. A unit test proves the ORDER; that the new site is
+SERVED rests on the window's own wait, not re-driven here.
+
 ### #475 at the assistants' deploy
 
 `deploy_section` meets the question about classes dated after the next class
@@ -4412,7 +4470,28 @@ answers say what was already written first and the refusal after it, with no
 tool-runner change. The one tool-runner change is honesty: `carryOut` used to
 end "This changed the teacher's files and their PREVIEW" after a rebuild that
 did not build; a preview that did not build is now one of the "left as it
-was" notes, like #433's.
+was" notes, like #433's. **Since #522 (2026-10-16) the rule is the other way
+round:** the claim is made ONLY when the note is `previewIsRebuilding` — the
+preview restarted in its window — and every other note ends "This changed the
+teacher's files." (`AssistToolRunner.changedTheirFiles` /
+`changedTheirFilesAndPreview`). A list of the notes that meant "left as it
+was" had to be kept complete by hand and was not: a rebuild that stopped at a
+question (exit 3), one declined while a copy is zipped, while the section
+deploys, with no working folder, built elsewhere or unable to launch all still
+made the false claim. `builtWithNoWindowOpen` is NOT a claim either — the site
+was rebuilt, but no preview exists to have changed (its own sentence says no
+window shows it). Measured: the copy and the deploy cases do reach `carryOut`
+(the change is written first). The one test this moved,
+`OutsideAssistantWhilePreviewingTests.testTheInAppAssistantSaysWhatItSaidBefore`,
+now asserts the plain ending for the in-app assistant meeting a preview built
+elsewhere; everything else it pins under #433 ruling 4 stands. Pinned by
+`PreviewClaimAfterAChangeTests` (five cases: the question on `.mcp` and
+`.local`, publish and hide; no window; a copy; a deploy; and the positive
+case, a window restarted). No shared-rules list: Windows has no "their
+PREVIEW" sentence, so a list would have no Windows reader (the director's
+ruling on the plan review, H3). KNOWN, not fixed: `previewIsRebuilding` is
+returned even when the window's own `startPreview()` then refuses (a lease
+taken in between), so that rare case still claims a preview.
 
 **The cross.** The launcher's line begins "❌ ". `FailureExplainer`'s two lifts
 (#381's and #439's) used to strip that one character and spaces; they now
@@ -4465,8 +4544,9 @@ keys with identical text and says them from `AssistWorkspace.RebuildPreview`,
 detail is in `documentation/12-windows-app.md` → the #471 bullet. One
 difference stays the mac's to close: Windows also says a rebuild that stopped
 for a question (exit 3) as `previewBuildNeedsAnAnswer` on the page and unit
-paths (#478), and the mac's `carryOut` does not yet count that sentence as
-"the preview was left as it was". **Rename:** the mac has no
+paths (#478); the mac's `carryOut` did not count that sentence as "the
+preview was left as it was" until #522 (2026-10-16), which replaced the list
+with the positive rule above. **Rename:** the mac has no
 unit-rename assistant tool, so the issue's fourth bullet has nothing to meet
 here. **No new trail event:** the launcher's refusal line is already recorded.
 
