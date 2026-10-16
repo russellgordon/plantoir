@@ -8,7 +8,7 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **`NamedGapLedger` holds mac #524's sixteen plan-table wording keys** (`plan*`, `menuPlan*`) against #548, milestoned v1.7.2 (added 2026-10-16 with #551's piece). It was EMPTY from 2026-10-15 until then.
 - **The version is 1.7.1** (`<Version>` in `Plantoir.csproj`); Windows 1.7.1 joined the v1.7.1 release on 2026-10-16 (#481). The next cut, 1.7.2, joins the mac's existing v1.7.2 release and un-pins the Windows card again.
 - **Gates at the branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
-- **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum is 900 PIXELS (600 epx at 150%), below which the toolbar's buttons leave the window.
+- **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
 ## 2026-10-15 — Windows catch-up to 1.7.1, batch 6 (#514) and batch 5B's review fixes
 
@@ -728,9 +728,12 @@ kind of session can do, measured on the day and written for the next one:
   against; there is no VM, no reboot-for-VM-platform-features case, and
   nothing here to verify.
 - The toolbar can still truncate at narrow widths. The window minimum **is**
-  enforced at 900×600 (`MainWindow.xaml.cs`, `PreferredMinimumWidth` /
-  `PreferredMinimumHeight`); the opening size is not 900×600 but a share of
-  the display's work area, clamped, so it looks right at any scale.
+  enforced at 900×600 epx (`MainWindow.ApplyMinimumSize`, `PreferredMinimumWidth` /
+  `PreferredMinimumHeight`, which the presenter scales); the opening size is a
+  share of the display's work area, clamped, and since #542 (2026-10-16) never
+  below that minimum — it used to open at 793 epx at 150%. Below 900 epx (a
+  225%+ display, where the minimum is clamped to the work area) the toolbar
+  can still truncate.
 - The preview accelerators exist — Ctrl+R, Alt+Left, Alt+Right — on View ▸
   Reload Page, Back and Forward since #488 (2026-10-15; they were declared at
   view scope in `Views/SectionDetailView.xaml` until then, and a measurement
