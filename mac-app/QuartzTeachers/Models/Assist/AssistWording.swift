@@ -1106,6 +1106,78 @@ nonisolated enum AssistWording {
         return "it is a \(noun.singular) of its own."
     }
 
+    // The plan's one-page pieces (#524). `AssistPublishPlan.describe()` says
+    // each change as "“Bananas” will become visible." and each page an
+    // unpublish keeps as "“Ohm's Law” stays visible, because …"; the Section
+    // menu's plan table shows the same piece in a cell, without the page's
+    // name. One member for each, so the card and the table cannot drift.
+    // Moved here from inline literals in `describe()` byte for byte: the card
+    // did not change (measured before and after, documentation/09-mac-app.md
+    // → "The plan as a table (#524)").
+
+    /// "will become visible" — a page a publish shows.
+    static let planWillBecomeVisible: String = "will become visible"
+
+    /// "will become hidden" — a page an unpublish takes down.
+    static let planWillBecomeHidden: String = "will become hidden"
+
+    /// One of the two above, then ", with the same date as “Unit 4, Day 24”"
+    /// once for each class whose date the page takes — in the plan's order,
+    /// every one of them, as `describe()` has always said it.
+    static func planWillBecome(visible: Bool, withTheDatesOf classes: [String] = []) -> String {
+        var piece: String = visible ? planWillBecomeVisible : planWillBecomeHidden
+        for takenFrom in classes {
+            piece += ", with the same date as “\(takenFrom)”"
+        }
+        return piece
+    }
+
+    /// "stays visible, because " and a reason that ends with its own full
+    /// stop (`AssistPublishKept.Reason.finishing(noun:)`).
+    static func planStaysVisibleBecause(_ reason: String) -> String {
+        return "stays visible, because \(reason)"
+    }
+
+    /// A plan in which no page would change.
+    static let planNothingWouldChange: String = "No page's visibility would change."
+
+    // The Section menu's plan table (#524): its summary, its columns, and
+    // the cells only the table has. The card says the same facts in its own
+    // sentences; these are said about one page, beside its name.
+
+    /// The line above the table: "8 pages would change, 8 already visible."
+    /// Counts the pages that change and the pages already the way asked;
+    /// the pages an unpublish keeps are rows of their own, with their reason.
+    static func menuPlanSummary(changing: Int, already: Int, publishing: Bool) -> String {
+        if changing == 0 {
+            return planNothingWouldChange
+        }
+        let word: String = changing == 1 ? "page" : "pages"
+        if already == 0 {
+            return "\(changing) \(word) would change."
+        }
+        return "\(changing) \(word) would change, \(already) already \(publishing ? "visible" : "hidden")."
+    }
+
+    static let menuPlanPageColumn: String = "Page"
+    static let menuPlanFolderColumn: String = "Folder"
+    static let menuPlanChangeColumn: String = "What changes"
+
+    /// A page that is already the way it was asked to be.
+    static let menuPlanAlreadyVisible: String = "already visible"
+    static let menuPlanAlreadyHidden: String = "already hidden"
+
+    /// A class a publish followed a link onto and left hidden — the row
+    /// beside `linkedClassesWereLeftAlone`, which says it for all of them.
+    static func menuPlanStaysHidden(noun: ClassNoun = .class) -> String {
+        return "stays hidden, because " + aLinkedClassStaysBecause(noun: noun)
+    }
+
+    /// A page whose settings have no room for a key — the row beside
+    /// `pagesWhoseSettingsCannotBeAddedToFromTheMenu`, which names a few of
+    /// them and says where to set them instead.
+    static let menuPlanStaysExactlyAsItIs: String = "stays exactly as it is, because Plantoir cannot add to its settings."
+
     /// Pages nothing could be written to, NAMED rather than counted (#186).
     ///
     /// The settings at the top of a page can be written in a way that leaves
