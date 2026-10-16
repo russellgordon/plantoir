@@ -3744,9 +3744,9 @@ mac has no share modes; nothing to mirror.
 #324): the scheduled run posts a toast in the section's own sentence, and a
 click opens that section (`ScheduledPublishToast`; trail `scheduled publish
 notification`). It is unproven on a real click (the desktop was locked), and
-nothing about it is ledgered — `NamedGapLedger` was empty from bundle 9 until
-2026-10-16, when mac #524's sixteen plan-table sentences went in against #548
-(v1.7.2).
+nothing about it is ledgered — `NamedGapLedger` has been empty since bundle 9,
+but for a few hours on 2026-10-16 when mac #524's sixteen plan-table
+sentences were held against #548 until #548 landed them.
 
 ## Deploy and publish: the two words (v1.4.4, #443)
 
