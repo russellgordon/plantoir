@@ -4412,7 +4412,28 @@ answers say what was already written first and the refusal after it, with no
 tool-runner change. The one tool-runner change is honesty: `carryOut` used to
 end "This changed the teacher's files and their PREVIEW" after a rebuild that
 did not build; a preview that did not build is now one of the "left as it
-was" notes, like #433's.
+was" notes, like #433's. **Since #522 (2026-10-16) the rule is the other way
+round:** the claim is made ONLY when the note is `previewIsRebuilding` — the
+preview restarted in its window — and every other note ends "This changed the
+teacher's files." (`AssistToolRunner.changedTheirFiles` /
+`changedTheirFilesAndPreview`). A list of the notes that meant "left as it
+was" had to be kept complete by hand and was not: a rebuild that stopped at a
+question (exit 3), one declined while a copy is zipped, while the section
+deploys, with no working folder, built elsewhere or unable to launch all still
+made the false claim. `builtWithNoWindowOpen` is NOT a claim either — the site
+was rebuilt, but no preview exists to have changed (its own sentence says no
+window shows it). Measured: the copy and the deploy cases do reach `carryOut`
+(the change is written first). The one test this moved,
+`OutsideAssistantWhilePreviewingTests.testTheInAppAssistantSaysWhatItSaidBefore`,
+now asserts the plain ending for the in-app assistant meeting a preview built
+elsewhere; everything else it pins under #433 ruling 4 stands. Pinned by
+`PreviewClaimAfterAChangeTests` (five cases: the question on `.mcp` and
+`.local`, publish and hide; no window; a copy; a deploy; and the positive
+case, a window restarted). No shared-rules list: Windows has no "their
+PREVIEW" sentence, so a list would have no Windows reader (the director's
+ruling on the plan review, H3). KNOWN, not fixed: `previewIsRebuilding` is
+returned even when the window's own `startPreview()` then refuses (a lease
+taken in between), so that rare case still claims a preview.
 
 **The cross.** The launcher's line begins "❌ ". `FailureExplainer`'s two lifts
 (#381's and #439's) used to strip that one character and spaces; they now
@@ -4465,8 +4486,9 @@ keys with identical text and says them from `AssistWorkspace.RebuildPreview`,
 detail is in `documentation/12-windows-app.md` → the #471 bullet. One
 difference stays the mac's to close: Windows also says a rebuild that stopped
 for a question (exit 3) as `previewBuildNeedsAnAnswer` on the page and unit
-paths (#478), and the mac's `carryOut` does not yet count that sentence as
-"the preview was left as it was". **Rename:** the mac has no
+paths (#478); the mac's `carryOut` did not count that sentence as "the
+preview was left as it was" until #522 (2026-10-16), which replaced the list
+with the positive rule above. **Rename:** the mac has no
 unit-rename assistant tool, so the issue's fourth bullet has nothing to meet
 here. **No new trail event:** the launcher's refusal line is already recorded.
 

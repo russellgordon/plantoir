@@ -1922,6 +1922,18 @@ final class AssistToolRunner {
     /// contract holds it, and Windows words its own.
     static let awakeThenWithTheLidOpen: String = "on and awake then, with the lid open."
 
+    /// How a publish or a hide of named pages ends (`carryOut`), for the
+    /// model: what it changed, and that nothing reached students. The
+    /// PREVIEW is named only when it was restarted in its window (#522).
+    /// Named here, not in `AssistWording`: no contract holds them, and
+    /// Windows has no such sentence.
+    static let changedTheirFiles: String = "This changed the teacher's files. It did not put anything in front "
+        + "of students — deploying does that, and only when they ask."
+
+    /// The same, when the change restarted the section's preview.
+    static let changedTheirFilesAndPreview: String = "This changed the teacher's files and their PREVIEW. It did not "
+        + "put anything in front of students — deploying does that, and only when they ask."
+
     // MARK: - Writing pages
 
     /// Back the course up, write the change, remember it, rebuild the preview.
@@ -2028,35 +2040,26 @@ final class AssistToolRunner {
             previewNote = await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber)
             detail += "\n\n" + previewNote
         }
-        // Not "and their PREVIEW" when an outside assistant's change left the
-        // open preview as it was (#433): that would be false.
-        // Nor when the headless rebuild RAN and did not build (#471) —
-        // whether the launcher refused it or it failed for any other reason:
-        // the preview is as it was, and saying it changed would be false.
-        // (Matched by sentence: a rebuild that stopped at a question, could
-        // not launch, or was declined before it ran — this copy deploying
-        // the section, a copy of the course being zipped, no working folder
-        // — still gets the old ending, a pre-existing gap this does not
-        // close.)
-        let previewLeftAsItWas: Bool = !previewFollowsAChange
-            || previewNote == AssistWording.changesAreSavedPreviewShowsTheOldPages(
+        // "and their PREVIEW" ONLY when the preview was restarted in its
+        // window — `previewIsRebuilding` is the one note that means it
+        // changed (#522, the director's ruling 2026-10-16). Every other note
+        // means it did not: an outside assistant's change left the open
+        // preview as it was (#433); a headless rebuild that failed, was
+        // refused (#471) or stopped at a question (exit 3, #478/#522); one
+        // declined before it ran (a copy being zipped, this section being
+        // deployed, no working folder, a build somewhere else, a launch
+        // problem); and `builtWithNoWindowOpen`, where the SITE was rebuilt
+        // but no preview exists to have changed. Until #522 this listed the
+        // notes that meant "left as it was", and every note it did not list
+        // made the false claim.
+        let previewChanged: Bool = previewFollowsAChange
+            && previewNote == AssistWording.previewIsRebuilding(
                 course: course.code, section: String(sectionNumber)
             )
-            || previewNote == AssistWording.changesAreSavedWhileTheCourseIsBuilt(
-                course: course.code, section: String(sectionNumber)
-            )
-            || previewNote == AssistWording.previewDidNotBuildForACallerWithNoWindow(
-                course: course.code, section: String(sectionNumber)
-            )
-            || previewNote.hasPrefix(AssistWording.previewDidNotBuildBecause(
-                course: course.code, section: String(sectionNumber), reason: ""
-            ))
-        if previewLeftAsItWas {
-            detail += "\n\nThis changed the teacher's files. It did not put anything in front "
-                    + "of students — deploying does that, and only when they ask."
+        if previewChanged {
+            detail += "\n\n" + AssistToolRunner.changedTheirFilesAndPreview
         } else {
-            detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
-                    + "of students — deploying does that, and only when they ask."
+            detail += "\n\n" + AssistToolRunner.changedTheirFiles
         }
 
         return AssistToolOutcome.wrote(
