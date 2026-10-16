@@ -17739,7 +17739,7 @@
             "print_blanks": null
           },
           "remove": [],
-          "why": "Proposed from the mac with #537 (2026-10-16). A null list reads as Name and Date, the build's reading (printablePages.corners → \"blanks of null are the default\"), and the reading is never written back: the null stays in the file until the teacher changes the setting, so a course holding it opens clean. Windows' getter already reads null as absent, so it should pass as it stands."
+          "why": "Proposed from the mac with #537 (2026-10-16). A null list reads as Name and Date, the build's reading (printablePages.corners → \"blanks of null are the default\"), and the reading is never written back: the null stays in the file until the teacher changes the setting, so a course holding it opens clean. Windows' getter already reads null as absent; what goes red there is CourseSettingsSaveTests' count of the cases (9, now 10) — see the mac issue #537's windows note."
         }
       ],
       "freshOpenExpect": {

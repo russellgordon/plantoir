@@ -3461,12 +3461,12 @@ idle-slept", which on battery comes sooner. So:
   words are unchanged.)
 - the assistant's two sentences — the `schedule_deploy` card and the answer
   after setting one (`AssistToolRunner.awakeThenWithTheLidOpen`) — say "on and
-  awake then, with the lid open." They do not carry the battery bullet, so the
+  awake then, with the lid open." They do not carry the battery line, so the
   dialog and the assistant differ by that one line, which was Russell's call.
   Neither is in `AssistWording` or any contract (ruling 6: not lifted this
   batch), so no contract moved.
 - Pinned: `ScheduledDeployTests.testThePlanSaysWhatMustBeTrueOfTheMac` (the
-  absence of "plugged in", the battery bullet present) and
+  absence of "plugged in", the battery line present) and
   `AssistSettingsFreshnessTests.testTheCardAndTheAnswerNeverAskForACable`.
 - plantoir.app: `website/pages/day-to-day.html` said "Schedule the deploy for
   7:00 on Monday and close the laptop", which contradicts "lid open"; it now
