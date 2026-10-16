@@ -672,6 +672,14 @@ Safari 26.6, light, real print sheet then Save as PDF: "All 3 Pages", the
 diagram DRAWN (no source text — the first version printed it as text, B1),
 the hash removed afterwards.
 New-window links, the PDF link among them, open in the browser too. See 09.
+**Windows depends on the check's exact shape (#496, #539).** WebView2 has no
+`window.webkit`, so Windows' preview INJECTS exactly
+`window.webkit.messageHandlers.plantoirPrint` (`PreviewBrowserHandoff.PrintShim`)
+and forwards the message to the app. Keep `print.inline.ts`'s check and the
+`{mode, paper, url}` message as they are: a renamed handler, a wider
+`window.webkit` feature test or a Safari sniff breaks Print in Windows' preview
+SILENTLY, and Windows' `PreviewBrowserHandoffTests.TheShimGivesThePageTheShapeItsPrintCodeLooksFor`
+goes red — say so in that change's `windows` issue.
 
 ### F6. Figures (decision 13, for #485 E1)
 
