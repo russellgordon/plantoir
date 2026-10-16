@@ -3263,8 +3263,10 @@ case says which of the two you are looking at.
 
 Two more that stay per-platform: the plan's own words (the mac's says what has
 to be true of the Mac — awake, lid open, and that on battery it sleeps sooner;
-"plugged in" was dropped by #521 because launchd runs the job on battery — and Windows says something
-different about sleep and Modern Standby), and cancelling, which on the mac is
+"plugged in" was dropped by #521 because launchd runs the job on battery — and Windows, which dropped
+it too with #547 because its task runs on battery, says it in its own words about a PC's sleep:
+`ScheduledDeploy.OnBatterySleepsSooner`, "On battery, a PC goes to sleep sooner…", in the same two
+places as the mac, `documentation/07-deployment.md` → "\"Plugged in, if it is a laptop\" removed (#521)"), and cancelling, which on the mac is
 `launchctl bootout` plus deleting the plist.
 
 **The sidebar filter — the empty state.** The contract says WHAT matches. It
