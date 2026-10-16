@@ -26,7 +26,9 @@ layers.
 ## A. Components replaced at image build time
 
 These five files in [`patches/`](../patches/) overwrite their stock
-counterparts inside the image. The first three implement the **two-tier
+counterparts inside the image. The explorer's STYLES are not among them:
+`explorer.scss` is Quartz's own, and the one thing added on top of it — the
+page marker — comes from `support/quartz` (H). The first three implement the **two-tier
 sidebar**: some folders are *expandable trees*, others are *plain links*.
 The last two (A4) replace Quartz's draft filter with a publish filter.
 
@@ -438,7 +440,8 @@ rules are data in [`contracts/shared-rules.json`](../contracts/shared-rules.json
 `pageOptIns`; this section says how the site does it and why.
 
 **Compatibility, stated first because it is the promise.** A page that does
-not opt in renders exactly as it did before #454: its HTML carries no print
+not opt in renders exactly as it did before #454 (its sidebar aside, since
+#515: below): its HTML carries no print
 markup at all — no wrapper, no button, no style, no `@page` — and its date
 line is the plain `<p class="content-meta">` it always was. Measured on EXC2O
 (implementation review, `origin/dev` 8178eeaac against the branch): **all 300
@@ -446,8 +449,12 @@ pages that do not opt in are byte-identical** once what Quartz already varies
 between ANY two builds is set aside (the explorer's random list id, build-time
 dates on curriculum pages, and the order of tag-list entries sharing one of
 those dates); the only pages that differ are the 7 that opt in. Every new CSS
-selector is scoped to a printable page or the handout frame — with ONE
-exception since #501, below — and nothing adds an `@page`. **verify.sh gates
+selector is scoped to a printable page or the handout frame — or to figure
+markup (`.pl-figure`, G, #485) — with TWO exceptions: #501's print block,
+below, and since #515 the sidebar's page marker (H), which is NOT print-scoped and changes every page's on-screen
+sidebar — and nothing adds an `@page`. So a page that does not opt in still
+has byte-identical HTML, but since #515 its sidebar does not RENDER exactly as
+it did before #454: page rows inside an open folder carry a dot. **verify.sh gates
 it on every run**: section 5 plants "Printable Not Opted", the worksheet with
 only `printable: true` taken out, and the 6h printable-pages check fails if
 that page carries `plantoir-meta-line`, `plantoir-print`, `data-plantoir` or
@@ -475,6 +482,9 @@ against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
 `index.css` 35,386 → 41,045 (+5,659) on the final branch (the review measured
 +10,525 and +5,659 at 4c587f670, before the light-page wait and the corner
 change), every rule in them scoped so it cannot touch an ordinary page.
+Those are history, as #501's +316 above is: since #515 (v1.7.2) `index.css`
+also carries the sidebar's page marker, 454 bytes, which DOES touch every page's
+sidebar on screen (H); `postscript.js` is unchanged by it.
 
 ### F1. The files and how they reach a section
 
@@ -488,6 +498,7 @@ on its next preview:
 | `components/PlantoirMetaLine.tsx` | Wraps the CONTENT layout's `ContentMeta()` only (folder and tag pages never get a button). Not opted in → renders the inner date line and nothing else. `printPdf` → a plain `<a … target="_blank">` to `Media/<Quartz slug of the file>`, built with Quartz's own `slugifyFilePath` so the address is the one the Assets emitter writes (measured with `&` and a space: `Media/plantoir-print-fixture--and--key.pdf`). `printable` → Print, the summary of a `<details>` menu (#499, decision 29: Portrait / Landscape radios, then Questions only, Answers only, Both — nothing prints until a choice), at the TRAILING edge (`margin-inline-start: auto`, so right-to-left too), present even when the date line shows nothing (decision 6), and an inline `<style id="plantoir-print-page">` with the Latin Modern `@font-face` rules, the `@page` box (margins, NO size — F4) and its four corners for ⌘P, and the code box. The page's `title` and `description` travel in `data-settings` for the footer and the subtitle. Reads `quartz/plantoir_print.json` with `fs` rather than importing it, so a missing file costs the button, never the build. Forwards the inner component's `css`/`afterDOMLoaded` (review S7). Both the Print button and the PDF link open with a printer glyph (#497): an inline `<svg>` stroked in `currentColor`, 1em square, `aria-hidden` so the button is still read as its label alone, drawn the way Quartz draws its search and dark-mode icons — no image file, hidden on paper with the button, and nothing on a page that does not opt in. |
 | `components/scripts/printRules.ts` | The rules with no DOM and no imports — answer/question/unfold roles, labels and answer places, question numbering, part letters and columns, title cleaning, page labels, the paper box, the footer, which callouts keep a box, the code box, the completeness decision, and the `@page`/`@font-face` text both ⌘P and the handout write — so `scripts/check_print_rules_against_the_site.py` can bundle it with the scaffold's esbuild and run every contract case in Node (verify.sh). `PlantoirMetaLine.tsx` imports it too, so ⌘P's page box and the handout's cannot drift. |
 | `components/scripts/print.inline.ts` | The button, the handout, ⌘P and the preview handoff (F3–F5). Bundled into every site; inert unless the page carries a printable meta line. |
+| `components/styles/sidebarPageMarker.scss` | Not print: the sidebar's page dot (#515, H). Rides on `PlantoirMetaLine`'s `concatenateResources` as `figures.scss` does, so no wiring edit; reaches every page's `index.css`. |
 | `components/styles/print.scss` | On-screen button styles, ⌘P rules under `@media print { html.plantoir-printable … }`, and handout rules under `html.plantoir-print-frame`. No bare `@page` anywhere (review B2: it cannot be scoped). |
 
 Two marker edits wire them in (`wire_quartz_additions`, idempotent, ALWAYS):
@@ -1135,9 +1146,209 @@ whole syntax for an assistant.
 each — a site carries only the ones its drawings name, ~30 KB a face);
 carrying function-plot in every site; a CDN.
 
+## H. The sidebar's page marker (#515, v1.7.2)
+
+**What it does.** Inside an OPEN folder of "Navigate this site", every page
+row starts with a small dot, and a title that wraps hangs: its second line
+starts under its first letter, not under the dot. Before it, a long title
+that wrapped ("Solving Linear Systems Graph-ically", on MPM2D) read as two
+pages, because nothing marked where one page ended and the next began.
+Folder rows keep their chevron and get no dot, at any depth; pages at the
+TOP level of the sidebar get none (they sit among folder rows, next to
+chevrons, not among other pages); a folder with no chevron gets none; the
+dot does not change colour on the current page or on hover (Russell's
+rulings 1-4 and 8, 2026-10-16).
+
+**Where it lives: one stylesheet, no markup.**
+`support/quartz/components/styles/sidebarPageMarker.scss`, imported by
+`components/PlantoirMetaLine.tsx` and added to its `concatenateResources`
+beside `figures.scss`, the same ride figures took (G1), so there is no layout
+edit and no third wiring edit. Quartz writes ONE `index.css` for every page,
+so the rule reaches content, folder and tag pages alike; it depends on
+`wire_quartz_additions` having wired `PlantoirMetaLine` into the layout (F1),
+and if that wiring ever failed, print and the dot would go together. The file
+is NOT called `explorer.scss`: `install_quartz_additions` copies
+`support/quartz` over Quartz by path, so that name would replace Quartz's own
+explorer styles in every section (the shared test asserts no such file).
+
+**The selector, and why it is exactly a page row.**
+`.explorer .explorer-content .folder-outer > ul > li:has(> a)`. The sidebar's
+rows are built in the browser from `<template>`s (A2): a page row is
+`<li><a>`, and a folder row is `<li><div class="folder-container">…`, whose
+link (when `folderClickBehavior: "link"` gives it one) is two levels down,
+never a direct child, chevron or not. A folder's `index.md` becomes the
+folder's own data, not a child row. `.folder-outer > ul` keeps it to the
+inside of a folder. The rule sets `position: relative` and
+`padding-left: .8em` on the row, so every line of the title starts .8em in,
+and draws the dot as an absolutely positioned `::before` in that padding:
+`left: 0`, .32em round, `top: calc(.5lh - .16em)` — half the row's OWN line
+height less half the dot, so it is level with the first line whatever the
+scheme's font and line height (`top: .5em` first, for a browser without `lh`;
+Safari 16.4+ and Chrome 109+ have it, within macOS 15 and WebView2). Under
+`forced-colors: active` the dot is `CanvasText`.
+
+**It wins by specificity, so do not shorten it.** Plantoir's CSS comes BEFORE
+the explorer's in `index.css` (component CSS follows the layout's order, and
+`beforeBody`, where PlantoirMetaLine sits, precedes `left`; measured: print at
+offset 3,180, figures at 3,948, the stock `.explorer-content ul{` at 30,277),
+so the rule beats Quartz's only by being more specific. No stock rule sets
+`padding-left` or `position` on a sidebar `li` today; a Quartz upgrade that
+adds one has to be checked against this.
+
+**What it leaves unchanged.** Nothing styles the link: its colour (`--dark`
+at .75), the current page's (`--tertiary` at 1) and hover (`--tertiary`) stay
+Quartz's own rules, and because the dot is on the ROW it does not follow
+them. Every page's HTML is unchanged by construction — the change is a
+stylesheet and no `.tsx` render changed, and Quartz links `index.css` by a
+fixed name — and `postscript.js` gains nothing (no script). The sidebar is
+`display: none` on paper (print.scss's printable and every-other-page blocks;
+the handout frame clones the article only), so print is untouched.
+**Measured** in the verify build (EXC2O section 1): the rule's minified text
+is **454 bytes** of `index.css` (57,824 bytes in all), ahead of the stock
+`.explorer-content ul{` (92 for the row, 215 for its `::before`, 147 for the forced-colours block, from offset 23,010; the stock rule is at 30,731). (The first, inline-dot form measured
+473 bytes: dev's 57,370 → 57,843.) **HTML, measured by the implementation
+review:** the branch's final verify build (plants removed) against the
+scheduled deploy's EXC2O build of the same day (a different image and base
+URL, so not a clean dev-vs-branch pair): across 299 pages `<head>` identical
+once URLs and og/twitter/rss metas are set aside, `<body>` identical once the
+random list id and dates are, but for 5 pages (`Curriculum/index`,
+`tags/index`, `tags/A1`, `strand-a`, `strand-b`) that differ only by
+same-date list order, Quartz's known variance. verify.sh's 6h check also
+holds the row templates to `<li><a>` and `<li><div class="folder-container">`.
+
+**Contrast, measured.** The target is WCAG 2.2 SC 1.4.11, non-text contrast,
+**at least 3:1** against the sidebar's `--light`. The dot's effective colour
+is `--dark` at .75 blended over `--light` (the title's own tone, ruling 1).
+Over all 43 schemes in `support/colour_schemes.json`
+(`scripts/test_sidebar_page_marker.py`, which prints these): **light at least
+5.45:1** (vintage-sepia; standard 6.09), **dark at least 8.37:1**
+(lakefield-college-school; standard 8.90), none of 86 under 3:1. Off the BUILT
+verify fixture in Chrome for Testing (EXC2O section 1 is forest-moss): **light
+5.63:1, dark 9.45:1**, the sidebar's own computed background, the
+dot's computed colour and opacity. The alternatives, same method:
+
+| Dot colour | Light min | Dark min | Under 3:1 |
+|---|---|---|---|
+| **`--dark` at .75 (chosen)** | **5.45** | **8.37** | **0 / 86** |
+| `--darkgray` at .75 | 3.49 (desert-sandstone) | 7.30 | 0 / 86 |
+| `--darkgray` at .5 | 2.16 | 3.90 | 43 light: REJECTED |
+| `--gray` | 1.72 | 2.52 | 47: REJECTED |
+| `--secondary` / `--tertiary` | 1.74 / 1.46 | 1.06 / 2.59 | 6-17 schemes: REJECTED, and they already mean "link" and "here" |
+
+**Why the dot is out of the line (the first implementation's limit, gone).**
+The first implementation drew the dot as an inline-block `::before` with a
+`text-indent: -.8em` hang. An inline-block is an atomic inline with a
+line-break opportunity after it, so a title whose FIRST WORD is wider than the
+sidebar less .8em left the dot alone on line one (implementation review,
+measured with "Electroencephalographicallycounterrevolutionarily debate": a
+four-line row, the link starting on line two). The absolute dot is not in the
+line at all, so nothing can strand it; verify.sh plants that title, and the
+check holds every row's dot level with its own title's first line.
+
+**Gated, in two places.**
+
+- `scripts/test_sidebar_page_marker.py` (verify.sh step 0; Windows'
+  `PythonToolchainTests` discovers it): reads the `background-color: var(--…)`
+  and `opacity` of the `::before` rule from the stylesheet and holds the blend
+  to 3:1 in every scheme and mode; asserts no rule's SUBJECT (the selector's
+  last compound, `:has()` arguments removed) is a link, `:hover` or `.active`,
+  so `li:has(> a)` passes and `li > a` would not; asserts PlantoirMetaLine
+  imports the file AND hands it to `concatenateResources`; asserts there is no
+  `support/quartz/components/styles/explorer.scss`.
+- `browser-checks/sidebar_page_marker.mjs` (verify.sh 6h, beside the print and
+  graph checks, Chrome for Testing at 1512 × 900): verify.sh plants
+  `Discussions/Marker Fixture Long.md` (a title that wraps to three lines) and
+  `Discussions/Tasks/` (its own `index.md` and one page). The folder is
+  called Tasks because the sidebar gives a chevron to a folder whose NAME is
+  in `expandable`, at any depth, and Tasks already is; the check finds it by
+  its path, Discussions then Tasks, never by the name alone. **Adding a new
+  name to `expandable` was the first implementation and verify.sh caught it:**
+  `Explorer.tsx` writes that list into every page's `data-expandable`, so it
+  changed every page's HTML for the build with the plants, and 6c's #485
+  check (Help Sessions byte for byte against the build after the plants are
+  gone) failed. The check opens both folders with a click on the
+  chevron — only if not already open, since Quartz saves the sidebar's state
+  in `localStorage` across loads — and waits by polling for the list's height
+  to settle. Then, in order: every page row in both folders has a drawn
+  `::before` box (from CDP `DOM.describeNode` and `DOM.getBoxModel`, the
+  browser's own layout); no folder row at any depth and no top-level page has
+  one, and the folders kept their chevrons; the long title has at least two
+  lines, line two starts at line one's left (±0.5 px) and at the row's content
+  edge, and the dot is left of line one and level with it; on EVERY page row
+(the too-wide first word included) the dot's middle is inside the title's
+first line and left of it; the current page's
+  link is `--tertiary` at 1, a hovered link (CDP mouse move, read until two
+  reads agree, since Quartz eases colour over .2 s) is `--tertiary`, and the
+  dot is the same on the current, hovered and a plain row; contrast as above.
+  All again in dark mode (emulated, reloaded, `saved-theme` asserted), on the
+  folder's own folder page (`Discussions/index.html`), and under emulated
+  forced colours, where every dot must be at least 3:1 against its row (a
+  drawn box is not enough: Chrome forces a background to Canvas and keeps its
+  alpha, so without the `CanvasText` block the dot is still "there", Canvas on
+  Canvas, 1:1). The fixture's `Discussions/Tasks` is planted only if the course
+  has none, with a marker file, and removed only while the marker is in it.
+  A static 6h check also finds the minified selector in `index.css`.
+- **Must-fail, each failing for its OWN reason** (copy-and-restore, on a copy
+  of a built EXC2O site served over HTTP with the fixture rows added to its
+  `contentIndex.json` and the rule placed before the explorer's, as the build
+  places it): no rule → `page rows carry no marker` for all seven rows, first;
+  the selector widened to `.folder-outer>ul>li` → `folder row carries a
+  marker: "Tasks"`; the padding cut to .2em → `the dot (to 62.9 px) is not
+  left of the title (from 61.0 px)`; opacity .3 → `the dot is 1.78:1 … under
+  3:1`; the forced-colours block deleted → `forced colours: 6 of 6 page rows
+  have no dot that can be seen (lowest 1.00:1 …)` (with it: 10.41:1); the
+  first implementation's inline dot → `the dot of
+  "Electroencephalographicallycounterrevolutionarily debate" (middle 413.3 px)
+  is not beside its first line (428.2-446.2 px …)`. The restore guard: an
+  unmarked `Discussions/Tasks` with a teacher's `index.md` survives the restore
+  block; a marked one is removed. The Python test: opacity .3
+  fails the contrast test (every scheme listed), a `> a:hover` rule fails the
+  link test, and the import left out of `concatenateResources` fails the
+  carrier test.
+
+**Tuned by eye** in Chrome for Testing, light and dark, at 1512 × 900 and at
+phone width (390 × 844, the explorer opened from its button): `.8em` hang and
+`.32em` dot kept. The hang is compact on purpose (ruling 4): a hang as wide as
+a folder's chevron (17 px) would line page titles up with sibling folder
+titles, and make more titles wrap, which is the problem being fixed.
+
+**REJECTED, so they are not proposed again.**
+
+- `list-style: disc` / `::marker`: the hang comes free, but the gap and the
+  marker's size are the browser's own and differ between Chrome, Safari and
+  Edge; `::marker` takes no opacity and no size short of `font-size`; and it
+  lands against the folder's border line, inside `.folder-outer > ul`'s .8rem.
+- An inline-block `::before` with a `text-indent` hang (the first
+  implementation): it strands on a too-wide first word, above. The planner had
+  rejected the absolute dot as drifting with the line height; `top:
+  calc(.5lh - .16em)` follows the row's own line height, so it does not.
+- The "•" glyph: its size and height change with the scheme's font (43
+  schemes, several faces). The drawn dot is the same everywhere.
+- A class on page rows from `patches/explorer.inline.ts`, or the styles in
+  `patches/Explorer.tsx`: a layer-A change and a change to every site's
+  `postscript.js`, for nothing the selector cannot already tell apart.
+- Appending to `custom.scss`/`base.scss`: marker appends freeze (C2; F1
+  rejected it too).
+- A new component or a layout edit: a third regex edit, nothing gained.
+- `--gray`, `--darkgray` at .5, `--secondary`, `--tertiary`: the table above.
+- A contract key (`shared-rules.json`, as #501 did for ⌘P): the CSS is in
+  shared `support/quartz`, so both apps carry the same bytes, and the shared
+  test holds the contrast rule; a key would copy the stylesheet's values into
+  a second place (ruling 6). No trail line either: nothing the app does
+  changes (ruling 7).
+
+**Screenshots.** Every plantoir.app shot that shows a class site's sidebar
+(`hero`, `preview`, `site-eng2d`, `print-page`, `site-mcv4u`,
+`site-sch3u-chemistry`, `site-sch3u`, `coverage`, `search`, `colour-schemes`,
+`light-and-dark`, `both-curricula`, `site-phone`, and their `-windows` pairs)
+has every folder CLOSED, and the dot appears only inside an open one, so none
+is expected to change by a pixel; the cut spot-checks them rather than
+retaking (ruling 5).
+
 ## E. Summary: what is *not* customized
 
-Everything else is stock Quartz v4.5.0 — with five asset exceptions, all in
+Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
+except the page marker H adds on top of them from `support/quartz` — with five asset exceptions, all in
 `quartz/static/` and all written every build: `og-image.png` is redrawn as the
 section's social sharing card (C2-13), and `favicon.ico`, `icon.svg`,
 `apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25). Two of

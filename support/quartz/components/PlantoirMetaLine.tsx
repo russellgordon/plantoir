@@ -38,6 +38,11 @@ import script from "./scripts/print.inline"
 import figuresStyle from "./styles/figures.scss"
 // @ts-ignore
 import figuresScript from "./scripts/figures.inline"
+// The sidebar's page marker (#515) rides along for the same reason: Quartz
+// writes ONE index.css for every page, so a style any component carries
+// reaches the sidebar of every page, folder and tag pages included. It changes
+// no page's HTML; the rows it marks are drawn in the browser.
+import sidebarPageMarkerStyle from "./styles/sidebarPageMarker.scss"
 
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
 type PrintSettings = {
@@ -206,7 +211,7 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
   PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript)
   return PlantoirMetaLine

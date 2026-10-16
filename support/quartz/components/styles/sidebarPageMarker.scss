@@ -1,0 +1,64 @@
+// #515: a small dot before each PAGE inside an open folder of "Navigate this
+// site", with a hanging indent, so a title that wraps onto a second line is
+// not read as two pages. Rides on PlantoirMetaLine.tsx, as figures.scss does,
+// so it reaches every page's index.css with no layout edit.
+//
+// Which rows: in the built sidebar a page row is an li whose DIRECT child is
+// its link; a folder row's li holds a div.folder-container instead (its link,
+// when it has one, is two levels down), so `li:has(> a)` is exactly a page
+// row. Scoped to `.folder-outer > ul`, so pages at the top level of the
+// sidebar, and folders at any depth, get no dot.
+//
+// Nothing here styles the link itself: its colour, its hover colour and the
+// current page's colour stay Quartz's own rules, and the dot is drawn on the
+// row, so it does not change colour with them.
+//
+// The selector wins over Quartz's explorer rules by SPECIFICITY alone - this
+// file's rules come BEFORE explorer.scss's in index.css - so do not shorten
+// it. No Quartz rule sets padding or position on a sidebar li today.
+//
+// The dot's colour is the page title's own: --dark at the opacity Quartz gives
+// the title. scripts/test_sidebar_page_marker.py reads the two declarations
+// below and holds them to 3:1 against --light in every colour scheme, light
+// and dark (WCAG 2.2, 1.4.11 non-text contrast). Change them there too.
+//
+// Left and right are written physically, as Quartz's own `.folder-outer > ul`
+// rule is: the sidebar is laid out left to right.
+
+$hang: 0.8em; // how far the title sits in from the row's edge (the dot is inside it)
+$dot: 0.32em; // the dot's width and height
+
+.explorer .explorer-content .folder-outer > ul > li:has(> a) {
+  // The title starts $hang in, on every line, so a wrapped second line starts
+  // under its first letter; the dot sits in that padding.
+  position: relative;
+  padding-left: $hang;
+
+  // Drawn OUT of the line (absolutely, against the row), not as an inline box
+  // before the title: an inline dot can be left alone on the first line when
+  // the title's first word is wider than the sidebar (#515 review). `lh` is the
+  // row's own line height, so the dot stays level with the first line
+  // whatever the scheme's font and line height; `top: .5em` is for a browser
+  // without `lh`.
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.5em;
+    top: calc(0.5lh - #{$dot * 0.5});
+    width: $dot;
+    height: $dot;
+    border-radius: 50%;
+    background-color: var(--dark);
+    opacity: 0.75;
+  }
+}
+
+// Windows' High Contrast and other forced-colour modes drop background colours;
+// keep the dot drawn, in the text colour.
+@media (forced-colors: active) {
+  .explorer .explorer-content .folder-outer > ul > li:has(> a)::before {
+    background-color: CanvasText;
+    forced-color-adjust: none;
+  }
+}
