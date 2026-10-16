@@ -1553,8 +1553,13 @@ restore_hit_fixture() {
   [[ -n "${HIT_CONFIG_BACKUP:-}" && -f "$HIT_CONFIG_BACKUP" ]] || return 0
   rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
   rm -f "$HIT_COURSE/Plain Long Page.md"
-  rm -f "$HIT_COURSE/Discussions/Marker Fixture Long.md"
-  rm -rf "$HIT_COURSE/Discussions/Tasks"
+  rm -f "$HIT_COURSE/Discussions/Marker Fixture Long.md" "$HIT_COURSE/Discussions/Marker Fixture Word.md"
+  # Only a Discussions/Tasks this run made: it carries the marker file.
+  if [[ -f "$HIT_COURSE/Discussions/Tasks/.plantoir-verify-fixture" ]]; then
+    rm -f "$HIT_COURSE/Discussions/Tasks/.plantoir-verify-fixture" "$HIT_COURSE/Discussions/Tasks/index.md" \
+          "$HIT_COURSE/Discussions/Tasks/Marker Fixture Inner Page.md"
+    rmdir "$HIT_COURSE/Discussions/Tasks" 2>/dev/null || true
+  fi
   rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
         "$HIT_COURSE/Printable Too Tall.md" \
@@ -2017,14 +2022,28 @@ sed -e '/^printable: true$/d' -e 's/^title: Printable Fixture$/title: Printable 
 # page's HTML (Explorer.tsx writes the list into data-expandable), and the
 # #485 check in 6c compares a page from this build with one built after the
 # plants are gone. It has its own index.md so its sidebar name is its title
-# whichever way Quartz reads a folder's name. Removed by restore_hit_fixture.
+# whichever way Quartz reads a folder's name, and a marker file, so
+# restore_hit_fixture removes only a folder this run made: a Discussions/Tasks
+# that is already there is the developer's, and is neither written into nor
+# deleted (the check then fails, saying the folder is not its fixture). A third
+# page's title starts with a word too wide for the sidebar, so the dot is
+# checked level with a first line that is not the title's first word's alone.
+# Removed by restore_hit_fixture.
 printf -- '---\ntitle: Marker Fixture Page With A Title Long Enough To Wrap Onto A Second Line\n---\nA page planted by verify.sh for the sidebar check (plantoir-marker-sentinel-7f3a).\n' \
   > "$HIT_COURSE/Discussions/Marker Fixture Long.md"
-mkdir -p "$HIT_COURSE/Discussions/Tasks"
-printf -- '---\ntitle: Tasks\n---\nA folder planted by verify.sh for the sidebar check.\n' \
-  > "$HIT_COURSE/Discussions/Tasks/index.md"
-printf -- '---\ntitle: Marker Fixture Inner Page\n---\nA page inside the planted folder.\n' \
-  > "$HIT_COURSE/Discussions/Tasks/Marker Fixture Inner Page.md"
+printf -- '---\ntitle: Electroencephalographicallycounterrevolutionarily debate\n---\nA page planted by verify.sh for the sidebar check.\n' \
+  > "$HIT_COURSE/Discussions/Marker Fixture Word.md"
+if [[ -e "$HIT_COURSE/Discussions/Tasks" ]]; then
+  fail "the course already has a Discussions/Tasks folder, so the sidebar check's fixture was not planted there (#515): move it aside and run again"
+else
+  mkdir "$HIT_COURSE/Discussions/Tasks"
+  printf 'Planted by verify.sh (#515); restore_hit_fixture removes this folder only while this file is in it.\n' \
+    > "$HIT_COURSE/Discussions/Tasks/.plantoir-verify-fixture"
+  printf -- '---\ntitle: Tasks\n---\nA folder planted by verify.sh for the sidebar check.\n' \
+    > "$HIT_COURSE/Discussions/Tasks/index.md"
+  printf -- '---\ntitle: Marker Fixture Inner Page\n---\nA page inside the planted folder.\n' \
+    > "$HIT_COURSE/Discussions/Tasks/Marker Fixture Inner Page.md"
+fi
 mkdir -p "$HIT_COURSE/Media"
 # Pictures for the worksheet's hazards (#499): a tall portrait one that must be
 # scaled onto a page, a wide one inside a folded answer, and an SVG with only a
@@ -2545,9 +2564,9 @@ page = public / "Discussions" / "Marker-Fixture-Long.html"
 text = page.read_text(encoding="utf-8") if page.is_file() else ""
 if not text:
     problems.append("Discussions/Marker-Fixture-Long.html was not built")
-elif '<template id="template-file"><li><a href="#"></a></li></template>' not in text:
+if text and '<template id="template-file"><li><a href="#"></a></li></template>' not in text:
     problems.append("the sidebar's page-row template is no longer <li><a>: the dot's selector no longer means a page row")
-elif '<template id="template-folder"><li><div class="folder-container">' not in text:
+if text and '<template id="template-folder"><li><div class="folder-container">' not in text:
     problems.append("the sidebar's folder-row template no longer starts <li><div class=\"folder-container\">: a folder row might take the dot")
 for problem in problems:
     print("   " + problem)
@@ -2613,7 +2632,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
        "Marker Fixture Page With A Title Long Enough To Wrap Onto A Second Line" >/tmp/verify_sidebar_page_marker.log 2>&1; then
-    pass "the sidebar's page dot: every page row in an open folder and a folder inside it has its dot, no folder row and no page at the top level does, a wrapped title's second line starts under its first letter, the current page and a hovered link keep Quartz's colours, in light and dark, on a folder page and under forced colours - $(head -1 /tmp/verify_sidebar_page_marker.log | sed 's/^OK: //') against the sidebar (#515, browser-checks/sidebar_page_marker.mjs)"
+    pass "the sidebar's page dot: every page row in an open folder and a folder inside it has its dot, no folder row and no page at the top level does, a wrapped title's second line starts under its first letter, every dot is level with its title's first line (a too-wide first word included), the current page and a hovered link keep Quartz's colours, in light and dark, on a folder page, and every dot at least 3:1 under forced colours - $(head -1 /tmp/verify_sidebar_page_marker.log | sed 's/^OK: //') against the sidebar (#515, browser-checks/sidebar_page_marker.mjs)"
   else
     fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang (browser-checks/sidebar_page_marker.mjs, #515)"
     cat /tmp/verify_sidebar_page_marker.log

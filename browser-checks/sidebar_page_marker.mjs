@@ -22,7 +22,8 @@
 //
 // then all of it again in DARK mode (emulated, page reloaded), then on the
 // planted folder's own FOLDER page (the rule is in the one index.css every page
-// links), then under forced colours.
+// links), then under forced colours (each dot at least 3:1 against its row,
+// since a forced Canvas-on-Canvas dot still has a box).
 //
 // Folders stay open between loads (Quartz saves the sidebar's state in
 // localStorage, and the profile is fresh per RUN, not per load), so a folder is
@@ -337,6 +338,21 @@ async function connect(chunk) {
         if (middle < first.top || middle > first.bottom) problems.push(`${mode}: the dot's middle (${middle.toFixed(1)} px) is not beside the title's first line (${first.top.toFixed(1)}-${first.bottom.toFixed(1)} px)`)
         seen.hang = { dotLeft: +(dot.left - lines.rowLeft).toFixed(2), dotWidth: +(dot.right - dot.left).toFixed(2), titleLeft: +(first.left - lines.rowLeft).toFixed(2), secondLineLeft: +(second.left - lines.rowLeft).toFixed(2) }
       }
+      // Every page row, not only the long one: the dot is left of the title's
+      // FIRST line and level with it - so a title whose first word is too wide
+      // for the line (planted too) does not leave the dot alone on a line.
+      let beside = 0
+      for (const row of rows.filter((entry) => entry.kind.startsWith("page in") && entry.box !== null)) {
+        const first = await evaluate(`(() => {
+          const r = window.__plMarker.rows[${row.index}].querySelector(":scope > a").getClientRects()[0]
+          return r ? { left: r.left, top: r.top, bottom: r.bottom } : null
+        })()`)
+        const middle = (row.box.top + row.box.bottom) / 2
+        if (!first) problems.push(`${mode}: "${row.title}" has no line to measure`)
+        else if (middle < first.top || middle > first.bottom || row.box.right > first.left + TOLERANCE) problems.push(`${mode}: the dot of "${row.title}" (middle ${middle.toFixed(1)} px) is not beside its first line (${first.top.toFixed(1)}-${first.bottom.toFixed(1)} px, from ${first.left.toFixed(1)} px)`)
+        else beside += 1
+      }
+      seen.dotsBesideFirstLine = beside
     }
 
     // 4. The current page, a hovered link, and the dot on each.
@@ -454,14 +470,24 @@ async function connect(chunk) {
         const dots = await evaluate(`(() => {
           const m = window.__plMarker
           m.rows = m.pageRowsIn(m.ownList(m.folderRow(${JSON.stringify(folderName)})))
-          return m.rows.map((row) => { const before = getComputedStyle(row, "::before"); return { colour: before.backgroundColor, alpha: m.channels(before.backgroundColor)[3] } })
+          // Chrome forces a background to Canvas but keeps its alpha, so a dot
+          // that is "there" can be Canvas on Canvas: what counts is contrast.
+          return m.rows.map((row) => {
+            const before = getComputedStyle(row, "::before")
+            const [r, g, b, a] = m.channels(before.backgroundColor)
+            const alpha = a * parseFloat(before.opacity)
+            const ground = m.channels(m.backdrop(row))
+            const blended = [r * alpha + ground[0] * (1 - alpha), g * alpha + ground[1] * (1 - alpha), b * alpha + ground[2] * (1 - alpha)]
+            return { colour: before.backgroundColor, ratio: m.contrast(blended, ground), ground: m.backdrop(row) }
+          })
         })()`)
         let drawn = 0
         for (let index = 0; index < dots.length; index += 1) {
-          if ((await markerBox(index)) !== null && dots[index].alpha > 0) drawn += 1
+          if ((await markerBox(index)) !== null && dots[index].ratio >= LEAST_CONTRAST) drawn += 1
         }
-        report["forced colours"] = { pagesMarked: drawn, of: dots.length, dot: dots.length ? dots[0].colour : null }
-        if (dots.length === 0 || drawn !== dots.length) problems.push(`forced colours: ${dots.length - drawn} of ${dots.length} page rows lost their dot`)
+        const lowest = dots.length ? Math.min(...dots.map((dot) => dot.ratio)) : 0
+        report["forced colours"] = { pagesSeen: drawn, of: dots.length, dot: dots.length ? dots[0].colour : null, ground: dots.length ? dots[0].ground : null, contrast: +lowest.toFixed(2) }
+        if (dots.length === 0 || drawn !== dots.length) problems.push(`forced colours: ${dots.length - drawn} of ${dots.length} page rows have no dot that can be seen (lowest ${lowest.toFixed(2)}:1 against the row, under ${LEAST_CONTRAST}:1)`)
       }
     }
 
@@ -469,7 +495,8 @@ async function connect(chunk) {
     const good = problems.length === 0
     const light = report.light?.contrast
     const dark = report.dark?.contrast
-    const summary = `light ${light ?? "-"}:1, dark ${dark ?? "-"}:1`
+    const forcedRatio = report["forced colours"]?.contrast
+    const summary = `light ${light ?? "-"}:1, dark ${dark ?? "-"}:1, forced colours ${forcedRatio ?? "-"}:1`
     finish(good ? 0 : 1, (good ? `OK: ${summary}\n` : "FAIL: " + problems.join("\n  ") + "\n") + JSON.stringify(report))
   }
 }
