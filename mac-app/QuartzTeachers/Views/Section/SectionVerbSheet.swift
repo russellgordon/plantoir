@@ -574,16 +574,22 @@ struct SectionVerbSheet: View {
                     Text(row.title)
                         .help(row.title)
                 }
+                .width(min: 90, ideal: 130)
                 TableColumn(AssistWording.menuPlanFolderColumn, value: \.folder) { (row: AssistPlanTable.Row) in
                     Text(row.folder)
                         .foregroundStyle(.secondary)
                         .help(row.folder)
                 }
+                .width(min: 80, ideal: 110)
                 TableColumn(AssistWording.menuPlanChangeColumn, value: \.whatChanges) { (row: AssistPlanTable.Row) in
                     // A date move or a reason is long; the tooltip has it whole.
                     Text(row.whatChanges)
                         .help(row.whatChanges)
                 }
+                // The widest: it carries the longest words (a date move, a
+                // reason). Three equal columns, as first drawn, cut it at
+                // about twenty letters in the real 560-point sheet.
+                .width(min: 180, ideal: 240)
             }
             .tableStyle(.bordered(alternatesRowBackgrounds: true))
             .frame(height: planTableHeight)
