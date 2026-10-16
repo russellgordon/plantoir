@@ -1178,7 +1178,18 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>The reason an unpublish leaves a linked class up (#342 / mac #201).</summary>
-    private const string ClassOfItsOwn = "it is a class of its own.";
+    internal const string ClassOfItsOwn = "it is a class of its own.";
+
+    /// <summary>
+    /// <see cref="ClassOfItsOwn"/> in a club, for the Section menu's plan table
+    /// only (#548): the planner records the class form, which is what the model
+    /// reads; <see cref="PublishPlan.Tabulate"/> says it in the course's noun,
+    /// as the mac's <c>finishing(noun:)</c> does.
+    /// </summary>
+    internal const string MeetingOfItsOwn = "it is a meeting of its own.";
+
+    /// <summary>The reason an unpublish keeps a page in the section's Key Links.</summary>
+    internal const string KeptBecauseInKeyLinks = "it is in this section's Key Links.";
 
 
     private static string? ReasonToKeep(
@@ -1191,7 +1202,7 @@ public sealed partial class AssistWorkspace
         if (page.IsFolderIndex)
             return "it is a folder's landing page, which following links never takes down.";
         if (mustStay.Contains(page.RelativePath))
-            return "it is in this section's Key Links.";
+            return KeptBecauseInKeyLinks;
         if (PagePaths.IsCurriculum(course.DirectoryPath, page.RelativePath))
             return "it is a curriculum page.";
         // An unpublish never takes a class down by following a link, and does
