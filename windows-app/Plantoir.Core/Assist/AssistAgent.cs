@@ -1168,7 +1168,7 @@ public sealed class AssistAgent
             ? " " + AssistWording.ScheduleReplaces(was.ToString("dddd d MMMM, h:mm tt"))
             : "";
         return $"Set this computer to deploy {_courseCode} Section {_section} to {destination} at {moment}. " +
-               "It has to be on and awake then — plugged in if it is a laptop, lid open. " +
+               "It has to be " + ScheduledDeploy.AwakeThenWithTheLidOpen + " " +
                "Plantoir cannot wake it up." + replaces;
     }
 

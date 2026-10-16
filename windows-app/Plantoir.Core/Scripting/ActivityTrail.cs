@@ -576,8 +576,11 @@ public static class ActivityTrail
         /// One of the assistant's functions run from the menu bar (#489, the
         /// mac's #457 batch B): where the item is (Section ▸ Publish Pages…),
         /// how it ended — carried out, changed nothing, took the last change
-        /// back, cancelled at the plan, rebuilt, not rebuilt — and counts, never
-        /// a page's title. The assistant's own lines are written by its
+        /// back, took part of the last change back (an undo that kept its
+        /// entry, #550), cancelled at the plan, rebuilt, not rebuilt — and
+        /// counts, never a page's title. "Carried out" covers a change that
+        /// wrote and then stopped part way, too (#550, the mac's #531). The
+        /// assistant's own lines are written by its
         /// conversation, which the menu does not have; without this a page
         /// published from the menu is a page nobody can say who published.
         /// </summary>

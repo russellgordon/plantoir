@@ -217,6 +217,38 @@ public class AssistantReadsSettingsAtTheCallTests : IDisposable
         Assert.Null(ScheduledDeploy.CausingDestination(new ScheduledDeploy.Refusal("keptForReference")));
     }
 
+    /// <summary>
+    /// #547 (the mac's #521, its <c>testTheCardAndTheAnswerNeverAskForACable</c>):
+    /// none of the assistant's three scheduling sentences asks for a cable —
+    /// the card, the <c>schedule_deploy</c> answer and the outside assistant's
+    /// instructions — and neither the card nor the answer carries the battery
+    /// line, which the mac keeps to the plan and the dialog too. Here rather
+    /// than in <c>ScheduledDeployTests</c> because the answer needs the
+    /// <see cref="FakeScheduler"/>, which belongs to this serialised collection.
+    /// </summary>
+    [Fact]
+    public void TheCardTheAnswerAndTheInstructionsNeverAskForACable()
+    {
+        WriteCourse("ICS3U", new[] { 1 }, "local_folder", _savedFolder);
+        var agent = new AssistAgent(new ScriptModel(), new CannedTools(), new JsonArray(), "ICS3U", 1);
+        string card = agent.AskFirst("deploy at 6:30", "schedule_deploy",
+            new JsonObject { ["course"] = "ICS3U", ["section"] = 1, ["when"] = "2030-09-09 06:30" })[0].Text;
+
+        var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
+        var result = tools.ScheduleDeploy("ICS3U", 1, "2030-09-09 06:30");
+        string answer = result.Summary() + "\n" + result.Detail();
+        Assert.StartsWith("Scheduled:", result.Summary());
+
+        foreach (string said in new[] { card, answer, McpInstructions.Text })
+            Assert.DoesNotContain("plugged in", said);
+        foreach (string said in new[] { card, answer })
+        {
+            Assert.Contains(ScheduledDeploy.AwakeThenWithTheLidOpen, said);
+            Assert.DoesNotContain(ScheduledDeploy.OnBatterySleepsSooner, said);
+        }
+        Assert.Contains("AWAKE at that moment, with the lid open", McpInstructions.Text);
+    }
+
     // ---- The fixture ------------------------------------------------------
 
     private void WriteCourse(string code, int[] sections, string? target, string folderPath)
