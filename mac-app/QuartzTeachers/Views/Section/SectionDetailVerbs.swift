@@ -355,8 +355,9 @@ extension SectionDetailView {
         }
     }
 
-    /// The plan twin, run with nothing written: its card is the sheet's body,
-    /// and Go then runs the write with the same arguments. A twin that
+    /// The plan twin, run with nothing written: the three page plans show its
+    /// rows (`planTable`, #524), Re-date and Make Room its card as the sheet's
+    /// body, and Go then runs the write with the same arguments. A twin that
     /// refuses, or finds nothing to do, ends the sheet with its sentence.
     func planTheChoice(_ model: SectionVerbSheetModel) {
         guard let verbs = workspace.sectionVerbs() else {
@@ -403,6 +404,9 @@ extension SectionDetailView {
             let outcome: AssistToolOutcome = await verbs.plan(planCall)
             if outcome.isPlan {
                 model.body = outcome.forTheCard
+                // The three page plans' rows (#524); nil for Re-date and
+                // Make Room, which keep the card's text.
+                model.planTable = outcome.planTable
                 model.stage = .planned
                 return
             }

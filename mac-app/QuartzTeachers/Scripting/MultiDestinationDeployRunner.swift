@@ -163,6 +163,12 @@ class MultiDestinationDeployRunner {
     /// Refuses up front, against EVERY configured destination, rather than
     /// discovering a missing credential halfway through a redundancy run —
     /// exactly the surprise redundancy exists to prevent.
+    ///
+    /// A folder's problem points at the course's settings, because the folder
+    /// IS a course setting; a missing Account ID points at Plantoir ▸
+    /// Settings ▸ Deploying, the only place it is edited since #457 — the
+    /// words the launchers use too (#490). Said "this course's settings"
+    /// until #534.
     static func refusalReason(
         destinations: [CourseConfiguration.DeployDestination],
         cloudflareAccountID: String
@@ -175,7 +181,7 @@ class MultiDestinationDeployRunner {
             }
             if destination.type == "cloudflare_pages" {
                 if let accountProblem = CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) {
-                    return "\(accountProblem) Add it in this course’s settings, under Deploying, then deploy again."
+                    return "\(accountProblem) Add it in Plantoir ▸ Settings ▸ Deploying, then deploy again."
                 }
             }
         }

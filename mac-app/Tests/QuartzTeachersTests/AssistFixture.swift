@@ -463,6 +463,10 @@ final class StubSiteWork: AssistSiteWork {
     /// contract's output, cross and all.
     var rebuildFailsWithOutput: String?
 
+    /// A rebuild whose launcher stops at a question (exit 3, #478): the real
+    /// path's sentence, as `AssistToolchainWork.rebuildPreview` returns it.
+    var rebuildMeetsAQuestion: Bool = false
+
     // MARK: - Functions
 
     // The REAL sentences, not a stub's own words. A fixture that answers
@@ -471,6 +475,12 @@ final class StubSiteWork: AssistSiteWork {
     // the scenario suite failed, correctly.
     func rebuildPreview(course: Course, sectionNumber: Int) async -> AssistSiteWorkResult {
         previewRebuilds += 1
+        if rebuildMeetsAQuestion {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.previewBuildNeedsAnAnswer(course: course.code, section: String(sectionNumber))
+            )
+        }
         if let output = rebuildFailsWithOutput {
             return AssistSiteWorkResult.previewDidNotBuild(
                 course: course.code, section: String(sectionNumber), output: output

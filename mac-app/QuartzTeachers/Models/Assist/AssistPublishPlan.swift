@@ -250,7 +250,46 @@ struct AssistPublishPlan {
     static func stayingVisibleLine(title: String,
                                    reason: AssistPublishKept.Reason,
                                    noun: ClassNoun) -> String {
-        return "“\(title)” stays visible, because \(reason.finishing(noun: noun))"
+        return "“\(title)” " + AssistWording.planStaysVisibleBecause(reason.finishing(noun: noun))
+    }
+
+    /// A date move whose page is not one of the changes — said on its own
+    /// line, under the list (see `describe()`).
+    static func orphanedDateMoveLine(_ move: AssistPublishDateMove) -> String {
+        return "“\(move.page.displayTitle)” will take the same date as "
+             + "“\(move.takenFrom)”."
+    }
+
+    /// The names the teacher gave that fit no page of the section.
+    static func noPageIsCalledLine(_ unknownNames: [String]) -> String {
+        return "No page in this section is called "
+             + AssistPublishPlan.listing(unknownNames) + "."
+    }
+
+    /// The date moves `describe()` cannot say beside a change: their page
+    /// is not one of the changes. Matched by lower-cased TITLE, as it always
+    /// has been — unlike the clause beside a change, which matches by path.
+    func orphanedDateMoves() -> [AssistPublishDateMove] {
+        var namedAlready: Set<String> = []
+        for change in changes {
+            namedAlready.insert(change.page.lowercasedTitle)
+        }
+        var orphaned: [AssistPublishDateMove] = []
+        for move in dateMoves where !namedAlready.contains(move.page.lowercasedTitle) {
+            orphaned.append(move)
+        }
+        return orphaned
+    }
+
+    /// The classes each changing page takes its date from, by PATH (#425):
+    /// two pages sharing a file name must not take each other's dates.
+    func classesWhoseDatesAreTaken(by change: AssistPublishChange) -> [String] {
+        var classes: [String] = []
+        for move in dateMoves
+        where move.page.fileURL.path == change.page.fileURL.path {
+            classes.append(move.takenFrom)
+        }
+        return classes
     }
 
     /// The plan in words, meant to be read aloud to a teacher.
@@ -290,7 +329,7 @@ struct AssistPublishPlan {
         lines.append("")
 
         if changes.isEmpty {
-            lines.append("No page's visibility would change.")
+            lines.append(AssistWording.planNothingWouldChange)
         } else {
             let word: String = changes.count == 1 ? "page" : "pages"
             lines.append("\(changes.count) \(word) would change:")
@@ -310,18 +349,13 @@ struct AssistPublishPlan {
                 // how a person says it. `publishForSection1` in particular is
                 // the name of a line in a file — the teacher is being shown
                 // the implementation of the thing they asked for.
-                let becoming: String = change.willBeVisible ? "visible" : "hidden"
                 let shown: String = namesWithTheirFolder[change.page.fileURL.path]
                     ?? "“\(change.page.displayTitle)”"
-                var line: String = "\(shown) will become \(becoming)"
-                // The date, said here rather than in a list of its own. Matched
-                // by PATH (#425): two pages sharing a file name must not take
-                // each other's dates.
-                for move in dateMoves
-                where move.page.fileURL.path == change.page.fileURL.path {
-                    line += ", with the same date as “\(move.takenFrom)”"
-                }
-                lines.append(line + ".")
+                // The date, said here rather than in a list of its own.
+                let becoming: String = AssistWording.planWillBecome(
+                    visible: change.willBeVisible, withTheDatesOf: classesWhoseDatesAreTaken(by: change)
+                )
+                lines.append("\(shown) \(becoming).")
                 listed += 1
             }
         }
@@ -377,29 +411,101 @@ struct AssistPublishPlan {
         // is a hidden page this publish is making visible, so it is always one
         // of the changes — but a silent drop is the wrong way to find out
         // otherwise.
-        var namedAlready: Set<String> = []
-        for change in changes {
-            namedAlready.insert(change.page.lowercasedTitle)
-        }
-        var orphaned: [AssistPublishDateMove] = []
-        for move in dateMoves where !namedAlready.contains(move.page.lowercasedTitle) {
-            orphaned.append(move)
-        }
+        let orphaned: [AssistPublishDateMove] = orphanedDateMoves()
         if !orphaned.isEmpty {
             lines.append("")
             for move in orphaned {
-                lines.append("“\(move.page.displayTitle)” will take the same date as "
-                             + "“\(move.takenFrom)”.")
+                lines.append(AssistPublishPlan.orphanedDateMoveLine(move))
             }
         }
 
         if !unknownNames.isEmpty {
             lines.append("")
-            lines.append("No page in this section is called "
-                         + AssistPublishPlan.listing(unknownNames) + ".")
+            lines.append(AssistPublishPlan.noPageIsCalledLine(unknownNames))
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    /// The plan as rows, for the Section menu's plan sheet (#524): the same
+    /// stored properties `describe()` reads, and the same `AssistWording`
+    /// pieces its lines are made of, so the table and the card cannot say
+    /// two different things.
+    ///
+    /// Rows come in this order: the changes, in plan order (named pages,
+    /// then linked ones); the pages an unpublish keeps; the classes a
+    /// publish left as they are; the pages with no room for a key; the pages
+    /// already the way they were asked to be. None of them is capped.
+    func tabulated(noun: ClassNoun, fromTheMenu: Bool, courseDirectoryURL: URL) -> AssistPlanTable {
+        var rows: [AssistPlanTable.Row] = []
+
+        func addRow(_ page: AssistSectionPage, _ change: AssistPlanTable.Change, _ whatChanges: String) {
+            rows.append(AssistPlanTable.Row(
+                position: rows.count,
+                title: page.displayTitle,
+                folder: StartOfYearPageNaming.folder(
+                    of: page.fileURL, courseDirectoryURL: courseDirectoryURL, courseCode: courseCode
+                ),
+                change: change,
+                whatChanges: whatChanges
+            ))
+        }
+
+        for change in changes {
+            addRow(
+                change.page,
+                change.willBeVisible ? .willBecomeVisible : .willBecomeHidden,
+                AssistWording.planWillBecome(
+                    visible: change.willBeVisible, withTheDatesOf: classesWhoseDatesAreTaken(by: change)
+                )
+            )
+        }
+        for staying in kept {
+            addRow(staying.page, .staysVisible,
+                   AssistWording.planStaysVisibleBecause(staying.reason.finishing(noun: noun)))
+        }
+        for page in linkedClassesLeftAlone {
+            addRow(page, .staysAsItIs, AssistWording.menuPlanStaysAsItIs(noun: noun))
+        }
+        for page in noRoomForAKey {
+            addRow(page, .staysExactlyAsItIs, AssistWording.menuPlanStaysExactlyAsItIs)
+        }
+        for page in alreadyRight {
+            if publishes {
+                addRow(page, .alreadyVisible, AssistWording.menuPlanAlreadyVisible)
+            } else {
+                addRow(page, .alreadyHidden, AssistWording.menuPlanAlreadyHidden)
+            }
+        }
+
+        // The card's other sentences, from the same functions it uses.
+        var notes: [String] = []
+        if !noRoomForAKey.isEmpty {
+            notes.append(AssistPublishPlan.sayingPagesWithNoRoomForAKey(noRoomForAKey, fromTheMenu: fromTheMenu))
+        }
+        if !linkedClassesLeftAlone.isEmpty {
+            var names: [String] = []
+            for page in linkedClassesLeftAlone {
+                names.append(page.displayTitle)
+            }
+            notes.append(AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(names), count: names.count, noun: noun
+            ))
+        }
+        for move in orphanedDateMoves() {
+            notes.append(AssistPublishPlan.orphanedDateMoveLine(move))
+        }
+        if !unknownNames.isEmpty {
+            notes.append(AssistPublishPlan.noPageIsCalledLine(unknownNames))
+        }
+
+        return AssistPlanTable(
+            summary: AssistWording.menuPlanSummary(
+                changing: changes.count, already: alreadyRight.count, publishing: publishes
+            ),
+            rows: rows,
+            notes: notes
+        )
     }
 
     /// "a", "a and b", "a, b and c" — the way a sentence says a list.
@@ -516,6 +622,27 @@ struct AssistPublishPlan {
 ///   at another class exactly as publishing does: a class comes down when the
 ///   teacher names it, and a linked class that stays is named in the plan.
 enum AssistPublishPlanner {
+
+    // MARK: - Types
+
+    /// `apply` stopped part way AFTER writing at least one file (#531). The
+    /// error that stopped it is kept and its words are the error's own, so
+    /// what the teacher is told (`publishStoppedPartWay`) is unchanged; the
+    /// runner only learns that something WAS written, which a bare rethrow
+    /// cannot say.
+    struct StoppedAfterWriting: LocalizedError {
+
+        // MARK: - Stored properties
+
+        let filesWritten: Int
+        let underlying: Error
+
+        // MARK: - Computed properties
+
+        var errorDescription: String? {
+            return underlying.localizedDescription
+        }
+    }
 
     // MARK: - Functions
 
@@ -1503,55 +1630,62 @@ enum AssistPublishPlanner {
         // teacher is told is built from these, not from the plan.
         var leftAlone: [String] = []
         var movedTitles: [String] = []
-        for path in paths {
-            guard let edit = editsByPath[path] else {
-                continue
-            }
-            let before: String = try String(contentsOf: edit.url, encoding: .utf8)
-            var text: String = before
-            var declined: Bool = false
-            var visibilityMoved: Bool = false
+        do {
+            for path in paths {
+                guard let edit = editsByPath[path] else {
+                    continue
+                }
+                let before: String = try String(contentsOf: edit.url, encoding: .utf8)
+                var text: String = before
+                var declined: Bool = false
+                var visibilityMoved: Bool = false
 
-            if let published = publishByPath[path] {
-                let result: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
-                    published: published, in: text,
-                    forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
-                )
-                if result.outcome == .noRoomForAKey {
-                    declined = true
-                }
-                if result.outcome == .written {
-                    visibilityMoved = true
-                }
-                text = result.text
-            }
-            if let day = dateByPath[path] {
-                let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
-                    in: text,
-                    key: PageFrontmatter.createdKey(
+                if let published = publishByPath[path] {
+                    let result: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
+                        published: published, in: text,
                         forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
-                    ),
-                    to: day,
-                    fallbackTail: tail
-                )
-                if result.outcome == .noRoomForAKey {
-                    declined = true
+                    )
+                    if result.outcome == .noRoomForAKey {
+                        declined = true
+                    }
+                    if result.outcome == .written {
+                        visibilityMoved = true
+                    }
+                    text = result.text
                 }
-                text = result.text
-            }
+                if let day = dateByPath[path] {
+                    let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
+                        in: text,
+                        key: PageFrontmatter.createdKey(
+                            forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
+                        ),
+                        to: day,
+                        fallbackTail: tail
+                    )
+                    if result.outcome == .noRoomForAKey {
+                        declined = true
+                    }
+                    text = result.text
+                }
 
-            let title: String = titleByPath[path] ?? edit.url.deletingPathExtension().lastPathComponent
-            if declined {
-                leftAlone.append(title)
+                let title: String = titleByPath[path] ?? edit.url.deletingPathExtension().lastPathComponent
+                if declined {
+                    leftAlone.append(title)
+                }
+                if text == before {
+                    continue
+                }
+                try text.write(to: edit.url, atomically: true, encoding: .utf8)
+                saved.append(AssistSavedFile(fileURL: edit.url, before: before, after: text))
+                if visibilityMoved {
+                    movedTitles.append(title)
+                }
             }
-            if text == before {
-                continue
+        } catch {
+            if saved.isEmpty {
+                throw error
             }
-            try text.write(to: edit.url, atomically: true, encoding: .utf8)
-            saved.append(AssistSavedFile(fileURL: edit.url, before: before, after: text))
-            if visibilityMoved {
-                movedTitles.append(title)
-            }
+            throw StoppedAfterWriting(filesWritten: saved.count, underlying: error)
         }
 
         // The section's landing page follows its most recent visible class.

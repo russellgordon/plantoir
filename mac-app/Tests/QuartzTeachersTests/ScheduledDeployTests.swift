@@ -906,6 +906,37 @@ final class ScheduledDeployTests: XCTestCase {
         let text: String = try XCTUnwrap(problem)
         XCTAssertTrue(text.contains("Cloudflare Pages"))
         XCTAssertTrue(text.contains("Account ID"))
+        XCTAssertTrue(text.contains("Plantoir ▸ Settings ▸ Deploying"), text)
+        XCTAssertFalse(text.contains("this course’s settings"), text)
+    }
+
+    /// #534: both Cloudflare refusals name Settings, where the Account ID is
+    /// (#457) — and the FOLDER refusals still name the course's settings,
+    /// because a deploy folder IS a course setting. Guarded on the clauses
+    /// the contract pins (`scheduledDeployCancellation.theDestination` →
+    /// `reasonClauses`) and on the in-app deploy's folder refusal.
+    func testTheAccountIDRefusalsNameSettingsAndTheFolderOnesTheCourse() throws {
+        try prepare()
+        let course: Course = try makeCourse(deployTarget: "cloudflare_pages")
+        let additional: String = ScheduledDeployRefusal
+            .additionalCloudflareAccountMissing(problem: "Paste your Cloudflare Account ID.")
+            .sentence(course: course, section: 1)
+        XCTAssertTrue(additional.contains("Plantoir ▸ Settings ▸ Deploying"), additional)
+        XCTAssertFalse(additional.contains("this course’s settings"), additional)
+
+        let folderClause: String = ScheduledDeployRefusal.deployFolderNeedsAttention(problem: "x").reasonClause
+        let additionalFolderClause: String = ScheduledDeployRefusal
+            .additionalDeployFolderNeedsAttention(problem: "x").reasonClause
+        XCTAssertTrue(folderClause.contains("this course’s settings, under Deploying"), folderClause)
+        XCTAssertTrue(additionalFolderClause.contains("this course’s settings, under Deploying"), additionalFolderClause)
+
+        let folder: CourseConfiguration.DeployDestination = CourseConfiguration.DeployDestination(
+            type: "local_folder", path: "/a/folder/that/is/not/there"
+        )
+        let folderRefusal: String = try XCTUnwrap(MultiDestinationDeployRunner.refusalReason(
+            destinations: [folder], cloudflareAccountID: ""
+        ))
+        XCTAssertTrue(folderRefusal.contains("this course’s settings, under Deploying"), folderRefusal)
     }
 
     /// Unlike the Windows app, the mac CAN hand a scheduled deploy the
@@ -999,7 +1030,12 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(text.contains("ICS3U Section 1"))
         XCTAssertTrue(text.contains("Netlify"))
         XCTAssertTrue(text.contains("switched on, and awake"))
-        XCTAssertTrue(text.contains("plugged in, if it is a laptop"))
+        // #521: launchd runs the job on battery, so the plan never asks for a
+        // cable — and says what battery does change. MUST FAIL with the old
+        // "plugged in, if it is a laptop" bullet.
+        XCTAssertFalse(text.contains("plugged in"), text)
+        XCTAssertTrue(text.contains("\n\nOn battery, a Mac goes to sleep sooner, so be sure to keep it awake until then.\n\n"), text)
+        XCTAssertFalse(text.contains("• On battery"), "its own line, not a bullet: \(text)")
         XCTAssertTrue(text.contains("lid open"))
         XCTAssertTrue(text.contains("Plantoir does not wake this Mac up"))
         // launchd really does run a missed calendar job at the next wake,
