@@ -170,6 +170,41 @@ final class SectionVerbsTests: XCTestCase {
         XCTAssertFalse(verbs.lastChangeIsIn(courseCode: "ICS3U", sectionNumber: 1))
     }
 
+    /// #528: Section ▸ Rebuild Preview, enabled only while a preview runs,
+    /// stops the SERVING preview, waits for the stop, and starts it again —
+    /// the menu's runner reaches the same `bringThePreviewUpToDate` as the
+    /// assistant, with no branch of its own. A GUARD: it passes on dev too
+    /// (the mac never had Windows' defect); it exists so a menu-only shortcut
+    /// cannot make the item a no-op unnoticed.
+    func testRebuildPreviewFromTheMenuRestartsAServingPreview() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        defer {
+            ActivityTrail.store = previousTrail
+            FakePreview.shared.forget()
+            SectionWindowControllers.shared.forgetAll()
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        FakePreview.shared.register(folderPath: made.root.path, courseCode: "ICS3U", sectionNumber: 1, running: true)
+        let verbs: SectionVerbs = SectionVerbs(
+            folderPath: made.root.path, siteWork: StubSiteWork(),
+            today: { return CalendarDay(year: 2026, month: 9, day: 8)! }
+        )
+        let outcome: AssistToolOutcome = await verbs.perform(
+            SectionVerbs.rebuildPreview(course: "ICS3U", section: 1),
+            item: .rebuildPreview, courseCode: "ICS3U", sectionNumber: 1
+        )
+        XCTAssertEqual(FakePreview.shared.events, ["stop-begins", "stop-ends", "start"],
+                       "a serving preview must be stopped, waited for, and started again")
+        XCTAssertEqual(outcome.summary, AssistWording.previewIsRebuilding(course: "ICS3U", section: "1"))
+        XCTAssertTrue(
+            ActivityTrail.store.activityText(includingPrompts: false)
+                .contains(SectionVerbs.ranLine(.rebuildPreview, ending: "rebuilt", counts: "")),
+            ActivityTrail.store.activityText(includingPrompts: false)
+        )
+    }
+
     // MARK: - The gate
 
     /// A course kept for reference: every writing call from the menu is

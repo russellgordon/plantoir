@@ -409,7 +409,7 @@ recounted 2026-09-07.
 
 **Two `pageNaming` sections exist, in different files, and they answer different questions.** `shared-rules.json` → `pageNaming` is what the ASSISTANT calls a page when it talks about one (the frontmatter title, or the folder's name for an `index.md`). `class-planning.json` → `pageNaming` is which class-page TITLES carry unit and day numbers. Grepping for the name alone will send you to the wrong one.
 
-| Deploy/preview order, cards, cancels | `assist-cases.json` → `scenarios` | AssistToolRunner (49), AssistScenario |
+| Deploy/preview order, cards, cancels | `assist-cases.json` → `scenarios` | AssistToolRunner (49), AssistScenario — including "rebuild with a preview serving stops it and starts it again" (#528, authored on the mac 2026-10-16; Section ▸ Rebuild Preview runs the same call, `SectionVerbsTests.testRebuildPreviewFromTheMenuRestartsAServingPreview`) |
 | Card phrasings and near misses | `assist-cases.json` → `cardPhrasings` | AssistAgent (8) |
 | Tool lists, approvals, plan twins | `assist-cases.json` → `tools` | AssistToolRunner |
 | Arrow-key history | `assist-cases.json` → `promptHistory` | AssistPromptHistory (15) |
