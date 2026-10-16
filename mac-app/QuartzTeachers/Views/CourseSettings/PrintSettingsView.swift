@@ -104,6 +104,16 @@ struct PrintSettingsView: View {
     /// The school name and the course code that print at `place`, school
     /// first, joined the way the build joins them.
     private func sketch(for place: String) -> String {
+        return PrintSettingsView.placed(
+            at: place, configuration: configuration, displayedCourseCode: displayedCourseCode
+        )
+    }
+
+    /// What prints at `place` (`header_left` or `footer_left`): the school
+    /// name and the course code placed there, school first, joined by " · ".
+    /// Static, and not private, so `PrintablePagesTests` runs every
+    /// `printablePages.corners` case through the sketch's own rule (#537).
+    static func placed(at place: String, configuration: CourseConfiguration, displayedCourseCode: String) -> String {
         var pieces: [String] = []
         let school: String = configuration.printSchoolName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !school.isEmpty && configuration.printSchoolNameAt == place {

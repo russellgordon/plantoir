@@ -250,8 +250,14 @@ final class OutsideAssistantWhilePreviewingTests: XCTestCase {
 
     /// #433 is for Claude and Codex only (Russell, 2026-10-03; ruling 4):
     /// the in-app assistant, meeting another program's served preview, says
-    /// exactly what it said before. MUST FAIL if the outside rule leaks into
-    /// `.local`.
+    /// what it said before — refused as built elsewhere, nothing deployed or
+    /// rebuilt, no #433 line on the trail. MUST FAIL if the outside rule leaks
+    /// into `.local`.
+    ///
+    /// One thing changed, on purpose, with #522 (the director's ruling,
+    /// 2026-10-16): the publish's last paragraph no longer claims "their
+    /// PREVIEW", because the preview was built elsewhere and this change left
+    /// it as it was. Only a preview restarted in its window is claimed.
     func testTheInAppAssistantSaysWhatItSaidBefore() async throws {
         let made: AssistFixture.Made = try makeCourse(surface: .local)
         try writeOthersLeases(["preview"], in: made.root)
@@ -269,7 +275,7 @@ final class OutsideAssistantWhilePreviewingTests: XCTestCase {
             "publish_pages", with: ["pages": "Unit 1, Day 1"], on: made.runner
         )
         XCTAssertTrue(published.detail.contains("\n\n" + before + "\n\n"), published.detail)
-        XCTAssertTrue(published.detail.contains("their PREVIEW"), published.detail)
+        XCTAssertTrue(published.detail.hasSuffix("\n\n" + AssistToolRunner.changedTheirFiles), published.detail)
         XCTAssertFalse(trailText(in: made.root).contains("left the preview open in Plantoir as it was"))
     }
 }

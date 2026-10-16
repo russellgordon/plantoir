@@ -202,7 +202,7 @@
         "default": ["name", "date"],
         "key": "print_blanks",
         "type": "array of strings: name, date, class_number",
-        "why": "#454. The lines a student fills in, printed top right on EVERY page (decision 4), always in the order Name, Date, Class # whatever order the array holds. ABSENT means [\"name\", \"date\"]; an EMPTY array means none. An unknown value is ignored rather than refused, and a repeated one prints once, so a value a newer app adds cannot break an older build."
+        "why": "#454. The lines a student fills in, printed top right on EVERY page (decision 4), always in the order Name, Date, Class # whatever order the array holds. ABSENT or null means [\"name\", \"date\"] (null is what the build reads as absent, #537); an EMPTY array means none. An unknown value is ignored rather than refused, and a repeated one prints once, so a value a newer app adds cannot break an older build."
       },
       {
         "default": "header_left",

@@ -1817,9 +1817,12 @@ What replaces the old container concepts:
         `PreviewBuildNeedsAnAnswer`/`DeployNeedsAnAnswer`. Both now check
         `NeededAnAnswer` first and say what was done, then
         `PreviewBuildNeedsAnAnswer` (`APublishOrHideWhoseRebuildStopsForAQuestionSaysSo`).
-        The mac's own runner has the matching gap one level up — its
-        `carryOut` counts the headless failure sentences as "the preview was
-        left as it was" but not the question — and owes it as a `mac` issue.
+        The mac's own runner had the matching gap one level up — its
+        `carryOut` counted the headless failure sentences as "the preview was
+        left as it was" but not the question — closed by #522 (2026-10-16):
+        the mac now names the preview only when it restarted it in its
+        window (`documentation/10-local-ai-assistant.md`). Windows has no
+        such sentence, so owes nothing.
       - **Unpublishing single PAGES never rebuilt (#479).** `Apply` returned
         before the build whenever the plan hid pages (`if (!plan.Publishes)`).
         Nothing chose that: since the first commit (b3b7fc040) `Apply` tied
@@ -5565,8 +5568,9 @@ and before anything runs: an outside assistant is refused with
 own assistant reaches it only with no window seams at all, and is told
 `…AndNoWindow`. The trail line is the contract's: "a deploy was held back for
 classes dated after the next class — {N} with no answer" — no "by an outside
-assistant" (the mac adds who asked; the contract's line does not, and the plan
-review ruled for the contract). `publish_class_on`, from any client, and the
+assistant" (the plan review ruled for the contract; the mac added who asked
+until #532, 2026-10-16, and writes the contract's line too since —
+`DeployAsksAboutLaterClassesTests.testAHeldBackDeployIsTheContractsLine`). `publish_class_on`, from any client, and the
 links checklist's Publish (`PublishAndRemember`) record a later class they
 published as kept: a date the teacher named is not a mistake to catch, and
 without it the two questions undid each other (the mac's batch B review,
@@ -5705,7 +5709,9 @@ false. Course Settings uses the same check.
 Settings ▸ Deploying, then deploy again."; Schedule a Deploy's two
 (`ScheduledDeploy`, `cloudflareAccountMissing` and its additional twin) say
 "… then schedule this again." Constants in `Core/Models/DeployingSettings.cs`.
-The mac's three still say "this course's settings" — a `mac` issue, #534.
+The mac's three said "this course's settings" until #534 (2026-10-16); they
+now say "Plantoir ▸ Settings ▸ Deploying", where the item is on the mac — the
+File ▸ / Plantoir ▸ split below stands.
 
 **The deliberate wording split.** The app's sentences say **File ▸ Settings ▸
 Deploying**, where the item IS on Windows. The launchers' non-interactive

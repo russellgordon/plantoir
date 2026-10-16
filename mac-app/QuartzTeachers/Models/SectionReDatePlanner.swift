@@ -72,6 +72,24 @@ enum SectionReDatePlanner {
 
     // MARK: - Types
 
+    /// `apply` stopped part way AFTER writing at least one page (#531, the
+    /// director's ruling M3). The pages are written one by one, so "Nothing
+    /// was changed" would be false; the runner says which were written. The
+    /// error's own words are kept.
+    struct StoppedAfterWriting: LocalizedError {
+
+        // MARK: - Stored properties
+
+        let written: [URL]
+        let underlying: Error
+
+        // MARK: - Computed properties
+
+        var errorDescription: String? {
+            return underlying.localizedDescription
+        }
+    }
+
     enum Problem: LocalizedError {
         case noTimetable(String, Int)
         case noClasses(String, Int)
@@ -261,48 +279,59 @@ enum SectionReDatePlanner {
         var leftAlone: [String] = []
         var classesReDated: Int = 0
         var pagesTheyUseReDated: Int = 0
-        for move in plan.moves {
-            let before: String = try String(contentsOf: move.fileURL, encoding: .utf8)
-            let dated: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
-                in: before,
-                key: PageFrontmatter.createdKey(
-                    forSection: sectionNumber, isSectionLocal: move.isSectionLocal
-                ),
-                to: move.to,
-                fallbackTail: tail
-            )
-            var after: String = dated.text
-            // Only the DATE is reported (#186's review, B3): the sentence is
-            // about a new date. A hide declined on a page whose date WAS
-            // written needs a block whose first line is indented with a
-            // column-0 `created:` below it — a block the build cannot read at
-            // all, which the build already hides and names (#246).
-            let declined: Bool = dated.outcome == .noRoomForAKey
-            if move.unpublishes {
-                let hidden: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
-                    published: false,
-                    in: after,
-                    forSection: sectionNumber,
-                    isSectionLocal: move.isSectionLocal
+        do {
+            for move in plan.moves {
+                let before: String = try String(contentsOf: move.fileURL, encoding: .utf8)
+                let dated: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
+                    in: before,
+                    key: PageFrontmatter.createdKey(
+                        forSection: sectionNumber, isSectionLocal: move.isSectionLocal
+                    ),
+                    to: move.to,
+                    fallbackTail: tail
                 )
-                after = hidden.text
-            }
-            if declined {
-                leftAlone.append(move.fileURL.deletingPathExtension().lastPathComponent)
-            }
-            if dated.outcome == .written {
-                switch move.reason {
-                case .aClass:
-                    classesReDated += 1
-                case .broughtBy, .yearRound:
-                    pagesTheyUseReDated += 1
+                var after: String = dated.text
+                // Only the DATE is reported (#186's review, B3): the sentence is
+                // about a new date. A hide declined on a page whose date WAS
+                // written needs a block whose first line is indented with a
+                // column-0 `created:` below it — a block the build cannot read at
+                // all, which the build already hides and names (#246).
+                let declined: Bool = dated.outcome == .noRoomForAKey
+                if move.unpublishes {
+                    let hidden: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
+                        published: false,
+                        in: after,
+                        forSection: sectionNumber,
+                        isSectionLocal: move.isSectionLocal
+                    )
+                    after = hidden.text
                 }
+                if declined {
+                    leftAlone.append(move.fileURL.deletingPathExtension().lastPathComponent)
+                }
+                if dated.outcome == .written {
+                    switch move.reason {
+                    case .aClass:
+                        classesReDated += 1
+                    case .broughtBy, .yearRound:
+                        pagesTheyUseReDated += 1
+                    }
+                }
+                if after == before {
+                    continue
+                }
+                try after.write(to: move.fileURL, atomically: true, encoding: .utf8)
+                saved.append(AssistSavedFile(fileURL: move.fileURL, before: before, after: after))
             }
-            if after == before {
-                continue
+        } catch {
+            if saved.isEmpty {
+                throw error
             }
-            try after.write(to: move.fileURL, atomically: true, encoding: .utf8)
-            saved.append(AssistSavedFile(fileURL: move.fileURL, before: before, after: after))
+            var written: [URL] = []
+            for file in saved {
+                written.append(file.fileURL)
+            }
+            throw StoppedAfterWriting(written: written, underlying: error)
         }
 
         if let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {

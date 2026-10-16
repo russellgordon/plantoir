@@ -169,6 +169,17 @@ final class AssistToolRunner {
     /// one call.
     @ObservationIgnored var previewFollowsAChange: Bool = true
 
+    /// How many times this runner has written the teacher's files WITHOUT
+    /// adding an undo entry (#531): Make Room for Classes (which records none
+    /// on purpose — `makingRoomCannotBeUndone`), an undo that put some files
+    /// back but kept its entry because others were in the way, and a publish
+    /// or hide that wrote pages and then stopped part way (#412, whose entry
+    /// is abandoned on the throw). The Section menu reads it beside the undo
+    /// list's depth, so "the workspace wrote something" is one signal rather
+    /// than a flag per verb: until #531 the depth alone decided, and every
+    /// one of these was written to the trail as "changed nothing".
+    @ObservationIgnored private(set) var writesWithNoNewUndoEntry: Int = 0
+
     // MARK: - Computed properties
 
     /// The section of the change `undo_last_change` would take back next, or
@@ -381,7 +392,7 @@ final class AssistToolRunner {
             let when: String = AssistToolRunner.moment(named: raw)
                 .map { moment in ScheduledDeploy.dayAndTimeText(moment) } ?? raw
             let card: String = "Set this Mac to deploy \(code) Section \(number) to \(destination) at \(when). "
-                 + "It has to be on and awake then — plugged in if it is a laptop, lid open. "
+                 + "It has to be " + AssistToolRunner.awakeThenWithTheLidOpen + " "
                  + "Plantoir cannot wake it up."
             // The deploy this one would replace, if there is one (issue #195).
             // The card is the only moment before anything is written, so it is
@@ -1405,6 +1416,11 @@ final class AssistToolRunner {
                     changedAnything = true
                 }
             } catch {
+                // An earlier plan of the unit written whole, or this one part
+                // way: a write with no undo entry (#531).
+                if changedAnything || error is AssistPublishPlanner.StoppedAfterWriting {
+                    writesWithNoNewUndoEntry += 1
+                }
                 return AssistToolOutcome.refused(publishStoppedPartWay(
                     what: "\(located.course.configuration.unitWord) \(unit)",
                     problem: error.localizedDescription,
@@ -1929,6 +1945,26 @@ final class AssistToolRunner {
         "The course was backed up before this conversation changed anything, so this can also be "
       + "undone from Plantoir's Backups list."
 
+    /// What has to be true of this Mac when a scheduled deploy runs, in the
+    /// schedule card and in the answer after setting one (#521). Not "plugged
+    /// in if it is a laptop", said until #521: launchd runs the job on battery,
+    /// so being awake is what the deploy needs. Named here rather than in
+    /// `AssistWording` on purpose (the director's ruling 6, 2026-10-16): no
+    /// contract holds it, and Windows words its own.
+    static let awakeThenWithTheLidOpen: String = "on and awake then, with the lid open."
+
+    /// How a publish or a hide of named pages ends (`carryOut`), for the
+    /// model: what it changed, and that nothing reached students. The
+    /// PREVIEW is named only when it was restarted in its window (#522).
+    /// Named here, not in `AssistWording`: no contract holds them, and
+    /// Windows has no such sentence.
+    static let changedTheirFiles: String = "This changed the teacher's files. It did not put anything in front "
+        + "of students — deploying does that, and only when they ask."
+
+    /// The same, when the change restarted the section's preview.
+    static let changedTheirFilesAndPreview: String = "This changed the teacher's files and their PREVIEW. It did not "
+        + "put anything in front of students — deploying does that, and only when they ask."
+
     // MARK: - Writing pages
 
     /// Back the course up, write the change, remember it, rebuild the preview.
@@ -1992,7 +2028,11 @@ final class AssistToolRunner {
             leftAlone = applied.leftAlone
         } catch {
             // Not "Nothing was changed" (said here until #412): the write is
-            // page by page, so pages before the one that failed are written.
+            // page by page, so pages before the one that failed are written —
+            // and when one was, it is a write with no undo entry (#531).
+            if error is AssistPublishPlanner.StoppedAfterWriting {
+                writesWithNoNewUndoEntry += 1
+            }
             return AssistToolOutcome.refused(publishStoppedPartWay(
                 what: "the pages you named",
                 problem: error.localizedDescription,
@@ -2035,35 +2075,26 @@ final class AssistToolRunner {
             previewNote = await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber)
             detail += "\n\n" + previewNote
         }
-        // Not "and their PREVIEW" when an outside assistant's change left the
-        // open preview as it was (#433): that would be false.
-        // Nor when the headless rebuild RAN and did not build (#471) —
-        // whether the launcher refused it or it failed for any other reason:
-        // the preview is as it was, and saying it changed would be false.
-        // (Matched by sentence: a rebuild that stopped at a question, could
-        // not launch, or was declined before it ran — this copy deploying
-        // the section, a copy of the course being zipped, no working folder
-        // — still gets the old ending, a pre-existing gap this does not
-        // close.)
-        let previewLeftAsItWas: Bool = !previewFollowsAChange
-            || previewNote == AssistWording.changesAreSavedPreviewShowsTheOldPages(
+        // "and their PREVIEW" ONLY when the preview was restarted in its
+        // window — `previewIsRebuilding` is the one note that means it
+        // changed (#522, the director's ruling 2026-10-16). Every other note
+        // means it did not: an outside assistant's change left the open
+        // preview as it was (#433); a headless rebuild that failed, was
+        // refused (#471) or stopped at a question (exit 3, #478/#522); one
+        // declined before it ran (a copy being zipped, this section being
+        // deployed, no working folder, a build somewhere else, a launch
+        // problem); and `builtWithNoWindowOpen`, where the SITE was rebuilt
+        // but no preview exists to have changed. Until #522 this listed the
+        // notes that meant "left as it was", and every note it did not list
+        // made the false claim.
+        let previewChanged: Bool = previewFollowsAChange
+            && previewNote == AssistWording.previewIsRebuilding(
                 course: course.code, section: String(sectionNumber)
             )
-            || previewNote == AssistWording.changesAreSavedWhileTheCourseIsBuilt(
-                course: course.code, section: String(sectionNumber)
-            )
-            || previewNote == AssistWording.previewDidNotBuildForACallerWithNoWindow(
-                course: course.code, section: String(sectionNumber)
-            )
-            || previewNote.hasPrefix(AssistWording.previewDidNotBuildBecause(
-                course: course.code, section: String(sectionNumber), reason: ""
-            ))
-        if previewLeftAsItWas {
-            detail += "\n\nThis changed the teacher's files. It did not put anything in front "
-                    + "of students — deploying does that, and only when they ask."
+        if previewChanged {
+            detail += "\n\n" + AssistToolRunner.changedTheirFilesAndPreview
         } else {
-            detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
-                    + "of students — deploying does that, and only when they ask."
+            detail += "\n\n" + AssistToolRunner.changedTheirFiles
         }
 
         return AssistToolOutcome.wrote(
@@ -2726,6 +2757,9 @@ final class AssistToolRunner {
                 summary = AssistWording.undidFromTheMenu(result.whatHappened)
             }
         } else {
+            // Some files went back and the entry stayed, so the depth did not
+            // move (#531): counted as a write.
+            writesWithNoNewUndoEntry += 1
             summary = AssistWording.undidPartly(
                 result.whatHappened, leftAlone: result.skipped.count
             )
@@ -3241,7 +3275,7 @@ final class AssistToolRunner {
         let pages: String = AssistPublishPlan.listingAFew(titles)
         ActivityTrail.note(
             .laterClassesHeldADeployBack,
-            ClassesDatedLater.heldBackLine(count: flagged.count, by: surface == .mcp ? "an outside assistant" : "the assistant"),
+            ClassesDatedLater.heldBackLine(count: flagged.count),
             course: course.code, section: section
         )
         if surface == .mcp {
@@ -3404,8 +3438,8 @@ final class AssistToolRunner {
         }
         return AssistToolOutcome.wrote(
             summary,
-            detail: summary + "\n\nThis Mac has to be on and awake then — plugged in if it is a laptop, "
-                  + "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it."
+            detail: summary + "\n\nThis Mac has to be " + AssistToolRunner.awakeThenWithTheLidOpen + " "
+                  + "Plantoir cannot wake it up. Say the word and I'll cancel it."
         )
     }
 
@@ -4440,6 +4474,16 @@ final class AssistToolRunner {
                 leftAlone = applied.leftAlone
                 classesReDated = applied.classesReDated
                 pagesTheyUseReDated = applied.pagesTheyUseReDated
+            } catch let stopped as SectionReDatePlanner.StoppedAfterWriting {
+                // Pages before the one that failed ARE re-dated, and the undo
+                // entry is abandoned (#531, ruling M3): said as part way, with
+                // the pages written named, and counted as a write.
+                writesWithNoNewUndoEntry += 1
+                return AssistToolOutcome.refused(publishStoppedPartWay(
+                    what: "the section's class dates",
+                    problem: stopped.localizedDescription,
+                    sectionNumber: asked.located.sectionNumber
+                ) + "\n\nThe pages already re-dated:\n" + listing(stopped.written))
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
@@ -4935,6 +4979,12 @@ final class AssistToolRunner {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
                 )
+            }
+            // Written, with no undo entry (#531): counted, so the Section
+            // menu's line says "carried out" — but only when a file WAS
+            // written (ruling L5): every failed write is carried past.
+            if outcome.wroteSomething {
+                writesWithNoNewUndoEntry += 1
             }
 
             var detail: String = outcome.message
