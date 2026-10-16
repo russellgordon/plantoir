@@ -112,17 +112,6 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-10-15 | **Windows catches up to the mac's 1.7.1.** Every row below is the Windows half of something the mac already shipped (its milestone in brackets) or a Windows-only fix, so the Windows installer joins the EXISTING v1.7.1 release with no new tag, the way 1.4.3 did, and the mac gains nothing from these rows | Windows (branch `issue/windows-catch-up-1.7.1`) | — |
-| 2026-10-15 | A menu bar — File, Course, Section, View, Help — with every course and section action, greyed rather than hidden, keys on its items, and File ▸ Open Recent [v1.5.0] | mac v1.5.0; Windows 1.7.1 | #488, #483 |
-| 2026-10-15 | The assistant's functions in the Section menu (Publish Pages…, Hide Pages…, Rebuild Preview, Undo Last Change, Add Next Class, Class Dates… and the rest), with the menu's own backups [v1.5.0] | mac v1.5.0; Windows 1.7.1 | #489 |
-| 2026-10-15 | Classes dated after the next class are asked about at Deploy, by the assistants and by a scheduled deploy [v1.5.0] | mac v1.5.0; Windows 1.7.1 | #475 (Windows half under #489) |
-| 2026-10-15 | One Settings window (File ▸ Settings…: Assistant, Preview, Deploying); the Cloudflare Account ID is edited only there, and a refused deploy says where; Help ▸ Plantoir Help (F1) [v1.5.0] | mac v1.5.0; Windows 1.7.1 | #491, #490 |
-| 2026-10-15 | The HIG sweep: title-case buttons, one dialog-title shape, Escape never trapped by a picker, Delete and − run the menu's Remove…, All Backups sorts and takes Delete, the rows' Revise With ▸ [v1.5.0] | mac v1.5.0; Windows 1.7.1 | #491 |
-| 2026-10-15 | Hiding a page rebuilds the preview as publishing one does, and a rebuild that stops for a question says so; an outside assistant's failed preview build is told in a sentence, not a log; the Netlify rate-limit sentence only for a real 429 | Windows 1.7.1 (the mac already behaved this way) | #479, #478, #481, #482 |
-| 2026-10-15 | A scheduled deploy set again while its earlier run works is queued and still deploys; the scheduled run brings the folder's tools up to date itself; closing during a tools copy waits for it, then quits | Windows 1.7.1 (Windows-only faults) | #470, #477, #484 |
-| 2026-10-15 | Printable pages: Course Settings → Printing, the guidance for assistants, Print handed to the browser [v1.6.0] | mac v1.6.0; Windows 1.7.1 | #496 |
-| 2026-10-15 | Diagrams and graphs from ` ```tikz ` and ` ```functionplot ` fences — the Windows runtime carries the engines and Latin Modern [v1.7.0] | mac v1.7.0; Windows 1.7.1 | #503 |
-| 2026-10-15 | Preview at Last Viewed — the setting, Alt for the other one, a second Section item [v1.7.1] | mac v1.7.1; Windows 1.7.1 | #514 |
 
 ## Warnings the release notes MUST carry
 
