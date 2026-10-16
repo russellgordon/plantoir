@@ -113,14 +113,22 @@ final class SectionVerbs {
         SectionMenuActivity.begin(folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber)
         let before: SectionKey? = currentLastChange()
         let changesBefore: Int = toolRunner.changeCount
+        let writesBefore: Int = toolRunner.writesWithNoNewUndoEntry
         let outcome: AssistToolOutcome = await toolRunner.run(call: call)
         let changesAfter: Int = toolRunner.changeCount
+        let writesAfter: Int = toolRunner.writesWithNoNewUndoEntry
         lastChange = currentLastChange()
         SectionMenuActivity.end(folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber)
         running = nil
 
+        // Something was written when the undo list moved, when the change it
+        // would take back moved, OR when the runner wrote files with no new
+        // undo entry (#531: Make Room, a partial undo, a publish that stopped
+        // part way — each "changed nothing" here until then). The depth
+        // alone is not the signal; it is what tells "took the last change
+        // back" from "carried out".
         var ending: String = "changed nothing"
-        if changesAfter != changesBefore || before != lastChange {
+        if changesAfter != changesBefore || before != lastChange || writesAfter != writesBefore {
             ending = item == .undoLastChange ? "took the last change back" : "carried out"
         } else if item == .rebuildPreview {
             let rebuilding: String = AssistWording.previewIsRebuilding(course: courseCode, section: String(sectionNumber))

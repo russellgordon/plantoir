@@ -451,3 +451,208 @@ final class SectionVerbsFixesTests: XCTestCase {
         ))
     }
 }
+
+/// #531: how the Section menu's "ran from a menu" line ENDS. "Carried out"
+/// when the runner wrote something — the undo list moved, or it wrote files
+/// with no new undo entry (`AssistToolRunner.writesWithNoNewUndoEntry`) —
+/// and "changed nothing" only when it wrote nothing. Until #531 the depth
+/// alone decided, so Make Room, a partial undo and a publish that stopped
+/// part way were all written as "changed nothing". Endings are built with
+/// `SectionVerbs.ranLine`, never typed.
+@MainActor
+final class SectionVerbsEndingTests: XCTestCase {
+
+    // MARK: - Stored properties
+
+    private var root: URL?
+
+    private var lockedFolder: URL?
+
+    private var previousTrail: ProblemReportStore = ActivityTrail.store
+
+    // MARK: - Set up and tear down
+
+    override func setUp() async throws {
+        previousTrail = ActivityTrail.store
+    }
+
+    override func tearDown() async throws {
+        if let lockedFolder {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: lockedFolder.path)
+        }
+        lockedFolder = nil
+        ActivityTrail.store = previousTrail
+        SectionMenuActivity.reset()
+        SectionSchedulePrompt.shared.stopAsking()
+        if let root {
+            try? FileManager.default.removeItem(at: root)
+        }
+        root = nil
+        try await super.tearDown()
+    }
+
+    // MARK: - Helpers
+
+    private func makeVerbs() throws -> (made: AssistFixture.Made, verbs: SectionVerbs) {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(surface: .menu)
+        root = made.root
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        let verbs: SectionVerbs = SectionVerbs(
+            folderPath: made.root.path, siteWork: StubSiteWork(),
+            today: { return CalendarDay(year: 2026, month: 9, day: 8)! }
+        )
+        return (made, verbs)
+    }
+
+    /// The last "ran from a menu" line on the trail.
+    private func lastMenuLine() -> String {
+        var found: String = ""
+        for line in ActivityTrail.store.activityText(includingPrompts: false).components(separatedBy: "\n") {
+            if line.contains("Section ▸ ") {
+                found = line
+            }
+        }
+        return found
+    }
+
+    private func publish(_ names: [String], with verbs: SectionVerbs) async -> AssistToolOutcome {
+        return await verbs.perform(
+            SectionVerbs.publishPages(course: "ICS3U", section: 1, names: names, planning: false),
+            item: .publishPages, courseCode: "ICS3U", sectionNumber: 1
+        )
+    }
+
+    /// A class page that links a course-level page, so a publish writes
+    /// `Concepts/Notes.md` first (paths are written in sorted order) and then
+    /// meets the class folder, which is made unwritable.
+    private func layOutAPublishThatStopsAfterAWrite(in made: AssistFixture.Made) throws {
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "One links [[Notes]].", in: made.course)
+        try "---\ntitle: Notes\npublish: false\n---\nNotes.\n".write(
+            to: made.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), atomically: true, encoding: .utf8
+        )
+        let folder: URL = ClassPages.folderURL(forSection: 1, in: made.course)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        lockedFolder = folder
+    }
+
+    // MARK: - Tests
+
+    /// Make Room records no undo entry, on purpose. MUST FAIL on the old
+    /// `perform`, which wrote "changed nothing".
+    func testMakeRoomFromTheMenuIsCarriedOut() async throws {
+        let (made, verbs) = try makeVerbs()
+        try MenuVoiceTests.layOutAUnitWithDates(in: made.course)
+        let before: [String: String] = try SectionVerbsTests.pages(in: made.course)
+        _ = await verbs.perform(
+            SectionVerbs.makeRoom(course: "ICS3U", section: 1, unit: 1, atDay: 2, howMany: 1, planning: false),
+            item: .makeRoomForClasses, courseCode: "ICS3U", sectionNumber: 1
+        )
+        XCTAssertNotEqual(try SectionVerbsTests.pages(in: made.course), before, "Make Room wrote nothing")
+        XCTAssertTrue(
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.makeRoomForClasses, ending: "carried out", counts: "")),
+            lastMenuLine()
+        )
+    }
+
+    /// An undo that put one file back and left an edited one alone keeps
+    /// its entry, so the depth does not move. MUST FAIL on the old `perform`.
+    func testAPartialUndoTookTheLastChangeBack() async throws {
+        let (made, verbs) = try makeVerbs()
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "false", date: "2026-09-09", body: "Two.", in: made.course)
+        _ = await publish(["section1/All Classes/Unit 1, Day 1", "section1/All Classes/Unit 1, Day 2"], with: verbs)
+        let edited: URL = AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course)
+        try (try String(contentsOf: edited, encoding: .utf8) + "\nEdited in Obsidian since.\n")
+            .write(to: edited, atomically: true, encoding: .utf8)
+
+        let undone: AssistToolOutcome = await verbs.perform(
+            SectionVerbs.undoLastChange(), item: .undoLastChange, courseCode: "ICS3U", sectionNumber: 1
+        )
+        let template: String = AssistWording.undidPartlyFromTheMenu("\u{1}", leftAlone: 1)
+        let partly: String = template.components(separatedBy: "\u{1}").last ?? template
+        XCTAssertTrue(undone.summary.hasSuffix(partly), "not a partial undo: \(undone.summary)")
+        XCTAssertTrue(
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "took the last change back", counts: "")),
+            lastMenuLine()
+        )
+    }
+
+    /// A page list that wrote a page and then stopped part way (#412).
+    /// MUST FAIL on the old `perform`.
+    func testAPublishThatStoppedAfterAWriteIsCarriedOut() async throws {
+        let (made, verbs) = try makeVerbs()
+        try layOutAPublishThatStopsAfterAWrite(in: made)
+        let outcome: AssistToolOutcome = await publish(["section1/All Classes/Unit 1, Day 1"], with: verbs)
+        XCTAssertTrue(
+            outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "the pages you named", problem: "")),
+            outcome.detail
+        )
+        let notes: String = try String(
+            contentsOf: made.course.directoryURL.appendingPathComponent("Concepts/Notes.md"), encoding: .utf8
+        )
+        XCTAssertNotEqual(notes, "---\ntitle: Notes\npublish: false\n---\nNotes.\n", "the linked page was not written first")
+        XCTAssertTrue(
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "")),
+            lastMenuLine()
+        )
+    }
+
+    /// A whole unit that wrote a page and then stopped part way. MUST FAIL
+    /// on the old `perform`.
+    func testAWholeUnitThatStoppedAfterAWriteIsCarriedOut() async throws {
+        let (made, verbs) = try makeVerbs()
+        try layOutAPublishThatStopsAfterAWrite(in: made)
+        let outcome: AssistToolOutcome = await verbs.perform(
+            SectionVerbs.call("publish_pages", ["course": "ICS3U", "section": 1, "pages": "Unit 1"]),
+            item: .publishPages, courseCode: "ICS3U", sectionNumber: 1
+        )
+        XCTAssertTrue(
+            outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "Unit 1", problem: "")), outcome.detail
+        )
+        XCTAssertTrue(
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "")),
+            lastMenuLine()
+        )
+    }
+
+    /// The other side, so the signal cannot pass by always claiming: a
+    /// publish whose FIRST write failed wrote nothing, and says so.
+    func testAPublishThatWroteNothingChangedNothing() async throws {
+        let (made, verbs) = try makeVerbs()
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
+        let folder: URL = ClassPages.folderURL(forSection: 1, in: made.course)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        lockedFolder = folder
+        let outcome: AssistToolOutcome = await publish(["section1/All Classes/Unit 1, Day 1"], with: verbs)
+        XCTAssertTrue(
+            outcome.detail.hasPrefix(AssistWording.publishStoppedPartWay(what: "the pages you named", problem: "")),
+            outcome.detail
+        )
+        XCTAssertTrue(
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "changed nothing", counts: "")),
+            lastMenuLine()
+        )
+    }
+
+    /// Windows' second case: the 21st change in a window's life. The mac's
+    /// undo list has no cap (`AssistChangeHistory.record` appends), so this
+    /// PASSES on the old code too — a GUARD, so a cap added later cannot
+    /// turn every change after it into "changed nothing" unnoticed.
+    func testTheTwentyFirstChangeIsCarriedOut() async throws {
+        let (made, verbs) = try makeVerbs()
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
+        let page: [String] = ["section1/All Classes/Unit 1, Day 1"]
+        for change in 1...21 {
+            if change % 2 == 1 {
+                _ = await publish(page, with: verbs)
+            } else {
+                _ = await verbs.perform(
+                    SectionVerbs.hidePages(course: "ICS3U", section: 1, names: page, planning: false),
+                    item: .hidePages, courseCode: "ICS3U", sectionNumber: 1
+                )
+            }
+            XCTAssertTrue(lastMenuLine().contains("— carried out"), "change \(change): \(lastMenuLine())")
+        }
+        XCTAssertEqual(verbs.toolRunner.changeCount, 21)
+    }
+}

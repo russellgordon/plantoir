@@ -4019,6 +4019,32 @@ false only around the call that hides classes at Deploy (#475), where the
 deploy builds straight after. Every other menu write rebuilds the preview, as
 the tool does — the menu must not disagree with the tool.
 
+**How the trail line ends (#531, 2026-10-16).** `SectionVerbs.perform` writes
+"carried out" (or, for Undo Last Change, "took the last change back") when the
+runner WROTE something, and "changed nothing" only when it wrote nothing.
+"Wrote something" is one signal, not a flag per verb: the undo list's depth
+moved, the change it would take back moved, or
+`AssistToolRunner.writesWithNoNewUndoEntry` moved. That counter covers the
+writes that add no entry: **Make Room for Classes** (no entry, on purpose —
+`makingRoomCannotBeUndone`), **a partial undo** (some files back, the entry
+kept because others were edited since), and **a publish or hide that wrote
+pages and then stopped part way** (#412; `AssistPublishPlanner.apply` throws
+`StoppedAfterWriting`, which keeps the error's own words, only when at least
+one file was written — a first write that fails is still "changed nothing").
+Until #531 the depth alone decided, so each of those was written as "changed
+nothing" — the line rule 5 calls worse than none. Found by Windows' batch 2B
+review, where Make Room and a full undo list (`UndoHistory.MostRemembered =
+20`) both read that way. **MEASURED on the mac: no cap.**
+`AssistChangeHistory.record` appends, and only a clean undo removes, so the
+21st change grows the depth; `SectionVerbsEndingTests.testTheTwentyFirstChangeIsCarriedOut`
+is a guard against a cap added later, and passes on the old code too. The
+other five tests there (Make Room, partial undo, page list and whole unit
+stopped after a write, and a publish that wrote nothing) are must-fail. Not
+covered: duplicating a class when it moves others (`duplicateClassRequested`)
+also writes with no entry, and no menu item reaches it. No contract case: the
+ending depends on the runner's internals, not on data, and the contract's
+`ran from a menu` endings are unchanged.
+
 ### #475 at the assistants' deploy
 
 `deploy_section` meets the question about classes dated after the next class

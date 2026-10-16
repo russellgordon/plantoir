@@ -517,6 +517,27 @@ struct AssistPublishPlan {
 ///   teacher names it, and a linked class that stays is named in the plan.
 enum AssistPublishPlanner {
 
+    // MARK: - Types
+
+    /// `apply` stopped part way AFTER writing at least one file (#531). The
+    /// error that stopped it is kept and its words are the error's own, so
+    /// what the teacher is told (`publishStoppedPartWay`) is unchanged; the
+    /// runner only learns that something WAS written, which a bare rethrow
+    /// cannot say.
+    struct StoppedAfterWriting: LocalizedError {
+
+        // MARK: - Stored properties
+
+        let filesWritten: Int
+        let underlying: Error
+
+        // MARK: - Computed properties
+
+        var errorDescription: String? {
+            return underlying.localizedDescription
+        }
+    }
+
     // MARK: - Functions
 
     /// What publishing these pages would do — along with everything they link
@@ -1503,55 +1524,62 @@ enum AssistPublishPlanner {
         // teacher is told is built from these, not from the plan.
         var leftAlone: [String] = []
         var movedTitles: [String] = []
-        for path in paths {
-            guard let edit = editsByPath[path] else {
-                continue
-            }
-            let before: String = try String(contentsOf: edit.url, encoding: .utf8)
-            var text: String = before
-            var declined: Bool = false
-            var visibilityMoved: Bool = false
+        do {
+            for path in paths {
+                guard let edit = editsByPath[path] else {
+                    continue
+                }
+                let before: String = try String(contentsOf: edit.url, encoding: .utf8)
+                var text: String = before
+                var declined: Bool = false
+                var visibilityMoved: Bool = false
 
-            if let published = publishByPath[path] {
-                let result: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
-                    published: published, in: text,
-                    forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
-                )
-                if result.outcome == .noRoomForAKey {
-                    declined = true
-                }
-                if result.outcome == .written {
-                    visibilityMoved = true
-                }
-                text = result.text
-            }
-            if let day = dateByPath[path] {
-                let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
-                    in: text,
-                    key: PageFrontmatter.createdKey(
+                if let published = publishByPath[path] {
+                    let result: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
+                        published: published, in: text,
                         forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
-                    ),
-                    to: day,
-                    fallbackTail: tail
-                )
-                if result.outcome == .noRoomForAKey {
-                    declined = true
+                    )
+                    if result.outcome == .noRoomForAKey {
+                        declined = true
+                    }
+                    if result.outcome == .written {
+                        visibilityMoved = true
+                    }
+                    text = result.text
                 }
-                text = result.text
-            }
+                if let day = dateByPath[path] {
+                    let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
+                        in: text,
+                        key: PageFrontmatter.createdKey(
+                            forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
+                        ),
+                        to: day,
+                        fallbackTail: tail
+                    )
+                    if result.outcome == .noRoomForAKey {
+                        declined = true
+                    }
+                    text = result.text
+                }
 
-            let title: String = titleByPath[path] ?? edit.url.deletingPathExtension().lastPathComponent
-            if declined {
-                leftAlone.append(title)
+                let title: String = titleByPath[path] ?? edit.url.deletingPathExtension().lastPathComponent
+                if declined {
+                    leftAlone.append(title)
+                }
+                if text == before {
+                    continue
+                }
+                try text.write(to: edit.url, atomically: true, encoding: .utf8)
+                saved.append(AssistSavedFile(fileURL: edit.url, before: before, after: text))
+                if visibilityMoved {
+                    movedTitles.append(title)
+                }
             }
-            if text == before {
-                continue
+        } catch {
+            if saved.isEmpty {
+                throw error
             }
-            try text.write(to: edit.url, atomically: true, encoding: .utf8)
-            saved.append(AssistSavedFile(fileURL: edit.url, before: before, after: text))
-            if visibilityMoved {
-                movedTitles.append(title)
-            }
+            throw StoppedAfterWriting(filesWritten: saved.count, underlying: error)
         }
 
         // The section's landing page follows its most recent visible class.
