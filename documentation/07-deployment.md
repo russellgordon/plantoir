@@ -3523,7 +3523,8 @@ mac's "on and awake then, with the lid open." through one constant,
   `Describe()` was left as it is. With `StartWhenAvailable=true` a missed
   start may run when the PC wakes, inside the lateness window, so that sentence
   may be untrue. It has to be MEASURED before it is reworded, and a `windows`
-  issue asks for that.
+  issue ([#554](https://github.com/russellgordon/plantoir/issues/554)) asks
+  for that.
 
 **REJECTED, again:** a wake timer (`pmset schedule wake` /
 `IOPMSchedulePowerEvent` — needs administrator rights and fails silently; the

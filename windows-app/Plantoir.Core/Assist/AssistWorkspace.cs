@@ -3019,8 +3019,11 @@ public sealed partial class AssistWorkspace
             // those pages named, and counted as a write (the mac's #531,
             // ruling M3). Before any page was written it changed no page —
             // though the timetable written above is already remembered.
-            // An AssistRefusal, so re_date_classes (through Guarded) and
-            // roll_over_section (its own catch) both ANSWER it.
+            // An AssistRefusal, so re_date_classes and roll_over_section both
+            // ANSWER it, each through its own catch (AssistRefusal); before
+            // #550 both let the IOException escape as a protocol error. Any
+            // OTHER IOException here (TimetableMemory.Write, say) still
+            // escapes; that predates #550.
             if (written.Count == 0) throw new AssistRefusal(NothingWasChanged(error));
             NoteAChangeWithNoUndoEntry();
             throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section) +
