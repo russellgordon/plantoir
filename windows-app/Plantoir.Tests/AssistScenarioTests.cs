@@ -237,9 +237,42 @@ public class AssistScenarioTests : IDisposable
             };
         }
 
+        // What the window goes on to do by itself after a fire-and-forget seam
+        // returns, awaited before the events are read (see RebuildPreviewInApp).
+        Task windowWork = Task.CompletedTask;
+
         if (sectionWindowOpen)
         {
             agent.ShowPreviewInApp = () => _window.Note("startPreview");
+            // Rebuild Preview (#489, #528). The runner hands rebuild_preview to
+            // this ONE seam and returns at once; the window does the rest. In
+            // the app it is MainWindow.RebuildPreviewFor ->
+            // SectionDetailView.RebuildPreviewAsync, which AWAITS
+            // StopPreviewIfRunningAsync (only when a preview is up) and then
+            // calls StartAutomatedPreview — so this fake does the same, with a
+            // real suspension inside the stop, and the harness waits for it as
+            // a teacher would see it finish. The fake can only mirror that
+            // order, and NO test holds the real one: it lives in
+            // RebuildPreviewAsync and is held by reading that code.
+            // SectionVerbsUiTests.RebuildPreviewRebuildsAServingPreview (opt-in,
+            // part of no gate) proves only that a serving preview ends up
+            // showing the edit after Section ▸ Rebuild Preview; it never sees
+            // a stop, or the order.
+            agent.RebuildPreviewInApp = () =>
+            {
+                windowWork = RebuildInTheWindow();
+                async Task RebuildInTheWindow()
+                {
+                    if (previewRunning)
+                    {
+                        _window.Note("stopPreview.begins");
+                        await Task.Delay(60);
+                        previewRunning = false;
+                        _window.Note("stopPreview.ends");
+                    }
+                    _window.Note("startPreview");
+                }
+            };
             agent.StopPreviewInAppAsync = async () =>
             {
                 // Two events with a real suspension between them, so a caller
@@ -274,6 +307,7 @@ public class AssistScenarioTests : IDisposable
             toolAnswer = await RunOneTool(agent, transcript, when, given?["arguments"] as JsonObject);
         }
 
+        await windowWork;
         AssertEvents(scenario, scenarioName);
         AssertReply(scenario, toolAnswer, transcript);
         AssertTranscript(scenario, scenarioName, transcript);
