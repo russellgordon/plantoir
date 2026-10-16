@@ -5,7 +5,10 @@ import XCTest
 /// settings, what a Save of them leaves on the trail, the preview handing a
 /// page to the web browser, and the assistant guidance written into a working
 /// folder. The rules themselves (which callout is an answer, the corners) are
-/// the build's and the site's, gated by the shared Python and verify.sh.
+/// the build's and the site's, gated by the shared Python and verify.sh — and
+/// since #537 the mac runs every `printablePages.corners` case through Course
+/// Settings' sketch too (`testEveryCornersCaseHoldsAsTheContractSays`), so the
+/// sketch cannot say something the paper contradicts.
 @MainActor
 final class PrintablePagesTests: XCTestCase {
 
@@ -59,6 +62,75 @@ final class PrintablePagesTests: XCTestCase {
 
     func testAnEmptyListMeansNoBlanks() {
         XCTAssertEqual(configuration(["print_blanks": [String]()]).printBlanks, [])
+    }
+
+    /// #537: a null list is the default, Name and Date, because that is what
+    /// the build prints — read from real JSON bytes, the way a course opens,
+    /// and READ ONLY: the null stays in the file and the course is not marked
+    /// changed by looking at it. MUST FAIL on the old getter, which read null
+    /// as no blanks.
+    func testANullListIsTheDefaultAndReadingItWritesNothing() throws {
+        let file: URL = folder.appendingPathComponent("course_config.json")
+        try Data(#"{"course_code": "ICS3U", "print_blanks": null}"#.utf8).write(to: file)
+        let course: CourseConfiguration = try CourseConfiguration(contentsOf: file)
+        XCTAssertFalse(course.hasUnsavedChanges, "a course just opened has nothing to save")
+        XCTAssertEqual(course.printBlanks, ["name", "date"])
+        XCTAssertTrue(course.values["print_blanks"] is NSNull, "reading must never rewrite what the file holds")
+        XCTAssertFalse(course.hasUnsavedChanges, "reading the blanks marked the course changed")
+    }
+
+    /// #537: every `printablePages.corners` case, through the getters and
+    /// the sketch's own rule (`PrintSettingsView.placed`), the top right
+    /// rendered with the contract's OWN words, line lengths and join — the
+    /// mac's share of what `scripts/test_print_settings.py` and Windows'
+    /// `PrintablePagesTests.EveryCornersCaseHoldsAsTheContractSays` run.
+    /// MUST FAIL on the old getter, at exactly one case: "blanks of null are
+    /// the default".
+    func testEveryCornersCaseHoldsAsTheContractSays() throws {
+        let printable: [String: Any] = try SharedRulesContractTests.section("printablePages")
+        let corners: [String: Any] = try XCTUnwrap(printable["corners"] as? [String: Any])
+        let words: [String: Any] = try XCTUnwrap(printable["words"] as? [String: Any])
+        let lines: [String: Int] = try XCTUnwrap(corners["blankLines"] as? [String: Int])
+        let join: String = try XCTUnwrap(corners["blankJoin"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(corners["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 13, "the contract holds thirteen cases since #496")
+
+        var wordFor: [String: String] = [:]
+        wordFor["name"] = try XCTUnwrap(words["blankName"] as? String)
+        wordFor["date"] = try XCTUnwrap(words["blankDate"] as? String)
+        wordFor["class_number"] = try XCTUnwrap(words["blankClassNumber"] as? String)
+        for blank in CourseConfiguration.printBlankOrder {
+            XCTAssertEqual(CourseSettingsWording.printingBlank(blank), wordFor[blank],
+                           "the settings' word for \(blank) is not the paper's")
+        }
+
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let folderName: String = try XCTUnwrap(oneCase["folder"] as? String)
+            let settings: [String: Any] = try XCTUnwrap(oneCase["settings"] as? [String: Any])
+            let expect: [String: Any] = try XCTUnwrap(oneCase["expect"] as? [String: Any])
+            let course: Course = Course(
+                code: folderName,
+                directoryURL: folder.appendingPathComponent(folderName),
+                configuration: configuration(settings)
+            )
+
+            var blanks: [String] = []
+            for blank in course.configuration.printBlanks {
+                let line: String = String(repeating: "_", count: lines[blank] ?? 0)
+                blanks.append((wordFor[blank] ?? blank) + " " + line)
+            }
+            let topRight: String = blanks.joined(separator: join)
+            let topLeft: String = PrintSettingsView.placed(
+                at: "header_left", configuration: course.configuration, displayedCourseCode: course.displayCode
+            )
+            let bottomLeft: String = PrintSettingsView.placed(
+                at: "footer_left", configuration: course.configuration, displayedCourseCode: course.displayCode
+            )
+            XCTAssertEqual(topLeft, expect["topLeft"] as? String, "topLeft, case: \(name)")
+            XCTAssertEqual(topRight, expect["topRight"] as? String, "topRight, case: \(name)")
+            XCTAssertEqual(bottomLeft, expect["bottomLeft"] as? String, "bottomLeft, case: \(name)")
+        }
     }
 
     func testBlanksAreWrittenInPrintOrderAndAnEmptySchoolNameRemovesTheKey() {

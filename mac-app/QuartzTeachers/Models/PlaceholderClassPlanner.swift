@@ -214,7 +214,9 @@ enum PlaceholderClassPlanner {
         for planned in written {
             createdURLs.append(planned.fileURL)
         }
-        return ClassChangeOutcome(message: message, created: createdURLs)
+        // Pages were written with no undo entry of their own when `written` is
+        // not empty (#531, the fix review): the Section menu's line reads it.
+        return ClassChangeOutcome(message: message, created: createdURLs, wroteSomething: !createdURLs.isEmpty)
     }
 }
 

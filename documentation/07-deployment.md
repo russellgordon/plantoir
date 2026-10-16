@@ -3442,6 +3442,50 @@ card and `list_courses` (#404). `planOpening.cases` and
 Not done there: `actsUseTheSavedSettings` case 8 (rides with #357) and the
 `scheduled deploy could not be set` line naming the cause (#261).
 
+### "Plugged in, if it is a laptop" removed (#521)
+
+Russell's decision, 2026-10-13, carried out 2026-10-16. The plan the sheet
+shows (`ScheduledDeployPlan.description`, which `plan_scheduled_deploy` also
+returns over MCP) listed three things the Mac must be at the moment: switched
+on and awake, **plugged in, if it is a laptop**, and lid open. The middle one
+was not true. launchd's `StartCalendarInterval` fires on battery as readily as
+on mains, and nothing in the agent's plist gates on the power source; what a
+deploy needs is a Mac that is AWAKE. The cable was standing in for "has not
+idle-slept", which on battery comes sooner. So:
+
+- the bullet is gone, and after the list, on its own line, Russell's own
+  words: "On battery, a Mac goes to sleep sooner, so be sure to keep it awake
+  until then." (First placed as the last bullet, as ruled; moved to its own
+  line in the fixes round — the implementation review's L1 — because it is a
+  sentence and does not read on from "at that moment this Mac must be:". His
+  words are unchanged.)
+- the assistant's two sentences — the `schedule_deploy` card and the answer
+  after setting one (`AssistToolRunner.awakeThenWithTheLidOpen`) — say "on and
+  awake then, with the lid open." They do not carry the battery line, so the
+  dialog and the assistant differ by that one line, which was Russell's call.
+  Neither is in `AssistWording` or any contract (ruling 6: not lifted this
+  batch), so no contract moved.
+- Pinned: `ScheduledDeployTests.testThePlanSaysWhatMustBeTrueOfTheMac` (the
+  absence of "plugged in", the battery line present) and
+  `AssistSettingsFreshnessTests.testTheCardAndTheAnswerNeverAskForACable`.
+- plantoir.app: `website/pages/day-to-day.html` said "Schedule the deploy for
+  7:00 on Monday and close the laptop", which contradicts "lid open"; it now
+  says to leave the computer on and awake. The `schedule-{light,dark}.png`
+  shots still show the old bullet and are retaken at the v1.7.2 cut.
+
+**Windows** registers its task battery-allowed already
+(`DisallowStartIfOnBatteries=false`, `StopIfGoingOnBatteries=false`), so the
+same line there is untrue too; a `windows` issue carries its five strings.
+
+**REJECTED, again:** a wake timer (`pmset schedule wake` /
+`IOPMSchedulePowerEvent` — needs administrator rights and fails silently; the
+doc comment at the top of `ScheduledDeploy.swift`) and a power-assertion
+helper holding off idle sleep until the run (battery drain overnight, a
+process alive while Plantoir looks quit; Russell, 2026-10-13). **NOT
+MEASURED:** a scheduled run on a MacBook on battery, lid open, Plantoir quit —
+the issue's "measure before deciding" was overtaken by Russell's decision,
+which rests on launchd's documented behaviour, not on a run.
+
 ## On Windows since bundle 3: the scheduled run is Plantoir
 
 Since 2026-09-30 (the Windows parity run's bundle 3: #347, #289, #239, #309,
