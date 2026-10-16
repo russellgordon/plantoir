@@ -266,7 +266,17 @@ public class LastViewedPagesTests : IDisposable
 /// <summary>One real try against a small server on 127.0.0.1: the status, redirects followed, silence as null.</summary>
 public class PreviewPageStatusTests
 {
-    private static async Task<(int Port, Task Serving)> ServeAsync(Func<string, string?> answer, CancellationToken stop)
+    /// <param name="heard">Completed with the path once a request has been
+    /// read, so a test can act at that moment rather than on a timer.</param>
+    /// <remarks>
+    /// <c>listener.Start()</c> already accepts at the TCP level: the kernel
+    /// completes the handshake into the backlog before this returns, so "wait
+    /// until the listener accepts" would not change what a slow run meets (#543
+    /// REJECTED it). What is late under load is everything in user mode on
+    /// BOTH sides, and that needs pool threads.
+    /// </remarks>
+    private static async Task<(int Port, Task Serving)> ServeAsync(Func<string, string?> answer, CancellationToken stop,
+                                                                   TaskCompletionSource<string>? heard = null)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -287,6 +297,7 @@ public class PreviewPageStatusTests
                         int read = await stream.ReadAsync(buffer, stop);
                         string request = Encoding.ASCII.GetString(buffer, 0, read);
                         string path = request.Split(' ')[1];
+                        heard?.TrySetResult(path);
                         string? response = answer(path);
                         if (response is null) { try { await Task.Delay(Timeout.Infinite, stop); } catch { } return; }
                         byte[] bytes = Encoding.ASCII.GetBytes(response);
@@ -319,11 +330,19 @@ public class PreviewPageStatusTests
         using var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         Uri At(string path) => new($"http://127.0.0.1:{port}{path}");
 
-        Assert.Equal(200, await PreviewStartPage.StatusOfAsync(client, At("/ok"), CancellationToken.None));
-        Assert.Equal(200, await PreviewStartPage.StatusOfAsync(client, At("/Concepts"), CancellationToken.None));
-        Assert.Equal(404, await PreviewStartPage.StatusOfAsync(client, At("/gone"), CancellationToken.None));
-        Assert.Equal(410, await PreviewStartPage.StatusOfAsync(client, At("/withdrawn"), CancellationToken.None));
-        Assert.Equal(500, await PreviewStartPage.StatusOfAsync(client, At("/broken"), CancellationToken.None));
+        // A generous clock on every ANSWERED path (#543). This test is about
+        // reading statuses; the default per-try clock is a product number
+        // (previewStartPage.secondsPerAttempt, 5 s), and at the start of a full
+        // run the thread pool can be starved for longer than that, which once
+        // read a 200 as null here (Expected 200, Actual null, 7 s). A pass
+        // takes milliseconds, so the length costs nothing. Only /stalls keeps a
+        // short clock: it is the one assert whose subject IS the clock.
+        var answered = TimeSpan.FromSeconds(30);
+        Assert.Equal(200, await PreviewStartPage.StatusOfAsync(client, At("/ok"), CancellationToken.None, answered));
+        Assert.Equal(200, await PreviewStartPage.StatusOfAsync(client, At("/Concepts"), CancellationToken.None, answered));
+        Assert.Equal(404, await PreviewStartPage.StatusOfAsync(client, At("/gone"), CancellationToken.None, answered));
+        Assert.Equal(410, await PreviewStartPage.StatusOfAsync(client, At("/withdrawn"), CancellationToken.None, answered));
+        Assert.Equal(500, await PreviewStartPage.StatusOfAsync(client, At("/broken"), CancellationToken.None, answered));
         Assert.Null(await PreviewStartPage.StatusOfAsync(client, At("/stalls"), CancellationToken.None, TimeSpan.FromMilliseconds(300)));
         stop.Cancel();
     }
@@ -331,12 +350,25 @@ public class PreviewPageStatusTests
     [Fact]
     public async Task AStoppedPreviewEndsTheAskingRatherThanReadingItAsSilence()
     {
+        // Deterministic rather than raced (#543). This used to stop the preview
+        // with a 200 ms timer against the product's 5 s per-try clock; under a
+        // starved pool neither timer's callback ran on time, the per-try one
+        // could win, and the method then read silence (null) instead of
+        // throwing ("No exception was thrown", 7 s). Now the test stops the
+        // preview itself, once the request has ARRIVED, and the per-try clock is
+        // a minute so it cannot win. The wait on the asking is 30 s, inside that
+        // minute, so a product that ignored the stop fails here with a
+        // TimeoutException instead of passing when its own clock ran out.
         using var stop = new CancellationTokenSource();
-        var (port, _) = await ServeAsync(_ => null, stop.Token);
+        var heard = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var (port, _) = await ServeAsync(_ => null, stop.Token, heard);
         using var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-        using var preview = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            PreviewStartPage.StatusOfAsync(client, new Uri($"http://127.0.0.1:{port}/x"), preview.Token));
+        using var preview = new CancellationTokenSource();
+        var started = PreviewStartPage.StatusOfAsync(client, new Uri($"http://127.0.0.1:{port}/x"), preview.Token,
+                                                     TimeSpan.FromMinutes(1));
+        await heard.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        preview.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => started.WaitAsync(TimeSpan.FromSeconds(30)));
         stop.Cancel();
     }
 }

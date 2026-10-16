@@ -657,6 +657,65 @@ than implying every line came off a run. **Nothing here has ever been seen to
 crash its host**; this exists so that if one ever does, it is read correctly
 the first time.
 
+### A red that is a clock: the pool starved early in a full run (#543, #427)
+
+Three tests with a real socket or a real process went red one run in N in a
+full `dotnet test` and green alone straight after: `PreviewPageStatusTests.
+EachStatusIsReadAsTheServerAnsweredIt` ("Expected: 200, Actual: null", 7 s,
+11.6 s into the 1.7.1 cut's run), its sibling `AStoppedPreviewEndsTheAsking
+RatherThanReadingItAsSilence` ("No exception was thrown", 7 s, 26.8 s into a
+run), and `ConPtyRedirectedParentTests.AChildStartedFromARedirectedParent
+StillWritesToItsPseudoConsole` (11 s, twice; its messages were not kept).
+Seven seconds is the product's 5 s per-try clock (`previewStartPage.
+secondsPerAttempt`) plus about two; eleven is the test's 10 s wait plus one.
+
+**What was reproduced** (2026-10-16, Intel i5-8365U, 8 logical CPUs, 16 GB,
+Windows 11 Pro 26200), with a scratch harness that was NOT committed: before
+each repetition it blocks every pool thread on a `ManualResetEventSlim`
+(4 × cores + the pool's current thread count work items, released from a
+DEDICATED thread, since a pool timer could not fire), then runs a verbatim
+copy of the old and the new test body, ten times each:
+
+| Body | Old | New |
+|---|---|---|
+| ConPTY, pool held 12 s | **8 of 10 red**, each `exited: True` and an EMPTY transcript, 11.8 s | 10 of 10 green |
+| `EachStatus…`, pool held 8 s | 1 of 10 red ("Expected 200, Actual null", 7.8 s) — the first repetition in the process | 10 of 10 green |
+| the same, threads handed back one per 60 ms | 1 of 10 red (7.0 s), again the first | 10 of 10 green |
+| `AStoppedPreview…`, both release shapes | 0 of 20 red | 20 of 20 green |
+
+The ConPTY shape is the useful one: an EMPTY transcript is starvation (the
+pool reader never ran), which is not #155's shape — mode sequences and no
+`PTY-OK` — so a red there should be read by its transcript. The harness
+proves the tests were VULNERABLE to a starved pool; it does not prove that
+is what happened in the recorded runs, whose messages were lost (#427) or
+whose sibling was not reproduced (`AStoppedPreview…`, a timer race that
+needs the 5 s per-try timer to be serviced before the 200 ms one).
+CPU load alone does NOT starve the pool, and the loops say so: each class
+run alone 50 times with the NEW bodies gave 50 of 50 green for both
+classes, and 50 of 50 again for both while eight busy-loop jobs held every
+core (200 runs in all, `dotnet test --no-build`, judged by the totals line).
+
+**What changed** (test code only): `EachStatus…` passes a 30 s per-try clock
+on the five answered paths and keeps 300 ms on `/stalls`, the one assert
+whose subject is the clock. `AStoppedPreview…` no longer races two timers:
+`ServeAsync` completes a `heard` `TaskCompletionSource`
+(`RunContinuationsAsynchronously`) when the request arrives, the test then
+cancels the preview itself with a one-minute per-try clock, and waits on the
+asking with `WaitAsync(30 s)`, so a product that ignored the stop would fail
+with a `TimeoutException` rather than pass when its own clock ran out. The
+ConPTY test reads on a dedicated `Thread`, as the product's `ScriptRunner`
+does, and both of its waits are 30 s. A pass still takes milliseconds.
+
+**Rejected:** `ThreadPool.SetMinThreads` in the test host — it would hide a
+starvation a product path could meet, and the tests would then be passing in
+a process unlike the app's. Waiting for the listener to accept once before
+the first assert (#543's other option) — `listener.Start()` already accepts
+at the TCP level (the kernel completes the handshake into the backlog
+before `ServeAsync` returns); what starves is the user-mode work on both
+sides, the accept loop, the reads and writes, HttpClient's continuations
+and the timers, so it would change nothing. A dedicated server thread
+instead of `Task.Run` — the client side starves too, so it cures half.
+
 ### And when the failure IS real: a red contract test is a handover
 
 Everything above is about telling a genuine failure from a crash or an empty
@@ -1151,6 +1210,10 @@ the whole process) and the per-instance `_ptyGate` (it would not serialise two
 Starts). The cost: while the lock is held, another thread writing to
 `Console` loses that output — the GUI app writes none. Launching harnesses
 with ShellExecute is still the better habit, and `DrivenApp` keeps doing it.
+Since #427 (2026-10-16) the test reads on a dedicated thread with 30 s
+waits: a pool reader starved at the start of a full run gave `exited: True`
+and an EMPTY transcript — a different shape from the one above — in a
+harness that starved the pool ("A red that is a clock", above).
 
 The app also says so now: when it starts with stdout, stderr or stdin
 redirected to a pipe or a file, `startup.log` gets one line
