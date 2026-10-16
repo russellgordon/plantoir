@@ -5565,8 +5565,9 @@ and before anything runs: an outside assistant is refused with
 own assistant reaches it only with no window seams at all, and is told
 `…AndNoWindow`. The trail line is the contract's: "a deploy was held back for
 classes dated after the next class — {N} with no answer" — no "by an outside
-assistant" (the mac adds who asked; the contract's line does not, and the plan
-review ruled for the contract). `publish_class_on`, from any client, and the
+assistant" (the plan review ruled for the contract; the mac added who asked
+until #532, 2026-10-16, and writes the contract's line too since —
+`DeployAsksAboutLaterClassesTests.testAHeldBackDeployIsTheContractsLine`). `publish_class_on`, from any client, and the
 links checklist's Publish (`PublishAndRemember`) record a later class they
 published as kept: a date the teacher named is not a mistake to catch, and
 without it the two questions undid each other (the mac's batch B review,
