@@ -5705,7 +5705,9 @@ false. Course Settings uses the same check.
 Settings ▸ Deploying, then deploy again."; Schedule a Deploy's two
 (`ScheduledDeploy`, `cloudflareAccountMissing` and its additional twin) say
 "… then schedule this again." Constants in `Core/Models/DeployingSettings.cs`.
-The mac's three still say "this course's settings" — a `mac` issue, #534.
+The mac's three said "this course's settings" until #534 (2026-10-16); they
+now say "Plantoir ▸ Settings ▸ Deploying", where the item is on the mac — the
+File ▸ / Plantoir ▸ split below stands.
 
 **The deliberate wording split.** The app's sentences say **File ▸ Settings ▸
 Deploying**, where the item IS on Windows. The launchers' non-interactive

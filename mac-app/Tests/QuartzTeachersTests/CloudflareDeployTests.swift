@@ -282,7 +282,10 @@ final class CloudflareDeployTests: XCTestCase {
         )
         let text: String = try XCTUnwrap(refusal)
         XCTAssertTrue(text.contains("Paste your Cloudflare Account ID."))
-        XCTAssertTrue(text.contains("under Deploying"))
+        // The Account ID lives in Settings, not in the course (#457, #534):
+        // the refusal names where it is, as the launchers do (#490).
+        XCTAssertTrue(text.contains("Plantoir ▸ Settings ▸ Deploying"), text)
+        XCTAssertFalse(text.contains("this course’s settings"), text)
 
         XCTAssertNil(SectionDetailView.deployRefusalReason(
             configuration: cloudflare, cloudflareAccountID: "0123456789abcdef0123456789abcdef"
