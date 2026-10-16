@@ -83,6 +83,13 @@ public sealed class ClubNounTests : IDisposable
                         TeacherCopy(tools.PlanAddNextClass("ICS3U", 1)));
         Assert.Contains(AssistWording.MakingRoomCannotBeUndoneForAMeeting,
                         TeacherCopy(tools.PlanAddNextClass("ICS3U", 1, duplicate: "Week 1")));
+
+        // #530: the make-room card, too, in the meeting form; the model's copy
+        // keeps the class form (TheNounNeverReachesWhatTheModelReads).
+        var makeRoom = tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2);
+        Assert.Contains(AssistWording.MakingRoomCannotBeUndoneForAMeeting, TeacherCopy(makeRoom));
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndone, TeacherCopy(makeRoom));
+        Assert.Contains(AssistWording.MakingRoomCannotBeUndone, ModelCopy(makeRoom));
     }
 
     /// <summary>

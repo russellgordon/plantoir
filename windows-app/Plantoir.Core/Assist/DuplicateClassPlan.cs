@@ -59,7 +59,7 @@ public sealed class DuplicateClassPlan
     /// then offers an undo that takes back the new page and leaves the rest of
     /// the year moved.</para>
     /// </summary>
-    public bool MovesOtherClasses => Insertion.Renames.Count > 0 || Insertion.Moves.Count > 0;
+    public bool MovesOtherClasses => Insertion.MovesOtherClasses;
 
     /// <summary>The card a teacher agrees to before anything is written.</summary>
     public string Describe() => Describe(ClassNoun.Class);

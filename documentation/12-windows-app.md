@@ -5341,21 +5341,107 @@ sends `plantoir.app/lastChange` (`"CODE/N"`, or null) and
 `plantoir.app/changesToUndo` on every answer, and `plantoir.app/changed`,
 whether the call changed anything. `SectionVerbs.LastChange` greys Undo Last
 Change everywhere but that section (`lastChangeIsHere`), and `changed`
-decides the trail's ending — "carried out", "changed nothing", "took the last
-change back". It was the undo list's DEPTH before and after until 2B's
+decides the trail's ending: "carried out" or "changed nothing", and for Undo
+Last Change "took the last change back", "took part of the last change back"
+or "changed nothing". It was the undo list's DEPTH before and after until 2B's
 implementation review (M1) found it wrong twice: Make Room for Classes keeps
 no undo entry, on purpose, so a room really made read "changed nothing"; and
 `UndoHistory` keeps twenty, so from the twenty-first change the depth stops
 growing and every change read the same way. The server knows: a call changed
 something when the top of its undo list is a different entry afterwards (a
-new one however deep the list, or one taken back), or when Make Room says it
-wrote (`AssistWorkspace.NoteAChangeWithNoUndoEntry`); the depth is only the
-fallback for an answer without the key. Not entirely free of sentences, and
-said so: Rebuild Preview's ending compares the answer with
-`AssistWording.PreviewIsRebuilding`, and Undo's also counts an answer
-containing "is put back". None of the three keys is sent to an outside
-client. Pinned by `SectionVerbsTests.MakingRoom_IsCarriedOut_ThoughItKeepsNoUndoEntry`
-and `TheTwentyFirstChange_IsCarriedOut_ThoughTheListStaysAtTwenty`.
+new one however deep the list, or one taken back), or when the call noted a
+write that leaves no new entry (`AssistWorkspace.NoteAChangeWithNoUndoEntry`).
+For anything but Undo, the depth is only the fallback for an answer without
+the key. None of the three keys is sent to an outside client. Rebuild
+Preview's ending is the one that reads a sentence: it compares the answer with
+`AssistWording.PreviewIsRebuilding`. Pinned by
+`SectionVerbsTests.MakingRoom_IsCarriedOut_ThoughItKeepsNoUndoEntry` and
+`TheTwentyFirstChange_IsCarriedOut_ThoughTheListStaysAtTwenty`.
+
+**Writes with no new undo entry, and Undo's three endings (#550, the mac's
+#531, 2026-10-16).** Five paths note a write that adds no entry, and each is
+pinned:
+- **Make Room for Classes**, when it wrote anything. Since #550 a new page
+  whose save FAILS is carried past and named, like the renames and the dates
+  already were. Until then that one `Save` was not in a try, so a failure
+  after the renames threw past the note: the line said "changed nothing" about
+  a renamed section, and the teacher was told Guarded's "That couldn’t be
+  read". Only the stand-alone call carries it past. `ApplyDuplicateClass`,
+  which calls the same insertion, still notes the change and THROWS, because
+  carried past, it would find no page of its own and say "the place for the
+  copy is still taken" about a plain write failure
+  (`InsertClassesTests.MakeRoomWhoseNewPageCouldNotBeSaved_IsCarriedPastAndNotedAsAChange`,
+  `ADuplicateWhoseNewPageCouldNotBeSaved_ThrowsAndIsNotStillTaken`).
+- **A partial undo.** `UndoHistory.Undo` keeps the entry when any file was
+  skipped, so `undo_last_change` notes the change when files were both
+  restored and skipped.
+- **A publish or hide that wrote and then stopped part way**, both the page
+  list (`AssistWorkspace.Apply`) and the whole unit (`ApplyWholeUnit`). The
+  recording is abandoned on the throw, so the top entry does not move. Each
+  tracks whether a file has been written yet (`wrote`, and the whole unit's
+  existing `changedAnything`). On an `IOException` or
+  `UnauthorizedAccessException`, `StoppedWhileWriting` notes the change and
+  rethrows, so the teacher still hears `PublishStoppedPartWay`.
+- **Re-date Classes… that stopped part way** (`ApplyReDate`). After the first
+  page is written it notes the change and throws an `AssistRefusal`:
+  `PublishStoppedPartWay("the section's class dates", …)` with its way back,
+  then "The pages already re-dated:" and the pages, which are the mac's words.
+  It is an `AssistRefusal` so that both callers ANSWER it, each through its
+  own `catch (AssistRefusal)`: `re_date_classes` and `roll_over_section`.
+  Neither goes through `Guarded`. (The plan said the re-date's error reached
+  the teacher "through Guarded", and that was wrong. Before #550 both tools
+  let an `IOException` escape, and the teacher's assistant got the SDK's
+  generic "An error occurred invoking '…'" protocol error. Neither tool ever
+  said "That couldn’t be read".) Any OTHER `IOException` in the re-date
+  still escapes, for example one from `TimetableMemory.Write`; that predates
+  #550. `TimetableMemory.Write` runs BEFORE the loop, so the remembered dates
+  have changed even when no page has. That is true on the mac too, and the
+  "Nothing was changed" below is about pages.
+
+**A first write that fails says the mac's "Nothing was changed: {reason}"**
+(`AssistWorkspace.NothingWasChanged`, with "Plantoir doesn’t have permission
+to change one of them." for a permission). That covers a re-date and a
+roll-over, and since the director's ruling on review F8 it covers a publish or
+hide too: page list, whole unit and `publish_class_on`. Those had said
+`PublishStoppedPartWay` for every `IOException`, which is false when nothing
+was written. Its trail ending is "changed nothing". `OnlyPartlyDone` and the
+re-date now share one composition, `AssistWorkspace.StoppedPartWay`, so the
+way back (Backups on the menu, Restore Section in the window, nothing for an
+outside assistant) is decided in one place.
+
+**Undo's ending comes from the depth plus `changed`**
+(`SectionVerbs.Ending`). The depth went DOWN means the entry came off: "took
+the last change back". `UndoHistory.Undo` removes the entry exactly when
+nothing was skipped, so a whole undo lowers the depth by one at any depth; the
+cap of twenty trims only when an entry is added. `changed` with the depth
+unmoved is "took part of the last change back"; anything else is "changed
+nothing". It used to count an answer containing "is put back" as a whole
+undo, and `UndidPartlyFromTheMenu` (the twin the menu shows) contains those words too, so
+a partial undo read as a whole one. A second press after the edit is undone is
+partial AGAIN: the file the first press restored no longer matches what the
+change wrote, so it is skipped and the entry stays. The mac behaves the same,
+and a `decision` issue
+([#555](https://github.com/russellgordon/plantoir/issues/555)) asks whether an entry that blocks the list for good is
+right. Pinned by `SectionVerbsTests.APartialUndo_TookPartOfTheLastChangeBack`,
+`APublishThatStoppedPartWay_IsCarriedOut`,
+`AWholeUnitThatStoppedPartWay_IsCarriedOut`,
+`APublishWhoseFirstWriteFails_SaysNothingWasChanged`,
+`ReDateThatStoppedPartWay_SaysPartWayAndListsThePages`,
+`ReDateWhoseFirstWriteFails_SaysNothingWasChanged` and
+`TheEnding_PrefersWhatTheServerSays_OverTheDepth`; by
+`RolloverWebsiteTests.RollOverThatStoppedPartWay_IsAnsweredNotThrown`,
+`RollOverWhoseFirstWriteFails_SaysNothingWasChanged` and
+`ReDateWhoseFirstWriteFails_SaysNothingWasChanged`; and by
+`PublishStoppedPartWayTests.APublishWhoseFirstWriteFailsSaysNothingWasChanged`.
+Thirteen of these were red on the old code (MEASURED). A test that forces a
+write to fail holds the page with `FileShare.Read`, never `FileShare.None`:
+None also blocks the backup's zip and the plan's read, so the call fails
+before the write it exists to exercise (measured by the plan review).
+REJECTED: a new `_meta` key for "the entry came off", because the depth
+already says it, deterministically. Also REJECTED: one writes-signal from
+`UndoHistory.Abandon`. It would be one place instead of four, but it would
+miss Make Room and a partial undo, and it would hide which paths are covered,
+whereas the mac pins each path.
 
 **One sentence outside the contract, deliberately: `SectionVerbs.CouldNotBeDone`**
 ("That could not be done just now. Try again in a moment."). It is what a
@@ -5475,7 +5561,8 @@ dialog is still closing, rather than drop the change's answer.
 
 **Trail**: `RanFromAMenu` ("UIVERB/1 · Section ▸ Publish Pages… — carried
 out, 1 page ticked"; endings carried out, changed nothing, took the last change
-back, cancelled at the plan, rebuilt, not rebuilt, opened) and
+back, took part of the last change back (#550), cancelled at the plan,
+rebuilt, not rebuilt, opened) and
 `SectionMenuBackedUpACourse`. The second is written by the window's
 `plantoir-mcp`, which `--state-dir` does not reach (`AppDataRoot` does not
 cross processes), so a UI test's copy line lands in the PC's own trail.

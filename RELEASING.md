@@ -113,6 +113,10 @@ version line. A list that survives its own release is worse than no list.
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
 | 2026-10-16 | Pages inside an open folder of a class site's sidebar have a small dot, so a long title that wraps reads as one page | mac (Windows when its toolchain next ships; shared `support/quartz`) | #515 |
+| 2026-10-16 | A scheduled deploy no longer asks for the computer to be plugged in; the plan says a PC on battery sleeps sooner, so keep it awake | Windows (mac shipped it in v1.7.2, #521) | #547 |
+| 2026-10-16 | An outside assistant's How I Teach plan refuses a course kept for reference, as the write does | Windows (mac already did) | #540 |
+| 2026-10-16 | The assistant's Make Room for Classes plan says Undo will not take it back when other classes move | Windows (mac already did) | #530 |
+| 2026-10-16 | Section menu trail endings: a partial undo says it took part of the last change back; a Re-date, publish or hide that stops part way says which pages were written, and one whose first write fails says nothing was changed | Windows (mac shipped it in v1.7.2, #531) | #550 |
 
 ## Warnings the release notes MUST carry
 
