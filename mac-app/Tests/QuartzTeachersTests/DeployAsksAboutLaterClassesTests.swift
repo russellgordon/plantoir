@@ -63,6 +63,28 @@ final class DeployAsksAboutLaterClassesTests: XCTestCase {
         XCTAssertLessThan(held.lowerBound, stops.lowerBound, "asked before the preview is stopped")
     }
 
+    /// #532: the held-back line is the contract's `line`, nobody named —
+    /// `activityTrail.mustRecord` → "a deploy was held back for classes
+    /// dated after the next class", which Windows writes too. MUST FAIL with
+    /// ", asked for by …" on the end.
+    func testAHeldBackDeployIsTheContractsLine() throws {
+        let events: [[String: Any]] = try XCTUnwrap(
+            try SharedRulesContractTests.section("activityTrail")["mustRecord"] as? [[String: Any]])
+        var example: String = ""
+        for event in events where event["event"] as? String == ActivityTrail.Event.laterClassesHeldADeployBack.rawValue {
+            example = (event["line"] as? String) ?? ""
+        }
+        XCTAssertFalse(example.isEmpty, "the contract names the event")
+        XCTAssertEqual(
+            example.replacingOccurrences(of: "{N}", with: "1 class"),
+            "{course}/{section} · " + ClassesDatedLater.heldBackLine(count: 1)
+        )
+        XCTAssertEqual(
+            example.replacingOccurrences(of: "{N}", with: "2 classes"),
+            "{course}/{section} · " + ClassesDatedLater.heldBackLine(count: 2)
+        )
+    }
+
     /// A scheduled deploy goes out as it is and records the places: the line
     /// is the trail's shape, and the run calls it.
     func testAScheduledDeployRecordsTheClassesItSent() throws {

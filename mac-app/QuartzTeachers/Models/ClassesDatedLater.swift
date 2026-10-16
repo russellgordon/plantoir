@@ -335,11 +335,17 @@ nonisolated enum ClassesDatedLater {
     }
 
     /// The trail's words for a deploy held back for them (#475):
-    /// `laterClassesHeldADeployBack`.
-    static func heldBackLine(count: Int, by who: String) -> String {
+    /// `laterClassesHeldADeployBack` — the contract's `line`, exactly.
+    ///
+    /// Nobody is named. It said ", asked for by an outside assistant" (or
+    /// "the assistant") until #532, which the contract's line never did and
+    /// Windows does not: which side asked is already on the trail, because
+    /// an outside assistant's own lines sit beside this one, and the in-app
+    /// assistant reaches the hold only with no window to ask in (Russell,
+    /// 2026-10-16: drop it).
+    static func heldBackLine(count: Int) -> String {
         let classes: String = count == 1 ? "1 class" : "\(count) classes"
-        return "a deploy was held back for classes dated after the next class — \(classes) with no answer, "
-             + "asked for by \(who)"
+        return "a deploy was held back for classes dated after the next class — \(classes) with no answer"
     }
 
     /// The trail's words for the question, answered (#475):

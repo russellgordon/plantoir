@@ -3226,7 +3226,7 @@ final class AssistToolRunner {
         let pages: String = AssistPublishPlan.listingAFew(titles)
         ActivityTrail.note(
             .laterClassesHeldADeployBack,
-            ClassesDatedLater.heldBackLine(count: flagged.count, by: surface == .mcp ? "an outside assistant" : "the assistant"),
+            ClassesDatedLater.heldBackLine(count: flagged.count),
             course: course.code, section: section
         )
         if surface == .mcp {
