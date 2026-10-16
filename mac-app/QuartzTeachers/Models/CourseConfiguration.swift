@@ -832,17 +832,25 @@ class CourseConfiguration {
         }
     }
 
-    /// The blanks, in print order. Absent means Name and Date; unknown values
-    /// are ignored; an empty list means none.
+    /// The blanks, in print order. Absent OR null means Name and Date;
+    /// unknown values are ignored; an empty list means none.
+    ///
+    /// Null is the default because that is what the BUILD prints
+    /// (`scripts/print_settings.py` → `_blanks` reads `None` as absent), and
+    /// the sketch must not show an empty corner over paper that carries Name
+    /// and Date (#537; the corners case "blanks of null are the default").
+    /// Read only: the null stays in the file, so opening the course does not
+    /// mark it changed.
     var printBlanks: [String] {
         get {
-            guard values["print_blanks"] != nil else {
+            let stored: Any? = values["print_blanks"]
+            if stored == nil || stored is NSNull {
                 return ["name", "date"]
             }
-            let stored: [String] = stringListValue(forKey: "print_blanks")
+            let chosen: [String] = stringListValue(forKey: "print_blanks")
             var ordered: [String] = []
             for blank in CourseConfiguration.printBlankOrder {
-                if stored.contains(blank) {
+                if chosen.contains(blank) {
                     ordered.append(blank)
                 }
             }
