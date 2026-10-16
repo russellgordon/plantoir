@@ -5789,7 +5789,7 @@ cap past fifteen, the summary's counts, the card/table anti-drift guards, a
 club's meeting forms, JSON both ways, the sort, the natural order),
 `SectionMenuServerTests` (the table from the menu only, the text content
 unmoved, none on an answer that is not a plan), the `ContractTests` block, and
-the layout (`PlanTableLayout`: everything fits whenever four rows and two
+the layout (`PlanTableLayout`: everything fits whenever two rows and two
 lines of notes can; long notes scroll at the default window; a tall window
 shows 12). Through the window (`PlanTableUiTests`, opt-in, 4 of 4 on this PC,
 2 min 20 s): the table, its fit, the last row shown inside the table after
