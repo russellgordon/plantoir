@@ -4064,6 +4064,22 @@ entry, and no menu item reaches it. The other menu paths were read: Make
 Room's `apply` throws only before its first write, Add Next Class writes one
 page.
 
+**On Windows since #550 (2026-10-16).** The same endings, and the same five
+paths, each pinned. The undo ending comes from the depth the menu's server
+sends plus its `changed` flag, never from the sentence; it used to count
+"is put back", which the partial sentence also contains. Re-date Classes… that
+stops part way says `publishStoppedPartWay` with the pages already re-dated,
+on both `re_date_classes` and `roll_over_section`. Before, the first said
+"That couldn’t be read" and the second let the error escape. A first write
+that fails says the mac's "Nothing was changed: …", and that now includes a
+publish or hide, which had said "Only part of …" for any write failure. One
+difference was Windows' alone: Make Room's add-a-new-page save was not carried
+past the way its renames and dates were, so a failure there after renames
+threw past the note. It is carried past now, for the stand-alone call only.
+The duplicate still throws, so it never says "the place for the copy is still
+taken" about a plain write failure. `documentation/12-windows-app.md` →
+"Writes with no new undo entry, and Undo's three endings" has the rest.
+
 **Rebuild Preview restarts a SERVING preview (#528, checked 2026-10-16).**
 Windows found its own `rebuild_preview` returned at once while a preview was
 serving and still said it was rebuilding (#489). The mac never had that:

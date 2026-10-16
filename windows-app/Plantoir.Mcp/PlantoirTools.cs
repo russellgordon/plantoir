@@ -1793,6 +1793,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // Nothing went back, because every file has been edited since. This
         // must not read like a success, and a count of files put back reads
         // exactly like one when the count is zero.
+        // Some files went back and the rest were kept, so the entry STAYS on
+        // the list: a write with no new undo entry, which the menu's trail
+        // reads as "took part of the last change back" (#550, the mac's #531).
+        if (result.Restored.Count > 0 && result.Skipped.Count > 0) workspace.NoteAChangeWithNoUndoEntry();
+
         if (result.Restored.Count == 0)
         {
             string refusal = (menu ? AssistWording.CouldNotUndoFromTheMenu(result.Description, result.Skipped.Count)
@@ -2152,17 +2157,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             if (unitWord is not null) unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
         }
         string what = unit is { } number ? $"{unitWord} {number}" : "the pages you named";
-        string reason = error is UnauthorizedAccessException
-            ? "Plantoir doesn’t have permission to change one of them."
-            : error.Message;
-        string said = AssistWording.PublishStoppedPartWay(what, reason);
-        // The menu has no Restore banner; its way back is the copy it made
-        // just before this change, in the course's Backups (#489).
-        if (workspace.SpeaksFromTheMenu && workspace.ConversationBackupPath is not null)
-            said += " " + AssistWording.RestoreFromBackupPutsItBack;
-        else if (workspace.ServesTheLocalWindow && workspace.ConversationBackupPath is not null)
-            said += " " + AssistWording.RestoreSectionPutsItBack(section.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        return said;
+        // One composition for every change that stopped part way, the re-date
+        // included since #550 (the way back per surface is decided there).
+        return workspace.StoppedPartWay(what, error, section);
     }
 
     private async Task<CallToolResult?> WholeUnitRequested(
