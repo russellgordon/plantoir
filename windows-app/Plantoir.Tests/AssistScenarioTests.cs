@@ -252,9 +252,12 @@ public class AssistScenarioTests : IDisposable
             // calls StartAutomatedPreview — so this fake does the same, with a
             // real suspension inside the stop, and the harness waits for it as
             // a teacher would see it finish. The fake can only mirror that
-            // order; the real window's order is pinned by
-            // SectionVerbsUiTests.RebuildPreviewRebuildsAServingPreview, which
-            // drives Rebuild Preview against a serving preview.
+            // order, and NO test holds the real one: it lives in
+            // RebuildPreviewAsync and is held by reading that code.
+            // SectionVerbsUiTests.RebuildPreviewRebuildsAServingPreview (opt-in,
+            // part of no gate) proves only that a serving preview ends up
+            // showing the edit after Section ▸ Rebuild Preview; it never sees
+            // a stop, or the order.
             agent.RebuildPreviewInApp = () =>
             {
                 windowWork = RebuildInTheWindow();
