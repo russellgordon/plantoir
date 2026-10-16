@@ -292,7 +292,15 @@ Questions only handout through `handout_pdf.mjs` with the runtime's Node
 shows that PDF in an Edge `--app` window with the viewer's toolbar off
 (`print-handout-windows.png`, light: it is paper). Each picture is read back
 with Windows' own text recognition (`windowshot --ocr`) and must show
-`expectText`, as the mac's must show it to Vision. When all three are taken
+`expectText`, as the mac's must show it to Vision; a word not read at the
+picture's size is read again from a copy three times larger (reading only —
+the handout's 10-pixel footer, "Page 1 of 1", was not read at all at 1x on a
+1080-pixel screen). The windows are the mac's sizes in DIPs, and on a screen
+too small for them at its own scale (1920 × 1080 at 150%, 2026-10-15) Edge
+is told to draw at a smaller one (`hero_windows.fitted_scale`, 1.15 there)
+so the page keeps the mac's framing with fewer pixels — 1427 × 961 for the
+page, 736 × 962 for the handout, shown whole (`view=Fit`). First taken on an
+unlocked desktop on 2026-10-15. When all three are taken
 the run marks both shots `windows: true`; take them off
 `WINDOWS_PICTURE_OWED` in `website/test_build_data.py` in the same commit.
 The preview is stopped with `preview.ps1 MPM2D 1 --stop`; the folder and its

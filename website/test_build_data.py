@@ -409,20 +409,11 @@ class ReleaseReadinessTests(unittest.TestCase):
 
 
 # A Windows picture that cannot be taken yet, each with what blocks it. Every
-# other id must be `windows: true` (Russell, 2026-10-04). Empty since that day:
-# `schedule`, the last, is the sheet alone on Windows, because Windows'
-# notification is no window Windows.Graphics.Capture can be given (Russell's
-# ruling, 2026-10-04) — until v1.7.0's two print pictures, below.
-WINDOWS_PICTURE_OWED: dict = {
-    # v1.7.0, mac only (DECISIONS 15): what printing does, and a drawn
-    # diagram, photographed from a Mac preview. Windows' harness takes both
-    # since the 1.7.1 catch-up (`capture_windows.py --print-set`,
-    # print_set_windows.py), but the shutter needs an UNLOCKED desktop; the
-    # run marks both `windows: true` when it has them, and these two lines
-    # come off then.
-    "print-page": "capture_windows.py --print-set, on an unlocked desktop",
-    "print-handout": "capture_windows.py --print-set, on an unlocked desktop",
-}
+# other id must be `windows: true` (Russell, 2026-10-04). Empty again since
+# 2026-10-15: v1.7.0's two print pictures (`print-page`, `print-handout`),
+# mac only at first, were taken on Windows by `capture_windows.py
+# --print-set` on the first unlocked desktop after the 1.7.1 catch-up.
+WINDOWS_PICTURE_OWED: dict = {}
 
 
 class WindowsSwapTests(unittest.TestCase):

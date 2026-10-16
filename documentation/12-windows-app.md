@@ -1504,22 +1504,65 @@ This is the mac's own method for its F7–F9 numbers (headless Chromium,
   `../Media/Worksheet-3.pdf` — the FOLDER's spelling, as Quartz slugs it —
   and the build reported no `printPdfNotFound`.
 
-**MEASURE WHEN UNLOCKED** (the desktop was locked for all of batch 5B — RDP
-disconnected, LogonUI up — so nothing that needs a window in front, or the
-teacher's own browser, could be done): (1) whether WebView2 would have
-printed the handout itself — a print preview for
-`frame.contentWindow.print()` on the hidden frame, `afterprint`, whether
-`print()` blocks — which decides only whether the hand-over could one day be
-dropped, not whether it works; (2) Ctrl+P in the pane on a printable page
-(page count, corners); (3) that `#plantoir-print=…&paper=…` survives
-ShellExecute into the teacher's Edge (and Chrome, once installed) and prints
-at once; (4) the two checks above in a HEADED Edge and in Chrome, if the
-director wants more than the headless numbers. UI tests written and OWED a
-run on an unlocked desktop (each failed only at `DrivenApp.BringToFront`,
-"could not be brought in front"): `CourseSettingsPrintingUiTests` (2),
-`GuidanceAskUiTests` and `PreviewHandsLinksToTheBrowserUiTests`. The
-guidance test got as far as the real app writing `AGENTS.md` without asking
-and showing the question naming `CLAUDE.md` before it needed the keyboard.
+**Measured on an unlocked desktop** (2026-10-15, the same PC: Intel
+i5-8365U, 16 GB, Windows 11 Pro 26200, WebView2 Runtime and Edge
+155.0.4283.45, one 1920 × 1080 screen at 150%; the real x64 Debug app on a
+scratch working folder holding the print set's MPM2D, its pane driven over
+WebView2's own debugging port, `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`):
+
+- **Ctrl+P in the pane** opens WebView2's own print window INSIDE the pane
+  (Chromium's print preview, "Microsoft Print to PDF" by default) on
+  *Similar Triangles Practice*: **2 sheets**, the ⌘P path of
+  `modes.commandP` — Name and Date top right, "Similar Triangles Practice ·
+  MPM2D" bottom left, "Page 1 of 2" bottom right, the answers folded.
+  `beforeprint` fires when it opens and `afterprint` when it is cancelled.
+  At this window size the print window does not fit the pane: Copies,
+  Layout and Pages are reached by scrolling inside it.
+- **`window.print()` in the pane BLOCKS** the page's script until the print
+  window closes (4.8 s, the time it was left open), with `beforeprint` and
+  `afterprint` both fired before it returns.
+- **The hidden frame prints there too.** With the injected
+  `window.webkit` taken away (so `print.inline.ts` takes its own path),
+  Print ▸ Questions only laid the handout out in its frame and WebView2's
+  print window showed it: **1 sheet**, the handout's corners (Name, Date;
+  "Similar Triangles Practice · MPM2D", "Page 1 of 1"), the triangles drawn.
+  `frame.contentWindow.print()` blocked the page (a probe queued behind it
+  answered only after Cancel, 29.4 s after the click), `afterprint` fired,
+  and the frame was removed. Differences from the browser's: the math was
+  drawn in the page's colours in the pane's preview where the browser's is
+  black, and the print window is cramped inside the pane.
+- **The hand-over survives ShellExecute.** Print ▸ Questions only in the
+  pane wrote `preview page opened in the web browser — to print it questions
+  only (Exercises/Similar-Triangles-Practice)` on the trail and opened the
+  teacher's default browser (Edge) on `127.0.0.1:8081`, which went STRAIGHT
+  to its print window: **1 sheet**, the Latin Modern handout, Name and Date,
+  the triangle diagram. The address bar then read the page without
+  `#plantoir-print=…` — the page's own `history.replaceState` takes the
+  fragment off once read (`print.inline.ts`), which is itself the proof it
+  arrived. Chrome is not installed here and was not measured.
+- **A real mouse click on a `target="_blank"` link in the pane** is handed
+  over too (trail: `a link to another page of the site (the front page)`,
+  an Edge window on the page). The UI test invokes the link through UI
+  Automation instead, because its harness's mouse click missed it on this
+  screen (`PrintablePagesUiTests.cs`); the app's path is the same.
+- **Not done: the two browser checks in a HEADED Edge.** Both read paper
+  through `Page.printToPDF`, which Chromium offers headless only; the
+  printing a teacher sees in a headed browser is what the two hand-over
+  measurements above looked at by eye.
+
+**What it means for the design (for the director, not decided here):**
+WebView2 COULD print the handout itself — the frame path works in the pane,
+blocking and `afterprint` included — so the hand-over to the browser is not
+forced by the engine, as it is by WebKit on the mac. What the hand-over buys
+on Windows is the teacher's own browser: its full-size print window rather
+than one squeezed into the pane, black math, and the same behaviour as the
+mac. Dropping it would be the plan's option (ii) in reverse (no shim on
+Windows) and was NOT done.
+
+The four UI tests owed from batch 5B ran on this desktop on 2026-10-15 and
+pass after four fixes to the tests and one to the app (the corner sketch's
+ids, which sat on a Border that UI Automation never sees): see
+`PrintablePagesUiTests.cs` for what each found.
 
 Tests: `PrintablePagesTests` (the getters, the corners cases, the 13
 printing words, the settings-saved clause), `AgentGuidanceTests` (the ten
@@ -5902,11 +5945,29 @@ matches. REJECTED, with `Uri.AbsolutePath` for the path (.NET unescapes some
 ### Toolbar width
 
 "Preview at Last Viewed" roughly doubles the button. The section title's
-column is now the star column with `TextTrimming="CharacterEllipsis"`, so at
-the window's narrowest a long title shortens and the buttons never leave the
-view — applied without measuring, because the desktop was locked for this
-batch. **MEASURE WHEN UNLOCKED:** at the 900-epx minimum with the sidebar at
-its widest, does the title ellipsize before the Browser button clips?
+column is now the star column with `TextTrimming="CharacterEllipsis"`, so a
+long title shortens before the buttons are pushed out.
+
+**Measured 2026-10-15** (Intel i5-8365U, Windows 11 Pro 26200, one 1920 ×
+1080 screen at 150%, the sidebar at its only width, 230 epx; widths are the
+window's outer pixels): the window's minimum is **900 PIXELS, not 900 epx** —
+`PreferredMinimumWidth` is in the AppWindow's physical units — so at 150% it
+is 600 epx, and dragging the edge stops there.
+
+| Window | "Preview" | "Preview at Last Viewed" (Alt held) |
+|---|---|---|
+| 1350 px (900 epx) | all fits, title whole | all fits, title whole |
+| 1200 px (800 epx) | all fits | title "MP…", every button whole |
+| 1100 px (733 epx) | all fits | title gone, the Browser button cut |
+| 1000 px (667 epx) | all fits | Deploy cut, the Browser button off the window |
+| 900 px (600 epx, the minimum) | title gone, Deploy cut, Browser off | the Preview button cut, Deploy and Browser off |
+
+So at 900 epx nothing clips; the ellipsis does its job down to about 800
+epx with the long title; below that the buttons leave the window, and the
+minimum allows it at any scale above 100%. Not changed here (it is
+behaviour, and the mac's minimum is a separate question): making the
+minimum 900 epx (`900 × scale`), or letting the toolbar's buttons shrink to
+their glyphs, is the director's call.
 
 ### Known limits
 
@@ -5927,7 +5988,12 @@ from a TCP server), `PreviewNavigationSourceTests`. `[UiFact]`s in
 `PreviewStartPageUiTests` (Settings ▸ Preview saves and re-titles the button
 and both items; Alt re-titles; Alt+click opens the page last viewed; a
 teacher's click is remembered and View ▸ Reload Page is not) — written with
-the desktop locked and OWED their first run. `DrivenApp` now keeps a
+the desktop locked; all four pass on the first unlocked desktop (2026-10-15),
+after two fixes to the tests: the link is scrolled into view before the
+click (the harness's window is short at 150%), and Alt is held 500 ms past
+the Alt+click, because WinUI raises Click after the mouse button is up and
+the press reads the keyboard then — released at once, the press read Alt as
+up, twice. `DrivenApp` now keeps a
 `settings.json` a test's `beforeLaunch` seeded, adding its own two keys.
 
 ## The HIG sweep, screen by screen, on Windows (#491 part B)

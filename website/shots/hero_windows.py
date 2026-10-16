@@ -519,7 +519,7 @@ EDGE_FLAGS = [
 CDP_PORT = 9339
 
 
-def launch_edge(target: list[str], x: int, y: int, w: int, h: int) -> subprocess.Popen:
+def launch_edge(target: list[str], x: int, y: int, w: int, h: int, *, flags: tuple[str, ...] = ()) -> subprocess.Popen:
     shutil.rmtree(EDGE_PROFILE, ignore_errors=True)
     EDGE_PROFILE.mkdir(parents=True, exist_ok=True)
     return subprocess.Popen([
@@ -527,10 +527,32 @@ def launch_edge(target: list[str], x: int, y: int, w: int, h: int) -> subprocess
         f"--user-data-dir={EDGE_PROFILE}",
         f"--remote-debugging-port={CDP_PORT}",
         *EDGE_FLAGS,
+        *flags,
         f"--window-position={x},{y}",
         f"--window-size={w},{h}",
         *target,
     ])
+
+
+def fitted_scale(size_dip: tuple[int, int]) -> float:
+    """The display scale a `size_dip` window is drawn at so that ALL of it
+    fits the work area: the screen's own when it fits, else smaller, the
+    same for both sides so the page keeps its framing. Measured 2026-10-15
+    on a 1920 x 1080 console at 150% (work area 1920 x 1032): the mac's
+    1280 x 860 page window would be 1920 x 1290 pixels, and capping the
+    height alone made a 1862 x 959 picture of a 1241 x 639 DIP page -- a
+    different framing from the mac's, and a handout whose footer was below
+    the window. At the fitted scale (1.15 there) the page is laid out at
+    the mac's 1280 x 860 and drawn with fewer pixels instead."""
+    left, top, right, bottom = work_area()
+    return min(scale_factor(), (right - left - 40) / size_dip[0], (bottom - top - 40) / size_dip[1])
+
+
+def device_scale_flags(scale: float) -> tuple[str, ...]:
+    """Edge told to draw at `scale` when that is not the screen's own."""
+    if abs(scale - scale_factor()) < 0.01:
+        return ()
+    return (f"--force-device-scale-factor={scale:.4f}",)
 
 
 def edge_window(process: subprocess.Popen, title_fragment: str, seconds: float = 60) -> int:
@@ -619,7 +641,8 @@ def land_on_anchor(page, fragment: str) -> None:
 
 
 def capture_page(url: str, title_fragment: str, destination: Path, *,
-                 size_dip: tuple[int, int] = (PAGE_WIDTH_DIP, PAGE_HEIGHT_DIP), prepare_page=None) -> Path:
+                 size_dip: tuple[int, int] = (PAGE_WIDTH_DIP, PAGE_HEIGHT_DIP), prepare_page=None,
+                 fit: bool = False) -> Path:
     """One page of a class site in a window with no browser round it.
 
     Edge's `--app=` window is this side's counterpart of the mac's page window
@@ -628,17 +651,20 @@ def capture_page(url: str, title_fragment: str, destination: Path, *,
     launched (`edge_window`). An address with a fragment is loaded without it,
     left to finish drawing, then scrolled and checked (`land_on_anchor`).
     `prepare_page(page)` does anything else the picture needs (the search).
+    `fit`: drawn at `fitted_scale` rather than cut to the work area, so the
+    page keeps the size it is laid out at (the print set, 2026-10-15).
     The appearance is the machine's, so the caller switches Windows first.
     """
     from playwright.sync_api import sync_playwright
 
     left, top, right, bottom = work_area()
-    scale = scale_factor()
+    scale = fitted_scale(size_dip) if fit else scale_factor()
     width = min(round(size_dip[0] * scale), right - left - 40)
     height = min(round(size_dip[1] * scale), bottom - top - 40)
     x, y = left + 20, top + 20
     page_address, _, fragment = url.partition("#")
-    process = launch_edge([f"--app={page_address}"], x, y, width, height)
+    process = launch_edge([f"--app={page_address}"], x, y, width, height,
+                          flags=device_scale_flags(scale) if fit else ())
     try:
         hwnd = edge_window(process, "")
         place(hwnd, x, y, width, height)
