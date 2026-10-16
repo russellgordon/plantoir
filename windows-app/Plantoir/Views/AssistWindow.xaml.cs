@@ -117,6 +117,26 @@ public sealed partial class AssistWindow : Window
     }
 
     /// <summary>
+    /// The in-app assistant's deploy meets the question about classes dated
+    /// after the next class (#475) in the section's window. Nothing flagged:
+    /// nothing to ask, and no window is brought forward for it. No window that
+    /// can show the section: the deploy is held back, the classes named.
+    /// </summary>
+    private async Task<LaterClassesAtADeploy> AskAboutClassesDatedLaterInTheWindow()
+    {
+        var course = Workspace.DiscoverCourses(_folder)
+            .FirstOrDefault(found => found.Code.Equals(_course.Code, StringComparison.OrdinalIgnoreCase)) ?? _course;
+        var flagged = ClassesDatedLater.FlaggedIn(course, _section, DateOnly.FromDateTime(DateTime.Now));
+        if (flagged.Count == 0) return LaterClassesAnswer.NothingToAsk;
+        if (MainWindowForBuilds() is { } main &&
+            await main.AskAboutClassesDatedLaterFor(_folder, _course.Code, _section) is { } answer)
+            return answer;
+        ActivityTrail.Note(ActivityTrail.Event.LaterClassesHeldADeployBack,
+            ClassesDatedLater.HeldBackLine(flagged.Count), _course.Code, _section);
+        return new LaterClassesAtADeploy(LaterClassesAnswer.NoWindow, flagged.Select(page => page.Title).ToList());
+    }
+
+    /// <summary>
     /// Where a build or a deploy this conversation asked for is carried out —
     /// a window on this section's own folder, opened if there is none.
     /// </summary>
@@ -391,7 +411,7 @@ public sealed partial class AssistWindow : Window
                     Content = "The assistant runs on this computer — nothing you write is sent anywhere. " +
                               "It needs a one-time download of about 1.1 GB, and then it works offline.",
                     PrimaryButtonText = "Download",
-                    CloseButtonText = "Not now",
+                    CloseButtonText = "Not Now",
                     DefaultButton = ContentDialogButton.Primary,
                     XamlRoot = Root.XamlRoot,
                 };
@@ -504,6 +524,18 @@ public sealed partial class AssistWindow : Window
             // Building and deploying automate the main window's own flows —
             // once, on screen — rather than running again behind the chat.
             ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
+            // "Rebuild" means rebuild (#489, Q1): a serving preview is stopped
+            // and started again, where ShowPreviewFor would leave it as it was.
+            RebuildPreviewInApp = () => MainWindowForBuilds()?.RebuildPreviewFor(_course.Code, _section),
+            // The Section menu's claim (#489): this window's change to a
+            // section the menu is changing right now is refused, never interleaved.
+            SectionIsChangingFromTheMenu = () => SectionMenuActivity.IsChanging(_folder, _course.Code, _section),
+            // #475: the question about classes dated after the next class, in
+            // the section's window, before the deploy stops anything. On this
+            // side the assistant always gets a window (MainWindowForBuilds
+            // opens one), so "no window" is reached only when none can show
+            // the section — and is said, never thrown.
+            AskAboutClassesDatedLaterInApp = AskAboutClassesDatedLaterInTheWindow,
             StartDeployInApp = () => MainWindowForBuilds()?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {
@@ -728,7 +760,7 @@ public sealed partial class AssistWindow : Window
                 App.Settings.ConfirmationMentioned = true;
                 try { App.Settings.Save(); } catch { }
                 lines.Add(new AssistAgent.Line("assistant",
-                    "The assistant shows what it is about to do before doing it. You can change that in Settings."));
+                    "The assistant shows what it is about to do before doing it. You can change that in File ▸ Settings, under Assistant."));
             }
             return lines;
         });
@@ -755,6 +787,10 @@ public sealed partial class AssistWindow : Window
         Input.IsEnabled = false;
         SendButton.IsEnabled = false;
         ShowThinking();
+        // The Section menu's writing items grey while this window works on
+        // its section (#489, verbIsRunning): every turn, approval and decline
+        // comes through here.
+        AssistActivity.ReportWork(_folder, _course.Code, _section, working: true);
         try
         {
             foreach (var line in await exchange())
@@ -771,6 +807,7 @@ public sealed partial class AssistWindow : Window
         }
         finally
         {
+            AssistActivity.ReportWork(_folder, _course.Code, _section, working: false);
             HideThinking();
             // Never re-enable typing under a question that is still waiting —
             // the answer to "shall I go ahead?" is a button, not a sentence.
@@ -1068,7 +1105,8 @@ public sealed partial class AssistWindow : Window
 
     /// <summary>
     /// Presents an inline card asking whether the teacher would like to enter class dates,
-    /// with "Enter class dates" (opens SectionScheduleDialog) and "Not now" buttons.
+    /// with "Enter Class Dates" (opens SectionScheduleDialog) and "Not Now" buttons, title case
+    /// and on the trailing end (#491 item 9), the commit button first as Windows orders them.
     /// </summary>
     private void ShowDatesOffer()
     {
@@ -1093,21 +1131,23 @@ public sealed partial class AssistWindow : Window
         };
         box.Children.Add(subtext);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        // On the trailing end, as every other card and dialog puts its buttons
+        // (#491 item 9; the mac moved Yes last on its side of the same sweep).
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
         var enterBtn = new Button
         {
-            Content = "Enter class dates",
+            Content = "Enter Class Dates",
             Style = (Style)Application.Current.Resources["AccentButtonStyle"],
         };
         var notNowBtn = new Button
         {
-            Content = "Not now",
+            Content = "Not Now",
         };
 
         enterBtn.Click += async (_, _) =>
         {
             buttons.Visibility = Visibility.Collapsed;
-            Say("You", "Enter class dates");
+            Say("You", "Enter Class Dates");
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             var xamlRoot = Root.XamlRoot ?? Content?.XamlRoot;
             if (xamlRoot is null)
@@ -1141,7 +1181,7 @@ public sealed partial class AssistWindow : Window
         notNowBtn.Click += (_, _) =>
         {
             buttons.Visibility = Visibility.Collapsed;
-            Say("You", "Not now");
+            Say("You", "Not Now");
             Say("Assistant", "No class dates recorded. You can add them anytime.");
         };
 

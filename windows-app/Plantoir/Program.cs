@@ -37,9 +37,16 @@ public static class Program
             // One toast for the section, whatever happened (#324) — what it
             // needs is read BEFORE the run, whose one-shot clearing deletes
             // the job file (#448).
+            // The run brings the folder's tools up to date from the recipe
+            // beside this program before it builds (#477): after an update,
+            // a 06:30 deploy must not build with the old tools just because
+            // nobody has opened the app since. Blocking there is safe: no
+            // synchronisation context exists yet.
+            Plantoir.Core.Models.ToolchainReadiness.Diagnostic = App.LogDiagnostic;
             var ending = Plantoir.Core.Assist.ScheduledRunAnnouncement.RunAndAnnounce(
-                job, new Plantoir.Services.ScheduledPublishNotifier.SystemToasts(), taskToken: token,
-                diagnostic: App.LogDiagnostic);
+                job, new Plantoir.Services.ScheduledPublishNotifier.SystemToasts(),
+                world: new Plantoir.Core.Assist.ScheduledRun.World { BundledToolchainRoot = Plantoir.Services.BundledToolchain.Root },
+                taskToken: token, diagnostic: App.LogDiagnostic);
             Environment.Exit(ending is Plantoir.Core.Assist.ScheduledRun.Ending.JobUnreadable ? 2 : 0);
             return;
         }

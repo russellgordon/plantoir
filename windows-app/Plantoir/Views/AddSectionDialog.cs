@@ -59,7 +59,7 @@ public sealed class AddSectionDialog : ContentDialog
         numberRow.Children.Add(_numberBox);
 
         var panel = new StackPanel { Spacing = 12, MinWidth = 300 };
-        panel.Children.Add(new TextBlock { Text = existingSentence, FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(FormBuilders.DialogExplanation(existingSentence));
         panel.Children.Add(numberRow);
         panel.Children.Add(_warningSlot);
         Content = panel;
@@ -76,7 +76,7 @@ public sealed class AddSectionDialog : ContentDialog
         string? problem = SectionAdder.EntryProblem(entry, existing, _course.Code);
         _warningSlot.Text = problem ?? " ";
         _warningSlot.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
-        IsPrimaryButtonEnabled = SectionAdder.EntryIsAddable(entry, existing);
+        DialogButtons.EnablePrimary(this, SectionAdder.EntryIsAddable(entry, existing));
     }
 
     private void OnAdd(ContentDialog sender, ContentDialogButtonClickEventArgs args)

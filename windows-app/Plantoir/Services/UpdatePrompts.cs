@@ -112,14 +112,37 @@ public sealed class UpdatePrompts : IUpdatePrompts
         CloseButtonText = UpdateWording.OkButton,
     };
 
-    public void QuitForInstall(string installerPath, string arguments)
+    /// <summary>
+    /// Start the installer and quit. FIRST waits for any copy of the tools into
+    /// a working folder that has started writing (#484): this quit ends in
+    /// <c>Application.Exit</c>, which raises no window's Closing, so the
+    /// window's own wait never runs — and the installer overwrites
+    /// <c>{app}\Toolchain</c>, the very files the copy is reading. The windows
+    /// stay up, with their banner, meanwhile.
+    /// </summary>
+    public void QuitForInstall(string installerPath, string arguments) => _ = QuitForInstallAfterTheCopy(installerPath, arguments);
+
+    private static async Task QuitForInstallAfterTheCopy(string installerPath, string arguments)
     {
+        bool held = false;
         try
         {
+            if (ToolchainReadiness.AnyCopyIsWriting)
+            {
+                App.LogDiagnostic("update install waits for the tools copy to finish");
+                held = true;
+                await ToolchainReadiness.WhenWritingCopiesFinish();
+            }
             Process.Start(new ProcessStartInfo(installerPath, arguments) { UseShellExecute = false });
             App.QuitForUpdate();
         }
-        catch (Exception error) { App.LogDiagnostic("update install: " + error.Message); }
+        catch (Exception error)
+        {
+            App.LogDiagnostic("update install: " + error.Message);
+            // The installer did not start, so the app carries on: the copies
+            // the wait held back go ahead (the batch 4 review's M1).
+            if (held) ToolchainReadiness.ReleaseWaitingCopies();
+        }
     }
 
     // ---- What the gate reads -------------------------------------------------

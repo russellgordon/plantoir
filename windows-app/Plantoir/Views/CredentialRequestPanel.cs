@@ -19,7 +19,8 @@ internal static class CredentialRequestPanel
     public static StackPanel Build(CredentialRequest request)
     {
         var panel = new StackPanel { Spacing = 12, MaxWidth = 480 };
-        panel.Children.Add(new TextBlock { Text = request.Explanation, TextWrapping = TextWrapping.Wrap });
+        // Under a dialog's title, the one explanation shape (#491 item 3).
+        panel.Children.Add(FormBuilders.DialogExplanation(request.Explanation));
 
         var stepsList = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 4) };
         for (int i = 0; i < request.Steps.Count; i++)

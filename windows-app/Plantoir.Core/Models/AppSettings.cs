@@ -58,7 +58,83 @@ public sealed class AppSettings
     /// </summary>
     public string CloudflareAccountId { get; set; } = "";
 
+    /// <summary>
+    /// Raised after <see cref="ChangeCloudflareAccountId"/> stores a new ID, on
+    /// the thread that changed it, so every read-only display (a course's
+    /// Deploying section, the new-course wizard) shows it — and re-validates —
+    /// at once (#491). Static because the ID is app-wide; a subscriber
+    /// unsubscribes when its view unloads.
+    /// </summary>
+    public static event Action? CloudflareAccountIdChanged;
+
+    /// <summary>
+    /// The one way the Account ID is changed (#491): File ▸ Settings ▸ Deploying
+    /// calls it as the teacher types. Saved at once and announced; nothing when
+    /// the value is unchanged. <c>CloudflareAccountInSettingsTests</c> holds every
+    /// write in the app to <c>DeployingSettingsPane</c>.
+    /// </summary>
+    public void ChangeCloudflareAccountId(string id)
+    {
+        if (CloudflareAccountId == id) return;
+        CloudflareAccountId = id;
+        Save();
+        CloudflareAccountIdChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Where a teacher's press of Preview opens the site (#514; the mac's
+    /// <c>previewOpensAt</c>): the contract's raw value, <c>frontPage</c> or
+    /// <c>lastViewed</c>. Kept RAW, so a value this build does not know reads
+    /// as the front page (<see cref="PreviewStartPage.Read"/>) without being
+    /// lost from the file. Changed only through <see cref="ChangePreviewOpensAt"/>.
+    /// </summary>
+    public string PreviewOpensAt { get; set; } = "frontPage";
+
+    /// <summary>Raised after <see cref="ChangePreviewOpensAt"/> stores a new choice. Static, as the setting is app-wide; a subscriber unsubscribes when it goes.</summary>
+    public static event Action? PreviewOpensAtChanged;
+
+    /// <summary>File ▸ Settings ▸ Preview's change: saved at once and announced, so every window's titles follow; nothing when unchanged.</summary>
+    public void ChangePreviewOpensAt(PreviewStartPage.Setting choice)
+    {
+        string stored = PreviewStartPage.Stored(choice);
+        if (PreviewOpensAt == stored) return;
+        PreviewOpensAt = stored;
+        Save();
+        PreviewOpensAtChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Which section File ▸ Settings… opened on last ("assistant", "preview", "deploying"),
+    /// so it opens there again — the mac remembers its pane the same way
+    /// (<c>SettingsPane.storageKey</c>). Open Settings… beside the Account ID
+    /// always asks for Deploying.
+    /// </summary>
+    public string? LastSettingsSection { get; set; }
+
     public List<RememberedWindow> RememberedWindows { get; set; } = new();
+
+    /// <summary>
+    /// File ▸ Open Recent (#488, <c>shared-rules.json</c> → <c>openRecent</c>):
+    /// the working folders OPENED, newest first, at most
+    /// <see cref="Models.RecentWorkingFolders.Cap"/>. Null until the list is
+    /// first read: <see cref="RecentFolders"/> then seeds it from the last
+    /// working folder and the remembered windows, so the menu is not empty on
+    /// the first launch after the update. Not pruned on load: a folder that has
+    /// gone stays listed, and choosing it says why it could not be opened.
+    /// </summary>
+    public List<string>? RecentWorkingFolders { get; set; }
+
+    /// <summary>The Open Recent list, seeded (in memory) the first time it is read.</summary>
+    [JsonIgnore]
+    public List<string> RecentFolders
+    {
+        get
+        {
+            RecentWorkingFolders ??= Models.RecentWorkingFolders
+                .Seed(WorkspacePath, RememberedWindows.Select(window => window.Path)).ToList();
+            return RecentWorkingFolders;
+        }
+    }
 
     /// <summary>
     /// Where each SECTION's assistant window was last left, keyed by

@@ -33,6 +33,19 @@ namespace Plantoir.Core.Models;
 /// disk (<see cref="AnotherProgramIsGettingReady"/>). Not a <c>.lease</c>
 /// name on purpose: lease readers, the update gate's sweep and reference
 /// staging all read <c>*.lease</c>, and this is not a hold on any course.</para>
+///
+/// <para><b>Copies take turns (#477).</b> Two programs copying into one folder
+/// at once is not harmless here: measured on an i5-8365U (Windows 11 Pro 26200,
+/// 2026-10-15), two copies of 2,004 files started on the same tick failed 36
+/// times across 5 runs with sharing violations (0x80070020) — the bytes ended
+/// up right, but each copier would have reported a FAILED copy. So every copy
+/// writes its marker FIRST and then waits while a live marker written before
+/// its own (an earlier moment, or the same moment and a lower process id)
+/// stands — <see cref="MustWaitFor"/>. How long it waits is the CALLER's
+/// policy (<see cref="TakingTurns"/>): a window waits until the other copy is
+/// done, with its banner up; the scheduled run gives up at its ten minutes and
+/// stands down. The scheduled run copies too, through
+/// <see cref="RefreshWorkspace"/>, before it builds.</para>
 /// </summary>
 public static class ToolchainReadiness
 {
@@ -55,8 +68,35 @@ public static class ToolchainReadiness
     /// down), and <paramref name="Problem"/> why — that file's error, or the
     /// error that stopped the copy outright.
     /// </summary>
+    /// <param name="GaveUpWaiting">The copy never started: another program's
+    /// copy of the folder was still running when the caller's wait ran out
+    /// (<see cref="TakingTurns.GiveUp"/>). Nothing was written.</param>
+    /// <param name="WaitedForPid">The program whose copy this one waited for, if it waited.</param>
     public sealed record Status(State State, int FilesChanged, int FilesFailed, double Seconds, string? Problem,
-                                string? FirstFailedPath = null);
+                                string? FirstFailedPath = null, bool GaveUpWaiting = false, int? WaitedForPid = null);
+
+    /// <summary>
+    /// How a copy that finds an earlier live copy of the folder waits for it:
+    /// <paramref name="Pause"/> between looks, and <paramref name="GiveUp"/>
+    /// asked after each look. The window's (<see cref="WaitUntilDone"/>) never
+    /// gives up; the scheduled run's gives up on its own ten-minute clock.
+    /// </summary>
+    public sealed record TakingTurns(Action<TimeSpan> Pause, Func<bool> GiveUp);
+
+    /// <summary>A window's turn-taking: look every half second, never give up.</summary>
+    public static TakingTurns WaitUntilDone => new(span => Pause(span), () => false);
+
+    /// <summary>How often a waiting copy looks again.</summary>
+    public static readonly TimeSpan LookAgainEvery = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>The pause between looks. A seam for tests; the app never changes it.</summary>
+    internal static Action<TimeSpan> Pause { get; set; } = Thread.Sleep;
+
+    /// <summary>
+    /// Where startup.log lines go (the app sets it to <c>App.LogDiagnostic</c>):
+    /// a copy that waited for another, or gave up waiting. Null: said nowhere.
+    /// </summary>
+    public static Action<string>? Diagnostic { get; set; }
 
     // ---- The words a teacher reads (rule 1: no machinery) ----------------
 
@@ -98,6 +138,12 @@ public static class ToolchainReadiness
         public State State;
         public Task Copy = Task.CompletedTask;
         public Status? Last;
+        /// <summary>The copier has STARTED writing — not merely waiting its turn (#484 waits only for these).</summary>
+        public bool Writing;
+        /// <summary>A closing window waited for this copy (#484): the trail line says so.</summary>
+        public bool WaitedForBeforeClosing;
+        /// <summary>The scheduled deploy this copy was made for, if any: the trail line says so.</summary>
+        public (string Course, int Section)? ForAScheduledDeploy;
     }
 
     private static readonly object Gate = new();
@@ -120,8 +166,197 @@ public static class ToolchainReadiness
     /// <summary>Forget every folder and put the real copier back. Tests only.</summary>
     internal static void Reset()
     {
-        lock (Gate) Folders.Clear();
+        lock (Gate)
+        {
+            Folders.Clear();
+            _holdingBack = false;
+            GuidanceRan.Clear();
+            GuidanceNotices.Clear();
+            PendingAppends.Clear();
+        }
         Copier = ToolchainMirror.RefreshToolchain;
+        GuidanceWriter = WriteGuidance;
+        Pause = Thread.Sleep;
+    }
+
+    // ---- Guidance for assistants (#496; the mac's #454) -------------------
+    //
+    // Written AFTER the copy, on a task of its OWN, whatever the copy's
+    // outcome, and never chained to entry.Copy: the window's refusals
+    // (RefusedWhileTheFolderIsGettingReady) and InitializeWorkspace await
+    // that task, so a slow or failing guidance pass cannot hold Preview,
+    // Deploy or New Course back (the mac's implementation review S1). Its
+    // failure is a log line, a trail line and a dismissable notice; the
+    // folder's State is untouched. Once per folder per process, as on the mac
+    // ("the pass runs once per folder per launch"), unless the pass failed,
+    // when the next copy of the folder tries again.
+
+    /// <summary>The pass itself. A seam for tests; the app never changes it.</summary>
+    internal static Func<string, string, AgentGuidance.Outcome> GuidanceWriter { get; set; } = WriteGuidance;
+
+    private static readonly HashSet<string> GuidanceRan = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, string> GuidanceNotices = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, List<AgentGuidance.PendingAppend>> PendingAppends = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Raised with the folder's path when its guidance notice or its files
+    /// waiting for a yes change. ON ANY THREAD; a window that subscribes
+    /// unsubscribes when it goes, as with <see cref="Changed"/>.
+    /// </summary>
+    public static event Action<string>? GuidanceChanged;
+
+    private static AgentGuidance.Outcome WriteGuidance(string workspacePath, string bundledRoot) =>
+        AgentGuidance.Write(Path.Combine(bundledRoot, "support", "agent_guidance"), workspacePath,
+                            AgentGuidanceDeclined.SignatureFor, AgentGuidanceDeclined.Forget);
+
+    /// <summary>The task of the last guidance pass started, for tests that wait for it.</summary>
+    internal static Task? LastGuidancePass { get; private set; }
+
+    private static void StartGuidance(string workspacePath, string key, string bundledRoot)
+    {
+        lock (Gate)
+        {
+            if (!GuidanceRan.Add(key)) return;
+        }
+        var writer = GuidanceWriter;
+        LastGuidancePass = Task.Run(() =>
+        {
+            AgentGuidance.Outcome outcome;
+            try { outcome = writer(workspacePath, bundledRoot); }
+            catch (Exception error)
+            {
+                outcome = new AgentGuidance.Outcome();
+                outcome.Note("the working folder", AgentGuidance.SystemReason(error));
+            }
+            ApplyGuidance(workspacePath, outcome);
+        });
+    }
+
+    /// <summary>
+    /// What a pass found, made known: a failure is logged, recorded on the
+    /// trail and becomes the folder's notice; the files waiting for a yes are
+    /// queued for a window to ask about. Never touches the folder's State.
+    /// </summary>
+    internal static void ApplyGuidance(string workspacePath, AgentGuidance.Outcome outcome)
+    {
+        string key = Key(workspacePath);
+        if (outcome.Failures.Count > 0)
+        {
+            string line = AgentGuidance.CouldNotWriteLine(outcome.Failures);
+            Diagnostic?.Invoke($"guidance for assistants in '{workspacePath}': {line}");
+            try { ActivityTrail.Note(ActivityTrail.Event.GuidanceCouldNotBeWritten, line); } catch { }
+        }
+        lock (Gate)
+        {
+            if (outcome.Failures.Count > 0)
+            {
+                GuidanceNotices[key] = AgentGuidanceWording.CouldNotWrite(outcome.FirstReason ?? AgentGuidance.CouldNotBeWritten);
+                GuidanceRan.Remove(key);
+            }
+            else
+            {
+                // A later pass that succeeded clears the notice an earlier
+                // failure left (the mac's applyGuidance, the batch 5B
+                // review's L-1): it no longer describes the folder.
+                GuidanceNotices.Remove(key);
+            }
+            if (outcome.Pending.Count > 0)
+            {
+                if (!PendingAppends.TryGetValue(key, out var queue)) PendingAppends[key] = queue = [];
+                foreach (var pending in outcome.Pending)
+                    if (!queue.Any(waiting => string.Equals(waiting.FilePath, pending.FilePath, StringComparison.OrdinalIgnoreCase)))
+                        queue.Add(pending);
+            }
+        }
+        RaiseGuidanceChanged(workspacePath);
+    }
+
+    /// <summary>The notice for this folder (<c>words.couldNotWrite</c>), or null.</summary>
+    public static string? GuidanceNoticeFor(string? workspacePath)
+    {
+        if (string.IsNullOrEmpty(workspacePath)) return null;
+        lock (Gate) return GuidanceNotices.TryGetValue(Key(workspacePath), out var notice) ? notice : null;
+    }
+
+    /// <summary>The teacher closed the notice: it stays closed until a pass fails again.</summary>
+    public static void DismissGuidanceNotice(string workspacePath)
+    {
+        lock (Gate) GuidanceNotices.Remove(Key(workspacePath));
+        RaiseGuidanceChanged(workspacePath);
+    }
+
+    /// <summary>
+    /// The next file to ask about, TAKEN, so each file is asked about in
+    /// exactly one window, AGENTS.md before CLAUDE.md. Null when none waits.
+    /// </summary>
+    public static AgentGuidance.PendingAppend? TakeNextPending(string? workspacePath)
+    {
+        if (string.IsNullOrEmpty(workspacePath)) return null;
+        lock (Gate)
+        {
+            if (!PendingAppends.TryGetValue(Key(workspacePath), out var queue) || queue.Count == 0) return null;
+            var next = queue[0];
+            queue.RemoveAt(0);
+            return next;
+        }
+    }
+
+    /// <summary>Whether a file still waits to be asked about in this folder.</summary>
+    public static bool HasPending(string? workspacePath)
+    {
+        if (string.IsNullOrEmpty(workspacePath)) return false;
+        lock (Gate) return PendingAppends.TryGetValue(Key(workspacePath), out var queue) && queue.Count > 0;
+    }
+
+    /// <summary>
+    /// A question never answered (its window closed while it was up, or the
+    /// quit path took the dialog down) goes back to the FRONT of the queue.
+    /// Closing a window is not a Not Now.
+    /// </summary>
+    public static void PutBack(string workspacePath, AgentGuidance.PendingAppend pending)
+    {
+        lock (Gate)
+        {
+            string key = Key(workspacePath);
+            if (!PendingAppends.TryGetValue(key, out var queue)) PendingAppends[key] = queue = [];
+            queue.Insert(0, pending);
+        }
+        RaiseGuidanceChanged(workspacePath);
+    }
+
+    /// <summary>
+    /// The teacher's answer. Add appends the section (reading the file again)
+    /// and forgets any earlier Not Now; a file it cannot read or write is
+    /// refused, recorded and shown as the notice. Not Now is remembered for
+    /// this file and these words. Either way the trail says what was asked
+    /// and answered (<c>asked before adding guidance to a file</c>).
+    /// </summary>
+    public static void Answer(string workspacePath, AgentGuidance.PendingAppend pending, bool add)
+    {
+        try { ActivityTrail.Note(ActivityTrail.Event.GuidanceFileAskedAbout, AgentGuidance.AskedLine(pending.FileName, add)); }
+        catch { }
+        if (!add)
+        {
+            AgentGuidanceDeclined.Remember(pending);
+            return;
+        }
+        AgentGuidanceDeclined.Forget(pending.FilePath);
+        if (AgentGuidance.AppendAfterYes(pending) is { } reason)
+        {
+            var failed = new AgentGuidance.Outcome();
+            failed.Note(pending.FileName, reason);
+            ApplyGuidance(workspacePath, failed);
+        }
+    }
+
+    private static void RaiseGuidanceChanged(string workspacePath)
+    {
+        var handlers = GuidanceChanged;
+        if (handlers is null) return;
+        foreach (Action<string> handler in handlers.GetInvocationList())
+        {
+            try { handler(workspacePath); } catch { }
+        }
     }
 
     private static string Key(string workspacePath)
@@ -161,7 +396,12 @@ public static class ToolchainReadiness
     /// stays NotStarted — the same rule the copy itself had.</item>
     /// </list>
     /// </summary>
-    public static Task Ensure(string workspacePath, string bundledRoot, bool retryAFailedCopy = false)
+    /// <param name="turns">How to wait for another program's copy of the
+    /// folder; null is a window's (<see cref="WaitUntilDone"/>).</param>
+    /// <param name="forAScheduledDeploy">The scheduled deploy this copy is made
+    /// for: its trail line names the course and section and says so.</param>
+    public static Task Ensure(string workspacePath, string bundledRoot, bool retryAFailedCopy = false,
+                              TakingTurns? turns = null, (string Course, int Section)? forAScheduledDeploy = null)
     {
         if (string.IsNullOrEmpty(workspacePath) || !ToolchainMirror.IsAWorkingFolder(workspacePath))
             return Task.CompletedTask;
@@ -184,13 +424,17 @@ public static class ToolchainReadiness
                     return entry.Copy;
             }
             entry.State = State.Copying;
+            entry.Writing = false;
+            entry.WaitedForBeforeClosing = false;
+            entry.ForAScheduledDeploy = forAScheduledDeploy;
             var copier = Copier;
+            var waiting = turns ?? WaitUntilDone;
             // Made INSIDE the lock, so a second caller that arrives a moment
             // later finds Copying and this very task, never a gap between them
             // — but STARTED only after "started" has been said, so no window
             // can hear "finished" first (a copy with nothing to do ends in
             // milliseconds).
-            entry.Copy = copy = new Task(() => CopyNow(workspacePath, key, bundledRoot, copier));
+            entry.Copy = copy = new Task(() => CopyNow(workspacePath, key, bundledRoot, copier, waiting));
         }
         RaiseChanged(workspacePath);
         copy.Start(TaskScheduler.Default);
@@ -198,10 +442,66 @@ public static class ToolchainReadiness
     }
 
     private static void CopyNow(string workspacePath, string key, string bundledRoot,
-                                Func<string, string, ToolchainMirror.CopyResult> copier)
+                                Func<string, string, ToolchainMirror.CopyResult> copier, TakingTurns turns)
     {
         var clock = Stopwatch.StartNew();
-        string? marker = WriteMarker(workspacePath);
+        var (marker, myMoment) = WriteMarker(workspacePath);
+
+        // Take, then look (#477): only a live copy whose marker was written
+        // BEFORE this one's holds it back, so two copies never wait for each
+        // other. A closing window holds back a copy that has not started
+        // writing yet (#484), so its wait cannot miss one that starts later:
+        // the check and the "writing" mark are made under the same lock the
+        // close takes its snapshot under.
+        int? waitedFor = null;
+        bool gaveUp = false;
+        while (true)
+        {
+            int? earlier = myMoment is null ? null : EarlierCopierThan(workspacePath, myMoment);
+            if (earlier is null)
+            {
+                bool go = false;
+                lock (Gate)
+                {
+                    if (!_holdingBack)
+                    {
+                        if (Folders.TryGetValue(key, out var started)) started.Writing = true;
+                        go = true;
+                    }
+                }
+                if (go) break;
+            }
+            else waitedFor ??= earlier;
+            if (turns.GiveUp()) { gaveUp = true; break; }
+            turns.Pause(LookAgainEvery);
+        }
+
+        if (gaveUp)
+        {
+            if (marker is not null) { try { File.Delete(marker); } catch { } }
+            clock.Stop();
+            Diagnostic?.Invoke($"tools copy for '{workspacePath}' did not start: another copy (process {waitedFor}) " +
+                               $"was still running after {clock.Elapsed.TotalSeconds:0.0} s of waiting");
+            var notStarted = new Status(State.Failed, 0, 0, clock.Elapsed.TotalSeconds,
+                                        "another copy of the folder was still running", null,
+                                        GaveUpWaiting: true, WaitedForPid: waitedFor);
+            lock (Gate)
+            {
+                if (Folders.TryGetValue(key, out var entry))
+                {
+                    entry.State = State.Failed;
+                    entry.Last = notStarted;
+                    entry.Writing = false;
+                }
+            }
+            RaiseChanged(workspacePath);
+            StartGuidance(workspacePath, key, bundledRoot);
+            return;
+        }
+        if (waitedFor is not null)
+            Diagnostic?.Invoke($"tools copy for '{workspacePath}' waited {clock.Elapsed.TotalSeconds:0.0} s " +
+                               $"for another copy (process {waitedFor}) to finish first");
+
         ToolchainMirror.CopyResult result;
         string? problem = null;
         try
@@ -215,20 +515,25 @@ public static class ToolchainReadiness
         }
         finally
         {
-            if (marker is not null) { try { File.Delete(marker); } catch { } }
+            if (marker is not null) DeleteMarker(workspacePath, marker);
         }
         clock.Stop();
 
         bool ready = result.Failed == 0;
         var status = new Status(ready ? State.Ready : State.Failed, result.Changed, result.Failed,
                                 clock.Elapsed.TotalSeconds, problem ?? result.FirstProblem,
-                                problem is null ? result.FirstFailedPath : null);
+                                problem is null ? result.FirstFailedPath : null, WaitedForPid: waitedFor);
+        bool waitedBeforeClosing = false;
+        (string Course, int Section)? forADeploy = null;
         lock (Gate)
         {
             if (Folders.TryGetValue(key, out var entry))
             {
                 entry.State = status.State;
                 entry.Last = status;
+                entry.Writing = false;
+                waitedBeforeClosing = entry.WaitedForBeforeClosing;
+                forADeploy = entry.ForAScheduledDeploy;
             }
         }
         // Only a copy that DID something, or failed, is worth a line: every
@@ -236,10 +541,18 @@ public static class ToolchainReadiness
         // would bury the one that explains a slow first launch.
         if (result.Changed > 0 || result.Failed > 0)
         {
-            try { ActivityTrail.Note(ActivityTrail.Event.WorkingFolderToolsCopied, TrailLine(workspacePath, status)); }
+            try
+            {
+                string line = TrailLine(workspacePath, status, forADeploy is not null, waitedBeforeClosing);
+                if (forADeploy is { } deploy)
+                    ActivityTrail.Note(ActivityTrail.Event.WorkingFolderToolsCopied, line, deploy.Course, deploy.Section);
+                else
+                    ActivityTrail.Note(ActivityTrail.Event.WorkingFolderToolsCopied, line);
+            }
             catch { }
         }
         RaiseChanged(workspacePath);
+        StartGuidance(workspacePath, key, bundledRoot);
     }
 
     /// <summary>
@@ -247,12 +560,19 @@ public static class ToolchainReadiness
     /// would recognise, with the counts and the seconds a slow or broken first
     /// launch is diagnosed from. The path is redacted on the way in.
     /// </summary>
-    public static string TrailLine(string workspacePath, Status status)
+    /// <param name="forAScheduledDeploy">The copy a scheduled run made before
+    /// it built (#477): said, and a failure says the deploy stood down rather
+    /// than pointing at a menu nobody is there to open.</param>
+    /// <param name="waitedBeforeClosing">A closing window waited for this copy (#484).</param>
+    public static string TrailLine(string workspacePath, Status status, bool forAScheduledDeploy = false,
+                                   bool waitedBeforeClosing = false)
     {
         string files = status.FilesChanged == 1 ? "1 file" : $"{status.FilesChanged} files";
         string seconds = status.Seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        string what = forAScheduledDeploy ? "the working folder ready for a scheduled deploy" : "the working folder ready";
+        string closing = waitedBeforeClosing ? ", and Plantoir waited for it before closing" : "";
         if (status.State == State.Ready)
-            return $"got the working folder ready — {files} brought up to date in {seconds} s — {workspacePath}";
+            return $"got {what} — {files} brought up to date in {seconds} s{closing} — {workspacePath}";
         string failed = status.FilesFailed == 1 ? "1 file" : $"{status.FilesFailed} files";
         string first = (status.FirstFailedPath, status.Problem) switch
         {
@@ -261,8 +581,9 @@ public static class ToolchainReadiness
             (_, { Length: > 0 } why) => $" ({why})",
             _ => "",
         };
-        return $"could not finish getting the working folder ready — {failed} could not be copied or removed{first}, " +
-               $"{files} brought up to date in {seconds} s; Preview and Deploy wait for Reload Courses — {workspacePath}";
+        string after = forAScheduledDeploy ? "the scheduled deploy stood down" : "Preview and Deploy wait for Reload Courses";
+        return $"could not finish getting {what} — {failed} could not be copied or removed{first}, " +
+               $"{files} brought up to date in {seconds} s{closing}; {after} — {workspacePath}";
     }
 
     private static void RaiseChanged(string workspacePath)
@@ -306,6 +627,30 @@ public static class ToolchainReadiness
         _ => new Banner(false, false, null, null),
     };
 
+    /// <summary>
+    /// The banner's title while a closing window waits for ANOTHER folder's
+    /// copy (#484; the batch 4 review's M2): this folder is ready, so "Getting
+    /// this folder ready…" would be false, but the window staying up must
+    /// still say why.
+    /// </summary>
+    public const string FinishingAnotherFolderTitle = "Finishing getting a folder ready…";
+
+    /// <summary>The message under <see cref="FinishingAnotherFolderTitle"/>.</summary>
+    public const string FinishingAnotherFolderMessage =
+        "Plantoir is copying what it needs into another working folder, and will close when it has finished.";
+
+    /// <summary>
+    /// The banner while a closing window is held open for the copy (#484): this
+    /// folder's own copying banner when it is the one being copied (the delay
+    /// treated as passed), a failure as ever, and otherwise the words above —
+    /// the copy being waited for is another folder's. PURE.
+    /// </summary>
+    public static Banner BannerWhileClosing(State state) => state switch
+    {
+        State.Copying or State.Failed => BannerFor(state, pastTheDelay: true),
+        _ => new Banner(true, false, FinishingAnotherFolderTitle, FinishingAnotherFolderMessage),
+    };
+
     /// <summary>The banner: open or not, an error or not, and its words.</summary>
     public sealed record Banner(bool IsOpen, bool IsError, string? Title, string? Message);
 
@@ -326,22 +671,32 @@ public static class ToolchainReadiness
     /// Only when <c>courses\</c> exists: creating it here would turn a folder
     /// with no courses yet into one with an empty list. Best-effort.
     /// </summary>
-    private static string? WriteMarker(string workspacePath)
+    /// <returns>The marker's path and the moment written on its line 3 — the
+    /// moment this copy takes its turn by — or nulls when none was written.</returns>
+    private static (string? Path, string? Moment) WriteMarker(string workspacePath)
     {
         try
         {
-            if (!Directory.Exists(Workspace.CoursesDirectory(workspacePath))) return null;
+            if (!Directory.Exists(Workspace.CoursesDirectory(workspacePath))) return (null, null);
             string path = MarkerPath(workspacePath, Environment.ProcessId);
             Directory.CreateDirectory(ActivityDirectory(workspacePath));
             SweepDeadMarkers(workspacePath);
             // Written under another name and MOVED into place, so no reader —
             // another Plantoir's sweep included — ever sees the marker empty.
             string writing = Path.Combine(ActivityDirectory(workspacePath), $"writing-{MarkerPrefix}{Environment.ProcessId}.tmp");
-            File.WriteAllText(writing, WorkLease.LeaseBody(withStart: true));
+            string body = WorkLease.LeaseBody(withStart: true);
+            File.WriteAllText(writing, body);
             File.Move(writing, path, overwrite: true);
-            return path;
+            return (path, MomentIn(body));
         }
-        catch { return null; }
+        catch { return (null, null); }
+    }
+
+    /// <summary>A marker body's line 3, the moment it was written (UTC, "O"), or null.</summary>
+    private static string? MomentIn(string body)
+    {
+        string[] lines = body.Replace("\r", "").Split('\n');
+        return lines.Length > 2 && lines[2].Trim() is { Length: > 0 } moment ? moment : null;
     }
 
     /// <summary>
@@ -351,7 +706,7 @@ public static class ToolchainReadiness
     /// </summary>
     private static void SweepDeadMarkers(string workspacePath)
     {
-        foreach (var (marker, pid, alive, parsed) in Markers(workspacePath))
+        foreach (var (marker, pid, alive, parsed, _) in Markers(workspacePath))
         {
             // Never one whose body did not read: a marker caught mid-write by
             // a writer that does not move it into place would be empty for a
@@ -365,9 +720,9 @@ public static class ToolchainReadiness
     }
 
     /// <summary>Every marker in the folder, with its owner and whether that owner lives.</summary>
-    private static List<(string Marker, int Pid, bool Alive, bool Parsed)> Markers(string workspacePath)
+    private static List<(string Marker, int Pid, bool Alive, bool Parsed, string? Moment)> Markers(string workspacePath)
     {
-        var found = new List<(string, int, bool, bool)>();
+        var found = new List<(string, int, bool, bool, string?)>();
         IEnumerable<string> markers;
         try { markers = Directory.EnumerateFiles(ActivityDirectory(workspacePath), MarkerPrefix + "*").ToList(); }
         catch { return found; }
@@ -380,7 +735,7 @@ public static class ToolchainReadiness
             catch { continue; }
             var (name, start) = WorkLease.ReadBody(body);
             found.Add((marker, pid, name is not null && WorkLease.OwnerIsAlive(pid, name, start, "toolchain-copying"),
-                       name is not null));
+                       name is not null, MomentIn(body)));
         }
         return found;
     }
@@ -392,6 +747,167 @@ public static class ToolchainReadiness
     /// belongs to another process (a different start time on line 4), counts
     /// for nothing: a killed Plantoir must not lock the assistant out.
     /// </summary>
-    public static bool AnotherProgramIsGettingReady(string workspacePath) =>
-        Markers(workspacePath).Any(marker => marker.Alive);
+    /// <param name="exceptThisProcess">Leave this process's own marker out —
+    /// what the scheduled run asks, so it never waits for itself.</param>
+    public static bool AnotherProgramIsGettingReady(string workspacePath, bool exceptThisProcess = false) =>
+        LiveCopiers(workspacePath, exceptThisProcess).Count > 0;
+
+    /// <summary>The process ids of the live programs copying into this folder now.</summary>
+    public static IReadOnlyList<int> LiveCopiers(string workspacePath, bool exceptThisProcess = false) =>
+        Markers(workspacePath)
+            .Where(marker => marker.Alive && !(exceptThisProcess && marker.Pid == Environment.ProcessId))
+            .Select(marker => marker.Pid)
+            .ToList();
+
+    /// <summary>
+    /// Whether a copy whose marker says <paramref name="myMoment"/> must wait
+    /// for another live copy whose marker says <paramref name="otherMoment"/>
+    /// (#477): the other was written first — an earlier moment, or the same
+    /// moment and a lower process id (<c>WorkLease.TakenBefore</c>'s order).
+    /// PURE. A moment that is not the one 28-character shape both apps write
+    /// counts as NOT earlier (the plan review's M2): <c>TakenBefore</c>
+    /// answers "earlier" there, which is right for a lease nobody waits on in
+    /// turn, but two copies facing one unreadable marker would both wait for
+    /// it to the end. Never waits for itself.
+    /// </summary>
+    public static bool MustWaitFor(string myMoment, int myPid, string? otherMoment, int otherPid)
+    {
+        if (otherPid == myPid) return false;
+        if (otherMoment is null || !WorkLease.IsMomentShape(otherMoment) || !WorkLease.IsMomentShape(myMoment)) return false;
+        int order = string.CompareOrdinal(otherMoment, myMoment);
+        return order < 0 || (order == 0 && otherPid < myPid);
+    }
+
+    /// <summary>A live copy of this folder that went before this process's, or null.</summary>
+    private static int? EarlierCopierThan(string workspacePath, string myMoment)
+    {
+        foreach (var marker in Markers(workspacePath))
+            if (marker.Alive && MustWaitFor(myMoment, Environment.ProcessId, marker.Moment, marker.Pid))
+                return marker.Pid;
+        return null;
+    }
+
+    /// <summary>
+    /// Take a finished copy's marker away, trying a few times: a live marker
+    /// left behind by a process that is still running holds every other
+    /// program's copy of this folder (and plantoir-mcp, and a scheduled run)
+    /// until this process ends — a virus scanner or an indexer holding the
+    /// file open for a moment is the usual cause (the batch 4 review's L1).
+    /// What still fails after the last try is said in startup.log, and the
+    /// marker then stands until this process exits, when it reads as stale.
+    /// </summary>
+    private static void DeleteMarker(string workspacePath, string marker)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Delete(marker);
+                return;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= MarkerDeleteAttempts)
+                {
+                    Diagnostic?.Invoke($"tools copy for '{workspacePath}': its marker could not be removed " +
+                                       $"after {attempt} tries ({error.Message})");
+                    return;
+                }
+                Thread.Sleep(MarkerDeleteRetryPause);
+            }
+        }
+    }
+
+    /// <summary>How many times a finished copy tries to remove its marker.</summary>
+    internal const int MarkerDeleteAttempts = 5;
+
+    /// <summary>The pause between those tries.</summary>
+    internal static readonly TimeSpan MarkerDeleteRetryPause = TimeSpan.FromMilliseconds(200);
+
+    // ---- The refresh: the window's and the scheduled run's (#477) ----------
+
+    /// <summary>
+    /// Bring a working folder's launchers and tools up to date from the recipe
+    /// at <paramref name="bundledRoot"/>: the launchers that already exist,
+    /// synchronously, then the copy through <see cref="Ensure"/>. What the
+    /// window does on every Reload, and — since #477 — what the scheduled run
+    /// does before it writes its wrapper, so a 06:30 deploy after an update
+    /// builds with the new tools even when nobody has opened the app since.
+    /// <para><b>Does nothing without a recipe there</b> (its first root file,
+    /// the Dockerfile): mirroring from a missing folder would DELETE the
+    /// working folder's tools, because the mirror removes what its source
+    /// lacks.</para>
+    /// </summary>
+    public static Task RefreshWorkspace(string workspacePath, string bundledRoot, bool retryAFailedCopy = false,
+                                        TakingTurns? turns = null, (string Course, int Section)? forAScheduledDeploy = null)
+    {
+        if (string.IsNullOrEmpty(bundledRoot) || !File.Exists(Path.Combine(bundledRoot, ToolchainMirror.RecipeRootFiles[0])))
+        {
+            Diagnostic?.Invoke($"tools copy for '{workspacePath}' skipped: no recipe at '{bundledRoot}'");
+            return Task.CompletedTask;
+        }
+        ToolchainMirror.RefreshLaunchers(workspacePath, bundledRoot);
+        return Ensure(workspacePath, bundledRoot, retryAFailedCopy, turns, forAScheduledDeploy);
+    }
+
+    // ---- Closing while a copy writes (#484) --------------------------------
+
+    /// <summary>Set by a closing window: copies still waiting their turn do not start.</summary>
+    private static bool _holdingBack;
+
+    /// <summary>Whether any folder's copy in this process has started writing and not finished.</summary>
+    public static bool AnyCopyIsWriting
+    {
+        get { lock (Gate) return Folders.Values.Any(entry => entry.State == State.Copying && entry.Writing); }
+    }
+
+    /// <summary>
+    /// For a close that quits (#484; the mac's <c>waitForAllCopies</c>, #476):
+    /// hold back every copy still WAITING its turn — it has written nothing and
+    /// must not start now — and finish when every copy that has started
+    /// writing, in every folder of this process, has finished. The hold and the
+    /// snapshot are taken under the same lock a copy takes to mark itself
+    /// writing, and the snapshot is taken again after each wait, so no copy can
+    /// start between the look and the exit (the plan review's M3). A copy that
+    /// finishes this way says on the trail that Plantoir waited for it. Never
+    /// throws.
+    /// </summary>
+    public static async Task WhenWritingCopiesFinish()
+    {
+        while (true)
+        {
+            Task[] writing;
+            lock (Gate)
+            {
+                _holdingBack = true;
+                var entries = Folders.Values.Where(entry => entry.State == State.Copying && entry.Writing).ToList();
+                foreach (var entry in entries) entry.WaitedForBeforeClosing = true;
+                writing = entries.Select(entry => entry.Copy).ToArray();
+            }
+            if (writing.Length == 0) return;
+            try { await Task.WhenAll(writing).ConfigureAwait(false); }
+            catch { /* a copy that threw has finished too */ }
+        }
+    }
+
+    /// <summary>
+    /// Let held-back copies go again: the close that held them did not quit
+    /// after all (another window was opened while it waited).
+    /// </summary>
+    public static void ReleaseWaitingCopies()
+    {
+        lock (Gate) _holdingBack = false;
+    }
+
+    /// <summary>
+    /// Whether this close keeps the window up until the copy has finished
+    /// (#484). PURE. Only a close that QUITS (the last window), only while a
+    /// copy is WRITING, never twice, and never while Windows is ending the
+    /// session: Windows ends the process at sign-out whatever the window does,
+    /// and holding the close only brings up "this app is preventing shutdown"
+    /// — a Windows-only difference from the mac, made cheaper by #477 (the
+    /// scheduled run gets the folder ready itself before it builds).
+    /// </summary>
+    public static bool ClosingWaitsForTheCopy(bool closingQuits, bool aCopyIsWriting, bool systemIsEnding, bool alreadyWaited) =>
+        closingQuits && aCopyIsWriting && !systemIsEnding && !alreadyWaited;
 }

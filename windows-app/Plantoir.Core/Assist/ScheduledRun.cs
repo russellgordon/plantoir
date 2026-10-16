@@ -29,7 +29,12 @@ namespace Plantoir.Core.Assist;
 /// (<c>scheduledDeployCancellation.theDestination.order</c>): the lateness
 /// window first; then waiting for the course; then whether the task still
 /// stands; then the settings — so a Save made while the run waited counts.
-/// Leases taken while waiting are released before any stand-down.</para>
+/// Leases taken while waiting are released before any stand-down. Since #477
+/// the wait also covers a live copy of the folder's tools by another program,
+/// and after the settings the run brings those tools up to date itself,
+/// holding its leases, before it writes the wrapper
+/// (documentation/07-deployment.md → "On Windows since bundle 3: the
+/// scheduled run is Plantoir").</para>
 ///
 /// <para><b>Tasks set before bundle 3 drain.</b> They run
 /// <c>powershell.exe -File &lt;baked .ps1&gt;</c>, one-shot; migrating them at
@@ -204,6 +209,13 @@ public static class ScheduledRun
     public const string SettingsCouldNotBeRead =
         "its settings could not be read when the time came, so there was no telling where to deploy it";
 
+    /// <summary>
+    /// The clause for a deploy the run could not get ready: its wrapper could
+    /// not be written — and, since #477, the folder's tools could not be
+    /// brought up to date, or another program was still copying them at the
+    /// end of the run's ten minutes. True for all three, and the contract's
+    /// own words (<c>wrapperCouldNotBeWritten</c>), so no contract change.
+    /// </summary>
     public const string WrapperCouldNotBeWritten =
         "Plantoir could not get the deploy ready on this computer when the time came";
 
@@ -218,6 +230,22 @@ public static class ScheduledRun
         /// <summary>Runs the written wrapper and answers its exit code.</summary>
         public Func<string, int> RunWrapper { get; init; } = RunWrapperForReal;
         public string OutcomeDirectory { get; init; } = ScheduledPublishOutcome.Directory();
+
+        /// <summary>
+        /// The app's recipe, beside the program (#477): the run brings the
+        /// folder's launchers and tools up to date from it before it builds.
+        /// Null: no refresh (the tests that are not about it; the program
+        /// sets it).
+        /// </summary>
+        public string? BundledToolchainRoot { get; init; }
+
+        /// <summary>
+        /// The process id of a LIVE program copying the tools into this
+        /// working folder now, never this run's own, or null (#477) — read from
+        /// the <c>toolchain-copying.&lt;pid&gt;</c> markers.
+        /// </summary>
+        public Func<string, int?> CopyingTheFolder { get; init; } = folder =>
+            ToolchainReadiness.LiveCopiers(folder, exceptThisProcess: true) is { Count: > 0 } pids ? pids[0] : null;
     }
 
     /// <summary>How the run ended — for the process's exit code and for tests.</summary>
@@ -249,22 +277,43 @@ public static class ScheduledRun
         // 2. Wait for the course (#289): another program's build or publish,
         // never a preview. Take, then look — only leases taken before this
         // run's build lease count — on the wall clock, fifteen seconds at a time.
+        //
+        // Since #477 it also waits, in the same window and on the same clock,
+        // while another program is copying the tools into the working folder
+        // (a window opened on the folder just before 06:30, after an update):
+        // building then would build from a mix of old and new files. It takes
+        // no lease while a copy is live, and a copy still live at ten minutes
+        // stands it down as a deploy it could not get ready — never "the course
+        // was busy", which would be a false sentence about the course.
         var started = world.Now();
         WorkLease.Held? build = null, publish = null;
         WorkLease.Other? inTheWay;
-        bool waited = false;
+        int? copying;
+        int? copier = null;
+        bool waited = false, metACopy = false, metTheCourse = false;
         while (true)
         {
-            inTheWay = WorkLease.InTheWay(WorkLease.Asker.AScheduledPublish, job.WorkingFolder, job.CourseCode, claim: null);
-            if (inTheWay is null)
+            inTheWay = null;
+            copying = world.CopyingTheFolder(job.WorkingFolder);
+            if (copying is not null)
             {
-                build = WorkLease.Take(job.WorkingFolder, job.CourseCode, WorkLease.Building);
-                publish = WorkLease.Take(job.WorkingFolder, job.CourseCode, WorkLease.Publishing);
-                inTheWay = WorkLease.InTheWay(WorkLease.Asker.AScheduledPublish, job.WorkingFolder, job.CourseCode, build.Claim);
-                if (inTheWay is null) break;
-                build.Dispose();
-                publish.Dispose();
-                build = publish = null;
+                metACopy = true;
+                copier = copying;
+            }
+            else
+            {
+                inTheWay = WorkLease.InTheWay(WorkLease.Asker.AScheduledPublish, job.WorkingFolder, job.CourseCode, claim: null);
+                if (inTheWay is null)
+                {
+                    build = WorkLease.Take(job.WorkingFolder, job.CourseCode, WorkLease.Building);
+                    publish = WorkLease.Take(job.WorkingFolder, job.CourseCode, WorkLease.Publishing);
+                    inTheWay = WorkLease.InTheWay(WorkLease.Asker.AScheduledPublish, job.WorkingFolder, job.CourseCode, build.Claim);
+                    if (inTheWay is null) break;
+                    build.Dispose();
+                    publish.Dispose();
+                    build = publish = null;
+                }
+                metTheCourse = true;
             }
             if (world.Now() - started >= LongestWait) break;
             waited = true;
@@ -272,6 +321,14 @@ public static class ScheduledRun
         }
 
         int seconds = (int)Math.Round((world.Now() - started).TotalSeconds);
+        if (copying is not null)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse,
+                $"waited {seconds} s for Plantoir to finish getting the working folder ready (process {copying}), and stood down",
+                job.CourseCode, job.Section);
+            StandDown(job, world, ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, WrapperCouldNotBeWritten);
+            return Ending.StoodDown;
+        }
         if (inTheWay is not null)
         {
             ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse,
@@ -281,8 +338,7 @@ public static class ScheduledRun
             return Ending.StoodDown;
         }
         if (waited)
-            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse,
-                $"waited {seconds} s for another program on this computer to finish with the course, and went ahead",
+            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse, WaitedLine(seconds, metTheCourse, metACopy, copier),
                 job.CourseCode, job.Section);
 
         try
@@ -306,7 +362,38 @@ public static class ScheduledRun
             }
             if (decision.NotesTheChange) NoteTheSettings(job, course, decision, wentAhead: true);
 
-            // 5. Write the wrapper from those settings, under the job's OWN
+            // 5a. Bring the folder's tools up to date (#477), holding both
+            // leases, BEFORE the wrapper: its fingerprint step and the build it
+            // runs read .toolchain\, and must read the tools this program
+            // carries — not the ones from before an update nobody has opened
+            // the app since. The copy writes the same marker the window's does,
+            // so plantoir-mcp refuses meanwhile and a window's later copy waits
+            // its turn; a copy by another program still running at the run's
+            // ten minutes stands it down, as does a copy that failed.
+            if (world.BundledToolchainRoot is { } bundled)
+            {
+                var turns = new ToolchainReadiness.TakingTurns(world.Sleep, () => world.Now() - started >= LongestWait);
+                ToolchainReadiness.RefreshWorkspace(job.WorkingFolder, bundled, retryAFailedCopy: true, turns,
+                                                    (job.CourseCode, job.Section)).GetAwaiter().GetResult();
+                if (ToolchainReadiness.StateOf(job.WorkingFolder) == ToolchainReadiness.State.Failed)
+                {
+                    if (ToolchainReadiness.LastCopyOf(job.WorkingFolder) is { GaveUpWaiting: true } notStarted)
+                        ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse,
+                            $"waited {(int)Math.Round((world.Now() - started).TotalSeconds)} s for Plantoir to finish getting " +
+                            $"the working folder ready (process {notStarted.WaitedForPid}), and stood down",
+                            job.CourseCode, job.Section);
+                    build?.Dispose();
+                    publish?.Dispose();
+                    build = publish = null;
+                    StandDown(job, world, ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, WrapperCouldNotBeWritten);
+                    return Ending.StoodDown;
+                }
+                // A cold copy takes minutes (94–120 s measured): a cancellation
+                // or a re-set made meanwhile must not be deployed over.
+                if (!StillStands(job, jobPath)) return Ending.NoLongerStands;
+            }
+
+            // 5b. Write the wrapper from those settings, under the job's OWN
             // name, and run it. The name is never recomputed (#309's trap).
             string launcher = Path.Combine(job.WorkingFolder, "deploy.ps1");
             var excluded = SectionPublishState.SelfPublishingSubpaths(course!.DirectoryPath, decision.DeploysTo);
@@ -319,7 +406,17 @@ public static class ScheduledRun
                 StandDown(job, world, ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, WrapperCouldNotBeWritten);
                 return Ending.StoodDown;
             }
+            // #475: nobody is awake at half six to be asked about classes dated
+            // after the next class, so the deploy goes out as it is — read
+            // here, from the settings and pages it is about to deploy, on the
+            // run's own day, and recorded below only once it HAS deployed.
+            var later = ClassesDatedLater.FlaggedIn(course, job.Section, DateOnly.FromDateTime(world.Now().LocalDateTime));
+            // The wrapper's success record is read against the REAL clock that
+            // dates its file, never world.Now (a test's pinned morning), so
+            // both sides of the comparison are this computer's local time.
+            var ranAt = DateTime.Now;
             world.RunWrapper(script);
+            NoteTheClassesThatWentOut(job, world, later, ranAt);
         }
         finally
         {
@@ -331,6 +428,40 @@ public static class ScheduledRun
         // mistaken for one still to come. The wrapper's record stays.
         ClearIfStillMine(job, TaskScheduling.JobPath(job.TaskName));
         return Ending.Deployed;
+    }
+
+    /// <summary>
+    /// The trail's line for a run that waited and then went ahead
+    /// (<c>scheduled publish waited for the course</c>): what stood in the way
+    /// — another program's work on the course, a copy of the folder's tools
+    /// (#477), or both — and, for a copy, which program.
+    /// </summary>
+    internal static string WaitedLine(int seconds, bool metTheCourse, bool metACopy, int? copier) =>
+        (metTheCourse, metACopy) switch
+        {
+            (true, true) => $"waited {seconds} s for another program on this computer to finish with the course " +
+                            $"and for Plantoir to finish getting the working folder ready (process {copier}), and went ahead",
+            (false, true) => $"waited {seconds} s for Plantoir to finish getting the working folder ready (process {copier}), and went ahead",
+            _ => $"waited {seconds} s for another program on this computer to finish with the course, and went ahead",
+        };
+
+    /// <summary>
+    /// "deployed with classes dated after the next class: …" (#475,
+    /// <c>laterClassesWentOut</c>) — written only when the wrapper left its
+    /// SUCCESS record during this run. Never on the wrapper's exit code: it is
+    /// 0 whether or not the deploy got through (the mac measured gating on it
+    /// writing the line after a failed deploy, its fixes review A), and a
+    /// record older than this run is an earlier night's.
+    /// </summary>
+    private static void NoteTheClassesThatWentOut(Job job, World world, IReadOnlyList<ClassesDatedLater.Page> later,
+                                                  DateTime ranAt)
+    {
+        if (ClassesDatedLater.WentOutLine(later) is not { } line) return;
+        if (ScheduledPublishOutcome.ReadFrom(world.OutcomeDirectory, job.CourseCode, job.Section, job.WorkingFolder)
+                is not { Outcome: ScheduledPublishOutcome.Kind.Succeeded } record) return;
+        // A second's slack for the file system's clock against this one.
+        if (record.When < ranAt.AddSeconds(-1)) return;
+        ActivityTrail.Note(ActivityTrail.Event.LaterClassesWentOut, line, job.CourseCode, job.Section);
     }
 
     /// <summary>

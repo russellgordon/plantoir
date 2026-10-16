@@ -2720,7 +2720,7 @@ touched (Russell's real folder has a `.claude/settings.local.json`) — and a
 **managed section** in `AGENTS.md` and `CLAUDE.md` naming the skill, between
 `<!-- BEGIN PLANTOIR: … -->` and `<!-- END PLANTOIR -->`. Russell's rulings
 of 2026-10-09 (P1 REVISED AGAIN and ADDENDUM 2), as contract cases
-(`printablePages.agentGuidance.rootFileCases`, nine):
+(`printablePages.agentGuidance.rootFileCases`, ten):
 
 - **no file** → written, holding only the section;
 - **the markers present** → only what is between them is replaced;
@@ -3092,8 +3092,8 @@ at the click, as `MenuRoute` does, and the context menu's items, which do not
 consult the rule, meet the same check.
 
 **Every menu write rebuilds the preview**, as the tool does today (the
-director kept it: the menu must not disagree with the tool; Windows' gap is
-#479). The one exception is the classes hidden at Deploy (#475, below), where
+director kept it: the menu must not disagree with the tool; Windows matches
+it since #479, 2026-10-15, when its hides began rebuilding too). The one exception is the classes hidden at Deploy (#475, below), where
 the deploy builds straight after.
 
 REJECTED: lifting each tool's private function into a shared typed one (the
@@ -3333,11 +3333,17 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   `PlantoirSettingsView` was about a SINGLE tab titling the window
   "Assistant"; with two panes a window titled after the chosen pane is how
   every multi-pane Mac settings window reads. Trail: "Cloudflare account ID
-  changed in Settings" (never the ID). **Not changed, and now stale on the
-  mac:** the launchers' non-interactive refusal still says "Add the Account ID
-  in this course's settings in Plantoir, under Deploying" (`deploy.sh`,
+  changed in Settings" (never the ID). **Not changed in this batch, and stale
+  until #490:** the launchers' non-interactive refusal said "Add the Account
+  ID in this course's settings in Plantoir, under Deploying" (`deploy.sh`,
   `deploy.ps1`) — the publishing path, left for a change that runs
-  `verify-deploy.sh`.
+  `verify-deploy.sh`. #490 changed both launchers, from Windows, to "Add your
+  Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying, then deploy
+  again." (`documentation/07-deployment.md`; pinned by
+  `scripts/test_deploy_non_interactive.py`). The app's own in-app refusals —
+  `MultiDestinationDeployRunner.swift` and `ScheduledDeployWording.swift` —
+  still said "this course's settings" when that landed; a `mac` issue (#534) owns
+  them.
 - **Assistant window**: "May I ask for your class dates?" puts its buttons on
   the trailing end with Yes last, as every other card and sheet does.
 
@@ -3361,6 +3367,19 @@ sort indicator. **Not captured**: Import Courses for Reference (behind a
 folder chooser), the links checklist (needs a build's offer), Class Dates
 (opened only by the assistant), Special Folders help and the folder-rename
 sheet — the title scan holds their shape.
+
+**On Windows** (#491 part B, 2026-10-15): the same rules through WinUI's own
+mechanisms — [12 → "The HIG sweep, screen by screen, on Windows (#491 part
+B)"](12-windows-app.md#the-hig-sweep-screen-by-screen-on-windows-491-part-b).
+What a mac reader should KNOW, none of it owed back: Delete on a row whose item
+is greyed does nothing silently there (Windows has no beep for it); the font
+floor is 12 effective pixels, Fluent's Caption, rather than a conversion of 10
+pt; a disabled default button in WinUI keeps the accent slab (#BFBFBF Light,
+#434343 Dark — measured), so Windows needed the same "grey and not the
+default" helper the mac did; an AutoSuggestBox traps Escape the way the mac's
+fields did (measured), so both pickers route through a `PickerEscape` of their
+own; and a failed course or section removal names its act there too ("Could not
+remove EXC2O"), Windows' own addition to `BackupProblemTitle`.
 
 ## Opening the preview at the page last viewed (#504)
 
@@ -3634,6 +3653,12 @@ WAS the front page, today's class was just put on it); written only when the
 press asked for the page last viewed, so a plain press writes nothing new.
 **"preview start page chosen in Settings"** — which choice. Never a page's
 words.
+
+**On Windows** (#514): the same contract, with a second Section item in place
+of the Option alternate, Alt read at the click, WebView2's `SourceChanged` and
+`ContentLoading` in place of KVO and didCommit, and the page kept in its own
+file — `12-windows-app.md` → "Preview at Last Viewed on Windows (#514, the
+mac's #504)".
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
@@ -7439,10 +7464,16 @@ folder ready after an update (#473)"), with the mac's differences named:**
   copy; the mac does not, because every file is written atomically from the
   same bundle, so two copies at once write the same bytes and the worse
   outcome is wasted work, not a broken recipe.
-- **The scheduled run is unchanged**, as on Windows: `ScheduledDeploy`
-  starts its own `Process`, never a `ScriptRunner`, and never mirrors; a
-  `--stop` (`PreviewStopper`) is its own process too, so neither meets the
-  backstop (finding 1).
+- **The scheduled run is unchanged**: `ScheduledDeploy` starts its own
+  `Process`, never a `ScriptRunner`, and never mirrors; a `--stop`
+  (`PreviewStopper`) is its own process too, so neither meets the backstop
+  (finding 1). **Windows' run is no longer the same** (#477, 2026-10-15):
+  it waits for a live copy of the folder's tools and makes its own before it
+  builds, and its copies take turns, because two copies at once were
+  MEASURED to fail there with sharing violations (07 → "On Windows since
+  bundle 3: the scheduled run is Plantoir"). Whether the mac's run builds
+  from an out-of-date or half-copied `.toolchain/` after an update is a
+  `mac` issue.
 - **The banner** (`ToolchainReadinessNoticeView`, above the path bar beside
   the synced-folder notice) appears only once the copy has actually written
   or removed its first file (`syncDirectory` says so once, for a write or a
@@ -7458,8 +7489,10 @@ folder ready after an update (#473)"), with the mac's differences named:**
   `.terminateLater`): the synchronous copy could not be quit through; off
   the main actor it could, leaving `.toolchain/` half old and half new for a
   scheduled run or a command-line launcher to build from (finding 8). Bounded
-  by the copy. Windows has this gap and does not wait — a `windows` issue
-  says so.
+  by the copy. Windows waits too since #484 (2026-10-15): the window stays up
+  with its banner until the copy has finished — but not while Windows is
+  ending the session, which ends the process regardless; 12 → "Closing waits
+  for a copy that is writing (#484)".
 - **The trail line** `working folder tools copied` is written on both
   platforms now (its contract entry lost `appliesOn: ["windows"]`): once per
   copy that changed or failed something, the counts, the seconds, and the

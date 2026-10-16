@@ -20,11 +20,32 @@ public class TaskDefinitionTests : IDisposable
         try { Directory.Delete(_root, true); } catch { }
     }
 
-    private static void HasTheThreeSettings(string xml)
+    /// <summary>
+    /// Battery, a missed start, and — since #470 — a start that comes while the
+    /// earlier run still works is QUEUED behind it, never refused (IgnoreNew).
+    /// </summary>
+    private static void HasTheFourSettings(string xml)
     {
+        Assert.Contains("<MultipleInstancesPolicy>Queue</MultipleInstancesPolicy>", xml);
+        Assert.DoesNotContain("IgnoreNew", xml);
         Assert.Contains("<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>", xml);
         Assert.Contains("<StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>", xml);
         Assert.Contains("<StartWhenAvailable>true</StartWhenAvailable>", xml);
+    }
+
+    [Fact]
+    public void SchedulingRegistersATaskThatQueuesASecondStart()
+    {
+        using var scheduler = new FakeScheduler(_root);
+        string folder = FakeScheduler.WorkingFolderWith(_root, "queue", "ICS3U", "{}");
+        Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, DateTime.Now.AddDays(1), [new("netlify", "")]));
+        Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, DateTime.Now.AddDays(2), [new("netlify", "")]));
+        Assert.Equal(2, scheduler.CreatedXml.Count);
+        foreach (string xml in scheduler.CreatedXml)
+        {
+            Assert.Contains("<MultipleInstancesPolicy>Queue</MultipleInstancesPolicy>", xml);
+            Assert.DoesNotContain("IgnoreNew", xml);
+        }
     }
 
     [Fact]
@@ -33,7 +54,7 @@ public class TaskDefinitionTests : IDisposable
         using var scheduler = new FakeScheduler(_root);
         string folder = FakeScheduler.WorkingFolderWith(_root, "work", "ICS3U", "{}");
         Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, DateTime.Now.AddDays(1), [new("netlify", "")]));
-        HasTheThreeSettings(Assert.Single(scheduler.CreatedXml));
+        HasTheFourSettings(Assert.Single(scheduler.CreatedXml));
     }
 
     /// <summary>
@@ -43,7 +64,7 @@ public class TaskDefinitionTests : IDisposable
     /// (PARITYPROBE) in a temp working folder; the task is cancelled after.
     /// </summary>
     [Fact]
-    public void TheRegisteredTaskKeepsTheThreeSettingsAndCarriesItsToken()
+    public void TheRegisteredTaskKeepsTheFourSettingsAndCarriesItsToken()
     {
         if (!OperatingSystem.IsWindows()) return;
         string folder = FakeScheduler.WorkingFolderWith(_root, "probe", "PARITYPROBE", "{}");
@@ -58,7 +79,7 @@ public class TaskDefinitionTests : IDisposable
         {
             Assert.Null(TaskScheduling.Schedule(folder, "PARITYPROBE", 1, DateTime.Now.AddDays(1), [new("netlify", "")]));
             var (_, back) = Schtasks("/Query", "/TN", name, "/XML");
-            HasTheThreeSettings(back);
+            HasTheFourSettings(back);
             string token = ScheduledRun.ReadJob(TaskScheduling.JobPath(name))!.Token;
             Assert.Contains($"{TaskScheduling.TokenArgument} {token}", back);
         }

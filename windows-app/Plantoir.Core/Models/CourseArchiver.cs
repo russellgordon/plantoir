@@ -59,7 +59,8 @@ public static class CourseArchiver
     /// Deletes the oldest backups of one course until only
     /// <see cref="MostBackupsKept"/> are left.
     ///
-    /// ONLY the assistant's own backups are pruned. A teacher's backup is a
+    /// ONLY the assistant's and the Section menu's own backups are pruned,
+    /// five of each. A teacher's backup is a
     /// decision — deleting that on a schedule they never agreed to is the app
     /// overruling them about their own work.
     ///
@@ -83,11 +84,23 @@ public static class CourseArchiver
         if (!Directory.Exists(backupsDir)) return;
 
         var entries = Directory.GetFiles(backupsDir, "*.zip");
+        // Two groups of five, counted APART (#489, mac #457 batch B;
+        // course-management.json → backups.pruneCases): the Section menu saves
+        // a copy before EVERY change, and an afternoon of menu changes must
+        // never push the copy an open conversation's Restore button needs off
+        // the disk. The teacher's own are in neither group, and never pruned.
         var assistantBackups = new List<BackupItem>();
+        var menuBackups = new List<BackupItem>();
         foreach (var file in entries)
         {
             if (BackupItem.From(file, courseCode) is not { } item) continue;
-            if (item.Maker is not BackupMaker.Assistant) continue;
+            var group = item.Maker switch
+            {
+                BackupMaker.Assistant => assistantBackups,
+                BackupMaker.Menu => menuBackups,
+                _ => null,
+            };
+            if (group is null) continue;
             // A stamp that cannot be true is not allowed to decide what gets
             // DELETED. The zip stays where it is and stays LISTED, so the
             // teacher can restore it or delete it themselves; it is simply
@@ -95,21 +108,33 @@ public static class CourseArchiver
             // the one thing about it known to be wrong and this list is
             // sorted by date before its tail is thrown away.
             if (!ArchiveStamp.CouldHaveBeenStamped(item.BackedUpAt, now)) continue;
-            assistantBackups.Add(item);
+            group.Add(item);
         }
 
-        if (assistantBackups.Count <= MostBackupsKept) return;
+        KeepTheNewest(assistantBackups);
+        KeepTheNewest(menuBackups);
+    }
 
-        // Newest first. Two backups made in the same second are ordered by name.
-        assistantBackups.Sort((first, second) =>
+    /// <summary>Deletes all but the <see cref="MostBackupsKept"/> newest of one maker's backups.</summary>
+    private static void KeepTheNewest(List<BackupItem> backups)
+    {
+        if (backups.Count <= MostBackupsKept) return;
+
+        // Newest first. Two in the same second: the higher "-N" is the later
+        // copy (the mac's same-second name), then by name.
+        backups.Sort((first, second) =>
         {
             if (first.BackedUpAt == second.BackedUpAt)
+            {
+                int counters = SameSecondCounter(second.FilePath).CompareTo(SameSecondCounter(first.FilePath));
+                if (counters != 0) return counters;
                 return string.Compare(Path.GetFileName(second.FilePath), Path.GetFileName(first.FilePath), StringComparison.Ordinal);
+            }
             return second.BackedUpAt.CompareTo(first.BackedUpAt);
         });
 
         int kept = 0;
-        foreach (var backup in assistantBackups)
+        foreach (var backup in backups)
         {
             kept++;
             if (kept > MostBackupsKept)
@@ -117,6 +142,18 @@ public static class CourseArchiver
                 try { File.Delete(backup.FilePath); } catch { }
             }
         }
+    }
+
+    /// <summary>The "-N" after a backup's time (1 when there is none), for ordering copies of one second.</summary>
+    private static int SameSecondCounter(string filePath)
+    {
+        string name = Path.GetFileNameWithoutExtension(filePath);
+        int backup = name.IndexOf("_backup_", StringComparison.Ordinal);
+        if (backup < 0) return 1;
+        string[] pieces = name[(backup + "_backup_".Length)..].Split('_');
+        if (pieces.Length < 2) return 1;
+        int dash = pieces[1].IndexOf('-');
+        return dash >= 0 && int.TryParse(pieces[1][(dash + 1)..], out int counter) ? counter : 1;
     }
 
     /// <summary>

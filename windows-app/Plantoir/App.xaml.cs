@@ -93,6 +93,9 @@ public partial class App : Application
         // finished" bracket the copy, and "MainWindow.Activate called" is when
         // the window appeared. Developer-only, never on the trail (the trail
         // has its own line, written by ToolchainReadiness).
+        // A copy that waited for another program's copy of the folder, or
+        // gave up waiting (#477), says so here too.
+        Plantoir.Core.Models.ToolchainReadiness.Diagnostic = LogDiagnostic;
         Plantoir.Core.Models.ToolchainReadiness.Changed += folder =>
         {
             var state = Plantoir.Core.Models.ToolchainReadiness.StateOf(folder);
@@ -387,6 +390,9 @@ public partial class App : Application
     private static void QuitTime()
     {
         LogDiagnostic("QuitTime called");
+        // First: Exit below may end the process without raising the Settings
+        // window's Closed, and a changed Account ID would never reach the trail.
+        Views.SettingsWindow.NoteBeforeQuit();
         // atQuit (#337): never refuses; a prepared update is set aside when
         // work is under way, or installed as Plantoir quits without reopening.
         try

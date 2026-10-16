@@ -1043,7 +1043,10 @@ This is the only time you will be asked for it.
      (It is also the long code in the address bar, just after
      dash.cloudflare.com/.)
 "@ | Out-Host
-  Assert-CanAsk "Paste Cloudflare Account ID" "Add the Account ID in this course's settings in Plantoir, under Deploying."
+  # The ▸ is spelled as a character code: this file has no byte-order mark and
+  # Windows PowerShell 5.1 reads it in the system code page, where a literal
+  # one arrives garbled (#490; the [char] convention used for · and — above).
+  Assert-CanAsk "Paste Cloudflare Account ID" ("Add your Cloudflare Account ID in Plantoir {0} Settings {0} Deploying, then deploy again." -f [char]0x25B8)
   $entered = (Read-Host "Paste Cloudflare Account ID").Trim()
   if ($entered -notmatch '^[0-9a-fA-F]{32}$') {
     Write-Host "That does not look like an Account ID (it should be 32 letters and digits)."

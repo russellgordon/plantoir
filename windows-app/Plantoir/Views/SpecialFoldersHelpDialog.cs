@@ -48,13 +48,7 @@ public static class SpecialFoldersHelpDialog
     private static UIElement Body(CourseConfiguration config, CurriculumFolderRule.Resolution? curriculum)
     {
         var stack = new StackPanel { Spacing = 18 };
-        stack.Children.Add(new TextBlock
-        {
-            Text = SpecialFoldersHelp.Intro,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.7,
-            MaxWidth = BodyWidth,
-        });
+        stack.Children.Add(FormBuilders.DialogExplanation(SpecialFoldersHelp.Intro));
 
         foreach (var entry in SpecialFoldersHelp.Entries(config, curriculum))
         {

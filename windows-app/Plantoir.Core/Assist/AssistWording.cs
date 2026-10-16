@@ -394,6 +394,22 @@ public static partial class AssistWording
     public static string PreviewDidNotBuild(string course, string section) =>
         $"The preview for {course} Section {section} did not finish building. {WhereTheOutputIs}";
 
+    /// <summary>
+    /// A preview build that failed, said to a caller that has no window and
+    /// so cannot be pointed at the output (#481): an outside assistant over
+    /// <c>rebuild_preview</c>, <c>publish_pages</c> or <c>unpublish_pages</c>.
+    /// Said when nothing in the output has a plainer reason.
+    /// </summary>
+    public static string PreviewDidNotBuildForACallerWithNoWindow(string course, string section) =>
+        $"The preview for {course} Section {section} did not finish building. Build it once from its window in Plantoir to see what stopped it.";
+
+    /// <summary>
+    /// The same failure when <see cref="Plantoir.Core.Scripting.FailureExplainer"/>
+    /// recognises its cause; <paramref name="reason"/> is that explanation (#481).
+    /// </summary>
+    public static string PreviewDidNotBuildBecause(string course, string section, string reason) =>
+        $"The preview for {course} Section {section} did not finish building: {reason}";
+
     // MARK: - Taking something back
 
     public static string Undid(string whatHappened) =>
@@ -912,4 +928,20 @@ public static partial class AssistWording
     public const string WhereTheOutputIs = "The output is in that section's window in Plantoir.";
 
     public const string NothingToDo = "I am not sure what to do with that.";
+
+    // MARK: - Help ▸ Publishing and Deploying… (#488; the mac's #457 batch B)
+
+    /// <summary>The Help menu item's own title, and its dialog's.</summary>
+    public const string PublishingAndDeployingTitle = "Publishing and Deploying";
+
+    /// <summary>
+    /// What the two words mean, said TO the teacher (the assistant's own
+    /// <c>whatPublishingMeans</c> says "the teacher"). Shown with or without
+    /// a course selected.
+    /// </summary>
+    public const string PublishingAndDeployingExplained =
+        "Publishing a page decides whether students can see it in this section's website. Deploying sends the whole " +
+        "website out to the web. They are different acts: a page can be published for days and still not be online, " +
+        "and deploying puts everything already published in front of students straight away. Preview after a change " +
+        "to look it over first, which is the safer order.";
 }

@@ -5,6 +5,7 @@ using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Models;
 using Plantoir.Mcp;
 
 namespace Plantoir.Tests;
@@ -119,6 +120,29 @@ public class AssistScenarioTests : IDisposable
     public async Task AssistCases_Scenario_MatchesContract(string scenarioName, string caseJson)
     {
         Assert.NotEmpty(scenarioName);
+
+        // A scenario this app owes is held open by name: it must still FAIL,
+        // and the day it passes this says to delete its ledger entry. (None
+        // is held today: #475's three landed with #489's 2C.)
+        // Each case is its own test here, so the ledger's "it now passes"
+        // direction is checked case by case rather than through GapsIn.
+        if (NamedGapLedger.Holding(NamedGapLedger.AssistScenarios, scenarioName) is { } owed)
+        {
+            var failure = await Record.ExceptionAsync(() => Play(scenarioName, caseJson));
+            Assert.True(failure is not null, NamedGapLedger.ClosedMessage(owed));
+            return;
+        }
+
+        await Play(scenarioName, caseJson);
+    }
+
+    /// <summary>The ledger's other direction for scenarios: every one it holds open is still in the contract.</summary>
+    [Fact]
+    public void TheLedgeredScenariosAreStillInTheContract() =>
+        NamedGapLedger.StillNamed(NamedGapLedger.AssistScenarios, Cases().Select(c => c!["name"]!.ToString()));
+
+    private async Task Play(string scenarioName, string caseJson)
+    {
         var scenario = JsonNode.Parse(caseJson)!.AsObject();
         var given = scenario["given"]?.AsObject();
         string when = scenario["when"]!.ToString();
@@ -153,7 +177,36 @@ public class AssistScenarioTests : IDisposable
         // what the window holds for a conversation: the backup taken before the
         // first change is per-server, so a fresh one per call would back the
         // course up again on every turn.
-        var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()));
+        // The server's surface (#489, the plan review's H2): OUTSIDE unless a
+        // case says otherwise — every scenario before #475's has run that way,
+        // and flipping the default would change the asker, the sentences and
+        // the lease rules under them. `surface: "mcp"` is named explicitly.
+        var surface = given?["surface"]?.ToString() switch
+        {
+            "mcp" or null => AssistSurface.Outside,
+            "menu" => AssistSurface.Menu,
+            _ => AssistSurface.LocalWindow,
+        };
+        // #475: `given.classesDatedLater` lays out three published classes —
+        // today's, the next class day's and one two days after that — around
+        // a PINNED today, so the case cannot flake at midnight; the server is
+        // handed the same day.
+        bool classesDatedLater = given?["classesDatedLater"]?.GetValue<bool>() == true;
+        if (classesDatedLater)
+        {
+            Class("Unit 2, Day 3", Iso(PinnedToday), published: true);
+            Class("Unit 2, Day 4", Iso(PinnedToday.AddDays(1)), published: true);
+            Class("Unit 2, Day 5", Iso(PinnedToday.AddDays(3)), published: true);
+        }
+        // `given.laterClassesKeptAll`: Keep All and Deploy, answered before.
+        if (given?["laterClassesKeptAll"]?.GetValue<bool>() == true)
+        {
+            var course = Workspace.DiscoverCourses(_folder).Single(found => found.Code == Course);
+            LaterClassesKept.Keep(course.DirectoryPath, SectionNumber,
+                                  ClassesDatedLater.FlaggedIn(course, SectionNumber, PinnedToday));
+        }
+        var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory())
+            { Surface = surface, Today = () => PinnedToday });
         var model = new ScriptedModel(given?["modelReply"] as JsonObject);
         // The contract's LOCAL schemas, as the window's own narrowed surface
         // declares them (#440 scenario "an empty add_next_class from the model
@@ -166,6 +219,23 @@ public class AssistScenarioTests : IDisposable
             PreviewIsShowing = () => previewRunning,
             SectionIsBusy = () => sectionBusy,
         };
+
+        // `given.laterClassesAnswer`: what the section window's question
+        // answers, noted as `askAboutClassesDatedLater` (#475). Absent, the
+        // window has nothing to ask, and no such event is recorded.
+        if (given?["laterClassesAnswer"]?.ToString() is { } laterAnswer)
+        {
+            agent.AskAboutClassesDatedLaterInApp = () =>
+            {
+                _window.Note("askAboutClassesDatedLater");
+                return Task.FromResult<LaterClassesAtADeploy>(laterAnswer switch
+                {
+                    "goAhead" => LaterClassesAnswer.GoAhead,
+                    "cancelled" => LaterClassesAnswer.Cancelled,
+                    var other => throw new InvalidOperationException($"{scenarioName}: laterClassesAnswer {other}"),
+                });
+            };
+        }
 
         if (sectionWindowOpen)
         {
@@ -298,6 +368,11 @@ public class AssistScenarioTests : IDisposable
                 "typed in by hand", new DateOnly(2026, 9, 8));
         }
     }
+
+    /// <summary>The day the #475 cases are laid out around — the mac fixture's own.</summary>
+    private static readonly DateOnly PinnedToday = new(2026, 10, 8);
+
+    private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     private string PagePath(string title) =>
         Path.Combine(_folder, "courses", Course, $"section{SectionNumber}", "All Classes", title + ".md");
@@ -722,10 +797,12 @@ public class AssistScenarioTests : IDisposable
     internal sealed class RealTools : IToolServer
     {
         private readonly PlantoirTools _tools;
+        private readonly AssistWorkspace _workspace;
         private readonly Dictionary<string, MethodInfo> _served = new(StringComparer.Ordinal);
 
         public RealTools(AssistWorkspace workspace)
         {
+            _workspace = workspace;
             _tools = new PlantoirTools(workspace);
             foreach (var method in typeof(PlantoirTools).GetMethods(BindingFlags.Public | BindingFlags.Instance))
             {
@@ -747,6 +824,7 @@ public class AssistScenarioTests : IDisposable
                     $"The contract asks for a tool this server does not serve: {name}");
 
             object? returned;
+            var topBefore = _workspace.TopOfTheUndoList;
             try { returned = method.Invoke(_tools, Bind(method, arguments, cancellation)); }
             catch (TargetInvocationException wrapped) when (wrapped.InnerException is not null)
             {
@@ -761,7 +839,10 @@ public class AssistScenarioTests : IDisposable
 
             return returned switch
             {
-                CallToolResult result => Answer(result),
+                // What plantoir-mcp's request filter adds after every call (#489).
+                CallToolResult result => Answer(PlantoirTools.AfterCall(_workspace, topBefore,
+                    arguments["course"]?.GetValue<string>(),
+                    arguments["section"] is JsonValue number && number.TryGetValue<int>(out int n) ? n : null, result)),
                 string said => AssistToolAnswer.Same(said),
                 null => throw new InvalidOperationException(
                     $"{name} answered with nothing this runner can read."),

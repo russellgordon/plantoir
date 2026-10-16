@@ -839,7 +839,7 @@ public class AssistWorkspaceTests : IDisposable
                     "section1", "All Classes", "Unit 2, Day 3.md")));   // and never edited
 
             // Plantoir's own window keeps its own sentence (director's ruling).
-            var window = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
+            var window = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow };
             var inTheWindow = Assert.ThrowsAsync<AssistRefusal>(
                 () => window.Apply(window.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }))).Result;
             Assert.Contains("Plantoir is building ICS3U right now", inTheWindow.Message);
@@ -925,7 +925,7 @@ public class AssistWorkspaceTests : IDisposable
         try
         {
             WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
-            var workspace = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
+            var workspace = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow };
 
             var refusal = Assert.ThrowsAsync<AssistRefusal>(() => workspace.RebuildPreview("ICS3U", 1)).Result;
 
@@ -950,7 +950,7 @@ public class AssistWorkspaceTests : IDisposable
         try
         {
             WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
-            var workspace = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
+            var workspace = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.LocalWindow };
             var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
             var result = workspace.Apply(plan).Result;
@@ -1496,6 +1496,40 @@ public class AssistWorkspaceTests : IDisposable
     }
 
     /// <summary>
+    /// #478: the rebuild after a publish, a hide or a whole unit stops for a
+    /// question the same way RebuildPreview's does — said as a question, after
+    /// what was already done, never as a broken build.
+    /// </summary>
+    [Fact]
+    public async Task APublishOrHideWhoseRebuildStopsForAQuestionSaysSo()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 4.md", draft: false);
+        Page("ICS3U", "section1/All Classes/Unit 3, Day 1.md", draft: true);
+        _launcher.QuestionOn = "preview";
+        var workspace = Open();
+        string folder = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes");
+
+        var published = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
+        var hidden = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 4" }, draft: true));
+        var unit = await workspace.ApplyWholeUnit("ICS3U", 1, 3, publishing: true, preview: true);
+
+        foreach (var (name, result) in new[] { ("publish", published), ("hide", hidden), ("whole unit", unit) })
+        {
+            Assert.False(result.Succeeded, name);
+            Assert.Contains(AssistWording.PreviewBuildNeedsAnAnswer("ICS3U", "1"), result.Message);
+            Assert.DoesNotContain(AssistWording.WhereTheOutputIs, result.Message);
+            Assert.DoesNotContain(AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"), result.Message);
+            Assert.NotNull(result.BackupPath);
+        }
+        Assert.StartsWith("1 page was changed and the course was backed up. ", published.Message);
+        Assert.Contains("publish: true", File.ReadAllText(Path.Combine(folder, "Unit 2, Day 3.md")));
+        Assert.Contains("publish: false", File.ReadAllText(Path.Combine(folder, "Unit 2, Day 4.md")));
+        Assert.Contains("publish: true", File.ReadAllText(Path.Combine(folder, "Unit 3, Day 1.md")));
+        Assert.Equal(3, _launcher.Runs.Count(run => run.Launcher == "preview"));
+    }
+
+    /// <summary>
     /// #467 (mac #439): a deploy whose legs were refused because the section
     /// was still being deployed says so - for a refused BUILD leg instead of
     /// "the build failed", and for refused deploy legs instead of "did not
@@ -1590,6 +1624,44 @@ public class AssistWorkspaceTests : IDisposable
         Assert.Contains("published", result.Message.ToLowerInvariant());
     }
 
+    /// <summary>
+    /// #479: hiding a page rebuilds the preview, as publishing one does, so an
+    /// outside assistant's "unpublished" is not said over a preview that still
+    /// shows the page. It used to return before the build.
+    /// </summary>
+    [Fact]
+    public async Task HidingAPageRebuildsThePreviewAndStopsThere()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
+        var workspace = Open();
+
+        var result = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, draft: true));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(new[] { "preview" }, _launcher.Runs.Select(r => r.Launcher));
+        Assert.Equal(new[] { "ICS3U", "1", "--build-only", "--non-interactive" }, _launcher.Runs[0].Arguments);
+        Assert.Contains("rebuilt the preview", result.Message);
+        Assert.StartsWith("Unpublished", result.Message);
+    }
+
+    /// <summary>
+    /// #479: the window's own visible rebuild still covers a hide — told not
+    /// to build, Apply builds nothing for a hide either.
+    /// </summary>
+    [Fact]
+    public async Task HidingWithPreviewFalseBuildsNothing()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
+        var workspace = Open();
+
+        var result = await workspace.Apply(
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, draft: true), preview: false);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(_launcher.Runs);
+        Assert.DoesNotContain("rebuilt the preview", result.Message);
+    }
+
     [Fact]
     public async Task APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog()
     {
@@ -1606,7 +1678,68 @@ public class AssistWorkspaceTests : IDisposable
             workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
 
         Assert.False(result.Succeeded);
-        Assert.Contains(AssistWording.WhereTheOutputIs, result.Message);
+        // #481: this caller has no window, so it is never pointed at one.
+        Assert.Contains(AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"), result.Message);
+        Assert.DoesNotContain(AssistWording.WhereTheOutputIs, result.Message);
+        Assert.DoesNotContain("Last output:", result.Message);
+    }
+
+    /// <summary>
+    /// #481: a rebuild that fails says one sentence to a caller with no
+    /// window — never "(The launcher exited with code 1.)" and never the log.
+    /// </summary>
+    [Fact]
+    public async Task ARebuildThatFailsSaysOneCleanSentence()
+    {
+        _launcher.FailOn = "preview";
+        _launcher.FailMessage = "(The launcher exited with code 1.)\n\nLast output:\nKeyError: 'x'";
+        var workspace = Open();
+
+        var result = await workspace.RebuildPreview("ICS3U", 1);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Nothing was changed. " + AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"),
+                     result.Message);
+        Assert.DoesNotContain("Last output:", result.Message);
+        Assert.DoesNotContain("exited with code", result.Message);
+    }
+
+    /// <summary>
+    /// #481: when the output has a plain reason, the sentence carries it — the
+    /// same explanation the app's own window would give.
+    /// </summary>
+    [Fact]
+    public async Task ARebuildThatFailsForAReasonSaysTheReason()
+    {
+        const string output = "(The launcher exited with code 1.)\n\nLast output:\ncurl: (6) Could not resolve host: registry.npmjs.org";
+        _launcher.FailOn = "preview";
+        _launcher.FailMessage = output;
+        var workspace = Open();
+
+        var result = await workspace.RebuildPreview("ICS3U", 1);
+
+        string reason = Plantoir.Core.Scripting.FailureExplainer.Explanation(output)!;
+        Assert.NotNull(reason);
+        Assert.Equal("Nothing was changed. " + AssistWording.PreviewDidNotBuildBecause("ICS3U", "1", reason),
+                     result.Message);
+        Assert.DoesNotContain("Last output:", result.Message);
+    }
+
+    /// <summary>#481: a whole unit published with a build that fails says the same sentence after its summary.</summary>
+    [Fact]
+    public async Task AWholeUnitWhoseBuildFailsSaysOneCleanSentence()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        _launcher.FailOn = "preview";
+        _launcher.FailMessage = "(The launcher exited with code 1.)\n\nLast output:\nKeyError: 'x'";
+        var workspace = Open();
+
+        var result = await workspace.ApplyWholeUnit("ICS3U", 1, 2, publishing: true, preview: true);
+
+        Assert.False(result.Succeeded);
+        Assert.NotNull(result.BackupPath);
+        Assert.EndsWith(". " + AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"), result.Message);
+        Assert.DoesNotContain(AssistWording.WhereTheOutputIs, result.Message);
         Assert.DoesNotContain("Last output:", result.Message);
     }
 
@@ -1907,7 +2040,8 @@ public class AssistWorkspaceTests : IDisposable
         var result = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
 
         Assert.False(result.Succeeded);
-        Assert.Contains("the preview couldn’t be built", result.Message);
+        Assert.Equal("1 page was changed and the course was backed up. " +
+                     AssistWording.PreviewDidNotBuildForACallerWithNoWindow("ICS3U", "1"), result.Message);
         Assert.Single(_launcher.Runs);                       // deploy never ran
         Assert.NotNull(result.BackupPath);                   // and the backup is still there
     }

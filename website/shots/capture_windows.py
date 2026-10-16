@@ -14,8 +14,12 @@ What it does:
    in both Light and Dark mode with native Windows ClearType typography.
 4. Assembles the two static color composites (colour-schemes-windows,
    light-and-dark-windows) using the Edge captures.
-5. Scales and optimizes all captured PNGs and generates WebP companions.
-6. Rebuilds the marketing site (website/build.py).
+5. Photographs what printing does (``--print-set``, ``print_set_windows.py``):
+   a preview of the MPM2D example course built natively in ``~/Plantoir Print``
+   with the bundled runtime, its printable page in light and dark, and the
+   handout its Print button prints, as paper.
+6. Scales and optimizes all captured PNGs and generates WebP companions.
+7. Rebuilds the marketing site (website/build.py).
 
 ``--provision-demo <folder>`` instead gives a demo working folder the state
 ``marketing/folders.json`` describes, through ``plantoir-mcp.exe``
@@ -107,7 +111,10 @@ def find_or_build_plantoir_exe() -> Path:
 # The class-site shots, by `capture.kind` in shots.json. Each is a page of a
 # demo site in an Edge `--app` window, photographed whole by windowshot (#380):
 # the window's own corners, no browser toolbar, no shadow of its own (the
-# page's stylesheet gives a single Windows window its drop-shadow).
+# page's stylesheet gives a single Windows window its drop-shadow). The two
+# print kinds, `preview-page` and `handout`, are not here: they are of a local
+# PREVIEW rather than a published site, and `--print-set` takes them
+# (print_set_windows.py).
 SITE_KINDS = ("browser", "browser-search", "browser-phone")
 
 
@@ -262,6 +269,9 @@ def main() -> int:
         --app [scene,...]  the app's own windows, each scene staged by
                            Plantoir.exe --stage-scene and photographed whole
                            (app_scenes_windows.py)
+        --print-set        what printing does: print-page (light, dark) and
+                           print-handout, from a preview of MPM2D in
+                           ~/Plantoir Print (print_set_windows.py)
         --provision-demo <folder>
                            no pictures: give a demo folder the state
                            marketing/folders.json describes (colours, the
@@ -292,7 +302,7 @@ def main() -> int:
             return arguments[index + 1].split(",")
         return None
 
-    everything = not any(flag in arguments for flag in ("--sites", "--figures", "--app"))
+    everything = not any(flag in arguments for flag in ("--sites", "--figures", "--app", "--print-set"))
     if everything or "--sites" in arguments:
         capture_browser_sites(listed_after("--sites") if "--sites" in arguments else None)
     if everything or "--figures" in arguments:
@@ -306,6 +316,10 @@ def main() -> int:
         from app_scenes_windows import capture_app_scenes
         capture_app_scenes(find_or_build_plantoir_exe(),
                            listed_after("--app") if "--app" in arguments else None)
+
+    if everything or "--print-set" in arguments:
+        from print_set_windows import capture_print_set
+        capture_print_set()
 
     announce("Rebuilding plantoir.app")
     subprocess.run([sys.executable, str(WEBSITE / "build.py")], cwd=REPO, check=True)

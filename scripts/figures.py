@@ -235,13 +235,25 @@ class Cache:
 
     def put(self, engine: str, key: str, entry: dict) -> None:
         path = self._path(engine, key)
+        # The temporary name carries this process and thread, so it is only
+        # this writer's, and it is closed by the time os.replace runs.
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         try:
             self.folder.mkdir(parents=True, exist_ok=True)
-            temporary = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
             temporary.write_text(json.dumps(entry, ensure_ascii=False), encoding="utf-8")
             os.replace(temporary, path)
         except OSError:
-            pass
+            # Not cached, and nothing lost: Windows refuses to replace a file
+            # another build has open for reading or is replacing at the same
+            # moment (PermissionError), which on the mac never happens. When
+            # it does, another writer has stored the same key, so the entry is
+            # there already — but the temporary must not be left behind
+            # beside it. Retrying was rejected: it adds build time to store an
+            # entry that is already stored.
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
 
     def clear(self) -> None:
         """--full-rebuild: this engine's entries, each one that can be
