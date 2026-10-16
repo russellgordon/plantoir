@@ -17,8 +17,8 @@ namespace Plantoir.UiTests;
 /// it too.</para>
 ///
 /// <para><b>The body is the longest the notice says</b>: a success naming
-/// two destinations, one of them a long folder path. The window is squeezed
-/// to 500 px wide (the sidebar column alone is at least 180) and the notice's
+/// two destinations, one of them a long folder path. The window is asked for
+/// 500 px wide and given its minimum, 900 epx (#542), and the notice's
 /// height read back. The mac's fault gave thousands of points; a few hundred
 /// pixels is fine. Reported in the test output and in
 /// <c>%TEMP%\plantoir-214-measurement.txt</c>, and asserted against the
@@ -46,8 +46,14 @@ public class PanelHeightUnderSqueezeUiTests
         var notice = app.Find("scheduledPublishNotice", "the scheduled-publish notice");
 
         var window = app.Window;
+        // Asked for 500, given the minimum, 900 epx (#542): the window never
+        // reaches 500, so wait for its width to settle rather than for a number
+        // (the wait used to be "width <= 520", which could never come true and
+        // always ran its full five seconds).
         window.Patterns.Transform.Pattern.Resize(500, 800);
-        Retry.WhileFalse(() => window.BoundingRectangle.Width <= 520, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200));
+        int last = -1;
+        Retry.WhileFalse(() => { int now = window.BoundingRectangle.Width; bool settled = now == last; last = now; return settled; },
+            TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(300));
         Thread.Sleep(800);
 
         var noticeBox = notice.BoundingRectangle;
@@ -64,7 +70,8 @@ public class PanelHeightUnderSqueezeUiTests
 
     /// <summary>
     /// #214's other half (bundle 11, V5/W3): a REAL publish to a folder, then
-    /// the window squeezed (it goes no narrower than 900), then the five parts
+    /// the window squeezed (it goes no narrower than its minimum, 900 epx:
+    /// 1350 px at 150%, #542), then the five parts
     /// of the folder publish's Done panel measured against the window — the
     /// phase, the folder sentence, Show in File Explorer, the render note and
     /// Show details. Each is an element WITH an automation peer (the panels

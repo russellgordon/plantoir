@@ -4437,7 +4437,9 @@ not apply here: there is no splitter to drag (the sidebar is a fixed 230 px)
 and WinUI does not measure a TextBlock at a proposed near-zero width; with a
 900 px minimum window the detail column cannot get narrower than about
 670 px. Height was not squeezed (737 of a 600 px minimum), and the lowest
-part sits at 328 px.
+part sits at 328 px. (Read since #542: these UI Automation numbers are epx,
+not pixels. The test host is not DPI-aware, so it is handed rectangles
+virtualised to 96 dpi; "900" was the 900 epx minimum, 1350 px at 150%.)
 
 **Measured, 2026-10-01 13:51 (bundle 11, run 1, same PC), verbatim:**
 "window 900x737; notice 631x157 (top 135 below the window's top)". The
@@ -4447,6 +4449,8 @@ notice is 157 px of a 737 px window, inside it. The test's own wait for the
 width to reach 520 times out silently; it should say so if the window's
 minimum ever drops (left as it is: the assertion that matters — the notice
 stays inside the window — holds at the narrowest width a teacher can reach).
+(Since #542 the wait is for the width to SETTLE, which it does at the 900 epx
+minimum, rather than for a number it can never reach.)
 
 
 ## The pictures on plantoir.app: real windows, staged by the app (#380, #370)
@@ -5992,11 +5996,61 @@ is 600 epx, and dragging the edge stops there.
 | 900 px (600 epx, the minimum) | title gone, Deploy cut, Browser off | the Preview button cut, Deploy and Browser off |
 
 So at 900 epx nothing clips; the ellipsis does its job down to about 800
-epx with the long title; below that the buttons leave the window, and the
-minimum allows it at any scale above 100%. Not changed here (it is
-behaviour, and the mac's minimum is a separate question): making the
-minimum 900 epx (`900 × scale`), or letting the toolbar's buttons shrink to
-their glyphs, is the director's call.
+epx with the long title; below that the buttons leave the window.
+
+**Corrected 2026-10-16 (#542): the minimum was already 900 epx; the window
+OPENED below it.** Measured on the same PC at 150% by
+`WindowMinimumUiTests.AtItsNarrowestTheWindowStillShowsPreviewDeployAndBrowser`,
+reading the frame both through UI Automation and through `GetWindowRect` on a
+thread made per-monitor DPI-aware, against an x64 Debug build of dev
+99295805c, "Preview at Last Viewed" seeded:
+
+- **At launch** (first run, no remembered frame): 1190 × 725 px, which UI
+  Automation reports as 793 × 483, i.e. **793 × 483 epx** — the first-run size
+  is 62% × 72% of the work area (1920 × 1008), set by `AppWindow.Resize` in
+  pixels BEFORE the minimum was set, and setting a minimum does not grow a
+  window that is already narrower. Every button was whole (Browser's right
+  edge 15 epx inside the window), the section title shortened — the "800 epx"
+  row above.
+- **At its narrowest** (UI Automation asked for 400 × 400): **1350 × 900 px =
+  900 × 600 epx**. `PreferredMinimumWidth`/`Height` behave as epx: the
+  presenter scales them. Nothing drags below that.
+
+So the table's first sentence ("900 PIXELS, not 900 epx … dragging the edge
+stops there") was wrong, and the rows below 900 epx were not reachable by a
+drag. Those widths were reached some other way that was not recorded; the
+rows still describe what the toolbar does at those widths (they agree with
+the launch measurement at 793 epx). In a teacher's hands the app reached
+them in two ways: the first-run window above, and a remembered frame — it is
+kept in PIXELS, so a 1350 px window remembered at 150% reopens at 600 epx on
+a 225% display.
+
+**What changed.** `MainWindow.ApplyMinimumSize(scale)` sets the minimum
+BEFORE the first `Resize` and the launch size (first-run or remembered) is
+clamped up to it, so the window opens at no less than 900 × 600 epx (1350 ×
+900 px at 150%). The minimum is clamped to the work area of the display the
+window is on (`DisplayArea.GetFromWindowId(…, Nearest)`), divided by the
+scale, because 900 epx is 2025 px at 225% — wider than a 1920 work area, and
+a minimum wider than the screen would trap the window. It is re-applied once
+from `XamlRoot.RasterizationScale` when the content loads and again on
+`XamlRoot.Changed` when the scale changes (a monitor move, a display-scale
+change): the clamp is the part a scale changes. **That re-apply is held by
+reading the code, not by a test** — there is one screen here and no test
+changes the display scale. **At 225–250% the work-area clamp can still cut
+the toolbar**: the window there is narrower than 900 epx (1920 / 2.25 = 853
+epx), which is below the width the long title needs. After the change the
+same UiFact read 1350 × 900 px at launch and at the narrowest, every button
+at its full width (Preview 185, Deploy 89, Browser 36 epx), Browser 15 epx
+inside the right edge.
+
+**REJECTED:** a minimum of `900 × RasterizationScale`, #542's option 1 as
+filed — on the reading that the minimum was in pixels. The presenter already
+scales it, so that would have asked for 1350 epx (2025 px) at 150%. And #542's
+option 2, toolbar buttons that shrink to their glyphs: the mac does not have
+it, and with the launch clamp nothing needs it above 200%. The UiFact's
+right-edge check is 8 px × scale inside UI Automation's window rectangle,
+because that rectangle includes Windows 11's invisible resize border (7 px a
+side at 150%: `GetWindowRect` 1350 against the visible frame's 1332).
 
 ### Known limits
 
