@@ -194,10 +194,176 @@ public class SectionVerbsTests : IDisposable
         var unchanged = AssistToolAnswer.Same("Nothing to do.") with { Changed = false };
         Assert.Equal("carried out", SectionVerbs.Ending("publish_pages", changed, 20, 20, "ICS3U", 1));
         Assert.Equal("changed nothing", SectionVerbs.Ending("publish_pages", unchanged, 3, 4, "ICS3U", 1));
-        Assert.Equal("took the last change back", SectionVerbs.Ending("undo_last_change", changed, 20, 20, "ICS3U", 1));
         // Not told: the depth, as before.
         Assert.Equal("changed nothing", SectionVerbs.Ending("publish_pages", AssistToolAnswer.Same("x"), 2, 2, "ICS3U", 1));
+
+        // Undo (#550, the mac's #531): the entry came off — the depth went
+        // down, at any depth — is a whole undo; a change noted with the depth
+        // unmoved is a partial one; anything else changed nothing. Never the
+        // sentence: the partial one contains "is put back" too.
+        Assert.Equal("took the last change back", SectionVerbs.Ending("undo_last_change", changed, 20, 19, "ICS3U", 1));
+        Assert.Equal("took part of the last change back", SectionVerbs.Ending("undo_last_change", changed, 20, 20, "ICS3U", 1));
+        Assert.Equal("changed nothing", SectionVerbs.Ending("undo_last_change", unchanged, 20, 20, "ICS3U", 1));
+        var soundsWhole = AssistToolAnswer.Same("Undone. “Unit 1, Day 1” is put back.") with { Changed = false };
+        Assert.Equal("changed nothing", SectionVerbs.Ending("undo_last_change", soundsWhole, 3, 3, "ICS3U", 1));
     }
+
+    // ---- Writes with no new undo entry (#550, the mac's #531) -------------------
+
+    /// <summary>
+    /// Held open for reading and shared for reading only, so the page can still
+    /// be read — by the backup and the plan — and cannot be written. NEVER
+    /// <c>FileShare.None</c>: that blocks the backup's zip and the plan's read
+    /// too, so the call would fail before the write it is meant to exercise
+    /// (measured by #550's plan review).
+    /// </summary>
+    private static FileStream HeldAgainstWriting(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+    private static readonly string[] BothPages =
+        { "section1/All Classes/Unit 1, Day 1", "section1/All Classes/Unit 1, Day 2" };
+
+    /// <summary>
+    /// An undo that put some files back and kept its entry, because another
+    /// had been edited since: "took part of the last change back" — it read
+    /// "took the last change back" while the ending searched the sentence for
+    /// "is put back". Pressed again after the edit is undone, the undo is
+    /// partial AGAIN: the file the first press restored no longer matches,
+    /// so the entry still stays (the mac behaves the same; a `decision` issue
+    /// asks whether that is right).
+    /// </summary>
+    [Fact]
+    public async Task APartialUndo_TookPartOfTheLastChangeBack()
+    {
+        var history = new UndoHistory();
+        await using var verbs = Verbs(out _, history);
+        await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
+                            "Section ▸ Publish Pages…", "ICS3U", 1, "2 pages ticked");
+        string published = File.ReadAllText(Page("Unit 1, Day 2"));
+        File.WriteAllText(Page("Unit 1, Day 2"), published + "Edited since.\n");
+
+        await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+
+        Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Single(history.Entries);
+        Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — took part of the last change back", File.ReadAllText(_trail));
+        Assert.DoesNotContain("— took the last change back", File.ReadAllText(_trail));
+
+        File.WriteAllText(Page("Unit 1, Day 2"), published);
+        await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+
+        Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 2")));
+        Assert.Single(history.Entries);
+        Assert.Equal(2, File.ReadAllLines(_trail).Count(line =>
+            line.Contains("Section ▸ Undo Last Change — took part of the last change back")));
+    }
+
+    /// <summary>
+    /// A publish that wrote one page and stopped at the next: the recording is
+    /// abandoned, so the undo list does not move — and a page WAS written, so
+    /// the line says "carried out" (it said "changed nothing").
+    /// </summary>
+    [Fact]
+    public async Task APublishThatStoppedPartWay_IsCarriedOut()
+    {
+        await using var verbs = Verbs(out _);
+        AssistToolAnswer answer;
+        using (HeldAgainstWriting(Page("Unit 1, Day 2")))
+            answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
+                                         "Section ▸ Publish Pages…", "ICS3U", 1, "2 pages ticked");
+
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the pages you named", ""), answer.Summary);
+        Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — carried out, 2 pages ticked", File.ReadAllText(_trail));
+    }
+
+    /// <summary>The same through a whole unit, which has its own write loop.</summary>
+    [Fact]
+    public async Task AWholeUnitThatStoppedPartWay_IsCarriedOut()
+    {
+        await using var verbs = Verbs(out _);
+        AssistToolAnswer answer;
+        using (HeldAgainstWriting(Page("Unit 1, Day 2")))
+            answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1" }, plan: false),
+                                         "Section ▸ Publish Pages…", "ICS3U", 1, "1 unit");
+
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay("Unit 1", ""), answer.Summary);
+        Assert.Contains("publish: true", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — carried out, 1 unit", File.ReadAllText(_trail));
+    }
+
+    /// <summary>
+    /// A publish whose FIRST write fails changed nothing, and says so in the
+    /// mac's words rather than "Only part of … was changed" (#550, the
+    /// director's ruling on review F8).
+    /// </summary>
+    [Fact]
+    public async Task APublishWhoseFirstWriteFails_SaysNothingWasChanged()
+    {
+        await using var verbs = Verbs(out _);
+        AssistToolAnswer answer;
+        using (HeldAgainstWriting(Page("Unit 1, Day 1")))
+            answer = await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, new[] { BothPages[0] }, plan: false),
+                                         "Section ▸ Publish Pages…", "ICS3U", 1, "1 page ticked");
+
+        Assert.StartsWith("Nothing was changed: ", answer.Summary);
+        Assert.DoesNotContain("Only part of", answer.Summary);
+        Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Contains("ICS3U/1 · Section ▸ Publish Pages… — changed nothing, 1 page ticked", File.ReadAllText(_trail));
+    }
+
+    /// <summary>
+    /// Re-date Classes… that stopped part way says so and names the pages
+    /// already re-dated — never "Nothing was changed", and never the
+    /// "couldn’t be read" a read failure gets — and the line says "carried out".
+    /// </summary>
+    [Fact]
+    public async Task ReDateThatStoppedPartWay_SaysPartWayAndListsThePages()
+    {
+        RememberOctoberDates();
+        await using var verbs = Verbs(out _);
+        AssistToolAnswer answer;
+        using (HeldAgainstWriting(Page("Unit 1, Day 2")))
+            answer = await verbs.Perform(SectionVerbs.ReDateClasses("ICS3U", 1, plan: false),
+                                         "Section ▸ Re-date Classes…", "ICS3U", 1);
+
+        string said = answer.Summary + "\n" + answer.Detail;
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the section's class dates", ""), answer.Summary);
+        Assert.Contains("The pages already re-dated:\n  courses/ICS3U/section1/All Classes/Unit 1, Day 1.md", said);
+        // The failure's own message names the page it stopped at; the LIST of
+        // pages already re-dated must not.
+        string listed = answer.Summary[answer.Summary.IndexOf("The pages already re-dated:", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("Unit 1, Day 2.md", listed);
+        Assert.DoesNotContain("couldn’t be read", said);
+        Assert.DoesNotContain("Nothing was changed", said);
+        Assert.Contains("2026-10-01", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Contains("ICS3U/1 · Section ▸ Re-date Classes… — carried out", File.ReadAllText(_trail));
+    }
+
+    /// <summary>
+    /// A re-date whose FIRST write fails changed no page: the mac's "Nothing
+    /// was changed" (it said "That couldn’t be read"), and "changed nothing".
+    /// </summary>
+    [Fact]
+    public async Task ReDateWhoseFirstWriteFails_SaysNothingWasChanged()
+    {
+        RememberOctoberDates();
+        await using var verbs = Verbs(out _);
+        AssistToolAnswer answer;
+        using (HeldAgainstWriting(Page("Unit 1, Day 1")))
+            answer = await verbs.Perform(SectionVerbs.ReDateClasses("ICS3U", 1, plan: false),
+                                         "Section ▸ Re-date Classes…", "ICS3U", 1);
+
+        Assert.StartsWith("Nothing was changed: ", answer.Summary);
+        Assert.DoesNotContain("couldn’t be read", answer.Summary);
+        Assert.Contains("ICS3U/1 · Section ▸ Re-date Classes… — changed nothing", File.ReadAllText(_trail));
+    }
+
+    /// <summary>Two meetings in October, so both class pages change date, Day 1 first.</summary>
+    private void RememberOctoberDates() =>
+        TimetableMemory.Write(_folder, "ICS3U", 1,
+            new[] { new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 2) },
+            "typed in by hand", new DateOnly(2026, 9, 8));
 
     /// <summary>
     /// The menu's server meets the same request filter every client does

@@ -608,6 +608,66 @@ public class RolloverWebsiteTests : IDisposable
         Assert.Empty(_scheduler.Deleted);
     }
 
+    /// <summary>
+    /// #550: roll_over_section shares ApplyReDate, so a re-date that stops part
+    /// way is ANSWERED here too — the part-way sentence and the pages already
+    /// re-dated — where an IOException used to leave the tool as a protocol
+    /// error (it caught only AssistRefusal).
+    /// </summary>
+    [Fact]
+    public async Task RollOverThatStoppedPartWay_IsAnsweredNotThrown()
+    {
+        Class("ICS3U", "Unit 1, Day 1", "2026-09-01");   // so both pages change, Day 1 first
+        string dayTwo = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 2.md");
+
+        string said;
+        using (new FileStream(dayTwo, FileMode.Open, FileAccess.Read, FileShare.Read))
+            said = await new PlantoirTools(Open()).RollOverSection(
+                "ICS3U", 1, timetable: ATimetableFile(), block: "F", cancellation: default,
+                pages: null, meetings: null, firstDay: "", startYear: 2026);
+
+        Assert.StartsWith(AssistWording.PublishStoppedPartWay("the section's class dates", ""), said);
+        Assert.Contains("The pages already re-dated:\n  courses/ICS3U/section1/All Classes/Unit 1, Day 1.md", said);
+    }
+
+    /// <summary>
+    /// And one whose FIRST write fails says the mac's "Nothing was changed",
+    /// answered rather than thrown (the director's ruling on #550).
+    /// </summary>
+    [Fact]
+    public async Task RollOverWhoseFirstWriteFails_SaysNothingWasChanged()
+    {
+        Class("ICS3U", "Unit 1, Day 1", "2026-09-01");
+        string dayOne = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 1.md");
+
+        string said;
+        using (new FileStream(dayOne, FileMode.Open, FileAccess.Read, FileShare.Read))
+            said = await new PlantoirTools(Open()).RollOverSection(
+                "ICS3U", 1, timetable: ATimetableFile(), block: "F", cancellation: default,
+                pages: null, meetings: null, firstDay: "", startYear: 2026);
+
+        Assert.StartsWith("Nothing was changed: ", said);
+        Assert.DoesNotContain("Only part of", said);
+    }
+
+    /// <summary>
+    /// re_date_classes, through Guarded, says the same rather than "That
+    /// couldn’t be read" — the sentence a READ failure gets.
+    /// </summary>
+    [Fact]
+    public async Task ReDateWhoseFirstWriteFails_SaysNothingWasChanged()
+    {
+        Class("ICS3U", "Unit 1, Day 1", "2026-09-01");
+        string dayOne = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 1.md");
+
+        string said;
+        using (new FileStream(dayOne, FileMode.Open, FileAccess.Read, FileShare.Read))
+            said = await ReDate();
+
+        Assert.Contains("Nothing was changed: ", said);
+        Assert.DoesNotContain("couldn’t be read", said);
+    }
+
     // ---- Fixture ---------------------------------------------------------
 
     private AssistWorkspace Open() => new(_folder, _launcher);
