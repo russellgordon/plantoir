@@ -1555,10 +1555,11 @@ restore_hit_fixture() {
   rm -f "$HIT_COURSE/Plain Long Page.md"
   rm -f "$HIT_COURSE/Discussions/Marker Fixture Long.md" "$HIT_COURSE/Discussions/Marker Fixture Word.md"
   # Only a Discussions/Tasks this run made: it carries the marker file.
+  # The marker proves this run made the folder, so the whole folder goes,
+  # a stray .DS_Store included (the #515 fix review): removing the files one
+  # by one and then rmdir left it behind, unmarked, when anything else was in it.
   if [[ -f "$HIT_COURSE/Discussions/Tasks/.plantoir-verify-fixture" ]]; then
-    rm -f "$HIT_COURSE/Discussions/Tasks/.plantoir-verify-fixture" "$HIT_COURSE/Discussions/Tasks/index.md" \
-          "$HIT_COURSE/Discussions/Tasks/Marker Fixture Inner Page.md"
-    rmdir "$HIT_COURSE/Discussions/Tasks" 2>/dev/null || true
+    rm -rf "$HIT_COURSE/Discussions/Tasks"
   fi
   rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
