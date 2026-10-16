@@ -943,7 +943,8 @@ public class AssistScenarioTests : IDisposable
                 // every argument as a string (AssistCardCommand.ToJsonObject),
                 // and the real server reads "1" as an int (MEASURED with #530,
                 // plantoir-mcp.exe over stdio: plan_make_room_for_classes with
-                // "unit":"1" answered the plan, not a binding error). Plain
+                // "unit":"1" answered the tool's own timetable refusal, not a
+                // binding error). Plain
                 // Deserialize refused it, so no make-room card scenario could
                 // run here until then.
                 try { bound[i] = given.Deserialize(parameter.ParameterType, McpJsonUtilities.DefaultOptions); }

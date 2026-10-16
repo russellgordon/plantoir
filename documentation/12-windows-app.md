@@ -5416,7 +5416,7 @@ nothing was skipped, so a whole undo lowers the depth by one at any depth; the
 cap of twenty trims only when an entry is added. `changed` with the depth
 unmoved is "took part of the last change back"; anything else is "changed
 nothing". It used to count an answer containing "is put back" as a whole
-undo, and `UndidPartly`/`UndidPartlyFromTheMenu` contain those words too, so
+undo, and `UndidPartlyFromTheMenu` (the twin the menu shows) contains those words too, so
 a partial undo read as a whole one. A second press after the edit is undone is
 partial AGAIN: the file the first press restored no longer matches what the
 change wrote, so it is skipped and the entry stays. The mac behaves the same,
