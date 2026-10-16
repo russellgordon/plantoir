@@ -174,6 +174,24 @@ final class AssistSettingsFreshnessTests: XCTestCase {
         XCTAssertEqual(agents.count, 1, "the scheduled deploy's plist should have been written")
     }
 
+    /// #521: the schedule card and the answer after setting one say the Mac
+    /// must be awake with its lid open — never that it must be plugged in,
+    /// which is not true (launchd runs the job on battery). MUST FAIL on the
+    /// old "plugged in if it is a laptop" wording.
+    func testTheCardAndTheAnswerNeverAskForACable() async throws {
+        let world: World = try makeWorld()
+        _ = try saveFolderDestinationElsewhere(in: world.root)
+
+        let card: String = world.runner.explain(call: call("schedule_deploy", scheduling))
+        XCTAssertTrue(card.contains(AssistToolRunner.awakeThenWithTheLidOpen), card)
+        XCTAssertFalse(card.contains("plugged in"), card)
+
+        let outcome: AssistToolOutcome = await world.runner.run(call: call("schedule_deploy", scheduling))
+        XCTAssertTrue(outcome.summary.hasPrefix("Scheduled:"), outcome.summary)
+        XCTAssertTrue(outcome.detail.contains(AssistToolRunner.awakeThenWithTheLidOpen), outcome.detail)
+        XCTAssertFalse(outcome.detail.contains("plugged in"), outcome.detail)
+    }
+
     func testTheApprovalCardNamesTheDestinationSavedNow() throws {
         let world: World = try makeWorld()
         let folder: URL = try saveFolderDestinationElsewhere(in: world.root)

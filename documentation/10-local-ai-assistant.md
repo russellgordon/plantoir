@@ -3262,7 +3262,8 @@ silence. Check it, and record what you find here; the contract
 case says which of the two you are looking at.
 
 Two more that stay per-platform: the plan's own words (the mac's says what has
-to be true of the Mac — awake, plugged in, lid open — and Windows says something
+to be true of the Mac — awake, lid open, and that on battery it sleeps sooner;
+"plugged in" was dropped by #521 because launchd runs the job on battery — and Windows says something
 different about sleep and Modern Standby), and cancelling, which on the mac is
 `launchctl bootout` plus deleting the plist.
 
