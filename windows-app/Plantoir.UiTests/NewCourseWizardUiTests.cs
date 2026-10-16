@@ -326,7 +326,13 @@ public class NewCourseWizardUiTests
                     "the wizard did not open with the cursor in Course code");
         Assert.False(CopyAPageEscapeUiTests.ListIsDrawn(app), "the code list was drawn before anything was typed");
 
-        app.ClickMiddleOf(edit);
+        // The cursor is already in Course code (asserted above); the click
+        // only puts the app in front for the typing. On a 1920 x 1080 screen
+        // at 150% the harness's window is short and the box can sit below
+        // its edge (measured 2026-10-15: "TextBox is off screen", twice), so
+        // there the app is brought forward without the click.
+        if (edit.IsOffscreen) app.BringToFront();
+        else app.ClickMiddleOf(edit);
         FlaUI.Core.Input.Keyboard.Type("MFM");
         Assert.True(Retry.WhileFalse(() => CopyAPageEscapeUiTests.ListIsDrawn(app), TimeSpan.FromSeconds(5),
                                      TimeSpan.FromMilliseconds(200)).Result, "typing a code drew no list");
