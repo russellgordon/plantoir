@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-16 | Pages inside an open folder of a class site's sidebar have a small dot, so a long title that wraps reads as one page | mac (Windows when its toolchain next ships; shared `support/quartz`) | #515 |
 
 ## Warnings the release notes MUST carry
 
