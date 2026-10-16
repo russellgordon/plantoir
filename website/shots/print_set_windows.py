@@ -257,6 +257,21 @@ def must_show(picture: Path, shot: dict) -> None:
     seen = "".join(recognised_text(picture).split()).lower()
     missing = [word for word in shot.get("expectText", []) if "".join(word.split()).lower() not in seen]
     if missing:
+        # Read again from a copy three times the size, for READING only (the
+        # picture is not changed): Windows' recogniser misses lettering about
+        # 10 px high, which is what the handout's footer is when the page
+        # must fit a 1080-pixel screen (measured 2026-10-15: "Page 1 of 1"
+        # not read at all at 1x, "Page I (f I" at 2x, exact at 3x).
+        from PIL import Image
+        larger = PARTS / f"reading-{picture.name}"
+        with Image.open(picture) as opened:
+            opened.convert("RGB").resize((opened.width * 3, opened.height * 3), Image.BICUBIC).save(larger)
+        try:
+            seen += "".join(recognised_text(larger).split()).lower()
+        finally:
+            larger.unlink(missing_ok=True)
+        missing = [word for word in missing if "".join(word.split()).lower() not in seen]
+    if missing:
         raise SystemExit(f"{picture.name} does not show {', '.join(missing)}. Nothing past this point was taken.")
     print(f"   {picture.name} shows {', '.join(shot.get('expectText', []))}")
 
@@ -278,14 +293,17 @@ def desktop_is_locked() -> bool:
 def photograph_pdf(pdf: Path, destination: Path) -> Path:
     """The PDF in an Edge `--app` window with the viewer's toolbar off: the
     page on the viewer's own background, as the Mac's handout window shows it."""
-    from hero_windows import (edge_window, launch_edge, photograph, place, scale_factor, stop_matching,
-                              work_area, EDGE_PROFILE)
-    left, top, right, bottom = work_area()
-    scale = scale_factor()
-    width = min(round(HANDOUT_SIZE_DIP[0] * scale), right - left - 40)
-    height = min(round(HANDOUT_SIZE_DIP[1] * scale), bottom - top - 40)
+    from hero_windows import (device_scale_flags, edge_window, fitted_scale, launch_edge, photograph, place,
+                              stop_matching, work_area, EDGE_PROFILE)
+    left, top, _, _ = work_area()
+    scale = fitted_scale(HANDOUT_SIZE_DIP)
+    width, height = round(HANDOUT_SIZE_DIP[0] * scale), round(HANDOUT_SIZE_DIP[1] * scale)
     x, y = left + 20, top + 20
-    process = launch_edge([f"--app={pdf.resolve().as_uri()}#toolbar=0&view=FitH"], x, y, width, height)
+    # `view=Fit`, the whole page: FitH filled the width and left the footer
+    # (Page 1 of 1, which expectText asks for) below the window's edge
+    # (measured 2026-10-15, the first unlocked run).
+    process = launch_edge([f"--app={pdf.resolve().as_uri()}#toolbar=0&view=Fit"], x, y, width, height,
+                          flags=device_scale_flags(scale))
     try:
         hwnd = edge_window(process, "")
         place(hwnd, x, y, width, height)
@@ -348,7 +366,7 @@ def capture_print_set(folder: Path = PRINT_FOLDER) -> None:
                     write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
                     announce(f"{shot['id']}, {theme}")
                     part = PARTS / f"{shot['id']}-windows-{theme}.png"
-                    capture_page(url, "", part, size_dip=PAGE_SIZE_DIP, prepare_page=at_the_top)
+                    capture_page(url, "", part, size_dip=PAGE_SIZE_DIP, prepare_page=at_the_top, fit=True)
                     must_show(part, shot)
                     destination = IMAGE_DIR / part.name
                     shutil.copyfile(part, destination)

@@ -101,7 +101,7 @@
       },
       "alt": "A Grade 10 mathematics worksheet on a class website: typeset equations, a diagram of two similar triangles drawn from the notes, folded answers, and a Print button beside the date.",
       "caption": "Mathematics typeset, a diagram drawn from your notes, and a Print button.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "Similar Triangles Practice",
         "Print",
@@ -121,7 +121,7 @@
       },
       "alt": "The same worksheet printed: a typeset handout with a name and date line, numbered questions, the triangle diagram in black on white, lettered parts, and Page 1 of 1 in the footer.",
       "caption": "The same page, printed: questions only. The answers can print as a key of their own.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "Similar Triangles Practice",
         "Page 1 of 1"
