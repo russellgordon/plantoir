@@ -3230,6 +3230,12 @@ bubble; it stays text, Russell's ruling 3); "will be hidden" for the column
 
 Windows: the layout is visual, so it went as a `windows` issue, not a
 contract case; the 16 keys reach Windows through `assist-wording.json`.
+Windows did it in #548 (`documentation/12-windows-app.md` → "The plan as a
+table (#548, the mac's #524)"). What the mac should KNOW from it: there the
+rows travel in the tool result's `_meta`, because the planner runs in another
+process; the rows shown are what fits the window (4 to 12), not a fixed 12;
+the ListView kept Return for itself, so Return is caught before it; and a
+club's table speaks of meetings while Windows' card does not yet.
 
 ### Classes dated after the next class, at Deploy (#475)
 

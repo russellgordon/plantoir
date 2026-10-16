@@ -751,10 +751,11 @@ each case on its own; two Section-menu names against #489) and
 ledgered scenario must still FAIL, checked per case through
 `NamedGapLedger.Holding`/`ClosedMessage`, and
 `TheLedgeredScenariosAreStillInTheContract` checks the other direction; three
-Deploy-question scenarios against #489). The ledger file is the live list. It was
-**empty** once batch 6 (#514) closed its last two entries the same day, until
-2026-10-16, when mac 1.7.2's sixteen plan-table sentences (#524) went in
-against #548 (v1.7.2), whose piece adds the members with the table; `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
+Deploy-question scenarios against #489). The ledger file is the live list, and
+it is **empty**: batch 6 (#514) closed its last two entries the same day, and
+mac 1.7.2's sixteen plan-table sentences (#524), held open against #548 on
+2026-10-16, landed with #548's plan table that day ("The plan as a table",
+below); `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
 keeps the rule exercised on made-up entries meanwhile.
 
 **From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
@@ -3756,8 +3757,9 @@ checked against a real course. (This said counting the course busy while
 the zip runs in `plantoir-mcp` was not built and that `courseIsBeingCopied`
 stayed in the ledger against #360. It was built in parity bundle 6a —
 `AssistWording.CourseIsBeingCopied`, `WorkLease`, `CourseBeingCopiedTests` —
-and `NamedGapLedger` was empty from bundle 9 until 2026-10-16, when mac
-#524's sixteen plan-table sentences went in against #548, v1.7.2.)
+and `NamedGapLedger` has been empty since bundle 9, but for a few hours on
+2026-10-16 when mac #524's sixteen plan-table sentences were held against #548
+until #548 landed them.)
 
 ---
 
@@ -5355,7 +5357,9 @@ said so: Rebuild Preview's ending compares the answer with
 `AssistWording.PreviewIsRebuilding`, and Undo's also counts an answer
 containing "is put back". None of the three keys is sent to an outside
 client. Pinned by `SectionVerbsTests.MakingRoom_IsCarriedOut_ThoughItKeepsNoUndoEntry`
-and `TheTwentyFirstChange_IsCarriedOut_ThoughTheListStaysAtTwenty`.
+and `TheTwentyFirstChange_IsCarriedOut_ThoughTheListStaysAtTwenty`. Since
+#548 a page plan from the menu's server also carries `plantoir.app/planTable`,
+its rows for the plan's table ("The plan as a table", below).
 
 **One sentence outside the contract, deliberately: `SectionVerbs.CouldNotBeDone`**
 ("That could not be done just now. Try again in a moment."). It is what a
@@ -5461,6 +5465,9 @@ copy of ICS3U first…" only while the server's progress line says so — Undo
 never saves a copy, and a refusal comes before one; review M2): a stage changes by cancelling the
 button's own close and doing the work under its deferral, because WinUI shows
 one dialog at a time and refuses a second asked for while the first closes.
+The Plan stage is the plan twin's card as text, except for Publish Pages…,
+Hide Pages… and Publish Class for a Date…, whose plan is a table since #548
+("The plan as a table", below).
 While a call runs no button is drawn and Escape does not close it. A plan
 twin that refuses ends with its sentence and OK alone. Publish Pages… and
 Hide Pages… list classes first (by date), then the rest by folder, two pages
@@ -5490,6 +5497,169 @@ passing, 2 min 5 s): Publish Pages… → tick → plan → Publish → the flag
 changes on disk, one `_menu-section1` zip, Undo Last Change live and putting
 the page back; and Rebuild Preview with the REAL launcher — a serving
 preview, an edit on disk, Rebuild Preview, and the edit served.
+
+### The plan as a table (#548, the mac's #524)
+
+Section ▸ Publish Pages…, Hide Pages… and Publish Class for a Date… show
+their plan stage as the mac has since #524 (`documentation/09-mac-app.md` →
+"The plan as a table (#524)", which has the row order, the mac's
+measurements and what it rejected): a summary line (`menuPlanSummary` and its
+shapes), a read-only table with one row for EVERY page the plan is about —
+the changes, the pages an unpublish keeps with their reason, the classes a
+publish left as they are, the pages with no room for a key, the pages already
+right — and the card's other sentences under it. The card listed 15 changes
+and then "…and N more"; the table lists all of them. Re-date Classes… and
+Make Room for Classes… keep the text card, and so does the assistant's
+Go/Cancel card. Nothing changed in what Publish does, in the model's text, or
+on the trail (`ranFromAMenu`: the mac's reasoning, and its rejected count of
+pages that would change, hold here too).
+
+**The rows travel in `_meta`, because the plan is in another process.** On
+the mac `SectionVerbs` runs the tools in-process and the sheet reads
+`AssistToolOutcome.planTable`. Here every menu call goes through the window's
+own `plantoir-mcp` (Option B, above), and the dialog never holds the
+`PublishPlan`. So the server builds the rows — `PublishPlan.Tabulate`, beside
+`Describe()`, from the same stored properties and the same `AssistWording`
+pieces — and `PlantoirTools.Proposing(PublishPlan)` sends them as
+`plantoir.app/planTable` (`AssistToolAnswer.PlanTableKey`, read by the one
+`AssistToolAnswer.FromResult`) ONLY when `workspace.SpeaksFromTheMenu`, beside
+the card and never instead of it. The precedent is `plantoir.app/nextClass`
+(#440). The text content — what a model or Claude Code reads — is the same
+bytes on every surface (`SectionMenuServerTests.TheTextContentIsTheSameWithOrWithoutTheTable`),
+and neither the assistant's server nor an outside one sends a table
+(`ThePageAndDayPlansCarryATable_OnlyFromTheMenu`). A plan without one — a
+whole unit (`WholeUnitPlan` answers with text), or a table that will not
+parse (`PlanTable.FromJson` returns null) — shows the text card. REJECTED:
+parsing `Describe()` back into rows (titles hold quotes and commas, and a
+parse is a second reader of a format that changes — the mac's reason);
+putting the rows in the text content (that moves the model's bytes, a
+routing change); building the plan in the window with an in-process
+`AssistWorkspace` (it would skip the server's reference-course gate and
+outside-change hold, which are its request filter — the mac rejected
+`SectionVerbs` calling the planner for the same reason); a second tool or
+round trip (one call already carries everything).
+
+**The card is built from the same pieces, and did not move.** `Describe()`'s
+three inline literals became `AssistWording.PlanNothingWouldChange`,
+`PlanWillBecome(visible, withTheDatesOf)` and `PlanStaysVisibleBecause`, and
+the selections the table also reads (`ClassesWhoseDatesAreTakenBy`,
+`LeftAlonePages`, `OrphanedDateMoves`, the orphan and no-such-page lines)
+were extracted, so card and table read one copy. MEASURED with a throwaway
+characterisation test (not committed — a golden file would be the
+assistant's sentences typed into a test): 1,252 lines of `Describe()` and
+`Describe(3)` over 21 branches × publish/hide × menu/not, byte-identical
+before and after; one extra space in `PlanStaysVisibleBecause` changed 112
+of them, so the run could see a change. The lasting guard is
+`PlanTableTests.EveryCellIsTheCardsLineWithoutTheName` (each cell is the
+card's line for that page with the name taken off; `Describe(int.MaxValue)`,
+because the card stops at fifteen) and `EveryNoteIsALineOfTheCard`.
+
+**How the 16 keys map** (`ContractTests.AssistWording_MatchesContract`):
+twelve are constants of the key's own name, compared by value by the walk —
+including `menuPlanStaysAsItIsForAMeeting` and `menuPlanSummaryOnePage`,
+whose samples vary nothing. `menuPlanSummaryHiding` is a method the
+dispatcher `MenuPlanSummary` really returns, the convention
+`PagesWhoseSettingsCannotBeAddedTo` → `…NamingSeveral` set. The four methods
+have hand-written assertions, the Key Links reason rendered from the
+planner's own `AssistWorkspace.KeptBecauseInKeyLinks`. `PlanWillBecome`, the
+mac's keyless `planWillBecome(visible:withTheDatesOf:)`, is the one
+`WindowsOnlyWording` entry. No `NamedGapLedger` entry: the ledger is for work
+a later milestone owes, not a permanent mapping.
+
+**A club's table says "meeting"; its card does not, yet.** The table is the
+teacher's copy and never the model's, so `Tabulate` takes the course's noun:
+the left-alone cell (`menuPlanStaysAsItIsForAMeeting`), its note
+(`linkedClass…LeftAloneForAMeeting`) and a kept class's reason ("it is a
+meeting of its own", `AssistWorkspace.MeetingOfItsOwn`, rendered with
+`PlanStaysVisibleBecause` to the contract's `linkedClassStaysVisibleForAMeeting`)
+— as the mac's `stayingVisibleLine(noun:)` does. Windows' CARD has never
+spoken the noun for these (the planner records the class form, and
+`Describe()` has no noun); that gap, on the menu's card and the assistant's,
+is a separate `windows` issue, not this piece.
+
+**Two differences from the mac, kept on purpose so neither side "fixes" them.**
+(1) The summary says `planNothingWouldChange` when no page changes, even when
+pages were declined; `Describe()` deliberately says nothing there in that case
+(#308, `DeclinedPagesAreNamedTests`), because "no page would change" reads as
+"already right" about pages it declined. The table's summary is a count, the
+declined pages are rows of their own beside it, and the mac accepts the same
+difference. (2) The Folder cell is `AssistWorkspace.FolderOf` — the folder
+from the course folder, and the COURSE CODE for a page at the course root,
+which is the mac's `StartOfYearPageNaming.folder` — while the choosing
+stage's `MenuPage.Folder` gives "" for a root page. Left as it is.
+
+**The control: a plain `ListView` of `Grid` rows**, modelled on All Backups:
+`SelectionMode = None`, a header `Grid` of sort `Button`s above it (margin
+13 = the table's 1-epx border plus the rows' 12 of padding), columns Page 170,
+Folder 150, What changes the rest, each cell trimmed with its whole text in a
+tooltip (as the mac), each row `sectionVerbPlanRow<plan position>` and named
+"title, folder, what changes" for Narrator. No alternating backgrounds.
+REJECTED: `ItemsView` (no columns or header either, and no precedent here);
+a toolkit DataGrid (no toolkit package is in the project, and a dependency
+in the self-contained bundle for one read-only list that the app already
+draws by hand buys nothing a teacher can see — and would be Russell's call).
+**Sorting** is `PlanTableOrder` (plan order first; a new column ascending,
+the same one flipped; numbers in a title compared as numbers, "Day 2" before
+"Day 10", as the mac's string comparator does; ties by plan order).
+
+**Width: 680 epx, pinned at construction for the three items** (the
+`ContentDialogMinWidth`/`MaxWidth` resources, the `NewCourseDialog`
+precedent), so the dialog is the same width at every stage — the mac rejected
+widening mid-flow because the sheet jumps. The panel stretches to it.
+
+**Height: what fits the window, 4 to 12 rows — a deliberate departure from
+the mac's fixed 12.** ContentDialog's content `ScrollViewer` has its vertical
+scrolling DISABLED in the template, so content taller than the dialog is
+clipped, notes first, and a Windows window is often short: the default window
+on this PC (Windows 11, 1920 × 1080 at 150%) is 793 × 483 epx, a XAML root
+446 epx tall. So `ShowPlanTable` reads `XamlRoot.Size.Height` and shows
+clamp(floor((min(H, 756) − 230 − notes) / 32), 4, 12) rows
+(`SectionVerbDialog.PlanRowsThatFit`; 756 is ContentDialog's own maximum
+height, notes measured and capped at 120), then the table scrolls inside
+itself. MEASURED through UI Automation, 2026-10-16 (`PlanTableUiTests`, the
+19-row fixture with one note): row pitch 32 epx; at the default window 5 rows,
+the table's bottom 157 epx above the window's, the note's 131, Publish's 49;
+the chrome outside the rows and notes measured 220–222 epx against the 230
+budgeted. Dragged to its minimum the window stops at 900 × 600 epx (taller
+than the default), XAML root 563: 9 rows, everything inside. Earlier the
+same day, over a 200% remote session (window 937 × 625 epx), 10 rows. The
+floor of 4 overflows only on a screen whose default window gives a XAML root
+under about 385 epx (the 680-pixel clamp at 175% or more); there the note can
+be clipped, and the buttons still show.
+
+**Return and Escape with the table focused — measured, and one key needed
+handling.** First built with no key handling and driven with real keys. Escape
+with a row focused closed the dialog with nothing written and the trail's
+"cancelled at the plan" line — it reached the dialog. Return with a row
+focused did nothing for 60 s: the `ListView` kept it. So Return is caught in
+the list's `PreviewKeyDown` — tunnelling, before the list sees it, as
+`CopyAPageDialog` does for the AutoSuggestBox and Escape — and runs
+`Advance()`, the verb button's own body (extracted from `PrimaryPressed`, which
+now awaits it). Handled there, the key never reaches the dialog as well:
+`ReturnWithTheTableFocusedPublishesEveryPage` publishes the 17 pages with ONE
+`_menu-section1` copy and ONE "carried out" line. Reaching into the template
+for `PrimaryButton` was rejected (template-dependent). **The focus also had
+to be placed:** on the first drive, Tab went round the main window BEHIND the
+dialog — the element that had the focus was in the stage just replaced — so
+the table takes the focus when it appears (`list.Focus` on `Loaded`). The mac
+needed neither: its table takes neither key, and Tab reached it.
+
+**The sort headers stay in the Tab order, after the table** (`TabIndex` 1 for
+the table, 2 for the headers), so Tab reaches the rows first; Return on a
+focused HEADER sorts, which is what a focused button does on Windows. #548
+asks only that Return publishes while the grid has focus. Rejected: taking
+the headers out of the Tab order, which would leave a keyboard user unable to
+sort.
+
+**Testing it**: unit — `PlanTableTests` (row order publishing and hiding, no
+cap past fifteen, the summary's counts, the card/table anti-drift guards, a
+club's meeting forms, JSON both ways, the sort, the natural order),
+`SectionMenuServerTests` (the table from the menu only, the text content
+unmoved, none on an answer that is not a plan), the `ContractTests` block.
+Through the window (`PlanTableUiTests`, opt-in, 3 of 3 on this PC, 2 min):
+the table, its fit and Escape; Return; the headers and the minimum window.
+`SectionVerbsUiTests.PublishPagesTicksPlansAndPublishes_…` still reads
+`sectionVerbPlan`, which is the summary now.
 
 ### Classes dated after the next class, at Deploy (2C, 2026-10-15)
 
