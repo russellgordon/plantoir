@@ -74,8 +74,14 @@ public class GuidanceQuestionAndTheQuitQuestionUiTests
 
     private static AutomationElement? QuitQuestion(DrivenApp app)
     {
+        // Told by its Keep Working BUTTON: a ContentDialog's button words are
+        // the buttons' names, not text under the dialog (measured 2026-10-15,
+        // the first unlocked run: the question was up, reading "A preview is
+        // still being built / Quitting now could leave it unfinished…", and
+        // TextsUnder held neither button's words).
         var dialog = app.OpenDialog();
         if (dialog is null) return null;
-        return DrivenApp.TextsUnder(dialog).Any(text => text == QuitConfirmation.KeepWorking) ? dialog : null;
+        var keep = dialog.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"));
+        return keep?.Name == QuitConfirmation.KeepWorking ? dialog : null;
     }
 }
