@@ -146,12 +146,19 @@ struct ClassChangeOutcome {
     /// the conversation's words for the same pages, is the model's.
     var leftUndoneFromTheMenu: String = ""
 
+    /// Whether any file was actually written — a page created, renamed,
+    /// re-dated or a link updated. Make Room carries every failed write past
+    /// rather than throwing, so a run can return having written nothing; the
+    /// Section menu's line says "changed nothing" then (#531, ruling L5).
+    var wroteSomething: Bool = false
+
     // MARK: - Initializer
 
-    init(message: String, created: [URL] = [], leftUndoneFromTheMenu: String = "") {
+    init(message: String, created: [URL] = [], leftUndoneFromTheMenu: String = "", wroteSomething: Bool = false) {
         self.message = message
         self.created = created
         self.leftUndoneFromTheMenu = leftUndoneFromTheMenu
+        self.wroteSomething = wroteSomething
     }
 }
 

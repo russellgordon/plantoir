@@ -3453,10 +3453,12 @@ on mains, and nothing in the agent's plist gates on the power source; what a
 deploy needs is a Mac that is AWAKE. The cable was standing in for "has not
 idle-slept", which on battery comes sooner. So:
 
-- the bullet is gone, and in its place, as the last bullet, Russell's own
+- the bullet is gone, and after the list, on its own line, Russell's own
   words: "On battery, a Mac goes to sleep sooner, so be sure to keep it awake
-  until then." (It sits under "at that moment this Mac must be:" as he ruled
-  it, though it is a sentence rather than a continuation of that lead-in.)
+  until then." (First placed as the last bullet, as ruled; moved to its own
+  line in the fixes round — the implementation review's L1 — because it is a
+  sentence and does not read on from "at that moment this Mac must be:". His
+  words are unchanged.)
 - the assistant's two sentences — the `schedule_deploy` card and the answer
   after setting one (`AssistToolRunner.awakeThenWithTheLidOpen`) — say "on and
   awake then, with the lid open." They do not carry the battery bullet, so the

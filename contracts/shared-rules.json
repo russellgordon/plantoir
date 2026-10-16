@@ -868,7 +868,7 @@
       },
       {
         "event": "ran from a menu",
-        "carries": "the course and section, where the item is in the menus (Section > Publish Pages..., Hide Pages..., Publish Class for a Date..., Rebuild Preview, Undo Last Change, Add Next Class, Re-date Classes..., Make Room for Classes..., Class Dates..., or Help > Publishing and Deploying...), how it ended - carried out, changed nothing, took the last change back, cancelled at the plan, rebuilt or not rebuilt - and counts (pages ticked), never a page's title.",
+        "carries": "the course and section, where the item is in the menus (Section > Publish Pages..., Hide Pages..., Publish Class for a Date..., Rebuild Preview, Undo Last Change, Add Next Class, Re-date Classes..., Make Room for Classes..., Class Dates..., or Help > Publishing and Deploying...), how it ended - carried out, changed nothing, took the last change back, took part of the last change back (an undo that put some files back and kept the entry because others were edited since, #531), cancelled at the plan, rebuilt or not rebuilt - and counts (pages ticked), never a page's title.",
         "line": "{course}/{section} · Section ▸ Publish Pages… — {carried out|changed nothing|cancelled at the plan|…}, {N pages ticked}",
         "why": "#457 batch B. The assistant's functions now run from the menu bar for a teacher who never opened the assistant, and the assistant's own trail lines are written by its conversation, which the menu does not have. Without this a page published from the menu is a page nobody can say who published. Not 'section menu item ran': Help is not in the Section menu (the plan review's note 11)."
       },
