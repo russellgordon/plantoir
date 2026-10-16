@@ -4045,6 +4045,21 @@ also writes with no entry, and no menu item reaches it. No contract case: the
 ending depends on the runner's internals, not on data, and the contract's
 `ran from a menu` endings are unchanged.
 
+**Rebuild Preview restarts a SERVING preview (#528, checked 2026-10-16).**
+Windows found its own `rebuild_preview` returned at once while a preview was
+serving and still said it was rebuilding (#489). The mac never had that:
+`rebuildPreview` → `bringThePreviewUpToDate(afterAChange: false)` stops a
+preview that is building OR showing (`isPreviewRunning` is `previewState() !=
+.notRunning`), waits for the stop (`stopPreviewAndWait`), and starts it again,
+whose start waits for the built index to CHANGE before it serves. The menu's
+`.menu` runner has no branch of its own on that path (`menuChangeHeldBack` is
+nil for it). An outside assistant (`.mcp`) is the deliberate exception, #433.
+Now held by the contract: `assist-cases.json` → "rebuild with a preview
+serving stops it and starts it again" (authored here), and on the menu by
+`SectionVerbsTests.testRebuildPreviewFromTheMenuRestartsAServingPreview` — a
+guard, green on dev. A unit test proves the ORDER; that the new site is
+SERVED rests on the window's own wait, not re-driven here.
+
 ### #475 at the assistants' deploy
 
 `deploy_section` meets the question about classes dated after the next class
