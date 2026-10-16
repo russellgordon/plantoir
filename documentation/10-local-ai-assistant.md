@@ -7589,11 +7589,24 @@ before changing it:
   with "with no backup, because one could not be made" on the trail. Every other
   Windows write refuses instead; this one follows the mac because the page is
   never on the site and the undo entry still holds the previous text.
-- **No reference-course gate on the PLAN yet (#540)**: Windows has had courses
-  kept for reference since #241, and `ReferenceWriteGate` refuses the WRITE on
-  one, but `plan_write_how_i_teach` is read-only and so is never gated — the
-  plan can promise what the write will refuse. The plan must refuse one, as the
-  mac's does; #540 tracks it.
+- **The PLAN refuses a course kept for reference (#540, 2026-10-16).**
+  `ReferenceWriteGate` refuses every non-read-only tool on such a course, the
+  write included. `plan_write_how_i_teach` is read-only, so the gate never sees
+  it, and until #540 the plan could promise what the write was then refused.
+  `PlanHowITeach`, which the plan and the write share, now refuses first, as
+  the mac's `howITeachPlan` does. It uses the sentence the gate gives the write,
+  `ReferenceCourse.StaysAsItIs(ShownCode(course))`
+  (`referenceCourses.wording.staysAsItIs`), so `planAndWriteAgree` holds word
+  for word. Reading still works (`readOnAReferenceCourse`). Pinned:
+  `HowITeachTests.ThePlanRefusesACourseKeptForReference` and
+  `ThePlanAndTheWriteRefuseAReferenceCourseInTheSameWords`, which compares the
+  plan with `ReferenceWriteGate.Refusal` itself. There is no new contract
+  prose: `planAndWriteAgree` already says it, and the mac's
+  `howITeachPage.tools.refusals` has no reference-course entry either. In the
+  same function, a How I Teach page that cannot be read as text now gets the
+  mac's `unreadablePage` sentence, "“How I Teach” could not be read, so nothing
+  was changed." Before, it was "… couldn’t be read as text.", with its
+  quotation marks saved as the wrong characters.
 - **`PLANTOIR_KEPT_OFF:`** is read from a watched console (`ScriptRunner`) and
   from a scheduled publish's record (`ScheduledHealthFindings`, the wrapper's
   scan now keeps the line), and hidden from the console a teacher reads
