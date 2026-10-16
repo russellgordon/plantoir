@@ -483,7 +483,7 @@ against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
 +10,525 and +5,659 at 4c587f670, before the light-page wait and the corner
 change), every rule in them scoped so it cannot touch an ordinary page.
 Those are history, as #501's +316 above is: since #515 (v1.7.2) `index.css`
-also carries the sidebar's page marker, @@CSSBYTES@@ bytes, which DOES touch every page's
+also carries the sidebar's page marker, 473 bytes, which DOES touch every page's
 sidebar on screen (H); `postscript.js` is unchanged by it.
 
 ### F1. The files and how they reach a section
@@ -1201,8 +1201,10 @@ stylesheet and no `.tsx` render changed, and Quartz links `index.css` by a
 fixed name — and `postscript.js` gains nothing (no script). The sidebar is
 `display: none` on paper (print.scss's printable and every-other-page blocks;
 the handout frame clones the article only), so print is untouched.
-**Measured:** `index.css` grows by @@CSSBYTES@@ bytes, exactly the rule's minified text
-(@@CSSMEASURE@@). **Not measured:** a dev-image build compared with a
+**Measured** in the verify build (EXC2O section 1): the rule's minified text
+is **473 bytes** of `index.css` (57,843 bytes in all) — 92 for the row, 234 for
+its `::before`, 147 for the forced-colours block — at offset 23,010, ahead of
+the stock `.explorer-content ul{` at 30,750. **Not measured:** a dev-image build compared with a
 branch-image build page by page, which the plan asked for; this piece ran no
 image build but verify.sh's (no docker by hand on a day with a scheduled
 deploy). The HTML claim rests on construction plus verify.sh's 6h check that
@@ -1216,7 +1218,7 @@ Over all 43 schemes in `support/colour_schemes.json`
 5.45:1** (vintage-sepia; standard 6.09), **dark at least 8.37:1**
 (lakefield-college-school; standard 8.90), none of 86 under 3:1. Off the BUILT
 verify fixture in Chrome for Testing (EXC2O section 1 is forest-moss): **light
-@@LIGHT@@:1, dark @@DARK@@:1**, the sidebar's own computed background, the
+5.63:1, dark 9.45:1**, the sidebar's own computed background, the
 dot's computed colour and opacity. The alternatives, same method:
 
 | Dot colour | Light min | Dark min | Under 3:1 |
@@ -1247,8 +1249,15 @@ deliberately does not do.
 - `browser-checks/sidebar_page_marker.mjs` (verify.sh 6h, beside the print and
   graph checks, Chrome for Testing at 1512 × 900): verify.sh plants
   `Discussions/Marker Fixture Long.md` (a title that wraps to three lines) and
-  `Discussions/Marker Fixture Folder/` (made expandable, with its own
-  `index.md` and one page). The check opens both folders with a click on the
+  `Discussions/Tasks/` (its own `index.md` and one page). The folder is
+  called Tasks because the sidebar gives a chevron to a folder whose NAME is
+  in `expandable`, at any depth, and Tasks already is; the check finds it by
+  its path, Discussions then Tasks, never by the name alone. **Adding a new
+  name to `expandable` was the first implementation and verify.sh caught it:**
+  `Explorer.tsx` writes that list into every page's `data-expandable`, so it
+  changed every page's HTML for the build with the plants, and 6c's #485
+  check (Help Sessions byte for byte against the build after the plants are
+  gone) failed. The check opens both folders with a click on the
   chevron — only if not already open, since Quartz saves the sidebar's state
   in `localStorage` across loads — and waits by polling for the list's height
   to settle. Then, in order: every page row in both folders has a drawn
@@ -1269,7 +1278,7 @@ deliberately does not do.
   `contentIndex.json` and the rule placed before the explorer's, as the build
   places it): no rule → `page rows carry no marker` for all six rows, first;
   the selector widened to `.folder-outer>ul>li` → `folder row carries a
-  marker: "Marker Fixture Folder"`; the gap set to .2em → `the long title's
+  marker: "Tasks"`; the gap set to .2em → `the long title's
   second line starts at 70.6 px, not under its first letter at 66.1 px`;
   opacity .3 → `the dot is 1.78:1 … under 3:1`. The Python test: opacity .3
   fails the contrast test (every scheme listed), a `> a:hover` rule fails the

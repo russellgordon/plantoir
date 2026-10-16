@@ -1554,7 +1554,7 @@ restore_hit_fixture() {
   rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
   rm -f "$HIT_COURSE/Plain Long Page.md"
   rm -f "$HIT_COURSE/Discussions/Marker Fixture Long.md"
-  rm -rf "$HIT_COURSE/Discussions/Marker Fixture Folder"
+  rm -rf "$HIT_COURSE/Discussions/Tasks"
   rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
         "$HIT_COURSE/Printable Too Tall.md" \
@@ -1581,8 +1581,6 @@ path = sys.argv[1]
 config = json.load(open(path, encoding="utf-8"))
 config.setdefault("shared_files", []).append("How I Teach.md")
 config.setdefault("per_section_files", []).append("HOW I TEACH.md")
-# #515: the folder planted inside Discussions, below, opens with a chevron.
-config.setdefault("expandable", []).append("Marker Fixture Folder")
 json.dump(config, open(path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
 PY
 
@@ -2012,17 +2010,21 @@ sed -e '/^printable: true$/d' -e 's/^title: Printable Fixture$/title: Printable 
 } > "$HIT_COURSE/Plain Long Page.md"
 # #515: the sidebar's page dot (browser-checks/sidebar_page_marker.mjs). A
 # page inside Discussions whose title wraps in the sidebar at a laptop's width,
-# and a folder inside Discussions (made expandable above) with a page of its
-# own, so a folder row sits among page rows. The folder has its own index.md
-# so its sidebar name is its title whichever way Quartz reads a folder's name.
-# Removed by restore_hit_fixture.
+# and a folder inside Discussions with a page of its own, so a folder row sits
+# among page rows. The folder is called Tasks because the sidebar gives a
+# chevron to a folder whose NAME is in `expandable`, at any depth, and Tasks
+# already is: adding a new name to `expandable` instead would change every
+# page's HTML (Explorer.tsx writes the list into data-expandable), and the
+# #485 check in 6c compares a page from this build with one built after the
+# plants are gone. It has its own index.md so its sidebar name is its title
+# whichever way Quartz reads a folder's name. Removed by restore_hit_fixture.
 printf -- '---\ntitle: Marker Fixture Page With A Title Long Enough To Wrap Onto A Second Line\n---\nA page planted by verify.sh for the sidebar check (plantoir-marker-sentinel-7f3a).\n' \
   > "$HIT_COURSE/Discussions/Marker Fixture Long.md"
-mkdir -p "$HIT_COURSE/Discussions/Marker Fixture Folder"
-printf -- '---\ntitle: Marker Fixture Folder\n---\nA folder planted by verify.sh for the sidebar check.\n' \
-  > "$HIT_COURSE/Discussions/Marker Fixture Folder/index.md"
+mkdir -p "$HIT_COURSE/Discussions/Tasks"
+printf -- '---\ntitle: Tasks\n---\nA folder planted by verify.sh for the sidebar check.\n' \
+  > "$HIT_COURSE/Discussions/Tasks/index.md"
 printf -- '---\ntitle: Marker Fixture Inner Page\n---\nA page inside the planted folder.\n' \
-  > "$HIT_COURSE/Discussions/Marker Fixture Folder/Marker Fixture Inner Page.md"
+  > "$HIT_COURSE/Discussions/Tasks/Marker Fixture Inner Page.md"
 mkdir -p "$HIT_COURSE/Media"
 # Pictures for the worksheet's hazards (#499): a tall portrait one that must be
 # scaled onto a page, a wide one inside a folded answer, and an SVG with only a
@@ -2609,7 +2611,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   fi
   # #515: the sidebar's page dot, on the rows the browser draws.
   if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
-       "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Marker Fixture Folder" \
+       "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
        "Marker Fixture Page With A Title Long Enough To Wrap Onto A Second Line" >/tmp/verify_sidebar_page_marker.log 2>&1; then
     pass "the sidebar's page dot: every page row in an open folder and a folder inside it has its dot, no folder row and no page at the top level does, a wrapped title's second line starts under its first letter, the current page and a hovered link keep Quartz's colours, in light and dark, on a folder page and under forced colours - $(head -1 /tmp/verify_sidebar_page_marker.log | sed 's/^OK: //') against the sidebar (#515, browser-checks/sidebar_page_marker.mjs)"
   else

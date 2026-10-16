@@ -41,6 +41,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const [chromePath, pageUrl, folderPageUrl, folderName, nestedFolderName, longTitle] = process.argv.slice(2)
+const nestedPath = folderName + "/" + nestedFolderName
 if (!chromePath || !pageUrl || !folderPageUrl || !folderName || !nestedFolderName || !longTitle) {
   console.error("usage: node sidebar_page_marker.mjs <chrome> <fixture page> <folder page> <folder> <nested folder> <long title>")
   process.exit(2)
@@ -78,16 +79,28 @@ const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mil
 const HELPERS = `
 (() => {
   const plain = (text) => (text || "").replace(/\\s+/g, " ").trim()
-  const folderRow = (name) => {
-    for (const container of document.querySelectorAll(".explorer .folder-container")) {
-      const title = container.querySelector(".folder-title")
-      if (title && plain(title.textContent) === name) return container.parentElement
-    }
-    return null
-  }
   const ownList = (row) => {
     const outer = row ? row.querySelector(":scope > .folder-outer") : null
     return outer ? outer.querySelector(":scope > ul") : null
+  }
+  // A folder's row by its path of names, "Discussions/Tasks": each name is
+  // looked for among the rows of the list before it only, so a folder inside
+  // Discussions that shares its name with a top-level folder is not confused
+  // with it.
+  const folderRow = (path) => {
+    let list = document.querySelector(".explorer .explorer-ul")
+    let found = null
+    for (const name of path.split("/")) {
+      found = null
+      if (!list) return null
+      for (const row of list.children) {
+        const title = row.querySelector(":scope > .folder-container .folder-title")
+        if (title && plain(title.textContent) === name) found = row
+      }
+      if (!found) return null
+      list = ownList(found)
+    }
+    return found
   }
   const pageRowsIn = (list) => {
     const rows = []
@@ -238,7 +251,7 @@ async function connect(chunk) {
   const checkSidebar = async (mode, { geometry = true, current = true } = {}) => {
     const seen = { mode }
     report[mode] = seen
-    for (const name of [folderName, nestedFolderName]) {
+    for (const name of [folderName, nestedPath]) {
       const state = await openFolder(name)
       if (state !== "ok") {
         problems.push(`${mode}: the folder "${name}" ${state === "missing" ? "is not in the sidebar - the check would prove nothing" : state === "no chevron" ? "has no chevron to open it (is it in the course's expandable folders?)" : state}`)
@@ -250,7 +263,7 @@ async function connect(chunk) {
     const rows = await evaluate(`(() => {
       const m = window.__plMarker
       const folderList = m.ownList(m.folderRow(${JSON.stringify(folderName)}))
-      const nestedList = m.ownList(m.folderRow(${JSON.stringify(nestedFolderName)}))
+      const nestedList = m.ownList(m.folderRow(${JSON.stringify(nestedPath)}))
       const entries = []
       const add = (row, kind) => {
         m.rows.push(row)
