@@ -117,6 +117,7 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-16 | An outside assistant's How I Teach plan refuses a course kept for reference, as the write does | Windows (mac already did) | #540 |
 | 2026-10-16 | The assistant's Make Room for Classes plan says Undo will not take it back when other classes move | Windows (mac already did) | #530 |
 | 2026-10-16 | Section menu trail endings: a partial undo says it took part of the last change back; a Re-date, publish or hide that stops part way says which pages were written, and one whose first write fails says nothing was changed | Windows (mac shipped it in v1.7.2, #531) | #550 |
+| 2026-10-16 | Section ▸ Publish Pages…, Hide Pages… and Publish Class for a Date… show their plan as a table: a summary line, one row per page (Page / Folder / What changes, sortable), the card's other sentences under it | Windows (mac shipped it in v1.7.2, #524) | #548 |
 
 ## Warnings the release notes MUST carry
 

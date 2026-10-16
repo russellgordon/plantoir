@@ -90,6 +90,19 @@ public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan
     public AssistNextClassReading? NextClass { get; init; }
 
     /// <summary>
+    /// The <c>_meta</c> key carrying a page plan as the Section menu's table
+    /// (#548, the mac's <c>AssistToolOutcome.planTable</c>, #524) —
+    /// <see cref="Assist.PlanTable.ToJson"/>. Sent by <c>plan_publish_pages</c>,
+    /// <c>plan_unpublish_pages</c> and <c>plan_publish_class_on</c> ONLY from the
+    /// menu's server, beside the card; the text content, which a model or
+    /// Claude Code reads, is the same bytes on every surface.
+    /// </summary>
+    public const string PlanTableKey = "plantoir.app/planTable";
+
+    /// <summary>What <see cref="PlanTableKey"/> carried, or null — the dialog then shows the text card.</summary>
+    public PlanTable? PlanTable { get; init; }
+
+    /// <summary>
     /// Whether the answer said where the last change was made
     /// (<see cref="AssistWorkspace.LastChangeKey"/>) — sent by the Section
     /// menu's server only (#489). False means "not told", never "nothing to undo".
@@ -122,16 +135,18 @@ public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan
         string? backup = meta?[ConversationBackupKey]?.GetValue<string>();
         bool noPage = meta?[NoPageFoundKey]?.GetValue<bool>() == true;
         var nextClass = AssistNextClassReading.FromJson(meta?[NextClassKey]);
+        var planTable = Assist.PlanTable.FromJson(meta?[PlanTableKey]);
         bool carriesLastChange = meta is JsonObject carrying && carrying.ContainsKey(AssistWorkspace.LastChangeKey);
         string? lastChange = carriesLastChange ? meta?[AssistWorkspace.LastChangeKey]?.GetValue<string>() : null;
         int? changesToUndo = meta?[AssistWorkspace.ChangesToUndoKey]?.GetValue<int>();
         bool? changed = meta?[AssistWorkspace.ChangedKey]?.GetValue<bool>();
         return string.IsNullOrWhiteSpace(summary)
             ? Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage, NextClass = nextClass,
+                                  PlanTable = planTable,
                                   CarriesLastChange = carriesLastChange, LastChange = lastChange, ChangesToUndo = changesToUndo,
                                   Changed = changed }
             : new AssistToolAnswer(summary, detail, isPlan, backup, noPage)
-              { NextClass = nextClass, CarriesLastChange = carriesLastChange, LastChange = lastChange, ChangesToUndo = changesToUndo,
+              { NextClass = nextClass, PlanTable = planTable, CarriesLastChange = carriesLastChange, LastChange = lastChange, ChangesToUndo = changesToUndo,
                 Changed = changed };
     }
 }
