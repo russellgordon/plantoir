@@ -3191,14 +3191,28 @@ metrics were measured on.
   the table focused and without
   (`testReturnPublishesAndEscapeCancelsWhileTheTableHasFocus`), and taking
   `.keyboardShortcut(.cancelAction)` off Cancel turned it red — so the harness
-  can see a key go missing. REAL_APP_DRIVE_RESULT
+  can see a key go missing. Then in the real app (Debug build, `--state-dir`,
+  a scratch folder with stub launchers, macOS 26.6, 2026-10-16), driven with
+  System Events: a class linking 16 hidden concept pages and one visible one
+  (17 rows to change, 1 already visible, so the table scrolled); Tab put the
+  focus on the table (Accessibility reported `AXOutline` focused; Full
+  Keyboard Access on), and Escape closed the sheet with nothing written,
+  then Return, with the table again focused, published the 17 pages. A
+  table with no `selection:` does not take Return or Escape for itself, so
+  no `.onKeyPress`/`.onExitCommand` was needed. Measured in the same drive:
+  three equal columns cut "What changes" at about twenty letters, so the
+  columns are sized (Page 130, Folder 110, What changes 240 ideal); a long
+  date-move cell still truncates, and its tooltip carries it whole.
 
 **The trail is unchanged, deliberately.** `ran from a menu` still records
 `carried out` / `cancelled at the plan` / `changed nothing` and the pages
 ticked. The table changes how the plan is SHOWN, not what Publish does or how
 the sheet ends, so rule 5's "a changed behaviour changes its line" does not
 bite. Adding a count of the pages that would change was REJECTED: the line is
-about what the teacher did, not what the plan held. TRAIL_DRIVE_RESULT
+about what the teacher did, not what the plan held. Read after the drive
+above: `Section ▸ Publish Pages… — cancelled at the plan, 1 page ticked` for
+the Escape, then the menu's backup line and `… — carried out, 1 page ticked`
+for the Return.
 
 **REJECTED:** parsing the card back into rows (titles hold quotes and commas,
 and a parse is a second reader of a format that changes); `SectionVerbs`
