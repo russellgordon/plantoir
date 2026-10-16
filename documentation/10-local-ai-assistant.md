@@ -5132,6 +5132,29 @@ runs every case, the numbered ones in a numbered course, and reads
 withheld. The trap: `OtherClassesMoved` is the past tense and must not go
 on a plan.
 
+**Windows' make-room plan says it too since 2026-10-16 (#530).** Until then
+only the Section menu's card carried it, as the `FromTheMenu` twin (#489); the
+in-app assistant's make-room card and the model's copy left it out, which
+contradicted "on every PLAN that moves other classes" above.
+`PlantoirTools.PlanMakeRoomForClasses` now appends it when
+`InsertPlan.MovesOtherClasses` is true (renames or moves, the mac's
+`movesAnythingElse`; `DuplicateClassPlan.MovesOtherClasses` reads the same
+property). The model's copy gets the class form, as the mac's `makeRoomPlan`
+does. The card gets the course's noun on the assistant's card, or the
+`FromTheMenu` twin on the menu's card, and never both. `InsertPlan.Describe`
+stays pure. Its "New, and unpublished until you write it" line already says
+the new pages start hidden, so the mac's separate line was not copied. Pinned
+by `InsertClassesTests.TheAssistantsCardSaysUndoWillNotTakeItBack_WhenOtherClassesMove`,
+`NoUndoWarningWhenNothingElseMoves` and `TheMenusCardSaysItsOwnTwinAndNotTheAssistants`,
+by `ClubNounTests.AClubsTeacherReadsMeeting` (the meeting form), and by a
+scenario PROPOSED from Windows, `assist-cases.json` → "the make-room card says
+Undo will not take it back when other classes move (proposed from Windows,
+#530)". All of these were red before the change and are green after
+(MEASURED). The scenario is expected green on the mac, and a `mac` issue asks
+for that to be confirmed. REJECTED: an `insertion.undoRule.planWarns` list in
+`class-planning.json`. It would be a second structure for one rule, and the
+scenario pins the CARD, which is what #530 is about.
+
 #### Three things the duplicate did that nothing was watching
 
 All three were found from the Windows side and closed on the mac in #163.
