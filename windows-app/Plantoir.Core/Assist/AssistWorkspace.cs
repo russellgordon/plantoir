@@ -1872,44 +1872,57 @@ public sealed partial class AssistWorkspace
 
         var changed = new List<string>();
         var declined = plan.CannotBeAddedTo.Select(p => p.DisplayTitle).ToList();
-        foreach (var page in plan.Changing)
+        // Whether a file has been written yet: a failure after one is a write
+        // with no undo entry (the recording is abandoned), and before one it
+        // changed nothing (#550, the mac's #531).
+        bool wrote = false;
+        try
         {
-            // Named as it happens, so a teacher watching the conversation
-            // sees the work go by page by page rather than a silence with
-            // a count at the end.
-            progress?.Report($"Editing “{page.Title}”…");
-            string full = PagePaths.ResolveInside(_folder, page.RelativePath);
-            string text = File.ReadAllText(full);
-            var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
-            // Edited since the plan into a shape with no room: named, never
-            // counted as done (#308).
-            if (edit.NoRoomForAKey) { declined.Add(page.DisplayTitle); continue; }
-            if (!edit.Changed) continue;
-            Save(full, updated);
-            changed.Add(page.Title);
-        }
-        if (changed.Count > 0)
-            progress?.Report($"Changed {changed.Count} page{(changed.Count == 1 ? "" : "s")}.");
-        NoteSettingsLeftAsTheyWere(act, declined.Count, course.Code, section);
-
-        // Pages only this class uses take its date.
-        string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
-        foreach (var date in plan.InheritedDates.Where(d => d.WillChange))
-        {
-            try
+            foreach (var page in plan.Changing)
             {
-                string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                var (updated, moved) = PageFrontmatter.SetCreated(
-                    File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-                if (moved) Save(full, updated);
+                // Named as it happens, so a teacher watching the conversation
+                // sees the work go by page by page rather than a silence with
+                // a count at the end.
+                progress?.Report($"Editing “{page.Title}”…");
+                string full = PagePaths.ResolveInside(_folder, page.RelativePath);
+                string text = File.ReadAllText(full);
+                var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
+                // Edited since the plan into a shape with no room: named, never
+                // counted as done (#308).
+                if (edit.NoRoomForAKey) { declined.Add(page.DisplayTitle); continue; }
+                if (!edit.Changed) continue;
+                Save(full, updated);
+                wrote = true;
+                changed.Add(page.Title);
             }
-            catch { }
+            if (changed.Count > 0)
+                progress?.Report($"Changed {changed.Count} page{(changed.Count == 1 ? "" : "s")}.");
+            NoteSettingsLeftAsTheyWere(act, declined.Count, course.Code, section);
+
+            // Pages only this class uses take its date.
+            string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+            foreach (var date in plan.InheritedDates.Where(d => d.WillChange))
+            {
+                try
+                {
+                    string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                    var (updated, moved) = PageFrontmatter.SetCreated(
+                        File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
+                    if (moved) { Save(full, updated); wrote = true; }
+                }
+                catch { }
+            }
+
+            // And the front page catches up with what is now published.
+            if (plan.Index is { WillChange: true } index) { ApplyIndexChange(index, tail); wrote = true; }
+
+            recording.Done();
         }
-
-        // And the front page catches up with what is now published.
-        if (plan.Index is { WillChange: true } index) ApplyIndexChange(index, tail);
-
-        recording.Done();
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            StoppedWhileWriting(wrote, error);
+            throw;
+        }
 
         // Publishing AND hiding build a PREVIEW, and stop there (#479).
         //
@@ -2144,52 +2157,63 @@ public sealed partial class AssistWorkspace
             if (!declined.Contains(title, StringComparer.OrdinalIgnoreCase)) declined.Add(title);
         }
 
-        foreach (var page in unitPages)
+        try
         {
-            var pagePlan = PlanPublish(
-                course.Code, section, new[] { page.RelativePath }, draft: !publishing, publishes: publishing);
-            foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
-
-            if (pagePlan.ChangesNothing) continue;
-
-            foreach (var change in pagePlan.Changing)
+            foreach (var page in unitPages)
             {
-                progress?.Report($"Editing “{change.Title}”…");
-                string full = PagePaths.ResolveInside(_folder, change.RelativePath);
-                string text = File.ReadAllText(full);
-                var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
-                if (edit.NoRoomForAKey) { Decline(change.DisplayTitle); continue; }
-                if (!edit.Changed) continue;
-                Save(full, updated);
-                if (!changed.Contains(change.Title)) changed.Add(change.Title);
-                changedAnything = true;
-            }
+                var pagePlan = PlanPublish(
+                    course.Code, section, new[] { page.RelativePath }, draft: !publishing, publishes: publishing);
+                foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
 
-            string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
-            foreach (var date in pagePlan.InheritedDates.Where(d => d.WillChange))
-            {
-                try
+                if (pagePlan.ChangesNothing) continue;
+
+                foreach (var change in pagePlan.Changing)
                 {
-                    string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-                    var (updated, moved) = PageFrontmatter.SetCreated(
-                        File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
-                    if (moved)
-                    {
-                        Save(full, updated);
-                        changedAnything = true;
-                    }
+                    progress?.Report($"Editing “{change.Title}”…");
+                    string full = PagePaths.ResolveInside(_folder, change.RelativePath);
+                    string text = File.ReadAllText(full);
+                    var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
+                    if (edit.NoRoomForAKey) { Decline(change.DisplayTitle); continue; }
+                    if (!edit.Changed) continue;
+                    Save(full, updated);
+                    if (!changed.Contains(change.Title)) changed.Add(change.Title);
+                    changedAnything = true;
                 }
-                catch { }
+
+                string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+                foreach (var date in pagePlan.InheritedDates.Where(d => d.WillChange))
+                {
+                    try
+                    {
+                        string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                        var (updated, moved) = PageFrontmatter.SetCreated(
+                            File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
+                        if (moved)
+                        {
+                            Save(full, updated);
+                            changedAnything = true;
+                        }
+                    }
+                    catch { }
+                }
+
+                if (pagePlan.Index is { WillChange: true } index)
+                {
+                    ApplyIndexChange(index, tail);
+                    changedAnything = true;
+                }
             }
 
-            if (pagePlan.Index is { WillChange: true } index)
-            {
-                ApplyIndexChange(index, tail);
-                changedAnything = true;
-            }
+            recording.Done();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // changedAnything is set after each write, so it says whether
+            // one landed before the failure (#550).
+            StoppedWhileWriting(changedAnything, error);
+            throw;
         }
 
-        recording.Done();
         NoteSettingsLeftAsTheyWere(publishing ? "publishing pages" : "hiding pages", declined.Count, course.Code, section);
         string? declinedSentence = declined.Count > 0 ? SettingsCannotBeAddedTo(declined) : null;
 
@@ -2958,28 +2982,52 @@ public sealed partial class AssistWorkspace
         // a date it could not set, and a hide it could not write.
         var undated = new List<string>();
         var notHidden = new List<string>();
+        // The pages already written, so a re-date that stops part way can name
+        // them (#550, the mac's #531).
+        var written = new List<string>();
 
-        foreach (var date in plan.Changing)
+        try
         {
-            string full = PagePaths.ResolveInside(_folder, date.RelativePath);
-            string fileText = File.ReadAllText(full);
-            var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
-            string updated = dateEdit.Text;
-            bool changed = dateEdit.Changed;
-            if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
-            if (date.Unpublishes)
+            foreach (var date in plan.Changing)
             {
-                bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
-                string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-                var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
-                    updated, pubKey, draft: true, section);
-                updated = draftUpdated;
-                if (draftEdit.Changed) changed = true;
-                if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
+                string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                string fileText = File.ReadAllText(full);
+                var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
+                string updated = dateEdit.Text;
+                bool changed = dateEdit.Changed;
+                if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
+                if (date.Unpublishes)
+                {
+                    bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+                    string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
+                    var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
+                        updated, pubKey, draft: true, section);
+                    updated = draftUpdated;
+                    if (draftEdit.Changed) changed = true;
+                    if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
+                }
+                if (!changed) continue;
+                Save(full, updated);
+                written.Add(full);
+                if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
             }
-            if (!changed) continue;
-            Save(full, updated);
-            if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Stopped part way: the pages before the failing one ARE re-dated
+            // and the undo entry is abandoned, so it is said as part way, with
+            // those pages named, and counted as a write (the mac's #531,
+            // ruling M3). Before any page was written it changed no page —
+            // though the timetable written above is already remembered.
+            // An AssistRefusal, so re_date_classes and roll_over_section both
+            // ANSWER it, each through its own catch (AssistRefusal); before
+            // #550 both let the IOException escape as a protocol error. Any
+            // OTHER IOException here (TimetableMemory.Write, say) still
+            // escapes; that predates #550.
+            if (written.Count == 0) throw new AssistRefusal(NothingWasChanged(error));
+            NoteAChangeWithNoUndoEntry();
+            throw new AssistRefusal(StoppedPartWay("the section's class dates", error, section) +
+                                    "\n\nThe pages already re-dated:\n" + ListingOf(written));
         }
 
         string indexPath = SectionIndex.PathFor(course, section);
@@ -3811,13 +3859,23 @@ public sealed partial class AssistWorkspace
 
     /// <summary>Carry out the insertion: rename, re-date, relink, then create the blanks.</summary>
     public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null) =>
-        ApplyInsertClasses(plan, progress, out _);
+        ApplyInsertClasses(plan, progress, out _, carryPastAFailedNewPage: true);
 
     /// <param name="created">The full paths of the blank class pages this run
     /// WROTE — a page already standing at a path is not among them. The
     /// duplicate asks it, because it is the one question link rewriting and
     /// date moves cannot fool (#200 A).</param>
-    private AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress, out List<string> created)
+    /// <param name="carryPastAFailedNewPage">
+    /// True for Make Room on its own (#550): a new page whose save FAILS is
+    /// carried past and named, like every other write here, so the renames
+    /// already made are still reported and noted as a change. False for
+    /// <see cref="ApplyDuplicateClass"/>, which asks whether ITS page was
+    /// created and would otherwise tell a teacher "the place for the copy is
+    /// still taken" about a plain write failure: there the failure is noted
+    /// as a change (when anything was written) and thrown, as before.
+    /// </param>
+    private AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress, out List<string> created,
+                                            bool carryPastAFailedNewPage)
     {
         created = new List<string>();
         var course = Course(plan.CourseCode);
@@ -3950,7 +4008,20 @@ public sealed partial class AssistWorkspace
             // Still taken: the class whose rename did not happen is there.
             // Not overwritten, and named rather than counted as made.
             if (File.Exists(path)) { notFinished.Add(added.Title); notAdded++; continue; }
-            Save(path, ClassSkeleton(added, plan.Naming.IsNumbered ? null : plan.Unit, plan.Added.Count, tail));
+            try
+            {
+                Save(path, ClassSkeleton(added, plan.Naming.IsNumbered ? null : plan.Unit, plan.Added.Count, tail));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                // Until #550 this one save was not carried past, unlike the
+                // renames and the dates above: a failure here after renames
+                // threw past the note below, so the trail said "changed
+                // nothing" about a section that had been renamed.
+                if (carryPastAFailedNewPage) { notFinished.Add(added.Title); notAdded++; continue; }
+                if (created.Count > 0 || renamed.Count > 0 || moved > 0 || linksUpdated > 0) NoteAChangeWithNoUndoEntry();
+                throw;
+            }
             created.Add(path);
         }
 
@@ -4076,7 +4147,7 @@ public sealed partial class AssistWorkspace
         using var recording = UndoHistory.Record(_undo,
             $"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
 
-        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress, out var created);
+        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress, out var created, carryPastAFailedNewPage: false);
 
         // The one case that could destroy a lesson (#200 A, the mac's #163).
         // Asked of the PLANNER — did this run write the page standing there? —

@@ -162,8 +162,74 @@ public sealed partial class AssistWorkspace
 
     private bool _changedWithNoUndoEntry;
 
-    /// <summary>A change that records no undo entry (Make Room for Classes) wrote something.</summary>
-    internal void NoteAChangeWithNoUndoEntry() => _changedWithNoUndoEntry = true;
+    /// <summary>
+    /// A call wrote something that leaves no NEW undo entry, so the menu's
+    /// trail line ends "carried out" (or, for an undo, "took part of the last
+    /// change back") rather than "changed nothing" (#489 M1; #550, the mac's
+    /// #531). Five paths say so: Make Room for Classes when it wrote anything
+    /// (it keeps no entry on purpose), a partial undo (its entry stays on the
+    /// list), and a publish or hide — page list or whole unit — or a re-date
+    /// that stopped part way after writing (the recording is abandoned).
+    /// Public because <c>undo_last_change</c>, in plantoir-mcp, notes the
+    /// partial undo.
+    /// </summary>
+    public void NoteAChangeWithNoUndoEntry() => _changedWithNoUndoEntry = true;
+
+    /// <summary>
+    /// Why a write failed, in a teacher's words: a permission said plainly,
+    /// anything else as the system put it — what a publish that stopped part
+    /// way has said since #165.
+    /// </summary>
+    internal static string ReasonItStopped(Exception error) => error is UnauthorizedAccessException
+        ? "Plantoir doesn’t have permission to change one of them."
+        : error.Message;
+
+    /// <summary>
+    /// A change whose FIRST write failed: nothing was changed — the mac's
+    /// "Nothing was changed: {error}" (#550). In no contract on either side.
+    /// </summary>
+    internal static string NothingWasChanged(Exception error) => "Nothing was changed: " + ReasonItStopped(error);
+
+    /// <summary>
+    /// A publish, hide or re-date that failed while writing (#550). After a
+    /// write it is noted as a change with no undo entry and the caller
+    /// rethrows, so the part-way sentence is said; before any write it is
+    /// refused as <see cref="NothingWasChanged"/>, since "Only part of … was
+    /// changed" would be false.
+    /// </summary>
+    internal void StoppedWhileWriting(bool wrote, Exception error)
+    {
+        if (!wrote) throw new AssistRefusal(NothingWasChanged(error));
+        NoteAChangeWithNoUndoEntry();
+    }
+
+    /// <summary>
+    /// <c>wording.publishStoppedPartWay</c> with its way back, said by every
+    /// change that stopped part way (#165, #436; the re-date since #550):
+    /// the menu, which has no Restore banner, points at the course's Backups
+    /// (#489); Plantoir's own window at its Restore Section button; an outside
+    /// assistant at neither. The undo entry is abandoned on a throw, so the
+    /// copy is what puts it back.
+    /// </summary>
+    public string StoppedPartWay(string what, Exception error, int section)
+    {
+        string said = AssistWording.PublishStoppedPartWay(what, ReasonItStopped(error));
+        if (SpeaksFromTheMenu && ConversationBackupPath is not null)
+            said += " " + AssistWording.RestoreFromBackupPutsItBack;
+        else if (ServesTheLocalWindow && ConversationBackupPath is not null)
+            said += " " + AssistWording.RestoreSectionPutsItBack(section.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return said;
+    }
+
+    /// <summary>Pages named one to a line by their place in the folder, at most fifteen — <c>PlantoirTools.Listing</c>'s shape.</summary>
+    internal string ListingOf(IReadOnlyList<string> paths)
+    {
+        const int mostListed = 15;
+        var lines = new List<string>();
+        foreach (string path in paths.Take(mostListed)) lines.Add("  " + Relative(path));
+        if (paths.Count > mostListed) lines.Add($"  …and {paths.Count - mostListed} more.");
+        return string.Join("\n", lines);
+    }
 
     /// <summary>
     /// After a call: whether it changed anything (see <see cref="ChangedKey"/>).

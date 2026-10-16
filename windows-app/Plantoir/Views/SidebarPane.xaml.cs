@@ -1203,6 +1203,9 @@ public sealed partial class SidebarPane : UserControl
             // Names EVERY destination (#400); nothing about unpublished classes.
             Text = ScheduledDeploy.DialogOpening(course, number),
         });
+        // #547: its own line, never glued into DialogOpening — that is "the
+        // first sentence" #400 and SharedRuleContractTests read.
+        body.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = ScheduledDeploy.OnBatterySleepsSooner });
         if (unsavedSomewhere)
             body.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = SavedSettings.SchedulingUsesSavedSettings });
         body.Children.Add(day);

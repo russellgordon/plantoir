@@ -48,11 +48,16 @@ public class PublishStoppedPartWayTests : IDisposable
     /// ONLY in Plantoir's own window, which has that button — never to an
     /// outside assistant (director's ruling, as on the mac).
     /// </summary>
+    /// <remarks>
+    /// Day 1 is written before Day 2 fails, so part of it WAS changed. Asked
+    /// for Day 2 alone, its first write is the one that fails, and since #550
+    /// that says "Nothing was changed" (the next test).
+    /// </remarks>
     [Theory]
     [InlineData("Unit 1", "Unit 1", false)]
-    [InlineData("Unit 1, Day 2", "the pages you named", false)]
+    [InlineData("Unit 1, Day 1|Unit 1, Day 2", "the pages you named", false)]
     [InlineData("Unit 1", "Unit 1", true)]
-    [InlineData("Unit 1, Day 2", "the pages you named", true)]
+    [InlineData("Unit 1, Day 1|Unit 1, Day 2", "the pages you named", true)]
     public async Task APageThatCannotBeWrittenIsAnsweredAndTheCopyIsNamedOnlyInTheWindow(
         string asked, string what, bool inTheWindow)
     {
@@ -66,7 +71,7 @@ public class PublishStoppedPartWayTests : IDisposable
         try
         {
             var answer = await tools.PublishPages("ICS3U", 1, progress, default,
-                                                  new[] { asked }, preview: false);
+                                                  asked.Split('|'), preview: false);
             string said = answer.Summary();
             Assert.StartsWith(AssistWording.PublishStoppedPartWay(what, ""), said);
             Assert.NotNull(workspace.ConversationBackupPath);
@@ -76,5 +81,38 @@ public class PublishStoppedPartWayTests : IDisposable
                 Assert.DoesNotContain("Restore Section", said);
         }
         finally { File.SetAttributes(Page("Unit 1, Day 2"), FileAttributes.Normal); }
+    }
+
+    /// <summary>
+    /// A publish whose FIRST write fails changed nothing, and says the mac's
+    /// "Nothing was changed: …" — never "Only part of … was changed", and no
+    /// pointer at a copy, since there is nothing to put back (#550). On every
+    /// tool that marks pages: a page list, a whole unit, and a class by date.
+    /// </summary>
+    [Fact]
+    public async Task APublishWhoseFirstWriteFailsSaysNothingWasChanged()
+    {
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.LocalWindow };
+        var tools = new PlantoirTools(workspace);
+        var progress = new Progress<ProgressNotificationValue>(_ => { });
+        // Day 2 on its own day, so "the class on 2026-09-08" is Day 1 alone.
+        File.WriteAllText(Page("Unit 1, Day 2"), "---\npublish: false\ncreated: 2026-09-10T07:00:00.000-0400\n---\nBody.\n");
+
+        File.SetAttributes(Page("Unit 1, Day 1"), FileAttributes.ReadOnly);
+        try
+        {
+            string named = (await tools.PublishPages("ICS3U", 1, progress, default,
+                                                     new[] { "Unit 1, Day 1" }, preview: false)).Summary();
+            string unit = (await tools.PublishPages("ICS3U", 1, progress, default,
+                                                    new[] { "Unit 1" }, preview: false)).Summary();
+            string byDate = (await tools.PublishClassOn("ICS3U", 1, "2026-09-08", progress, default, preview: false)).Summary();
+
+            foreach (string said in new[] { named, unit, byDate })
+            {
+                Assert.Equal("Nothing was changed: Plantoir doesn’t have permission to change one of them.", said);
+            }
+            Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 2")));
+        }
+        finally { File.SetAttributes(Page("Unit 1, Day 1"), FileAttributes.Normal); }
     }
 }

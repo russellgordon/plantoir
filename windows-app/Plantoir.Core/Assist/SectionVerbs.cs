@@ -267,19 +267,30 @@ public sealed class SectionVerbs : IAsyncDisposable
         $"{item} — {ending}" + (string.IsNullOrWhiteSpace(counts) ? "" : ", " + counts);
 
     /// <summary>
-    /// How a change ended. Not "without parsing a sentence" everywhere, and
-    /// said so: Rebuild Preview's ending compares the answer with the one
-    /// sentence the window says when it rebuilds, and Undo Last Change also
-    /// counts an answer containing "is put back" as taking the change back.
+    /// How a change ended, from what the server says and the undo list's
+    /// depth — never from a sentence, except Rebuild Preview, whose ending
+    /// compares the answer with the one sentence the window says when it
+    /// rebuilds.
     /// </summary>
     /// <remarks>
-    /// The server says whether the call changed anything
+    /// <para>The server says whether the call changed anything
     /// (<see cref="AssistToolAnswer.Changed"/>, the <c>plantoir.app/changed</c>
     /// key). It used to be read off the undo list's DEPTH alone, which was wrong
     /// for Make Room for Classes — it keeps no undo entry, on purpose — and for
     /// every change after the twentieth, when the list is full and its depth
     /// stops growing (2B's implementation review, M1). The depth is kept as the
-    /// fallback for an answer that does not carry the key.
+    /// fallback for an answer that does not carry the key.</para>
+    ///
+    /// <para>Undo Last Change has three endings (#550, the mac's #531). The
+    /// entry came off — the depth went DOWN — is "took the last change back":
+    /// <c>UndoHistory.Undo</c> removes the entry exactly when nothing was
+    /// skipped, so a whole undo always lowers the depth by one at any depth
+    /// (the cap of twenty trims only when an entry is added). Some files went
+    /// back and the entry stayed (the server noted a change, the depth did
+    /// not move) is "took part of the last change back". Anything else changed
+    /// nothing. It used to count an answer containing "is put back" as a
+    /// whole undo, and the partial sentence contains those words too, so a
+    /// partial undo read as a whole one.</para>
     /// </remarks>
     internal static string Ending(string tool, AssistToolAnswer answer, int? before, int? after, string course, int section)
     {
@@ -287,10 +298,17 @@ public sealed class SectionVerbs : IAsyncDisposable
             return answer.Summary == AssistWording.PreviewIsRebuilding(course, section.ToString()) ? "rebuilt" : "not rebuilt";
         bool undo = tool.Equals("undo_last_change", StringComparison.OrdinalIgnoreCase);
         bool? changed = answer.Changed;
-        if (changed is null && before is { } was && after is { } now) changed = undo ? now < was : now > was;
         if (undo)
-            return changed == true || answer.Summary.Contains("is put back", StringComparison.Ordinal)
-                ? "took the last change back" : "changed nothing";
+        {
+            if (before is { } was && after is { } now)
+            {
+                if (now < was) return "took the last change back";
+                return changed == true ? "took part of the last change back" : "changed nothing";
+            }
+            // No depth to go by: what the server says, as a whole undo.
+            return changed == true ? "took the last change back" : "changed nothing";
+        }
+        if (changed is null && before is { } earlier && after is { } later) changed = later > earlier;
         return changed == false ? "changed nothing" : "carried out";
     }
 
