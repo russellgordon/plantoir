@@ -525,8 +525,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                              $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}." +
                              (replaced is { } was ? " " + AssistWording.ScheduleReplaces($"{was:dddd d MMMM, h:mm tt}") : "");
             return Answering(summary, summary + "\n\n" +
-                             "Remember this computer has to be on and awake then — plugged in if it is a laptop, " +
-                             "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it.");
+                             "Remember this computer has to be " + ScheduledDeploy.AwakeThenWithTheLidOpen + " " +
+                             "Plantoir cannot wake it up. Say the word and I'll cancel it.");
         });
 
     [McpServerTool(Name = "cancel_scheduled_deploy", Title = "Call off a scheduled deploy",

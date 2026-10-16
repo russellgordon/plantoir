@@ -243,9 +243,28 @@ public sealed class ScheduledDeployTests : IDisposable
         // Said up front, because the alternative is a teacher walking into
         // class to find yesterday's site still up.
         Assert.Contains("switched on, and awake", described);
-        Assert.Contains("plugged in, if it is a laptop", described);
         Assert.Contains("lid open", described);
         Assert.Contains("Plantoir does not wake the computer up", described);
+        // #547 (the mac's #521): the deploy needs the computer AWAKE, not on
+        // mains — the task is registered to run on battery — so the cable
+        // bullet must not creep back. The battery line is said instead, as a
+        // line of its own after the list, where the mac says its own.
+        Assert.DoesNotContain("plugged in", described);
+        Assert.Contains(ScheduledDeploy.OnBatterySleepsSooner, described.Split('\n'));
+    }
+
+    [Fact]
+    public void TheDialogNeverAsksForACable()
+    {
+        string opening = ScheduledDeploy.DialogOpening(Open().Course("ICS3U"), 1);
+
+        Assert.DoesNotContain("plugged in", opening);
+        Assert.Contains("awake", opening);
+        Assert.Contains("lid open", opening);
+        // The battery line is the dialog's SECOND text block, never glued into
+        // the first sentence #400 reads (SidebarPane.ShowScheduleDialog).
+        Assert.DoesNotContain(ScheduledDeploy.OnBatterySleepsSooner, opening);
+        Assert.DoesNotContain("plugged in", ScheduledDeploy.OnBatterySleepsSooner);
     }
 
     [Fact]
