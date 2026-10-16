@@ -127,6 +127,122 @@ public sealed class InsertClassesTests : IDisposable
         Assert.Contains("Nothing would change", TextOf(noop));
     }
 
+    /// <summary>
+    /// #530: when other classes are renamed or moved, the make-room records no
+    /// undo entry, and the plan is where a teacher can still say no — so the
+    /// in-app assistant's card says so before Go, as the mac's does, and the
+    /// model's copy says it too (class form). The Section menu's twin never
+    /// appears on the assistant's card.
+    /// </summary>
+    [Fact]
+    public void TheAssistantsCardSaysUndoWillNotTakeItBack_WhenOtherClassesMove()
+    {
+        FourClasses();
+
+        var planned = new Plantoir.Mcp.PlantoirTools(Open())
+            .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1);
+        string card = planned.Summary();
+        string model = TextOf(planned);
+
+        Assert.Equal(true, planned.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
+        Assert.EndsWith("\n\n" + AssistWording.MakingRoomCannotBeUndone, card);
+        Assert.Contains(AssistWording.MakingRoomCannotBeUndone, model);
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndoneFromTheMenu, card);
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndoneFromTheMenu, model);
+    }
+
+    /// <summary>
+    /// Room made after the last class, so nothing is renamed or moved: the
+    /// make-room can be undone, and neither copy says it cannot.
+    /// </summary>
+    [Fact]
+    public void NoUndoWarningWhenNothingElseMoves()
+    {
+        FourClasses();
+
+        var planned = new Plantoir.Mcp.PlantoirTools(Open())
+            .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 3, howMany: 1);
+
+        Assert.Equal(true, planned.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
+        Assert.DoesNotContain("will not take this back", planned.Summary());
+        Assert.DoesNotContain("will not take this back", TextOf(planned));
+    }
+
+    /// <summary>
+    /// The Section menu's card carries its own twin (#489) and NOT the
+    /// assistant's form — exactly one of the two, never both.
+    /// </summary>
+    [Fact]
+    public void TheMenusCardSaysItsOwnTwinAndNotTheAssistants()
+    {
+        FourClasses();
+        var menu = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.Menu };
+
+        string card = new Plantoir.Mcp.PlantoirTools(menu)
+            .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1).Summary();
+
+        Assert.EndsWith("\n\n" + AssistWording.MakingRoomCannotBeUndoneFromTheMenu, card);
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndone, card);
+    }
+
+    // ---- A new page whose save fails (#550) ---------------------------------
+
+    /// <summary>
+    /// Reports a progress line SYNCHRONOUSLY (<see cref="Progress{T}"/> posts
+    /// it later), so a test can change the folder at the moment a step begins.
+    /// </summary>
+    private sealed class AtTheStep(string step, Action then) : IProgress<string>
+    {
+        public void Report(string value) { if (value.StartsWith(step, StringComparison.Ordinal)) then(); }
+    }
+
+    /// <summary>
+    /// Make Room on its own: the new page's save fails AFTER the renames (its
+    /// path is made a folder as "Adding the new classes…" begins, so it is not
+    /// "still taken" — that test is for a FILE). It is carried past and named,
+    /// like every other write here, and noted as a change — until #550 it threw
+    /// past the note, so the menu's line said "changed nothing" about a section
+    /// that had been renamed, and the teacher was told "That couldn’t be read".
+    /// </summary>
+    [Fact]
+    public void MakeRoomWhoseNewPageCouldNotBeSaved_IsCarriedPastAndNotedAsAChange()
+    {
+        FourClasses();
+        var workspace = Open();
+        var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 2, atDay: 1, count: 1);
+        string newPage = ClassPath("Unit 2, Day 1");
+
+        var result = workspace.ApplyInsertClasses(plan, new AtTheStep("Adding the new", () => Directory.CreateDirectory(newPage)));
+
+        Assert.True(result.Succeeded);
+        Assert.True(File.Exists(ClassPath("Unit 2, Day 3")), "the classes after it were renamed");
+        Assert.True(Directory.Exists(newPage));
+        Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 2, Day 1" }), result.Message);
+        Assert.True(workspace.TakeWhetherTheCallChangedAnything(workspace.TopOfTheUndoList));
+    }
+
+    /// <summary>
+    /// The duplicate keeps what it did (#550's ruling): its new page's save
+    /// failing is noted as a change and THROWN, never carried past — carried
+    /// past, the duplicate would find no page of its own and tell the teacher
+    /// "the place for the copy is still taken" about a plain write failure.
+    /// </summary>
+    [Fact]
+    public void ADuplicateWhoseNewPageCouldNotBeSaved_ThrowsAndIsNotStillTaken()
+    {
+        FourClasses();
+        var workspace = Open();
+        var plan = workspace.PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 1");
+        string newPage = ClassPath(plan.NewTitle);
+
+        var thrown = Record.Exception(() => workspace.ApplyDuplicateClass(
+            plan, new AtTheStep("Adding the new", () => Directory.CreateDirectory(newPage))));
+
+        Assert.True(thrown is IOException or UnauthorizedAccessException, $"threw {thrown?.GetType().Name}: {thrown?.Message}");
+        Assert.DoesNotContain("is still there", thrown!.Message);
+        Assert.True(workspace.TakeWhetherTheCallChangedAnything(workspace.TopOfTheUndoList), "the renames were written");
+    }
+
     private static string TextOf(ModelContextProtocol.Protocol.CallToolResult result) =>
         string.Join(" ", result.Content
             .OfType<ModelContextProtocol.Protocol.TextContentBlock>()

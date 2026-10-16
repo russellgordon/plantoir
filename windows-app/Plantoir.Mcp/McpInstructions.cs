@@ -35,7 +35,7 @@ public static class McpInstructions
         "teacher to look the preview over in Plantoir and wait for them to say they have; if they have not, offer to " +
         "wait. A deploy takes several minutes, and so does building a preview.\n\n" +
         "Scheduled deploys. Call plan_scheduled_deploy first and read it out, especially that the computer must be ON " +
-        "and AWAKE at that moment, plugged in if it is a laptop, with the lid open: Plantoir does not wake it. Pass the " +
+        "and AWAKE at that moment, with the lid open: Plantoir does not wake it. Pass the " +
         "class pages the teacher has in mind as `classes`, separated by semicolons, so the plan checks they are actually " +
         "published. Scheduling " +
         "replaces any deploy already scheduled for that section; cancel_scheduled_deploy calls it off and is safe when " +

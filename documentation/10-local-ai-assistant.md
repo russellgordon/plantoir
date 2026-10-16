@@ -3263,8 +3263,10 @@ case says which of the two you are looking at.
 
 Two more that stay per-platform: the plan's own words (the mac's says what has
 to be true of the Mac — awake, lid open, and that on battery it sleeps sooner;
-"plugged in" was dropped by #521 because launchd runs the job on battery — and Windows says something
-different about sleep and Modern Standby), and cancelling, which on the mac is
+"plugged in" was dropped by #521 because launchd runs the job on battery — and Windows, which dropped
+it too with #547 because its task runs on battery, says it in its own words about a PC's sleep:
+`ScheduledDeploy.OnBatterySleepsSooner`, "On battery, a PC goes to sleep sooner…", in the same two
+places as the mac, `documentation/07-deployment.md` → "\"Plugged in, if it is a laptop\" removed (#521)"), and cancelling, which on the mac is
 `launchctl bootout` plus deleting the plist.
 
 **The sidebar filter — the empty state.** The contract says WHAT matches. It
@@ -4061,6 +4063,23 @@ class when it moves others (`duplicateClassRequested`) also writes with no
 entry, and no menu item reaches it. The other menu paths were read: Make
 Room's `apply` throws only before its first write, Add Next Class writes one
 page.
+
+**On Windows since #550 (2026-10-16).** The same endings, and the same five
+paths, each pinned. The undo ending comes from the depth the menu's server
+sends plus its `changed` flag, never from the sentence; it used to count
+"is put back", which the partial sentence also contains. Re-date Classes… that
+stops part way says `publishStoppedPartWay` with the pages already re-dated,
+on both `re_date_classes` and `roll_over_section`, each through its own
+`catch (AssistRefusal)`. Before, both let the `IOException` escape as the
+SDK's generic protocol error. A first write
+that fails says the mac's "Nothing was changed: …", and that now includes a
+publish or hide, which had said "Only part of …" for any write failure. One
+difference was Windows' alone: Make Room's add-a-new-page save was not carried
+past the way its renames and dates were, so a failure there after renames
+threw past the note. It is carried past now, for the stand-alone call only.
+The duplicate still throws, so it never says "the place for the copy is still
+taken" about a plain write failure. `documentation/12-windows-app.md` →
+"Writes with no new undo entry, and Undo's three endings" has the rest.
 
 **Rebuild Preview restarts a SERVING preview (#528, checked 2026-10-16).**
 Windows found its own `rebuild_preview` returned at once while a preview was
@@ -5129,6 +5148,30 @@ runs every case, the numbered ones in a numbered course, and reads
 `undoRule.planWarns` too: the warning is on the plan exactly when the undo is
 withheld. The trap: `OtherClassesMoved` is the past tense and must not go
 on a plan.
+
+**Windows' make-room plan says it too since 2026-10-16 (#530).** Until then
+only the Section menu's card carried it, as the `FromTheMenu` twin (#489); the
+in-app assistant's make-room card and the model's copy left it out, which
+contradicted "on every PLAN that moves other classes" above.
+`PlantoirTools.PlanMakeRoomForClasses` now appends it when
+`InsertPlan.MovesOtherClasses` is true (renames or moves, the mac's
+`movesAnythingElse`; `DuplicateClassPlan.MovesOtherClasses` reads the same
+property). The model's copy gets the class form, as the mac's `makeRoomPlan`
+does. The card gets the course's noun on the assistant's card, or the
+`FromTheMenu` twin on the menu's card, and never both. `InsertPlan.Describe`
+stays pure. Its "New, and unpublished until you write it" line already says
+the new pages start hidden, so the mac's separate line was not copied. Pinned
+by `InsertClassesTests.TheAssistantsCardSaysUndoWillNotTakeItBack_WhenOtherClassesMove`,
+`NoUndoWarningWhenNothingElseMoves` and `TheMenusCardSaysItsOwnTwinAndNotTheAssistants`,
+by `ClubNounTests.AClubsTeacherReadsMeeting` (the meeting form), and by a
+scenario PROPOSED from Windows, `assist-cases.json` → "the make-room card says
+Undo will not take it back when other classes move (proposed from Windows,
+#530)". All of these were red before the change and are green after
+(MEASURED). The scenario is expected green on the mac, and a `mac` issue
+([#553](https://github.com/russellgordon/plantoir/issues/553)) asks
+for that to be confirmed. REJECTED: an `insertion.undoRule.planWarns` list in
+`class-planning.json`. It would be a second structure for one rule, and the
+scenario pins the CARD, which is what #530 is about.
 
 #### Three things the duplicate did that nothing was watching
 
@@ -7587,11 +7630,24 @@ before changing it:
   with "with no backup, because one could not be made" on the trail. Every other
   Windows write refuses instead; this one follows the mac because the page is
   never on the site and the undo entry still holds the previous text.
-- **No reference-course gate on the PLAN yet (#540)**: Windows has had courses
-  kept for reference since #241, and `ReferenceWriteGate` refuses the WRITE on
-  one, but `plan_write_how_i_teach` is read-only and so is never gated — the
-  plan can promise what the write will refuse. The plan must refuse one, as the
-  mac's does; #540 tracks it.
+- **The PLAN refuses a course kept for reference (#540, 2026-10-16).**
+  `ReferenceWriteGate` refuses every non-read-only tool on such a course, the
+  write included. `plan_write_how_i_teach` is read-only, so the gate never sees
+  it, and until #540 the plan could promise what the write was then refused.
+  `PlanHowITeach`, which the plan and the write share, now refuses first, as
+  the mac's `howITeachPlan` does. It uses the sentence the gate gives the write,
+  `ReferenceCourse.StaysAsItIs(ShownCode(course))`
+  (`referenceCourses.wording.staysAsItIs`), so `planAndWriteAgree` holds word
+  for word. Reading still works (`readOnAReferenceCourse`). Pinned:
+  `HowITeachTests.ThePlanRefusesACourseKeptForReference` and
+  `ThePlanAndTheWriteRefuseAReferenceCourseInTheSameWords`, which compares the
+  plan with `ReferenceWriteGate.Refusal` itself. There is no new contract
+  prose: `planAndWriteAgree` already says it, and the mac's
+  `howITeachPage.tools.refusals` has no reference-course entry either. In the
+  same function, a How I Teach page that cannot be read as text now gets the
+  mac's `unreadablePage` sentence, "“How I Teach” could not be read, so nothing
+  was changed." Before, it was "… couldn’t be read as text.", with its
+  quotation marks saved as the wrong characters.
 - **`PLANTOIR_KEPT_OFF:`** is read from a watched console (`ScriptRunner`) and
   from a scheduled publish's record (`ScheduledHealthFindings`, the wrapper's
   scan now keeps the line), and hidden from the console a teacher reads

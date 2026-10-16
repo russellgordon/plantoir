@@ -276,14 +276,42 @@ public sealed class ScheduledDeploy
             configuration.AllDeployDestinations.Select(Models.DeployCommand.DestinationDescription).ToList());
 
     /// <summary>
+    /// What the in-app assistant's card and the <c>schedule_deploy</c> answer
+    /// say has to be true of the computer at the moment — the mac's
+    /// <c>AssistToolRunner.awakeThenWithTheLidOpen</c>, word for word. Before
+    /// #547 both also said "plugged in if it is a laptop", which was untrue:
+    /// the task is registered to run on battery (<c>TaskScheduling</c>:
+    /// <c>DisallowStartIfOnBatteries=false</c>), and a scheduled deploy needs
+    /// the computer AWAKE, not on mains (the mac's #521, Russell 2026-10-13).
+    /// </summary>
+    public const string AwakeThenWithTheLidOpen = "on and awake then, with the lid open.";
+
+    /// <summary>
+    /// The one thing about a battery worth saying (#547, following the mac's
+    /// #521; Russell's ruling of 2026-10-16): on battery a PC's power plan
+    /// (and Modern Standby) puts it to sleep sooner than on mains, and a
+    /// sleeping PC does not deploy. Windows' own words about a PC's own sleep —
+    /// the mac's sentence says "a Mac", so it is not reused. Said on its own
+    /// line in <see cref="Describe"/> (what <c>plan_scheduled_deploy</c>
+    /// returns) and under the sidebar dialog's opening sentence — and NOT on the
+    /// assistant's card or in the <c>schedule_deploy</c> answer, which is where
+    /// the mac puts it too. No contract holds it on either platform; were it
+    /// ever lifted into one it would be written once with <c>{machine}</c>
+    /// ("On battery, a {machine} goes to sleep sooner…"), which "a PC" and
+    /// "a Mac" fill with no rewording.
+    /// </summary>
+    public const string OnBatterySleepsSooner =
+        "On battery, a PC goes to sleep sooner, so be sure to keep it awake until then.";
+
+    /// <summary>
     /// The first sentence of the sidebar's Schedule Deploy dialog. It names no
     /// moment (the time is picked below it), so it CONTAINS "to " + every
     /// destination rather than adopting planOpening's message (#400).
     /// </summary>
     public static string DialogOpening(Models.Course course, int sectionNumber) =>
         $"{course.Code} Section {sectionNumber} will deploy on its own to {EveryDestination(course.Configuration)} " +
-        "at the time you pick. This computer must be switched on and awake then — plugged in if it is a laptop, " +
-        "with the lid open. Plantoir does not wake it up.";
+        "at the time you pick. This computer must be switched on and awake then, with the lid open. " +
+        "Plantoir does not wake it up.";
 
     /// <summary>
     /// What the teacher is agreeing to — including everything that has to be
@@ -298,8 +326,9 @@ public sealed class ScheduledDeploy
             "",
             "For this to happen, at that moment this computer must be:",
             "  • switched on, and awake — not asleep, shut down, or hibernating",
-            "  • plugged in, if it is a laptop",
             "  • with the lid open, if closing it puts it to sleep",
+            "",
+            OnBatterySleepsSooner,
             "",
             "Plantoir does not wake the computer up. If it is asleep at that time, " +
             "nothing happens and the site stays as it is.",
