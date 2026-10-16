@@ -127,6 +127,64 @@ public sealed class InsertClassesTests : IDisposable
         Assert.Contains("Nothing would change", TextOf(noop));
     }
 
+    /// <summary>
+    /// #530: when other classes are renamed or moved, the make-room records no
+    /// undo entry, and the plan is where a teacher can still say no — so the
+    /// in-app assistant's card says so before Go, as the mac's does, and the
+    /// model's copy says it too (class form). The Section menu's twin never
+    /// appears on the assistant's card.
+    /// </summary>
+    [Fact]
+    public void TheAssistantsCardSaysUndoWillNotTakeItBack_WhenOtherClassesMove()
+    {
+        FourClasses();
+
+        var planned = new Plantoir.Mcp.PlantoirTools(Open())
+            .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1);
+        string card = planned.Summary();
+        string model = TextOf(planned);
+
+        Assert.Equal(true, planned.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
+        Assert.EndsWith("\n\n" + AssistWording.MakingRoomCannotBeUndone, card);
+        Assert.Contains(AssistWording.MakingRoomCannotBeUndone, model);
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndoneFromTheMenu, card);
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndoneFromTheMenu, model);
+    }
+
+    /// <summary>
+    /// Room made after the last class, so nothing is renamed or moved: the
+    /// make-room can be undone, and neither copy says it cannot.
+    /// </summary>
+    [Fact]
+    public void NoUndoWarningWhenNothingElseMoves()
+    {
+        FourClasses();
+
+        var planned = new Plantoir.Mcp.PlantoirTools(Open())
+            .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 3, howMany: 1);
+
+        Assert.Equal(true, planned.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
+        Assert.DoesNotContain("will not take this back", planned.Summary());
+        Assert.DoesNotContain("will not take this back", TextOf(planned));
+    }
+
+    /// <summary>
+    /// The Section menu's card carries its own twin (#489) and NOT the
+    /// assistant's form — exactly one of the two, never both.
+    /// </summary>
+    [Fact]
+    public void TheMenusCardSaysItsOwnTwinAndNotTheAssistants()
+    {
+        FourClasses();
+        var menu = new AssistWorkspace(_folder, _launcher) { Surface = AssistSurface.Menu };
+
+        string card = new Plantoir.Mcp.PlantoirTools(menu)
+            .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1).Summary();
+
+        Assert.EndsWith("\n\n" + AssistWording.MakingRoomCannotBeUndoneFromTheMenu, card);
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndone, card);
+    }
+
     private static string TextOf(ModelContextProtocol.Protocol.CallToolResult result) =>
         string.Join(" ", result.Content
             .OfType<ModelContextProtocol.Protocol.TextContentBlock>()

@@ -679,15 +679,25 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             var noun = workspace.NounForCourse(course);
             if (plan.ChangesNothing) return Answering(plan.Describe());
+            string forTheModel = plan.Describe();
             string card = plan.Describe(noun);
-            // The menu's card says, before Make Room is pressed, that Undo
-            // Last Change will not take this back once other classes move
-            // (#489, the mac's makeRoomPlan(fromTheMenu:)).
-            if (workspace.SpeaksFromTheMenu && (plan.Renames.Count > 0 || plan.Moves.Count > 0))
-                card += "\n\n" + (noun == ClassNoun.Meeting
-                    ? AssistWording.MakingRoomCannotBeUndoneFromTheMenuForAMeeting
-                    : AssistWording.MakingRoomCannotBeUndoneFromTheMenu);
-            return Proposing(plan.Describe(), card);
+            // Once other classes move, Undo Last Change will not take this
+            // back, and the plan is where the teacher can still say no — so it
+            // says so before Go, the mac's makeRoomPlan. The model's copy in
+            // the CLASS form (it reads the class form in every course, #274);
+            // the card in the course's noun on the assistant's card (#530),
+            // or the FromTheMenu twin on the Section menu's card (#489) —
+            // exactly one of the two, never both.
+            if (plan.MovesOtherClasses)
+            {
+                forTheModel += "\n\n" + AssistWording.MakingRoomCannotBeUndone;
+                card += "\n\n" + (workspace.SpeaksFromTheMenu
+                    ? ClassPageSchemes.Say(noun, AssistWording.MakingRoomCannotBeUndoneFromTheMenu,
+                                           AssistWording.MakingRoomCannotBeUndoneFromTheMenuForAMeeting)
+                    : ClassPageSchemes.Say(noun, AssistWording.MakingRoomCannotBeUndone,
+                                           AssistWording.MakingRoomCannotBeUndoneForAMeeting));
+            }
+            return Proposing(forTheModel, card);
         });
 
     [McpServerTool(Name = "make_room_for_classes", Title = "Make room for classes",
