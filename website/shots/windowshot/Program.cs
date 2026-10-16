@@ -1,4 +1,5 @@
 // windowshot <hwnd> <out.png>
+// windowshot --ocr <picture.png>   (the words on a picture; see Recognise)
 //
 // Photographs ONE window with Windows.Graphics.Capture and keeps it whole: the
 // frame comes back with the window's own alpha, so the corners Windows 11
@@ -64,8 +65,34 @@ internal static class Program
         finally { Marshal.Release(pointer); }
     }
 
+    // windowshot --ocr <picture.png>: the words Windows' own text recognition
+    // reads off a picture, one line each -- this side's counterpart of the
+    // mac's ocr.swift, so `shots.json -> expectText` is checked against the
+    // PICTURE on both platforms rather than against the page it came from.
+    // It needs no window and no display, so it runs on a locked desktop too.
+    private static async Task<int> Recognise(string path)
+    {
+        var engine = Windows.Media.Ocr.OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en-US"))
+                     ?? Windows.Media.Ocr.OcrEngine.TryCreateFromUserProfileLanguages();
+        if (engine is null)
+        {
+            Console.Error.WriteLine("windowshot: this PC has no text recognition language installed");
+            return 1;
+        }
+        var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(Path.GetFullPath(path));
+        using var stream = await file.OpenAsync(Windows.Storage.FileAccessMode.Read);
+        var decoder = await BitmapDecoder.CreateAsync(stream);
+        using var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+        var result = await engine.RecognizeAsync(bitmap);
+        foreach (var line in result.Lines)
+            Console.WriteLine(line.Text);
+        return 0;
+    }
+
     private static async Task<int> Main(string[] arguments)
     {
+        if (arguments.Length == 2 && arguments[0] == "--ocr")
+            return await Recognise(arguments[1]);
         if (arguments.Length != 2 || !long.TryParse(arguments[0], out var handle))
         {
             Console.Error.WriteLine("usage: windowshot <hwnd> <out.png>");

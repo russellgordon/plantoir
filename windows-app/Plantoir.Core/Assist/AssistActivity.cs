@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Plantoir.Core.Assist;
 
@@ -85,11 +86,45 @@ public static class AssistActivity
         }
     }
 
+    private static readonly HashSet<Session> Working = new();
+
+    /// <summary>
+    /// An assistant window has started, or finished, working on its section —
+    /// a turn, an approval or a decline under way (#489, the mac's
+    /// <c>AssistActivity.reportWork</c>). The Section menu's writing items grey
+    /// while it is (<c>subjectMenus</c> → <c>verbIsRunning</c>), so the
+    /// assistant's undo list and the menu's never interleave on one section.
+    /// </summary>
+    public static void ReportWork(string folderPath, string courseCode, int sectionNumber, bool working)
+    {
+        var session = new Session(folderPath, courseCode, sectionNumber);
+        lock (Gate)
+        {
+            if (working) Working.Add(session);
+            else Working.Remove(session);
+        }
+        Changed?.Invoke();
+    }
+
+    /// <summary>Whether an assistant window is working on this section right now.</summary>
+    public static bool IsWorking(string folderPath, string courseCode, int sectionNumber)
+    {
+        lock (Gate)
+            return Working.Any(session =>
+                session.SectionNumber == sectionNumber
+                && string.Equals(session.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase)
+                && Plantoir.Core.Models.WorkingFolder.IsTheSame(session.FolderPath, folderPath));
+    }
+
     /// <summary>Forget everything, for tests — process-wide state that
     /// outlives a test answers the next test's questions.</summary>
     public static void Reset()
     {
-        lock (Gate) Open.Clear();
+        lock (Gate)
+        {
+            Open.Clear();
+            Working.Clear();
+        }
         Changed?.Invoke();
     }
 }

@@ -179,7 +179,9 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
             if (destination.Type == "cloudflare_pages")
             {
                 if (CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID) is { } accountProblem)
-                    return $"{accountProblem} Add it in this course's settings, under Deploying, then deploy again.";
+                    // The ID is the teacher's, kept in Settings since #491 —
+                    // a course's settings show it, and cannot change it.
+                    return $"{accountProblem} {DeployingSettings.AddItThenDeployAgain}";
             }
         }
         return null;

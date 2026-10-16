@@ -85,8 +85,19 @@ public sealed partial class SectionDetailView : UserControl
     /// quit question counts (#231). Ends with the build claim.
     /// </summary>
     private IDisposable? _previewBuildRecord;
+    /// <summary>
+    /// The site's ROOT, as the launcher announced it, while it is shown —
+    /// never the page on screen (#514): the capture resolves pages against
+    /// it, and the remembered path is cut from it. (The mac calls its root
+    /// <c>previewRoot</c> and the page <c>previewURL</c>; here the root kept
+    /// the old name.)
+    /// </summary>
     private Uri? _previewUrl;
     private Uri? _lastLoadedUrl;
+
+    /// <summary>The app's own loads in the pane, told from the teacher's (#514).</summary>
+    private readonly PreviewNavigationLedger _ledger = new();
+    private bool _ledgerWired;
     private bool _isWaitingForServer;
     private CancellationTokenSource? _serverWait;
 
@@ -186,7 +197,7 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>Menu-bar equivalents of Back_Click/Forward_Click/Reload_Click, for the Preview menu.</summary>
     public void PreviewGoBack() { if (Preview.CanGoBack) Preview.GoBack(); }
     public void PreviewGoForward() { if (Preview.CanGoForward) Preview.GoForward(); }
-    public void PreviewReload() { if (HasPreview) Preview.Reload(); }
+    public void PreviewReload() { if (HasPreview) _ = ReloadAsAppAsync(); }
 
     internal bool IsBusy => _previewRunner.IsRunning || _deployRunner.IsRunning;
     // What "busy" means to a DEPLOY since the deploy-during-preview port: a
@@ -194,6 +205,9 @@ public sealed partial class SectionDetailView : UserControl
     // so only a deploy already running does. Mac parity: deployAndWait()'s
     // check is deployRunner.isRunning, evaluated after the stop.
     internal bool IsDeploying => _deployRunner.IsRunning;
+
+    /// <summary>A deploy running, or one between the press and its runner starting (<c>_isPreparingDeploy</c>).</summary>
+    internal bool IsDeployingOrPreparing => _deployRunner.IsRunning || _isPreparingDeploy;
     private string TitleText => $"{ReferenceCourse.ShownCode(_course)}-S{_sectionNumber}";
 
     public SectionDetailView(MainWindow window, Course course, int sectionNumber)
@@ -274,8 +288,19 @@ public sealed partial class SectionDetailView : UserControl
                     ReleaseTheHeldLinksFinding();
             }
         };
+        Preview.CoreWebView2Initialized += (_, args) =>
+        {
+            if (args.Exception is not null) return;
+            HandPagesToTheBrowser();
+            WatchTheTeachersNavigations();
+        };
         Preview.NavigationCompleted += (_, args) =>
         {
+            // The print shim again, on the page now showing (#496): a
+            // registration made while the very first navigation was already
+            // under way may miss that one document.
+            if (args.IsSuccess && Preview.CoreWebView2 is { } core)
+                core.ExecuteScriptAsync(PreviewBrowserHandoff.PrintShim).AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
             // For a test run ONLY (--state-dir): what the preview pane actually
             // loaded, readable through UI Automation, so the UI suite can tell
             // the teacher's page from a blank one, an error page or another
@@ -289,6 +314,10 @@ public sealed partial class SectionDetailView : UserControl
             RefreshChrome();
         };
         _window.Activated += OnWindowActivated;
+        // #514: the pointer has to reach the button, or focus it, to press
+        // it — so Alt is read again there too (MainWindow.Modifier.cs).
+        PreviewButton.PointerEntered += (_, _) => _window.ReadTheModifierAgain();
+        PreviewButton.GotFocus += (_, _) => _window.ReadTheModifierAgain();
         // Anything last night's scheduled deploy found. It ran with the app
         // closed, so this is the first moment there is anywhere to say it.
         // On Loaded rather than in the constructor: presenting needs a
@@ -301,6 +330,9 @@ public sealed partial class SectionDetailView : UserControl
             // change of selection, so one left subscribed is rooted for good.
             ToolchainReadiness.Changed -= OnReadinessChanged;
             ToolchainReadiness.Changed += OnReadinessChanged;
+            // #514: the button's title follows File ▸ Settings ▸ Preview live.
+            AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
+            AppSettings.PreviewOpensAtChanged += OnPreviewOpensAtChanged;
             RefreshChrome();
             TakeAnythingTheScheduledDeployFound();
             OfferTheLinksChecklistIfWaiting();
@@ -309,6 +341,7 @@ public sealed partial class SectionDetailView : UserControl
         {
             _isTornDown = true;
             ToolchainReadiness.Changed -= OnReadinessChanged;
+            AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
             StopPreview();
             _window.Activated -= OnWindowActivated;
         };
@@ -382,6 +415,23 @@ public sealed partial class SectionDetailView : UserControl
         });
     }
 
+    /// <summary>The setting changed, on the thread that changed it: redraw the title on this view's own.</summary>
+    private void OnPreviewOpensAtChanged()
+    {
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            if (_isTornDown) return;
+            RefreshChrome();
+        });
+    }
+
+    /// <summary>Alt went down or up in this view's window (#514): only the button's title can change.</summary>
+    internal void RefreshPreviewTitle()
+    {
+        if (_isTornDown) return;
+        RefreshChrome();
+    }
+
     private void RefreshChrome()
     {
         bool previewShown = _previewUrl is not null;
@@ -407,7 +457,7 @@ public sealed partial class SectionDetailView : UserControl
         // queued (Russell's decision), with the banner's own sentence as the
         // reason. Read from the folder on screen, like `building` above.
         string? notReady = ToolchainReadiness.Refusal(_window.Workspace.WorkspacePath);
-        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !building && notReady is null;
+        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !_isAskingAboutLaterClasses && !building && notReady is null;
         if (notReady is not null)
             ToolTipService.SetToolTip(DeployButton, notReady);
         else if (building)
@@ -416,7 +466,10 @@ public sealed partial class SectionDetailView : UserControl
             ToolTipService.SetToolTip(DeployButton, "Deploy this section's website");
 
         bool running = _previewRunner.IsRunning;
-        PreviewLabel.Text = running ? "Stop Preview" : "Preview";
+        // #514: titled by what a press will do — the setting, or the other
+        // while Alt is held in THIS window (the one function, titles.cases).
+        PreviewLabel.Text = PreviewStartPage.Words(PreviewStartPage.TitleFor(
+            PreviewStartPage.Read(App.Settings.PreviewOpensAt), _window.ModifierHeldForTitles, running));
         AutomationProperties.SetName(PreviewButton, PreviewLabel.Text);
         PreviewIcon.Glyph = running ? Glyphs.Stop : Glyphs.Play;
         ToolTipService.SetToolTip(PreviewButton,
@@ -801,15 +854,17 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>While today's-class question is up, findings and the links checklist wait behind it (#406).</summary>
     private bool _todaysClassQuestionUp;
 
-    private async Task OfferTodaysClassAsync(string folder)
+    /// <returns>True only when Show on Front Page WROTE the page (#514: the
+    /// press then opens the front page, whatever it asked for).</returns>
+    private async Task<bool> OfferTodaysClassAsync(string folder)
     {
         var askedOn = DateOnly.FromDateTime(DateTime.Now);
         var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
-            { ServesTheLocalWindow = true };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
+            { Surface = AssistSurface.LocalWindow };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
         TodaysClassOnTheFrontPage.Offering? offer;
         try { offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn); }
-        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return; }
-        if (offer is null) return;
+        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
+        if (offer is null) return false;
 
         var noun = _course.Configuration.ClassNoun;
         _todaysClassQuestionUp = true;
@@ -825,11 +880,11 @@ public sealed partial class SectionDetailView : UserControl
                 CloseButtonText = TodaysClassOnTheFrontPage.NotToday,   // Escape is Not Today
                 DefaultButton = ContentDialogButton.Primary,
             });
-            if (answer is null) return;   // never shown: nothing was answered, nothing is written
+            if (answer is null) return false;   // never shown: nothing was answered, nothing is written
             if (answer != ContentDialogResult.Primary)
             {
                 workspace.DeclineTodaysClass(_course.Code, _sectionNumber, askedOn, offer);
-                return;
+                return false;
             }
 
             // Busy checks again, then decided again for the day ASKED.
@@ -852,8 +907,9 @@ public sealed partial class SectionDetailView : UserControl
                     Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
                     CloseButtonText = "OK",
                 });
+            return outcome == TodaysClassOnTheFrontPage.Outcome.Written;
         }
-        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); }
+        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
         finally { _todaysClassQuestionUp = false; }
     }
 
@@ -1132,8 +1188,12 @@ public sealed partial class SectionDetailView : UserControl
 
     // ---- Preview ---------------------------------------------------------
 
-    /// <summary>Smoke-test entry: the same path the Preview button takes.</summary>
-    public void StartPreviewForAutomation() => PreviewOrStop_Click(this, new RoutedEventArgs());
+    /// <summary>
+    /// Smoke-test entry: the same path the Preview button takes — at the
+    /// FRONT page, whatever the setting says (#514): a smoke run or a
+    /// marketing picture must not depend on what a teacher last read.
+    /// </summary>
+    public void StartPreviewForAutomation() => _ = PressPreviewAsync(atLastViewed: false);
 
     /// <summary>
     /// Start the preview if nothing is currently previewing. If a preview
@@ -1208,6 +1268,29 @@ public sealed partial class SectionDetailView : UserControl
         }
     }
 
+    /// <summary>
+    /// REBUILD the preview (#489, Q1): stop a serving one, then start it
+    /// again — or start one. Section ▸ Rebuild Preview and the in-app
+    /// assistant's rebuild_preview both come here; before, they reached
+    /// <see cref="StartPreviewIfIdle"/>, which returns at once while a preview
+    /// serves, so "rebuilding" was said and nothing was rebuilt.
+    /// </summary>
+    public async Task RebuildPreviewAsync()
+    {
+        try
+        {
+            await StopPreviewIfRunningAsync();
+            // The stop can take a while; a view replaced meanwhile must not
+            // start a preview nobody can see (PreviewAgainAfterRepairAsync's reason).
+            if (_isTornDown || !IsLoaded) return;
+            StartAutomatedPreview();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"RebuildPreviewAsync exception: {ex}");
+        }
+    }
+
     /// <summary>Stop the preview if one is up — the assistant's half of stop, edit, start again.</summary>
     public void StopPreviewIfRunning()
     {
@@ -1242,7 +1325,13 @@ public sealed partial class SectionDetailView : UserControl
     /// already running, to nudge the app forward) gets its OWN outcome and
     /// can never steal or orphan another caller's pending await.
     /// </summary>
-    public Task<string?> StartDeployForAutomationAsync() => DeployAsync();
+    /// <remarks>
+    /// The assistant's runner has ALREADY put the question about classes
+    /// dated after the next class (#475) through
+    /// <see cref="AskAboutClassesDatedLaterForTheAssistantAsync"/>, before it
+    /// stopped the preview — so it is not asked twice here (the plan review's M4).
+    /// </remarks>
+    public Task<string?> StartDeployForAutomationAsync() => DeployAsync(alreadyAsked: true);
 
     /// <summary>
     /// Refuse to start a build while the assistant is running one.
@@ -1353,7 +1442,23 @@ public sealed partial class SectionDetailView : UserControl
             _course.Code, _sectionNumber);
     }
 
+    /// <summary>
+    /// The toolbar button. Where the press opens is read HERE, at the click
+    /// and before any question (#514: the setting, or the other while Alt —
+    /// and not Ctrl+Alt, which is AltGr — is held); the menu's two items pass
+    /// their own instead and never read the keyboard.
+    /// </summary>
     private async void PreviewOrStop_Click(object sender, RoutedEventArgs e)
+    {
+        bool atLastViewed = PreviewStartPage.OpensAtLastViewed(
+            PreviewStartPage.Read(App.Settings.PreviewOpensAt),
+            PreviewStartPage.ModifierHeld(MainWindow.KeyIsDown(Windows.System.VirtualKey.Menu),
+                                          MainWindow.KeyIsDown(Windows.System.VirtualKey.Control)));
+        await PressPreviewAsync(atLastViewed);
+    }
+
+    /// <summary>A teacher's press of Preview (or of Stop Preview), asking for the page last viewed or not.</summary>
+    private async Task PressPreviewAsync(bool atLastViewed)
     {
         try
         {
@@ -1372,7 +1477,7 @@ public sealed partial class SectionDetailView : UserControl
             // (a preview that is going to be refused is refused with no
             // question first) and BEFORE anything is taken. The preview starts
             // after the question has gone, whatever the answer.
-            await OfferTodaysClassAsync(workspacePath);
+            bool frontPageWasJustChanged = await OfferTodaysClassAsync(workspacePath);
             if (_isTornDown) return;
 
             // Decided here, so the stop that follows names the same folder.
@@ -1427,11 +1532,11 @@ public sealed partial class SectionDetailView : UserControl
                 workspacePath);
             SayIfThePreviewUsesSavedSettings();
             RefreshChrome();
-            await WaitForPreviewServer();
+            await WaitForPreviewServer(new StartPageRequest(atLastViewed, frontPageWasJustChanged));
         }
         catch (Exception ex)
         {
-            App.LogDiagnostic($"PreviewOrStop_Click exception: {ex}");
+            App.LogDiagnostic($"PressPreviewAsync exception: {ex}");
         }
     }
 
@@ -1454,7 +1559,10 @@ public sealed partial class SectionDetailView : UserControl
     /// contract's sentence. A preview the teacher stopped meanwhile gets
     /// neither.</para>
     /// </summary>
-    private async Task WaitForPreviewServer()
+    /// <summary>What a teacher's press asked for (#514), carried to the moment the site answers. Every other start passes none: the front page.</summary>
+    private sealed record StartPageRequest(bool AtLastViewed, bool FrontPageWasJustChanged);
+
+    private async Task WaitForPreviewServer(StartPageRequest? request = null)
     {
         _serverWait?.Cancel();
         var cancel = new CancellationTokenSource();
@@ -1498,14 +1606,11 @@ public sealed partial class SectionDetailView : UserControl
                                 // The site is up, so the build is over: the assistant
                                 // may build again from here on, while this preview
                                 // stays on screen for the teacher to read.
-                                _isWaitingForServer = false;
                                 ReleaseBuildClaim();
                                 // Serving from here: a later end may be another
                                 // program's deploy closing it (#436).
                                 _previewRunner.HasBeenServing = true;
-                                _previewUrl = announced;
-                                LoadIfNeeded(announced);
-                                RefreshChrome();
+                                await OpenTheSiteAsync(announced, request, cancel);
                                 return;
                             }
                             lastAttempt = null;
@@ -1549,12 +1654,140 @@ public sealed partial class SectionDetailView : UserControl
         await ShowDialogSafelyAsync(dialog);
     }
 
+    /// <summary>
+    /// The site answered: open the front page, or — when the teacher's press
+    /// asked for it — the page last viewed, after asking this run's server
+    /// whether it is still there (#514; <see cref="PreviewStartPage"/>).
+    /// "Preparing the preview…" stays up while it asks (up to three tries of
+    /// five seconds: a request made during a rebuild WAITS for it). Falling
+    /// back is silent on screen and says why on the trail.
+    /// </summary>
+    private async Task OpenTheSiteAsync(Uri root, StartPageRequest? request, CancellationTokenSource thisWait)
+    {
+        string? remembered = null;
+        PreviewStartPage.Answer? answer = null;
+        Uri? page = null;
+        if (request is not null)
+        {
+            // Read at the root's answer, as the mac does.
+            if (_folderThisSectionWorksIn is { } folder)
+                remembered = LastViewedPages.PageFor(folder, _course.Code, _sectionNumber);
+            if (PreviewStartPage.PathToAsk(request.AtLastViewed, request.FrontPageWasJustChanged, remembered) is { } path)
+            {
+                page = PreviewStartPage.PageAddress(root, path);
+                if (page is null) answer = PreviewStartPage.Answer.Gone;   // not a page of this site
+                else
+                {
+                    using var asker = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+                    try
+                    {
+                        var address = page;
+                        answer = await PreviewStartPage.AskAsync(
+                            ask => PreviewStartPage.StatusOfAsync(asker, address, ask),
+                            (pause, ask) => Task.Delay(pause, ask),
+                            thisWait.Token);
+                    }
+                    catch (OperationCanceledException) { return; }   // stopped while asking: nothing opens
+                }
+            }
+        }
+
+        // The same run, still: a stop, another start or a view torn down
+        // while it asked opens nothing and writes nothing.
+        if (thisWait.IsCancellationRequested || _serverWait != thisWait || _isTornDown) return;
+        // The server ended during the ask without anybody pressing Stop: there
+        // is nothing to open, and loading its dead port would put the blame on
+        // the page in the trail. Left the way the wait leaves a run that is over.
+        if (!_previewRunner.IsRunning || _previewRunner.WasStoppedByUser)
+        {
+            if (!_previewRunner.WasStoppedByUser) AbandonWait();
+            return;
+        }
+
+        var opens = PreviewStartPage.Opens.FrontPage;
+        string? trail = null;
+        if (request is not null)
+            (opens, trail) = PreviewStartPage.Decide(request.AtLastViewed, remembered, answer, request.FrontPageWasJustChanged);
+
+        _isWaitingForServer = false;
+        _previewUrl = root;   // the ROOT, always — never the page opened
+        // The line and the chrome BEFORE the navigation runs, so a teardown
+        // during it cannot lose either.
+        if (trail is not null)
+            ActivityTrail.Note(ActivityTrail.Event.PreviewStartedAtThePageLastViewed, trail, _course.Code, _sectionNumber);
+        RefreshChrome();
+        LoadIfNeeded(opens == PreviewStartPage.Opens.RememberedPage && page is not null ? page : root);
+    }
+
     /// <summary>Interface updates must never yank the teacher back from a page they navigated to.</summary>
     private void LoadIfNeeded(Uri url)
     {
         if (_lastLoadedUrl == url) return;
         _lastLoadedUrl = url;
-        Preview.Source = url;
+        _ = NavigateAsAppAsync(url);
+    }
+
+    // ---- The app's own loads, told from the teacher's (#514) --------------
+    //
+    // Every load the APP makes goes through these two: the site's first page,
+    // Reload, the marketing capture. Each is marked in the ledger from its
+    // request until its content starts to arrive (ContentLoading, WebView2's
+    // counterpart of the mac's didCommit), and an address change meanwhile is
+    // not the teacher's, so it is not remembered. CoreWebView2.Navigate rather
+    // than setting Preview.Source: one route for every app load. (Measured on
+    // WebView2 155, setting the same address again DOES navigate, so this is
+    // not about a trap: documentation/12 → "Preview at Last Viewed on Windows".)
+
+    private async Task NavigateAsAppAsync(Uri url)
+    {
+        try
+        {
+            await Preview.EnsureCoreWebView2Async();
+            WatchTheTeachersNavigations();
+            _ledger.AppLoadRequested(DateTime.UtcNow);
+            Preview.CoreWebView2.Navigate(url.AbsoluteUri);
+        }
+        catch (Exception ex) { App.LogDiagnostic($"NavigateAsAppAsync: {ex.Message}"); }
+    }
+
+    private async Task ReloadAsAppAsync()
+    {
+        try
+        {
+            await Preview.EnsureCoreWebView2Async();
+            WatchTheTeachersNavigations();
+            _ledger.AppLoadRequested(DateTime.UtcNow);
+            Preview.CoreWebView2.Reload();
+        }
+        catch (Exception ex) { App.LogDiagnostic($"ReloadAsAppAsync: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Feeds the ledger from the pane's own events and remembers where the
+    /// teacher goes: a click, Back, Forward, Quartz's own pushState links and
+    /// fragments (SourceChanged with IsNewDocument false), all of them. Once.
+    /// </summary>
+    private void WatchTheTeachersNavigations()
+    {
+        if (_ledgerWired || Preview.CoreWebView2 is not { } core) return;
+        _ledgerWired = true;
+        core.NavigationStarting += (_, args) => _ledger.NavigationStarting(args.NavigationId, args.IsRedirected);
+        core.ContentLoading += (_, args) => _ledger.ContentLoading(args.NavigationId);
+        core.NavigationCompleted += (_, args) => _ledger.NavigationCompleted(args.NavigationId);
+        core.SourceChanged += (_, _) => RememberWhereTheTeacherIs(core.Source);
+    }
+
+    /// <summary>
+    /// The page the pane shows now, remembered for this section when it was
+    /// the teacher's doing. Nothing while no site is shown (during the ask,
+    /// after a stop), and only against the folder this section decided on,
+    /// never the window's live one.
+    /// </summary>
+    private void RememberWhereTheTeacherIs(string? address)
+    {
+        if (_isTornDown || _previewUrl is not { } root || _folderThisSectionWorksIn is not { } folder) return;
+        if (PreviewStartPage.Remember(address, root, _ledger.AppLoadUnderWay(DateTime.UtcNow)) is { } path)
+            LastViewedPages.Remember(folder, _course.Code, _sectionNumber, path);
     }
 
     // ---- Teardown ---------------------------------------------------------
@@ -1722,6 +1955,194 @@ public sealed partial class SectionDetailView : UserControl
 
     // ==== END TEARDOWN REGION =============================================
 
+    // ---- Classes dated after the next class (#475) ---------------------------
+
+    /// <summary>
+    /// Whether this section's deploy would be refused right now — the
+    /// deploy's own refusals, read WITHOUT claiming anything, showing anything
+    /// or writing a line (the mac's <c>deployWillBeRefused</c>; the plan
+    /// review's H1), in the order <see cref="DeployAsync"/> meets them: a
+    /// deploy already preparing or running (or this question already up), a
+    /// course kept for reference, a folder still getting ready, another
+    /// program building the course, saved settings that cannot be read, a
+    /// destination that cannot be deployed to.
+    /// </summary>
+    /// <remarks>
+    /// The in-app assistant's deploy asks the question about classes dated
+    /// later BEFORE it presses Deploy, so without this a teacher could Hide
+    /// Ticked — a copy of the course and a write — and then be refused, which
+    /// breaks "a refusal never follows a change". When one of these will
+    /// refuse, nothing is asked: the deploy goes on to its own refusal, which
+    /// shows its dialog here and is the sentence the assistant relays.
+    /// <see cref="DeployAsync"/> itself meets the same refusals, with their
+    /// dialogs, before it asks, so the button needs no second reading.
+    /// </remarks>
+    internal bool DeployWillBeRefused()
+    {
+        if (_deployRunner.IsRunning || _isPreparingDeploy || _isAskingAboutLaterClasses) return true;
+        if (ReferenceCourse.KeptOnDisk(_course.DirectoryPath) is not null) return true;
+        if (ToolchainReadiness.Refusal(_window.Workspace.WorkspacePath) is not null) return true;
+        if (_window.Workspace.WorkspacePath is not { } folder) return true;
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, folder, _course.Code, claim: null) is not null) return true;
+        if (SavedSettings.Read(_course) is not { } saved) return true;
+        return MultiDestinationDeployRunner.RefusalReason(saved.Configuration.AllDeployDestinations,
+                   _window.Workspace.Settings.CloudflareAccountId.Trim()) is not null;
+    }
+
+    /// <summary>True from the moment the question is put until it is answered: a second Deploy waits for it.</summary>
+    private bool _isAskingAboutLaterClasses;
+
+    /// <summary>Where the trail says the in-app assistant's deploy was asked (<c>activityTrail</c> → "asked about classes…").</summary>
+    internal const string TheInAppAssistantsDeploy = "the in-app assistant's deploy";
+
+    /// <summary>
+    /// The in-app assistant's deploy asks here, BEFORE it stops the preview.
+    /// A window with a dialog (or this very question) already up is not
+    /// waited on: <see cref="LaterClassesAnswer.CannotAsk"/>, refused with
+    /// <c>deployWaitsForAnOpenQuestion</c>, nothing stopped
+    /// (<c>shared-rules.json</c> → <c>classesDatedLater.whenTheWindowIsBusy</c>).
+    /// That check comes FIRST: <see cref="DeployWillBeRefused"/> also reads
+    /// the open question as a refusal, and answering it there let the runner
+    /// stop the preview and press a Deploy that returned at once (2C's
+    /// implementation review, M-A). Nothing is asked when the deploy will be
+    /// refused anyway; the answer says so, so the preview is kept and the
+    /// deploy's own refusal speaks.
+    /// </summary>
+    internal async Task<LaterClassesAtADeploy> AskAboutClassesDatedLaterForTheAssistantAsync()
+    {
+        if (_isAskingAboutLaterClasses || DialogGate.IsOpen(EffectiveXamlRoot)) return LaterClassesAnswer.CannotAsk;
+        if (DeployWillBeRefused()) return new LaterClassesAtADeploy(LaterClassesAnswer.NothingToAsk, WillBeRefused: true);
+        return await AskAboutClassesDatedLaterAsync(TheInAppAssistantsDeploy);
+    }
+
+    /// <summary>
+    /// The question about classes dated after the next class (#475;
+    /// <c>shared-rules.json</c> → <c>classesDatedLater</c>), put in this
+    /// window. Every flagged class is listed, ticked to hide, with two buttons
+    /// beside Cancel, always: Hide Ticked and Deploy (the default) and Keep All
+    /// and Deploy.
+    /// </summary>
+    /// <param name="route">Where it was asked, as the trail line names it: "Deploy", or the in-app assistant's deploy.</param>
+    /// <returns>
+    /// <see cref="LaterClassesAnswer.NothingToAsk"/> when nothing is flagged;
+    /// <see cref="LaterClassesAnswer.GoAhead"/> once answered;
+    /// <see cref="LaterClassesAnswer.Cancelled"/> for Cancel, Escape, or a hide
+    /// that left a ticked class visible; <see cref="LaterClassesAnswer.CannotAsk"/>
+    /// when a dialog is already up.
+    /// </returns>
+    /// <remarks>
+    /// <para>The list is decided ONCE, when the question is put, on this
+    /// computer's day: an answer given after midnight acts on the classes it
+    /// listed, never on a list worked out afresh.</para>
+    /// <para>Hide Ticked and Deploy records the unticked as kept at their dates
+    /// (<see cref="LaterClassesKept"/>) and hides the ticked with Hide
+    /// Pages…'s OWN call through this window's runner
+    /// (<see cref="MainWindow.HideClassesForTheDeploy"/>) — backed up,
+    /// undoable — with no preview either side. A ticked class still visible
+    /// afterwards stops the deploy, and the teacher is shown what the hide
+    /// said. Keep All and Deploy keeps every listed class and hides nothing.</para>
+    /// </remarks>
+    internal async Task<LaterClassesAnswer> AskAboutClassesDatedLaterAsync(string route)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var pages = ClassesDatedLater.ClassPages(_course, _sectionNumber);
+        IReadOnlyList<ClassesDatedLater.Page> flagged = ReferenceCourse.IsKeptForReference(_course)
+            ? Array.Empty<ClassesDatedLater.Page>()
+            : ClassesDatedLater.Flagged(pages, today, LaterClassesKept.Read(_course.DirectoryPath, _sectionNumber));
+        if (flagged.Count == 0 || ClassesDatedLater.NextClassDay(today, pages) is not { } nextDay)
+            return LaterClassesAnswer.NothingToAsk;
+        if (DialogGate.IsOpen(EffectiveXamlRoot)) return LaterClassesAnswer.CannotAsk;
+
+        bool meeting = _course.Configuration.ClassNoun == ClassNoun.Meeting;
+        string title = meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle;
+        var boxes = new List<(ClassesDatedLater.Page Page, CheckBox Box)>();
+        var list = new StackPanel { Spacing = 2 };
+        int index = 0;
+        foreach (var page in flagged)
+        {
+            string shown = $"{page.Title} — {AssistWording.LaterClassesDay(page.Date!.Value)}";
+            var box = new CheckBox { Content = shown, IsChecked = true };
+            AutomationProperties.SetName(box, shown);
+            AutomationProperties.SetAutomationId(box, $"laterClass{index++}");
+            boxes.Add((page, box));
+            list.Children.Add(box);
+        }
+        var content = new StackPanel { Spacing = 12, MinWidth = 460 };
+        content.Children.Add(new TextBlock
+        {
+            Text = meeting ? AssistWording.LaterClassesAtDeployForAMeeting(nextDay) : AssistWording.LaterClassesAtDeploy(nextDay),
+            TextWrapping = TextWrapping.Wrap, MaxWidth = 520,
+        });
+        content.Children.Add(new ScrollViewer { Content = list, MaxHeight = 320 });
+        content.Children.Add(new TextBlock
+        {
+            Text = meeting ? AssistWording.LaterClassesKeptNoteForAMeeting : AssistWording.LaterClassesKeptNote,
+            TextWrapping = TextWrapping.Wrap, MaxWidth = 520, Opacity = 0.8,
+        });
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = content,
+            PrimaryButtonText = AssistWording.HideTickedAndDeployButton,
+            SecondaryButtonText = AssistWording.KeepAllAndDeployButton,
+            CloseButtonText = AssistWording.MenuCancelButton,
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        AutomationProperties.SetAutomationId(dialog, "laterClassesDialog");
+
+        _isAskingAboutLaterClasses = true;
+        RefreshChrome();
+        try
+        {
+            var chosen = await ShowDialogSafelyAsync(dialog);
+            if (chosen is not (ContentDialogResult.Primary or ContentDialogResult.Secondary))
+            {
+                ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
+                    ClassesDatedLater.CancelledLine(route, flagged.Count), _course.Code, _sectionNumber);
+                return LaterClassesAnswer.Cancelled;
+            }
+
+            var ticked = chosen == ContentDialogResult.Secondary
+                ? new List<ClassesDatedLater.Page>()
+                : boxes.Where(row => row.Box.IsChecked == true).Select(row => row.Page).ToList();
+            var keeping = flagged.Where(page => !ticked.Contains(page)).ToList();
+            LaterClassesKept.Keep(_course.DirectoryPath, _sectionNumber, keeping);
+
+            if (ticked.Count > 0)
+            {
+                var hid = await _window.HideClassesForTheDeploy(_course.Code, _sectionNumber,
+                                                                 ticked.Select(page => page.Place).ToList());
+                bool stillVisible = ClassesDatedLater.ClassPages(_course, _sectionNumber)
+                    .Any(page => page.Visible && ticked.Any(asked => asked.Place == page.Place));
+                if (hid is null || stillVisible)
+                {
+                    ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
+                        ClassesDatedLater.CancelledLine(route, flagged.Count), _course.Code, _sectionNumber);
+                    await ShowDialogSafelyAsync(new ContentDialog
+                    {
+                        Title = title,
+                        Content = new TextBlock
+                        {
+                            Text = hid?.Summary ?? SectionVerbs.CouldNotBeDone,
+                            TextWrapping = TextWrapping.Wrap, MaxWidth = 520, IsTextSelectionEnabled = true,
+                        },
+                        CloseButtonText = AssistWording.MenuDoneButton,
+                    });
+                    return LaterClassesAnswer.Cancelled;
+                }
+            }
+
+            ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
+                ClassesDatedLater.AskedLine(route, flagged.Count, ticked.Count, keeping.Count), _course.Code, _sectionNumber);
+            return LaterClassesAnswer.GoAhead;
+        }
+        finally
+        {
+            _isAskingAboutLaterClasses = false;
+            RefreshChrome();
+        }
+    }
+
     // ---- Deploy ----------------------------------------------------------
 
     private async void Deploy_Click(object sender, RoutedEventArgs e) => await DeployAsync();
@@ -1736,7 +2157,12 @@ public sealed partial class SectionDetailView : UserControl
     /// outcome) can safely both be in flight at once without one starving
     /// or stealing the other's answer.
     /// </summary>
-    private async Task<string?> DeployAsync()
+    /// <param name="alreadyAsked">
+    /// True when the in-app assistant's deploy has already asked about classes
+    /// dated after the next class (#475); the button and Section ▸ Deploy… ask
+    /// here, after every refusal below and before anything is claimed or stopped.
+    /// </param>
+    private async Task<string?> DeployAsync(bool alreadyAsked = false)
     {
         // Overwritten only on the path that actually calls RunAsync and
         // gets a real outcome back — every early return and the catch block
@@ -1756,7 +2182,9 @@ public sealed partial class SectionDetailView : UserControl
             // sweep) — a second click there would race its own
             // stop-preview-then-deploy sequence against the first's
             // (row 318a).
-            if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
+            // _isAskingAboutLaterClasses: the question below is up, and nothing
+            // is claimed yet — a second press waits for its answer (M4).
+            if (_deployRunner.IsRunning || _isPreparingDeploy || _isAskingAboutLaterClasses) return outcomeMessage;
             // FIRST, before anything is stopped, built or uploaded (#241, door
             // 1): a course kept for reference is never deployed. The button is
             // not drawn on one; this is what the assistant's hand-back, or a
@@ -1797,16 +2225,6 @@ public sealed partial class SectionDetailView : UserControl
                 });
                 return SavedSettings.CouldNotBeReadToDeploy(_course.Code);
             }
-            string? savedNotice = null;
-            if (Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(_course.ConfigFilePath))
-            {
-                savedNotice = SavedSettings.DeployUsesSavedSettings;
-                ShowSettingsNotice(savedNotice);
-                ActivityTrail.Note(ActivityTrail.Event.DeployUsedTheSavedSettings,
-                    SavedSettings.DeployUsedTheSavedSettingsLine("deployed from the section window", saved, _course),
-                    _course.Code, _sectionNumber);
-            }
-
             var destinations = saved.Configuration.AllDeployDestinations;
             string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
 
@@ -1824,6 +2242,32 @@ public sealed partial class SectionDetailView : UserControl
                 };
                 await ShowDialogSafelyAsync(problemDialog);
                 return outcomeMessage;
+            }
+
+            // #475: AFTER every refusal above, so a refusal never follows a
+            // change (hiding is one), and BEFORE the console is claimed or the
+            // preview stopped, so Cancel leaves the preview the teacher was
+            // reading. The in-app assistant's deploy asked already (M4).
+            if (!alreadyAsked)
+            {
+                var answer = await AskAboutClassesDatedLaterAsync("Deploy");
+                if (answer is LaterClassesAnswer.Cancelled or LaterClassesAnswer.CannotAsk)
+                    return AssistWording.DeployWasCancelled;
+                // Another deploy may have begun while the question was up.
+                if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
+            }
+
+            // After the question, never before it (M4): a deploy cancelled
+            // there must not leave "deployed using the saved settings" on the
+            // trail, or the notice on screen.
+            string? savedNotice = null;
+            if (Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(_course.ConfigFilePath))
+            {
+                savedNotice = SavedSettings.DeployUsesSavedSettings;
+                ShowSettingsNotice(savedNotice);
+                ActivityTrail.Note(ActivityTrail.Event.DeployUsedTheSavedSettings,
+                    SavedSettings.DeployUsedTheSavedSettingsLine("deployed from the section window", saved, _course),
+                    _course.Code, _sectionNumber);
             }
 
             // Claim the console for the deploy panel BEFORE touching the
@@ -2010,19 +2454,51 @@ public sealed partial class SectionDetailView : UserControl
 
     private void Back_Click(object sender, RoutedEventArgs e) { if (Preview.CanGoBack) Preview.GoBack(); }
     private void Forward_Click(object sender, RoutedEventArgs e) { if (Preview.CanGoForward) Preview.GoForward(); }
-    private void Reload_Click(object sender, RoutedEventArgs e) => Preview.Reload();
+    private void Reload_Click(object sender, RoutedEventArgs e) => _ = ReloadAsAppAsync();
 
-    private void ReloadAccelerator(Microsoft.UI.Xaml.Input.KeyboardAccelerator sender,
-        Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
-    { if (_previewUrl is not null) { Preview.Reload(); args.Handled = true; } }
+    // ---- The preview hands pages to the browser (#496) ---------------------
 
-    private void BackAccelerator(Microsoft.UI.Xaml.Input.KeyboardAccelerator sender,
-        Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
-    { if (Preview.CanGoBack) { Preview.GoBack(); args.Handled = true; } }
+    /// <summary>
+    /// The preview pane's two doors to the teacher's web browser
+    /// (<see cref="PreviewBrowserHandoff"/>): a link that asks for a new
+    /// window, and the page's own Print, which posts through the injected
+    /// <c>plantoirPrint</c> shim. Each hand-over is one trail line naming the
+    /// page the teacher was on and only the KIND of link
+    /// (<c>preview page opened in the web browser</c>).
+    /// </summary>
+    private void HandPagesToTheBrowser()
+    {
+        var core = Preview.CoreWebView2;
+        if (core is null) return;
+        _ = core.AddScriptToExecuteOnDocumentCreatedAsync(PreviewBrowserHandoff.PrintShim);
+        core.NewWindowRequested += (_, args) =>
+        {
+            // Never a bare popup owned by Plantoir: handled, and opened in the
+            // teacher's own browser, or dropped (any scheme but http, https
+            // and mailto).
+            args.Handled = true;
+            if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out var target)) return;
+            if (!PreviewBrowserHandoff.IsHandedOver(target)) return;
+            Uri? page = Preview.Source;
+            HandOver(PreviewBrowserHandoff.ForTheBrowser(target),
+                PreviewBrowserHandoff.TrailWords(page, target, PreviewBrowserHandoff.Why.NewWindow));
+        };
+        core.WebMessageReceived += (_, args) =>
+        {
+            // Only the preview's own pages may ask (served from this PC).
+            if (!Uri.TryCreate(args.Source, UriKind.Absolute, out var source) || !PreviewBrowserHandoff.IsThePreviews(source)) return;
+            if (PreviewBrowserHandoff.FromMessage(args.WebMessageAsJson) is not { } request) return;
+            HandOver(PreviewBrowserHandoff.ForTheBrowser(request.Address),
+                PreviewBrowserHandoff.TrailWords(request.Address, request.Address,
+                    PreviewBrowserHandoff.Why.PrintHandout, request.Mode, request.Paper));
+        };
+    }
 
-    private void ForwardAccelerator(Microsoft.UI.Xaml.Input.KeyboardAccelerator sender,
-        Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
-    { if (Preview.CanGoForward) { Preview.GoForward(); args.Handled = true; } }
+    private void HandOver(Uri address, string trailWords)
+    {
+        if (!Plantoir.Services.ExternalLinks.Open(address)) return;
+        ActivityTrail.Note(ActivityTrail.Event.PreviewPageOpenedInBrowser, trailWords, _course.Code, _sectionNumber);
+    }
 
     private void OpenInBrowser_Click(object sender, RoutedEventArgs e)
     {
@@ -2039,9 +2515,57 @@ public sealed partial class SectionDetailView : UserControl
         catch { }
     }
 
+    /// <summary>
+    /// The one Obsidian route (#488): the SECTION's folder revealed, and on a
+    /// course kept for reference the calm note first — which this button used
+    /// to skip, going straight to Obsidian (the plan's finding 0.9).
+    /// </summary>
     private void Obsidian_Click(object sender, RoutedEventArgs e) =>
-        _ = FolderActions.OpenInObsidian(_course.SectionDirectory(_sectionNumber), _course.DirectoryPath,
-            BundledToolchain.SupportPath("obsidian_defaults/.obsidian"));
+        _ = _window.SidebarPane.OpenInObsidian(_course, _sectionNumber);
+
+    // ---- What the menu bar reads and presses (#488) ---------------------
+
+    /// <summary>Section > Preview is live exactly when this Preview button is (subjectMenus.previewButtonEnabled).</summary>
+    internal bool PreviewButtonIsEnabled => PreviewButton.IsEnabled;
+
+    /// <summary>Section > Deploy… reads the Deploy button: enabled, and drawn (it is not on a course kept for reference).</summary>
+    internal bool DeployButtonIsEnabled => DeployButton.IsEnabled && DeployButton.Visibility == Visibility.Visible;
+
+    /// <summary>The Preview button reads Stop Preview: the menu item says the same.</summary>
+    internal bool PreviewButtonStops => _previewRunner.IsRunning;
+
+    /// <summary>A preview of this section is building, waiting for its server, or showing (subjectMenus.previewIsRunning).</summary>
+    internal bool PreviewIsRunning => _previewRunner.IsRunning || _isWaitingForServer || HasPreview;
+
+    /// <summary>
+    /// Section > Preview / Stop Preview (<paramref name="opposite"/> false)
+    /// and its second item, which opens at the other start page (#514): the
+    /// toolbar button's own path, so today's-class question (#406) is asked
+    /// from the menu too. Each item passes its own start page; neither reads
+    /// the keyboard. The second item NEVER stops a preview (a menu drawn
+    /// before a preview started elsewhere could otherwise offer it): it
+    /// answers false, so the menu is redrawn instead.
+    /// </summary>
+    internal bool PressPreview(bool opposite)
+    {
+        if (!PreviewButton.IsEnabled) return true;
+        if (opposite && _previewRunner.IsRunning) return false;
+        bool atLastViewed = PreviewStartPage.OpensAtLastViewed(PreviewStartPage.Read(App.Settings.PreviewOpensAt), opposite);
+        _ = PressPreviewAsync(atLastViewed);
+        return true;
+    }
+
+    /// <summary>Section > Deploy…: the toolbar button's own handler, on its own predicate, asked again now.</summary>
+    internal void PressDeploy()
+    {
+        if (DeployButtonIsEnabled) Deploy_Click(DeployButton, new RoutedEventArgs());
+    }
+
+    /// <summary>Section > Open in Browser: the toolbar button's own handler.</summary>
+    internal void PressOpenInBrowser()
+    {
+        if (BrowserButton.IsEnabled) OpenInBrowser_Click(BrowserButton, new RoutedEventArgs());
+    }
 
     /// <summary>
     /// For the marketing pictures only (<c>--stage-scene two-maps</c>,
@@ -2068,7 +2592,7 @@ public sealed partial class SectionDetailView : UserControl
         Preview.NavigationCompleted += Done;
         try
         {
-            Preview.Source = target;
+            await NavigateAsAppAsync(target);
             if (await Task.WhenAny(loaded.Task, Task.Delay(TimeSpan.FromSeconds(45))) != loaded.Task) return $"{target} did not finish loading";
             if (loaded.Task.Result is { } failed) return failed;
         }

@@ -65,11 +65,43 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// Whether this server answers Plantoir's own assistant window rather than
-    /// an outside door. Only list_courses asks: the window's answer never
-    /// carries the How I Teach line (<c>howITeachPage.listCoursesLine</c>).
+    /// Set by Plantoir's own window when it starts a server for the Section
+    /// menu's functions (#489): <c>menu</c>. Read by <c>plantoir-mcp</c> into
+    /// <see cref="Surface"/>; with no value the server is the assistant's
+    /// (<see cref="LocalWindowVariable"/>) or an outside door's.
     /// </summary>
-    public bool ServesTheLocalWindow { get; init; }
+    public const string SurfaceVariable = "PLANTOIR_SURFACE";
+
+    /// <summary>
+    /// Who this server answers (#489): an outside door, Plantoir's own
+    /// assistant window, or the Section menu. Replaces the bool
+    /// <c>ServesTheLocalWindow</c> was, which could not tell the last two
+    /// apart; that name stays as the question most callers ask.
+    /// </summary>
+    public AssistSurface Surface { get; init; } = AssistSurface.Outside;
+
+    /// <summary>
+    /// Whether this server answers Plantoir's own app — its assistant window
+    /// or its Section menu — rather than an outside door. The menu is the
+    /// window everywhere except its voice, its backups and its claim
+    /// (<see cref="SpeaksFromTheMenu"/>). list_courses' How I Teach line, the
+    /// reference courses it lists and the Restore pointer ask this.
+    /// </summary>
+    public bool ServesTheLocalWindow => Surface != AssistSurface.Outside;
+
+    /// <summary>
+    /// Whether this server's sentences are read at the Section menu, where
+    /// nobody said "undo that" and there is no "me" to ask again: the
+    /// <c>…FromTheMenu</c> twins in <see cref="AssistWording"/> are chosen when
+    /// this is true, and a copy of the course is saved before every change.
+    /// </summary>
+    public bool SpeaksFromTheMenu => Surface == AssistSurface.Menu;
+
+    /// <summary>The surface named by <see cref="SurfaceVariable"/> and <see cref="LocalWindowVariable"/>, as <c>plantoir-mcp</c> reads them.</summary>
+    public static AssistSurface SurfaceFrom(string? surface, string? localWindow) =>
+        string.Equals(surface?.Trim(), "menu", StringComparison.OrdinalIgnoreCase) ? AssistSurface.Menu
+        : localWindow == "1" ? AssistSurface.LocalWindow
+        : AssistSurface.Outside;
 
     /// <summary>list_courses' How I Teach line for one course, or null for the local window.</summary>
     public string? HowITeachListingLine(Course course) =>
@@ -206,7 +238,7 @@ public sealed partial class AssistWorkspace
 
         int? wordsBefore = planned.ExistingIsWritten ? HowITeachPage.WordCount(planned.ExistingText!) : null;
         ActivityTrail.Note(ActivityTrail.Event.HowITeachPageWritten,
-            $"{planned.Course.Code} Â· " + HowITeachPage.TrailLineForAWrite(
+            $"{planned.Course.Code} · " + HowITeachPage.TrailLineForAWrite(
                 wordsBefore, HowITeachPage.WordCount(newText), backup is null ? null : Path.GetFileName(backup)));
 
         return new AssistResult(true, AssistWording.HowITeachSaved(planned.Course.Code), backup);
@@ -217,5 +249,5 @@ public sealed partial class AssistWorkspace
         !HowITeachPage.IsTheHowITeachPage(fullPath, course.DirectoryPath);
 
     private static void NoteHowITeachRead(Course course, string line) =>
-        ActivityTrail.Note(ActivityTrail.Event.HowITeachPageRead, $"{course.Code} Â· {line}");
+        ActivityTrail.Note(ActivityTrail.Event.HowITeachPageRead, $"{course.Code} · {line}");
 }

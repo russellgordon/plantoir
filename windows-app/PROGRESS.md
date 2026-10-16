@@ -1,5 +1,90 @@
 # Plantoir for Windows — Progress
 
+## Where the app stands (2026-10-15, branch `issue/windows-catch-up-1.7.1`, not yet merged)
+
+Read this first; the dated entries below are history, newest first, and an earlier batch's "the ledger holds…" or "comes with #514" was true on its own day only.
+
+- **Windows has caught up to the mac's 1.7.1.** Sixteen issues' Windows halves are on this branch: the menu bar and Open Recent (#488, #483), the Section menu's functions (#489) and classes dated after the next class at Deploy (#475), the one Settings window — Assistant, Preview, Deploying — with the Account ID edited only there and Help ▸ Plantoir Help (#491 part A, #490), the HIG sweep (#491 part B), hiding rebuilds and the rebuild-question sentences (#479, #478, #481, #482), the scheduled run's Queue policy, its own tools refresh and the close that waits for a copy (#470, #477, #484), printable pages (#496), the runtime's diagram and graph engines (#503), and Preview at Last Viewed (#514). `RELEASING.md` → "Landed since v1.7.1" lists them with their platforms.
+- **`NamedGapLedger` is EMPTY.** Nothing the contract asks of Windows is held open by name.
+- **The version is still 1.4.5** (`<Version>` in `Plantoir.csproj`). The installer joins the existing v1.7.1 release at the cut, which sets 1.7.1, re-runs `dotnet test` after the bump, re-runs `Vendor\fetch-runtime.ps1` (the build refuses a runtime without `vendor`), runs `verify-deploy.ps1` (the publishing path changed in 3A), and flips `website/site.json` → `availability` for `printing`, `maths-figures` and `preview-start-page` and un-pins the Windows card.
+- **Gates at the branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
+- **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum is 900 PIXELS (600 epx at 150%), below which the toolbar's buttons leave the window.
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 6 (#514) and batch 5B's review fixes
+
+Same branch. First, 5B's implementation review: the guidance question stays down while the quit question is being put up and until it closes (a `_quitQuestionUp` flag; the re-ask is the 2 s timer's — before, it came back inside the quit question's waits and the close did nothing), a later guidance pass that succeeds clears the notice, the bundled guidance bodies are read with LF endings, and the print shim acts only on `localhost`/`127.0.0.1`.
+
+Then #514, **Preview at Last Viewed** (the mac's #504): File ▸ Settings ▸ **Preview** (front page by default, or the page last viewed); the Preview button titled by what a press will do and re-titled while Alt is held in the active window (Ctrl+Alt, AltGr, is not the modifier); **Section ▸ has a second item**, always the opposite, absent while a preview runs, never a stop; the page remembered per folder, course and section in `last-viewed-pages.json` — only from the teacher's navigations, every app load going through a ledger keyed on WebView2's NavigationId and ended at `ContentLoading`; once the root answers, the remembered page is asked (3 × 5 s) and opened, or the front page with a trail line saying why. Every other start opens the front page. The section title now gives way to the longer button. `NamedGapLedger` is **empty**. Measured: WebView2 155's event orders, Alt with no access keys (no KeyTips, no menu mode), the menu's first-item `Unloaded` on every close, the real serve handler's statuses — `documentation/12-windows-app.md` → "Preview at Last Viewed on Windows". OWED: the `[UiFact]`s in `PreviewStartPageUiTests` and `GuidanceQuestionAndTheQuitQuestionUiTests` (the desktop was locked), and the toolbar's width at 900 epx.
+
+Then batch 6's own review fixes: the navigation ledger captures one id per app load requested (two in one dispatcher turn no longer let the cancelled first end the second), and a preview that ended during the remembered page's ask opens nothing rather than a dead port. Then the whole-branch documentation pass. Gates: `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (5 m 31 s).
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 5B (#496) and batch 5A's review fixes
+
+Same branch. First, 5A's implementation review: `fetch-runtime.ps1` rewrites the manifest WITHOUT the four vendor keys before `runtime\vendor` is touched (on a fresh clone, a base-only manifest right after the base phases), so a vendor phase that dies leaves a runtime the build refuses and a re-run repairs by the vendor-only path (L1, L3); the vendor addresses are literals beside their version variables, the script refuses when they disagree, and `ToolchainContractTests.TheWindowsRuntimeRecipesVendorVersionsAreTheContracts` holds each variable against the contract (L2).
+
+Then #496, printable pages: **Course Settings → Printing** (school name, Name/Date/Class # switches, two pickers, the corner sketch; getters never write and a setter given what it would read back is a no-op, so an unknown blank, an unknown place or a `"   "` school name opens clean); the **`settings saved` line** says what printing changed (`SettingsSavedLine`); **the guidance for assistants** (`AgentGuidance`, the mac's port: skills in `.claude\skills` and `.agents\skills`, the managed section in `AGENTS.md`/`CLAUDE.md`, the question before a teacher's own file is changed) runs after the tools copy on a task of its own and never holds the folder back — atomic writes, a path-free notice from the Win32 error code, the quit question taking it down unanswered; **the preview pane** hands new-window links and Print to the default browser (a `window.webkit` shim forwarding to WebView2's channel, no shared file changed). New authored corners case: a null `print_blanks` is Name and Date, as the build prints it (a request to the mac). `.gitignore` hides the graphs skill this repository is given as a working folder — and **in a checkout of this repository, answer Not Now** to the question about its own CLAUDE.md and AGENTS.md. `NamedGapLedger` now holds only #514's two events.
+
+Measured (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, Edge 155.0.4283.45 headless = the WebView2 Runtime's build; no Chrome on this PC): the mac's `print_handout.mjs` and `print_plain_page.mjs` pass unchanged on a native build — handout pages 12 / 1 / 13 portrait, 14 / 2 / 16 landscape; #501's Plain Long Page 4 and 5 pages, 40/40 inked, light and dark; `printPdf: "WORKSHEET 3.PDF"` links the folder's spelling. Measured on an unlocked desktop afterwards (2026-10-15, see the entry above it): Ctrl+P in the pane prints 2 sheets with the corners, `window.print()` blocks and `afterprint` fires, the hidden frame prints the handout in the pane too, and `#plantoir-print=…&paper=…` survives ShellExecute — Edge prints at once, 1 sheet; the four UI tests pass. Details: `documentation/12-windows-app.md` → "Printable pages".
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 5A (#503) and batch 4's review fixes
+
+Same branch. First, batch 4's implementation review: a close that waited for the tools copy and then did not quit (Keep Working when asked again, a window opened meanwhile, the handler failing, or the installer not starting) releases the copies it held, so they no longer wait for the life of the process (M1); a window held open for ANOTHER folder's copy says "Finishing getting a folder ready…" (M2); a finished copy tries five times to remove its marker (L1); the mixed scheduled-run "waited" line names the copy's process (L3).
+
+Then #503: `fetch-runtime.ps1` fetches `runtime\vendor` — Paged.js 0.4.3, Latin Modern (Debian's `fonts-lmodern_2.005-1_all.deb`, the image's own bytes), function-plot 1.25.4 and node-tikzjax 1.0.5 from the lockfile — each checked by the contract's SHA-256s. An existing runtime is brought up to date from its manifest's keys, fetching only `vendor` (42 s here); the app's build REFUSES a runtime whose manifest lacks those keys, so **re-run `windows-app\Vendor\fetch-runtime.ps1` once on every clone**. `NamedGapLedger` no longer holds any runtime pin. memfs's `/tex_files/` works under win32 paths: the contract's triangle is byte-identical in two processes (1,540 bytes, SHA-256 `8c68b085…6827b37`); the mac is asked for the image's hash.
+
+Measured (Intel i5-8365U, 16 GB, Windows 11 Pro 26200): engine load 1.4–1.8 s; a section with three diagrams, a graph and a printable page 19.2 s first, 5.7 s cached; an endless diagram stopped at its 20 s clock (23.5 s for it and the next); a runtime under a path with spaces works; `tikz-engine\` 5,450 files, 40,838,241 bytes; graphs and Computer Modern lettering checked in headless Edge 155.0.4283.45 (the WebView2 Runtime's build) in light and dark. Details: `documentation/12-windows-app.md` → "Diagrams and graphs".
+
+Gates: `dotnet test` Failed 0, Passed 2649, Skipped 0, Total 2649 (5 m 36 s); UI: `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed; `TheWindowAppearsWhileTheFolderIsGotReadyAndPreviewWaitsForIt` could not run — the desktop was locked (no foreground window), twice.
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 4 (#470, #477, #484)
+
+Same branch. Three scheduled-deploy and copy faults, by Russell's rulings. #470: a scheduled deploy's task QUEUES a second start (`MultipleInstancesPolicy` Queue, not IgnoreNew) — measured, the queued start runs 2.1 s after the first ends with the newest definition, a re-set replaces a queued start and a delete throws it away; the run's own token, lateness and lease checks decide. #477: the scheduled run waits (inside its ten minutes) for another program's live copy of the folder's tools and then brings them up to date itself, holding its leases, before it writes the wrapper; a failed copy or one still running at ten minutes stands it down `couldNotRunAsSetNow` with the contract's `wrapperCouldNotBeWritten`; copies take turns by their markers' moments (measured: two copies at once failed with sharing violations, 36 times in 5 runs). #484: closing the last window while a copy is writing keeps it up with its banner until the copy finishes, then quits (not at sign-out); the installer's quit waits too. No new trail event; two lines changed. Also 3B's review fixes (M1, L1–L4). Details: documentation/07, "Set again while the run works (#409)" and "On Windows since bundle 3: the scheduled run is Plantoir"; documentation/12, "Getting a folder ready after an update (#473)".
+
+Gates (Intel i5-8365U, Windows 11 Pro 26200): `dotnet test` Failed 0, Passed 2642, Total 2642 (5 m 27 s); UI: `GettingReadyUiTests` (2, the new `ClosingDuringTheCopyWaitsForItThenQuits` measured closed at 3.6 s, quit at 18.9 s, every file in place; must-fail with the wait off: quit at 5.3 s, red), `AcceleratorUnderDialogUiTests`, `ReferenceCourseUiTests.OpenInObsidianLocksAnUnlockedPageAgainFirst` and `TheCalmNoteIsShownBeforeObsidianOpens`.
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 3B (#491 items 1–9)
+
+Same branch. The rest of #491, the mac's HIG sweep: a disabled main button is never the default (`PrimaryButtonLook` / `DialogButtons.EnablePrimary`, every dialog by source scan; the wizard's Create Course never takes Enter; Class Dates reads, then remembers); Escape is never trapped by Copy a Page's or the wizard's picker (`PickerEscape`; measured, the AutoSuggestBox swallowed every Escape); one explanation shape under a dialog title (`FormBuilders.DialogExplanation`, a census of every dialog); Open in Obsidian locks a reference course again first; Delete and − run the menu's removal under its own enablement (a reference section's − used to remove the whole course), and every row menu ends with Remove…; All Backups sorts, has a context menu and takes Delete; the rows' Revise With ▸ with the menu bar's titles (`outsideAgents.menuItem` now read here); title-case buttons, problem titles that name the act, OK only alone, and a 12 epx font floor. Also 3A's review fixes (the ID's trail line when the teacher switches windows; a tighter single-writer scan; Course Settings' Save following the ID live, by UI test). `sidebarDeleteKey` is now run here. Details: documentation/12, "The HIG sweep, screen by screen, on Windows (#491 part B)".
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 3A (#491 part A, #490)
+
+Same branch. File ▸ Settings… is ONE window (`SettingsWindow`: Assistant and Deploying; Preview comes with #514), not a dialog — WinUI allows one ContentDialog per window, measured per XamlRoot, and the wizard is one. The Cloudflare Account ID is edited only in Settings ▸ Deploying (a source scan holds every write to `DeployingSettingsPane`); a course's Deploying section and the wizard show it read-only with Open Settings… and follow it live. The in-app deploy's and Schedule a Deploy's refusals name File ▸ Settings ▸ Deploying. Help ▸ Plantoir Help (F1) opens plantoir.app/support. #490: both launchers' non-interactive refusal says "Add your Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying, then deploy again." (`deploy.ps1` via `[char]0x25B8`). Also 2C's review fixes (M-A: an open question refuses the assistant's deploy and stops nothing; L-1: a deploy the window will refuse keeps the preview; L-2; L-4). The #491 ledger entry is gone; the ledger holds #496, #503 and #514. Details: documentation/12, "The Settings window, Plantoir Help and the Account ID's refusals (#491 part A, #490)".
+
+**The publishing path changed** (`deploy.sh`, `deploy.ps1`): `verify-deploy.ps1` must run at the 1.7.1 cut on Windows, and `./verify-deploy.sh` on the mac before its next release. Neither was run in this batch.
+
+Gates (Intel i5-8365U, Windows 11 Pro 26200): `dotnet test` Failed 1, Passed 2560, Total 2561 (5 m 47 s) — the one, `ConPtyRedirectedParentTests` (#427), passed alone straight after; UI: `SettingsUiTests` (2), `PlantoirHelpUiTests`, `MenuBar*UiTests`, `AcceleratorUnderDialogUiTests`, `LaterClassesAtDeployUiTests` (2) — 8 of 8; `python scripts/test_deploy_non_interactive.py` OK, `python scripts/test_deploy_words.py` 6 OK.
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 2C (#475, the rest of #489)
+
+Same branch. Classes dated after the next class are caught at Deploy: `ClassesDatedLater` (the contract's 24 `futureDatedClasses` cases on real files, now run here), `LaterClassesKept` (released on rollover). The window asks after every refusal and before anything is claimed or stopped — Hide Ticked and Deploy (through Hide Pages…'s own call, backed up, undoable, no preview either side) or Keep All and Deploy; the in-app assistant asks the window before it stops the preview (`DeployWillBeRefused` first); an outside assistant is held back until answered once; a scheduled deploy records what went out only on the wrapper's success record; Publish Pages… leaves ticked later classes out; `publish_class_on` and the links checklist keep what they publish. Also 2B's review fixes (M1 `plantoir.app/changed`, M2, L3–L8). The ledger now holds only #491, #496, #503 and #514. Details: documentation/12, "Classes dated after the next class, at Deploy (2C, 2026-10-15)".
+
+Gates (Intel i5-8365U, Windows 11 Pro 26200): `dotnet test` Failed 0, Passed 2544, Total 2544 (5 m 40 s); UI: `LaterClassesAtDeployUiTests` (2) and `SectionVerbsUiTests` (2) pass, real launchers; `python scripts/test_tool_surface_digest.py` OK (digests unmoved), `python scripts/test_deploy_words.py` 6 OK.
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 2B (#489 items 1–2)
+
+Same branch. The assistant's nine functions in the Section menu — Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… — and four of them on the section row: the tools' own code through one runner entry (`AssistToolRunner`, extracted from `AssistAgent.RunTool`), behind a `plantoir-mcp` each window starts on first use (476–490 ms to answer, measured), in the menu's own voice (55 `…FromTheMenu` and dialog sentences), a `_menu-section<N>` copy before every change, an in-process claim against the assistant's window, and one dialog that moves through Choose → Plan → Working → Result. Rebuild Preview — and the assistant's rebuild_preview — now really restarts a serving preview. Pages are named by folder (`AssistWorkspace.Page` resolves inside the course). The Deploy question (#475) is 2C. Details and what was rejected: documentation/12, "The Section menu's functions (2B, 2026-10-15)".
+
+Gates (Intel i5-8365U, Windows 11 Pro 26200): `dotnet test` Failed 0, Passed 2501, Total 2501 (5 m 46 s); UI: `SectionVerbsUiTests` (both, real launcher for Rebuild Preview), `MenuBarReachUiTests`, `MenuGreysUnderADialogUiTests` pass; `python scripts/test_tool_surface_digest.py` OK (digests unmoved), `python scripts/test_deploy_words.py` 6 OK.
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 2A (#488, #483)
+
+Same branch. The menu bar the mac grew in #457: File, Course, Section, View and Help, every course and section action greyed by `SubjectMenuRules` (the contract's `subjectMenus`, 21 cases run by `SubjectMenusContractTests`), each running its row's or toolbar's own code; keys on menu items only (the root Grid's, Save's Ctrl+S and the section window's view-scoped keys are gone — measured to add nothing); File ▸ Open Recent (`openRecent`, `OpenRecentContractTests`; "recent working folders cleared" on the trail); row menus select their row first; one Open in Obsidian route; Help ▸ Publishing and Deploying…. #483 measured: every wizard field 32, nothing forced. The Section menu's functions (#489) are 2B, the Deploy question (#475) 2C. Details, numbers and what was rejected: documentation/12, "Menus, the Section menu's functions and #475 on Windows".
+
+Gates (Intel i5-8365U, Windows 11 Pro 26200): `dotnet test` Failed 1, Passed 2480, Total 2481 — the one, `ConPtyRedirectedParentTests`, passed alone straight after and in the run before; UI: `MenuBarReachUiTests`, `MenuGreysUnderADialogUiTests`, `OpenRecentUiTests`, `AcceleratorUnderDialogUiTests` pass; `python scripts/test_deploy_words.py` 6 OK.
+
+## 2026-10-15 — Windows catch-up to 1.7.1, batch 1
+
+Branch `issue/windows-catch-up-1.7.1`. The first batch of catching Windows up from 1.4.5 to the mac's 1.7.1: the suite is green again, with every debt a later batch owns held open by name.
+
+- **The ledger** (#481): each `NamedGapLedger` entry carries its own milestone (v1.5.0–v1.7.1), and `NamedGapLedgerTests` fails for any entry not LATER than `Plantoir.csproj`'s `<Version>`, so the 1.7.1 cut cannot go out over one. Four more lists are wired in: runtime pins, zip names, prune cases and assistant scenarios. Held open: 13 trail events, 72 wording keys, 4 config keys, 3 runtime pins, 3 scenarios, 1 prune case and 2 zip names, against #488, #489, #491, #496, #503 and #514.
+- **#481**: an outside assistant's failed preview build says `previewDidNotBuildBecause` or `previewDidNotBuildForACallerWithNoWindow` — never the raw log, never a pointer at a window it does not have.
+- **#479**: hiding a page rebuilds the preview, as publishing one does; the seventh `refusedBuildAnswers` case runs green.
+- **#478**: a publish's, hide's or unit's rebuild that stops for a question says so.
+- **#482**: the Netlify rate-limit sentence only for "Netlify API error 429" or "rate limit".
+- **`scripts/figures.py`**: a cache write Windows refuses no longer leaves its temporary file behind.
+
+Gates on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200): `dotnet test` Failed 0, Passed 2470, Skipped 0, Total 2470 (5 m 44 s), from Failed 13 at the start; `python scripts/test_figures.py` 35 OK; `python scripts/test_deploy_words.py` 6 OK.
+
 ## 2026-10-07 — the 1.4.3 release branch
 
 Branch `issue/windows-1.4.3-release`. The Windows version is 1.4.3 (`<Version>` in `Plantoir.csproj`, `AppVersion` in `installer.iss`), and `PlantoirSetup.exe` joins the EXISTING v1.4.3 release, which the mac cut on 2026-10-04 with its DMG — no new tag. It is the first version the Windows updater installs (1.4.2 offers it). `website/updates/windows.xml` gains a 1.4.3 item (built with `--reparse-existing --change-log-path`, notes in `windows-app/release-notes/1.4.3.md`) and the Windows download card is unpinned. `WINDOWS-DIRECTOR-PROMPT.md` is deleted.
@@ -501,9 +586,11 @@ remembered. The honest way to keep this list right is
 - **Claude Code integration.** `Services/ClaudeCodeLauncher.cs` writes
   `%LOCALAPPDATA%\Plantoir\assist\mcp-<CODE>.json` and launches `claude` with
   `--mcp-config … --strict-mcp-config`, so a teacher's own MCP servers are
-  neither used nor disturbed. Both doors sit on a course's context menu:
-  **Revise with Claude…** (only when Claude Code and the server are both
-  present) and **Revise with local AI assistant…**.
+  neither used nor disturbed. The doors sit on the rows' context menus, under
+  **Revise With ▸** since #491 (2026-10-15): **Claude…** (only when Claude
+  Code and the server are both present), **Codex…** (#210) and, on a section
+  row, **Local AI Assistant…** — until #491 "Revise with Claude…" and
+  "Revise with local AI assistant…" at the top level.
 - **A cross-process lease protocol**, `Plantoir.Core/Assist/WorkLease.cs`.
   Four kinds — `assist`, `preview`, `publish`, `build` — as files under
   `courses/.internal/activity/`, so the app and the server can see each
@@ -644,8 +731,11 @@ kind of session can do, measured on the day and written for the next one:
   enforced at 900×600 (`MainWindow.xaml.cs`, `PreferredMinimumWidth` /
   `PreferredMinimumHeight`); the opening size is not 900×600 but a share of
   the display's work area, clamped, so it looks right at any scale.
-- The preview accelerators exist — Ctrl+R, Alt+Left, Alt+Right, declared at
-  view scope in `Views/SectionDetailView.xaml` and handled in its code-behind.
+- The preview accelerators exist — Ctrl+R, Alt+Left, Alt+Right — on View ▸
+  Reload Page, Back and Forward since #488 (2026-10-15; they were declared at
+  view scope in `Views/SectionDetailView.xaml` until then, and a measurement
+  showed that scope added nothing: documentation/12, "Menus, the Section
+  menu's functions and #475 on Windows").
   ~~What is missing is a **Preview menu-bar item**~~ — added 2026-08-22
   (`MainWindow.xaml`, handoff item 1). Corrected 2026-09-06: this paragraph
   outlived the work by a fortnight, and anyone planning from it would have

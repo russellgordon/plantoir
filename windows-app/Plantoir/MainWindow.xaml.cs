@@ -74,7 +74,7 @@ public sealed partial class MainWindow : Window
 
         Picker.Attach(this);
         Sidebar.Attach(this);
-        ShowUpdateMenuItemIfActive();
+        BuildMenuBar();   // MainWindow.Menus.cs (#488)
 
         Activated += (_, args) =>
         {
@@ -95,7 +95,7 @@ public sealed partial class MainWindow : Window
                 // window on the same section, would otherwise sit invisible
                 // here until something else happened to reload the tree.
                 if (Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
-                RefreshRenameCourseItem();
+                ApplyMenuEnablement();
             }
         };
         // Covers app launch itself, in case the window's first Activated
@@ -152,30 +152,48 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(() => { if (!IsClosed) RefreshReadiness(); });
         }
         ToolchainReadiness.Changed += ReadinessChanged;
+        AttachGuidance();   // #496: MainWindow.Guidance.cs
+        AttachTheModifier();   // #514: MainWindow.Modifier.cs
+
+        // #489: a menu change or the assistant's work on a section greys the
+        // Section menu's functions in every window. Static, so let go on close.
+        void ActivityChanged()
+        {
+            if (IsClosed) return;
+            DispatcherQueue.TryEnqueue(() => { if (!IsClosed) ApplyMenuEnablement(); });
+        }
+        SectionMenuActivity.Changed += ActivityChanged;
+        AssistActivity.Changed += ActivityChanged;
 
         Closed += (_, _) =>
         {
             IsClosed = true;
+            SectionMenuActivity.Changed -= ActivityChanged;
+            AssistActivity.Changed -= ActivityChanged;
+            DropVerbs();   // this window's menu server stops; its undo list goes with it (#489)
             ToolchainReadiness.Changed -= ReadinessChanged;
             Views.SectionDetailView.SectionOutcomeDismissed -= OutcomeDismissed;
             // The event is static: a subscription left behind would root this window.
             Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged -= ScheduledRecordsChanged;
+            OpenRecentList.Changed -= OpenRecentChanged;   // static too (#488)
             Workspace.UnregisterWindow();
         };
 
-        // The Preview menu tracks whichever section is currently shown —
-        // one callback registered once, rather than a refresh call threaded
-        // through every place DetailHost.Content is assigned.
-        DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForPreviewMenu());
-        RefreshPreviewMenu();
+        // The menu bar tracks whichever section window or Course Settings is
+        // shown — one callback registered once, rather than a refresh call
+        // threaded through every place DetailHost.Content is assigned.
+        DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForMenus());
 
         Workspace.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(WorkspaceViewModel.State)
                 or nameof(WorkspaceViewModel.WorkspacePath)
                 or nameof(WorkspaceViewModel.WorkspaceProblem)) ApplyState();
+            // Another folder: the old folder's menu server, and its undo list, go (#489).
+            if (args.PropertyName is nameof(WorkspaceViewModel.WorkspacePath)
+                && _verbs is not null && !WorkingFolder.IsTheSame(_verbsFolder, Workspace.WorkspacePath)) DropVerbs();
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)
-                or nameof(WorkspaceViewModel.Courses)) { ShowDetailForSelection(); RefreshRenameCourseItem(); }
+                or nameof(WorkspaceViewModel.Courses)) { ShowDetailForSelection(); ApplyMenuEnablement(); }
             // The selection is part of the window's memory (row 99).
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)) App.RememberOpenWindows();
         };
@@ -236,7 +254,11 @@ public sealed partial class MainWindow : Window
         AutomationProperties.SetItemStatus(AppMenuBar, ToolchainReadiness.AutomationStatus(state));
 
         bool pastTheDelay = _shownAt is { } shown && DateTime.UtcNow - shown >= ToolchainReadiness.BannerDelay;
-        var banner = ToolchainReadiness.BannerFor(state, pastTheDelay);
+        // A close held open for a copy says so whichever folder is copying
+        // (the batch 4 review's M2): the copy waited for may be another
+        // window's folder, and this one would otherwise show nothing.
+        var banner = _waitingForCopies ? ToolchainReadiness.BannerWhileClosing(state)
+                                       : ToolchainReadiness.BannerFor(state, pastTheDelay);
         GettingReadyNotice.Title = banner.Title ?? "";
         GettingReadyNotice.Message = banner.Message ?? "";
         GettingReadyNotice.Severity = banner.IsError ? InfoBarSeverity.Error : InfoBarSeverity.Informational;
@@ -254,6 +276,8 @@ public sealed partial class MainWindow : Window
         }
 
         Sidebar.ShowWhetherCoursesCanBeAdded(ToolchainReadiness.Refusal(Workspace.WorkspacePath));
+        ApplyMenuEnablement();   // New Course… waits for the copy too (subjectMenus.folderGettingReady)
+        RefreshGuidance();       // #496: the folder on screen may have changed
     }
 
     private void BannerDelayRanOut(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
@@ -366,45 +390,135 @@ public sealed partial class MainWindow : Window
     /// <summary>Set once the teacher chose Quit Anyway, so the close that follows is not asked about again.</summary>
     private bool _quitConfirmed;
 
+    /// <summary>This window is being held open until the folder's tools copy has finished (#484).</summary>
+    private bool _waitingForCopies;
+
+    /// <summary>The wait above has been done once; the close that follows does not wait again.</summary>
+    private bool _copiesWaitedFor;
+
     /// <summary>
     /// The quit question (#231; <c>quittingWhileWorkIsUnderWay</c>). Only when
     /// closing THIS window quits the app, only for the teacher's own quit, and
     /// only for a publish or a preview being BUILT — never a preview merely
     /// open. Keep Working is the default: Return without reading keeps the work.
+    ///
+    /// <para>Then, since #484 (Russell's ruling 2026-10-15, the mac's #476): a
+    /// close that quits while the tools are being COPIED into a folder keeps
+    /// the window up, with its "Getting this folder ready…" banner, until the
+    /// copy has finished, and then quits. Ended part-way, the copy leaves
+    /// <c>.toolchain\</c> half old and half new for a scheduled run or a
+    /// launcher typed at a prompt to build from. The question comes FIRST, so
+    /// Keep Working still leaves everything as it was; Quit Anyway skips only
+    /// the question, never the wait (the plan review's H1). Never while
+    /// Windows is ending the session: it ends the process at sign-out whatever
+    /// the window does, and holding the close only shows "this app is
+    /// preventing shutdown". A window that is not the last never waits — the
+    /// copy carries on in the windows that remain.</para>
     /// </summary>
     private async void AskBeforeQuittingThroughWork(Microsoft.UI.Windowing.AppWindow sender,
                                                     Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
         try
         {
-            if (_quitConfirmed || !App.ClosingThisQuits(this)) return;
-            var underWay = CourseActivity.UnderWay();
-            var reason = Services.SessionEnding.IsEnding
-                ? QuitConfirmation.Reason.TheSystemIsEnding
-                : QuitConfirmation.Reason.TheTeacherAskedToQuit;
-            if (!QuitConfirmation.ShouldAsk(underWay, reason)) return;
+            // A second close while this one waits does nothing new.
+            if (_waitingForCopies) { args.Cancel = true; return; }
+            if (!App.ClosingThisQuits(this)) return;
 
-            args.Cancel = true;
-            var (title, message) = QuitConfirmation.Question(underWay);
-            var dialog = new ContentDialog
+            if (!_quitConfirmed)
             {
-                Title = title,
-                Content = message,
-                PrimaryButtonText = QuitConfirmation.QuitAnyway,
-                CloseButtonText = QuitConfirmation.KeepWorking,
-                DefaultButton = ContentDialogButton.Close,
-                XamlRoot = Content.XamlRoot,
-            };
-            bool quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
-            ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
-            if (!quit) return;
-            _quitConfirmed = true;
+                var underWay = CourseActivity.UnderWay();
+                var reason = Services.SessionEnding.IsEnding
+                    ? QuitConfirmation.Reason.TheSystemIsEnding
+                    : QuitConfirmation.Reason.TheTeacherAskedToQuit;
+                if (QuitConfirmation.ShouldAsk(underWay, reason))
+                {
+                    args.Cancel = true;
+                    // The guidance question (#496), if it is up, comes down
+                    // unanswered first: one ContentDialog per window (M8) —
+                    // and stays down until this question has closed (H-1).
+                    bool quit;
+                    _quitQuestionUp = true;
+                    try
+                    {
+                        TakeTheGuidanceQuestionDown();
+                        for (int look = 0; look < 20 && DialogGate.IsOpen(Content.XamlRoot); look++) await Task.Delay(50);
+                        var (title, message) = QuitConfirmation.Question(underWay);
+                        var dialog = new ContentDialog
+                        {
+                            Title = title,
+                            Content = message,
+                            PrimaryButtonText = QuitConfirmation.QuitAnyway,
+                            CloseButtonText = QuitConfirmation.KeepWorking,
+                            DefaultButton = ContentDialogButton.Close,
+                            XamlRoot = Content.XamlRoot,
+                        };
+                        AutomationProperties.SetAutomationId(dialog, "quitQuestionDialog");
+                        quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
+                    }
+                    finally { _quitQuestionUp = false; }
+                    ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
+                    if (!quit)
+                    {
+                        // Asked again after the wait (a preview began meanwhile)
+                        // and the teacher kept working: the copies held back
+                        // for that quit go ahead, and a later close waits again
+                        // (the batch 4 review's M1).
+                        LetHeldCopiesGo();
+                        return;
+                    }
+                    _quitConfirmed = true;
+                    Close();   // comes back through here, past the question, to the wait
+                    return;
+                }
+            }
+
+            if (!ToolchainReadiness.ClosingWaitsForTheCopy(closingQuits: true, ToolchainReadiness.AnyCopyIsWriting,
+                                                           Services.SessionEnding.IsEnding, _copiesWaitedFor))
+                return;
+
+            // Cancelled synchronously, before any await, or the close goes ahead.
+            args.Cancel = true;
+            _waitingForCopies = true;
+            App.LogDiagnostic("closing waits for the tools copy to finish");
+            // The banner shows at once, delay or no delay: the window staying
+            // up is the thing the teacher must be able to read.
+            _shownAt = DateTime.UtcNow - ToolchainReadiness.BannerDelay;
+            RefreshReadiness();
+            try { await ToolchainReadiness.WhenWritingCopiesFinish(); }
+            catch (Exception ex) { App.LogDiagnostic($"closing: waiting for the tools copy: {ex.Message}"); }
+            _copiesWaitedFor = true;
+            _waitingForCopies = false;   // before Close(), or the close below cancels itself (the review's H2)
+            App.LogDiagnostic("closing: the tools copy has finished");
+            // A window opened while this one waited: this close no longer
+            // quits, so copies held back for the quit go ahead after all.
+            if (!App.ClosingThisQuits(this)) LetHeldCopiesGo();
             Close();
         }
         catch (Exception ex)
         {
             App.LogDiagnostic($"AskBeforeQuittingThroughWork exception: {ex}");
+            // Whatever failed, the window is still up: a hold left set would
+            // keep every later copy waiting for the life of the process.
+            _waitingForCopies = false;
+            LetHeldCopiesGo();
         }
+    }
+
+    /// <summary>
+    /// A close that waited for the copy did not quit after all (Keep Working
+    /// when asked again, another window opened meanwhile, or the handler
+    /// failed): release the copies its wait held back, and let a later close
+    /// wait again. Without this the hold stays set for the life of the process
+    /// — every later copy waits its turn for ever, the banner stays up, Preview,
+    /// Deploy and New Course stay greyed, and the folder's marker stays live
+    /// (the batch 4 review's M1).
+    /// </summary>
+    private void LetHeldCopiesGo()
+    {
+        if (!_copiesWaitedFor) return;
+        _copiesWaitedFor = false;
+        ToolchainReadiness.ReleaseWaitingCopies();
+        if (!IsClosed) RefreshReadiness();
     }
 
     /// <summary>True once this window has closed; a closed window cannot show anything.</summary>
@@ -500,6 +614,53 @@ public sealed partial class MainWindow : Window
                 App.LogDiagnostic($"DeployFor exception: {ex}");
             }
         });
+    }
+
+    /// <summary>
+    /// The in-app assistant's deploy asks about classes dated after the next
+    /// class HERE, in the section's window (#475), before it stops anything:
+    /// the section is shown, the window comes forward if it was hidden, and
+    /// the window's own question is put. Null when this window cannot show
+    /// the section — it is on another folder, or the section is not there —
+    /// which the caller answers as "no window", never by throwing.
+    /// </summary>
+    public async Task<LaterClassesAtADeploy?> AskAboutClassesDatedLaterFor(string folder, string courseCode, int section)
+    {
+        var answered = new TaskCompletionSource<LaterClassesAtADeploy?>();
+        if (!DispatcherQueue.TryEnqueue(() => _ = AskOnTheInterfaceThread())) return null;
+        return await answered.Task;
+
+        async Task AskOnTheInterfaceThread()
+        {
+            try
+            {
+                if (IsClosed || !WorkingFolder.IsTheSame(Workspace.WorkspacePath, folder))
+                {
+                    answered.TrySetResult(null);
+                    return;
+                }
+                if (DetailHost.Content is not SectionDetailView existing ||
+                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    existing.SectionNumber != section)
+                {
+                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                }
+                if (DetailHost.Content is not SectionDetailView detail ||
+                    !string.Equals(detail.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    detail.SectionNumber != section)
+                {
+                    answered.TrySetResult(null);
+                    return;
+                }
+                ComeForwardIfHidden();
+                answered.TrySetResult(await detail.AskAboutClassesDatedLaterForTheAssistantAsync());
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"AskAboutClassesDatedLaterFor exception: {ex}");
+                answered.TrySetResult(null);
+            }
+        }
     }
 
     /// <summary>
@@ -601,9 +762,12 @@ public sealed partial class MainWindow : Window
         // port, mac commit "Allow Deploy button to stop active preview
         // before publishing"), so reporting a preview as busy here made the
         // assistant refuse — and say so — while the deploy went ahead.
+        // _isPreparingDeploy counts too (2C's implementation review, L-1): a
+        // deploy between its press and its runner starting is already on its
+        // way, and a second one would only be refused by the window.
         if (DetailHost.Content is SectionDetailView detail)
         {
-            return detail.IsDeploying;
+            return detail.IsDeployingOrPreparing;
         }
         return false;
     }
@@ -778,9 +942,7 @@ public sealed partial class MainWindow : Window
             ShowDetailForSelection();
         }
         RefreshPathBar();
-        RestoreFromArchiveItem.IsEnabled = Workspace.SelectedArchivedItem is not null;
-        RefreshRenameCourseItem();
-        RefreshReadiness();
+        RefreshReadiness();   // and with it the menu bar's enablement
         App.RememberOpenWindows();
     }
 
@@ -840,7 +1002,6 @@ public sealed partial class MainWindow : Window
 
     public void ShowDetailForSelection()
     {
-        RestoreFromArchiveItem.IsEnabled = Workspace.SelectedArchivedItem is not null;
         switch (Workspace.Selection)
         {
             case SidebarSelection.SectionItem(var code, var number)
@@ -894,7 +1055,8 @@ public sealed partial class MainWindow : Window
             case null when Workspace.Courses.Count == 0:
                 DetailHost.Content = EmptyState("No Courses Yet",
                     "Add your first course, or start from the example course to see how everything fits together.",
-                    "Add a Course…", () => _ = SidebarPane.OpenNewCourseWizard());
+                    // File ▸ New Course…'s own words (#488, mac #491 item 8): one name per command.
+                    "New Course…", () => _ = SidebarPane.OpenNewCourseWizard());
                 break;
             case null:
                 DetailHost.Content = EmptyState("Select a Course or Section",
@@ -1205,92 +1367,6 @@ public sealed partial class MainWindow : Window
         RememberSyncAccepted(path, service, "dismissed the note about the working folder");
     }
 
-    private void NewWindow_Click(object sender, RoutedEventArgs e) => App.OpenNewWindow();
-
-    private void ReloadCourses_Click(object sender, RoutedEventArgs e)
-    {
-        Workspace.ReloadTryingAgain();
-        ApplyState();
-    }
-
-    // ---- Rename Course, from the File menu and F2 -------------------------
-
-    /// <summary>
-    /// The course a rename would apply to: the selected course, or the
-    /// parent of the selected section — a teacher who has clicked into a
-    /// section has not stopped meaning the course (the mac's
-    /// <c>courseThatCanBeRenamed</c>).
-    /// </summary>
-    private Course? CourseThatCanBeRenamed =>
-        // Never a course kept for reference, by ANY route (#241): its folder
-        // carries the year and course_code the real code, and a rename would
-        // collapse the two. The menu item, F2 and the context menu all ask here.
-        Workspace.SelectedCourse is { } course && !ReferenceCourse.IsKeptForReference(course) ? course : null;
-
-    /// <summary>
-    /// Read at the moment of asking, never captured earlier (the staleness
-    /// lesson, row 104): a preview that started since the menu was drawn
-    /// still counts.
-    /// </summary>
-    private string? WhyRenameIsUnavailable(Course course) =>
-        Workspace.WorkspacePath is { } folder ? CourseActivity.BusyReason(folder, course.Code) : null;
-
-    /// <summary>
-    /// The File menu has no Opening event to hang this on, so the item is
-    /// redrawn when the selection changes and whenever the window's state is
-    /// re-applied; the accelerator re-checks live regardless.
-    /// </summary>
-    private void RefreshRenameCourseItem()
-    {
-        var course = CourseThatCanBeRenamed;
-        string? reason = course is null ? null : WhyRenameIsUnavailable(course);
-        RenameCourseItem.IsEnabled = course is not null && reason is null;
-        // Withheld, not greyed, when the selection is a reference course.
-        RenameCourseItem.Visibility = Workspace.SelectedCourse is { } selected && ReferenceCourse.IsKeptForReference(selected)
-            ? Visibility.Collapsed : Visibility.Visible;
-        RenameCourseItem.Text = course is null ? "Rename Course…" : $"Rename {course.Code}…";
-        RenameCourseReason.Text = reason ?? "";
-        RenameCourseReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
-    }
-
-    private void RenameCourse_Click(object sender, RoutedEventArgs e) => RenameSelectedCourse();
-
-    /// <summary>
-    /// No busy guard here on purpose: the dialog re-checks and EXPLAINS ("…is
-    /// previewing or deploying right now. Stop that first, then rename."),
-    /// and the menu item can be stale — the MenuBar has no Opening event and
-    /// nothing redraws it when a preview starts — so a silent return here
-    /// would be a dead click with no answer, where the sidebar's route gives
-    /// one.
-    /// </summary>
-    private void RenameSelectedCourse()
-    {
-        if (CourseThatCanBeRenamed is not { } course) return;
-        _ = Sidebar.OpenRenameCourseDialog(course);
-    }
-
-    /// <summary>
-    /// F2 renames the selected course — unless the teacher is typing. A
-    /// root-scoped accelerator fires wherever focus is, so it asks what has
-    /// focus first: any text-entry control keeps its F2, and the key is left
-    /// unhandled so nothing else swallows it either.
-    /// </summary>
-    private void RenameCourseAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (Services.DialogGate.Holds(Content?.XamlRoot, "F2")) return;   // #191: never under a dialog
-        var focused = FocusManager.GetFocusedElement(Content.XamlRoot);
-        if (focused is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
-        RenameSelectedCourse();
-        args.Handled = true;
-    }
-
-    private void ImportForReference_Click(object sender, RoutedEventArgs e) => _ = Sidebar.OpenImportForReference();
-
-    private void RestoreFromArchive_Click(object sender, RoutedEventArgs e)
-    {
-        if (Workspace.SelectedArchivedItem is { } item) Sidebar.ConfirmRestore(item);
-    }
-
     private async void ReportProblem_Click(object sender, RoutedEventArgs e)
     {
         var store = ProblemReportStore.Standard;
@@ -1380,23 +1456,11 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void Settings_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new AssistantSettingsDialog(Workspace.Settings) { XamlRoot = Content.XamlRoot };
-        try
-        {
-            await dialog.ShowAsync();
-        }
-        finally
-        {
-            // Normally a no-op — Closed already did this — but if ShowAsync
-            // never got the dialog on screen at all (WinUI allows only one
-            // ContentDialog at a time), Closed never fires, and without this
-            // the dialog stays subscribed to the app-lifetime
-            // AssistModelStores registry forever.
-            dialog.DetachFromStores();
-        }
-    }
+    /// <summary>
+    /// File ▸ Settings…: the one Settings window (#491), on the section last
+    /// chosen. A window rather than a dialog — see <see cref="SettingsWindow"/>.
+    /// </summary>
+    private void Settings_Click(object sender, RoutedEventArgs e) => SettingsWindow.Show(SettingsWindow.LastChosen());
 
     private async void About_Click(object sender, RoutedEventArgs e)
     {
@@ -1404,99 +1468,26 @@ public sealed partial class MainWindow : Window
         await dialog.ShowAsync();
     }
 
-    private void OpenWorkingFolderAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    // ---- Following what the detail pane shows (#488) -----------------------
+
+    private SectionDetailView? _trackedDetail;
+    private CourseSettingsView? _trackedSettings;
+
+    /// <summary>
+    /// The menu bar's Preview, Deploy, View and Save items follow the section
+    /// window or Course Settings on screen: one subscription to whichever is
+    /// shown, let go of when it is replaced.
+    /// </summary>
+    private void TrackDetailForMenus()
     {
-        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+O")) return;   // #191: never under a dialog
-        OpenWorkingFolder_Click(sender, null!);
-        args.Handled = true;
+        if (_trackedDetail is { } previous) previous.PreviewChromeChanged -= DetailChanged;
+        if (_trackedSettings is { } previousSettings) previousSettings.SaveStateChanged -= DetailChanged;
+        _trackedDetail = DetailHost.Content as SectionDetailView;
+        _trackedSettings = DetailHost.Content as CourseSettingsView;
+        if (_trackedDetail is { } current) current.PreviewChromeChanged += DetailChanged;
+        if (_trackedSettings is { } settings) settings.SaveStateChanged += DetailChanged;
+        ApplyMenuEnablement();
     }
 
-    /// <summary>Check for Updates… (#337): shown only when the engine has a feed to read.</summary>
-    private void CheckForUpdates_Click(object sender, RoutedEventArgs e)
-    {
-        if (App.Updater is { } updater) _ = updater.CheckAsync(teacherAsked: true);
-    }
-
-    private void ShowUpdateMenuItemIfActive()
-    {
-        CheckForUpdatesItem.Text = Plantoir.Core.Assist.UpdateWording.MenuItem;
-        CheckForUpdatesItem.Visibility = App.Updater?.IsActive == true ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void NewWindowAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+N")) return;   // #191: never under a dialog
-        App.OpenNewWindow();
-        args.Handled = true;
-    }
-
-    private void ReloadCoursesAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+Shift+R")) return;   // #191: never under a dialog
-        Workspace.ReloadTryingAgain();
-        ApplyState();
-        args.Handled = true;
-    }
-
-    // ---- Preview menu ------------------------------------------------
-    //
-    // Mirrors mac's PreviewCommands (mac-app/QuartzTeachers/App/PreviewCommands.swift):
-    // a top-level Back/Forward/Reload menu that tracks whichever section's
-    // preview is currently shown, discoverable even though the same actions
-    // already have working keyboard shortcuts scoped to SectionDetailView.
-
-    private SectionDetailView? _previewMenuTrackedDetail;
-
-    private void TrackDetailForPreviewMenu()
-    {
-        if (_previewMenuTrackedDetail is { } previous)
-            previous.PreviewChromeChanged -= PreviewChromeChanged_RefreshMenu;
-
-        _previewMenuTrackedDetail = DetailHost.Content as SectionDetailView;
-
-        if (_previewMenuTrackedDetail is { } current)
-            current.PreviewChromeChanged += PreviewChromeChanged_RefreshMenu;
-
-        RefreshPreviewMenu();
-    }
-
-    private void PreviewChromeChanged_RefreshMenu(object? sender, EventArgs e) => RefreshPreviewMenu();
-
-    private void RefreshPreviewMenu()
-    {
-        var detail = DetailHost.Content as SectionDetailView;
-        PreviewBackItem.IsEnabled = detail?.CanGoBack == true;
-        PreviewForwardItem.IsEnabled = detail?.CanGoForward == true;
-        PreviewReloadItem.IsEnabled = detail?.HasPreview == true;
-    }
-
-    private void PreviewBack_Click(object sender, RoutedEventArgs e) =>
-        (DetailHost.Content as SectionDetailView)?.PreviewGoBack();
-
-    private void PreviewForward_Click(object sender, RoutedEventArgs e) =>
-        (DetailHost.Content as SectionDetailView)?.PreviewGoForward();
-
-    private void PreviewReload_Click(object sender, RoutedEventArgs e) =>
-        (DetailHost.Content as SectionDetailView)?.PreviewReload();
-
-    // Global counterparts to SectionDetailView's own scoped BackAccelerator/
-    // ForwardAccelerator/ReloadAccelerator — see the comment on Root's
-    // KeyboardAccelerators in MainWindow.xaml for why both scopes exist.
-    private void PreviewBackAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        (DetailHost.Content as SectionDetailView)?.PreviewGoBack();
-        args.Handled = true;
-    }
-
-    private void PreviewForwardAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        (DetailHost.Content as SectionDetailView)?.PreviewGoForward();
-        args.Handled = true;
-    }
-
-    private void PreviewReloadAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        (DetailHost.Content as SectionDetailView)?.PreviewReload();
-        args.Handled = true;
-    }
+    private void DetailChanged(object? sender, EventArgs e) => ApplyMenuEnablement();
 }

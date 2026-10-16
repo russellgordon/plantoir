@@ -577,6 +577,18 @@ local time and when the window resets (converted to the teacher's timezone
 via `HOST_TZ_OFFSET`). Vendor-specific values like `Retry-After` counts are
 deliberately omitted to avoid confusion.
 
+Both apps turn that into one sentence for the teacher ("Netlify is limiting how
+often websites can be deployed right now…") only when the output carries
+deploy.py's own phrase, `Netlify API error 429`, or the words `rate limit` —
+never a bare `429` (#482, mac commit cb1b13e77, Windows 2026-10-15). The bare
+match fired on the eight-digit image tag every build prints (about one tag in
+seven hundred carries the digits), on a "Built in 429ms" timing, and on a
+Cloudflare 429, each time telling the teacher Netlify was limiting deploys. A
+Cloudflare 429 is deliberately NOT explained yet — the sentence names Netlify —
+so it falls back to the raw output until Cloudflare has a sentence of its own;
+matching the nameless `API error 429` was rejected for exactly that case.
+`app-rules.json` → `failureExplanations.cases` pins all three.
+
 ## Cloudflare Pages (`--target cloudflare`)
 
 Chosen with `deploy_target: "cloudflare_pages"`. Each section becomes its
@@ -609,7 +621,16 @@ Two things are needed, and only one comes from the teacher directly:
   up front, because an app publishing in the background has nothing attached
   that could answer a console prompt — and under `--non-interactive` that
   last "asking once" is a refusal instead, naming the Account ID and pointing
-  at the course's own settings.
+  at Plantoir ▸ Settings ▸ Deploying (#490). Both launchers say the same
+  sentence — "Add your Cloudflare Account ID in Plantoir ▸ Settings ▸
+  Deploying, then deploy again." — because the ID is the teacher's, not a
+  course's: it moved to the app's Settings on the mac in #457 and on Windows
+  in #491, and a refusal pointing at a course's settings sent the teacher to a
+  read-only display. `deploy.ps1` spells the ▸ as `[char]0x25B8`: it has no
+  byte-order mark and Windows PowerShell 5.1 would read a literal one
+  garbled. (On Windows the app's own sentences say File ▸ Settings ▸
+  Deploying, where the item is there; the launchers keep one sentence for
+  both platforms, Russell's ruling on #490.)
 
 ### Asking once, and the subshell that ate the question (2026-09-09)
 
@@ -3080,7 +3101,8 @@ them needs anything done on the mac.
   contract's authored half; no mac test reads the field.
 - **The thirty-minute wait has no Windows counterpart, and none is built.** A
   re-set leaves the running instance alone (`ClearIfStillMine`), so no
-  leftover run exists. Its leases stay live for the whole run, because its
+  leftover run exists; since #470 the re-set's own start waits in Task
+  Scheduler's queue instead (below). Its leases stay live for the whole run, because its
   `Plantoir.exe` holds them across the wrapper.
 - **What Task Scheduler does with the new moment was MEASURED, and it is
   worse than "the new run waits".** The test machine was RUSSELL_WINDOWS, an
@@ -3101,6 +3123,55 @@ them needs anything done on the mac.
     earlier run still works is silently not deployed, and no outcome record
     is written. That is a separate fault and is not fixed under #467; it is
     [#470](https://github.com/russellgordon/plantoir/issues/470).
+- **Fixed by #470 (2026-10-15): the task QUEUES a second start.**
+  `TaskScheduling.TaskXml` now registers `<MultipleInstancesPolicy>Queue`
+  (Russell's ruling). The new start waits in Task Scheduler until the earlier
+  instance ends, and then the run's OWN checks decide: the token (a start
+  that is not the job's does nothing), the lateness window (#239), the lease
+  wait (#289), whether the task still stands, and the settings at the run.
+  Measured the same way on the same machine (RUSSELL_WINDOWS, i5-8365U,
+  16 GB, Windows 11 Pro 26200, 2026-10-15; task `PlantoirMeasure470`, a
+  120-second sleeper that logs its token):
+  - **A queued start runs, 2.1 s after the first ends, with the NEWEST
+    definition.** A registered 11:06:21.0 for 11:06:45, started 11:06:47.3;
+    set again (token B) at 11:06:50.7 for 11:07:15. At 11:07:15 Last Run
+    Time moved to 11:07:15 and Next Run read N/A, but Status stayed
+    `Running` — it never reads "Queued", and only A is listed as an instance.
+    A ended 11:08:47.5; B started 11:08:49.6, logging token B.
+  - **Setting it again while a start is queued REPLACES the queued start.**
+    With B queued, re-registering token C for ten minutes on (11:10:21.1)
+    threw B away: after A ended (11:11:47.5) nothing started under either
+    token within 40 s, and Next Run read C's moment. So a queued start can
+    never carry a newer token than the setting it was queued for, and the
+    guard the plan held in reserve for that case (a run that starts early
+    against a newer job) was not built.
+  - **Deleting the task while a start is queued throws it away** (`schtasks
+    /Delete /F`): A kept running, B never started. So Cancel Scheduled
+    Deploy… while a start is queued is clean.
+  - The running instance survived `/Create /F` and `/Delete` every time.
+  What a queued run sees, then: a start well after its moment (the earlier
+  run's length later), its own token, no leases (the earlier run released
+  them on its way out), a task that still stands. It deploys if that is
+  inside the course's window, and stands down `tooLateToRun` otherwise
+  (`ScheduledRunTests.AQueuedRunStartedAfterTheFirstFinishedStillDeploys`,
+  `AQueuedRunStartedLaterThanTheCoursesWindowStandsDownTooLate`;
+  `TaskDefinitionTests.SchedulingRegistersATaskThatQueuesASecondStart`, and
+  `TheRegisteredTaskKeepsTheFourSettingsAndCarriesItsToken` reads the policy
+  back from the real Task Scheduler).
+  **No Windows line for `scheduled deploy waited for its earlier deploy`.**
+  On the mac that line is written by the run that waits; on Windows the
+  waiting happens inside Task Scheduler, before any Plantoir code runs, so
+  there is nothing for the run to time. The entry keeps its
+  `appliesOn: ["mac"]`. A version that read the task's Status column and
+  flagged the job "set while its run worked" was planned and CUT on review:
+  no issue asked for it, the Status text is localised, and an ordinary start
+  is already ~16 s late (above), which would have triggered a "waited" line
+  on any threshold short enough to be useful.
+  **Rejected:** `Parallel` — two runs of one task at once, the second waiting
+  up to ten minutes on the first's leases and standing down `courseWasBusy`
+  for a deploy that was merely queued; and leaving `IgnoreNew` and refusing
+  the re-set with a sentence ("is deploying now; set it again once it has
+  finished") — it hands the teacher a chore the scheduler can do.
 
 ### The window's acts read the saved settings too (#335)
 
@@ -3399,7 +3470,12 @@ then, in the contract's order (`theDestination.order`):
    wall clock for up to ten minutes, take-then-check with the run's own
    `build` + `publish` leases; still busy, it stands down `courseWasBusy`, its
    leases released first, with `scheduled publish waited for the course` on the
-   trail.
+   trail. **Since #477 the same look also waits for a live copy of the app's
+   tools into the working folder** (another program's
+   `toolchain-copying.<pid>` marker, the run's own never counted), taking no
+   lease while one is live; a copy still live at ten minutes stands it down
+   `couldNotRunAsSetNow` with `wrapperCouldNotBeWritten` — never
+   `courseWasBusy`, which would be false about the course.
 3. **Whether the task still stands**: registered, and its job still naming
    this run's moment. A task cancelled or re-set while the run waited deploys
    nothing and writes nothing.
@@ -3410,9 +3486,77 @@ then, in the contract's order (`theDestination.order`):
    `couldNotRunAsSetNow` with the reason clause; a destination that differs
    from what the teacher was told goes ahead and says so
    (`scheduled publish read the course's settings`).
-5. **The wrapper**, written from those settings under the task's OWN name
-   (#309's trap: never recomputed), and run. The task is then cleared (it is
+5. **The folder's tools, brought up to date (#477), then the wrapper.**
+   Holding both leases, the run copies the recipe beside `Plantoir.exe` into
+   the working folder (`ToolchainReadiness.RefreshWorkspace`: the existing
+   launchers, then `.toolchain\`, through the same `Ensure` and marker the
+   window uses) — so a 06:30 run after an update builds with the tools it
+   carries, not the ones from before an update nobody has opened the app
+   since. A copy that fails, or that is still waiting its turn behind another
+   program's copy when the run's ten minutes (counted from step 2's start)
+   are up, stands down `couldNotRunAsSetNow` with `wrapperCouldNotBeWritten`;
+   a task cancelled or set again during a long copy deploys nothing. Then the
+   wrapper, written from those settings under the task's OWN name (#309's
+   trap: never recomputed), and run. The task is then cleared (it is
    one-shot); the wrapper's record stays.
+
+**Why the run copies, and why before the wrapper (#477, Russell's ruling
+2026-10-15: fix it inside Windows, no contract change).** The run is
+`Plantoir.exe` with no window, and until #477 it never touched `.toolchain\`:
+after an update it built from the OLD recipe until somebody opened the app on
+that folder, and a run that fired while a window was copying built from a mix
+of old and new files. The copy goes after the settings decision (so a deploy
+that stands down for its settings copies nothing) and BEFORE the wrapper
+because the wrapper's fingerprint step (`TaskScheduling.cs`, the
+`section_fingerprint.py` call) and `preview.ps1 --build-only` both read
+`.toolchain\`: written first, the wrapper would bake the new program's
+`SectionPublishState.CurrentRule` beside the old fingerprint script. It holds
+the leases because it is part of the deploy; the WAIT in step 2 holds none,
+as `workLeases.declining.whyTheScheduledPublishWaits` says. The contract's
+order (`theDestination.order`) is unchanged — lateness, wait, still standing,
+settings — and neither `whyTheScheduledPublishWaits` nor the order mentions
+the copy, which is Windows-only by the ruling; this paragraph is where that
+difference is recorded. The stand-down sentence is the contract's own
+`wrapperCouldNotBeWritten` ("Plantoir could not get the deploy ready on this
+computer when the time came"), true for a failed copy and for one still
+running, so no new key; the trail lines are the run's own
+(`scheduled publish waited for the course` — "waited N s for Plantoir to
+finish getting the working folder ready (process P), and went ahead / stood
+down", and when both stood in the way "waited N s for another program on this
+computer to finish with the course and for Plantoir to finish getting the
+working folder ready (process P), and went ahead" — and `working folder tools copied`, "got the working folder ready for
+a scheduled deploy — …").
+
+**Copies take turns.** Two copies into one folder at once were measured
+(i5-8365U, 16 GB, Windows 11 Pro 26200, 2026-10-15; 2,004 files, 26.9 MB
+including 1, 2, 3 and 5 MB files; two .NET 9 processes started on the same
+UTC tick, each `File.Copy(src, dst, overwrite: true)` then
+`SetLastWriteTimeUtc`, as `ToolchainMirror` does): in 5 runs, 36 failures
+across 9 of the 10 copier processes (3+1, 2+2, 0+1, 1+2, 12+12), every one an
+`IOException` 0x80070020 sharing violation, the 5 MB file hit in 4 of the 5.
+The destination was byte-identical every time — the other copier had written
+the file — but each copier would have reported a FAILED copy, and a failed
+copy stands a scheduled run down. Writing to a temporary name and
+`File.Move(tmp, dst, overwrite: true)` was WORSE (3 runs): 855 failures, all
+`UnauthorizedAccessException` 0x80070005, with 4, 710 and 141 `.tmp` files
+left behind. So every copy (window or run) writes its marker FIRST, then
+waits while a live marker written BEFORE its own stands — an earlier moment
+on line 3, or the same moment and a lower process id
+(`ToolchainReadiness.MustWaitFor`; a moment not in the one shape both apps
+write counts as NOT earlier, so two copies facing one unreadable marker
+cannot both wait on it). A window waits for as long as it takes, with its
+banner up; the run gives up on its own ten-minute clock. Caveats on the
+numbers: `%TEMP%` with Defender real-time scanning on, and the copies ran
+unconditionally — `ToolchainMirror`'s compare-first skip narrows the window
+on a warm folder, not on the cold one an update leaves.
+
+**Rejected:** standing down `courseWasBusy` for a copy (a false sentence
+about the course); building from whatever `.toolchain\` holds (the mix the
+issue describes); a contract case for both platforms (the ruling — the mac
+is asked whether it has the gap instead); copying to a temporary name and
+renaming (measured above); and capping the WINDOW's wait and then copying
+anyway (it would bring back the two-copies-at-once failure the turn exists
+to prevent).
 
 **Measured end to end on this Windows PC** (Intel Core i5-8365U, 4 cores / 8
 threads, 15.7 GB, NTFS, Windows 11 Pro 25H2 build 26200, 2026-09-30): a real

@@ -111,13 +111,13 @@ public sealed class AboutDialog : ContentDialog
         var credits = new StackPanel { Spacing = 3, Margin = new Thickness(0, 14, 0, 0) };
         credits.Children.Add(CreditLine("Icon from ", "Phosphor Icons", "https://phosphoricons.com", " (MIT)."));
         credits.Children.Add(CreditLine("Designed by ", "Russell Gordon", "https://www.russellgordon.ca", "."));
-        credits.Children.Add(new TextBlock { Text = "Made with Claude.", FontSize = 11, Opacity = 0.7 });
+        credits.Children.Add(new TextBlock { Text = "Made with Claude.", FontSize = 12, Opacity = 0.7 });
         panel.Children.Add(credits);
 
         panel.Children.Add(new TextBlock
         {
             Text = "Copyright 2026 Russell Gordon",
-            FontSize = 11,
+            FontSize = 12,
             Opacity = 0.7,
             Margin = new Thickness(0, 14, 0, 0),
         });
@@ -142,7 +142,7 @@ public sealed class AboutDialog : ContentDialog
 
     private static TextBlock CreditLine(string before, string linkText, string uri, string after)
     {
-        var block = new TextBlock { FontSize = 11, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
+        var block = new TextBlock { FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
         block.Inlines.Add(new Run { Text = before });
         var link = new Hyperlink { NavigateUri = new Uri(uri) };
         link.Inlines.Add(new Run { Text = linkText });

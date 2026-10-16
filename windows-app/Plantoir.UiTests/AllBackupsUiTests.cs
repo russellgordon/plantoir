@@ -112,4 +112,52 @@ public class AllBackupsUiTests
         app.AssertAbsent("backup-" + Names[1], "the second deleted backup's sidebar row", TimeSpan.FromSeconds(15));
         Assert.NotNull(app.FindOrNull("backup-" + Names[2], TimeSpan.FromSeconds(3)));
     }
+
+    /// <summary>The rows' file names, in the order the list shows them.</summary>
+    private static string[] RowsInOrder(DrivenApp app)
+    {
+        var list = app.Find("allBackupsList", "the All Backups list");
+        return list.FindAllChildren()
+            .Select(child => child.Properties.AutomationId.ValueOrDefault ?? "")
+            .Where(id => id.StartsWith("allBackups-", StringComparison.Ordinal))
+            .Select(id => id["allBackups-".Length..])
+            .ToArray();
+    }
+
+    /// <summary>
+    /// #491 item 7: newest first until a header is pressed; pressing Made flips
+    /// it; the header's buttons take no row's id; and a right-click offers
+    /// Restore…, Show in File Explorer and Delete… — Delete… last. (Show in
+    /// File Explorer is not pressed: it would open a window on the desk.)
+    /// </summary>
+    [UiFact]
+    public void TheListSortsAndOffersAMenu()
+    {
+        using var app = new DrivenApp(WriteCoursesAndBackups);
+        app.PressRowMenuItem("backupsGroup", "All Backups…");
+        Assert.True(Retry.WhileFalse(() => RowsInOrder(app).Length == 3, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
+                    $"All Backups shows {RowsInOrder(app).Length} rows, not 3 (a header button carrying a row's id would add one)");
+        Assert.Equal(new[] { Names[2], Names[1], Names[0] }, RowsInOrder(app));   // newest first
+        Assert.Equal("Sort by Made", app.Find("allBackupsSortMade", "the Made header").Name);
+
+        app.Find("allBackupsSortMade", "the Made header").AsButton().Invoke();
+        Assert.True(Retry.WhileFalse(() => RowsInOrder(app).SequenceEqual(new[] { Names[0], Names[1], Names[2] }),
+                                     TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result,
+                    $"pressing Made did not flip the order: {string.Join(", ", RowsInOrder(app))}");
+
+        app.RightClickMiddleOf(app.Find("allBackups-" + Names[1], "the middle backup's line"));
+        var menuItems = Retry.WhileNull(() =>
+        {
+            var restore = app.Desktop.FindFirstDescendant(cf => cf.ByName("Restore…").And(cf.ByControlType(ControlType.MenuItem)));
+            return restore?.Parent?.FindAllChildren(cf => cf.ByControlType(ControlType.MenuItem));
+        }, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
+        Assert.NotNull(menuItems);
+        Assert.Equal(new[] { "Restore…", "Show in File Explorer", "Delete…" }, menuItems!.Select(item => item.Name).ToArray());
+        Assert.True(menuItems[0].IsEnabled, "Restore… was greyed with one backup chosen by the right-click");
+        Assert.True(app.Find("allBackups-" + Names[1], "the middle backup's line").AsListBoxItem().IsSelected,
+                    "the right-click did not select the row it was on");
+        Keyboard.Press(VirtualKeyShort.ESCAPE);   // the menu
+        Thread.Sleep(500);
+        if (app.OpenDialog()?.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton")) is { Name: "Done" } done) done.AsButton().Invoke();
+    }
 }

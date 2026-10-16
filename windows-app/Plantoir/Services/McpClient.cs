@@ -46,6 +46,52 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
     public static async Task<McpClient?> Start(string serverPath, string workspacePath, string courseCode,
                                                int sectionNumber, CancellationToken cancellation = default)
     {
+        // This server answers PLANTOIR'S OWN window, not an outside door: its
+        // list_courses carries no How I Teach line (#340,
+        // howITeachPage.listCoursesLine) — the local assistant neither reads
+        // nor drafts that page.
+        var info = ServerStartInfo(serverPath, workspacePath);
+        foreach (string argument in new[] { "--folder", workspacePath, "--course", courseCode })
+            info.ArgumentList.Add(argument);
+        info.Environment[Plantoir.Core.Assist.AssistWorkspace.LocalWindowVariable] = "1";
+        return await Launch(info, server =>
+            // This server is the WINDOW's (#468): its assist lease keeps every
+            // hold an outside session's does, and is told apart from one only so
+            // the teacher reads the window's own words, never "a Claude or Codex
+            // session". Registered the moment it exists, since it takes its lease
+            // at start-up; forgotten in DisposeAsync once it has exited.
+            Plantoir.Core.Assist.WindowServers.Register(server.Id, courseCode, sectionNumber), cancellation);
+    }
+
+    /// <summary>
+    /// Start the server the Section menu's functions run through (#489):
+    /// ONE per main window, started on first use, over the whole working
+    /// folder. No <c>--course</c> and no door variable, so it takes NO assist
+    /// lease (a menu change holds the course only while it runs, through the
+    /// tools' own leases); <c>PLANTOIR_SURFACE=menu</c>, so it speaks in the
+    /// menu's words and saves a copy before every change. NOT registered in
+    /// <see cref="Plantoir.Core.Assist.WindowServers"/>: that list tells the
+    /// assistant window's lease apart from an outside session's, and this
+    /// server holds none. Its undo list is the window's Undo Last Change.
+    /// </summary>
+    public static async Task<McpClient?> StartForTheMenu(string serverPath, string workspacePath,
+                                                         CancellationToken cancellation = default)
+    {
+        var info = ServerStartInfo(serverPath, workspacePath);
+        foreach (string argument in new[] { "--folder", workspacePath })
+            info.ArgumentList.Add(argument);
+        info.Environment[Plantoir.Core.Assist.AssistWorkspace.SurfaceVariable] = "menu";
+        return await Launch(info, _ => NothingRegistered.Instance, cancellation);
+    }
+
+    private sealed class NothingRegistered : IDisposable
+    {
+        public static readonly NothingRegistered Instance = new();
+        public void Dispose() { }
+    }
+
+    private static ProcessStartInfo ServerStartInfo(string serverPath, string workspacePath)
+    {
         var info = new ProcessStartInfo
         {
             FileName = serverPath,
@@ -56,18 +102,16 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        foreach (string argument in new[] { "--folder", workspacePath, "--course", courseCode })
-            info.ArgumentList.Add(argument);
         // Which Plantoir a deploy the server schedules should start when it
         // runs (#347): this one. In a development build the server is not
         // beside the app, so it could not find it on its own.
         if (Environment.ProcessPath is { } app) info.Environment["PLANTOIR_APP_PATH"] = app;
-        // This server answers PLANTOIR'S OWN window, not an outside door: its
-        // list_courses carries no How I Teach line (#340,
-        // howITeachPage.listCoursesLine) — the local assistant neither reads
-        // nor drafts that page.
-        info.Environment[Plantoir.Core.Assist.AssistWorkspace.LocalWindowVariable] = "1";
+        return info;
+    }
 
+    private static async Task<McpClient?> Launch(ProcessStartInfo info, Func<Process, IDisposable> register,
+                                                 CancellationToken cancellation)
+    {
         Process? server;
         try { server = Process.Start(info); }
         catch { return null; }
@@ -78,12 +122,7 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         server.ErrorDataReceived += (_, _) => { };
         server.BeginErrorReadLine();
 
-        // This server is the WINDOW's (#468): its assist lease keeps every
-        // hold an outside session's does, and is told apart from one only so
-        // the teacher reads the window's own words, never "a Claude or Codex
-        // session". Registered the moment it exists, since it takes its lease
-        // at start-up; forgotten in DisposeAsync once it has exited.
-        var registered = Plantoir.Core.Assist.WindowServers.Register(server.Id, courseCode, sectionNumber);
+        var registered = register(server);
         var client = new McpClient(server, registered);
         try
         {

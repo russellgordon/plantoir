@@ -24,10 +24,10 @@ namespace Plantoir.UiTests;
 [Collection("drives the real app")]
 public class CopyAPageDialogUiTests
 {
-    private const string Source = "CPS1";
+    internal const string Source = "CPS1";
     private const string Destination = "CPD1";
 
-    private static void WriteCourses(string coursesDir)
+    internal static void WriteCourses(string coursesDir)
     {
         var utf8 = new UTF8Encoding(false);
         foreach (string code in new[] { Source, Destination })

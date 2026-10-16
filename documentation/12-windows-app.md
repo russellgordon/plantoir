@@ -11,7 +11,7 @@ deploys, a New Course wizard, and the same on-device assistant.
 
 **This page is architecture and platform difference.** For what is BUILT and
 what is still missing, read [`windows-app/PROGRESS.md`](../windows-app/PROGRESS.md),
-which carries the live parity table; for the reasoning behind decisions,
+whose first section says where the app stands, and the open `windows` issues; for the reasoning behind decisions,
 the rest of this folder. Those are maintained as work
 happens. This page is not a status report and should not be read as one.
 
@@ -299,10 +299,14 @@ the section, builds it, deploys to each destination un-chained (one failing
 must not stop the others), and writes a record the app picks up.
 
 The task is registered from XML (`TaskScheduling.TaskXml`) so that it carries
-three settings the command-line switches cannot set: it may start on battery
+four settings the command-line switches cannot set: it may start on battery
 (`DisallowStartIfOnBatteries` false), is not stopped by going onto battery
-(`StopIfGoingOnBatteries` false) and starts as soon as possible after a missed
-start (`StartWhenAvailable` true). The older description here — a task that
+(`StopIfGoingOnBatteries` false), starts as soon as possible after a missed
+start (`StartWhenAvailable` true), and — since #470 — QUEUES a start that
+comes while the earlier run still works (`MultipleInstancesPolicy` `Queue`;
+it was `IgnoreNew`, which refused that start and lost the deploy). The
+measurements and what was rejected are in 07 → "Set again while the run
+works (#409)". The older description here — a task that
 runs `powershell.exe -File "<wrapper>"` — is how a task set before bundle 3
 still runs until it drains; do not read it as the current design.
 
@@ -445,7 +449,11 @@ dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 Skip the fetch and everything still BUILDS — and then every launcher refuses
 with "This copy of Plantoir is missing its website builder", which reads like a
 broken install rather than a missing step. (`Vendor/fetch-llama.ps1` is the
-same arrangement for the assistant's engine.)
+same arrangement for the assistant's engine.) **Re-run it after pulling a
+change to its vendor pins**: since #503 (2026-10-15) a runtime made before
+`runtime\vendor` existed STOPS the app's build ("predates the page
+features … Re-run windows-app\Vendor\fetch-runtime.ps1"), and the re-run
+fetches only that folder — "Diagrams and graphs" below.
 
 **Stop any running copy before building** — a running app holds
 `Plantoir.Core.dll` open and the build fails with `MSB3027 … file is locked
@@ -719,11 +727,40 @@ can see at the current milestone. Softening the contract instead — an
 — was rejected there and the reasoning is worth reading before proposing it
 again.
 
-**Since 2026-09-30 the ledger is the parity milestone's BURN-DOWN LIST**
-(Russell: no Windows release before parity, so an entry may name an open issue
-on "Windows: parity with mac v1.4.0" itself; `contracts/README.md` → "Named
-gaps"). Bundle 1 of the parity run widened it from two entries to every debt
-the suite could name, so that a red run means something again:
+**Since 2026-10-15 every entry carries its OWN milestone, and a test holds the
+cut to it (#481).** Windows is catching up from 1.4.5 to the mac's 1.7.1 in
+batches, and an entry may name work a LATER BATCH owns, on the milestone that
+work shipped in on the mac — `Owed(area, issue, milestone, reason, keys…)`, with
+`V150` … `V171` spelled exactly as the GitHub milestone titles.
+`NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild` reads
+`<Version>` from `Plantoir/Plantoir.csproj` and fails for any entry whose
+milestone is not LATER than it — so setting 1.7.1 turns every v1.5.0–v1.7.1
+entry still there red, while an entry owed by a genuinely later release
+survives the cut. It is "later than this build", not "empty at the cut", on
+purpose; a milestone that is not a version fails, because it cannot be
+compared. Batch 1 (2026-10-15) also wired four more lists into the ledger, in
+the same shape as the ones below: `toolchain.json` → `pins` with a
+`windowsRuntimeContains` (`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`
+— the contract-agrees-with-itself check still runs for every pin; pagedjs
+against #496, functionPlot and nodeTikzjax against #503, all three closed by
+#503's batch 5A the same day),
+`course-management.json` → `zipNames.cases` (`ContractTests.CourseManagement_ZipNames_MatchesContract`,
+each case on its own; two Section-menu names against #489) and
+`backups.pruneCases` (`BackupsContractTests`; one case against #489), and
+`assist-cases.json` → `scenarios.cases` (`AssistScenarioTests` — a theory, so a
+ledgered scenario must still FAIL, checked per case through
+`NamedGapLedger.Holding`/`ClosedMessage`, and
+`TheLedgeredScenariosAreStillInTheContract` checks the other direction; three
+Deploy-question scenarios against #489). The ledger file is the live list, and
+it has been **empty** since batch 6 (#514) closed its last two entries the same
+day; `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
+keeps the rule exercised on made-up entries meanwhile.
+
+**From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
+BURN-DOWN LIST** (Russell: no Windows release before parity, so an entry could
+name an open issue on "Windows: parity with mac v1.4.0" itself). Bundle 1 of
+the parity run widened it from two entries to every debt the suite could name,
+so that a red run means something again:
 
 | Area | What is held open | Wired into |
 |---|---|---|
@@ -1206,7 +1243,7 @@ Check the five things nothing pins:
    `QuestionParser.SeparateDefaultAnswer`.
 3. **Cancel cancels**, and does not hang. The run should end as cancelled
    rather than sit waiting on a question nobody can answer.
-4. "Save and continue" sends what you typed: the site Netlify creates carries
+4. "Save and Continue" sends what you typed: the site Netlify creates carries
    **that** address, not the pre-filled one.
 5. The breadcrumb trail records the ask — `asked for a publishing credential`,
    with the field named.
@@ -1285,18 +1322,255 @@ Reference: `Plantoir/Views/SidebarPane.xaml.cs` (`SidebarRow`,
 `ReconcileSections`), `Plantoir/Views/SidebarPane.xaml` (the three `Mode=OneWay`
 bindings), `Plantoir/MainWindow.xaml.cs`.
 
-## Printable pages (#454, v1.6.0) — a pointer
+## Printable pages (#454 on the mac; #496 here, v1.6.0)
 
 The build, the site and the shared Python do everything for a printed page,
 and Windows inherits them unchanged (`support/quartz`, `scripts/page_features.py`,
-`scripts/print_settings.py`, the skill under `support/agent_guidance`). What the
-Windows app owes — fetching Paged.js into `runtime\vendor\pagedjs`, Course
-Settings' Printing section, the widened `settings saved` line, writing the
-guidance into the working folder's root, and measuring WebView2's preview pane
-and Edge — is the `windows` issue for #454. The design and every measurement:
+`scripts/print_settings.py`, the skills under `support/agent_guidance`).
+Paged.js and Latin Modern are in `runtime\vendor\pagedjs` (since 2026-10-15,
+fetched with the figure engines: "Diagrams and graphs" below). The design
+and every mac measurement:
 [06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200),
 [05 → Printable pages](05-build-pipeline.md#printable-pages-what-the-build-does-454-v200),
-[09 → Printing](09-mac-app.md#printing-454-v200).
+[09 → Printing](09-mac-app.md#printing-454-v200). What the Windows APP does
+(#496, batch 5B of the catch-up to 1.7.1, 2026-10-15):
+
+**Course Settings → Printing**, between Footer and Content Structure, as on
+the mac: the school name, three switches (Name, Date, Class #), two pickers
+(top left / bottom left / not printed) and a sketch of the corners
+(`PrintCorners.Sketch`, the bottom-left corner led by
+`courseSettingsWording.printingSampleTitle` since #499). The four keys are
+`CourseConfiguration.PrintSchoolName` / `PrintBlanks` / `PrintSchoolNameAt`
+/ `PrintCourseCodeAt`. Two rules a reader of the code would not guess:
+
+- **Getters never write, and a setter given what it would read back is a
+  no-op.** `HasUnsavedChanges` compares the raw values, so a getter that
+  tidied `["seat","class_number","name"]` into the file would open the course
+  dirty (`savingSettings.freshOpenCases`, case 9). And WinUI raises
+  `TextChanged` for text set in code, LATER, after the handler is attached —
+  so "set the value before attaching the handler" is no guarantee for a text
+  box, and a stored `"   "` school name would have been removed on open
+  (plan review L9). Both are held by `PrintablePagesTests` and
+  `CourseSettingsSaveTests.AFreshlyOpenedCourseIsClean`, which reads the four
+  getters on every fresh-open case before deciding.
+- **A `print_blanks` of JSON null is Name and Date**, because that is what the
+  BUILD prints (`print_settings._blanks` reads null as absent). The mac read
+  NSNull as no blanks, so its sketch contradicted the paper; the authored
+  corners case "blanks of null are the default" now says which is right, and
+  the mac owes the fix (a `mac` issue). An empty list is still no blanks.
+
+**The `settings saved` line** says what a Save changed about printing
+(`SettingsSavedLine`, unit-tested now; it was built inline in `Save_Click`
+and untested): `; printing: school name set|changed|cleared` (never the
+name), `blanks Name, Date → Name, Date, Class #`, `school name top left →
+not printed`, `course code bottom left → top left`, only the parts that
+changed, before compared from the same disk read the Save already made (a
+file that could not be read compares with the defaults). The clause sits
+where the mac's does, after the course and before what was kept or replaced.
+The rest of the Windows line still differs from the mac's (`; kept from
+elsewhere: X`, no `— sidebar:` part); that predates #496 and is left alone.
+
+**The guidance for assistants** (`AgentGuidance`, a line-for-line port of
+`AgentGuidance.swift`; the rule is `printablePages.agentGuidance`): the
+skills in `support\agent_guidance\skills\` mirrored into `.claude\skills\`
+and `.agents\skills\` (each skill's folder is the app's whole), and the
+managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
+
+- **After the copy, on a task of its own** — `ToolchainReadiness` starts it
+  when a copy of the folder ends, whatever the copy's outcome, and never
+  chains it to the copy's task, which `RefusedWhileTheFolderIsGettingReady`
+  and `InitializeWorkspace` await. A failure is a startup.log line, the trail
+  event `guidance for assistants could not be written` and a closable
+  InfoBar (`guidanceNotice`) with `words.couldNotWrite`; the folder's State
+  is untouched, so Preview, Deploy and New Course never wait on it
+  (`AgentGuidanceTests.AGuidanceFailureNeverHoldsTheFolderBack`, through the
+  real hook with a `.claude` that is a FILE). Once per folder per process,
+  unless it failed.
+- **The notice's reason has no path.** .NET's IO messages carry the full
+  path ("Access to the path 'C:\Users\…\CLAUDE.md' is denied."), so the
+  notice says `Win32Exception`'s sentence for the error code instead
+  ("Access is denied.") — only for a FACILITY_WIN32 code (`0x8007xxxx`:
+  `0x80070005` access denied, `0x800700B7` a file where the folder belongs,
+  `0x80070020` in use), because for any other `Win32Exception` says "Unknown
+  error (0x1620)"; anything else says "could not be written" (plan review
+  M6). The trail line keeps the PLACE (`.claude/skills/plantoir-printing`,
+  forward slashes, from the working folder down); `LogRedactor` takes the
+  account name out of anything else, it does not redact a path.
+- **Writes are atomic** (a temporary file moved over the old), as the mac's
+  `.atomic` is: the pass runs on its own task, which the quit path does not
+  wait for (M7). **A file whose only difference from the current section is
+  its line endings is UNCHANGED**, so an editor that saves CRLF does not have
+  the section rewritten at every launch. **Files are read with a strict
+  UTF-8 decoder**, so a file saved in another encoding is refused, never
+  written over (`addCases` "cannot be read again").
+- **The question** is a ContentDialog (`MainWindow.Guidance.cs`): title
+  `askTitle`, `askFound` as the explanation under it, `askWhat`,
+  `askYoursStays`, an Expander (`showWhatIsAdded`) over a read-only
+  monospace box with the section; Add is the default (Enter), Not Now the
+  close button (Escape). ONE dialog per window: it is asked only when
+  `DialogGate.IsOpen` says none is up, and tried again on activation and
+  every 2 s while a file waits. **The quit question takes it DOWN first**
+  (WinUI throws on a second ContentDialog — plan review M8), and a question
+  taken down that way, or by the window closing, is PUT BACK unanswered:
+  closing a window is not a Not Now. From just before the quit question is
+  put up until it closes, the question taken down STAYS down and the re-ask
+  is the 2 s timer's (the batch 5B review's H-1: putting it back raised
+  `GuidanceChanged`, the question came back inside the quit question's
+  50 ms waits, the quit question's `ShowAsync` threw, and the close did
+  nothing). A question up at launch also makes `UpdatePrompts` and the
+  assistant's later-classes question hold back, through the `DialogGate`
+  check each already makes. A later pass that succeeds clears the notice an
+  earlier failure left, as the mac's `applyGuidance` does, and the bundled
+  bodies are read with LF endings, so an autocrlf checkout writes and
+  fingerprints the same section as the mac. Each file is asked about in one
+  window only, AGENTS.md first. Not Now answers are kept in
+  `%LOCALAPPDATA%\Plantoir\agent-guidance-declined.json` (path,
+  case-insensitive, → the section's signature), deliberately out of
+  `AppSettings`, which other code rewrites whole.
+- **This repository is itself a working folder** (`preview.ps1` and
+  `courses\` at its root), so opening it in Plantoir writes
+  `.claude\skills\plantoir-*` and `.agents\` (all ignored by `.gitignore`;
+  the graphs skill's line was missing until this batch) and ASKS about the
+  repository's own `CLAUDE.md` and `AGENTS.md`. **The answer in a checkout of
+  this repository is always Not Now**: Add would append Plantoir's teacher
+  guidance to the file that briefs every session here.
+
+**The preview pane hands pages to the browser** (`PreviewBrowserHandoff`,
+the mac's port; the wiring is `SectionDetailView.HandPagesToTheBrowser`):
+
+- **A link that opens a new window** — the page's own PDF among them — is
+  handled (`NewWindowRequested`, `Handled = true`) and opened in the
+  teacher's DEFAULT browser, `localhost` rewritten to `127.0.0.1` as Open in
+  Browser does; any scheme but http, https and mailto is dropped. Unhandled,
+  WebView2 opens a bare popup window owned by Plantoir: not the teacher's
+  browser, no address bar or bookmarks, gone when the app closes, and unlike
+  the mac (the director's decision for batch 5). REJECTED: leaving WebView2's
+  popup.
+- **Print**: the shared page code (`print.inline.ts`) asks the app when it
+  finds `window.webkit.messageHandlers.plantoirPrint`, which WebKit gives the
+  mac. Windows INJECTS exactly that shape
+  (`PreviewBrowserHandoff.PrintShim`, by `AddScriptToExecuteOnDocumentCreatedAsync`
+  and again on every completed navigation) — on the preview's own pages
+  only, `location.hostname` `localhost` or `127.0.0.1`, so an outside site
+  the pane was taken to never gains a `window.webkit` (the batch 5B
+  review's L-3) — forwarding to
+  `window.chrome.webview.postMessage({plantoirPrint: …})`; the app accepts
+  only a message from the preview's own origin, a mode from
+  `printablePages.modes.list` and a paper from `paper.cases` (none =
+  portrait), and opens `#plantoir-print=<mode>&paper=<paper>` in the browser.
+  No shared file changed (the plan's option (i)). The risk named — page code
+  reading `window.webkit` to detect Safari — was checked: nothing in the
+  bundled Quartz, its scripts or KaTeX reads it (Mermaid comes from a CDN
+  and was not checked). REJECTED for now: option (ii), a hook in
+  `print.inline.ts` gated on a Windows-only flag (never on `chrome.webview`
+  alone, which every WebView2 host has) — a shared change for no difference
+  a teacher could see.
+- Each hand-over is one trail line, `preview page opened in the web browser`,
+  naming the page the teacher was ON and only the KIND of link (the page's
+  own PDF, another page of the site, another site) — never where it led.
+- **Ctrl+P in the pane** is WebView2's own print (its browser accelerator
+  keys are on by default), the ⌘P path of `modes.commandP`.
+
+**Measured headless** (2026-10-15; Intel i5-8365U, 16 GB, Windows 11 Pro
+26200; Edge 155.0.4283.45 headless — the same Chromium build as this PC's
+WebView2 Runtime; no Chrome is installed here). The mac's own browser checks
+were run unchanged against a native build of the verify fixtures
+(`preview.ps1 --build-only` of a scratch course holding verify.sh's
+"Printable Fixture" and "Plain Long Page", served from the built `public\`
+over HTTP), with the runtime's Node 20.18.1 `--experimental-websocket` for
+the WebSocket they expect from Node 22, and poppler 24.08.0 for Windows
+(oschwartz10612/poppler-windows, in a scratch folder) for the PDF reading.
+This is the mac's own method for its F7–F9 numbers (headless Chromium,
+`Page.printToPDF`):
+
+- **`browser-checks/print_handout.mjs`: OK.** Every check the mac runs —
+  the print layout ran every time (never the fallback), every piece laid out
+  (212/212 questions-only, 23/23 answers-only, 235/235 both), every word,
+  answer and code line with its own number on paper, Latin Modern in the
+  PDF's fonts, the Curriculum connection nowhere, the menu printing nothing
+  until a way is chosen, in the contract's order, the paper remembered.
+  Pages: questions only **12** portrait / **14** landscape; answers only **1**
+  / **2**; both **13** / **16**. ⌘P: letter, 612 × 792 portrait and 792 × 612
+  landscape, the Curriculum connection off paper, no code line number wrong.
+- **#501, `browser-checks/print_plain_page.mjs`: OK, light and dark** (dark
+  by the same script with `prefers-color-scheme: dark`). Plain Long Page, a
+  1512 × 900 window: **4** pages portrait, **5** landscape; 40 of 40
+  paragraph sentinels INKED, 0 with no ink, 0 words past the paper's edge, 0
+  sidebar lines on paper (of the 6 the screen shows), 0 paragraphs broken.
+  Display scale does not enter: a PDF printed by the browser is laid out at
+  the paper's CSS width, not the screen's.
+- **`printPdf: "WORKSHEET 3.PDF"`** against `Media\Worksheet 3.pdf`
+  (`printPdfCases` "spelled in other capitals"): the built page links
+  `../Media/Worksheet-3.pdf` — the FOLDER's spelling, as Quartz slugs it —
+  and the build reported no `printPdfNotFound`.
+
+**Measured on an unlocked desktop** (2026-10-15, the same PC: Intel
+i5-8365U, 16 GB, Windows 11 Pro 26200, WebView2 Runtime and Edge
+155.0.4283.45, one 1920 × 1080 screen at 150%; the real x64 Debug app on a
+scratch working folder holding the print set's MPM2D, its pane driven over
+WebView2's own debugging port, `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`):
+
+- **Ctrl+P in the pane** opens WebView2's own print window INSIDE the pane
+  (Chromium's print preview, "Microsoft Print to PDF" by default) on
+  *Similar Triangles Practice*: **2 sheets**, the ⌘P path of
+  `modes.commandP` — Name and Date top right, "Similar Triangles Practice ·
+  MPM2D" bottom left, "Page 1 of 2" bottom right, the answers folded.
+  `beforeprint` fires when it opens and `afterprint` when it is cancelled.
+  At this window size the print window does not fit the pane: Copies,
+  Layout and Pages are reached by scrolling inside it.
+- **`window.print()` in the pane BLOCKS** the page's script until the print
+  window closes (4.8 s, the time it was left open), with `beforeprint` and
+  `afterprint` both fired before it returns.
+- **The hidden frame prints there too.** With the injected
+  `window.webkit` taken away (so `print.inline.ts` takes its own path),
+  Print ▸ Questions only laid the handout out in its frame and WebView2's
+  print window showed it: **1 sheet**, the handout's corners (Name, Date;
+  "Similar Triangles Practice · MPM2D", "Page 1 of 1"), the triangles drawn.
+  `frame.contentWindow.print()` blocked the page (a probe queued behind it
+  answered only after Cancel, 29.4 s after the click), `afterprint` fired,
+  and the frame was removed. Differences from the browser's: the math was
+  drawn in the page's colours in the pane's preview where the browser's is
+  black, and the print window is cramped inside the pane.
+- **The hand-over survives ShellExecute.** Print ▸ Questions only in the
+  pane wrote `preview page opened in the web browser — to print it questions
+  only (Exercises/Similar-Triangles-Practice)` on the trail and opened the
+  teacher's default browser (Edge) on `127.0.0.1:8081`, which went STRAIGHT
+  to its print window: **1 sheet**, the Latin Modern handout, Name and Date,
+  the triangle diagram. The address bar then read the page without
+  `#plantoir-print=…` — the page's own `history.replaceState` takes the
+  fragment off once read (`print.inline.ts`), which is itself the proof it
+  arrived. Chrome is not installed here and was not measured.
+- **A real mouse click on a `target="_blank"` link in the pane** is handed
+  over too (trail: `a link to another page of the site (the front page)`,
+  an Edge window on the page). The UI test invokes the link through UI
+  Automation instead, because its harness's mouse click missed it on this
+  screen (`PrintablePagesUiTests.cs`); the app's path is the same.
+- **Not done: the two browser checks in a HEADED Edge.** Both read paper
+  through `Page.printToPDF`, which Chromium offers headless only; the
+  printing a teacher sees in a headed browser is what the two hand-over
+  measurements above looked at by eye.
+
+**What it means for the design (for the director, not decided here):**
+WebView2 COULD print the handout itself — the frame path works in the pane,
+blocking and `afterprint` included — so the hand-over to the browser is not
+forced by the engine, as it is by WebKit on the mac. What the hand-over buys
+on Windows is the teacher's own browser: its full-size print window rather
+than one squeezed into the pane, black math, and the same behaviour as the
+mac. Dropping it would be the plan's option (ii) in reverse (no shim on
+Windows) and was NOT done.
+
+The four UI tests owed from batch 5B ran on this desktop on 2026-10-15 and
+pass after four fixes to the tests and one to the app (the corner sketch's
+ids, which sat on a Border that UI Automation never sees): see
+`PrintablePagesUiTests.cs` for what each found.
+
+Tests: `PrintablePagesTests` (the getters, the corners cases, the 13
+printing words, the settings-saved clause), `AgentGuidanceTests` (the ten
+`rootFileCases` with a second pass each, the three `addCases`, the failure
+line and a path-free notice, the skills, Not Now, the hook),
+`PreviewBrowserHandoffTests` (modes and papers against the contract, the
+message, the trail words, a link's destination never on the trail, the
+shim's shape against `print.inline.ts`).
 
 ## What this page does not cover
 
@@ -1306,14 +1580,17 @@ in [`windows-app/PROGRESS.md`](../windows-app/PROGRESS.md), which is maintained
 as work happens:
 
 - **The embedded preview** — WebView2, and the `127.0.0.1` question that was
-  measured and found to be a no-op here.
+  measured and found to be a no-op here. (How its navigations are told apart
+  for Preview at Last Viewed IS here: "Preview at Last Viewed on Windows".)
 - **The assistant's own window**, the model running natively with Vulkan, and
   the OUTSIDE doors: `ClaudeCodeLauncher` writes an MCP configuration and starts
   `claude` with `--strict-mcp-config`, so a teacher's own servers are neither
-  used nor disturbed. There are TWO of those doors on the mac since 2026-09-19
-  — "Revise with Claude…" and "Revise with Codex…" — and this app has only the
-  first; both are described as data in `contracts/app-rules.json` →
-  `outsideAgents`, which nothing here reads yet. See
+  used nor disturbed. There are TWO of those doors — Revise With ▸ Claude… and
+  Codex… (on Windows since #210, 2026-09-30; inside the Revise With ▸ submenu
+  on every row since #491, where they were "Revise with Claude…" and "Revise
+  with Codex…" at the top level) — both described as data in
+  `contracts/app-rules.json` → `outsideAgents`, read here by
+  `CodexLauncherTests` and, for the menu titles, `ContractTests`. See
   [the assistant](10-local-ai-assistant.md) for what the assistant IS, and
   [its "other doors" section](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has)
   for what each door launches, what was measured and what was rejected.
@@ -1495,41 +1772,72 @@ What replaces the old container concepts:
     assistant's `rebuild_preview`, `publish_pages` (a page or a whole unit)
     and `unpublish_pages` (a whole unit) rebuild with the same
     `--build-only` leg, so they meet the same refusal.
-    `AssistWorkspace.RebuildPreview`, `Apply` and `ApplyWholeUnit` now ask
-    `RefusedWhileItsSectionDeploys` inside their failed-build branch and say
-    what was already done, then the launcher's own line, lifted as the window
-    lifts it ("…, but the preview couldn’t be built: ICS4U section 2 is
-    already being deployed, so it cannot be built until that has finished.").
-    Not `DeployRefusedWhileItsSectionDeploys`, which says the section "was not
-    deployed again" — false of a rebuild — and not a new wording key, which
-    only the mac can add (assist-wording.json is generated there). The lifted
-    line is contract data already, and its build flavour exists because a
-    rebuild runs that leg. Pinned by `shared-rules.json` →
+    `AssistWorkspace.RebuildPreview`, `Apply` and `ApplyWholeUnit` said what
+    was already done, then the launcher's own line, lifted as the window lifts
+    it ("ICS4U section 2 is already being deployed, so it cannot be built until
+    that has finished."). Not `DeployRefusedWhileItsSectionDeploys`, which says
+    the section "was not deployed again" — false of a rebuild. The lifted line
+    is contract data already, and its build flavour exists because a rebuild
+    runs that leg. Pinned by `shared-rules.json` →
     `deployWhileItsSectionDeploys.refusedBuildAnswers`, run here by
-    `RefusedBuildAnswersTests` through the real `PlantoirTools`.
+    `RefusedBuildAnswersTests` through the real `PlantoirTools`. (Since #481,
+    below, the line arrives inside `wording.previewDidNotBuildBecause`.)
     - **The cross.** `plantoir-mcp`'s `LauncherRunner` reads the launcher
       without naming an encoding, so the cross arrives as `?` or as three
       characters of mojibake. Detection never cared (the markers are ASCII);
       since these answers SAY the sentence, `SectionDeployRefusalOf` now takes
       off everything before the course code's first letter or digit. The
       runner's encoding was deliberately left alone in this piece.
-    - **What is left as it was.** An ORDINARY build failure in `Apply` and
-      `ApplyWholeUnit` still ends with `WhereTheOutputIs`, which points at a
-      window the server does not have. Dropping it would leave "the preview
-      couldn't be built" with no reason, and pasting the raw log back is the
-      bug `APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog` exists to
-      prevent; the right answer is a headless variant of `previewDidNotBuild`,
-      which is a wording key, so it was the mac's to add — and it did, the same day: `previewDidNotBuildForACallerWithNoWindow` and `previewDidNotBuildBecause` are in `assist-wording.json` now, and #481 is Windows' issue to declare them (or `ContractTests` stays red) and then say them here. The same
-      key would cover a THIRD gap, pre-existing and also left alone:
-      `RebuildPreview`'s ordinary failure still appends `build.Message`
-      whole, so an outside assistant's `rebuild_preview` hands back the raw
-      launcher output — "(The launcher exited with code 1.)" and "Last
-      output:" included, a machinery word in a teacher's answer. A headless
-      `previewDidNotBuild` should replace that too. An exit 3 (a
-      question) in those two paths is still read as a failed build — a
-      separate gap. Unpublishing single PAGES never rebuilds on this side
-      (`Apply` returns before the build when the plan hides), so it cannot
-      meet the refusal at all. The contract HAS that case since the mac's half landed (the seventh `refusedBuildAnswers` case, added from the mac, which rebuilds after hiding one page): it is red here until #479 decides whether a hide rebuilds, and this side owes holding it open by name in `NamedGapLedger` against #479 until then (or implementing the rebuild) — not marking it `appliesOn`.
+    - **What was left as it was on 2026-10-08, and closed on 2026-10-15
+      (batch 1 of the catch-up to 1.7.1).** Three gaps were recorded here, all
+      now closed:
+      - **An ordinary build failure (#481).** `Apply` and `ApplyWholeUnit`
+        ended it with `WhereTheOutputIs`, a pointer at a window plantoir-mcp
+        does not have, and `RebuildPreview` appended `build.Message` whole —
+        "(The launcher exited with code 1.)" and "Last output:" handed to an
+        outside assistant. The mac added the two headless keys the same day,
+        and Windows now declares and says them: `PreviewDidNotBuildHere`
+        (which replaced `RefusedWhileItsSectionDeploys`) says
+        `wording.previewDidNotBuildBecause` with `FailureExplainer.Explanation`'s
+        reason when there is one — the #471 refusal among them, reached through
+        `SectionDeployRefusalOf` — and
+        `wording.previewDidNotBuildForACallerWithNoWindow` otherwise. A
+        rebuild's answer is "Nothing was changed. " and that sentence; a page or
+        unit's is what was already done and that sentence. `WhereTheOutputIs`
+        is said nowhere in `AssistWorkspace` any more. Accepted, as on the mac:
+        `Explanation` can lift a sentence written for a deploy ("… then deploy
+        again") into a preview build's answer. Rejected: a Windows-only
+        sentence, because a wording key is the mac's to add and it had.
+        Tests: `AssistWorkspaceTests.ARebuildThatFailsSaysOneCleanSentence`,
+        `ARebuildThatFailsForAReasonSaysTheReason`,
+        `AWholeUnitWhoseBuildFailsSaysOneCleanSentence`, and the two older
+        tests whose expectations moved.
+      - **Exit 3 in `Apply` and `ApplyWholeUnit` (#478).** A question was read
+        as a failed build there, while `RebuildPreview` and `Deploy` said
+        `PreviewBuildNeedsAnAnswer`/`DeployNeedsAnAnswer`. Both now check
+        `NeededAnAnswer` first and say what was done, then
+        `PreviewBuildNeedsAnAnswer` (`APublishOrHideWhoseRebuildStopsForAQuestionSaysSo`).
+        The mac's own runner has the matching gap one level up — its
+        `carryOut` counts the headless failure sentences as "the preview was
+        left as it was" but not the question — and owes it as a `mac` issue.
+      - **Unpublishing single PAGES never rebuilt (#479).** `Apply` returned
+        before the build whenever the plan hid pages (`if (!plan.Publishes)`).
+        Nothing chose that: since the first commit (b3b7fc040) `Apply` tied
+        "build the preview" to "the plan publishes", and the mac rebuilds
+        after a hide. The return is gone, so a hide takes the publish's path —
+        the window's `preview: false` return (its own visible rebuild covers
+        it), `ClaimTheRebuildAfterAWrite`, then `--build-only` — and the
+        seventh `refusedBuildAnswers` case runs green with no ledger entry
+        (`HidingAPageRebuildsThePreviewAndStopsThere`,
+        `HidingWithPreviewFalseBuildsNothing`). Left alone on purpose: a hide
+        that changes NOTHING still builds nothing, while a publish that changes
+        nothing does (the `ChangesNothing && !Publishes` return); and a hide is
+        still not refused up front while Plantoir is building
+        (`RefuseIfPlantoirIsBuilding` stays publish-only) — its pages are
+        written and only the rebuild is declined, with its note. No new trail
+        event: a hide's rebuild meets the existing "build declined, course busy
+        elsewhere" and "outside assistant worked while a preview was open"
+        lines, whose `carries` already say "a change it made".
     - **No new trail event (rule 5).** The launcher already writes "build
       declined, course busy elsewhere" for the refusal (`launcherLines`).
   - **The kind.** `ScheduledPublishOutcome.Kind.EarlierDeployStillWorking` is
@@ -1543,10 +1851,13 @@ What replaces the old container concepts:
     run of the section does not wait: its leases look free, its build leg is
     refused, and it is recorded as `buildDidNotFinish`. Rare enough to record
     rather than build.
-  - **Measured: a re-set whose moment arrives while the earlier run still
-    works never runs** (Task Scheduler `IgnoreNew`). The numbers are in 07 →
-    "Set again while the run works (#409)", and the fix is
-    [#470](https://github.com/russellgordon/plantoir/issues/470).
+  - **Measured: a re-set whose moment arrived while the earlier run still
+    worked never ran** (Task Scheduler `IgnoreNew`). Fixed by
+    [#470](https://github.com/russellgordon/plantoir/issues/470) on
+    2026-10-15: the task's policy is `Queue`, the queued start runs 2.1 s
+    after the first ends with the newest definition, and the run's own
+    checks decide whether it still deploys. The numbers for both are in 07 →
+    "Set again while the run works (#409)".
   - **Known limits.** A deploy run inside another process (typed at a prompt,
     or `-Command`) is not seen, and neither is an elevated one; the
     self-relaunch that would see the first was rejected (03).
@@ -1696,7 +2007,7 @@ Windows figures are the v1.1.0 release assets.
 | Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
-| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine); `get-pip.py` deliberately not (below) |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine), and since 2026-10-15 (#503) the Paged.js and function-plot tarballs and the Debian Latin Modern package, with the files kept from each checked again; `get-pip.py` deliberately not (below) |
 | When the building downloads happen (bundle B) | at the first preview | in the BACKGROUND at first launch, and again when the recipe changes (`setup.sh --prepare-builder`; one sidebar line, four trail events) | nothing to get ready: `builderWarmUp` and its trail events are `appliesOn: ["mac"]` |
 | The image itself (#334, bundle B) | full Quartz history, a spare scaffold copy, base tag unpinned | Quartz at depth 1 (≈342 MB first download), no `/opt/quartz-site`, base pinned by digest | no image; the runtime is bundled |
 
@@ -1842,7 +2153,8 @@ the same day.)
 
 Found 2026-08-22, testing the model-in-use guard written up in
 (`GUI-IMPROVEMENTS.md` row 421):
-`AssistantSettingsDialog`'s
+the Settings dialog's (`AssistantSettingsDialog`, since #491 the Assistant
+section of the Settings window, `AssistantSettingsPane`)
 "On this PC" housekeeping rows put a Stop/Remove/Download button flush against
 the `ScrollViewer`'s right edge, and the vertical scroll bar drew right over
 top of it — reported directly: "the scroll bar goes over the buttons — that
@@ -1858,7 +2170,8 @@ right-hand column of a two-column `Grid` — sits directly underneath it.
 
 **The fix, and the convention going forward**: give the `ScrollViewer` extra
 padding on the trailing side specifically — `Padding = new Thickness(0, 0, 20, 0)`
-in `AssistantSettingsDialog.cs`, 20px being enough to clear the thumb's hit
+in `AssistantSettingsDialog.cs` (now `AssistantSettingsPane.cs`, and the
+Deploying section's `DeployingSettingsPane.cs` keeps the same gutter), 20px being enough to clear the thumb's hit
 target with room to spare. Not a fix specific to Settings: **any `ScrollViewer`
 whose content places an interactive control (a button, a toggle, a link)
 flush against the trailing edge needs the same trailing gutter**, checked at
@@ -1989,6 +2302,25 @@ reach the course-code chevron runs under it, the accepted trade.
 own text box.** Match whatever ITS standard height is, with every field in
 the wizard and in Copy a Page the same height — never 24pt, which this
 section used to tell you to match. The `windows` issue from #456 says so.
+
+**Checked on Windows for #483 (2026-10-15): nothing was forced, and the
+fields are WinUI's own 32.** No single-line field in the wizard or Copy a Page
+sets a `Height` (`NewCourseDialog.cs`, `CopyAPageDialog.cs`, `FormBuilders.cs`
+— the one `MinHeight` is the multi-line footer box, 60); the course code is a
+real `AutoSuggestBox`, the rest plain `TextBox`es and `ComboBox`es at their
+theme height. Measured once through UI Automation's `BoundingRectangle` with
+the real app (`--state-dir`, the wizard scrolled through by its own scroll
+pattern so each field was on screen; Intel i5-8365U, Windows 11 Pro 26200,
+display at 144 dpi, values in the 96-dpi units the test process is given —
+the deploy picker's `MinWidth` of 300 reads 300): **the wizard's Course code
+32, Course name 32, Timetable section numbers 33, Deploy to 32** (the 33 and
+one 31 among ten samples of the picker are rounding of a 150% scale). **Copy a
+Page**'s three fields carry their label as a `Header`, so UI Automation's box
+includes it: Page 59, Copy into 64, Folder 64, each label 19 high — the edit
+parts are the same theme control; the 5-point difference is the header's
+spacing in a `ComboBox` against an `AutoSuggestBox`'s, not the field. Nothing
+to change; no permanent test was added (a one-off measurement, per the
+batch's plan review).
 
 ## Reading a page's visibility: four .NET defaults that get it wrong
 
@@ -2413,7 +2745,8 @@ Five things about it are decisions rather than details.
   if anything goes wrong, which fails the NEXT build with a lock error reading
   "the app is open" when the app is not open at all. `AssistSurfaceContractTests`
   made the same trade. The binder drops an argument the tool does not declare,
-  as the SDK's own binder does — `AssistAgent.RunTool` sets `preview` on tools
+  as the SDK's own binder does — `AssistToolRunner.Run` (reached through
+  `AssistAgent.RunTool` since #489) sets `preview` on tools
   that do not all take it — but everything else about it fails LOUDLY, because
   a runner that quietly drops an argument is #141 again: a declared argument
   that cannot be converted throws, a required one nobody sent throws rather
@@ -3003,7 +3336,10 @@ the state to go with them.
 MENU route to the folder picker is genuinely shut while a dialog is up:
 `MainWindow.OpenWorkingFolder_Click` is a `MenuFlyoutItem`, and the dialog's
 overlay covers the menu bar. **Ctrl+O is not obviously shut.** It is a
-`KeyboardAccelerator` declared on `MainWindow.xaml`'s `Root` grid; WinUI
+`KeyboardAccelerator` declared on `MainWindow.xaml`'s `Root` grid (as it was
+when this was written; since #488 every key is on its menu item — see
+"Accelerators under a dialog (#191)" and "Menus, the Section menu's functions
+and #475 on Windows"); WinUI
 searches for accelerators window-wide unless a `ScopeOwner` narrows them, none
 is set, and `OpenWorkingFolderAccelerator` has no guard of its own. Whether the
 key actually reaches it under a modal dialog cannot be settled by reading —
@@ -3655,8 +3991,13 @@ Deploy…, Rename (the File menu item, F2 and the context menu all ask
 the Site Health REPAIR button (and `SiteHealthRepair.OutcomeOfRepairing`
 refuses on its own), and the Course Settings form, replaced by
 `ReferenceSummaryView`. Cancel Scheduled Deploy… stays (gate by direction).
-The footer's Remove on a reference course's section removes the whole course;
-`ArchiveAndRemoveSection` refuses with `staysAsItIs` for any other caller.
+On a reference course's SECTION, the − button, the Delete key and the
+section's menu offer no removal at all (− is greyed, Delete does nothing, the
+menu has no Remove Section…); the course row's Remove Course… removes it all.
+`ArchiveAndRemoveSection` still refuses with `staysAsItIs` for any caller that
+skips that rule. (Until batch 3B the footer's Remove there silently removed the
+whole course; see "Delete and the − button run the menu's removal (items 5–6)"
+under "The HIG sweep, screen by screen, on Windows (#491 part B)".)
 Import Courses for Reference… is on the File menu, beside Restore from
 Archive…. The calm note is shown before Obsidian opens, once per course,
 remembered in the state folder.
@@ -3833,7 +4174,7 @@ Two things the redirect cannot see, and what covers each:
 - **A real Task Scheduler registration.** The initializer also sets
   `TaskScheduling.RealSchtasksGuardForTests`, which throws on any real
   `schtasks.exe` call other than `/Query`. It caught one on its first run:
-  `TaskDefinitionTests.TheRegisteredTaskKeepsTheThreeSettingsAndCarriesItsToken`
+  `TaskDefinitionTests.TheRegisteredTaskKeepsTheFourSettingsAndCarriesItsToken`
   registers a real probe task ON PURPOSE (ruling 7 of an earlier bundle) and
   now lifts the guard for itself, by name.
 
@@ -3863,7 +4204,11 @@ and invisible on the mac reading the same folder. `CourseArchiver.Archive` now
 waits for the next second (at most three tries) and stamps again. Rejected:
 teaching both readers a `-N` suffix (the mac's reader would hide a zip Windows
 wrote until it learned it too), and a millisecond stamp (it changes the frozen
-`zipNames` format). `ContractTests.CourseManagement_ZipNames` also takes each
+`zipNames` format). **Since #489 (2B) the READER takes `-N`** (N ≥ 2): the
+mac began writing `<time>-2` for a second copy in one second and reading it,
+so the reason above expired in that direction, and a copy the mac made must
+be listed and counted here. The WRITER still waits — see "The Section menu's
+functions". `ContractTests.CourseManagement_ZipNames` also takes each
 case's `moment` apart field by field against `GregorianCalendar` (#161 part 2);
 re-formatting with our own writer would stay green while both halves were
 wrong.
@@ -3992,6 +4337,24 @@ click; withdrawing when a later run clears the record (its own post already
 replaces the toast by tag).
 
 ### Accelerators under a dialog (#191)
+
+**Since #488 (2026-10-15) these keys are on MENU ITEMS, not the root Grid**:
+Ctrl+O on File ▸ Open Working Folder…, Ctrl+N on New Window, Ctrl+Shift+R on
+Reload Courses, F2 on Course ▸ Rename, and every new menu key besides — F1 on
+Help ▸ Plantoir Help since #491, with its own `InlineData` in
+`AcceleratorDialogGateTests`. (The sidebar's Delete key, #491 part B, is the
+one key that is deliberately NOT on a menu item — there it would take Delete
+from every text field — so the tree's `KeyDown` asks `DialogGate.Holds(root,
+"Delete")` itself; `AcceleratorDialogGateTests.TheSidebarsDeleteKeyAsksTheDialogGateFirst`.) Each
+item's key still asks `DialogGate.Holds(root, "<key>")` before it runs (in
+`MainWindow.Invoke`), so the record and the test below are unchanged; what
+changed is where WinUI looks for the key. Re-measured with the keys on items,
+2026-10-15, verbatim: "Ctrl+Shift+R / F2 / Ctrl+N / Ctrl+O: not delivered
+(the dialog kept it); control (no dialog): all four arrived at their
+handlers" — and a probe measured the same for an item's Ctrl+Shift+D and a
+root-scoped key ("Menus, the Section menu's functions and #475 on Windows",
+above). `MenuGreysUnderADialogUiTests` adds Ctrl+Shift+D with the same
+control. The history below is what was true of the root-scoped keys.
 
 Ctrl+O, Ctrl+N, Ctrl+Shift+R and F2 now return at once while a
 `ContentDialog` is open (`Services/DialogGate`: the open popups whose child
@@ -4169,6 +4532,27 @@ product question, not a capture one). Fixed on 2026-10-07 — see the next
 section; `Dress` now re-syncs the caption after it sets a scene's theme, so
 pictures taken after that carry a dark bar in the dark scenes.
 
+**What printing does (`capture_windows.py --print-set`, the 1.7.1
+catch-up).** The two print shots are of a PREVIEW, not a published site, so
+they have a pass of their own (`website/shots/print_set_windows.py`): a
+working folder made by the branch's own `setup.ps1`, a preview built by its
+own `preview.ps1` with the bundled runtime, the page taken in an Edge `--app`
+window like every class-site shot, and the handout printed by the page itself
+in headless Edge (`handout_pdf.mjs` under the runtime's Node 20, which needs
+`--experimental-websocket`). Three things met doing it, each measured on
+2026-10-15: `setup_course.py`'s colour-scheme picker reads keys through
+`msvcrt`, so answering `setup.ps1` through a PIPE hangs there for ever — it
+is driven through `PtyDriver` instead, with `q` keeping the scheme the
+written config names; Quartz scrolls the page about 300 px down on load, which
+puts the Print button above the window, so the page is scrolled back to its
+top before the shutter; and Windows.Graphics.Capture sends NO frame for a
+window on a locked or disconnected session ("the window sent no frame in 3
+seconds"), so the pictures need somebody's desktop even though the course,
+the preview and the PDF do not. Text read-back is `windowshot --ocr`
+(Windows.Media.Ocr, which does run locked), the counterpart of the mac's
+`ocr.swift`: on the mac's own `print-*` pictures it reads every `expectText`
+word. `website/SCREENSHOTS.md` → "Windows Capture" is the procedure.
+
 ## The title bar follows dark and light mode (ordered 2026-10-07, ships in Windows v1.4.4)
 
 Russell's order: "The title bar should be in dark mode when the computer is in
@@ -4264,7 +4648,8 @@ and editable; what builds from the copied tools waits:
   automation help text (a screen reader reads the second; it does not read a
   tooltip) saying `ToolchainReadiness.GettingReadyMessage`.
 - **New Course** (the sidebar's `+`) is greyed the same way, and every other way
-  into the wizard (the empty pane's "Add a Course…", the automation hooks) is
+  into the wizard (the empty pane's "New Course…" — "Add a Course…" until
+  #488 — File ▸ New Course…, the automation hooks) is
   refused by `SidebarPane.OpenNewCourseWizard` with the same sentence. Inside
   the wizard, Create and Add Example Course ask again before the progress view
   replaces the form, and `NewCourseCreator` refuses BEFORE `course_config.json`
@@ -4383,10 +4768,49 @@ another — before pressing anything, so a picture never shows the "Cannot
 Preview Yet" dialog; a FAILED copy makes a scene answer `refused: <the
 sentence>` and a hook log `automation hook refused: …` and do nothing.
 
-**The scheduled run is unchanged in this piece.** It never mirrors
-`.toolchain\` at all, and its wrapper's fingerprint reads
-`.toolchain\scripts`, so whether a 06:30 run should wait for a copy the app
-is making is its own question; the director opens it as an issue.
+**The scheduled run copies too, since #477 (2026-10-15).** It used to never
+mirror `.toolchain\` at all, while its wrapper's fingerprint reads
+`.toolchain\scripts` — so after an update a 06:30 run built from the OLD
+recipe until the app was opened, and one that fired while a window was
+copying built from a mix. Now `ScheduledRun.Execute` waits, inside its
+existing ten minutes, while another program's marker is live, and after the
+settings decision it calls `ToolchainReadiness.RefreshWorkspace` with the
+recipe beside `Plantoir.exe` (`World.BundledToolchainRoot`, set by
+`Program.Main`) before it writes the wrapper. The run's copy goes through
+`Ensure` and `CopyNow`, so it writes the same marker: `plantoir-mcp` refuses
+meanwhile and a window's later copy waits its turn. The order, the reasons,
+the stand-down sentence and the measurements are in 07 → "On Windows since
+bundle 3: the scheduled run is Plantoir".
+
+**Two copies take turns (#477).** Measured: two copies into one folder at
+once fail with sharing violations (36 failures in 5 runs, 0x80070020; a
+temp-name-and-rename version failed 855 times with 0x80070005 and left `.tmp`
+files behind — 07 has the numbers). So `CopyNow` writes its marker FIRST and
+then waits while a live marker written before its own stands
+(`ToolchainReadiness.MustWaitFor`: an earlier moment on line 3, or the same
+moment and a lower process id; an unreadable moment counts as NOT earlier,
+so no two copies can both wait on one marker; never itself). `Markers()` now
+reads the moment and `WriteMarker` returns the moment it actually wrote. How
+long to wait is the CALLER's (`ToolchainReadiness.TakingTurns`): the window's
+`WaitUntilDone` looks every half second and never gives up — the folder
+reads Copying, with its banner, meanwhile — and says in startup.log that it
+waited and for which process; the scheduled run passes its own `Sleep` and
+gives up when its ten minutes, counted from its wait for the course, are up,
+leaving `Status.GaveUpWaiting` and writing nothing. `Entry.Writing` is set
+only when the copier really starts (#484 waits only for those). A marker from
+an older Plantoir (1.4.5 and before) has the same body, so it is waited for;
+that program never waits in turn, so copies may still overlap with it, and
+nothing deadlocks. `RefreshWorkspace` (Core) does NOTHING when the recipe's
+`Dockerfile` is not at the root it is given: the mirror deletes what its
+source lacks, so mirroring from a missing bundle would empty the working
+folder's tools. `BundledToolchain.RefreshWorkspace` is now the app's thin
+wrapper around it, and keeps its name (`Reload()`'s body is pinned).
+
+A NOTE on a near-miss when reading the contract: `workLease`'s
+`howToRunACase` ends "On Windows, aBuild and aScheduledPublish also block on
+copy (#413)". That `copy` is the backup-zip LEASE (`WorkLease.Copying`, a
+course being zipped for an assistant), not this tools marker, which is not a
+lease and holds no course.
 
 **3. Whether the mac's equivalent blocks the same way.** It did, and #476
 (the mac, 2026-10-08) measured and then matched this design: the copy held
@@ -4398,11 +4822,114 @@ and a banner once a file is written; it marks a folder fresh only after a
 copy with nothing failed (the same defect, fixed the same way); its MCP
 server and headless rebuilds wait for their own copy; it writes the same
 `working folder tools copied` line; and ⌘Q waits for a running copy, which
-this side does not (a `windows` issue). Two differences, both on purpose: no
+this side now does too (#484, below). Two differences, both on purpose: no
 cross-process marker (every file is written atomically from the same bundle,
 so two copies at once write the same bytes), and the banner follows the
 first file WRITTEN rather than a timer. `documentation/09-mac-app.md` →
 "Getting a folder ready after an update, off the main actor (#476)".
+
+### Closing waits for a copy that is writing (#484)
+
+Since 2026-10-15 (Russell's ruling on #484: wait on close, matching the mac's
+#476). Before, closing the last window while the copy ran ended it part-way:
+each file is written whole, so nothing was torn, but `.toolchain\` was left
+half old and half new until the app next ran — and a launcher typed at a
+prompt, or (before #477) a scheduled run, hashed and built from that mix.
+
+**What it does.** `MainWindow.AskBeforeQuittingThroughWork` (the Closing
+handler) asks the #231 quit question FIRST, unchanged — Keep Working leaves
+everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
+the last window) and a copy is WRITING (`ToolchainReadiness.AnyCopyIsWriting`),
+it cancels the close synchronously, before any await, opens the banner at
+once (the one-second delay treated as passed) — the "Getting this folder
+ready…" banner when the copy is this window's folder's, and
+`ToolchainReadiness.BannerWhileClosing`'s "Finishing getting a folder ready…"
+when the copy being waited for is ANOTHER folder's and this one is ready (the
+batch 4 implementation review's M2: `RefreshReadiness` read only this
+folder's state, so a last window on folder Y waiting for folder X's copy
+showed nothing at all) — awaits
+`ToolchainReadiness.WhenWritingCopiesFinish()` — every folder's writing copy in
+the process, the mac's `waitForAllCopies()` — and closes again; `Closed` then
+runs `App.QuitTime()` as before, so a prepared update still installs at quit,
+after the copy. The decision is the pure
+`ToolchainReadiness.ClosingWaitsForTheCopy(closingQuits, aCopyIsWriting,
+systemIsEnding, alreadyWaited)`.
+
+**Three bugs the plan review found in the first design, and what fixed them.**
+(H1) the old handler began `if (_quitConfirmed || …) return;`, so Quit Anyway's
+own `Close()` skipped any wait: `_quitConfirmed` now skips only the QUESTION.
+(H2) a "second close does nothing" guard on `_waitingForCopies` would have
+cancelled the handler's own final `Close()`: the flag is cleared before it.
+(M3) waiting only for copies already writing could miss one still waiting its
+turn behind another program's copy, which then starts and is cut by the exit:
+`WhenWritingCopiesFinish` HOLDS BACK every copy not yet writing, under the
+same lock a copy takes to mark itself writing, and takes its snapshot again
+after each wait. A held-back copy has written nothing; if the close turns out
+not to quit, `ReleaseWaitingCopies` lets it go.
+
+**A close that waited and then did not quit releases the hold (the batch 4
+implementation review's M1).** The hold is process-wide and nothing else
+clears it, so a close that ends without quitting after the wait would leave
+every later copy waiting its turn for the life of the process — banner up,
+Preview, Deploy and New Course greyed, the folder's marker live so
+`plantoir-mcp` refuses and a scheduled run stands down. Three ways that
+happens, all handled by `MainWindow.LetHeldCopiesGo` (which also clears
+`_copiesWaitedFor`, so a later close waits again): the quit question is
+asked AGAIN after the wait (a preview began meanwhile) and the teacher keeps
+working; a window was opened meanwhile, so the close no longer quits; or the
+handler itself threw. `UpdatePrompts.QuitForInstallAfterTheCopy` releases
+it too when the installer does not start. Test:
+`ToolchainReadinessTests.AHoldReleasedAfterACloseThatDidNotQuitLetsALaterCopyFinish`.
+
+**A finished copy tries five times to take its marker away** (200 ms apart,
+the batch 4 implementation review's L1): a scanner or indexer holding the
+file for a moment would otherwise leave a LIVE marker for as long as this
+process runs, holding every other program's copy of the folder. The limit
+that remains: a marker still undeletable after the fifth try is said in
+`startup.log` ("its marker could not be removed after 5 tries") and stands
+until this process exits, when it reads as stale and is swept. Test:
+`AMarkerHeldOpenForAMomentIsStillTakenAwayAfterTheCopy`.
+
+**What it does not do, and why.**
+- **Not while Windows is ending the session** (`SessionEnding.IsEnding`).
+  Windows ends the process at sign-out whatever the window does; holding the
+  close only produces "this app is preventing shutdown". A Windows-only
+  difference from the mac, and a cheaper one since #477: the scheduled run now
+  brings the tools up to date itself before it builds.
+- **Not for a window that is not the last.** Closing it does not end the
+  process, so the copy carries on in the windows that remain.
+- **Not twice.** A second X while the window waits does nothing new.
+- **The update installer's quit** goes through `Application.Exit()`, which
+  raises no window's Closing, and the installer overwrites `{app}\Toolchain` —
+  the files the copy READS. So `UpdatePrompts.QuitForInstall` awaits
+  `WhenWritingCopiesFinish()` itself before it starts the installer (a
+  fire-and-forget helper; `IUpdatePrompts` stays `void`). The menu bar has no
+  Exit item (2A), so the window's X / Alt+F4 and the installer are the only
+  quits.
+
+**Measured** (i5-8365U, 16 GB, Windows 11 Pro 26200, x64 Debug, 2026-10-15,
+`GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits`, which deletes
+`.toolchain\support` — 12,660 files — before launch): window 3.5 s after
+launch, closed at 3.6 s, still up and copying 0.7 s later with its banner,
+quit at 18.9 s — 15.3 s held open — with every one of the bundle's support
+files in place and the trail line ending ", and Plantoir waited for it before
+closing". Must-fail: with `ClosingWaitsForTheCopy` forced false, the same test
+quit at 5.3 s with the support folder short, and failed.
+
+Tests: `ToolchainReadinessTests.ClosingWaitsOnlyForAWritingCopyWhenItQuits`
+(the decision table), `ClosingWaitsForEveryFoldersWritingCopy`,
+`ACopyStillWaitingItsTurnIsNotWaitedForAndDoesNotStartOnceTheCloseBegins`
+(M3), `ACopyAClosingWindowWaitedForSaysSoOnTheTrail`; the UI test above. H1
+(Quit Anyway, then the wait) is window logic no unit test reaches and was
+not driven through the window: it needs a build under way and a copy writing
+at once.
+
+**Rejected:** quitting anyway after a time limit (the copy is bounded by
+itself — seconds warm, about two minutes cold — and a cut copy is the fault);
+a dialog asking whether to wait (there is nothing to decide: the copy finishes
+on its own and the window says so); and doing nothing and recording the gap,
+the other answer #484 allowed — the mac waits, and the difference would have
+been one more thing to explain.
 
 ### What was rejected
 
@@ -4411,9 +4938,13 @@ first file WRITTEN rather than a timer. `documentation/09-mac-app.md` →
   changed — the in-place mirror only writes what differs, and the launchers
   hash the folder, so a whole new tree buys nothing. The residual risk is
   recorded instead: a preview ALREADY RUNNING from another process (a
-  command-line launcher, a scheduled run) while the app copies can read a mix
-  of old and new files. That is unchanged from before #473 — the copy was
-  never atomic — and the app's own builds now wait for it.
+  command-line launcher) while the app copies can read a mix of old and new
+  files. That is unchanged from before #473 — the copy was never atomic — and
+  the app's own builds now wait for it; since #477 a scheduled run does too
+  (it waits for a live copy and makes its own). Measured on 2026-10-15, a
+  temp-name-and-rename per FILE is worse still when two copies meet: 855
+  failures in 3 runs (07 → "On Windows since bundle 3: the scheduled run is
+  Plantoir").
 - **Queueing** Preview and Deploy until the copy finishes. Russell chose
   disabled with a reason: a queued press is invisible work that starts on its
   own minutes later, and a teacher who pressed Deploy and walked away cannot
@@ -4423,8 +4954,8 @@ first file WRITTEN rather than a timer. `documentation/09-mac-app.md` →
   for a deploy, and after #406's today's-class question — a refusal that
   arrives after the window has already acted. So the gates are at the entry
   points and `ScriptRunner` is the backstop.
-- **A wait in the scheduled run.** See above: the run never mirrors, so it is
-  its own issue rather than a patch here.
+- **A wait in the scheduled run** — rejected in #473 as out of scope, and
+  built in #477 (above): the run now waits for a live copy and makes its own.
 - **A modal "please wait" dialog.** It would block exactly what the teacher
   can safely do meanwhile (read and edit pages, settings) and is the shape of
   the freeze this fixes.
@@ -4436,14 +4967,24 @@ first file WRITTEN rather than a timer. `documentation/09-mac-app.md` →
 ### The trail, and measuring it
 
 `working folder tools copied` (`ActivityTrail.Event.WorkingFolderToolsCopied`;
-`shared-rules.json` → `activityTrail.mustRecord`, `appliesOn: ["windows"]` —
-its `appliesOnWhy` says why it is permanent rather than a gap) is written once
-per copy that changed or failed something, never for the ordinary pass:
+`shared-rules.json` → `activityTrail.mustRecord` — `appliesOn: ["windows"]`
+until the mac's #476 wrote it too) is written once per copy that changed or
+failed something, never for the ordinary pass:
 
 ```
 … · got the working folder ready — 2389 files brought up to date in 5.3 s — C:\…\workspace
 … · could not finish getting the working folder ready — 2 files could not be copied or removed (first: .toolchain\scripts\build_site.py, <its error>), 40 files brought up to date in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
 ```
+
+Since #477 the scheduled run's own copy writes it with the course and
+section, "got the working folder ready for a scheduled deploy — …", and a
+failure there ends "; the scheduled deploy stood down" (nobody is there to
+choose Reload Courses). Since #484 a copy a closing window waited for ends
+", and Plantoir waited for it before closing". A copy that waited for another
+program's copy says so in `startup.log` ("tools copy for '<folder>' waited
+N s for another copy (process P) to finish first", or "did not start" when the
+scheduled run gave up), not on the trail: the run's own `scheduled publish
+waited for the course` line carries that.
 
 It does not say "after an update": the same copy fills a folder the picker sets
 up from nothing, and refreshes any stale one. And a pass that changed NOTHING
@@ -4484,22 +5025,1370 @@ fixture `InitializeWorkspace` has already brought up to date that is the
 ordinary half-second pass, and without the wait a test pressing Preview the
 moment the sidebar appears would meet the disabled button.
 
-## Diagrams and graphs (#485 E1, v1.7.0): what the runtime must carry
+## Menus, the Section menu's functions and #475 on Windows (#488, #489, #483)
+
+The mac's #457 put every action on a course or a section into two persistent
+menus, **Course** and **Section**, with keys on menu items only, File ▸ Open
+Recent, and context menus that select their row first
+([09 → "Mac conventions: the menu bar, keys and text fields (#457)"](09-mac-app.md#mac-conventions-the-menu-bar-keys-and-text-fields-457)).
+Windows' catch-up to 1.7.1 lands it in three pieces: **2A** (this part, #488
+and #483) is the menu bar, Open Recent, the context menus and the Obsidian
+route; **2B** adds the assistant's nine functions to the Section menu (#489
+items 1–2) and **2C** the question about classes dated after the next class
+at Deploy (#475, the rest of #489). Their parts of this section are written
+when they land.
+
+### The menu bar (2A, 2026-10-15)
+
+| Menu | Items (Windows key) |
+|---|---|
+| File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
+| Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
+| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
+| Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
+
+**One table, in code** (`Plantoir/MainWindow.Menus.cs`): every item is built
+by one `Add(…)` that carries its contract item (`SubjectMenuRules.Item`), its
+key and its AutomationId, so an item cannot exist without its rule or its id.
+The menu bar's XAML holds five empty `MenuBarItem`s and nothing else.
+
+**Which items can be used** is `Plantoir.Core/Models/SubjectMenuRules.cs`, a
+port of the mac's `SubjectMenuRules.enabledItems`, run by
+`SubjectMenusContractTests` against `shared-rules.json` → `subjectMenus` (21
+cases, 51 items, 24 situation keys; the names map both ways by camel-casing
+the enum, so "Finder" and "NewTerminalAtFolder" in two names are the mac's
+neutral words for Show in File Explorer and Open in Terminal). Items GREY,
+never hide — except Revise With ▸ Claude… and Codex…, LEFT OUT when not
+installed (`ClaudeCodeLauncher.IsAvailable`, `CodexLauncher.IsAvailable`,
+decided when the window is built: a fact about the PC, not the selection).
+Local AI Assistant… is always drawn, greyed on a course row.
+
+**What the rule is fed** is `MainWindow.CurrentSituation()`, read from the
+owner that already decides each fact, so the menu and the button cannot
+disagree: Preview and Deploy from the section window's own buttons
+(`SectionDetailView.PreviewButtonIsEnabled`, `DeployButtonIsEnabled`), Save
+and Revert from Course Settings' (`SaveIsEnabled`, `RevertIsEnabled`), the
+schedule from the sidebar row's clock (`ScheduledDeployShownFor` — the tree
+already re-reads Task Scheduler on every refresh, and asking it again per
+menu refresh would spawn work on every hover), copying from the work lease
+plus this app's own Back Up Now (`SidebarPane.IsZipping`), the dialog from
+`DialogGate.IsOpen`. Two facts are gathered the Windows way: **any**
+assistant on the course greys all three Revise targets (Windows' #468 hold,
+which the context menus already used), and — since 2B — `lastChangeIsHere`
+and `verbIsRunning` come from the window's own runner and the in-process
+claims ("The Section menu's functions", below). A `mac` issue records the first.
+
+**Each item runs the SAME code as its other routes.** `SidebarPane.Perform`
+(`SidebarPane.Menus.cs`) dispatches the row items to the functions the
+context menus call (`OpenAddSectionDialog`, `KeepACopy`, `BackUpCourse`,
+`ConfirmRestoreBackup`, `AskWhenToDeploy`, …); Section ▸ Preview and Deploy…
+press the toolbar's own handlers on its own predicates (so today's-class
+question, #406, is asked from the menu too); Save Course Settings presses
+Save. Remove Course… and Remove Section… share the footer button's question
+(`SidebarPane.ConfirmRemove`, factored out of `Remove_Click`; since #491
+`ConfirmRemoveCourse` / `ConfirmRemoveSection`, which the − button, the Delete
+key and the rows' new Remove… items reach through `MainWindow.RunFromTheSidebar`).
+The selection
+is read when the item RUNS, never captured when the menu was drawn.
+
+### WinUI's menu bar has no Opening event — measured, and what fills the gap
+
+Measured with a probe app (MenuBar, three menus, a TextBox and a WebView2;
+keys sent with `keybd_event`, the pointer with `SetCursorPos`/`mouse_event`;
+two runs, Windows App SDK 1.8.260921001, **Intel i5-8365U, Windows 11 Pro
+26200**, 2026-10-15):
+
+| What | Measured |
+|---|---|
+| An item's key with its menu CLOSED, focus in a TextBox | fires; `Invoked` 11–14 ms after the key-down, then the item's `Click` (2 ms later) unless `Invoked` is marked handled |
+| One key on a DISABLED item earlier in the bar and an ENABLED one later | the ENABLED one fires (3–7 ms); the disabled one neither fires nor swallows the key — the OPPOSITE of AppKit, where the disabled item ate it |
+| One key on two ENABLED items | the FIRST in the bar fires, the second never |
+| The key on a disabled item alone | nothing |
+| Ctrl+, (`VirtualKey` 188, the comma) on an item | never fires (both runs) |
+| Focus in the WebView2 (given programmatically, or by a real click in the page): Ctrl+Shift+D, Ctrl+Shift+O, Ctrl+R, Alt+Left on items, and Ctrl+Shift+G on the root Grid | NONE fires — the page takes the keys (the WebView2's own browser keys are left on, so Ctrl+R and Alt+Left are its own reload and back; that half was not measured) |
+| A ContentDialog up: Ctrl+Shift+D on an item, Ctrl+Shift+G on the root Grid | neither fires |
+| Pointer onto a MenuBarItem, then a click | `PointerEntered` at once; `PointerPressed` (handled-events-too) at the press; `Tapped` 26–88 ms later; the flyout's items `Loaded` 3–4 ms after `Tapped` — so everything a refresh can hang on comes BEFORE the flyout draws |
+| F10, Right, Down from a TextBox | did not open a menu in the probe |
+
+So enablement is applied AHEAD of time (`ApplyMenuEnablement`) on every change
+the window hears — the selection, the folder's state, the section window's
+`PreviewChromeChanged`, Course Settings' new `SaveStateChanged`, the tools
+getting ready (#473), activation, a sidebar refresh, a backup starting and
+ending — and again on `PointerEntered` and `PointerPressed` of each menu
+title, on `AppMenuBar.GotFocus`, and on the `Loaded` of each menu's first item
+(a flyout opened from the keyboard or by UI Automation). Whatever the menu
+showed, `Invoke` asks `DialogGate` and the rule AGAIN at the click; that is the
+guard that counts, as the mac's `MenuRoute.run` is.
+
+**Keys live on the menu items, and nowhere else.** The root Grid's seven
+accelerators are gone, Course Settings' Save button lost Ctrl+S (now Course ▸
+Save Course Settings), and the section window's three view-scoped
+accelerators (Ctrl+R, Alt+Left, Alt+Right) are gone too: the measurement shows
+no XAML key fires with the page focused, whatever its scope, and with focus
+anywhere else the items' keys fire — so the view-scoped copies added nothing.
+Every accelerator's `Invoked` is marked handled (an unhandled one goes on to
+raise `Click`, which would run the item twice), and asks
+`DialogGate.Holds(root, "<key>")`, so the #191 record still notes every
+arrival. F2 does nothing while a text field has focus: the key is marked
+handled at the accelerator, so it is spent rather than passed to the field
+(which gives F2 no meaning of its own) — passing it on would raise the item's
+`Click` and rename anyway. **A Rename held back by `Invoke`'s re-check is
+silent too** — F2 on a course whose Rename the rule greys (a reference
+course, a section row, a course being copied) does nothing and says nothing,
+which is what the mac's key on a disabled menu item does. Before #488 F2 opened
+the rename dialog and let it explain the refusal; do not restore that route:
+the reason is on the greyed Course ▸ Rename's own reason line, and a key that
+opens a dialog the menu says cannot be used is the disagreement the one rule
+exists to prevent.
+
+**Ctrl+Shift+O sits on ONE Open in Obsidian item** — Course's unless a section
+row is selected, then Section's; `ApplyMenuEnablement` moves the accelerator
+object between the two items' `KeyboardAccelerators`. WinUI would in fact have
+coped with the key on both (the enabled one fires, measured), but the key
+would then be DRAWN on both, and one key means one thing.
+
+**Why the keys are these.** Ctrl+O, Ctrl+N, Ctrl+Shift+R and F2 were already
+Windows' own; Ctrl+S is Save everywhere on Windows; Alt+Left/Right and Ctrl+R
+are every Windows browser's Back, Forward and Reload. Ctrl+Shift+N, P, D and
+O follow the mac's ⇧⌘ letters. **Not Ctrl+Alt+anything**: on many European
+layouts AltGr IS Ctrl+Alt, so a Ctrl+Alt key fires while a teacher types @,
+€ or { — so Add Section… has no key here (the mac's ⌥⌘N). **Not Ctrl+Shift+C**
+for Copy a Page: it is the browser's inspect-element key and a teacher who has
+used one expects that; Copy a Page has no key. **Settings… lost its "Ctrl+,"
+label**: it was drawn with nothing behind it, and a comma key measured above
+does not fire. Ctrl+Shift+B was kept free for 2B's Rebuild Preview, which has it now.
+
+### What does NOT exist here: File with no window
+
+The mac's File menu works with no window open. A WinUI menu bar lives INSIDE a
+window, and closing the last window quits (`App.ClosingThisQuits`), so there
+is no "no window" state to serve. The nearest thing is a window on the folder
+picker (`WorkspacePickerView`): there `hasFolder` is false and the contract's
+first case holds — Open Working Folder… and Open Recent live, everything else
+greyed. Nothing to build; written down so nobody goes looking for it.
+
+### File ▸ Open Recent
+
+`RecentWorkingFolders` (Core) is the rule, run by `OpenRecentContractTests`
+(cap 10, the five adding cases for Windows — the mac's case of one folder in
+two spellings is `appliesOn: ["mac"]`, and Windows' own form of it, case and
+a trailing separator, is pinned beside it — the three title cases and the
+wording). The list is kept in `settings.json` → `RecentWorkingFolders`, null
+until first read, then seeded from the last working folder and the
+remembered windows so the menu is not empty after the update. It is recorded
+on OPEN only — `WorkspaceViewModel.ChooseWorkspace` (Open Working Folder…,
+Open Recent, the picker) and `AdoptRestoredPath` (the launch-time reopen) —
+never on activation, and never by Ctrl+N's window, which inherits a folder.
+`OpenRecentList.Changed` is static, so every window's submenu is rebuilt from
+the one list (and each window lets go of it on Closed).
+
+Titles join extra parents with "/" exactly as the contract's cases do, on
+Windows paths too ("Courses — A/2025"); a folder at the top of a drive is told
+apart by its letter ("Courses — C:"), Windows' own case. Choosing a folder
+asks `LastWorkingFolder.WhyItCannotBeReopened` first: gone, drive not
+connected or unreadable get `OpenRecentWording`'s title and sentence in a
+dialog over a window that KEEPS its folder, and the trail says "working folder
+not reopened (gone) — a folder chosen from Open Recent, <path>". The mac's
+`inTrash` and `privacyDenied` cannot happen on a computer that remembers a
+path, so they have no member here. Otherwise the synced-folder question runs
+as for a picked folder, and "working folder opened — <path> from File ▸ Open
+Recent". Clear Menu writes "recent working folders cleared — N folders".
+REJECTED: the taskbar's jump list as the list (a second place to keep in
+step, outside the window where the menu is), and recording on activation
+(see above).
+
+### Context menus select their row first, and one Obsidian route
+
+Every row menu's item now SELECTS its row before it acts (`SidebarPane.Selecting`,
+which sets the selection and the tree's highlight), so what is selected
+afterwards is what the item acted on. **Rename too**, unlike the mac: there a
+rename field opened in the same turn as a selection change lost focus and
+closed (#293); here Rename is a dialog, so nothing is lost. The row's item is
+**Rename** (no "Course"), as in the menu bar.
+
+**Open in Obsidian is one route**, `SidebarPane.OpenInObsidian(course,
+section)`, called by the section window's toolbar, Course Settings' toolbar,
+every row's menu and both menu-bar items: a section reveals the SECTION's
+folder, and a course kept for reference gets its calm note first — which the
+section window's toolbar used to skip, going straight to
+`FolderActions.OpenInObsidian` (the plan's finding 0.9).
+
+**The course row lost its local-assistant item** (then "Revise with local AI
+assistant…"; since #491 the rows' Revise items sit in Revise With ▸ as Claude…,
+Codex… and Local AI Assistant…, the menu bar's titles): the contract greys
+`courseReviseWithLocalAssistant` on a course row, a context menu hides what
+does not apply, and the item opened section 1 without saying so. Not a
+teacher's only route: every section row offers it, and so does Section ▸
+Revise With ▸ Local AI Assistant….
+
+**Two deliberate disagreements with the contract's reasoning, both in the
+row, both in the `mac` issue:** the section row keeps **Change Deploy Time
+(…)…**, which `subjectMenus` has no item for (the menu bar follows the
+contract: Schedule Deploy… greyed while one is set, Cancel live), and a
+reference section's row keeps **Cancel Scheduled Deploy…**, which the menu bar
+greys, because Windows does not yet turn such a schedule off itself (the
+mac's `ScheduledDeployCleanup`) and the row is the teacher's only way to stop
+it.
+
+### REJECTED, with the reason
+
+- **XAML for the 50-odd items**: each would need its item, key and id kept in
+  step by hand in two files; the code table keeps them in one line.
+- **One key on two items** — see Ctrl+Shift+O above.
+- **Keeping the view-scoped preview keys "in case"**: measured to add nothing.
+- **Greying items in an `Opening` handler**: there is none on `MenuBarItem`.
+- **Hiding what does not apply in the menu bar**: the contract's rule; items
+  would come and go with every click.
+- **A "Change Deploy Time…" in the menu bar** before the contract has the
+  item: it would be Windows' private command in a menu the two apps share.
+
+### Testing it
+
+`SubjectMenusContractTests` and `OpenRecentContractTests` (unit, every run).
+Through the real window, `[UiFact]`s (2026-10-15, this PC, all passing):
+`MenuBarReachUiTests` (Course ▸ Add Section… and Copy a Page…, Section ▸
+Schedule Deploy…, Help ▸ Publishing and Deploying… in the contract's words);
+`MenuGreysUnderADialogUiTests` (every Course and Section item greyed with a
+dialog up; Ctrl+Shift+D's control arrives with no dialog and the deploy
+refuses — its folder does not exist — and the same key under that refusal
+arrives nowhere); `OpenRecentUiTests` (a second folder opened, listed first;
+the first chosen back; the second deleted and chosen, the dialog, the window
+keeping its folder, the trail line; Clear Menu and its line). Section ▸ Class
+Dates… did not exist yet on that day (it arrived with 2B, below). `AcceleratorUnderDialogUiTests` (#191) still
+passes with the keys on items: "Ctrl+Shift+R / F2 / Ctrl+N / Ctrl+O: not
+delivered (the dialog kept it); control (no dialog): all four arrived at
+their handlers" (2026-10-15). One of three runs that day failed on its own
+Ctrl+N control ("the second window would not close") and passed twice since,
+alone and paired — recorded as a flake, not chased.
+The neighbouring UI tests the change touches (reference courses, Copy a Page,
+import for reference, Course Settings' Save, the sidebar's names) ran 13 of
+14; `ImportForReferenceUiTests.AnOldWorkingFolderIsImportedShelvedByYearAndLocked`
+failed first in the batch ("the import sheet never opened") and passed alone
+straight after. **#483** (the wizard's and Copy a Page's field heights) is
+measured in "The chrome is shared, and that was a trade — reversed by #456".
+
+### The Section menu's functions (2B, 2026-10-15)
+
+The nine items the mac's #457 batch B put in the Section menu, after Open in
+Browser and in two groups: **Publish Pages…, Hide Pages…, Publish Class for a
+Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class,
+Re-date Classes…, Make Room for Classes…, Class Dates…** (AutomationIds
+`sectionPublishPages` … `sectionClassDates`). The section ROW's context menu
+carries Publish Pages…, Hide Pages…, Publish Class for a Date… and Add Next
+Class, selects the row first, and meets the menu bar's own check at the click
+(`MainWindow.RunSectionVerbFromARow`), because a context menu does not
+consult the rule when it is drawn. What each item opens is the mac's table
+([09 → "The assistant's functions in the Section menu"](09-mac-app.md)); the
+deep dive on the third client is
+[10 → "The Section menu, a third client"](10-local-ai-assistant.md). This
+section is what Windows did differently, and why.
+
+**One runner entry.** `AssistAgent.RunTool`'s body is now
+`Plantoir.Core/Assist/AssistToolRunner.cs` — the preview, deploy and
+reference rules every client's call meets on this side of the server. Not a
+pure move (the plan review's H3): the seams stay on `AssistAgent`, where both
+windows and five test classes set them, and are handed to a runner per call;
+the runner RETURNS whether the work was handed to the app instead of setting
+the agent's flag, and the agent appends exactly one `tool` message for
+whatever came back. Gated on `AssistScenarioTests`, `ReferenceRefusalTests`,
+`AssistAgentTests`, `PreviewWhileDeployingTests` and
+`RelativeDayFreshnessTests` unchanged and green (118 of 118) before anything
+else moved. `AssistSurface { Outside, LocalWindow, Menu }` is in Core.
+
+**Behind the runner: one `plantoir-mcp` per main window (Option B).**
+`SectionVerbs` (Core) builds each call in code and runs it through
+`AssistToolRunner` on the Menu surface; behind it is a server the window
+starts on first use, `McpClient.StartForTheMenu(serverPath, folder)` — no
+`--course` and no door variable, so it takes NO assist lease
+(`Program.cs` takes one only when it holds a course), `PLANTOIR_SURFACE=menu`,
+and it is NOT registered in `WindowServers` (that list tells the assistant
+window's lease apart from an outside session's, and this server holds none).
+The server's request filter — `ReferenceWriteGate`, `OutsideChangeGate` — is
+the same entry every client meets. Its undo list is the window's Undo Last
+Change; `DropVerbs` stops it when the window opens another folder or closes,
+and its undo list goes with it (the mac's decision 4) — once any change
+running then has finished, and off the interface thread
+(`SectionVerbs.DisposeWhenIdleAsync`): stopping it at once killed the server
+three seconds later, mid-write, with `WaitForExit` blocking the window's
+thread (2B's implementation review, L4). **Measured cold start**
+on this PC (Intel i5-8365U, Windows 11 Pro 26200, Debug x64 build,
+2026-10-15): spawn to the `initialize` answer **476–490 ms** over six runs,
+`tools/list` answered 20 ms later — so the first menu item of a window's
+life pays half a second once, behind the dialog's "Working…".
+REJECTED, with the reason:
+- **The tools in-process** (`PlantoirTools` inside the app): the app would
+  reference the server's executable and the SDK, and the two gates live in
+  `Program.cs`'s filter lambda, so a second path would skip them — the mac's
+  own reason for one entry.
+- **`AssistAgent` with a null model**: drags a conversation, a transcript and
+  a system prompt into a menu click, for nothing.
+- **Sharing the assistant window's server**: a teacher with no assistant has
+  no such window, and it would interleave two undo lists.
+
+**Where the last change was made travels in `_meta`.** `UndoHistory.Entry`
+carries files, not a section (a shared page's flag lives in a file no section
+owns), so the server records the call's own course and section against each
+new top entry (`AssistWorkspace.NoteWhereTheLastChangeWasMade`, called by
+`PlantoirTools.AfterCall` from the request filter), and the menu's server
+sends `plantoir.app/lastChange` (`"CODE/N"`, or null) and
+`plantoir.app/changesToUndo` on every answer, and `plantoir.app/changed`,
+whether the call changed anything. `SectionVerbs.LastChange` greys Undo Last
+Change everywhere but that section (`lastChangeIsHere`), and `changed`
+decides the trail's ending — "carried out", "changed nothing", "took the last
+change back". It was the undo list's DEPTH before and after until 2B's
+implementation review (M1) found it wrong twice: Make Room for Classes keeps
+no undo entry, on purpose, so a room really made read "changed nothing"; and
+`UndoHistory` keeps twenty, so from the twenty-first change the depth stops
+growing and every change read the same way. The server knows: a call changed
+something when the top of its undo list is a different entry afterwards (a
+new one however deep the list, or one taken back), or when Make Room says it
+wrote (`AssistWorkspace.NoteAChangeWithNoUndoEntry`); the depth is only the
+fallback for an answer without the key. Not entirely free of sentences, and
+said so: Rebuild Preview's ending compares the answer with
+`AssistWording.PreviewIsRebuilding`, and Undo's also counts an answer
+containing "is put back". None of the three keys is sent to an outside
+client. Pinned by `SectionVerbsTests.MakingRoom_IsCarriedOut_ThoughItKeepsNoUndoEntry`
+and `TheTwentyFirstChange_IsCarriedOut_ThoughTheListStaysAtTwenty`.
+
+**One sentence outside the contract, deliberately: `SectionVerbs.CouldNotBeDone`**
+("That could not be done just now. Try again in a moment."). It is what a
+menu item ends with when this window's `plantoir-mcp` could not be started or
+went away under the call — a Windows mechanic (one server process per window,
+Option B above) that the mac, whose runner is in-process, cannot meet. A
+contract key would be a sentence one platform could never say; the trail's
+"ran from a menu … could not be done: <reason>" line carries the reason
+(2B's implementation review, L5).
+
+**Pages by folder and name — a server fix (the plan's finding 0.8, review
+M3).** The menu sends `section1/All Classes/Unit 2, Day 3` as a JSON array.
+`PlanPublish` already read a course-relative path; `AssistWorkspace.Page`
+(re-date's and the read tools' lookup) did not — it resolved a slashed name
+against the WORKING folder only. It now also resolves it INSIDE the course
+(`PagePaths.ResolveInside(course.DirectoryPath, …)`), treats a
+`section<M>/` prefix that is not this section as no page, keeps the How I
+Teach refusal, and answers only a page this section lists. Pinned by
+`SectionMenuServerTests.APageNamedByItsFolderIsTheOneTicked_NotItsDuplicateTemplate`
+(a `_DUPLICATE ME` page named by folder) and
+`PageByFolder_ResolvesInsideTheCourse_AndRefusesAnotherSectionsPrefix`.
+`AssistSurfaceContractTests` and both digests (`scripts/test_tool_surface_digest.py`)
+did not move: no schema or description changed.
+
+**The menu's voice, on the server.** `AssistWorkspace.Surface` replaces the
+bool `ServesTheLocalWindow`, which stays as the question most callers ask
+(`Surface != Outside`); `SpeaksFromTheMenu` picks the twins (helpers in
+`AssistWorkspace.Menu.cs`): the undo five in `UndoLastChange`, pages whose
+settings cannot be added to (including the plan's own sentence, through
+`PublishPlan.FromTheMenu`), new dates not set, pages a change could not
+finish, no page / no pages called (by the name TICKED — the part after the
+last slash — joined with "and"), no class on a day (`"Monday, 2026-09-14"`,
+weekday and ISO day, invariant and Gregorian, `AssistWording.MenuDay`), Make
+Room's card line, and `restoreFromBackupPutsItBack` after a publish that
+stopped part way. App side, the runner composes two: `sectionIsChangingFromTheMenu`
+(the in-app assistant's write refused) and `courseIsBeingCopiedFromTheMenu`
+(Rebuild Preview under a copy lease). `changedWhileSavingACopyFromTheMenu` is
+declared and has no Windows call site: Windows re-plans after saving a copy
+only for Get Ready for the Start of the Year, which the menu does not run
+through the tools. The scenario runner's default surface stays OUTSIDE and
+`surface: "mcp"` is mapped explicitly (review H2), so no green scenario moved.
+
+**A copy before EVERY change.** On the Menu surface
+`BackUpOnceForThisConversation` makes a fresh `_menu-section<N>` zip each
+time, under the same `copying` lease as the assistant's, with a "section menu
+backed up a course" line, never recorded as held; `PruneBackups` keeps five
+of the assistant's and five of the menu's, counted apart. **The same-second
+name is now READ, and the writer still waits.** #187 (above) rejected `-N`
+because the mac's reader would hide a zip Windows wrote; the mac now writes
+`<time>-2` itself and reads it, so that reason has expired in one direction:
+`BackupItem.From` reads `-N` (N ≥ 2; `-1` and `-x` still unread) so a copy
+the mac made is listed, counted and restorable here. Windows' own writer
+keeps waiting for the next second — it never collides, and changing it buys
+nothing a teacher sees. Two menu changes in one second measured as two zips a
+second apart (`SectionMenuServerTests.EveryChangeSavesItsOwnMenuCopy_AndSaysSoOnTheTrail`).
+
+**The claim is in-process.** `SectionMenuActivity` (Core, static) holds a
+section while a menu CHANGE runs (plans only read); the in-app assistant's
+write to it is refused before anything is backed up. `AssistActivity.ReportWork`
+is set by the assistant window around every turn, approval and decline, and
+`verbIsRunning` is this window's runner, any window's claim, or the
+assistant working. Both windows are this app, so a static set answers in a
+microsecond and needs no file; another program's work is the work leases'.
+The menu does not hold the assistant's backups.
+
+**Rebuild Preview really rebuilds — and so does the assistant now (Q1).**
+Before, `rebuild_preview` reached `StartPreviewIfIdle`, which returns at once
+while a preview serves, and still said "rebuilding" (the plan's finding 0.7).
+`SectionDetailView.RebuildPreviewAsync` stops a serving preview and starts it
+again; `MainWindow.RebuildPreviewFor` is the seam (`RebuildPreviewInApp`),
+used by Section ▸ Rebuild Preview, by the in-app assistant's
+`rebuild_preview`, by the fixed phrasing matched as `rebuild_preview`, and
+by "rebuild / refresh / update the preview" (plain "preview" and "show me the
+preview" still only show one). A behaviour change for the assistant, written
+up for the mac as a question (does its `rebuild_preview` restart a serving
+preview?). A page change from the menu follows the runner's rule for every
+client: a showing preview is stopped, the tool runs with `preview: false`,
+and the preview starts again.
+
+**The dialog is ONE `ContentDialog`** (`Views/SectionVerbDialog.cs`) moving
+through Choose → Plan → Working → Result (Working says "Working…", and "Saving a
+copy of ICS3U first…" only while the server's progress line says so — Undo
+never saves a copy, and a refusal comes before one; review M2): a stage changes by cancelling the
+button's own close and doing the work under its deferral, because WinUI shows
+one dialog at a time and refuses a second asked for while the first closes.
+While a call runs no button is drawn and Escape does not close it. A plan
+twin that refuses ends with its sentence and OK alone. Publish Pages… and
+Hide Pages… list classes first (by date), then the rest by folder, two pages
+of one title told apart by their folder; Publish Class for a Date… offers the
+next class day from the section's dates (tomorrow with none) in a
+`CalendarDatePicker`; Make Room… asks the class and 1–10. Class dates first:
+Add Next Class, Re-date Classes… and Make Room… open THIS window's
+`SectionScheduleDialog` with the reason (`datesForTheNextPage`,
+`datesToReDate`, `datesToMakeRoom`, club twins) when none are on file, and
+run once they are written; the dialog after it retries while the dates
+dialog is still closing, rather than drop the change's answer.
+
+**Trail**: `RanFromAMenu` ("UIVERB/1 · Section ▸ Publish Pages… — carried
+out, 1 page ticked"; endings carried out, changed nothing, took the last change
+back, cancelled at the plan, rebuilt, not rebuilt, opened) and
+`SectionMenuBackedUpACourse`. The second is written by the window's
+`plantoir-mcp`, which `--state-dir` does not reach (`AppDataRoot` does not
+cross processes), so a UI test's copy line lands in the PC's own trail.
+
+**Testing it**: unit — `SectionVerbsTests` (calls, the runner entry, Undo's
+place, the trail, the claim, Rebuild's two answers), `SectionMenuServerTests`
+(folder-named pages, a copy per change, the voice, the surface variables),
+the wording walk (55 keys declared; the 17 #475 keys were ledgered for 2C,
+which declared them).
+Through the window (`SectionVerbsUiTests`, 2026-10-15, this PC, both
+passing, 2 min 5 s): Publish Pages… → tick → plan → Publish → the flag
+changes on disk, one `_menu-section1` zip, Undo Last Change live and putting
+the page back; and Rebuild Preview with the REAL launcher — a serving
+preview, an edit on disk, Rebuild Preview, and the edit served.
+
+### Classes dated after the next class, at Deploy (2C, 2026-10-15)
+
+The mac's #475 ([09 → "Classes dated after the next class, at Deploy
+(#475)"](09-mac-app.md), [10 → "#475 at the assistants' deploy"](10-local-ai-assistant.md)):
+a class page students can see, dated after the NEXT class day, is caught
+before it goes out. The rule is `class-planning.json` → `futureDatedClasses`
+(`ClassesDatedLater` in Core; `FutureDatedClassesContractTests` runs the 24
+cases on real files, which were unrun here until now); where and in what order
+the teacher is asked is `shared-rules.json` → `classesDatedLater`; the answer is
+remembered in `.publish_state/section<N>.later-classes-kept.json`
+(`file-formats.json` → `laterClassesKept`, `LaterClassesKept`, released on
+rollover with the links checklist's answer under the same undo entry). This
+part is what Windows did differently, and why.
+
+**Two readings that would pass review and are wrong.** The date is the first
+ten characters of `created` AS WRITTEN — never `AssistWorkspace.DateOf`, whose
+`DateTimeOffset` parse is the same day today but is a moment, not a day, and is
+one refactor away from converting. And "today" is never read inside the rule:
+`ClassesDatedLater` takes it from the caller, `AssistWorkspace.Today` is
+injectable, and the scenario runner pins 2026-10-08 — a fixture laid out around
+the real clock is the "Three testing lessons" trap, which turned dev red for a
+morning once already.
+
+**The order in `SectionDetailView.DeployAsync`, and why.** Every refusal
+first — reference course, the folder still getting ready, another program
+building, saved settings that cannot be read, a destination that cannot be
+deployed to — then the question, then the saved-settings notice, and only then
+the console claimed and the preview stopped. Hiding is a change (a copy of the
+course and a write), so a question before a refusal would let a refusal follow
+a change; a question after the stop would make Cancel cost the teacher the
+preview they were reading. The saved-settings notice and its "deployed using
+the saved settings" line moved AFTER the question (the plan review's M4): a
+Cancel must not leave either behind. A second Deploy press while the question
+is up returns at once (`_isAskingAboutLaterClasses`; `_isPreparingDeploy` is
+still false at that point). `ClassesDatedLaterAtDeployTests.TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything`
+reads that order from the source, as `ReferenceRefusalTests` already did for the
+reference refusal — the window cannot be built in a unit test.
+
+**`DeployWillBeRefused()` (the plan review's H1).** The in-app assistant asks
+BEFORE it presses Deploy, and on this side most of the deploy's refusals live
+in the window, not in the runner. So the window offers a side-effect-free
+reading of all of them — nothing claimed, shown or written — and
+`AskAboutClassesDatedLaterForTheAssistantAsync` asks NOTHING when one will
+refuse: the deploy then goes on to its own refusal, which shows its dialog and
+is the sentence the assistant relays — and the preview is KEPT. The seam's
+record says so (`LaterClassesAtADeploy.WillBeRefused`) and the runner skips its
+stop: stopping the preview for a deploy that never starts would cost the
+teacher the page they were reading (2C's implementation review, L-1;
+`ClassesDatedLaterAtDeployTests.ADeployTheWindowWillRefuse_KeepsThePreview_AndLetsTheRefusalSpeak`).
+`IsSectionBusy` counts a deploy being prepared (`_isPreparingDeploy`) as well
+as one running. One check comes BEFORE that reading: a window already asking
+this question, or with any dialog up, answers `CannotAsk`, refused with
+`deployWaitsForAnOpenQuestion` and nothing stopped
+(`classesDatedLater.whenTheWindowIsBusy`). `DeployWillBeRefused()` also counts
+the open question as a refusal, so read the other way round the window said
+"nothing to ask", the runner stopped the preview and the deploy returned at
+once — the review's M-A, pinned by a source-order assertion
+(`TheAssistantsQuestion_ChecksForAnOpenQuestionBeforeTheRefusals`). When
+nothing is flagged the assistant window never asks the section's window, so
+that path still stops the preview first, as it did before #475. The alternative — returning the refusal
+sentence from the seam — was rejected: the window's dialog would never be
+shown, and the window and the assistant would word the same refusal from two
+places.
+
+**The answer, in the window.** Every flagged class is listed ticked, and two
+buttons always sit beside Cancel: Hide Ticked and Deploy (the default) and
+Keep All and Deploy. Hide Ticked records the unticked as kept, then hides the
+ticked with Hide Pages…'s OWN call through this window's `plantoir-mcp`
+(`MainWindow.HideClassesForTheDeploy` → `SectionVerbs.Perform`) — so it is
+backed up as `_menu-section<N>`, Section ▸ Undo Last Change takes it back, and
+pages only those classes link to go with them — with NO preview either side:
+`AssistToolRunner.PreviewFollowsAChange = false` skips the stop as well as the
+restart (the plan review's M1; a hide that failed would otherwise leave the
+teacher with no preview for a deploy that never happened). Its "ran from a
+menu" line names Hide Pages…, whose call it is, with "N classes dated later,
+at Deploy" as its counts — the mac's own line. A ticked class still visible
+afterwards stops the deploy, and the teacher is shown what the hide said. The
+"asked about…" line is written AFTER the hide, so a hide that left a class
+visible is recorded as cancelled rather than as hidden (the mac writes it
+before the hide, so its line can count a class as hidden that is not).
+
+**The in-app assistant always gets a window here.** `AssistWindow.MainWindowForBuilds`
+opens a main window on the section's folder when none shows it, so
+`deployHasClassesDatedLaterAndNoWindow` is reachable only when no window CAN
+show the section (it would not open, or the window ended up on another folder);
+the seam then returns `LaterClassesAnswer.NoWindow` with the titles, never
+throws. The seam is `AssistToolRunner.AskAboutClassesDatedLaterInApp`
+(`Func<Task<LaterClassesAtADeploy>>`): a small record rather than the bare
+answer, because the no-window sentence names the classes and only the app side
+can read them. Nothing flagged: nothing asked, and no window is brought forward
+for it. The window's route on the trail is the contract's "the in-app
+assistant's deploy", and `StartDeployForAutomationAsync` passes
+`alreadyAsked: true`, so the question is never put twice (M4).
+
+**The server's deploy** (`AssistWorkspace.Deploy`), after its own refusals
+and before anything runs: an outside assistant is refused with
+`deployHasClassesDatedLater` until the window's answer is on file; Plantoir's
+own assistant reaches it only with no window seams at all, and is told
+`…AndNoWindow`. The trail line is the contract's: "a deploy was held back for
+classes dated after the next class — {N} with no answer" — no "by an outside
+assistant" (the mac adds who asked; the contract's line does not, and the plan
+review ruled for the contract). `publish_class_on`, from any client, and the
+links checklist's Publish (`PublishAndRemember`) record a later class they
+published as kept: a date the teacher named is not a mistake to catch, and
+without it the two questions undid each other (the mac's batch B review,
+finding 2).
+
+**A scheduled deploy** reads the classes in `ScheduledRun.Execute` after the
+settings decision and before the wrapper runs, on the run's own day, and
+writes "deployed with classes dated after the next class: …" only when the
+wrapper's record is SUCCEEDED and newer than the run. Never on the exit code,
+which is 0 either way (the mac measured gating on it writing the line after a
+failed deploy). The record's time is its file's write time, so it is compared
+with the real clock read just before the wrapper ran — not `World.Now`, which
+tests pin to a morning — with a second's slack; both are local time.
+`ScheduledRunTests` runs it both ways, and with an earlier night's success
+record that must not count.
+
+**Section ▸ Publish Pages…** asks about the ticked classes after the choice
+and before the plan, in the same dialog (a `LaterClasses` stage): the ticked
+are left out and stay hidden ("Leave N Hidden and Continue", or "Publish Them
+All" with none ticked), the unticked are kept, and with nothing left nothing is
+published and the dialog closes.
+
+**Testing it**: unit — `FutureDatedClassesContractTests` (24 cases, the
+record's shape, the rollover undo), the four `assist-cases.json` scenarios
+(green; the three ledgered ones left the ledger), `ClassesDatedLaterAtDeployTests`
+(an open dialog not waited on, no window, the hide with no preview, the server's
+hold, what is kept, the window's order), `ScheduledRunTests` (both ways), the
+wording walk (17 keys declared). Through the window: `LaterClassesAtDeployUiTests`
+— Cancel deploys nothing and leaves the preview serving; Hide Ticked hides one
+class, keeps the unticked one and deploys to a folder; Keep All and Deploy, then
+a second Deploy that asks nothing.
+
+REJECTED, with the reason:
+- **Asking before the window's refusals, or after the assistant's stop**: see
+  the order above (the contract's own `rejected`).
+- **The seam returning the refusal sentence** when the deploy will be refused:
+  see `DeployWillBeRefused()` above.
+- **Comparing the success record with `World.Now`**: tests pin it to a morning
+  that is not the file's clock, and a real run's two clocks agree anyway.
+
+## The Settings window, Plantoir Help and the Account ID's refusals (#491 part A, #490)
+
+Batch 3A of the catch-up to mac 1.7.1 (2026-10-15). What landed, and why.
+
+**File ▸ Settings… is ONE window** (`Views/SettingsWindow.cs`; Russell's
+ruling on #491, 2026-10-15): a `NavigationView` with Assistant, Preview
+(since #514, batch 6: "Preview at Last Viewed on Windows" below) and
+Deploying. It
+replaced a `ContentDialog` (`AssistantSettingsDialog`), whose body moved
+unchanged into `AssistantSettingsPane`.
+
+*Why a window and not a dialog.* WinUI shows one `ContentDialog` per window.
+MEASURED in the batch's spike (i5-8365U, Windows 11 26200, 150%, Windows App
+SDK 1.8.260921001): the limit is per XamlRoot, not per thread — a second
+window showed its own dialog while the first window's was up, in either
+order, and a second dialog in the SAME window threw `COMException 0x80000019`
+"Only a single ContentDialog can be open at any time." The new-course wizard
+IS a `ContentDialog`, so a Settings dialog could not open from the wizard's
+Open Settings… without closing the wizard and losing what was typed; a
+modeless window comes forward beside it, and the wizard follows the ID live.
+**Rejected**, on #491 with Russell: a Deploying pane inside the assistant's
+settings dialog; keeping the field in a course's settings with a "for every
+course" label; and Settings as a `ContentDialog` (above). Settings may show
+dialogs of its own for the same reason — but the instructions for finding the
+ID are INLINE (an `Expander` holding `CredentialRequestPanel.Build(
+CredentialRequests.CloudflareAccountIDHelp)`), not a dialog with a second
+field and "Use This ID" as the mac's sheet has: the pane's own field already
+does that job.
+
+*One at a time, never keeping the app alive.* `SettingsWindow.Show(section)`
+brings an open window forward on that section rather than opening a second.
+File ▸ Settings… opens on the section last chosen
+(`AppSettings.LastSettingsSection`, the mac's `SettingsPane.storageKey`);
+Open Settings… beside the ID always opens Deploying. The app still quits when
+its last MAIN window closes; `App.QuitTime` calls
+`SettingsWindow.NoteBeforeQuit()` first (it also covers `QuitForUpdate`),
+because `Application.Exit` may end the process without raising the window's
+`Closed`. The "opened Settings — the assistant is set to …" line is written
+once per opening, as the dialog wrote it.
+
+**The Account ID is edited in ONE place**, `DeployingSettingsPane` — "Cloudflare
+Pages", the field (placeholder "32 letters and digits", AutomationId
+`cloudflareAccountField`, which the course form no longer carries), the inline
+instructions, a problem line only for a NON-EMPTY invalid ID (an empty one is
+not wrong here: a teacher who never deploys to Cloudflare has no reason to
+fill it in), and the mac's footer captions. `CloudflareAccountInSettingsTests.OnlyTheDeployingPane_WritesTheId`
+reads every `.cs` under `Plantoir/` and allows a write of the ID — an
+assignment or `ChangeCloudflareAccountId(` — in that file only. Before #491 a
+course's Deploying section and the wizard each wrote it, and typed in one
+course it changed silently for every other. No data moved: the value was
+always app-wide (`AppSettings.CloudflareAccountId`), so nothing is migrated.
+
+*Saved as typed, recorded on leaving.* Each keystroke calls
+`AppSettings.ChangeCloudflareAccountId(text.Trim())`, which saves and raises
+the static `AppSettings.CloudflareAccountIdChanged` — so a wizard waiting on
+the ID enables Create the moment it is valid. The pane does NOT listen to that
+event, so the trimmed value is never echoed back under the teacher's cursor.
+The trail line (`Cloudflare account ID changed in Settings`; the mac's three
+lines verbatim from `DeployingSettings.TrailLine`, never the ID) is written by
+`NoteTheChange()` on Enter, on leaving the field, on switching section, when
+the teacher switches to another window, when the window closes and at quit,
+comparing with the ID as it was at the last line — one line for a change, none
+for a visit. *Switching windows is its own trigger* (3A's implementation
+review, M1): Settings is modeless, so a teacher who types an ID and clicks
+back into the main window moves no focus INSIDE Settings and raises no
+`LostFocus`; until the window's `Activated` with `Deactivated` was added, no
+line was written until Settings closed — possibly hours later.
+
+**Three read-only displays** (`PublishingChoiceView`: the primary Cloudflare
+block, the additional-destination row; the wizard shares the view): "Kept in
+File ▸ Settings ▸ Deploying, for every course that deploys to Cloudflare
+Pages." first, then "Cloudflare Account ID" with the value — or "Not set yet"
+in the secondary colour — selectable, and Open Settings… beside it
+(`cloudflareAccountValue` / `cloudflareAccountOpenSettings`, and
+`additional…` for the row). One private builder, as the mac's
+`CloudflareDetailFields`. The account-finding sentence left the course's
+caption with the field it explains. The view listens to
+`CloudflareAccountIdChanged` while LOADED and raises `AccountRefreshed`, NOT
+`Changed`: an ID changed in Settings is not an edit to the course. The wizard
+re-reads Create on it (with no ID it keeps refusing with the contract's
+"Paste your Cloudflare Account ID." beside Open Settings…); Course Settings
+listens itself and re-reads Save only (`RefreshDirtyState`, never
+`MarkChanged`), so a held-back Save frees itself when a valid ID arrives.
+
+*MEASURED, and why every Unloaded is checked.* Inside the wizard's
+`ContentDialog`, the view's `Unloaded` arrived about 70 ms AFTER its `Loaded`
+with the view still on screen (`IsLoaded` true, parent unchanged) and no
+second `Loaded` followed. Unsubscribing on it left the wizard deaf to
+Settings — `SettingsUiTests.TheWizardWaitsForTheIdTypedInSettings` failed
+exactly so, twice, before the fix. An `Unloaded` that finds the element still
+loaded is ignored; the real one, when the wizard closed, measured `IsLoaded`
+false. Course Settings uses the same check.
+
+**The refusals now name the place.** The in-app deploy
+(`MultiDestinationDeployRunner.RefusalReason`) says "… Add it in File ▸
+Settings ▸ Deploying, then deploy again."; Schedule a Deploy's two
+(`ScheduledDeploy`, `cloudflareAccountMissing` and its additional twin) say
+"… then schedule this again." Constants in `Core/Models/DeployingSettings.cs`.
+The mac's three still say "this course's settings" — a `mac` issue, #534.
+
+**The deliberate wording split.** The app's sentences say **File ▸ Settings ▸
+Deploying**, where the item IS on Windows. The launchers' non-interactive
+refusal (#490) says **Plantoir ▸ Settings ▸ Deploying** in both `deploy.sh` and
+`deploy.ps1` — Russell's ruling: one launcher sentence for both platforms.
+Do not "fix" either to match the other.
+
+**Display labels, mirrored by hand and contracted on neither side.** The
+words around the ID — `DeployingSettings.KeptIn` ("Kept in File ▸ Settings ▸
+Deploying, for every course…"), `ShownWhenEmpty` ("Not set yet"), the
+"Open Settings…" button, the instructions' `Expander` header, the field's
+placeholder ("32 letters and digits") and the pane's two footer captions —
+were copied from the mac's `DeployingSettingsView` / `CloudflareDetailFields`
+by reading them, and no contract key holds them on either platform. That is
+deliberate rather than an oversight: they are labels a teacher reads in
+passing, not a rule with inputs and outputs, and `KeptIn` cannot be shared
+as one string anyway — it names the place the setting lives, which is File ▸
+on Windows and the app menu on the mac. What IS contracted is unchanged: the
+problem sentence (`configurationRules.cloudflareAccountID[].expectProblem`)
+and the trail event (`activityTrail.mustRecord`). If the mac rewords a
+label, nothing here goes red; the way it reaches Windows is the `windows`
+issue that rewording owes (CLAUDE.md rule 3).
+
+**#490 in the launchers.** "Add your Cloudflare Account ID in Plantoir ▸
+Settings ▸ Deploying, then deploy again." `deploy.ps1` has no byte-order mark
+and runs under Windows PowerShell 5.1, which reads it in the system code
+page, so a literal ▸ arrives garbled: the line is
+`("…Plantoir {0} Settings {0} Deploying…" -f [char]0x25B8)`, the convention the
+file already used for · and —. Checked: the file parses under 5.1.26100 with
+no errors, and the expression renders the sentence exactly.
+`scripts/test_deploy_non_interactive.py` →
+`test_both_launchers_point_at_settings_for_the_account_id` pins both (the ps1
+in its `-f` form), and `app-rules.json`'s authored `refuse` prose says the
+same. The publishing path changed, so `verify-deploy.ps1` runs at the cut
+(RELEASING.md), and `./verify-deploy.sh` on the mac before its next release.
+
+**Help ▸ Plantoir Help**, first in Help, with F1 — Windows' Help key —
+through `MainWindow.Invoke` like every menu key, so `DialogGate.Holds(…,
+"F1")` keeps it from acting under a dialog. It opens
+https://plantoir.app/support/ (`Core/Models/PlantoirHelp.cs`, the mac's
+address) through `Services/ExternalLinks.Open`, which in a redirected run
+(`--state-dir`) appends the address to `links-opened.txt` in the state folder
+instead of opening a browser — a UI test reads what WOULD have opened and
+never puts a browser in front of the person at the desk. Trail: `opened
+Plantoir Help`, "Help ▸ Plantoir Help — opened the support page in the
+browser". Both events left the `NamedGapLedger` with this batch.
+
+**Testing it**: unit — `CloudflareAccountInSettingsTests` (the three lines,
+nothing-changed, never the ID, the pane's problem rule, "Not set yet", the
+one writer by source scan, the refusals), `MultiDestinationDeployRunnerTests`,
+`ContractTests`' scheduled-deploy cases, `AcceleratorDialogGateTests` (F1).
+Through the window (`[UiFact]`): `SettingsUiTests` — File ▸ Settings… is a
+window titled Settings; the ID typed in Deploying reaches the run's
+`settings.json`, the trail says "…was changed" without the ID, and a
+Cloudflare course shows it read-only with no field; the wizard refuses Create
+with no ID, Open Settings… raises Settings on Deploying while the wizard stays
+open, and a valid ID typed there enables Create; and (since 3B) a course moved
+to Cloudflare with no ID holds Save back until an ID typed in Settings frees
+it, after which moving the course back leaves nothing to save or revert — the
+ID was not counted as an edit to the course
+(`CourseSettingsSaveFollowsTheIdTypedInSettings`). The single-writer scan
+reads Plantoir, Core and the MCP server and matches the property on a word
+boundary, so an object initialiser counts. `PlantoirHelpUiTests` —
+`links-opened.txt` and the line. `DrivenApp.FindTopLevel(automationId)` finds
+another top-level window of the run's own process.
+
+## Preview at Last Viewed on Windows (#514, the mac's #504)
+
+Batch 6 of the catch-up to mac 1.7.1 (2026-10-15). The design, the rule and
+every case are the mac's: `contracts/shared-rules.json` → `previewStartPage`,
+and `09-mac-app.md` → "Opening the preview at the page last viewed (#504)"
+for what the mac measured and rejected. This section is what is different
+here and why. Code: `Plantoir.Core/Models/PreviewStartPage.cs` (the rules and
+`PreviewNavigationLedger`), `LastViewedPages.cs` (the store),
+`Views/SectionDetailView.xaml.cs` (`PreviewOrStop_Click` → `PressPreviewAsync`,
+`OpenTheSiteAsync`, `NavigateAsAppAsync`, `ReloadAsAppAsync`,
+`WatchTheTeachersNavigations`), `MainWindow.Modifier.cs` (Alt),
+`MainWindow.Menus.cs` (the second item), `Views/PreviewSettingsPane.cs`.
+
+**What a teacher sees.** File ▸ Settings ▸ **Preview** (Russell's ruling on
+#514: the one Settings window, between Assistant and Deploying) asks "When
+you press Preview, open" — The site's front page (the default) ○ The page you
+last viewed — with `windowsWording.altNote` under it. The toolbar button reads
+"Preview" or "Preview at Last Viewed" by the setting, and the OTHER while Alt
+is held in that window. **Section ▸ has two items**: the first titled as the
+button with no key held (and "Stop Preview" while a preview runs), the second
+(`sectionPreviewAlternate`) always the opposite, absent while a preview runs.
+Every other start — the assistant, Rebuild Preview, Preview Again, Start of
+the Year, a repair, the smoke hook and the marketing capture — opens the
+front page.
+
+### Two items, not one re-titled item — a choice, not a constraint
+
+MEASURED in the batch's probe (i5-8365U, 16 GB, Windows 11 Pro 26200, 150%,
+Windows App SDK 1.8.260921001; the raw logs were the probe's, not committed):
+with a `MenuBarItem` flyout OPEN, Alt down, up or tapped does not dismiss it
+and shows no KeyTips; keys pressed in the flyout bubble to the window's root
+(Alt's KeyDown arrives unhandled); and changing an item's Text while the
+flyout is open re-lays it out (170.7 → 308.0 epx, the flyout 310.7). So live
+re-titling inside the menu WOULD have worked. Two items were chosen anyway
+(the director's ruling on the plan's Q1): a teacher scanning the menu sees
+both choices without knowing a key exists, which is the discoverability the
+mac's Option alternate buys with its own convention and WinUI menus have no
+convention for. `subjectMenus.rule` says the alternate is the SAME item for
+the enablement rule: it is added with `Item.Preview` (so `Invoke` re-checks
+the rule when it runs) but `rules: false`, so it does not take the first
+item's place in `_ruled`, and it is greyed by hand beside it.
+
+**The second item never stops a preview** (the plan review's M2): a menu drawn
+before a preview started elsewhere — the assistant's, say — still shows it,
+and the rule's re-check passes (Preview is enabled while running), so
+`PressPreview(opposite: true)` refuses when the runner is running and the menu
+is redrawn.
+
+**No key on the second item.** The mac's is ⌥⇧⌘P; the counterpart,
+Ctrl+Alt+Shift+P, is AltGr+Shift+P on keyboards with an AltGr (Ctrl+Alt is
+AltGr to Windows), a character a teacher may be typing. REJECTED for that
+reason, as Ctrl+Alt was for #488's keys.
+
+### Alt
+
+MEASURED (same probe): Alt alone, with no `AccessKey` anywhere in the app,
+arrives as `VirtualKey.Menu` KeyDown/KeyUp (unhandled), never raises
+`AccessKeyManager.IsDisplayModeEnabledChanged` (no KeyTips), sends no
+`WM_SYSCOMMAND`/`SC_KEYMENU` to any of the window's HWNDs, and swallows
+nothing — a key typed 1 ms after Alt's release arrived. Alt down → click a
+Button → Alt up: Click fires. So the subclass dropping `SC_KEYMENU` the plan
+held in reserve is NOT needed.
+
+- **The click reads the keyboard** (`InputKeyboardSource.GetKeyStateForCurrentThread`
+  for Menu and Control) and that is the authority; the title is a courtesy.
+  **Ctrl+Alt is not the modifier** (`PreviewStartPage.ModifierHeld`): it is
+  AltGr. The menu items never read the keyboard.
+- **The title follows Alt in the ACTIVE window only**: re-read on any Alt or
+  Ctrl KeyDown/KeyUp at the window's root (`handledEventsToo`), on
+  activation, when a menu closes (the first item's `Unloaded` — measured to
+  fire on EVERY close: Escape 2–6 ms, a click outside 21 ms, an item chosen
+  6 ms after its Click; the mac's lost release was Option let go inside an
+  open menu), and when the pointer reaches the Preview button or it takes
+  focus. **Forced off on deactivation**: a release in another window is never
+  seen, so the state is cleared rather than left stale.
+- The toolbar's title depends on Alt only while no preview runs — when the
+  web view is collapsed, so focus is never inside WebView2 (where #488
+  measured that no XAML key fires) at the moment it matters.
+
+### Remembering only the teacher's navigations
+
+`CoreWebView2.SourceChanged` is the mac's `url` KVO: it fires for a click,
+Back, Forward, and — with `IsNewDocument` false — Quartz's pushState links and
+fragment clicks. Every load the APP makes goes through `NavigateAsAppAsync` or
+`ReloadAsAppAsync`, which mark it in `PreviewNavigationLedger` before calling
+`CoreWebView2.Navigate`/`Reload`; `PreviewNavigationSourceTests` holds every
+`.Navigate(`/`.Reload(` to those two and `Preview.Source =` to nowhere.
+MEASURED event orders (WebView2 runtime 155.0.4283.45, SDK 1.0.3179.45):
+
+| Navigation | What WebView2 raised |
+|---|---|
+| The app's load of the root | NavigationStarting → SourceChanged (IsNewDocument true) → ContentLoading (0–2 ms after) → NavigationCompleted |
+| `/Concepts` (302 → `/Concepts/`) | NavigationStarting, then NavigationStarting again with IsRedirected and the SAME NavigationId; SourceChanged only for the final address |
+| Reload | no SourceChanged |
+| GoBack (a new document) | a full load, IsUserInitiated false |
+| pushState link, fragment click, Back after a fragment | ONLY SourceChanged (IsNewDocument false) + HistoryChanged — and each silently CONSUMES a NavigationId |
+| A 404 | IsSuccess false, status 404; ContentLoading IsErrorPage false |
+| A dead port | ContentLoading IsErrorPage true, status 0; Source names the dead address |
+
+So an app load ends at the `ContentLoading` of the NavigationId CAPTURED from
+the first `NavigationStarting` after the request — never "the next id", which
+pushState consumes — with that id's `NavigationCompleted` as the backstop for
+a failure and 15 s when no navigation ever started. Each request captures an
+id of its own — the ledger counts requests still waiting for a
+`NavigationStarting` — so the first of two app loads back to back cannot end
+the second, even when both are asked for in one dispatcher turn before
+either has started (`TwoAppLoadsAskedForInOneTurnEachWaitForTheirOwnNavigation`). The cost, chosen over ending a load early: a request WebView2 cancels before
+raising any `NavigationStarting` holds the ledger open until the 15 s backstop.
+`ContentLoading` is the mac's didCommit: ending at Completed instead would
+lose a click made while a page's fonts and KaTeX load (the mac measured a
+resource answering after 8 s). An app load's own SourceChanged lands before
+its ContentLoading, so it is ignored. `Remember` refuses only an address that is
+not the preview's own scheme, host and port — `about:blank`, or a dead port
+elsewhere; a dead port at
+the preview's OWN address would be remembered, which is why the press gives up
+before loading when the preview stopped during the ask.
+
+**CoreWebView2.Navigate, and why — corrected.** The plan said setting
+`WebView2.Source` to the address already shown does not navigate. MEASURED,
+it does (it reloads, every time: a new Uri, `Source = Source`, or a held
+instance). `Navigate` is kept because it gives every app load ONE route
+through the ledger, not because of a trap. `WebView2.Source` follows
+`CoreWebView2.Navigate` (it always matched `CoreWebView2.Source`, inside
+SourceChanged too), so Open in Browser, the test-run `ItemStatus` mirror and
+the capture's filter, which read `Preview.Source`, are unchanged.
+`EnsureCoreWebView2Async` completed on a COLLAPSED WebView2 in 84 ms (a second
+web view in the process; a cold first one not measured), and the trail line
+and `RefreshChrome` come BEFORE the navigation is started, so a teardown
+during it loses neither.
+
+**A flag, not "the address equals the one asked for"** — the mac's reason
+holds: a teacher's own Home click would be ignored, and a redirect never
+matches. REJECTED, with `Uri.AbsolutePath` for the path (.NET unescapes some
+`%xx` in it; the path is cut from the raw string, as the mac's
+`percentEncodedPath`).
+
+### The root, the ask, and where the page is kept
+
+- **`_previewUrl` stays the ROOT** (the opposite naming from the mac's
+  `previewRoot`/`previewURL`): the capture resolves pages against it, and the
+  remembered path is cut from it. `PreviewNavigationSourceTests` holds its
+  assignments to `root` or `null`. Nothing is remembered while it is null —
+  during the ask, after a stop.
+- **The ask** (`OpenTheSiteAsync`): once the root answers, the build claim is
+  released at once (the assistant may build again) but "Preparing the
+  preview…" stays while the remembered page's address is asked — a GET,
+  redirects followed, 5 s a try, up to 3 tries a second apart, through an
+  HttpClient of its own. A stop cancels it and nothing opens or is written;
+  the same-run check (`_serverWait == thisWait`, not torn down) guards the
+  rest. A stored path whose address would leave the root (`//elsewhere`, an
+  address) is read as gone. The address is built with `UriBuilder.Path`, so a
+  first segment with a colon stays a path.
+- **MEASURED on the real Windows serve handler** (a scratch course previewed
+  with `preview.ps1` from the command line, i5-8365U, Quartz v4.5.0 on the
+  bundled runtime): `/` 200, `/Concepts/Lesson-Marker` 200, `/Concepts` 302 →
+  `/Concepts/` 200, `/No-Such-Page` 404, `/Concepts/No-Such-Page` 404, a query
+  200 — 3–7 ms each. 120 requests fired 30 ms apart across three rebuilds
+  (Quartz's "Detected change, rebuilding…", 15–28 ms on this two-page site)
+  all answered 200, the slowest in 27 ms: none failed and none was read as
+  gone. A rebuild long enough to show the WAIT itself was not reproduced on
+  so small a site; the mac's handlers.js measurement stands for that.
+- **Where the page is kept: `%LOCALAPPDATA%\Plantoir\last-viewed-pages.json`**
+  (the state folder, so `--state-dir` moves it), per working folder
+  (`WorkingFolder.IsTheSame`), course (any case) and section; a path, never
+  an address; written only on a change, through a temporary file; 500 newest
+  kept; nothing pruned for a missing folder (#320: it may be on a drive not
+  plugged in). REJECTED: `settings.json` — every window rewrites it whole and
+  a parse failure resets every setting, so a write on every click would be one
+  more writer racing for it. Not a contract format: only this app reads it.
+
+### Toolbar width
+
+"Preview at Last Viewed" roughly doubles the button. The section title's
+column is now the star column with `TextTrimming="CharacterEllipsis"`, so a
+long title shortens before the buttons are pushed out.
+
+**Measured 2026-10-15** (Intel i5-8365U, Windows 11 Pro 26200, one 1920 ×
+1080 screen at 150%, the sidebar at its only width, 230 epx; widths are the
+window's outer pixels): the window's minimum is **900 PIXELS, not 900 epx** —
+`PreferredMinimumWidth` is in the AppWindow's physical units — so at 150% it
+is 600 epx, and dragging the edge stops there.
+
+| Window | "Preview" | "Preview at Last Viewed" (Alt held) |
+|---|---|---|
+| 1350 px (900 epx) | all fits, title whole | all fits, title whole |
+| 1200 px (800 epx) | all fits | title "MP…", every button whole |
+| 1100 px (733 epx) | all fits | title gone, the Browser button cut |
+| 1000 px (667 epx) | all fits | Deploy cut, the Browser button off the window |
+| 900 px (600 epx, the minimum) | title gone, Deploy cut, Browser off | the Preview button cut, Deploy and Browser off |
+
+So at 900 epx nothing clips; the ellipsis does its job down to about 800
+epx with the long title; below that the buttons leave the window, and the
+minimum allows it at any scale above 100%. Not changed here (it is
+behaviour, and the mac's minimum is a separate question): making the
+minimum 900 epx (`900 × scale`), or letting the toolbar's buttons shrink to
+their glyphs, is the director's call.
+
+### Known limits
+
+The teacher's web browser is not observable (Open in Browser's pages are not
+remembered). A click before an app load's content arrives is not
+remembered. The first click on an inactive window acts as Alt says but its
+title did not swap first. Ctrl+R and Alt+Left inside the page are WebView2's
+own, so Chromium's reload counts as the teacher's — harmless, it is the same
+page. A Quartz 404 page the teacher visits is remembered and falls back
+("gone") on the next press.
+
+### Testing
+
+`PreviewStartPageContractTests` (every block of `previewStartPage`, the press's
+own `Decide` through `DecideForCase`), `PreviewStartPageTests` (ledger orders,
+including two app loads back to back; addresses; the store; real statuses
+from a TCP server), `PreviewNavigationSourceTests`. `[UiFact]`s in
+`PreviewStartPageUiTests` (Settings ▸ Preview saves and re-titles the button
+and both items; Alt re-titles; Alt+click opens the page last viewed; a
+teacher's click is remembered and View ▸ Reload Page is not) — written with
+the desktop locked; all four pass on the first unlocked desktop (2026-10-15),
+after two fixes to the tests: the link is scrolled into view before the
+click (the harness's window is short at 150%), and Alt is held 500 ms past
+the Alt+click, because WinUI raises Click after the mouse button is up and
+the press reads the keyboard then — released at once, the press read Alt as
+up, twice. `DrivenApp` now keeps a
+`settings.json` a test's `beforeLaunch` seeded, adding its own two keys.
+
+## The HIG sweep, screen by screen, on Windows (#491 part B)
+
+Batch 3B of the catch-up to mac 1.7.1 (2026-10-15): items 1–9 of #491, the
+Windows half of the mac's #457 batch C ([09 → "The HIG sweep, screen by
+screen"](09-mac-app.md#the-hig-sweep-screen-by-screen-457-item-4-batch-c)).
+WinUI is a different animal, so each item takes the mac's RULE and finds the
+WinUI mechanism for it. Measurements are from batch 3's spike (Intel i5-8365U,
+Windows 11 Pro 26200, 150% scaling, Windows App SDK 1.8.260921001).
+
+### A button that cannot be pressed never looks like the default (item 2)
+
+**Measured.** A DISABLED button that is still a ContentDialog's default keeps
+the accent slab: #BFBFBF with white text in Light (about 1.8:1), #434343 with
+#A7A7A7 text in Dark — it still reads as the primary slot, where a disabled
+plain button is #F5F5F5 on #F3F3F3 (Light) or #2A2A2A on #202020 (Dark). And a
+trap: the same disabled default in a dialog with NO focusable content loses
+its accent, initial focus lands on Close, and Enter presses Close — the dialog
+dismisses. With a focused text box, a disabled default takes no Enter.
+
+**So enablement, the default and the accent change together.** The rule is
+`Plantoir.Core/Models/PrimaryButtonLook.For(enabled, PrimaryKind)`; one helper,
+`Views/DialogButtons.EnablePrimary(dialog, enabled, kind)`, applies it:
+while disabled the main button is not the default (`DefaultButton` None — only
+if it WAS Primary, so a dialog whose default is Close or Secondary keeps it)
+and carries no accent style; when it can be pressed it is the default again.
+Three kinds: `TakesEnterWhenEnabled` (every ordinary dialog),
+`NeverTakesEnter` (the wizard, below — the accent style explicitly, never the
+default) and `NotTheDefault` (All Backups' Delete…, destructive beside a Done
+that keeps Enter: only enablement changes). `DefaultButtonScanTests` holds
+every `IsPrimaryButtonEnabled` write under `Plantoir/` to `DialogButtons.cs`
+— object initialisers and bare writes inside a `ContentDialog` subclass
+included, which is how All Backups' initialiser was found — so a new dialog
+cannot grey its main button by hand. The 21 sites the plan listed, plus 2B's
+section-verb dialog, all go through it.
+
+**The wizard's Create Course NEVER takes Enter** — measured on the mac
+(2026-10-08): as the default, an Enter typed in the Course code field created
+a course named by the code with the rest of the form unread. `DefaultButton`
+is None from the start; the button wears the accent while it can be pressed;
+the cursor starts in Course code (`Opened` focuses it; the suggestion list
+opens only on typing). After the work, its Close is the ordinary kind and
+takes Enter — there is nothing left to type.
+
+**Class Dates reads, THEN remembers.** "Read the Dates" (Secondary) and
+"Remember These Dates" (Primary), the mac's words. Remember is live only once
+dates have been read (`_parsedDates`), so it never sits greyed in the default
+slot; the primary handler's own re-read stays as a safety net. Before a read,
+Read the Dates is the default — EXCEPT on the typed route, where no button is:
+the box needs Enter for a new line. Measured here, Enter in a multi-line box
+inserts a line and presses nothing even with a default button, but the rule
+is kept (the mac's `isTheDefault: route != .typed`) so it does not depend on
+that. A read that fails clears what was read before.
+
+### Escape is never trapped (item 1)
+
+**Measured: an AutoSuggestBox in a ContentDialog TRAPS Escape.** With its list
+closed, the inner TextBox marks Escape handled and a second Escape is
+swallowed too; with it open, the first closes the list and the second is
+swallowed. So Copy a Page — which opens with the cursor in its page field —
+and the wizard could not be closed from the keyboard at all. A ComboBox
+already behaves (closed: Escape closes the dialog in about 3 ms; open: the
+first closes the drop-down, the second the dialog) and is left alone.
+
+`Core/Models/PickerEscape.For(listWasOpen)` is the mac's rule; both
+AutoSuggestBoxes (`CopyAPageDialog._picker`, the wizard's `_codeBox`) ask it in
+`PreviewKeyDown` — which tunnels, so it runs before the inner TextBox marks the
+key handled — and, with no list drawn, mark it handled and `Hide()` the dialog
+(the wizard through its Cancel route: a running creation is stopped by the
+teacher, as `OnCloseButton` does). With a list drawn, WinUI's own handling
+closes it. `PickerEscapeTests` pins the rule and that both pickers route
+through it; `CopyAPageEscapeUiTests` and
+`NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` press real
+Escapes (list, then dialog), each after `BringToFront` and failing with "the
+app did not hold the foreground" rather than blaming the app when another
+window has it — the flake `SpecialFoldersHelpUiTests` records.
+
+### One dialog title shape (item 3)
+
+Every title was already a plain string in WinUI's own title style; what
+differed was the explanation under it in the five dialogs that carry one — 12
+at 70%, 13 at 80%, the default at 70%, and Keep a Copy's at the BOTTOM.
+`FormBuilders.DialogExplanation(text)` (14, `TextFillColorSecondaryBrush`,
+wrapped at 460, 12 below) is now FIRST in the content of Add Section, Keep a
+Copy for Reference (what the copy IS moved to the top; what it leaves behind
+and why it never deploys stay below the form), Class Dates, Special Folders
+and every credential request (`CredentialRequestPanel`, so the Deploying
+pane's inline instructions use it too). Titles stay in sentence case — and
+stay as they were: "Add a Section to ICS3U" is the mac's title too.
+`DialogTitleScanTests` holds a per-file census of every ContentDialog made (64
+on 2026-10-15) the way the mac's `SheetTitleScanTests` censuses sheets, so a
+new dialog arrives having been looked at; it also refuses a `TitleTemplate` or
+an element as a title, and checks the five call the helper.
+
+### Open in Obsidian locks a reference course again first (item 4)
+
+2A made Open in Obsidian one route (`SidebarPane.OpenInObsidian`, above). The
+mac's route also LOCKS the pages again before anything, so a page unlocked
+since the folder was read — by hand, by a sync client, by a restore — never
+opens editable; `OpenReferenceInObsidian` now runs
+`ReferenceLock.EnsureLocked` off the UI thread first (a large course is
+thousands of access-rule reads) and writes the existing "reference course
+pages locked again" line through `ReferenceCourseUpkeep.TrailLine` when it did
+anything; a failure is logged and the teacher may still open. The note is
+shown on the sidebar's `XamlRoot` — the sidebar always exists in a window
+(there is no collapsed-sidebar state here as on the mac, where the note had to
+move to the main window). `ObsidianRouteSourceTests` holds
+`FolderActions.OpenInObsidian(` to the sidebar's two branches plus ONE named
+exception, Course Settings' How I Teach row, which opens a PAGE of a LIVE
+course. Verified by hand once (2026-10-15, a throwaway UI test, Obsidian's
+vault registry backed up and restored byte for byte): a page unlocked by hand,
+the section toolbar's button, the page locked again BEFORE the note, "locked 1
+page of ICS3U again — it is kept for reference" on the trail, Obsidian opened.
+
+### Delete and the − button run the menu's removal (items 5–6)
+
+**The Delete key** on a selected sidebar row runs the item
+`shared-rules.json` → `sidebarDeleteKey` names — Remove Course…, Remove
+Section…, Delete Backup…, Delete Archive… — through the menu bar's own guard
+(`MainWindow.RunFromTheSidebar` → `Invoke`), so it asks the menu's question,
+and where the item is greyed (a section of a course kept for reference, a
+course being copied) it does NOTHING. **Silently**: the mac beeps, Windows has
+no beep for a greyed command, and a dialog explaining why would be a door the
+menu says is shut — the same reasoning as F2 on a greyed Rename (above). It is
+the tree's `KeyDown`, never a key on the menu item (which would take Delete
+from every text field; the filter box is outside the tree), and it asks
+`DialogGate.Holds(root, "Delete")` first (`AcceleratorDialogGateTests`).
+**Which row**: `Tree.SelectedItem` — measured, arrow keys move it (and focus)
+WITHOUT raising `ItemInvoked`, which is how the window's own selection is
+normally set — so the row is selected for the window first, and the item acts
+on what the teacher sees highlighted. Measured too: Delete reaches
+`Tree.KeyDown` unhandled with the item as its source.
+
+**The − button** follows the same rule for removal only
+(`Core/Models/SidebarDeleteKey.MinusButtonIsEnabled`, refreshed with the menu
+bar's enablement — every trigger `ApplyMenuEnablement` hears — and not greyed
+for a dialog, whose overlay covers it anyway): greyed on a backup, an archive
+and a section of a course kept for reference. **It used to remove the WHOLE
+COURSE there**: `ConfirmRemove` turned a reference section's removal into the
+course's, silently. That coercion is now an early `return` — a guard for any
+caller that skips the rule — and the "removing the only section removes the
+course" branch stays, as on the mac. `ConfirmRemoveCourse` /
+`ConfirmRemoveSection` are the entry points.
+
+**Every row menu's removal is last, behind a separator**: course, section and
+reference-course rows gained Remove Course… / Remove Section…, greyed by the
+rule for THAT row read when the menu opens (`MainWindow.SituationFor(selection)`,
+the generalisation of `CurrentSituation`; the section window's and Course
+Settings' own buttons are read only for the selected row, and no removal
+depends on them). A reference SECTION offers none
+(`interface.whatIsWithheld`); backup and archived rows already ended with
+their Delete….
+
+`SidebarDeleteKeyContractTests` runs the 6 cases and checks the − button
+against every `subjectMenus` case whose row is a course or a section. **No
+`minusButtonCases` key was proposed** (decided on the plan review): those
+cases already pin it, and the mac implements and tests the same rule
+(`SidebarMinusButtonTests`). Through the window: `SidebarDeleteKeyUiTests`
+(Delete on ICS3U asks "Remove ICS3U?" and Cancel removes nothing; on a
+reference section nothing opens and − is greyed) and
+`ReferenceCourseUiTests.AReferenceSectionOffersNoRemoveSection`.
+
+### All Backups (item 7)
+
+A header over the list: **Course**, **Made** and **Size** sort
+(`allBackupsSortCourse` / `…Made` / `…Size` — never `allBackups-…`, which
+names a row), with ▲/▼ on the sorted one; **Made By** is a label. Newest first
+until a header is pressed; a new column sorts ascending, the same one flips;
+the selection is kept by file. `Core/Models/AllBackupsOrder` (ties newest
+first, an unmeasured size the smallest) is unit-tested. Each row's context
+menu: **Restore…** (exactly one chosen), **Show in File Explorer** (one window
+per folder; the dialog stays), and **Delete…** last behind a separator; a
+right-click on an unselected row selects only it (the menu's `Target`, as in
+File Explorer). Delete in the list is Delete…. Restore… and Delete… close All
+Backups FIRST and ask once it has gone — WinUI shows one ContentDialog per
+window, and their questions are dialogs — through the same
+`ConfirmRestoreBackup` / `ConfirmDeleteBackups` as before.
+`AllBackupsUiTests.TheListSortsAndOffersAMenu` drives the order, the header's
+ids and the menu.
+
+### One name per command (item 8)
+
+The course and section rows' Revise items sit in **Revise With ▸**, titled as
+the menu bar's: Claude…, Codex…, Local AI Assistant…. The outside agents'
+titles are `ClaudeCodeLauncher.MenuItemTitle` / `CodexLauncher.MenuItemTitle`,
+which the menu bar and the rows share, and
+`ContractTests.TheOutsideAgentsMenuTitles_AreTheContracts` reads
+`app-rules.json` → `outsideAgents.agents[].menuItem` by key — until now
+nothing on Windows read it, so the mac's rename turned nothing red. "Rename"
+and the empty pane's "New Course…" came with 2A.
+
+### The words (item 9), and a 12 epx floor
+
+- Class Dates: **Choose a File…**, **Day First** / **Month First** (keeping
+  the "(…)" example).
+- Site health: the dismissing button says **OK** only when it is the only
+  answer — **Not Now** beside a repair, **Close** beside Preview Again
+  (`SiteHealthRepair.CloseTitle`).
+- A backup, restore, deletion or removal problem names its act
+  (`Core/Models/BackupProblemTitle`, the mac's words: "Could not back up
+  EXC2O", "Could not restore EXC2O", "Could not delete the backup(s)", "Could
+  not delete the archive"), plus Windows' own **Removing(code)** — a failed
+  removal has a dialog of its own here, the mac's has none.
+- Title case on buttons: "Not Now" (the model download prompt), the
+  class-dates card's **Enter Class Dates** / **Not Now** — moved to the
+  trailing end, commit button first as Windows orders a pair — and **Save and
+  Continue**. The assistant's one-time reminder now says where: "…in File ▸
+  Settings, under Assistant."
+- **Nothing below 12 effective pixels.** Why 12 and not a conversion: 12 is
+  Fluent's **Caption**, the smallest style in Windows' type ramp and the size
+  the app's captions already use. Points on the mac are logical pixels (body
+  13 pt there, 14 epx here), so the mac's "nothing below 10 pt" is about 10–11
+  epx — a floor below Windows' own smallest style would have allowed text
+  Windows never draws (plan review, M4). Raised: About (11 → 12, three
+  places), the wizard's Example content badge (10 → 12 — XAML held in a C#
+  string), Class Dates' sharing note (11 → 12). `FontSizeFloorScanTests`
+  reads every `.cs` and `.xaml`, XAML inside strings included (an attribute
+  belongs to the nearest `<Tag`, an assignment to the innermost open
+  `new Type {`); glyphs in a `FontIcon` are icons and exempt. Checked to fail
+  on a size put back.
+
+### Not done, and why
+
+- **"Just Do It" / "Keep Checking"** (item 9's list): Windows has no such
+  buttons — the assistant appends a line after fifteen accepted plans instead
+  of offering the choice — so there is nothing to title-case; the missing
+  buttons are a parity gap outside #491's words, recorded rather than built.
+- **"Use This ID"**: Windows' Deploying pane edits the ID in place, with the
+  instructions inline (3A), so there is no dialog to carry the button.
+- **Sentence-case repair buttons** ("Put the Media folder back"): the
+  repair's own titles, `SiteHealthRepair.ButtonTitle`, were left as they are —
+  #491 named the dismissing button, and the mac's repair titles are the same
+  words, left as they were by its sweep.
+
+## Diagrams and graphs (#485 E1, v1.7.0): the runtime carries the engines (#503)
 
 The build's figure pass (`scripts/figures.py`), its helper
 (`support/figures/plantoir-figures.mjs`), the site's transformer and the
 contract (`figureFences`) are shared and reach Windows unchanged; the Python
-half is tested there by `scripts/test_figures.py`, which needs no Node. What
-the RUNTIME owes is two engines under `runtime\vendor`: `function-plot\`
-(function-plot 1.25.4's `function-plot.js` and `LICENSE`, by the tarball's
-SHA-256) and `tikz-engine\` (`npm ci --omit=dev` from
-`support\figures\package-lock.json` — node-tikzjax 1.0.5, 133 packages,
-5,445 files, 39.8 MB). Until `fetch-runtime.ps1` fetches them,
-`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` is red by
-design (`functionPlot`, `nodeTikzjax` → `windowsRuntimeContains`), and a
-Windows build reports every figure as `engineMissing` without failing. The
-why, the measurements and what was rejected are in
+half is tested there by `scripts/test_figures.py`, which needs no Node. The
+why, the mac's measurements and what was rejected are in
 [02](02-docker-image.md#optvendorfunction-plot-and-optvendortikz-engine-485-e1-v170),
 [05](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170)
-and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170);
-the work is the `windows` issue opened with E1.
+and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170).
+This section is what Windows does differently, and what it measured.
+
+**What the runtime carries, since 2026-10-15 (#503, the catch-up's batch
+5A).** `fetch-runtime.ps1` has a vendor phase that mirrors the Dockerfile's
+`/opt/vendor` into `runtime\vendor`:
+
+| Folder | What | How it is checked |
+|---|---|---|
+| `pagedjs\` | Paged.js 0.4.3's `paged.min.js` + `LICENSE.md` (#454) | the tarball's SHA-256, then the file's (`fileSha256`) and its 502,617 bytes |
+| `pagedjs\fonts\` | Latin Modern's six OTFs + `LICENSE-Latin-Modern.txt` (#499) | the `.deb`'s SHA-256, then each font against `latinModern.files` |
+| `function-plot\` | function-plot 1.25.4's `function-plot.js` + `LICENSE` | the tarball's SHA-256, then the file's and its 202,953 bytes |
+| `tikz-engine\` | node-tikzjax 1.0.5 from `support\figures\package-lock.json` (`npm ci --omit=dev`) | `npm ls node-tikzjax@1.0.5`, then the three `tex\*.gz` against `nodeTikzjax.files` |
+
+Each URL is written out in full in the script, because
+`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` reads it as
+TEXT for every pin's `windowsRuntimeContains` — `latinModern` gained one
+(`fonts-lmodern_2.005-1_all.deb`) with this change; nothing on the mac reads
+that field. The `NamedGapLedger` entries that held `pagedjs`, `functionPlot`
+and `nodeTikzjax` open went in the same commit. Tarballs are unpacked with
+`%SystemRoot%\System32\tar.exe` by full path (Git's GNU tar may be first on
+PATH, and reads `C:` as a remote host).
+
+**Latin Modern comes from the same Debian package the image installs**,
+`fonts-lmodern_2.005-1_all.deb` from deb.debian.org (snapshot.debian.org as
+the fallback), SHA-256 `027cd4dd…c58398`, 4,540,004 bytes, measured
+2026-10-15 — so the six fonts are byte-for-byte the image's (all six matched
+`latinModern.files` on the first run). The `.deb` is an `ar` archive, which
+Windows' bsdtar reads; its `data.tar.xz` is unpacked with the runtime's own
+Python (`tarfile` + `lzma`) rather than bsdtar. MEASURED: this PC's bsdtar
+(3.8.9, liblzma 5.8.3) does read xz — but an older Windows 10's bsdtar is not
+known to, and the build PC is the only place this runs, so the dependency
+that is certainly there was chosen. REJECTED: GUST's zip (a second network
+host, the same reason the image rejects it) and converting to woff2 (the
+licence asks a changed font be renamed).
+
+**A runtime made before the vendor folder is brought up to date without
+fetching ~600 MB again.** What runs is decided from `manifest.json`'s KEYS,
+never from folders (a crashed `npm ci` leaves a `node_modules` that looks
+done): no manifest, everything; a manifest whose vendor keys (`pagedjs`,
+`latinModern`, `functionPlot`, `nodeTikzjax`) are missing or differ from the
+pins, `runtime\vendor` is deleted and only the vendor phase runs, against the
+node and python already there (both paths set before any phase), and the
+manifest is merged. The plan review's M4 found the first draft would have
+called `npm.cmd` with an empty `$nodeDir` on that path.
+
+**A run that dies part-way leaves a runtime the build refuses and the next
+run repairs** (the 5A implementation review's L1 and L3). Before
+`runtime\vendor` is touched, the manifest is rewritten WITHOUT the four vendor
+keys — on a fresh clone that is the first manifest written, the five base keys
+right after the base phases. So a vendor phase that fails (a download, `npm
+ci`, a hash) leaves base keys only: `CheckNativeRuntimeManifest` stops the
+build, and a re-run takes the vendor-only path instead of trying to move Node
+onto a `runtime
+ode` that is already there. REJECTED: keeping the old
+manifest until the end, which is what 5A did — after a pin bump a failed
+vendor-only run left all four keys (old values) beside no `vendor` folder, a
+runtime the build accepted and `publish.ps1` shipped without engines; and
+checking for the folder in `CheckNativeRuntimeManifest`, which is the "decide
+from folders" the script exists to avoid. **A version and its address cannot
+part either (L2):** the vendor addresses are literals beside the
+`$<Name>Version` variables, the script refuses at start when an address does
+not end with its version, and
+`ToolchainContractTests.TheWindowsRuntimeRecipesVendorVersionsAreTheContracts`
+holds each variable against the contract's pin.
+
+**The build refuses a runtime without them (the plan review's M5).**
+`publish.ps1` never runs `fetch-runtime.ps1`, and robocopy `/MIR` copies
+whatever `Vendor\runtime` holds — so a build PC with a 2026-08-19 runtime
+would have published an installer with no engines, silently.
+`Plantoir.csproj` → `CheckNativeRuntimeManifest` now runs before
+`CopyNativeRuntime` and `PublishNativeRuntime` and fails the build, saying to
+re-run `fetch-runtime.ps1`, when the manifest lacks any of the four keys.
+Must-fail measured: with `nodeTikzjax` removed from the manifest the x64
+Debug build stopped with that error; restored, it built. No runtime at all is
+still allowed, as before (the targets are skipped).
+
+**Installing over an older version.** Inno never removes a file a newer
+version drops, and the engine's `node_modules` is a lockfile tree, so
+`installer.iss` → `[InstallDelete]` empties
+`{app}\runtime\vendor\tikz-engine\node_modules` before `[Files]` puts the
+current tree back. `runtime\quartz\node_modules` has always had the same
+exposure (its tree has not changed since v4.5.0 was pinned).
+
+**How the build finds them: no new variable.** The launchers set
+`PLANTOIR_QUARTZ_DIR` to `<runtime>\quartz` and put `<runtime>\node` first on
+PATH (`Enter-NativeRuntime`); `toolchain_paths.VENDOR_DIR` is that folder's
+parent + `vendor`; `figures.helper_command` runs `node` from PATH.
+
+**Measured** (i5-8365U, 16 GB, Windows 11 Pro 26200, 2026-10-15; Node
+20.18.1, the image's is 20.20.2):
+
+- The vendor phase alone: **42 s** on a fresh run against the existing
+  runtime (downloads 1.05 MB + 4.33 MB + 0.19 MB, then `npm ci`).
+- `tikz-engine\`: **133 packages, 5,450 files** (5,448 under `node_modules`,
+  plus the folder's own `package.json` and lockfile; the mac counted 5,445 in
+  the image), **40,838,241 bytes** (38.9 MiB). The whole `vendor\`: 5,461
+  files, 42.2 MB. Latin Modern: 631,940 bytes for the six, as the image.
+- **memfs's `/tex_files/` works under win32 paths** — the open question in
+  #503 (review N7). The contract's triangle (`figureFences.cacheKey.cases[0]`)
+  drawn through `plantoir-figures.mjs` in two processes: byte-identical,
+  **1,540 bytes, SHA-256 `8c68b085…6827b37`**
+  (`8c68b08531cee21b507a3edb31e9346c9294defa63a0a0d04c5dde05a6827b37`). The
+  mac has not yet printed its own SHA-256 for the same SVG, so whether Node
+  20.18.1 and 20.20.2 draw the same bytes is not known (the `mac` issue from
+  this batch asks).
+- The engine's load: **1.6 s** the first time after the fetch (Defender
+  scanning 5,450 new files was not visible in it), 1.4–1.8 s after; the
+  triangle drawn in 0.33–0.45 s. Nowhere near `figures.START_SECONDS` (120 s).
+- A build (`preview.ps1 --build-only`, a fresh section, one page with three
+  diagrams, a graph and `printable: true`): **19.2 s** first, **5.7 s** again
+  with every figure from the cache ("📐 Drew 0 diagrams (4 from before)").
+  With one diagram the first build was 18.6 s, so most of the first build is
+  the section's Quartz scaffold, not TeX.
+- **A runtime under a path with spaces** (`…\Plantoir Runtime With Spaces`,
+  a junction to the runtime, given as `PLANTOIR_RUNTIME`): every test below
+  passed through it, so `node.exe` and the engine resolve there.
+- **A diagram that never ends** (`\def\x{\x}\x`) through `figures.run_jobs`:
+  answered `tookTooLong` and the next diagram still drawn, both in **23.5 s**
+  — the 20-second clock plus the helper's restart and the engine's second
+  load.
+- **Path length.** The longest path under `tikz-engine\` is 134 characters
+  (`…\@jsonjoy.com\json-pack\lib\nfs\v4\server\operations\node\Nfsv4OperationsNode.js.map`;
+  the longest code file is 130). Installed at
+  `C:\Users\<name>\AppData\Local\Programs\Plantoir\runtime\vendor\tikz-engine\`,
+  that stays under 260 for an account name up to 56 characters. A Debug
+  build from a worktree goes past it (149 + 134), and works here because
+  this PC has `LongPathsEnabled` = 1 — so this PC cannot show what a
+  machine without it does in a deep folder; the installed path is the one
+  that matters, and `publish.ps1` compiles through a short subst drive.
+- **In the browser** (headless Edge 155.0.4283.45 — the same Chromium build
+  as this PC's WebView2 Runtime, 155.0.4283.45 — over HTTP from the built
+  site, light and dark): the graph draws, the triangle's lettering is
+  Computer Modern (the page fetched `static/tikz/fonts.css`, `cmmi10.ttf` and
+  `cmr10.ttf` from the site itself, and `static/function-plot/function-plot.js`;
+  nothing from another address), and in dark mode the drawing turns light on
+  the dark page. NOT driven inside Plantoir's own preview pane; Print in the
+  pane hands the page to the browser since #496 ("Printable pages" above),
+  and WebView2's own print measurements are owed there.
+
+Tests: `NativeFiguresTests` (`[NativeVendorFact]`: skipped, with the reason,
+on a runtime without `vendor\tikz-engine`) —
+`TheContractsTriangleIsDrawnTheSameInTwoProcesses`,
+`ADiagramThatNeverEndsIsStoppedAndTheNextOneIsStillDrawn` (the runtime's
+Python with `-I -X utf8` and the scripts folder put on `sys.path` by hand:
+`-I` drops both), and
+`ABuildWithADiagramAGraphAndAPrintablePageCarriesAllThree` (the real launcher,
+the section's site read back: `static\pagedjs\paged.min.js`,
+`static\function-plot\function-plot.js`, an inline `<svg>` inside
+`pl-figure pl-tikz`, `pl-figure pl-functionplot`, none of the fallback
+sentences, then a second build from the cache). The helper's `--rules`
+argument must be a `figureRules.js` inside a `"type": "module"` package (a
+section's Quartz is one); handed the repository's copy directly, Node reads
+it as CommonJS and the helper dies before it says it is ready.

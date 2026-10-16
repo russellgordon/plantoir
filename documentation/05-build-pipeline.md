@@ -1636,7 +1636,7 @@ read-only commands for him are in the #128 hand-over.
 **Adding a second curriculum.** Nothing ships the College Board's pages — the
 framework's text is the teacher's to bring. A teacher makes the folder
 (`College Board Curriculum`), ticks it under Course Settings → "Curriculum
-folders", and asks "Revise with Claude…" to draft one page per code from the
+folders", and asks Revise With ▸ Claude… to draft one page per code from the
 framework they have; the next build draws its map.
 
 
@@ -1714,7 +1714,12 @@ cases: `contracts/shared-rules.json` → `figureFences`.
    `--full-rebuild` clears this engine's. Writes go to a temporary file and
    are moved into place, and a missing or half-written entry is a miss
    (review S7: previewing one section while publishing another is the
-   supported way of working). A build whose figures are all cached never
+   supported way of working). Windows refuses that move onto a file another
+   build has open or is replacing at the same moment; the entry is then
+   simply not cached (another writer has stored the same key) and the
+   writer removes its own temporary file rather than leaving it beside the
+   entry (2026-10-15; retrying was rejected, since it adds build time to store
+   what is already stored). A build whose figures are all cached never
    starts Node: "📐 Drew 0 diagrams (12 from before)".
 5. **The helper.** `support/figures/plantoir-figures.mjs`, one process per
    build, JSON lines each way (protocol at the top of the file). It says
@@ -1766,6 +1771,17 @@ the verify fixture's first build drew its 7 distinct diagrams and checked 5
 graphs; the scratch EXC2O build took 5.3 s with them drawn and 2.9 s with
 all of them cached. Single diagrams: triangles 74 ms, a TeX error 19–43 ms,
 circuitikz 664 ms, pgfplots 842 ms.
+
+**Measured on Windows** (#503, 2026-10-15; i5-8365U, 16 GB, Windows 11 Pro
+26200, the native runtime, Node 20.18.1, `preview.ps1 --build-only` of a fresh
+section whose one page has three diagrams, a graph and `printable: true`):
+**19.2 s** for the first build and **5.7 s** for the second, every figure from
+the cache; the engine's load 1.4–1.8 s (1.6 s the first time after it was
+fetched), the contract's triangle 0.33–0.45 s; a diagram that never ends
+stopped at its 20-second clock and the next one drawn, both in 23.5 s. The
+first build is mostly the new section's Quartz scaffold, not TeX (18.6 s with
+one diagram). The rest, and what was checked in the browser:
+[12 → Diagrams and graphs](12-windows-app.md#diagrams-and-graphs-485-e1-v170-the-runtime-carries-the-engines-503).
 
 **The live-preview edge.** The preview's live reload re-reads `content/`,
 not the teacher's vault, so a fence edited in Obsidian reaches the site on
