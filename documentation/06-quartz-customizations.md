@@ -449,9 +449,9 @@ pages that do not opt in are byte-identical** once what Quartz already varies
 between ANY two builds is set aside (the explorer's random list id, build-time
 dates on curriculum pages, and the order of tag-list entries sharing one of
 those dates); the only pages that differ are the 7 that opt in. Every new CSS
-selector is scoped to a printable page or the handout frame — with TWO
-exceptions: #501's print block, below, and since #515 the sidebar's page
-marker (H), which is NOT print-scoped and changes every page's on-screen
+selector is scoped to a printable page or the handout frame — or to figure
+markup (`.pl-figure`, G, #485) — with TWO exceptions: #501's print block,
+below, and since #515 the sidebar's page marker (H), which is NOT print-scoped and changes every page's on-screen
 sidebar — and nothing adds an `@page`. So a page that does not opt in still
 has byte-identical HTML, but since #515 its sidebar does not RENDER exactly as
 it did before #454: page rows inside an open folder carry a dot. **verify.sh gates
@@ -483,7 +483,7 @@ against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
 +10,525 and +5,659 at 4c587f670, before the light-page wait and the corner
 change), every rule in them scoped so it cannot touch an ordinary page.
 Those are history, as #501's +316 above is: since #515 (v1.7.2) `index.css`
-also carries the sidebar's page marker, 473 bytes, which DOES touch every page's
+also carries the sidebar's page marker, 454 bytes, which DOES touch every page's
 sidebar on screen (H); `postscript.js` is unchanged by it.
 
 ### F1. The files and how they reach a section
@@ -1178,11 +1178,13 @@ rows are built in the browser from `<template>`s (A2): a page row is
 link (when `folderClickBehavior: "link"` gives it one) is two levels down,
 never a direct child, chevron or not. A folder's `index.md` becomes the
 folder's own data, not a child row. `.folder-outer > ul` keeps it to the
-inside of a folder. The rule sets `padding-left: .8em` and
-`text-indent: -.8em` on the row, and draws the dot as an inline-block
-`::before` (.32em round, `margin-right: .48em`, `vertical-align: middle`), so
-dot plus gap fill exactly the negative indent: the first letter lands on the
-row's content edge, which is where line two starts. Under
+inside of a folder. The rule sets `position: relative` and
+`padding-left: .8em` on the row, so every line of the title starts .8em in,
+and draws the dot as an absolutely positioned `::before` in that padding:
+`left: 0`, .32em round, `top: calc(.5lh - .16em)` — half the row's OWN line
+height less half the dot, so it is level with the first line whatever the
+scheme's font and line height (`top: .5em` first, for a browser without `lh`;
+Safari 16.4+ and Chrome 109+ have it, within macOS 15 and WebView2). Under
 `forced-colors: active` the dot is `CanvasText`.
 
 **It wins by specificity, so do not shorten it.** Plantoir's CSS comes BEFORE
@@ -1190,7 +1192,7 @@ the explorer's in `index.css` (component CSS follows the layout's order, and
 `beforeBody`, where PlantoirMetaLine sits, precedes `left`; measured: print at
 offset 3,180, figures at 3,948, the stock `.explorer-content ul{` at 30,277),
 so the rule beats Quartz's only by being more specific. No stock rule sets
-`padding-left` or `text-indent` on a sidebar `li` today; a Quartz upgrade that
+`padding-left` or `position` on a sidebar `li` today; a Quartz upgrade that
 adds one has to be checked against this.
 
 **What it leaves unchanged.** Nothing styles the link: its colour (`--dark`
@@ -1202,13 +1204,17 @@ fixed name — and `postscript.js` gains nothing (no script). The sidebar is
 `display: none` on paper (print.scss's printable and every-other-page blocks;
 the handout frame clones the article only), so print is untouched.
 **Measured** in the verify build (EXC2O section 1): the rule's minified text
-is **473 bytes** of `index.css` (57,843 bytes in all) — 92 for the row, 234 for
-its `::before`, 147 for the forced-colours block — at offset 23,010, ahead of
-the stock `.explorer-content ul{` at 30,750. **Not measured:** a dev-image build compared with a
-branch-image build page by page, which the plan asked for; this piece ran no
-image build but verify.sh's (no docker by hand on a day with a scheduled
-deploy). The HTML claim rests on construction plus verify.sh's 6h check that
-the row templates are still `<li><a>` and `<li><div class="folder-container">`.
+is **454 bytes** of `index.css` (57,824 bytes in all), ahead of the stock
+`.explorer-content ul{` (92 for the row, 215 for its `::before`, 147 for the forced-colours block, from offset 23,010; the stock rule is at 30,731). (The first, inline-dot form measured
+473 bytes: dev's 57,370 → 57,843.) **HTML, measured by the implementation
+review:** the branch's final verify build (plants removed) against the
+scheduled deploy's EXC2O build of the same day (a different image and base
+URL, so not a clean dev-vs-branch pair): across 299 pages `<head>` identical
+once URLs and og/twitter/rss metas are set aside, `<body>` identical once the
+random list id and dates are, but for 5 pages (`Curriculum/index`,
+`tags/index`, `tags/A1`, `strand-a`, `strand-b`) that differ only by
+same-date list order, Quartz's known variance. verify.sh's 6h check also
+holds the row templates to `<li><a>` and `<li><div class="folder-container">`.
 
 **Contrast, measured.** The target is WCAG 2.2 SC 1.4.11, non-text contrast,
 **at least 3:1** against the sidebar's `--light`. The dot's effective colour
@@ -1229,12 +1235,15 @@ dot's computed colour and opacity. The alternatives, same method:
 | `--gray` | 1.72 | 2.52 | 47: REJECTED |
 | `--secondary` / `--tertiary` | 1.74 / 1.46 | 1.06 / 2.59 | 6-17 schemes: REJECTED, and they already mean "link" and "here" |
 
-**A known limit, not papered over.** The dot is an atomic inline, so there is
-a line-break opportunity between it and the title. A title whose FIRST WORD is
-wider than the sidebar less .8em would leave the dot alone on line one. No
-title in the example course does it at sidebar width; CSS has no way to glue
-the dot to the first word without changing the markup, which this piece
-deliberately does not do.
+**Why the dot is out of the line (the first implementation's limit, gone).**
+The first implementation drew the dot as an inline-block `::before` with a
+`text-indent: -.8em` hang. An inline-block is an atomic inline with a
+line-break opportunity after it, so a title whose FIRST WORD is wider than the
+sidebar less .8em left the dot alone on line one (implementation review,
+measured with "Electroencephalographicallycounterrevolutionarily debate": a
+four-line row, the link starting on line two). The absolute dot is not in the
+line at all, so nothing can strand it; verify.sh plants that title, and the
+check holds every row's dot level with its own title's first line.
 
 **Gated, in two places.**
 
@@ -1265,22 +1274,34 @@ deliberately does not do.
   browser's own layout); no folder row at any depth and no top-level page has
   one, and the folders kept their chevrons; the long title has at least two
   lines, line two starts at line one's left (±0.5 px) and at the row's content
-  edge, and the dot is left of line one and level with it; the current page's
+  edge, and the dot is left of line one and level with it; on EVERY page row
+(the too-wide first word included) the dot's middle is inside the title's
+first line and left of it; the current page's
   link is `--tertiary` at 1, a hovered link (CDP mouse move, read until two
   reads agree, since Quartz eases colour over .2 s) is `--tertiary`, and the
   dot is the same on the current, hovered and a plain row; contrast as above.
   All again in dark mode (emulated, reloaded, `saved-theme` asserted), on the
   folder's own folder page (`Discussions/index.html`), and under emulated
-  forced colours. A static 6h check also finds the minified selector in
-  `index.css`.
+  forced colours, where every dot must be at least 3:1 against its row (a
+  drawn box is not enough: Chrome forces a background to Canvas and keeps its
+  alpha, so without the `CanvasText` block the dot is still "there", Canvas on
+  Canvas, 1:1). The fixture's `Discussions/Tasks` is planted only if the course
+  has none, with a marker file, and removed only while the marker is in it.
+  A static 6h check also finds the minified selector in `index.css`.
 - **Must-fail, each failing for its OWN reason** (copy-and-restore, on a copy
   of a built EXC2O site served over HTTP with the fixture rows added to its
   `contentIndex.json` and the rule placed before the explorer's, as the build
-  places it): no rule → `page rows carry no marker` for all six rows, first;
+  places it): no rule → `page rows carry no marker` for all seven rows, first;
   the selector widened to `.folder-outer>ul>li` → `folder row carries a
-  marker: "Tasks"`; the gap set to .2em → `the long title's
-  second line starts at 70.6 px, not under its first letter at 66.1 px`;
-  opacity .3 → `the dot is 1.78:1 … under 3:1`. The Python test: opacity .3
+  marker: "Tasks"`; the padding cut to .2em → `the dot (to 62.9 px) is not
+  left of the title (from 61.0 px)`; opacity .3 → `the dot is 1.78:1 … under
+  3:1`; the forced-colours block deleted → `forced colours: 6 of 6 page rows
+  have no dot that can be seen (lowest 1.00:1 …)` (with it: 10.41:1); the
+  first implementation's inline dot → `the dot of
+  "Electroencephalographicallycounterrevolutionarily debate" (middle 413.3 px)
+  is not beside its first line (428.2-446.2 px …)`. The restore guard: an
+  unmarked `Discussions/Tasks` with a teacher's `index.md` survives the restore
+  block; a marked one is removed. The Python test: opacity .3
   fails the contrast test (every scheme listed), a `> a:hover` rule fails the
   link test, and the import left out of `concatenateResources` fails the
   carrier test.
@@ -1297,8 +1318,10 @@ titles, and make more titles wrap, which is the problem being fixed.
   marker's size are the browser's own and differ between Chrome, Safari and
   Edge; `::marker` takes no opacity and no size short of `font-size`; and it
   lands against the folder's border line, inside `.folder-outer > ul`'s .8rem.
-- An absolutely positioned `::before`: needs a `top` worked out from the line
-  height, and drifts when that changes.
+- An inline-block `::before` with a `text-indent` hang (the first
+  implementation): it strands on a too-wide first word, above. The planner had
+  rejected the absolute dot as drifting with the line height; `top:
+  calc(.5lh - .16em)` follows the row's own line height, so it does not.
 - The "•" glyph: its size and height change with the scheme's font (43
   schemes, several faces). The drawn dot is the same everywhere.
 - A class on page rows from `patches/explorer.inline.ts`, or the styles in
