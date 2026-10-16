@@ -12,8 +12,8 @@ namespace Plantoir.Core.Assist;
 /// vertically: whatever does not fit is clipped from outside, where no scroll
 /// bar can reach it. So everything on the plan stage has to fit, and two parts
 /// can give way. The NOTES give way first, down to <see cref="NotesFewest"/>,
-/// so that <see cref="FewestRows"/> rows still show; then the rows, down to
-/// that floor. The notes' cap is the notes scroller's <c>MaxHeight</c>, so a
+/// so that <see cref="PreferredRows"/> rows still show; then the rows, down to
+/// <see cref="FewestRows"/>. The notes' cap is the notes scroller's <c>MaxHeight</c>, so a
 /// note cut short is scrolled into view, never cut off out of reach (the #548
 /// implementation review, finding 1).</para>
 ///
@@ -24,7 +24,12 @@ namespace Plantoir.Core.Assist;
 public static class PlanTableLayout
 {
     public const int MostRows = 12;
-    public const int FewestRows = 4;
+
+    /// <summary>The rows the notes give way to: the notes' cap leaves room for this many.</summary>
+    public const int PreferredRows = 4;
+
+    /// <summary>The fewest rows shown, on a window too short for <see cref="PreferredRows"/> and two lines of notes.</summary>
+    public const int FewestRows = 2;
 
     /// <summary>One row's height and pitch: <c>ListViewItem.MinHeight</c> (measured 32 epx).</summary>
     public const double RowPitch = 32;
@@ -65,7 +70,7 @@ public static class PlanTableLayout
         double room = Math.Min(windowHeight, DialogMaxHeight) - Chrome - TableBorder;
         if (notesNatural <= 0)
             return new Fit(Rows(room), 0);
-        double cap = Math.Clamp(room - NotesSpacing - FewestRows * RowPitch, NotesFewest, NotesMost);
+        double cap = Math.Clamp(room - NotesSpacing - PreferredRows * RowPitch, NotesFewest, NotesMost);
         double notes = Math.Min(notesNatural, cap) + NotesSpacing;
         return new Fit(Rows(room - notes), cap);
     }

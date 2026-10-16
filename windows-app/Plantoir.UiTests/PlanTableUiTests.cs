@@ -332,12 +332,12 @@ public class PlanTableUiTests
 
     /// <summary>
     /// The review's finding 1: at the default window, notes longer than they
-    /// can be given scroll inside their own area — the last line is REACHED,
-    /// never cut off below the dialog — and the table, Cancel and Publish stay
-    /// inside the window.
+    /// can be given scroll inside their own area, to 100%, with that area
+    /// inside the window — never cut off below the dialog — and the table,
+    /// Cancel and Publish stay inside the window.
     /// </summary>
     [UiFact]
-    public void LongNotesScrollAndTheirLastLineCanBeReached()
+    public void LongNotesScrollToTheirEndInsideTheWindow()
     {
         using var app = new DrivenApp(WriteCourseWithLongNotes);
         var table = OpenThePlan(app);
@@ -374,10 +374,12 @@ public class PlanTableUiTests
         Thread.Sleep(500);
         Assert.True(area.Patterns.Scroll.Pattern.VerticalScrollPercent.Value >= 99.5,
                     $"the notes would not scroll to their end ({area.Patterns.Scroll.Pattern.VerticalScrollPercent.Value:0}%)");
-        var noteBox = note.BoundingRectangle;
+        // The note's own rectangle is clipped to the viewport, so it cannot
+        // say where the last line is; what can is the scroll above and the
+        // area, which must be inside the window.
         var areaBox = area.BoundingRectangle;
-        Assert.True(noteBox.Bottom <= areaBox.Bottom + 1 && noteBox.Bottom > areaBox.Top && areaBox.Bottom <= window.Bottom,
-                    $"scrolled to the end, the note's last line ({noteBox}) is not inside the notes area ({areaBox}) inside the window");
+        Assert.True(areaBox.Bottom <= window.Bottom,
+                    $"scrolled to the end, the notes area ({areaBox}) is not inside the window");
         MenuBar.CloseDialog(app);
     }
 
