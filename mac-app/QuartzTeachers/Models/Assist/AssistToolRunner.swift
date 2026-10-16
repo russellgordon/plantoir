@@ -169,6 +169,17 @@ final class AssistToolRunner {
     /// one call.
     @ObservationIgnored var previewFollowsAChange: Bool = true
 
+    /// How many times this runner has written the teacher's files WITHOUT
+    /// adding an undo entry (#531): Make Room for Classes (which records none
+    /// on purpose — `makingRoomCannotBeUndone`), an undo that put some files
+    /// back but kept its entry because others were in the way, and a publish
+    /// or hide that wrote pages and then stopped part way (#412, whose entry
+    /// is abandoned on the throw). The Section menu reads it beside the undo
+    /// list's depth, so "the workspace wrote something" is one signal rather
+    /// than a flag per verb: until #531 the depth alone decided, and every
+    /// one of these was written to the trail as "changed nothing".
+    @ObservationIgnored private(set) var writesWithNoNewUndoEntry: Int = 0
+
     // MARK: - Computed properties
 
     /// The section of the change `undo_last_change` would take back next, or
@@ -1390,6 +1401,11 @@ final class AssistToolRunner {
                     changedAnything = true
                 }
             } catch {
+                // An earlier plan of the unit written whole, or this one part
+                // way: a write with no undo entry (#531).
+                if changedAnything || error is AssistPublishPlanner.StoppedAfterWriting {
+                    writesWithNoNewUndoEntry += 1
+                }
                 return AssistToolOutcome.refused(publishStoppedPartWay(
                     what: "\(located.course.configuration.unitWord) \(unit)",
                     problem: error.localizedDescription,
@@ -1997,7 +2013,11 @@ final class AssistToolRunner {
             leftAlone = applied.leftAlone
         } catch {
             // Not "Nothing was changed" (said here until #412): the write is
-            // page by page, so pages before the one that failed are written.
+            // page by page, so pages before the one that failed are written —
+            // and when one was, it is a write with no undo entry (#531).
+            if error is AssistPublishPlanner.StoppedAfterWriting {
+                writesWithNoNewUndoEntry += 1
+            }
             return AssistToolOutcome.refused(publishStoppedPartWay(
                 what: "the pages you named",
                 problem: error.localizedDescription,
@@ -2722,6 +2742,9 @@ final class AssistToolRunner {
                 summary = AssistWording.undidFromTheMenu(result.whatHappened)
             }
         } else {
+            // Some files went back and the entry stayed, so the depth did not
+            // move (#531): counted as a write.
+            writesWithNoNewUndoEntry += 1
             summary = AssistWording.undidPartly(
                 result.whatHappened, leftAlone: result.skipped.count
             )
@@ -4932,6 +4955,9 @@ final class AssistToolRunner {
                     "Nothing was changed: \(error.localizedDescription)"
                 )
             }
+            // Written, with no undo entry (#531): counted, so the Section
+            // menu's line says "carried out".
+            writesWithNoNewUndoEntry += 1
 
             var detail: String = outcome.message
             detail += "\n\nThe new "
