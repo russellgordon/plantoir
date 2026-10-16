@@ -1030,7 +1030,11 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(text.contains("ICS3U Section 1"))
         XCTAssertTrue(text.contains("Netlify"))
         XCTAssertTrue(text.contains("switched on, and awake"))
-        XCTAssertTrue(text.contains("plugged in, if it is a laptop"))
+        // #521: launchd runs the job on battery, so the plan never asks for a
+        // cable — and says what battery does change. MUST FAIL with the old
+        // "plugged in, if it is a laptop" bullet.
+        XCTAssertFalse(text.contains("plugged in"), text)
+        XCTAssertTrue(text.contains("On battery, a Mac goes to sleep sooner, so be sure to keep it awake until then."), text)
         XCTAssertTrue(text.contains("lid open"))
         XCTAssertTrue(text.contains("Plantoir does not wake this Mac up"))
         // launchd really does run a missed calendar job at the next wake,

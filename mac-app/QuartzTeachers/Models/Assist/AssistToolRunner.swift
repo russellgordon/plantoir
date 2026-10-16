@@ -381,7 +381,7 @@ final class AssistToolRunner {
             let when: String = AssistToolRunner.moment(named: raw)
                 .map { moment in ScheduledDeploy.dayAndTimeText(moment) } ?? raw
             let card: String = "Set this Mac to deploy \(code) Section \(number) to \(destination) at \(when). "
-                 + "It has to be on and awake then — plugged in if it is a laptop, lid open. "
+                 + "It has to be " + AssistToolRunner.awakeThenWithTheLidOpen + " "
                  + "Plantoir cannot wake it up."
             // The deploy this one would replace, if there is one (issue #195).
             // The card is the only moment before anything is written, so it is
@@ -1914,6 +1914,14 @@ final class AssistToolRunner {
         "The course was backed up before this conversation changed anything, so this can also be "
       + "undone from Plantoir's Backups list."
 
+    /// What has to be true of this Mac when a scheduled deploy runs, in the
+    /// schedule card and in the answer after setting one (#521). Not "plugged
+    /// in if it is a laptop", said until #521: launchd runs the job on battery,
+    /// so being awake is what the deploy needs. Named here rather than in
+    /// `AssistWording` on purpose (the director's ruling 6, 2026-10-16): no
+    /// contract holds it, and Windows words its own.
+    static let awakeThenWithTheLidOpen: String = "on and awake then, with the lid open."
+
     // MARK: - Writing pages
 
     /// Back the course up, write the change, remember it, rebuild the preview.
@@ -3389,8 +3397,8 @@ final class AssistToolRunner {
         }
         return AssistToolOutcome.wrote(
             summary,
-            detail: summary + "\n\nThis Mac has to be on and awake then — plugged in if it is a laptop, "
-                  + "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it."
+            detail: summary + "\n\nThis Mac has to be " + AssistToolRunner.awakeThenWithTheLidOpen + " "
+                  + "Plantoir cannot wake it up. Say the word and I'll cancel it."
         )
     }
 
