@@ -126,10 +126,19 @@ final class SectionVerbs {
         // undo entry (#531: Make Room, a partial undo, a publish that stopped
         // part way — each "changed nothing" here until then). The depth
         // alone is not the signal; it is what tells "took the last change
-        // back" from "carried out".
+        // back" from "carried out" — and, for Undo, a whole undo (the entry
+        // came off the list) from a partial one (it stayed, files went back:
+        // "took part of the last change back", ruling L2 on #531).
+        let undoListMoved: Bool = changesAfter != changesBefore || before != lastChange
         var ending: String = "changed nothing"
-        if changesAfter != changesBefore || before != lastChange || writesAfter != writesBefore {
-            ending = item == .undoLastChange ? "took the last change back" : "carried out"
+        if item == .undoLastChange {
+            if undoListMoved {
+                ending = "took the last change back"
+            } else if writesAfter != writesBefore {
+                ending = "took part of the last change back"
+            }
+        } else if undoListMoved || writesAfter != writesBefore {
+            ending = "carried out"
         } else if item == .rebuildPreview {
             let rebuilding: String = AssistWording.previewIsRebuilding(course: courseCode, section: String(sectionNumber))
             let builtHeadless: String = AssistWording.builtWithNoWindowOpen(course: courseCode, section: String(sectionNumber))

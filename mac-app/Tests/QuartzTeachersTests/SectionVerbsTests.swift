@@ -589,9 +589,34 @@ final class SectionVerbsEndingTests: XCTestCase {
         )
     }
 
+    /// A Make Room whose every write failed — the class folder unwritable —
+    /// returns without throwing (each failure is carried past and named) and
+    /// wrote nothing, so the line says "changed nothing" (ruling L5: the
+    /// signal is "wrote something", not "ran"). MUST FAIL on the first fix.
+    func testMakeRoomThatWroteNothingChangedNothing() async throws {
+        let (made, verbs) = try makeVerbs()
+        try MenuVoiceTests.layOutAUnitWithDates(in: made.course)
+        let folder: URL = ClassPages.folderURL(forSection: 1, in: made.course)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        lockedFolder = folder
+        let before: [String: String] = try SectionVerbsTests.pages(in: made.course)
+        _ = await verbs.perform(
+            SectionVerbs.makeRoom(course: "ICS3U", section: 1, unit: 1, atDay: 2, howMany: 1, planning: false),
+            item: .makeRoomForClasses, courseCode: "ICS3U", sectionNumber: 1
+        )
+        XCTAssertEqual(try SectionVerbsTests.pages(in: made.course), before, "something was written after all")
+        XCTAssertTrue(
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.makeRoomForClasses, ending: "changed nothing", counts: "")),
+            lastMenuLine()
+        )
+    }
+
     /// An undo that put one file back and left an edited one alone keeps
-    /// its entry, so the depth does not move. MUST FAIL on the old `perform`.
-    func testAPartialUndoTookTheLastChangeBack() async throws {
+    /// its entry, so the depth does not move — and the line says only PART
+    /// of the change went back (ruling L2), since Undo can be pressed again.
+    /// MUST FAIL on the old `perform` ("changed nothing") and on the first
+    /// fix ("took the last change back").
+    func testAPartialUndoTookPartOfTheLastChangeBack() async throws {
         let (made, verbs) = try makeVerbs()
         try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
         try AssistFixture.write(page: "Unit 1, Day 2", publish: "false", date: "2026-09-09", body: "Two.", in: made.course)
@@ -607,7 +632,7 @@ final class SectionVerbsEndingTests: XCTestCase {
         let partly: String = template.components(separatedBy: "\u{1}").last ?? template
         XCTAssertTrue(undone.summary.hasSuffix(partly), "not a partial undo: \(undone.summary)")
         XCTAssertTrue(
-            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "took the last change back", counts: "")),
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "took part of the last change back", counts: "")),
             lastMenuLine()
         )
     }
@@ -646,6 +671,47 @@ final class SectionVerbsEndingTests: XCTestCase {
         )
         XCTAssertTrue(
             lastMenuLine().hasSuffix(SectionVerbs.ranLine(.publishPages, ending: "carried out", counts: "")),
+            lastMenuLine()
+        )
+    }
+
+    /// Re-date Classes… writes page by page: a class re-dated, then a page
+    /// it uses that cannot be written (ruling M3). The trail says "carried
+    /// out", and the teacher is told only PART was changed, with the page
+    /// already re-dated named — never "Nothing was changed". MUST FAIL on
+    /// the old code, on both counts.
+    func testAReDateThatStoppedAfterAWriteIsCarriedOutAndSaysSo() async throws {
+        let (made, verbs) = try makeVerbs()
+        let timetable: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08", "2026-09-10"], source: "typed in by hand", forSection: 1, in: made.course,
+            today: try XCTUnwrap(CalendarDay(text: "2026-09-08"))
+        )
+        try SectionTimetableStore.applyRememberTimetable(timetable)
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", date: "2020-01-15",
+                                body: "One links [[Notes]].", in: made.course)
+        let concepts: URL = made.course.directoryURL.appendingPathComponent("Concepts")
+        try "---\ntitle: Notes\npublish: true\ncreated: 2020-01-15T07:00:00.000-0400\n---\nNotes.\n".write(
+            to: concepts.appendingPathComponent("Notes.md"), atomically: true, encoding: .utf8
+        )
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: concepts.path)
+        lockedFolder = concepts
+
+        let outcome: AssistToolOutcome = await verbs.perform(
+            SectionVerbs.reDateClasses(course: "ICS3U", section: 1, planning: false),
+            item: .reDateClasses, courseCode: "ICS3U", sectionNumber: 1
+        )
+        let classText: String = try String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course), encoding: .utf8
+        )
+        XCTAssertFalse(classText.contains("2020-01-15"), "the class was not re-dated first: \(classText)")
+        XCTAssertTrue(
+            outcome.summary.hasPrefix(AssistWording.publishStoppedPartWay(what: "the section's class dates", problem: "")),
+            outcome.summary
+        )
+        XCTAssertFalse(outcome.summary.contains("Nothing was changed"), outcome.summary)
+        XCTAssertTrue(outcome.summary.contains("Unit 1, Day 1"), "the page written is not named: \(outcome.summary)")
+        XCTAssertTrue(
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.reDateClasses, ending: "carried out", counts: "")),
             lastMenuLine()
         )
     }

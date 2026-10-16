@@ -499,7 +499,8 @@ enum ClassInsertionPlanner {
             ))
         }
         return ClassChangeOutcome(
-            message: message, created: created, leftUndoneFromTheMenu: leftUndone.joined(separator: " ")
+            message: message, created: created, leftUndoneFromTheMenu: leftUndone.joined(separator: " "),
+            wroteSomething: !created.isEmpty || !renamed.isEmpty || moved > 0 || linksRewritten > 0
         )
     }
 

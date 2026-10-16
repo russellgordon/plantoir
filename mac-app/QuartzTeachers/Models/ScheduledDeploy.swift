@@ -3548,8 +3548,11 @@ struct ScheduledDeployPlan {
         // the job on battery — nothing in the agent's plist gates on power —
         // so the cable was standing in for "has not idle-slept". What battery
         // really changes is how soon a Mac left alone goes to sleep, which is
-        // what this bullet says (Russell's words, 2026-10-16).
-        lines.append("  • On battery, a Mac goes to sleep sooner, so be sure to keep it awake until then.")
+        // what this line says (Russell's words, 2026-10-16) — its own line
+        // after the list, not a bullet: it is a sentence, and does not read
+        // on from "this Mac must be:" (the implementation review's L1).
+        lines.append("")
+        lines.append("On battery, a Mac goes to sleep sooner, so be sure to keep it awake until then.")
         lines.append("")
         lines.append("Plantoir does not wake this Mac up. If it is asleep or switched off at that time, macOS runs the deploy at the next wake instead — which could be well after the class it was meant for.")
         lines.append("")

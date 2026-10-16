@@ -4020,30 +4020,46 @@ deploy builds straight after. Every other menu write rebuilds the preview, as
 the tool does — the menu must not disagree with the tool.
 
 **How the trail line ends (#531, 2026-10-16).** `SectionVerbs.perform` writes
-"carried out" (or, for Undo Last Change, "took the last change back") when the
-runner WROTE something, and "changed nothing" only when it wrote nothing.
-"Wrote something" is one signal, not a flag per verb: the undo list's depth
-moved, the change it would take back moved, or
-`AssistToolRunner.writesWithNoNewUndoEntry` moved. That counter covers the
-writes that add no entry: **Make Room for Classes** (no entry, on purpose —
-`makingRoomCannotBeUndone`), **a partial undo** (some files back, the entry
-kept because others were edited since), and **a publish or hide that wrote
-pages and then stopped part way** (#412; `AssistPublishPlanner.apply` throws
-`StoppedAfterWriting`, which keeps the error's own words, only when at least
-one file was written — a first write that fails is still "changed nothing").
-Until #531 the depth alone decided, so each of those was written as "changed
-nothing" — the line rule 5 calls worse than none. Found by Windows' batch 2B
-review, where Make Room and a full undo list (`UndoHistory.MostRemembered =
-20`) both read that way. **MEASURED on the mac: no cap.**
+"carried out" when the runner WROTE something, and "changed nothing" only when
+it wrote nothing. "Wrote something" is one signal, not a flag per verb: the
+undo list's depth moved, the change it would take back moved, or
+`AssistToolRunner.writesWithNoNewUndoEntry` moved. Undo Last Change ends "took
+the last change back" when its entry came off the list, and "took part of the
+last change back" when files went back but the entry stayed because others
+were edited since (Undo can be pressed again; the director's ruling L2 — the
+contract's `ran from a menu` `carries` names this ending). The counter covers
+EVERY path that writes files without adding an entry, each pinned in
+`SectionVerbsEndingTests`:
+- **Make Room for Classes** (no entry, on purpose — `makingRoomCannotBeUndone`),
+  counted only when it wrote a file (`ClassChangeOutcome.wroteSomething`):
+  Make Room carries each failed write past rather than throwing, so a run
+  whose every write failed says "changed nothing" (ruling L5);
+- **a partial undo**;
+- **a publish or hide that wrote pages and then stopped part way** (#412),
+  the page list and the whole unit: `AssistPublishPlanner.apply` throws
+  `StoppedAfterWriting` only when at least one file was written, keeping the
+  error's own words;
+- **Re-date Classes… that stopped part way** (ruling M3):
+  `SectionReDatePlanner.apply` writes page by page and now throws its own
+  `StoppedAfterWriting` with the pages written. The teacher is told
+  `publishStoppedPartWay` ("Only part of the section's class dates was
+  changed…") with the pages already re-dated listed — never "Nothing was
+  changed", which it said until then although pages were written.
+
+A first write that fails is still "changed nothing", and "Nothing was
+changed". Until #531 the depth alone decided, so each of these was written as
+"changed nothing" — the line rule 5 calls worse than none. Found by Windows'
+batch 2B review, where Make Room and a full undo list (`UndoHistory.MostRemembered
+= 20`) both read that way. **MEASURED on the mac: no cap.**
 `AssistChangeHistory.record` appends, and only a clean undo removes, so the
-21st change grows the depth; `SectionVerbsEndingTests.testTheTwentyFirstChangeIsCarriedOut`
-is a guard against a cap added later, and passes on the old code too. The
-other five tests there (Make Room, partial undo, page list and whole unit
-stopped after a write, and a publish that wrote nothing) are must-fail. Not
-covered: duplicating a class when it moves others (`duplicateClassRequested`)
-also writes with no entry, and no menu item reaches it. No contract case: the
-ending depends on the runner's internals, not on data, and the contract's
-`ran from a menu` endings are unchanged.
+21st change grows the depth. Of the tests, six are must-fail (Make Room,
+partial undo, page list, whole unit, Re-date, and Make Room that wrote
+nothing against the first fix); the publish that wrote nothing and the 21st
+change are guards, green on the old code too. Not covered: duplicating a
+class when it moves others (`duplicateClassRequested`) also writes with no
+entry, and no menu item reaches it. The other menu paths were read: Make
+Room's `apply` throws only before its first write, Add Next Class writes one
+page.
 
 **Rebuild Preview restarts a SERVING preview (#528, checked 2026-10-16).**
 Windows found its own `rebuild_preview` returned at once while a preview was

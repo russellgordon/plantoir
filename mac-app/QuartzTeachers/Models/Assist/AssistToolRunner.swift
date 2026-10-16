@@ -4459,6 +4459,16 @@ final class AssistToolRunner {
                 leftAlone = applied.leftAlone
                 classesReDated = applied.classesReDated
                 pagesTheyUseReDated = applied.pagesTheyUseReDated
+            } catch let stopped as SectionReDatePlanner.StoppedAfterWriting {
+                // Pages before the one that failed ARE re-dated, and the undo
+                // entry is abandoned (#531, ruling M3): said as part way, with
+                // the pages written named, and counted as a write.
+                writesWithNoNewUndoEntry += 1
+                return AssistToolOutcome.refused(publishStoppedPartWay(
+                    what: "the section's class dates",
+                    problem: stopped.localizedDescription,
+                    sectionNumber: asked.located.sectionNumber
+                ) + "\n\nThe pages already re-dated:\n" + listing(stopped.written))
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
@@ -4956,8 +4966,11 @@ final class AssistToolRunner {
                 )
             }
             // Written, with no undo entry (#531): counted, so the Section
-            // menu's line says "carried out".
-            writesWithNoNewUndoEntry += 1
+            // menu's line says "carried out" — but only when a file WAS
+            // written (ruling L5): every failed write is carried past.
+            if outcome.wroteSomething {
+                writesWithNoNewUndoEntry += 1
+            }
 
             var detail: String = outcome.message
             detail += "\n\nThe new "
