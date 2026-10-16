@@ -87,7 +87,7 @@ A representative example:
 | `reference_school_year` | integer or null | app (Keep a Copy for Reference…, Import Courses for Reference…, Set School Year…) | the app (sidebar grouping, the MCP course listing) | Which school year a reference course was taught in, as the calendar year it STARTED in: `2025` means 2025–26. The label is derived, never stored. Absent, null, or anything that is not a whole number within the offered range reads as **Other**. |
 | `use_lcs_terminology` | bool | setup | setup (starting folder and file names) | A school-specific mode: swaps the factory shared-folder and shared-file lists for one school's own words — "College Board Curriculum", "SIC Drop-In Sessions.md" and "Grove Time.md" in place of "Extra Help.md". Affects the names a new course starts with, nothing after that. |
 | `print_school_name` | string (absent or `""` = none) | Course Settings → Printing (#454) | build → `quartz/plantoir_print.json` (`scripts/print_settings.py`) | The school's name in a printed handout's corner, on every page. Course-wide: a handout is the same paper for every section. An empty name REMOVES the key, so a course that never set one writes the file it always did. |
-| `print_blanks` | string[] of `name`, `date`, `class_number` (absent = `["name","date"]`, `[]` = none) | Course Settings → Printing | build | The lines a student fills in, top right on every page, always in the order Name, Date, Class #. Unknown values are ignored, not refused, and are left in the file until the teacher changes the setting. |
+| `print_blanks` | string[] of `name`, `date`, `class_number` (absent or `null` = `["name","date"]`, `[]` = none) | Course Settings → Printing | build | The lines a student fills in, top right on every page, always in the order Name, Date, Class #. Unknown values are ignored, not refused, and are left in the file until the teacher changes the setting. `null` is read as absent because that is what the build prints (`print_settings._blanks`); the corners case "blanks of null are the default" says so, and Windows tests it (#496, 2026-10-15); no mac test reads the corners cases, so the mac reads it as none until #537. |
 | `print_school_name_at` | `header_left` \| `footer_left` \| `none` (absent or unknown = `header_left`) | Course Settings → Printing | build | Which corner the school name prints in. Sharing a corner with the course code reads "School · CODE". |
 | `print_course_code_at` | `header_left` \| `footer_left` \| `none` (absent or unknown = `footer_left`) | Course Settings → Printing | build | Which corner the course code prints in — the code a teacher reads (`course_code` for a reference course), in capitals. Cases: `shared-rules.json` → `printablePages.corners`. |
 
@@ -237,7 +237,11 @@ edited inside a course's settings — the same app-wide value, so changing it in
 one course changed it for every course, which is why it moved. The stored key
 did not change (`cloudflareAccountID` in the app's preferences), so nothing was
 migrated. Windows stores it app-wide too (`AppSettings.CloudflareAccountId`)
-and has no Settings window; where Windows edits it is its own decision. The API tokens for Netlify and Cloudflare never touch this
+and EDITS it in File ▸ Settings ▸ Deploying since the 1.7.1 catch-up (#491;
+a Settings window of its own, `documentation/12-windows-app.md` → "The
+Settings window, Plantoir Help and the Account ID's refusals"); a course's
+Deploying section and the wizard show it read-only with Open Settings…, as on
+the mac. Nothing was migrated there either. The API tokens for Netlify and Cloudflare never touch this
 file — or any file in the working folder.
 
 ## Files that travel alongside it
@@ -1160,8 +1164,9 @@ every working folder rebuilds its image once after updating.
 site is really built by.** `windows-app/Vendor/fetch-runtime.ps1` builds the
 native Windows runtime; nothing on that machine builds the Docker image at all.
 It did an unpinned `pip install python-frontmatter Pillow` until 2026-09-19 —
-PyYAML arriving as a dependency, unnamed. It carries the same three pins now,
-and each pin in `contracts/toolchain.json` names both places it must appear
+PyYAML arriving as a dependency, unnamed. It carries the same three pins now —
+and, since #503 (2026-10-15), the four page-feature pins too (Paged.js, Latin
+Modern, function-plot, node-tikzjax), seven in all — and each pin in `contracts/toolchain.json` names both places it must appear
 (`dockerfileContains`, `windowsRuntimeContains`), with a test on each side
 holding its own file against them, so the two cannot drift apart again. Neither
 test RUNS a fetch — the Windows one is ~600 MB — so both assert the recipe.

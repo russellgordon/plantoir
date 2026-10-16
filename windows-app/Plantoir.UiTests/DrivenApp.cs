@@ -65,6 +65,9 @@ public sealed class DrivenApp : IDisposable
 
     public Window Window { get; } = null!;
 
+    /// <summary>Whether this run's app has exited (a test that quits it through its own window, #484).</summary>
+    public bool HasExited => _app is null || _app.HasExited;
+
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr window);
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr window);
@@ -268,11 +271,14 @@ public sealed class DrivenApp : IDisposable
         buildCourses(Path.Combine(WorkspacePath, "courses"));
         beforeLaunch?.Invoke(WorkspacePath);
 
-        File.WriteAllText(Path.Combine(stateDir, "settings.json"), new JsonObject
-        {
-            ["WorkspacePath"] = WorkspacePath,
-            ["RestoreWindowsOnLaunch"] = false,
-        }.ToJsonString(), new UTF8Encoding(false));
+        // Over whatever beforeLaunch put there (a setting a test seeds, #514):
+        // the folder and the no-restore are always this harness's.
+        string settingsPath = Path.Combine(stateDir, "settings.json");
+        var settings = File.Exists(settingsPath) && JsonNode.Parse(File.ReadAllText(settingsPath)) is JsonObject seeded
+            ? seeded : new JsonObject();
+        settings["WorkspacePath"] = WorkspacePath;
+        settings["RestoreWindowsOnLaunch"] = false;
+        File.WriteAllText(settingsPath, settings.ToJsonString(), new UTF8Encoding(false));
 
         // UseShellExecute = TRUE, and this is not a detail: it is the one line
         // that decides whether a test can drive anything the app SHELLS OUT to
@@ -402,6 +408,28 @@ public sealed class DrivenApp : IDisposable
             Patience, TimeSpan.FromMilliseconds(250)).Result;
         return found ?? throw new InvalidOperationException(
             $"Never found {describedAs} (automation id '{automationId}').");
+    }
+
+    /// <summary>
+    /// Another top-level window of THIS run's app — File ▸ Settings… (#491) is
+    /// a window of its own, not a dialog inside <see cref="Window"/> — found by
+    /// an automation id somewhere inside it, and returned whole. Waited for.
+    /// </summary>
+    public AutomationElement FindTopLevel(string automationId, string describedAs)
+    {
+        int pid = _app?.ProcessId ?? throw new InvalidOperationException("the app was never launched");
+        var found = Retry.WhileNull(() =>
+        {
+            try
+            {
+                foreach (var top in Desktop.FindAllChildren(cf => cf.ByProcessId(pid)))
+                    if (top.FindFirstDescendant(cf => cf.ByAutomationId(automationId)) is not null) return top;
+            }
+            catch (System.Runtime.InteropServices.COMException) { }
+            return null;
+        }, Patience, TimeSpan.FromMilliseconds(250)).Result;
+        return found ?? throw new InvalidOperationException(
+            $"Never found {describedAs} (a window holding automation id '{automationId}').");
     }
 
     public AutomationElement? FindOrNull(string automationId, TimeSpan? within = null) =>

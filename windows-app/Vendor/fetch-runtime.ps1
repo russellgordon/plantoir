@@ -12,6 +12,11 @@ Windows pieces, and the app ships the folder the same way it ships llama/.
     runtime\quartz\     Quartz v4.5.0 + this repo's patches + node_modules
     runtime\wrangler\   wrangler 4.80.0 (npm prefix; Cloudflare deploys)
     runtime\fonts\      Noto Color Emoji (social sharing cards)
+    runtime\vendor\     the page features a site carries only when a page
+                        asks for them (#496, #503): pagedjs\ (Paged.js 0.4.3,
+                        and Latin Modern in pagedjs\fonts\), function-plot\
+                        (function-plot 1.25.4) and tikz-engine\ (node-tikzjax
+                        1.0.5 and its locked dependencies)
     runtime\manifest.json
 
 Pins mirror the Dockerfile deliberately: Node 20 because Quartz v4.5.0 is
@@ -22,6 +27,17 @@ Dockerfile's reasoning applies to you.
 NOT committed (~600 MB of fetched output) - this repository ships recipes,
 not binaries. Run once before building the Windows app; re-run after
 deleting runtime\ to rebuild it.
+
+RE-RUN IT after pulling a change to the vendor pins below: the run decides
+from runtime\manifest.json's KEYS what is missing. No manifest: everything is
+fetched. A manifest from before the vendor folder (every runtime made before
+2026-10-15) or with a vendor version that differs from the pins: runtime\vendor
+is deleted and ONLY the vendor phase runs, against the node and python
+already there, so nobody fetches ~600 MB again for the ~45 MB of new pieces.
+It never infers a phase from folders: an npm ci that crashed leaves a
+node_modules that looks finished. The app's build REFUSES a runtime whose
+manifest lacks the vendor keys (Plantoir.csproj -> CheckNativeRuntimeManifest),
+so a release cannot ship without the engines by accident.
 #>
 [CmdletBinding()]
 param()
@@ -34,6 +50,36 @@ $PythonVersion   = "3.11.9"
 $WranglerVersion = "4.80.0"
 $QuartzTag       = "v4.5.0"
 $EmojiFontTag    = "v2.047"
+
+# The vendor pins (#496, #503). Each URL below is written OUT IN FULL, never
+# built from these variables: ToolchainContractTests reads this file as text
+# for each pin's `windowsRuntimeContains` in contracts/toolchain.json, the
+# same way the Dockerfile is read for `dockerfileContains`. The versions here
+# are what the manifest records.
+$PagedjsVersion      = "0.4.3"
+$LatinModernVersion  = "2.005-1"
+$FunctionPlotVersion = "1.25.4"
+$NodeTikzjaxVersion  = "1.0.5"
+# The literal addresses, beside the versions they must carry. A bump that
+# edits a version and not its address would compare the manifest against
+# the new version while fetching the old bytes (or never fetch at all), so
+# the run refuses at once when the two disagree; ToolchainContractTests
+# holds each version above against the contract as well (5A review, L2).
+$PagedjsUrl      = "https://registry.npmjs.org/pagedjs/-/pagedjs-0.4.3.tgz"
+$LatinModernUrl  = "https://deb.debian.org/debian/pool/main/l/lmodern/fonts-lmodern_2.005-1_all.deb"
+$LatinModernSnapshotUrl = "https://snapshot.debian.org/archive/debian/20230101T000000Z/pool/main/l/lmodern/fonts-lmodern_2.005-1_all.deb"
+$FunctionPlotUrl = "https://registry.npmjs.org/function-plot/-/function-plot-1.25.4.tgz"
+$NodeTikzjaxSpec = "node-tikzjax@1.0.5"
+foreach ($pair in @(
+        @($PagedjsUrl, "pagedjs-$PagedjsVersion.tgz"),
+        @($LatinModernUrl, "fonts-lmodern_${LatinModernVersion}_all.deb"),
+        @($LatinModernSnapshotUrl, "fonts-lmodern_${LatinModernVersion}_all.deb"),
+        @($FunctionPlotUrl, "function-plot-$FunctionPlotVersion.tgz"),
+        @($NodeTikzjaxSpec, "node-tikzjax@$NodeTikzjaxVersion"))) {
+    if (-not $pair[0].EndsWith($pair[1], [StringComparison]::Ordinal)) {
+        throw "$($pair[0]) does not carry $($pair[1]): a version above was changed without its address."
+    }
+}
 
 # SHA-256 of each fixed download (#356, after the mac's #312 pinned its
 # helpers). A version pin says WHICH file is asked for; a hash says the file
@@ -49,21 +95,117 @@ $EmojiFontTag    = "v2.047"
 $NodeZipSha256   = "56e5aacdeee7168871721b75819ccacf2367de8761b78eaceacdecd41e04ca03"
 $PythonZipSha256 = "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b"
 $EmojiFontSha256 = "39ee3c587e10e89669b9ff32703261d10d5f9c4dd5ad147b6b5a1c5200591817"
+# The vendor tarballs' hashes are the contract's own (toolchain.json ->
+# pins -> sha256, and fileSha256 for the one file kept), checked here as the
+# Dockerfile checks them. The Debian package's hash was measured 2026-10-15
+# (i5-8365U, Windows 11 Pro 26200) from deb.debian.org; the six fonts inside
+# it equal latinModern.files, the SHA-256s verify.sh checks in the image.
+$PagedjsTgzSha256      = "a79baaa94d15cf952e6327950fa886ba7533bdce92194b677d9d1b4cce6c17c5"
+$PagedMinJsSha256      = "c4af9ac4a80f15e4abf53e11fdf34659dc4913f61b541652811cfa570f397211"
+$LatinModernDebSha256  = "027cd4ddc91b9254bd7fd9b9ce55d58c095319f691d4d7cbd09d2e4a99c58398"
+$FunctionPlotTgzSha256 = "33974ca53165365f585601f3e304e882107b44aa8a360d0b2b089ab9daf24a77"
+$FunctionPlotJsSha256  = "4e3cc6d8015e517b0356178bc6409405db2b31385ac655b657aaad7120b802d1"
+$LatinModernFiles = [ordered]@{
+    "lmroman10-regular.otf"    = "1aa18cfefa58132c52ce5de70db1fd1154201c19cd2b2cdaffba4906a33e6852"
+    "lmroman10-bold.otf"       = "102fe06c430a8b681b2bf6876b7cd967ae4d47b4b6b41d915eb7913b726d9fb1"
+    "lmroman10-italic.otf"     = "c1fce25075567bb8dbf2151658c3b442690041db17a2d49fc9e55905ea5b7169"
+    "lmroman10-bolditalic.otf" = "c37a28eed7a6e03f792b98b5e5f637b2fcda378bb4855f99284f1a88fe35f124"
+    "lmsans10-bold.otf"        = "a597b710326c1a8a2c7238d808e5d38711638a72a32383478db4829d63afd687"
+    "lmmono10-regular.otf"     = "22deb6d3be3ffcb40b33f0e010afb256c677d97c2a2bdee1f5740cdc97751558"
+}
+$NodeTikzjaxTexFiles = [ordered]@{
+    "tex\core.dump.gz"     = "ae9f69dfe3837606240c5b9cb50f86aa0ee7463bbae4c26f2843b17eb155b91f"
+    "tex\tex.wasm.gz"      = "f8667f45e90039832df4f62550f10ff0c2f47781dbfdde9510f0ff3f360a61ba"
+    "tex\tex_files.tar.gz" = "492271c589ab2d7b64c22a09f927ea09cd5ee3fc696a46067ddea2da4693c86f"
+}
 
 $VendorDir  = $PSScriptRoot
 $RepoRoot   = (Resolve-Path (Join-Path $VendorDir "..\..")).Path
 $Runtime    = Join-Path $VendorDir "runtime"
 $Manifest   = Join-Path $Runtime "manifest.json"
+$VendorOut  = Join-Path $Runtime "vendor"
+# Set before ANY phase: the vendor phase alone, against an existing runtime,
+# runs this node and this python (the plan review's M4).
+$nodeDir    = Join-Path $Runtime "node"
+$pyDir      = Join-Path $Runtime "python"
+# Windows' own bsdtar by full path: Git's GNU tar may come first on PATH, and
+# it reads "C:" in a path as a remote host.
+$Tar        = Join-Path $env:SystemRoot "System32\tar.exe"
 
+$BaseKeys   = @("node", "python", "quartz", "wrangler", "emoji")
+$VendorPins = [ordered]@{
+    pagedjs      = $PagedjsVersion
+    latinModern  = $LatinModernVersion
+    functionPlot = $FunctionPlotVersion
+    nodeTikzjax  = $NodeTikzjaxVersion
+}
+
+# What to run is decided from the manifest's KEYS, never from folders.
+$runBase = $true
+$existing = $null
 if (Test-Path $Manifest) {
-    Write-Host "[OK] Runtime already in place ($Runtime)." -ForegroundColor Green
-    Write-Host "     Delete that folder and re-run to fetch it again."
-    exit 0
+    $existing = Get-Content $Manifest -Raw | ConvertFrom-Json
+    $names = @($existing.PSObject.Properties.Name)
+    foreach ($key in $BaseKeys) {
+        if ($names -notcontains $key) {
+            throw "runtime\manifest.json has no '$key': this is not a runtime this script made. Delete $Runtime and re-run."
+        }
+    }
+    $vendorCurrent = $true
+    foreach ($key in $VendorPins.Keys) {
+        if ($names -notcontains $key -or [string]$existing.$key -ne $VendorPins[$key]) { $vendorCurrent = $false }
+    }
+    if ($vendorCurrent) {
+        Write-Host "[OK] Runtime already in place ($Runtime)." -ForegroundColor Green
+        Write-Host "     Delete that folder and re-run to fetch it again."
+        exit 0
+    }
+    Write-Host "The runtime predates the current page-feature pins: fetching runtime\vendor only." -ForegroundColor Cyan
+    $runBase = $false
 }
 
 New-Item -ItemType Directory -Force $Runtime | Out-Null
 $Temp = Join-Path ([IO.Path]::GetTempPath()) ("plantoir-runtime-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force $Temp | Out-Null
+
+function Assert-Sha256([string]$Path, [string]$Sha256, [long]$Length = -1) {
+    $got = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+    if ($got -ne $Sha256.ToLowerInvariant()) { throw "$Path : its SHA-256 is $got, the pin is $Sha256" }
+    $size = (Get-Item -LiteralPath $Path).Length
+    if ($Length -ge 0 -and $size -ne $Length) { throw "$Path : $size bytes, the pin says $Length" }
+}
+
+# Written the way it always was (Set-Content -Encoding utf8, which under
+# Windows PowerShell 5.1 starts with a BOM; ConvertFrom-Json takes it).
+function Write-RuntimeManifest($Fields) {
+    $Fields.made = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    [pscustomobject]$Fields | ConvertTo-Json | Set-Content $Manifest -Encoding utf8
+}
+
+# The manifest as it should read while runtime\vendor is absent or being
+# made: every key found (or the five base keys on a fresh run) WITHOUT the
+# four vendor keys. Written BEFORE the vendor folder is touched, so a run
+# that dies part-way leaves a manifest the app's build refuses
+# (CheckNativeRuntimeManifest) and the next run repairs by the vendor-only
+# path, rather than one naming engines that are not there (5A review, L1
+# and L3).
+function Get-BaseFields {
+    $fields = [ordered]@{}
+    if ($existing) {
+        foreach ($p in $existing.PSObject.Properties) {
+            if ($VendorPins.Contains($p.Name) -or $p.Name -eq "made") { continue }
+            $fields[$p.Name] = $p.Value
+        }
+    }
+    else {
+        $fields.node     = $NodeVersion
+        $fields.python   = $PythonVersion
+        $fields.quartz   = $QuartzTag
+        $fields.wrangler = $WranglerVersion
+        $fields.emoji    = $EmojiFontTag
+    }
+    return $fields
+}
 
 function Fetch([string]$Url, [string]$To, [string]$Sha256 = "") {
     Write-Host "Fetching $Url" -ForegroundColor Cyan
@@ -79,19 +221,18 @@ function Fetch([string]$Url, [string]$To, [string]$Sha256 = "") {
 }
 
 try {
+  $env:PATH = "$nodeDir;$env:PATH"
+  if ($runBase) {
     # ---- Node.js (portable zip - the whole point is that nothing installs) ----
     $nodeZip = Join-Path $Temp "node.zip"
     Fetch "https://nodejs.org/dist/v$NodeVersion/node-v$NodeVersion-win-x64.zip" $nodeZip $NodeZipSha256
     Expand-Archive $nodeZip -DestinationPath $Temp -Force
-    Move-Item (Join-Path $Temp "node-v$NodeVersion-win-x64") (Join-Path $Runtime "node")
-    $nodeDir = Join-Path $Runtime "node"
-    $env:PATH = "$nodeDir;$env:PATH"
+    Move-Item (Join-Path $Temp "node-v$NodeVersion-win-x64") $nodeDir
     Write-Host "Node $(& "$nodeDir\node.exe" --version) in place." -ForegroundColor Green
 
     # ---- Python (embeddable package + pip bootstrap) -------------------------
     $pyZip = Join-Path $Temp "python.zip"
     Fetch "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-embed-amd64.zip" $pyZip $PythonZipSha256
-    $pyDir = Join-Path $Runtime "python"
     Expand-Archive $pyZip -DestinationPath $pyDir -Force
     # The embeddable package ships with `import site` disabled; pip and
     # site-packages need it on.
@@ -196,16 +337,135 @@ try {
     $fontsDir = Join-Path $Runtime "fonts"
     New-Item -ItemType Directory -Force $fontsDir | Out-Null
     Fetch "https://github.com/googlefonts/noto-emoji/raw/$EmojiFontTag/fonts/NotoColorEmoji.ttf" (Join-Path $fontsDir "NotoColorEmoji.ttf") $EmojiFontSha256
+  }
+
+    # ---- runtime\vendor: the page features (#496, #503) ----------------------
+    # The native mirror of the Dockerfile's /opt/vendor. build_site.py finds
+    # it with no new variable: toolchain_paths.VENDOR_DIR is
+    # PLANTOIR_QUARTZ_DIR's parent + "vendor", and the launchers set
+    # PLANTOIR_QUARTZ_DIR to runtime\quartz. Always made from nothing: a
+    # half-made vendor folder from a crashed run is never trusted.
+    #
+    # The manifest loses its vendor keys FIRST (on a fresh run this is the
+    # first manifest written, right after the base phases): from here until
+    # the end, a failure leaves a runtime the build refuses and a re-run
+    # finishes by fetching runtime\vendor alone.
+    Write-RuntimeManifest (Get-BaseFields)
+    if (Test-Path $VendorOut) { Remove-Item $VendorOut -Recurse -Force }
+    New-Item -ItemType Directory -Force $VendorOut | Out-Null
+    $vendorClock = [Diagnostics.Stopwatch]::StartNew()
+
+    # Paged.js 0.4.3 (#454): the print layout. paged.min.js and its licence.
+    $pagedjsDir = Join-Path $VendorOut "pagedjs"
+    New-Item -ItemType Directory -Force $pagedjsDir | Out-Null
+    $pagedjsTgz = Join-Path $Temp "pagedjs.tgz"
+    Fetch $PagedjsUrl $pagedjsTgz $PagedjsTgzSha256
+    $pagedjsTmp = Join-Path $Temp "pagedjs"
+    New-Item -ItemType Directory -Force $pagedjsTmp | Out-Null
+    & $Tar -xzf $pagedjsTgz -C $pagedjsTmp package/dist/paged.min.js package/LICENSE.md
+    if ($LASTEXITCODE -ne 0) { throw "Unpacking Paged.js failed" }
+    Copy-Item (Join-Path $pagedjsTmp "package\dist\paged.min.js") $pagedjsDir
+    Copy-Item (Join-Path $pagedjsTmp "package\LICENSE.md") $pagedjsDir
+    Assert-Sha256 (Join-Path $pagedjsDir "paged.min.js") $PagedMinJsSha256 502617
+    Write-Host "Paged.js $PagedjsVersion in place." -ForegroundColor Green
+
+    # Latin Modern (#499): the six faces a printed handout is set in, beside
+    # Paged.js so the same gate carries them. From Debian's own
+    # fonts-lmodern_2.005-1_all.deb, the package the image's apt installs, so
+    # the bytes are the image's; snapshot.debian.org keeps it if the pool
+    # moves on. The .deb is an ar archive, which Windows' bsdtar reads; its
+    # data.tar.xz is unpacked with the runtime's Python (tarfile + lzma)
+    # rather than bsdtar, because whether a given Windows' bsdtar was built
+    # with xz is not something to assume (this PC's 3.8.9 was; older Windows
+    # 10 builds are not known to be). UNMODIFIED: the GUST Font License asks
+    # that a changed font be renamed. Debian's copyright file carries it.
+    $fontsOut = Join-Path $pagedjsDir "fonts"
+    New-Item -ItemType Directory -Force $fontsOut | Out-Null
+    $lmDeb = Join-Path $Temp "fonts-lmodern.deb"
+    try {
+        Fetch $LatinModernUrl $lmDeb $LatinModernDebSha256
+    }
+    catch {
+        Write-Host "deb.debian.org did not serve it ($($_.Exception.Message)); trying snapshot.debian.org" -ForegroundColor Yellow
+        Fetch $LatinModernSnapshotUrl $lmDeb $LatinModernDebSha256
+    }
+    $lmTmp = Join-Path $Temp "lmodern"
+    New-Item -ItemType Directory -Force $lmTmp | Out-Null
+    & $Tar -xf $lmDeb -C $lmTmp data.tar.xz
+    if ($LASTEXITCODE -ne 0) { throw "Reading the fonts-lmodern package failed" }
+    $lmScript = Join-Path $Temp "unpack_lmodern.py"
+    @'
+import os, shutil, sys, tarfile
+data, out, names = sys.argv[1], sys.argv[2], sys.argv[3:]
+wanted = {"./usr/share/texmf/fonts/opentype/public/lm/" + n: n for n in names}
+wanted["./usr/share/doc/fonts-lmodern/copyright"] = "LICENSE-Latin-Modern.txt"
+found = set()
+with tarfile.open(data, "r:xz") as archive:
+    for member in archive:
+        target = wanted.get(member.name)
+        if target is None or not member.isfile():
+            continue
+        with archive.extractfile(member) as source, open(os.path.join(out, target), "wb") as sink:
+            shutil.copyfileobj(source, sink)
+        found.add(member.name)
+missing = sorted(set(wanted) - found)
+if missing:
+    sys.exit("not in the package: " + ", ".join(missing))
+'@ | Set-Content $lmScript -Encoding ascii
+    & "$pyDir\python.exe" -I $lmScript (Join-Path $lmTmp "data.tar.xz") $fontsOut @($LatinModernFiles.Keys)
+    if ($LASTEXITCODE -ne 0) { throw "Unpacking Latin Modern failed" }
+    foreach ($name in $LatinModernFiles.Keys) { Assert-Sha256 (Join-Path $fontsOut $name) $LatinModernFiles[$name] }
+    Write-Host "Latin Modern $LatinModernVersion in place." -ForegroundColor Green
+
+    # function-plot 1.25.4 (#503): the graphs. The folder name is load-bearing
+    # (figures.GRAPH_ENGINE, page_features.GATED_ASSETS): it is copied into a
+    # site's static\ under the same name.
+    $fpDir = Join-Path $VendorOut "function-plot"
+    New-Item -ItemType Directory -Force $fpDir | Out-Null
+    $fpTgz = Join-Path $Temp "function-plot.tgz"
+    Fetch $FunctionPlotUrl $fpTgz $FunctionPlotTgzSha256
+    $fpTmp = Join-Path $Temp "function-plot"
+    New-Item -ItemType Directory -Force $fpTmp | Out-Null
+    & $Tar -xzf $fpTgz -C $fpTmp package/dist/function-plot.js package/LICENSE
+    if ($LASTEXITCODE -ne 0) { throw "Unpacking function-plot failed" }
+    Copy-Item (Join-Path $fpTmp "package\dist\function-plot.js") $fpDir
+    Copy-Item (Join-Path $fpTmp "package\LICENSE") $fpDir
+    Assert-Sha256 (Join-Path $fpDir "function-plot.js") $FunctionPlotJsSha256 202953
+    Write-Host "function-plot $FunctionPlotVersion in place." -ForegroundColor Green
+
+    # node-tikzjax 1.0.5 (#503): the TikZ engine, run at BUILD time by
+    # support\figures\plantoir-figures.mjs with the runtime's node. Installed
+    # from the LOCKFILE, which pins all 133 packages under it - never
+    # `npm install`. NOT named `tikz`: that is a site's fonts folder, and this
+    # one is never copied into a site.
+    $tikzDir = Join-Path $VendorOut "tikz-engine"
+    New-Item -ItemType Directory -Force $tikzDir | Out-Null
+    Copy-Item (Join-Path $RepoRoot "support\figures\package.json") $tikzDir
+    Copy-Item (Join-Path $RepoRoot "support\figures\package-lock.json") $tikzDir
+    Write-Host "Installing the TikZ engine from its lockfile..." -ForegroundColor Cyan
+    Push-Location $tikzDir
+    try {
+        & "$nodeDir\npm.cmd" ci --omit=dev --no-audit --no-fund --silent
+        if ($LASTEXITCODE -ne 0) { throw "npm ci of the TikZ engine failed" }
+        & "$nodeDir\npm.cmd" ls $NodeTikzjaxSpec | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "npm ls $NodeTikzjaxSpec failed: the lockfile did not install the pinned engine" }
+        $installed = @(& "$nodeDir\npm.cmd" ls --all --parseable --omit=dev)
+    }
+    finally { Pop-Location }
+    $tikzjax = Join-Path $tikzDir "node_modules\node-tikzjax"
+    foreach ($name in $NodeTikzjaxTexFiles.Keys) { Assert-Sha256 (Join-Path $tikzjax $name) $NodeTikzjaxTexFiles[$name] }
+    $engineFiles = @(Get-ChildItem $tikzDir -Recurse -File -Force)
+    $engineBytes = ($engineFiles | Measure-Object -Property Length -Sum).Sum
+    # npm ls --parseable lists the folder itself first, then each package.
+    Write-Host ("TikZ engine node-tikzjax $NodeTikzjaxVersion in place: {0} packages, {1} files, {2:N1} MB." -f `
+        ($installed.Count - 1), $engineFiles.Count, ($engineBytes / 1MB)) -ForegroundColor Green
+    Write-Host ("Vendor phase took {0:N0} s." -f $vendorClock.Elapsed.TotalSeconds)
 
     # ---- Manifest ------------------------------------------------------------
-    @{
-        node     = $NodeVersion
-        python   = $PythonVersion
-        quartz   = $QuartzTag
-        wrangler = $WranglerVersion
-        emoji    = $EmojiFontTag
-        made     = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-    } | ConvertTo-Json | Set-Content $Manifest -Encoding utf8
+    # Merged: a vendor-only run keeps the base keys it found.
+    $fields = Get-BaseFields
+    foreach ($key in $VendorPins.Keys) { $fields[$key] = $VendorPins[$key] }
+    Write-RuntimeManifest $fields
 
     Write-Host ""
     Write-Host "[OK] Native runtime ready at $Runtime" -ForegroundColor Green

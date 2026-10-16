@@ -1831,35 +1831,8 @@ def promote_captured_shots(passed: list[str]) -> None:
 # way the app's New Course panel answers it (NewCourseCreator presses Return at
 # every prompt and types the code where asked), so nothing in it is hand-made.
 PRINT_FOLDER = Path.home() / "Plantoir Print"
-PRINT_COURSE_CONFIG = {
-    "class_folder": "All Classes",
-    "color_schemes": {"section1": "quartz-standard"},
-    "course_code": "MPM2D",
-    "course_name": "Principles of Mathematics, Grade 10, Academic",
-    "custom_short_name": "",
-    "deploy_folder_path": "",
-    "deploy_target": "netlify",
-    "emojis": {"sections": {"section1": "📐"}},
-    "expandOnFolderClick": False,
-    "fonts": {
-        "default": {"body": "Helvetica, Arial", "code": "IBM Plex Mono", "header": "Helvetica, Arial"},
-        "sections": {"section1": {"body": "Helvetica, Arial", "code": "IBM Plex Mono", "header": "Helvetica, Arial"}},
-    },
-    "footer_html": "",
-    "include_coverage_notes": False,
-    "include_curriculum_coverage": True,
-    "include_curriculum_pages": True,
-    "locale": "en-CA",
-    "num_sections": 1,
-    "prepopulate_example_content": True,
-    "section_numbers": [1],
-    "show_grade_in_title": {"sections": {"section1": False}},
-    "show_reading_time": True,
-    "show_section_marker": {"sections": {"section1": True}},
-    "unit_word": "Unit",
-    "use_lcs_terminology": False,
-    "use_skeleton": False,
-}
+# The course itself is print_set.py's, shared with capture_windows.py.
+from print_set import PRINT_COURSE_CONFIG, write_course_config  # noqa: E402
 
 
 def provision_print_course(folder: Path) -> None:
@@ -1873,12 +1846,7 @@ def provision_print_course(folder: Path) -> None:
         print(f"   {code} is already there.")
         return
     course = folder / "courses" / code
-    course.mkdir(parents=True, exist_ok=True)
-    manifest = json.loads((REPO / "support" / "example_content" / code / "manifest.json").read_text(encoding="utf-8"))
-    config = dict(PRINT_COURSE_CONFIG)
-    for key in ("shared_folders", "shared_files", "per_section_folders", "per_section_files", "hidden", "expandable"):
-        config[key] = manifest[key]
-    (course / "course_config.json").write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    write_course_config(course)
     print(f"   Making {code} from its example content…")
     import pty
     import re

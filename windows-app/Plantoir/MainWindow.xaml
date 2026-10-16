@@ -6,24 +6,13 @@
     xmlns:models="using:Plantoir.Core.Models"
     Title="Plantoir">
 
-    <Grid x:Name="Root" KeyboardAcceleratorPlacementMode="Hidden">
-        <Grid.KeyboardAccelerators>
-            <KeyboardAccelerator Modifiers="Control" Key="O" Invoked="OpenWorkingFolderAccelerator" />
-            <KeyboardAccelerator Modifiers="Control" Key="N" Invoked="NewWindowAccelerator" />
-            <KeyboardAccelerator Modifiers="Control,Shift" Key="R" Invoked="ReloadCoursesAccelerator" />
-            <KeyboardAccelerator Key="F2" Invoked="RenameCourseAccelerator" />
-            <!-- Global Preview shortcuts, mirroring mac's ⌘[/⌘]/⌘R: WinUI
-                 resolves a key combo declared at more than one scope by
-                 preferring the one nearest the focused element, so these
-                 fire everywhere EXCEPT while focus is inside a
-                 SectionDetailView's own Grid — there its identical,
-                 more-local accelerators win instead and act on that view
-                 directly. Together the two scopes give the same "always
-                 works" behaviour mac gets from a single menu-bar shortcut. -->
-            <KeyboardAccelerator Modifiers="Control" Key="R" Invoked="PreviewReloadAccelerator" />
-            <KeyboardAccelerator Modifiers="Menu" Key="Left" Invoked="PreviewBackAccelerator" />
-            <KeyboardAccelerator Modifiers="Menu" Key="Right" Invoked="PreviewForwardAccelerator" />
-        </Grid.KeyboardAccelerators>
+    <Grid x:Name="Root">
+        <!-- No window-level accelerators since #488: every key is on a MENU
+             item (MainWindow.Menus.cs), so the menu shows it and one key
+             means one thing. Measured on this PC: an item's key fires with its
+             menu closed and focus anywhere in the window outside the preview's
+             page (documentation/12-windows-app.md, "Menus, the Section menu's
+             functions and #475 on Windows"). -->
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -31,55 +20,22 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Menu bar: File and Preview commands act on this window.
-             It also carries the window's READINESS for UI Automation (#473):
-             AutomationProperties.ItemStatus is "copying", "ready" or "failed"
-             from the moment the window exists, set in code-behind. The menu
-             bar because it is always there and has an automation peer; a
-             panel has none, and the banner is absent while it is closed. -->
+        <!-- Menu bar: File, Course, Section, View and Help (#488, the mac's
+             #457). Their items are built in MainWindow.Menus.cs from one table,
+             so each carries its contract item (subjectMenus), its key and its
+             AutomationId in one place. It also carries the window's READINESS
+             for UI Automation (#473): AutomationProperties.ItemStatus is
+             "copying", "ready" or "failed" from the moment the window exists,
+             set in code-behind. The menu bar because it is always there and
+             has an automation peer; a panel has none, and the banner is absent
+             while it is closed. -->
         <MenuBar Grid.Row="0" x:Name="AppMenuBar"
                  AutomationProperties.AutomationId="appMenuBar">
-            <MenuBarItem Title="File">
-                <MenuFlyoutItem x:Name="OpenWorkingFolderItem" Text="Open Working Folder…" Click="OpenWorkingFolder_Click" KeyboardAcceleratorTextOverride="Ctrl+O" />
-                <MenuFlyoutItem x:Name="NewWindowItem" Text="New Window" Click="NewWindow_Click" KeyboardAcceleratorTextOverride="Ctrl+N" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem x:Name="RestoreFromArchiveItem" Text="Restore from Archive…" Click="RestoreFromArchive_Click" IsEnabled="False" />
-                <!-- #244: beside Open Working Folder's neighbours, as on the
-                     mac, because it begins by choosing a folder. -->
-                <MenuFlyoutItem x:Name="ImportForReferenceItem" Text="Import Courses for Reference…" Click="ImportForReference_Click"
-                                AutomationProperties.AutomationId="fileImportForReference" />
-                <!-- File, not an Edit menu: on Windows a top-level Edit holds
-                     Cut/Copy/Paste, and one holding a single item reads as
-                     broken; File already holds a selection-scoped action.
-                     Dimmed WITH its reason, the way the course menu does it. -->
-                <MenuFlyoutItem x:Name="RenameCourseItem" Text="Rename Course…" Click="RenameCourse_Click"
-                                IsEnabled="False" KeyboardAcceleratorTextOverride="F2"
-                                AutomationProperties.AutomationId="fileRenameCourse" />
-                <MenuFlyoutItem x:Name="RenameCourseReason" IsEnabled="False" Visibility="Collapsed" />
-                <MenuFlyoutItem x:Name="ReloadCoursesItem" Text="Reload Courses" Click="ReloadCourses_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+R" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem x:Name="SettingsItem" Text="Settings…" Click="Settings_Click" KeyboardAcceleratorTextOverride="Ctrl+," />
-                <MenuFlyoutItem x:Name="CheckForUpdatesItem" Click="CheckForUpdates_Click" Visibility="Collapsed"
-                                AutomationProperties.AutomationId="fileCheckForUpdates" />
-            </MenuBarItem>
-            <!-- Acts on whichever section's preview is currently shown in
-                 DetailHost, matching mac's Preview menu; the accelerator
-                 text shown here is backed by real, globally-scoped
-                 KeyboardAccelerators on Root above. -->
-            <MenuBarItem Title="Preview">
-                <MenuFlyoutItem x:Name="PreviewBackItem" Text="Back" Click="PreviewBack_Click"
-                                 IsEnabled="False" KeyboardAcceleratorTextOverride="Alt+Left" />
-                <MenuFlyoutItem x:Name="PreviewForwardItem" Text="Forward" Click="PreviewForward_Click"
-                                 IsEnabled="False" KeyboardAcceleratorTextOverride="Alt+Right" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem x:Name="PreviewReloadItem" Text="Reload Page" Click="PreviewReload_Click"
-                                 IsEnabled="False" KeyboardAcceleratorTextOverride="Ctrl+R" />
-            </MenuBarItem>
-            <MenuBarItem Title="Help">
-                <MenuFlyoutItem Text="Report a Problem…" Click="ReportProblem_Click" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="About Plantoir" Click="About_Click" />
-            </MenuBarItem>
+            <MenuBarItem x:Name="FileMenu" Title="File" />
+            <MenuBarItem x:Name="CourseMenu" Title="Course" />
+            <MenuBarItem x:Name="SectionMenu" Title="Section" />
+            <MenuBarItem x:Name="ViewMenu" Title="View" />
+            <MenuBarItem x:Name="HelpMenu" Title="Help" />
         </MenuBar>
 
         <!-- The picker replaces the ENTIRE content area, sidebar included. -->
@@ -117,6 +73,13 @@
         <InfoBar x:Name="GettingReadyNotice" Margin="12,8,12,0"
                  IsOpen="False" Severity="Informational" IsClosable="False"
                  AutomationProperties.AutomationId="gettingReadyNotice" />
+        <!-- #496: the guidance for assistants could not be written into this
+             folder (printablePages.agentGuidance.words.couldNotWrite). Quiet
+             and closable: it holds nothing back, and it comes back at the
+             next launch while its cause remains. MainWindow.Guidance.cs. -->
+        <InfoBar x:Name="GuidanceNotice" Margin="12,8,12,0"
+                 IsOpen="False" Severity="Informational" IsClosable="True"
+                 AutomationProperties.AutomationId="guidanceNotice" />
         </StackPanel>
 
         <views:WorkspacePickerView x:Name="Picker" Grid.Row="2" Visibility="Collapsed" />

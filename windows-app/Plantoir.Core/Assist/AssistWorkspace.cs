@@ -114,6 +114,18 @@ public sealed partial class AssistWorkspace
     /// </summary>
     private string BackUpOnceForThisConversation(Course course, int sectionNumber, IProgress<string>? progress = null)
     {
+        // The Section menu saves a FRESH copy before every change (#489, the
+        // director's ruling on the mac's plan review): a server that lives as
+        // long as a window would otherwise make one copy a month, and "the
+        // copy made just before it is in Backups" would be false after the
+        // teacher deleted it. Named for the menu, never recorded as held.
+        if (SpeaksFromTheMenu)
+        {
+            progress?.Report(AssistWording.MenuSavingACopy(course.Code));
+            string fresh = MenuBackup(course, sectionNumber);
+            ConversationBackupPath = fresh;
+            return fresh;
+        }
         // One copy in flight per course: a second write arriving while the
         // first is zipping waits for it and reuses it rather than zipping again.
         lock (_conversationBackups)
@@ -472,6 +484,7 @@ public sealed partial class AssistWorkspace
         {
             string direct = PagePaths.ResolveInside(_folder, wanted);
             if (File.Exists(direct)) return direct;
+            if (InTheCourse(course, sectionNumber, wanted) is { } inCourse) return inCourse;
         }
 
         // Asked for by name, the How I Teach page is never published or
@@ -493,6 +506,34 @@ public sealed partial class AssistWorkspace
         throw new AssistRefusal(
             $"{course.Code} Section {sectionNumber} has {matches.Count} pages called “{wanted}” — " +
             Humanize(matches.Select(Relative)) + ". Say which one you mean.");
+    }
+
+    /// <summary>
+    /// A page named by its place in the COURSE — <c>section1/All Classes/Unit
+    /// 2, Day 3</c>, the shape the Section menu sends (#489, the plan's finding
+    /// 0.8): every shipped course has five to nine <c>_DUPLICATE ME</c> pages,
+    /// which a bare name refuses as ambiguous. Resolved INSIDE the course only;
+    /// a <c>section&lt;M&gt;/</c> prefix naming another section is no page
+    /// here; the How I Teach page is refused as it is by name, and only a page
+    /// this section lists is answered (the plan review's M3). Null for no such
+    /// page, so the caller's own refusal stands.
+    /// </summary>
+    private static string? InTheCourse(Course course, int sectionNumber, string wanted)
+    {
+        string relative = wanted.Replace('\\', '/').Trim('/');
+        string first = relative.Split('/')[0];
+        if (System.Text.RegularExpressions.Regex.IsMatch(first, @"^section\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+            && !string.Equals(first, $"section{sectionNumber}", StringComparison.OrdinalIgnoreCase))
+            return null;
+        string withExtension = relative.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? relative : relative + ".md";
+        string full;
+        try { full = Path.GetFullPath(PagePaths.ResolveInside(course.DirectoryPath, withExtension)); }
+        catch (OutsideWorkspaceException) { return null; }
+        if (!File.Exists(full)) return null;
+        if (HowITeachPage.IsItsTitle(Path.GetFileNameWithoutExtension(full)) || !ListsAsAPage(course, full))
+            throw new AssistRefusal(AssistWording.HowITeachIsNeverPublished(course.Code));
+        return PagePaths.MarkdownPages(course.DirectoryPath, sectionNumber)
+            .FirstOrDefault(page => string.Equals(Path.GetFullPath(page), full, StringComparison.OrdinalIgnoreCase));
     }
 
     public string ReadPage(Course course, int sectionNumber, string title) =>
@@ -819,9 +860,7 @@ public sealed partial class AssistWorkspace
         {
             NoteNamedNoPage(course.Code, section,
                 unknownNames.Count == 1 ? "1 name matched no page" : $"{unknownNames.Count} names matched no page");
-            throw new AssistRefusal(unknownNames.Count == 1
-                ? AssistWording.NoPageCalled(course.Code, section.ToString(), unknownNames[0])
-                : AssistWording.NoPagesCalled(course.Code, section.ToString(), AssistWording.ListingEither(unknownNames)));
+            throw new AssistRefusal(NoPageNamed(course.Code, section, unknownNames));
         }
 
         // Dates choose classes IN CODE. A teacher's "every class from the 15th
@@ -1051,6 +1090,7 @@ public sealed partial class AssistWorkspace
 
         return new PublishPlan
         {
+            FromTheMenu = SpeaksFromTheMenu,
             CourseCode = course.Code,
             SectionNumber = section,
             Publishes = isPublish,
@@ -1506,6 +1546,10 @@ public sealed partial class AssistWorkspace
         string nearby = dated.Count == 0
             ? "None of its classes have dates."
             : $"Its classes run {DateText.Iso(dated[0])} to {DateText.Iso(dated[^1])}.";
+        if (SpeaksFromTheMenu)
+            throw new AssistRefusal(course.Configuration.ClassNoun == ClassNoun.Meeting
+                ? AssistWording.NoClassOnFromTheMenuForAMeeting(date, course.Code, sectionNumber.ToString())
+                : AssistWording.NoClassOnFromTheMenu(date, course.Code, sectionNumber.ToString()));
         throw new AssistRefusal(
             $"{course.Code} Section {sectionNumber} has no class on {DateText.Iso(date)}. {nearby}");
     }
@@ -1584,6 +1628,24 @@ public sealed partial class AssistWorkspace
                 : $"{course.Code} Section {section} has never been deployed to {destinationName}, so deploying " +
                   "it there asks what to call that site — and that can only be answered in Plantoir. Deploy it " +
                   "there once from Plantoir, and I can do it after that.");
+        }
+
+        // #475, after the deploy's own refusals and before anything runs:
+        // classes dated after the next class with no answer on file. Nobody
+        // here can be asked, so the deploy is held back until the question
+        // has been answered once in the section's window, where the answer
+        // is remembered (laterClassesKept). An assistant in another program
+        // is told so in the shape of deployNeedsAnAnswer; Plantoir's own
+        // assistant, reaching this only with no window to ask in, is told to
+        // deploy from the window.
+        if (ClassesDatedLater.FlaggedIn(course, section, Today()) is { Count: > 0 } later)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.LaterClassesHeldADeployBack,
+                ClassesDatedLater.HeldBackLine(later.Count), course.Code, section);
+            var titles = later.Select(page => page.Title).ToList();
+            throw new AssistRefusal(IsOutside
+                ? AssistWording.DeployHasClassesDatedLater(course.Code, section.ToString(), titles)
+                : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles));
         }
 
         progress?.Report($"Building Section {section} of {course.Code}…");
@@ -1729,21 +1791,18 @@ public sealed partial class AssistWorkspace
             return new AssistResult(false,
                 AppendingFindings(course, section, build, 
                     AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString())), null);
-        // Refused because the section is still being deployed (#471, the
-        // build half of #467): said as the launcher's own line, which is the
-        // sentence a teacher can act on, rather than as a broken build.
-        if (RefusedWhileItsSectionDeploys(build) is { } refused)
-            return new AssistResult(false,
-                AppendingFindings(course, section, build,
-                    $"Nothing was changed, and the preview couldn’t be built: {refused}"), null);
+        // A failure is one clean sentence (#481): the reason when the output
+        // has a plain one — the launcher's own line when the section is still
+        // being deployed (#471) — and never the raw log, which this caller
+        // has no window to read beside it.
         return build.Succeeded
             ? new AssistResult(true,
-                AppendingFindings(course, section, build, 
+                AppendingFindings(course, section, build,
                     $"Rebuilt the preview of {course.Code} Section {section}. No content was changed. " +
                     "Look it over in Plantoir, and deploy it there when you're happy."), null)
             : new AssistResult(false,
-                AppendingFindings(course, section, build, 
-                    $"Nothing was changed, and the preview couldn’t be built. {build.Message}"), null);
+                AppendingFindings(course, section, build,
+                    "Nothing was changed. " + PreviewDidNotBuildHere(course, section, build)), null);
     }
 
     /// <summary>
@@ -1852,10 +1911,19 @@ public sealed partial class AssistWorkspace
 
         recording.Done();
 
-        if (!plan.Publishes)
-            return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined), backup);
-
-        // Publishing builds a PREVIEW, and stops there.
+        // Publishing AND hiding build a PREVIEW, and stop there (#479).
+        //
+        // A hide used to return here without building, because since the
+        // first commit this method tied "build the preview" to "the plan
+        // publishes" — nothing chose that. It left an outside assistant's
+        // unpublish_pages saying a page was hidden while the preview still
+        // showed it, and it was the one difference the mac's rebuild after a
+        // hide exposed (shared-rules.json → refusedBuildAnswers, the seventh
+        // case). A hide that changes NOTHING still builds nothing (the
+        // `ChangesNothing && !Publishes` return above); and a hide is still
+        // not refused up front while Plantoir is building
+        // (RefuseIfPlantoirIsBuilding is for publishing): its pages are
+        // written, and only the rebuild is declined below, with its note.
         //
         // Deploying is a separate request with its own tool and its own yes —
         // it is not something publishing does on the way past. That
@@ -1894,16 +1962,21 @@ public sealed partial class AssistWorkspace
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
+        string declinedTail = declined.Count > 0 ? " " + SettingsCannotBeAddedTo(declined) : "";
+        // The build stopped for a question nobody here can answer (#478,
+        // exit 3 under --non-interactive): said as that, as RebuildPreview
+        // and Deploy say it, never as a broken build.
+        if (build.NeededAnAnswer)
+            return new AssistResult(false,
+                $"{WhatSurvived(changed)}. {AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString(System.Globalization.CultureInfo.InvariantCulture))}" +
+                declinedTail, backup);
         if (!build.Succeeded)
             return new AssistResult(false,
-                // Refused while the section is being deployed (#471): the
-                // launcher's own line, and no pointer at a window this
-                // process does not have. Any other failure keeps its one
-                // clean sentence (never the raw log).
-                (RefusedWhileItsSectionDeploys(build) is { } refused
-                    ? $"{WhatSurvived(changed)}, but the preview couldn’t be built: {refused}"
-                    : $"{WhatSurvived(changed)}, but the preview couldn’t be built. {AssistWording.WhereTheOutputIs}") +
-                (declined.Count > 0 ? " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : ""), backup);
+                // One clean sentence, never the raw log, and no pointer at a
+                // window this caller does not have (#481); the reason when
+                // the output has one, the launcher's own line among them
+                // when the section is being deployed (#471).
+                $"{WhatSurvived(changed)}. {PreviewDidNotBuildHere(course, section, build)}" + declinedTail, backup);
 
         return new AssistResult(true, Summary(changed, previewed: true, course.Code, section, plan.Hiding, declined), backup);
     }
@@ -1959,7 +2032,7 @@ public sealed partial class AssistWorkspace
                     moving.Add(p.DisplayTitle);
             }
         }
-        string? declinedSentence = declined.Count > 0 ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : null;
+        string? declinedSentence = declined.Count > 0 ? SettingsCannotBeAddedTo(declined) : null;
 
         if (moving.Count == 0 && declinedSentence is not null)
         {
@@ -2118,7 +2191,7 @@ public sealed partial class AssistWorkspace
 
         recording.Done();
         NoteSettingsLeftAsTheyWere(publishing ? "publishing pages" : "hiding pages", declined.Count, course.Code, section);
-        string? declinedSentence = declined.Count > 0 ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : null;
+        string? declinedSentence = declined.Count > 0 ? SettingsCannotBeAddedTo(declined) : null;
 
         if (!changedAnything)
         {
@@ -2144,31 +2217,49 @@ public sealed partial class AssistWorkspace
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (build.Succeeded) return new AssistResult(true, summary, backup);
-        // As in Apply (#471): a refusal is said as the launcher's own line.
-        return RefusedWhileItsSectionDeploys(build) is { } refusal
-            ? new AssistResult(false, $"{summary} But the preview couldn’t be built: {refusal}", backup)
-            : new AssistResult(false, $"{summary} But the preview couldn’t be built. {AssistWording.WhereTheOutputIs}", backup);
+        // As in Apply: a question (#478), then one clean sentence (#481, #471).
+        if (build.NeededAnAnswer)
+            return new AssistResult(false,
+                $"{summary} {AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString(System.Globalization.CultureInfo.InvariantCulture))}",
+                backup);
+        return new AssistResult(false, $"{summary} {PreviewDidNotBuildHere(course, section, build)}", backup);
     }
 
     /// <summary>
-    /// The launcher's own sentence when a <c>--build-only</c> was refused
-    /// because the same section is still being deployed, or null for any
-    /// other outcome (#471; contracts/shared-rules.json →
-    /// <c>deployWhileItsSectionDeploys.refusedBuildAnswers</c>).
+    /// A preview build that failed, in one sentence for a caller with no
+    /// window (#481): <c>wording.previewDidNotBuildBecause</c> with the reason
+    /// when <see cref="FailureExplainer.Explanation"/> recognises one, else
+    /// <c>wording.previewDidNotBuildForACallerWithNoWindow</c>. Callers say
+    /// <see cref="AssistWording.PreviewBuildNeedsAnAnswer"/> first for exit 3.
     /// </summary>
     /// <remarks>
-    /// The LIFTED line ("… so it cannot be built until that has finished."),
-    /// not <c>wording.deployRefusedWhileItsSectionDeploys</c>: that sentence
-    /// says the section "was not deployed again", which is false of a
-    /// rebuild, and a new wording key can only be added on the mac, where
-    /// assist-wording.json is generated. The launcher's line is contract data
-    /// already (<c>failureExplanationCases</c>), and its build flavour exists
-    /// precisely because an assistant's rebuild runs the same leg.
+    /// <para>A build refused because the same section is still being deployed
+    /// (#471; <c>contracts/shared-rules.json</c> →
+    /// <c>deployWhileItsSectionDeploys.refusedBuildAnswers</c>) is one of
+    /// those reasons: <c>Explanation</c> reaches it through
+    /// <c>SectionDeployRefusalOf</c>, which LIFTS the launcher's own line ("…
+    /// so it cannot be built until that has finished.") with its cross and
+    /// any mojibake taken off. That line, not
+    /// <c>wording.deployRefusedWhileItsSectionDeploys</c>, because that
+    /// sentence says the section "was not deployed again", which is false of
+    /// a rebuild; the launcher's line is contract data already
+    /// (<c>failureExplanationCases</c>), and its build flavour exists
+    /// precisely because an assistant's rebuild runs the same leg.</para>
+    ///
+    /// <para>Never <c>wording.whereTheOutputIs</c> and never the raw log:
+    /// this is said to a caller that has no window, and a log handed to a
+    /// model gets restated line by line in its reply. The mac says the same
+    /// two sentences (#481, its <c>AssistSiteWork</c>). Accepted, as on the
+    /// mac: <c>Explanation</c> can lift a sentence written for a deploy ("…
+    /// then deploy again") into a preview build's answer.</para>
     /// </remarks>
-    private static string? RefusedWhileItsSectionDeploys(LaunchOutcome build) =>
-        build.Succeeded || build.NeededAnAnswer
-            ? null
-            : FailureExplainer.SectionDeployRefusalOf(build.Message)?.Sentence;
+    private static string PreviewDidNotBuildHere(Course course, int section, LaunchOutcome build)
+    {
+        string number = section.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return FailureExplainer.Explanation(build.Message) is { } reason
+            ? AssistWording.PreviewDidNotBuildBecause(course.Code, number, reason)
+            : AssistWording.PreviewDidNotBuildForACallerWithNoWindow(course.Code, number);
+    }
 
     /// <summary>
     /// Point the section's front page at its most recent published class, and
@@ -2204,13 +2295,13 @@ public sealed partial class AssistWorkspace
             ? "No page needed changing, and the course was backed up"
             : $"{changed.Count} page{(changed.Count == 1 ? " was" : "s were")} changed and the course was backed up";
 
-    private static string Summary(IReadOnlyList<string> changed, bool previewed, string code, int section, bool hiding = false,
+    private string Summary(IReadOnlyList<string> changed, bool previewed, string code, int section, bool hiding = false,
                                   IReadOnlyList<string>? declined = null)
     {
         // Pages the writer declined are NAMED (#308): never folded into
         // "Nothing needed changing.", which would say they were already right.
         string? declinedSentence = declined is { Count: > 0 }
-            ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined)
+            ? SettingsCannotBeAddedTo(declined)
             : null;
         if (changed.Count == 0) return declinedSentence ?? "Nothing needed changing.";
         string verb = hiding ? "Unpublished" : "Published";
@@ -2295,6 +2386,14 @@ public sealed partial class AssistWorkspace
     /// #289's rule, as the mac's in-app assistant keeps #156's.
     /// </summary>
     public bool IsOutside => !ServesTheLocalWindow;
+
+    /// <summary>
+    /// The teacher's calendar day on this computer's clock, for the question
+    /// about classes dated after the next class (#475). Injectable so the
+    /// contract's scenarios, which lay out classes around a pinned today,
+    /// cannot flake at midnight (12-windows-app.md, "Three testing lessons").
+    /// </summary>
+    public Func<DateOnly> Today { get; init; } = () => DateOnly.FromDateTime(DateTime.Now);
 
     /// <summary>
     /// Claim the build for as long as it runs, so Plantoir's own Preview and
@@ -2918,8 +3017,8 @@ public sealed partial class AssistWorkspace
         // from a total: "Re-dated 14 classes and -4 pages they use" came from
         // (pages whose date changes) - (every class in the section).
         string summary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials);
-        if (undated.Count > 0) summary += " " + AssistWording.PagesWhoseNewDatesCouldNotBeSet(undated);
-        if (notHidden.Count > 0) summary += " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(notHidden);
+        if (undated.Count > 0) summary += " " + NewDatesCouldNotBeSet(undated);
+        if (notHidden.Count > 0) summary += " " + SettingsCannotBeAddedTo(notHidden);
         NoteSettingsLeftAsTheyWere("re-dating classes", undated.Union(notHidden, StringComparer.OrdinalIgnoreCase).Count(),
             course.Code, section);
         string detail = summary +
@@ -3073,6 +3172,39 @@ public sealed partial class AssistWorkspace
         var course = Course(courseCode);
         int number = Section(course, sectionNumber);
         return Relative(AssistantBackup(course, number));
+    }
+
+    /// <summary>
+    /// The Section menu's copy before one change (#489): under the same
+    /// <c>copying</c> lease as the assistant's, so Preview, Deploy and every
+    /// assistant stand off while it is zipped; one "section menu backed up a
+    /// course" line per zip, with its name, size and seconds, or why it could
+    /// not. Pruned to five of its own, apart from the assistant's.
+    /// </summary>
+    private string MenuBackup(Course course, int sectionNumber)
+    {
+        using var copying = WorkLease.Take(_folder, course.Code, WorkLease.Copying);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        string made;
+        try
+        {
+            made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
+                                               new BackupMaker.Menu(sectionNumber));
+        }
+        catch (Exception error)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
+                $"the Section menu could not back up the course: {error.Message}", course.Code, sectionNumber);
+            throw;
+        }
+        double megabytes = 0;
+        try { megabytes = new FileInfo(made).Length / (1024.0 * 1024.0); } catch { }
+        ActivityTrail.Note(ActivityTrail.Event.SectionMenuBackedUpACourse,
+            $"the Section menu backed up the course as {Path.GetFileName(made)} " +
+            $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
+            $"{clock.Elapsed.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)",
+            course.Code, sectionNumber);
+        return made;
     }
 
     /// <summary>
@@ -3836,9 +3968,9 @@ public sealed partial class AssistWorkspace
             $"later class days, and updated {linksUpdated} link" +
             $"{(linksUpdated == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
             AssistWording.LookTheSectionOverBeforePublishing;
-        if (undated.Count > 0) said += " " + AssistWording.PagesWhoseNewDatesCouldNotBeSet(undated);
+        if (undated.Count > 0) said += " " + NewDatesCouldNotBeSet(undated);
         if (notFinished.Count > 0)
-            said += " " + AssistWording.PagesAChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+            said += " " + ChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
 
         // Said because it is now TRUE and was not said before: this records no
         // undo entry, so "undo that" afterwards reaches back past it to
@@ -3847,6 +3979,9 @@ public sealed partial class AssistWorkspace
         // (`makeRoomForClasses` → `movesAnythingElse`).
         if (plan.Renames.Count > 0 || plan.Moves.Count > 0)
             said += "\n\n" + ClassChangeWording.OtherClassesMoved(backup);
+
+        // No undo entry says so, so the menu's trail line is told here (#489, M1).
+        if (created.Count > 0 || renamed.Count > 0 || moved > 0 || linksUpdated > 0) NoteAChangeWithNoUndoEntry();
 
         return new AssistResult(true, said, backup);
     }

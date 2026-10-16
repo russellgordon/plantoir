@@ -62,11 +62,10 @@
                     Click="PreviewAgain_Click" AutomationProperties.AutomationId="previewAgainButton" />
             <Button x:Name="SaveButton" Grid.Column="3" Content="Save" IsEnabled="False" Click="Save_Click"
                     Style="{StaticResource AccentButtonStyle}"
-                    AutomationProperties.AutomationId="saveButton">
-                <Button.KeyboardAccelerators>
-                    <KeyboardAccelerator Modifiers="Control" Key="S" />
-                </Button.KeyboardAccelerators>
-            </Button>
+                    AutomationProperties.AutomationId="saveButton" />
+            <!-- No Ctrl+S here since #488: the key is Course > Save Course
+                 Settings' in the menu bar, which calls this button's own
+                 handler on its own predicate (shortcuts on menu items only). -->
         </Grid>
     </Grid>
 </UserControl>

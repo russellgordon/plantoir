@@ -48,6 +48,10 @@ public class ContractTests
         Assert.Equal(wording["builtWithNoWindowOpen"]!.ToString(), AssistWording.BuiltWithNoWindowOpen("{course}", "{section}"));
         Assert.Equal(wording["rebuiltForACallerWithNoWindow"]!.ToString(), AssistWording.RebuiltForACallerWithNoWindow("{course}", "{section}"));
         Assert.Equal(wording["previewDidNotBuild"]!.ToString(), AssistWording.PreviewDidNotBuild("{course}", "{section}"));
+        Assert.Equal(wording["previewDidNotBuildForACallerWithNoWindow"]!.ToString(),
+                     AssistWording.PreviewDidNotBuildForACallerWithNoWindow("{course}", "{section}"));
+        Assert.Equal(wording["previewDidNotBuildBecause"]!.ToString(),
+                     AssistWording.PreviewDidNotBuildBecause("{course}", "{section}", "{reason}"));
 
         Assert.Equal(wording["undid"]!.ToString(), AssistWording.Undid("{change}"));
         Assert.Equal(wording["undidPartly"]!.ToString(), AssistWording.UndidPartly("{change}", 2));
@@ -242,6 +246,70 @@ public class ContractTests
                      AssistWording.DeployRefusedWhileALaterDeployWorks("{course}", "{section}"));
         Assert.Equal(wording["deployRefusedWhileItsSectionDeploys"]!.ToString(),
                      AssistWording.DeployRefusedWhileItsSectionDeploys("{course}", "{section}"));
+
+        // #489 (mac #457 batch B): the Section menu's twins and its dialog's
+        // words, rendered with the contract's placeholders and the generator's
+        // own example titles, counts and day (Monday, 2026-09-14).
+        Assert.Equal(wording["undidFromTheMenu"]!.ToString(), AssistWording.UndidFromTheMenu("{change}"));
+        Assert.Equal(wording["undidPartlyFromTheMenu"]!.ToString(), AssistWording.UndidPartlyFromTheMenu("{change}", 2));
+        Assert.Equal(wording["couldNotUndoFromTheMenu"]!.ToString(), AssistWording.CouldNotUndoFromTheMenu("{change}", 2));
+        Assert.Equal(wording["changedWhileSavingACopyFromTheMenu"]!.ToString(),
+                     AssistWording.ChangedWhileSavingACopyFromTheMenu("{course}", "{section}"));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToFromTheMenu"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedToFromTheMenu(new[] { "Unit 2, Day 4" }));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral(five));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedToFromTheMenu(five));
+        Assert.Equal(wording["pageWhoseNewDateCouldNotBeSetFromTheMenu"]!.ToString(),
+                     AssistWording.PageWhoseNewDateCouldNotBeSetFromTheMenu("Unit 2, Day 4"));
+        Assert.Equal(wording["pagesWhoseNewDatesCouldNotBeSetFromTheMenu"]!.ToString(),
+                     AssistWording.PagesWhoseNewDatesCouldNotBeSetFromTheMenu(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
+        Assert.Equal(wording["noPageCalledFromTheMenu"]!.ToString(), AssistWording.NoPageCalledFromTheMenu("{page}", "{course}", "{section}"));
+        Assert.Equal(wording["noPagesCalledFromTheMenu"]!.ToString(), AssistWording.NoPagesCalledFromTheMenu("{pages}", "{course}", "{section}"));
+        Pair("noClassOnFromTheMenu",
+             AssistWording.NoClassOnFromTheMenu(new DateOnly(2026, 9, 14), "{course}", "{section}"),
+             AssistWording.NoClassOnFromTheMenuForAMeeting(new DateOnly(2026, 9, 14), "{course}", "{section}"));
+        Assert.Equal(wording["courseIsBeingCopiedFromTheMenu"]!.ToString(), AssistWording.CourseIsBeingCopiedFromTheMenu("{course}"));
+        Assert.Equal(wording["pagesAChangeCouldNotFinishFromTheMenu"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinishFromTheMenu(new[] { "Unit 1, Day 3" }));
+        Assert.Equal(wording["pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinishFromTheMenu(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
+        Assert.Equal(wording["pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinishFromTheMenuNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
+        Assert.Equal(wording["sectionIsChangingFromTheMenu"]!.ToString(), AssistWording.SectionIsChangingFromTheMenu("{course}", "{section}"));
+        Assert.Equal(wording["menuPublishPagesTitle"]!.ToString(), AssistWording.MenuPublishPagesTitle("{course}", "{section}"));
+        Assert.Equal(wording["menuHidePagesTitle"]!.ToString(), AssistWording.MenuHidePagesTitle("{course}", "{section}"));
+        Pair("menuPublishClassTitle", AssistWording.MenuPublishClassTitle("{course}", "{section}"),
+             AssistWording.MenuPublishClassTitleForAMeeting("{course}", "{section}"));
+        Pair("menuReDateTitle", AssistWording.MenuReDateTitle("{course}", "{section}"),
+             AssistWording.MenuReDateTitleForAMeeting("{course}", "{section}"));
+        Pair("menuMakeRoomTitle", AssistWording.MenuMakeRoomTitle("{course}", "{section}"),
+             AssistWording.MenuMakeRoomTitleForAMeeting("{course}", "{section}"));
+        Assert.Equal(wording["menuNoHiddenPages"]!.ToString(), AssistWording.MenuNoHiddenPages("{course}", "{section}"));
+        Assert.Equal(wording["menuNoVisiblePages"]!.ToString(), AssistWording.MenuNoVisiblePages("{course}", "{section}"));
+        Assert.Equal(wording["menuSavingACopy"]!.ToString(), AssistWording.MenuSavingACopy("{course}"));
+
+        // #475 (the rest of #489): the question about classes dated after the
+        // next class, with the generator's own examples — the next class on
+        // Friday, 2026-10-09, a row on Wednesday, 2026-10-14, Unit 2, Day 5
+        // (and Day 6) named, two ticked to stay hidden.
+        Pair("laterClassesAtDeploy", AssistWording.LaterClassesAtDeploy(new DateOnly(2026, 10, 9)),
+             AssistWording.LaterClassesAtDeployForAMeeting(new DateOnly(2026, 10, 9)));
+        Pair("laterClassesAtPublish", AssistWording.LaterClassesAtPublish(new DateOnly(2026, 10, 9)),
+             AssistWording.LaterClassesAtPublishForAMeeting(new DateOnly(2026, 10, 9)));
+        Assert.Equal(wording["laterClassesDay"]!.ToString(), AssistWording.LaterClassesDay(new DateOnly(2026, 10, 14)));
+        Assert.Equal(wording["leaveOutAndContinueButton"]!.ToString(), AssistWording.LeaveOutAndContinueButton(2));
+        Assert.Equal(wording["deployHasClassesDatedLater"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLater("{course}", "{section}", new[] { "Unit 2, Day 5" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterNamingSeveral"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLater("{course}", "{section}", new[] { "Unit 2, Day 5", "Unit 2, Day 6" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterNamingSeveral"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterNamingSeveral("{course}", "{section}", new[] { "Unit 2, Day 5", "Unit 2, Day 6" }));
+        Assert.Equal(wording["deployHasClassesDatedLaterAndNoWindow"]!.ToString(),
+                     AssistWording.DeployHasClassesDatedLaterAndNoWindow("{course}", "{section}", new[] { "Unit 2, Day 5" }));
+        Assert.Equal(wording["deployWaitsForAnOpenQuestion"]!.ToString(),
+                     AssistWording.DeployWaitsForAnOpenQuestion("{course}", "{section}"));
 
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
@@ -466,9 +534,27 @@ public class ContractTests
         string courseCode = zipNames["courseCode"]!.ToString();
         var cases = zipNames["cases"]!.AsArray();
 
+        // Each case runs on its own, so one this app owes (the Section menu's
+        // backups, #489) is held open by NAME against its issue rather than
+        // stopping the cases after it; the ledger fails the day it passes.
+        var failures = new List<(string Name, string Why)>();
         foreach (var c in cases)
         {
-            string kind = c!["kind"]!.ToString();
+            string name = c!["name"]!.ToString();
+            if (Record.Exception(() => CheckOne(c)) is { } failure)
+                failures.Add((name, failure.Message));
+        }
+
+        var names = cases.Select(c => c!["name"]!.ToString()).ToList();
+        var failing = failures.Select(f => f.Name).ToHashSet();
+        var deferred = NamedGapLedger.GapsIn(
+            NamedGapLedger.ZipNameCases, names, names.Where(n => !failing.Contains(n)));
+        var unexplained = failures.Where(f => !deferred.Contains(f.Name)).Select(f => $"{f.Name}: {f.Why}").ToList();
+        Assert.True(unexplained.Count == 0, string.Join("\n", unexplained));
+
+        void CheckOne(JsonNode c)
+        {
+            string kind = c["kind"]!.ToString();
             string name = c["name"]!.ToString();
             string filePath = $@"C:\folder\_backups\{courseCode}\{name}";
 
@@ -506,6 +592,15 @@ public class ContractTests
                         Assert.IsType<BackupMaker.Assistant>(backup!.Maker);
                         int expectedSection = c["section"]!.GetValue<int>();
                         Assert.Equal(expectedSection, ((BackupMaker.Assistant)backup.Maker).SectionNumber);
+                    }
+                    else if (expectedMaker == "menu")
+                    {
+                        Assert.IsType<BackupMaker.Menu>(backup!.Maker);
+                        Assert.Equal(c["section"]!.GetValue<int>(), ((BackupMaker.Menu)backup.Maker).SectionNumber);
+                    }
+                    else
+                    {
+                        Assert.Fail($"a maker this runner does not know: {expectedMaker}");
                     }
                     break;
                 case "archive":
@@ -1186,6 +1281,7 @@ public class ContractTests
                             break;
                         case "cloudflareAccountMissing":
                             Assert.Contains("Cloudflare Pages, which needs your Account ID", problem);
+                            Assert.EndsWith("Add it in File ▸ Settings ▸ Deploying, then schedule this again.", problem);   // #491
                             break;
                         case "neverDeployed":
                         case "additionalDestinationNeverDeployed":
@@ -1204,6 +1300,7 @@ public class ContractTests
                             break;
                         case "additionalCloudflareAccountMissing":
                             Assert.Contains("also deploys to Cloudflare Pages, which needs your Account ID", problem);
+                            Assert.EndsWith("Add it in File ▸ Settings ▸ Deploying, then schedule this again.", problem);   // #491
                             break;
                         default:
                             Assert.Fail($"Unknown refusal case: {expectRefusal}");
@@ -1228,7 +1325,7 @@ public class ContractTests
         string source = File.ReadAllText(Path.Combine(repoRoot, "windows-app", "Plantoir.Core", "Models", "CourseConfiguration.cs"));
 
         // A key this app does not carry yet is held open by name against the
-        // issue that owns it (NamedGapLedger, the parity burn-down list), and
+        // issue that owns it (NamedGapLedger, on that issue's milestone), and
         // the ledger fails the day the key appears in CourseConfiguration.cs.
         var here = keys.Where(key => source.Contains($"\"{key}\"")).ToList();
         var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CourseConfigKeys, keys, here);
@@ -1250,7 +1347,20 @@ public class ContractTests
         public Task<AssistToolAnswer> CallTool(string name, JsonObject arguments, Action<string>? progress = null, CancellationToken cancellation = default) =>
             Task.FromResult(AssistToolAnswer.Same("OK"));
     }
+
+    /// <summary>
+    /// <c>app-rules.json</c> → <c>outsideAgents.agents[].menuItem</c> (#491 item 8;
+    /// <c>menuItemWhy</c>): the item's title inside Revise With ▸, in the menu bar
+    /// and every row's menu. Until #491 no Windows test read this key, so the
+    /// mac's rename from "Revise with Claude…" to "Claude…" turned nothing red.
+    /// </summary>
+    [Fact]
+    public void TheOutsideAgentsMenuTitles_AreTheContracts()
+    {
+        var agents = ContractLoader.LoadJson("app-rules.json")["outsideAgents"]!["agents"]!.AsArray();
+        string Title(string key) => agents.Single(a => a!["key"]!.ToString() == key)!["menuItem"]!.ToString();
+        Assert.Equal(Title("claude"), ClaudeCodeLauncher.MenuItemTitle);
+        Assert.Equal(Title("codex"), CodexLauncher.MenuItemTitle);
+        Assert.Equal(2, agents.Count);
+    }
 }
-
-
-

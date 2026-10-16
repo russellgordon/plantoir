@@ -37,6 +37,14 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public static class ClaudeCodeLauncher
 {
+    /// <summary>
+    /// The item's title inside Revise With ▸, in the menu bar and every row's
+    /// menu alike (<c>app-rules.json</c> → <c>outsideAgents.agents[claude].menuItem</c>,
+    /// pinned by <c>ContractTests</c>; #491 item 8). "Revise with Claude" stays
+    /// the command's name in a sentence.
+    /// </summary>
+    public const string MenuItemTitle = "Claude…";
+
     /// <summary>Both halves have to be present: the assistant, and the tools for it to use.</summary>
     public static bool IsAvailable => FindClaude() is not null && FindServer() is not null;
 

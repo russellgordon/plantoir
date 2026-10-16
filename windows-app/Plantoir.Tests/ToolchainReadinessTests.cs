@@ -346,9 +346,9 @@ public sealed class ToolchainReadinessTests : IDisposable
         }
         Assert.Contains("Preview and Deploy", ToolchainReadiness.GettingReadyMessage);
         Assert.Contains("Reload Courses", ToolchainReadiness.CouldNotGetReady);
-        // The failure sentence names the real menu item.
-        string xaml = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "MainWindow.xaml"));
-        Assert.Contains("Text=\"Reload Courses\"", xaml);
+        // The failure sentence names the real menu item — built in code since #488.
+        string menus = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "MainWindow.Menus.cs"));
+        Assert.Contains("Add(file, \"Reload Courses\"", menus);
     }
 
     // ---- The backstop -------------------------------------------------------
@@ -503,7 +503,10 @@ public sealed class ToolchainReadinessTests : IDisposable
             int emptyPid = gone.Id + 1_000_000;   // a marker caught mid-write by an older Plantoir: no body yet
             WriteMarker(emptyPid, "");
             WriteMarker(gone.Id, $"{gone.Id}\nPlantoir\n{DateTime.UtcNow:O}\n");
-            WriteMarker(alive.Id, $"{alive.Id}\ncmd\n{DateTime.UtcNow:O}\n");
+            // A LATER moment than the copy's own marker will carry, so the live
+            // program does not hold this copy back (#477's turn-taking): the
+            // sweep is what is under test here.
+            WriteMarker(alive.Id, $"{alive.Id}\ncmd\n{DateTime.UtcNow.AddHours(1):O}\n");
             var copy = new HeldCopy();
             copy.LetGo();
             ToolchainReadiness.Copier = copy.Copy;
@@ -543,5 +546,302 @@ public sealed class ToolchainReadinessTests : IDisposable
 
         Assert.False(outcome.Succeeded);
         Assert.Equal(ToolchainReadiness.GettingReadyMessage, outcome.Message);
+    }
+
+    // ---- Copies take turns (#477) ------------------------------------------
+
+    [Theory]
+    [InlineData("2026-10-15T10:00:00.0000000Z", 200, "2026-10-15T09:59:59.0000000Z", 300, true)]    // earlier: wait
+    [InlineData("2026-10-15T10:00:00.0000000Z", 200, "2026-10-15T10:00:01.0000000Z", 100, false)]   // later: go
+    [InlineData("2026-10-15T10:00:00.0000000Z", 200, "2026-10-15T10:00:00.0000000Z", 100, true)]    // same moment, lower id: wait
+    [InlineData("2026-10-15T10:00:00.0000000Z", 200, "2026-10-15T10:00:00.0000000Z", 300, false)]   // same moment, higher id: go
+    [InlineData("2026-10-15T10:00:00.0000000Z", 200, "2026-10-15T09:00:00.0000000Z", 200, false)]   // never itself
+    [InlineData("2026-10-15T10:00:00.0000000Z", 200, "yesterday", 100, false)]                      // unreadable: not earlier (M2)
+    [InlineData("2026-10-15T10:00:00.0000000Z", 200, null, 100, false)]                             // no moment at all
+    [InlineData("2026-10-15T10:00:00+00:00", 200, "2026-10-15T09:00:00.0000000Z", 100, false)]      // its own not the shape
+    public void MustWaitForOnlyACopyWrittenFirst(string mine, int myPid, string? other, int otherPid, bool waits) =>
+        Assert.Equal(waits, ToolchainReadiness.MustWaitFor(mine, myPid, other, otherPid));
+
+    private static Process StartALiveChild() =>
+        Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 60 127.0.0.1 >nul") { CreateNoWindow = true, UseShellExecute = false })!;
+
+    [Fact]
+    public async Task ACopyWaitsForAnEarlierCopyByAnotherProgram()
+    {
+        using var other = StartALiveChild();
+        try
+        {
+            // Its real name, so the liveness rule reads it as alive; a moment
+            // a minute before this copy's own.
+            WriteMarker(other.Id, $"{other.Id}\n{other.ProcessName}\n{DateTime.UtcNow.AddMinutes(-1):O}\n");
+            int looks = 0;
+            ToolchainReadiness.Pause = _ => { Interlocked.Increment(ref looks); Thread.Sleep(20); };
+            var copy = new HeldCopy();
+            copy.LetGo();
+            ToolchainReadiness.Copier = copy.Copy;
+
+            var running = ToolchainReadiness.Ensure(_folder, "bundled");
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref looks) >= 3, TimeSpan.FromSeconds(10)), "it never waited");
+            Assert.Equal(0, copy.Runs);
+            Assert.Equal(ToolchainReadiness.State.Copying, ToolchainReadiness.StateOf(_folder));   // the banner's state meanwhile
+            Assert.True(File.Exists(ToolchainReadiness.MarkerPath(_folder, Environment.ProcessId)), "its own marker comes FIRST");
+
+            File.Delete(ToolchainReadiness.MarkerPath(_folder, other.Id));   // the other copy finished
+            await running;
+
+            Assert.Equal(1, copy.Runs);
+            Assert.Equal(ToolchainReadiness.State.Ready, ToolchainReadiness.StateOf(_folder));
+            Assert.Equal(other.Id, ToolchainReadiness.LastCopyOf(_folder)!.WaitedForPid);
+        }
+        finally { try { other.Kill(); } catch { } }
+    }
+
+    [Fact]
+    public async Task ALaterMarkerDoesNotHoldAnEarlierCopy()
+    {
+        using var other = StartALiveChild();
+        try
+        {
+            WriteMarker(other.Id, $"{other.Id}\n{other.ProcessName}\n{DateTime.UtcNow.AddHours(1):O}\n");
+            int looks = 0;
+            ToolchainReadiness.Pause = _ => Interlocked.Increment(ref looks);
+            var copy = new HeldCopy();
+            copy.LetGo();
+            ToolchainReadiness.Copier = copy.Copy;
+
+            await ToolchainReadiness.Ensure(_folder, "bundled");
+
+            Assert.Equal(0, looks);
+            Assert.Equal(1, copy.Runs);
+            Assert.Null(ToolchainReadiness.LastCopyOf(_folder)!.WaitedForPid);
+        }
+        finally { try { other.Kill(); } catch { } }
+    }
+
+    [Fact]
+    public async Task ACopyWhoseCallerGivesUpWritesNothingAndSaysWhy()
+    {
+        using var other = StartALiveChild();
+        try
+        {
+            WriteMarker(other.Id, $"{other.Id}\n{other.ProcessName}\n{DateTime.UtcNow.AddMinutes(-1):O}\n");
+            var copy = new HeldCopy();
+            copy.LetGo();
+            ToolchainReadiness.Copier = copy.Copy;
+            int looks = 0;
+            var turns = new ToolchainReadiness.TakingTurns(_ => looks++, () => looks >= 4);
+            string ownTrail = Path.Combine(_root, "activity.txt");
+            ActivityTrail.SetCustomLogPathForTesting(ownTrail);
+            try { await ToolchainReadiness.Ensure(_folder, "bundled", turns: turns); }
+            finally { ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
+
+            Assert.Equal(0, copy.Runs);
+            var last = ToolchainReadiness.LastCopyOf(_folder)!;
+            Assert.Equal(ToolchainReadiness.State.Failed, last.State);
+            Assert.True(last.GaveUpWaiting);
+            Assert.Equal(other.Id, last.WaitedForPid);
+            Assert.False(File.Exists(ToolchainReadiness.MarkerPath(_folder, Environment.ProcessId)));
+            Assert.False(File.Exists(ownTrail), "a copy that never started wrote a line: the caller says what happened");
+        }
+        finally { try { other.Kill(); } catch { } }
+    }
+
+    [Fact]
+    public void TheRunsOwnMarkerIsNeverAnotherProgram()
+    {
+        WriteMarker(Environment.ProcessId, WorkLease.LeaseBody(withStart: true));
+        Assert.True(ToolchainReadiness.AnotherProgramIsGettingReady(_folder));
+        Assert.False(ToolchainReadiness.AnotherProgramIsGettingReady(_folder, exceptThisProcess: true));
+        Assert.Empty(ToolchainReadiness.LiveCopiers(_folder, exceptThisProcess: true));
+    }
+
+    [Fact]
+    public void TheTrailLineSaysWhenItWasForAScheduledDeployOrWaitedForAtClosing()
+    {
+        var ready = new ToolchainReadiness.Status(ToolchainReadiness.State.Ready, 12, 0, 15.2, null);
+        Assert.StartsWith("got the working folder ready for a scheduled deploy — 12 files brought up to date in 15.2 s — ",
+                          ToolchainReadiness.TrailLine(@"C:\work", ready, forAScheduledDeploy: true));
+        var failed = new ToolchainReadiness.Status(ToolchainReadiness.State.Failed, 3, 1, 2.0, "denied", @".toolchain\x.py");
+        string line = ToolchainReadiness.TrailLine(@"C:\work", failed, forAScheduledDeploy: true);
+        Assert.Contains("could not finish getting the working folder ready for a scheduled deploy", line);
+        Assert.Contains("; the scheduled deploy stood down — ", line);
+        Assert.DoesNotContain("Reload Courses", line);   // nobody is there to choose it at half six
+        Assert.StartsWith("got the working folder ready — 12 files brought up to date in 15.2 s, and Plantoir waited for it before closing — ",
+                          ToolchainReadiness.TrailLine(@"C:\work", ready, waitedBeforeClosing: true));
+    }
+
+    [Fact]
+    public async Task RefreshingFromAFolderWithNoRecipeChangesNothing()
+    {
+        string tools = Path.Combine(_folder, ".toolchain", "scripts");
+        Directory.CreateDirectory(tools);
+        File.WriteAllText(Path.Combine(tools, "build_site.py"), "old");
+        string empty = Path.Combine(_root, "no-recipe");
+        Directory.CreateDirectory(empty);
+        var copy = new HeldCopy();
+        copy.LetGo();
+        ToolchainReadiness.Copier = copy.Copy;
+
+        await ToolchainReadiness.RefreshWorkspace(_folder, empty);
+
+        Assert.Equal(0, copy.Runs);
+        Assert.Equal(ToolchainReadiness.State.NotStarted, ToolchainReadiness.StateOf(_folder));
+        Assert.Equal("old", File.ReadAllText(Path.Combine(tools, "build_site.py")));
+    }
+
+    // ---- Closing while a copy writes (#484) --------------------------------
+
+    [Theory]
+    [InlineData(true, true, false, false, true)]     // the last window, a copy writing: wait
+    [InlineData(false, true, false, false, false)]   // not the last window: the copy goes on in the others
+    [InlineData(true, false, false, false, false)]   // nothing writing (none, or only waiting its turn)
+    [InlineData(true, true, true, false, false)]     // Windows is ending the session: never hold it
+    [InlineData(true, true, false, true, false)]     // already waited once: the close that follows goes
+    public void ClosingWaitsOnlyForAWritingCopyWhenItQuits(bool quits, bool writing, bool ending, bool waited, bool waits) =>
+        Assert.Equal(waits, ToolchainReadiness.ClosingWaitsForTheCopy(quits, writing, ending, waited));
+
+    [Fact]
+    public async Task ClosingWaitsForEveryFoldersWritingCopy()
+    {
+        string second = Path.Combine(_root, "second");
+        Directory.CreateDirectory(Path.Combine(second, "courses"));
+        File.WriteAllText(Path.Combine(second, Workspace.MarkerLauncher), "# stub");
+        var first = new HeldCopy();
+        var other = new HeldCopy();
+        ToolchainReadiness.Copier = (folder, bundled) =>
+            folder == _folder ? first.Copy(folder, bundled) : other.Copy(folder, bundled);
+        var a = ToolchainReadiness.Ensure(_folder, "bundled");
+        var b = ToolchainReadiness.Ensure(second, "bundled");
+        Assert.True(SpinWait.SpinUntil(() => first.Runs == 1 && other.Runs == 1, TimeSpan.FromSeconds(10)));
+        Assert.True(ToolchainReadiness.AnyCopyIsWriting);
+
+        var closing = ToolchainReadiness.WhenWritingCopiesFinish();
+        first.LetGo();
+        await a;
+        Assert.False(closing.IsCompleted, "the close went ahead with the second folder's copy still writing");
+        other.LetGo();
+        await b;
+        await closing.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(ToolchainReadiness.AnyCopyIsWriting);
+    }
+
+    [Fact]
+    public async Task ACopyStillWaitingItsTurnIsNotWaitedForAndDoesNotStartOnceTheCloseBegins()
+    {
+        using var other = StartALiveChild();
+        try
+        {
+            WriteMarker(other.Id, $"{other.Id}\n{other.ProcessName}\n{DateTime.UtcNow.AddMinutes(-1):O}\n");
+            int looks = 0;
+            ToolchainReadiness.Pause = _ => { Interlocked.Increment(ref looks); Thread.Sleep(20); };
+            var copy = new HeldCopy();
+            copy.LetGo();
+            ToolchainReadiness.Copier = copy.Copy;
+            var running = ToolchainReadiness.Ensure(_folder, "bundled");
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref looks) >= 2, TimeSpan.FromSeconds(10)));
+            Assert.False(ToolchainReadiness.AnyCopyIsWriting);   // waiting is not writing
+
+            await ToolchainReadiness.WhenWritingCopiesFinish().WaitAsync(TimeSpan.FromSeconds(5));   // nothing to wait for
+
+            // The other program finishes AFTER the close began (the review's M3):
+            // the waiting copy must not start now, or the exit would cut it.
+            File.Delete(ToolchainReadiness.MarkerPath(_folder, other.Id));
+            int at = Volatile.Read(ref looks);
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref looks) >= at + 3, TimeSpan.FromSeconds(10)));
+            Assert.Equal(0, copy.Runs);
+
+            // The close did not quit after all (a new window): it goes ahead.
+            ToolchainReadiness.ReleaseWaitingCopies();
+            await running.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(1, copy.Runs);
+        }
+        finally { try { other.Kill(); } catch { } }
+    }
+
+    [Fact]
+    public async Task AHoldReleasedAfterACloseThatDidNotQuitLetsALaterCopyFinish()
+    {
+        // The batch 4 review's M1: a close that waited (and so held copies
+        // back) and then did not quit — Keep Working when asked again, or an
+        // installer that would not start — must release the hold, or every
+        // later copy waits its turn for the life of the process.
+        int looks = 0;
+        ToolchainReadiness.Pause = _ => { Interlocked.Increment(ref looks); Thread.Sleep(20); };
+        var copy = new HeldCopy();
+        copy.LetGo();
+        ToolchainReadiness.Copier = copy.Copy;
+
+        await ToolchainReadiness.WhenWritingCopiesFinish().WaitAsync(TimeSpan.FromSeconds(5));   // the hold is now set
+        var later = ToolchainReadiness.Ensure(_folder, "bundled");
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref looks) >= 3, TimeSpan.FromSeconds(10)));
+        Assert.False(later.IsCompleted, "a copy started while a closing window held copies back");
+        Assert.Equal(0, copy.Runs);
+
+        ToolchainReadiness.ReleaseWaitingCopies();
+        await later.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(1, copy.Runs);
+        Assert.Equal(ToolchainReadiness.State.Ready, ToolchainReadiness.StateOf(_folder));
+    }
+
+    [Fact]
+    public void AClosingWindowSaysWhyItIsStillUpWhicheverFolderIsCopying()
+    {
+        // The batch 4 review's M2: the copy being waited for may be another
+        // folder's, and this folder is Ready — the window still says why.
+        var own = ToolchainReadiness.BannerWhileClosing(ToolchainReadiness.State.Copying);
+        Assert.True(own.IsOpen);
+        Assert.Equal(ToolchainReadiness.GettingReadyTitle, own.Title);
+
+        foreach (var state in new[] { ToolchainReadiness.State.Ready, ToolchainReadiness.State.NotStarted })
+        {
+            var other = ToolchainReadiness.BannerWhileClosing(state);
+            Assert.True(other.IsOpen);
+            Assert.False(other.IsError);
+            Assert.Equal(ToolchainReadiness.FinishingAnotherFolderTitle, other.Title);
+            Assert.Equal(ToolchainReadiness.FinishingAnotherFolderMessage, other.Message);
+        }
+        Assert.True(ToolchainReadiness.BannerWhileClosing(ToolchainReadiness.State.Failed).IsError);
+    }
+
+    [Fact]
+    public async Task AMarkerHeldOpenForAMomentIsStillTakenAwayAfterTheCopy()
+    {
+        // The batch 4 review's L1: a marker a scanner holds open when the copy
+        // finishes would otherwise stay live for the life of the process.
+        var copy = new HeldCopy();
+        ToolchainReadiness.Copier = copy.Copy;
+        var running = ToolchainReadiness.Ensure(_folder, "bundled");
+        Assert.True(SpinWait.SpinUntil(() => copy.Runs == 1, TimeSpan.FromSeconds(10)));
+        string marker = ToolchainReadiness.MarkerPath(_folder, Environment.ProcessId);
+        Assert.True(File.Exists(marker));
+
+        var holder = new FileStream(marker, FileMode.Open, FileAccess.Read, FileShare.Read);   // no FileShare.Delete
+        var letGoOfTheMarker = Task.Delay(ToolchainReadiness.MarkerDeleteRetryPause * 2).ContinueWith(_ => holder.Dispose());
+        copy.LetGo();
+        await running.WaitAsync(TimeSpan.FromSeconds(10));
+        await letGoOfTheMarker;
+        Assert.False(File.Exists(marker), "the marker outlived its copy");
+    }
+
+    [Fact]
+    public async Task ACopyAClosingWindowWaitedForSaysSoOnTheTrail()
+    {
+        var copy = new HeldCopy { Result = new(40, 0) };
+        ToolchainReadiness.Copier = copy.Copy;
+        string ownTrail = Path.Combine(_root, "activity.txt");
+        ActivityTrail.SetCustomLogPathForTesting(ownTrail);
+        try
+        {
+            var running = ToolchainReadiness.Ensure(_folder, "bundled");
+            Assert.True(SpinWait.SpinUntil(() => copy.Runs == 1, TimeSpan.FromSeconds(10)));
+            var closing = ToolchainReadiness.WhenWritingCopiesFinish();
+            copy.LetGo();
+            await running;
+            await closing.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally { ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
+
+        Assert.Contains("got the working folder ready — 40 files brought up to date in", File.ReadAllText(ownTrail));
+        Assert.Contains(", and Plantoir waited for it before closing — ", File.ReadAllText(ownTrail));
     }
 }

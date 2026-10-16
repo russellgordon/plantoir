@@ -176,9 +176,22 @@ public static class FailureExplainer
             ? "Plantoir couldn't read every file in this working folder. It may not have permission, or a file is open in another program. Try a folder you own — for example, one on your Desktop."
             : null;
 
+    /// <remarks>
+    /// Matches "Netlify API error 429" (what deploy.py prints for Netlify's
+    /// refusal) or "rate limit" — NOT a bare "429" (#482). The sentence names
+    /// Netlify, so it may only be said when Netlify is the one limiting: a bare
+    /// "429" also matched "Cloudflare API error 429", a "Built in 429ms" timing
+    /// and the eight-digit image tag every build prints (about one in seven
+    /// hundred carries the digits), and told the teacher Netlify was limiting
+    /// deploys when an ordinary build had failed.
+    /// <c>app-rules.json</c> → <c>failureExplanations.cases</c> carries the
+    /// three that must come back null; the mac's matcher is the same
+    /// (<c>FailureExplainer.swift</c>, commit cb1b13e77).
+    /// </remarks>
     private static string? RateLimitExplanation(string output)
     {
-        if (!output.Contains("429") && !output.Contains("rate limit", StringComparison.OrdinalIgnoreCase))
+        if (!output.Contains("Netlify API error 429", StringComparison.Ordinal)
+            && !output.Contains("rate limit", StringComparison.OrdinalIgnoreCase))
             return null;
         return $"Netlify is limiting how often websites can be deployed right now. Try deploying again {WaitDescription(output)}.";
     }

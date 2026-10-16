@@ -628,6 +628,84 @@ public sealed class CourseConfiguration
         set => _values["footer_html"] = value;
     }
 
+    // ---- Printing (#454 on the mac, #496 here) ---------------------------
+    // Course-wide, read by the build on every build (scripts/print_settings.py)
+    // for the corners of a printed page: contracts/file-formats.json →
+    // courseConfigKeys ("print_school_name", "print_blanks",
+    // "print_school_name_at", "print_course_code_at") and shared-rules.json →
+    // printablePages.corners.
+    //
+    // GETTERS NEVER WRITE: HasUnsavedChanges compares the raw values, so a
+    // getter that tidied an unknown blank or place into the file would make
+    // a freshly opened course dirty (savingSettings.freshOpenCases, "printing
+    // settings, with an unknown blank and an unknown place"). And a SETTER
+    // given the value it would read back is a no-op, because WinUI raises
+    // TextChanged / SelectionChanged for values set in code (plan review L9):
+    // a stored "   " school name would otherwise be removed on open.
+
+    /// <summary>The places a school name or course code can print.</summary>
+    public static readonly IReadOnlyList<string> PrintPlaces = ["header_left", "footer_left", "none"];
+
+    /// <summary>The blanks a student can be asked to fill in, in the order they print.</summary>
+    public static readonly IReadOnlyList<string> PrintBlankOrder = ["name", "date", "class_number"];
+
+    /// <summary>The school name as stored ("" when none). Set to blank or
+    /// spaces and the key is REMOVED, as the mac does.</summary>
+    public string PrintSchoolName
+    {
+        get => StringValue("print_school_name");
+        set
+        {
+            if (value == PrintSchoolName) return;
+            if (string.IsNullOrWhiteSpace(value)) _values.Remove("print_school_name");
+            else _values["print_school_name"] = value;
+        }
+    }
+
+    /// <summary>
+    /// The blanks, in print order, each once. Absent — or JSON null, which
+    /// the build reads as absent (print_settings._blanks; the corners case
+    /// "blanks of null are the default") — means Name and Date; a list keeps
+    /// its known names; anything else is no blanks. Written in print order.
+    /// </summary>
+    public List<string> PrintBlanks
+    {
+        get
+        {
+            var stored = _values["print_blanks"];
+            if (stored is null || stored.Type == JTokenType.Null) return ["name", "date"];
+            if (stored is not JArray list) return [];
+            var named = list.OfType<JValue>().Where(v => v.Type == JTokenType.String)
+                .Select(v => (string)v!).ToHashSet(StringComparer.Ordinal);
+            return PrintBlankOrder.Where(named.Contains).ToList();
+        }
+        set
+        {
+            var ordered = PrintBlankOrder.Where(value.Contains).ToList();
+            if (ordered.SequenceEqual(PrintBlanks)) return;
+            _values["print_blanks"] = new JArray(ordered);
+        }
+    }
+
+    /// <summary>Where the school name prints: header_left (the default), footer_left or none.</summary>
+    public string PrintSchoolNameAt
+    {
+        get => PrintPlace("print_school_name_at", "header_left");
+        set { if (value != PrintSchoolNameAt) _values["print_school_name_at"] = value; }
+    }
+
+    /// <summary>Where the course code prints: footer_left (the default), header_left or none.</summary>
+    public string PrintCourseCodeAt
+    {
+        get => PrintPlace("print_course_code_at", "footer_left");
+        set { if (value != PrintCourseCodeAt) _values["print_course_code_at"] = value; }
+    }
+
+    private string PrintPlace(string key, string fallback) =>
+        _values[key] is JValue { Type: JTokenType.String } stored && PrintPlaces.Contains((string)stored!)
+            ? (string)stored!
+            : fallback;
+
     /// <summary>The window when nothing usable is stored: a week.</summary>
     public const int DefaultMayRunLateDays = 7;
 

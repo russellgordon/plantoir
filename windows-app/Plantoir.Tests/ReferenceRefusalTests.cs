@@ -67,7 +67,7 @@ public class ReferenceRefusalTests : IDisposable
         // The window cannot be built in a unit test; its flow's FIRST check is
         // asserted in the source, before anything else is asked or stopped.
         string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"));
-        int start = source.IndexOf("private async Task<string?> DeployAsync()", StringComparison.Ordinal);
+        int start = source.IndexOf("private async Task<string?> DeployAsync(", StringComparison.Ordinal);
         int refusal = source.IndexOf("ReferenceCourse.KeptOnDisk(_course.DirectoryPath)", start, StringComparison.Ordinal);
         int firstOther = source.IndexOf("AnotherProgramStandsInTheWay", start, StringComparison.Ordinal);
         int stop = source.IndexOf("StopPreview", start, StringComparison.Ordinal);
@@ -328,7 +328,7 @@ public class ReferenceRefusalTests : IDisposable
         Assert.Contains("ICS3U-2025 \u2014", outside);
         Assert.Contains("kept for reference \u2014 never deployed", outside);
         Assert.Contains("school year: 2025\u201326", outside);
-        var local = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()) { ServesTheLocalWindow = true }).ListCourses();
+        var local = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.LocalWindow }).ListCourses();
         Assert.DoesNotContain("ICS3U-2025", local);
         Assert.Contains("ICS3U \u2014", local);
     }
@@ -342,7 +342,7 @@ public class ReferenceRefusalTests : IDisposable
     public void ListCoursesInTheLocalWindowWithOnlyReferenceCoursesSaysNoCoursesYet()
     {
         Directory.Delete(Path.Combine(_folder, "courses", "ICS3U"), recursive: true);
-        var local = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()) { ServesTheLocalWindow = true }).ListCourses();
+        var local = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.LocalWindow }).ListCourses();
         Assert.Equal(AssistWording.NoCoursesYet, local);
         var outside = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher())).ListCourses();
         Assert.Contains("ICS3U-2025 \u2014", outside);

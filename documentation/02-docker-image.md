@@ -280,7 +280,12 @@ graphs](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170
   `jsdom ^23`, `svgo ^3` and `memfs ^4`, and svgo shapes every drawing, so
   an unpinned install would change pictures under teachers. Measured:
   **133 packages, 5,445 files, 39.8 MB of files (57 MB on ext4), 14.4 MB
-  compressed.** It is NEVER copied into a site — the site carries only the
+  compressed.** The same lockfile on NTFS, in the Windows runtime's
+  `runtime\vendor\tikz-engine` (#503, measured 2026-10-15 on an i5-8365U,
+  Windows 11 Pro 26200): 133 packages, 5,450 files (5,448 under
+  `node_modules` plus the folder's `package.json` and lockfile), 40,838,241
+  bytes —
+  [12 → Diagrams and graphs](12-windows-app.md#diagrams-and-graphs-485-e1-v170-the-runtime-carries-the-engines-503). It is NEVER copied into a site — the site carries only the
   Computer Modern faces its drawings use (`static/tikz`, about 30 KB a face)
   — and it is deliberately not called `tikz`, the name of that fonts folder,
   so one slip into `GATED_ASSETS` cannot ship 39 MB into a site (review S8).

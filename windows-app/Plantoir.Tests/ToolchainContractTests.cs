@@ -98,17 +98,32 @@ public class ToolchainContractTests
         string recipe = File.ReadAllText(
             Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
 
-        int checked_ = 0;
-        foreach (var pin in doc["pins"]!.AsArray())
-        {
-            if (pin?["windowsRuntimeContains"]?.ToString() is not { } expected) continue;
-            string name = pin["pin"]!.ToString();
-            string value = pin["value"]!.ToString();
-            string why = pin["why"]?.ToString() ?? "";
+        var watched = doc["pins"]!.AsArray()
+            .Where(pin => pin?["windowsRuntimeContains"] is not null)
+            .Select(pin => (
+                name: pin!["pin"]!.ToString(),
+                value: pin["value"]!.ToString(),
+                expected: pin["windowsRuntimeContains"]!.ToString(),
+                why: pin["why"]?.ToString() ?? ""))
+            .ToList();
 
+        // A pin for a runtime piece a later batch brings (#496, #503) is held
+        // open by name: its recipe check is skipped, and the ledger fails the
+        // day the recipe starts carrying it.
+        var deferred = NamedGapLedger.GapsIn(
+            NamedGapLedger.ToolchainRuntimePins,
+            watched.Select(pin => pin.name),
+            watched.Where(pin => recipe.Contains(pin.expected, StringComparison.Ordinal)).Select(pin => pin.name));
+
+        int checked_ = 0;
+        foreach (var (name, value, expected, why) in watched)
+        {
+            // The contract agreeing with itself is checked for EVERY pin,
+            // ledgered or not: that half is not this app's to owe.
             Assert.True(expected.Contains(value, StringComparison.Ordinal),
                 $"{name}: the contract watches fetch-runtime.ps1 for \"{expected}\", which does " +
                 $"not carry the pinned version {value}. {why}");
+            if (deferred.Contains(name)) continue;
             Assert.True(recipe.Contains(expected, StringComparison.Ordinal),
                 $"{name}: windows-app/Vendor/fetch-runtime.ps1 does not pin {expected}. {why}");
             checked_++;
@@ -117,6 +132,42 @@ public class ToolchainContractTests
         Assert.True(checked_ > 0,
             "No pin in contracts/toolchain.json names a windowsRuntimeContains any more. " +
             "The two fetch paths can drift again the moment nothing holds them together.");
+    }
+
+    /// <summary>
+    /// fetch-runtime.ps1 decides whether runtime\vendor is current by
+    /// comparing the manifest against its <c>$&lt;Name&gt;Version</c>
+    /// variables, while the addresses it fetches are written out in full. A
+    /// pin bump that edited one and not the other would never fetch the new
+    /// bytes, or record old bytes under the new version (batch 5A review,
+    /// L2). The script refuses when an address and its variable disagree;
+    /// this holds each variable against the version in the contract's
+    /// <c>windowsRuntimeContains</c>.
+    /// </summary>
+    [Fact]
+    public void TheWindowsRuntimeRecipesVendorVersionsAreTheContracts()
+    {
+        var doc = ContractLoader.LoadJson("toolchain.json");
+        string recipe = File.ReadAllText(
+            Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
+        var vendorPins = new[] { "pagedjs", "latinModern", "functionPlot", "nodeTikzjax" };
+
+        foreach (string name in vendorPins)
+        {
+            var pin = doc["pins"]!.AsArray().First(p => p?["pin"]?.ToString() == name)!;
+            string contains = pin["windowsRuntimeContains"]!.ToString();
+            string variable = "$" + char.ToUpperInvariant(name[0]) + name[1..] + "Version";
+            var match = System.Text.RegularExpressions.Regex.Match(recipe,
+                System.Text.RegularExpressions.Regex.Escape(variable) + @"\s*=\s*""([^""]*)""");
+            Assert.True(match.Success, $"fetch-runtime.ps1 no longer sets {variable}.");
+            // The version is the one inside the contract's
+            // windowsRuntimeContains (latinModern's `value` is the apt
+            // package's NAME, fonts-lmodern; its version lives only there).
+            string version = match.Groups[1].Value;
+            Assert.True(version.Length > 0 && contains.Contains(version, StringComparison.Ordinal),
+                $"fetch-runtime.ps1 sets {variable} = \"{version}\", but the contract's windowsRuntimeContains " +
+                $"for {name} is \"{contains}\": the two name different versions.");
+        }
     }
 
     [Fact]

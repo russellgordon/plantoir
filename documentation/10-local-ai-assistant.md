@@ -3631,7 +3631,14 @@ naming every phrasing.
   `startPreview` / `runLauncherDirectly` onto whatever each app calls them.
   Two `given` flags decide the interesting cases: `sectionWindowOpen: false`
   is the headless path (`Plantoir.Mcp`, and a scheduled deploy), and
-  `previewRunning: true` is the case Windows currently gets wrong.
+  `previewRunning: true` is the case Windows once got wrong (it passes on
+  both platforms now — `AssistScenarioTests` runs it with the flag).
+- **An assistant's `startPreview` opens the FRONT page**, whatever the
+  Preview setting says: only a teacher's own press of Preview can ask for
+  the page last viewed (#504 on the mac, #514 on Windows;
+  `shared-rules.json` → `previewStartPage.rule`), and the assistant's
+  restart is one of the app's own loads, so it never changes the page
+  remembered either.
 - **Replies are NAMED, not quoted** — `wording.deployed`, not the sentence.
   Look them up in the wording file and substitute `{course}` and `{section}`
   yourself. A test that quotes its own copy of a sentence is how this problem
@@ -4429,18 +4436,20 @@ real path uses, a second test in `HeadlessDeployAnswersTests` runs
 echoes the contract's refusal and exits 1 — so the wiring from runner text to
 answer is exercised, not only the reading (the plan review's finding 4).
 
-**The seventh case, and why it is not `appliesOn`.** The mac rebuilds after
-hiding ONE page; Windows does not (#479, open). The single-page
-`unpublish_pages` case was added to the contract from the mac, and it is red on
-Windows until #479 decides whether a hide rebuilds. It is deliberately NOT
+**The seventh case, and why it was never `appliesOn`.** The mac rebuilds after
+hiding ONE page; Windows did not until #479. The single-page
+`unpublish_pages` case was added to the contract from the mac, and was red on
+Windows until #479 settled whether a hide rebuilds. It was deliberately NOT
 marked `appliesOn: ["mac"]`: `contracts/README.md`'s "four ways out" rejects
 recording as chosen a difference one side still owes, and `appliesOn` has no
-mend-check — the day Windows fixed #479 nobody would be told the case could
-run. Windows holds it open by name in `NamedGapLedger` against #479 instead
-(the plan review's finding 1; a comment on #479 says so).
+mend-check — the day Windows fixed #479 nobody would have been told the case
+could run. Windows has rebuilt after a hide since 2026-10-15 (#479; nothing had
+chosen the old behaviour, see `documentation/12-windows-app.md` → the #471
+bullet), and the case runs green on both.
 
 **Rejected.** Mirroring Windows' "Nothing was changed, and the preview
-couldn't be built: …" word for word: on the page and unit paths that phrase
+couldn't be built: …" word for word (a sentence Windows itself stopped saying on
+2026-10-15, when it adopted the two keys below): on the page and unit paths that phrase
 would follow "Done: …" and be false, and one key serving all three mac paths
 is worth more than identical text on one of them. The contract pins only
 that the lifted line is said whole, without the cross and without
@@ -4449,9 +4458,14 @@ that the lifted line is said whole, without the cross and without
 and taken out again: nothing read it, since `bringThePreviewUpToDate` returns
 only the message.
 
-**What Windows owes (#481):** declare the two new wording keys with identical
-text, or `ContractTests` fails on a key it lacks; then say them where its
-server still composes these answers inline. **Rename:** the mac has no
+**What Windows owed (#481), done 2026-10-15:** it declares the two new wording
+keys with identical text and says them from `AssistWorkspace.RebuildPreview`,
+`Apply` and `ApplyWholeUnit` through one helper, `PreviewDidNotBuildHere` — the
+detail is in `documentation/12-windows-app.md` → the #471 bullet. One
+difference stays the mac's to close: Windows also says a rebuild that stopped
+for a question (exit 3) as `previewBuildNeedsAnAnswer` on the page and unit
+paths (#478), and the mac's `carryOut` does not yet count that sentence as
+"the preview was left as it was". **Rename:** the mac has no
 unit-rename assistant tool, so the issue's fourth bullet has nothing to meet
 here. **No new trail event:** the launcher's refusal line is already recorded.
 
@@ -5259,8 +5273,11 @@ Two details that make the backups usable rather than merely present:
   can tell what made each one and why — Plantoir before an assistant chat
   about a particular section, or themselves on purpose. A list of five
   identical-looking timestamps is not a choice anybody can make.
-- **Prune only the ASSISTANT's own backups**, keeping its five most recent
-  per course — and, since 2026-09-10, only those whose stamp could be true.
+- **Prune only the ASSISTANT's and the Section menu's own backups**, keeping
+  the five most recent of EACH per course, counted apart (the menu's
+  `_menu-section<N>` copies since #457 batch B on the mac and #489 on
+  Windows, so a busy afternoon of menu changes never prunes away the
+  assistant's copy from before a chat) — and, since 2026-09-10, only those whose stamp could be true.
   The date lives in the file NAME, this list is sorted by it and its tail is
   thrown away, so a name stamped in another machine's calendar (2569, on a
   zip carried from a pre-fix Thai Mac) would sort as the newest thing in the
@@ -5271,9 +5288,10 @@ Two details that make the backups usable rather than merely present:
   they were about to do something they were unsure of — and deleting it on a
   schedule they never agreed to is the app overruling them about their own
   work. The assistant's are different in kind: it saves one per conversation
-  whether or not anybody asked, so clearing up after itself is its job. A
-  teacher with twenty of their own keeps all twenty, and they never crowd out
-  the assistant's five, because the two are counted separately.
+  whether or not anybody asked, so clearing up after itself is its job — and
+  so are the menu's, which it saves before every change. A teacher with
+  twenty of their own keeps all twenty, and they never crowd out the
+  assistant's five or the menu's five, because each is counted separately.
 - And prune ONLY backups at that: archives and the wizard's own zips live in
   the same folder and their parsers deliberately reject each other's forms.
 - **The zip runs off the main actor, and the window says what the wait is**
@@ -6816,8 +6834,10 @@ asks them to sign in).
 
 ### On Windows (#210, 2026-09-30)
 
-"Revise with Codex…" is in the section and course menus beside "Revise with
-Claude…", each hidden independently (`CodexLauncher.IsAvailable`,
+Codex… is in the section and course menus beside Claude… — inside Revise
+With ▸ since #491 (2026-10-15), with the menu bar's titles; until then
+"Revise with Codex…" and "Revise with Claude…" at the top level — each hidden
+independently (`CodexLauncher.IsAvailable`,
 `Plantoir.Core/Assist/CodexLauncher.cs`). It finds `codex.exe`, `codex.cmd` or
 `codex.bat` on PATH, then `%USERPROFILE%\.local\bin\codex.exe`,
 `%APPDATA%\npm\codex.cmd` and `%USERPROFILE%\.bun\bin\codex.exe`, and passes the
@@ -7486,9 +7506,11 @@ before changing it:
   with "with no backup, because one could not be made" on the trail. Every other
   Windows write refuses instead; this one follows the mac because the page is
   never on the site and the undo entry still holds the previous text.
-- **No reference-course gate yet**: Windows has no courses kept for reference
-  (#241). When it does, the PLAN must refuse one, as the mac's does, or it
-  promises what the write will refuse.
+- **No reference-course gate on the PLAN yet (#540)**: Windows has had courses
+  kept for reference since #241, and `ReferenceWriteGate` refuses the WRITE on
+  one, but `plan_write_how_i_teach` is read-only and so is never gated — the
+  plan can promise what the write will refuse. The plan must refuse one, as the
+  mac's does; #540 tracks it.
 - **`PLANTOIR_KEPT_OFF:`** is read from a watched console (`ScriptRunner`) and
   from a scheduled publish's record (`ScheduledHealthFindings`, the wrapper's
   scan now keeps the line), and hidden from the console a teacher reads

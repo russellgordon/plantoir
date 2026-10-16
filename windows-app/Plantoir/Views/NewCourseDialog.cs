@@ -228,6 +228,18 @@ public sealed class NewCourseDialog : ContentDialog
         {
             if (args.SelectedItem is CourseCodeSuggestion chosen) sender.Text = chosen.Code;
         };
+        // Escape is never trapped (#491 item 1): measured, the AutoSuggestBox
+        // swallows every Escape. With its list drawn the press closes the list;
+        // otherwise the wizard closes by its Cancel route, discarding what was
+        // typed (the HIG's answer for a Cancel with no question; the mac's too).
+        _codeBox.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key != Windows.System.VirtualKey.Escape) return;
+            if (PickerEscape.For(_codeBox.IsSuggestionListOpen) != PickerEscape.Result.LetTheDialogHaveIt) return;
+            args.Handled = true;
+            if (_creator.IsCreating) _creator.Runner.StopByUser();   // what OnCloseButton does
+            Hide();
+        };
 
         Title = "New Course or Club";
         // From Plantoir.Core, not a literal, so an ordinary `dotnet test` run
@@ -237,8 +249,16 @@ public sealed class NewCourseDialog : ContentDialog
         // thread — so a string that must FAIL when it drifts has to live there.
         PrimaryButtonText = WizardWording.Panel(isClub: false).CreateButton;
         CloseButtonText = "Cancel";
-        DefaultButton = ContentDialogButton.Primary;
+        // Create Course NEVER takes Enter (#491 item 2; measured on the mac,
+        // 2026-10-08): as the default, an Enter typed in the code field created
+        // a course named by the code with the rest of the form unread. It wears
+        // the accent while it can be pressed (RefreshCreateEnabled), and a long
+        // form is finished with a click.
+        DefaultButton = ContentDialogButton.None;
         PrimaryButtonClick += OnPrimaryButton;
+        // The cursor starts in Course code, as on the mac and as Copy a Page
+        // opens; the suggestion list stays closed until something is typed.
+        Opened += (_, _) => _codeBox.Focus(FocusState.Programmatic);
         CloseButtonClick += OnCloseButton;
 
         _validationText = new TextBlock
@@ -355,8 +375,9 @@ public sealed class NewCourseDialog : ContentDialog
         bool codeOk = _codeBox.Text.Trim().Length > 0 && CourseCodeProblem() is null;
         bool sectionsOk = SectionNumbersProblem(_sectionsBox.Text) is null;
         bool publishingOk = _publishingChoice?.Problem is null;   // a bad folder blocks Create (row 102)
-        IsPrimaryButtonEnabled = codeOk && sectionsOk && publishingOk && UnitWordIsUsable
-                                 && (!IsClub || ClubClassFolderProblem() is null);
+        DialogButtons.EnablePrimary(this,
+            codeOk && sectionsOk && publishingOk && UnitWordIsUsable && (!IsClub || ClubClassFolderProblem() is null),
+            PrimaryKind.NeverTakesEnter);
     }
 
     /// <summary>
@@ -616,11 +637,16 @@ public sealed class NewCourseDialog : ContentDialog
                 _additionalDeployTargets = CourseConfiguration.PruningAdditionalTargets(_additionalDeployTargets, v);
             },
             () => _deployFolderPath, v => _deployFolderPath = v,
+            // Shown, not edited: the ID is changed in File ▸ Settings ▸
+            // Deploying (#491), and Open Settings… beside it raises that
+            // window while this one stays open, so nothing typed is lost.
             () => _window.Workspace.Settings.CloudflareAccountId,
-            v => { _window.Workspace.Settings.CloudflareAccountId = v; _window.Workspace.Settings.Save(); },
             () => _additionalDeployTargets,
             v => _additionalDeployTargets = v.ToList());
         _publishingChoice.Changed += RefreshCreateEnabled;
+        // With no ID, Create stays refused with the contract's sentence beside
+        // Open Settings…; an ID typed in Settings enables it at once.
+        _publishingChoice.AccountRefreshed += RefreshCreateEnabled;
         form.Children.Add(_publishingChoice.Root);
 
         // -------- Structure (long lists stay collapsed) --------
@@ -1203,7 +1229,7 @@ public sealed class NewCourseDialog : ContentDialog
                 <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}"
                         CornerRadius="8" Padding="6,1,6,1" VerticalAlignment="Center"
                         Visibility="{Binding BadgeVisibility}">
-                  <TextBlock Text="Example content" FontSize="10" Foreground="White"/>
+                  <TextBlock Text="Example content" FontSize="12" Foreground="White"/>
                 </Border>
               </Grid>
             </DataTemplate>
@@ -1505,13 +1531,14 @@ public sealed class NewCourseDialog : ContentDialog
         // The closing button is present throughout so the footer never
         // reflows; it becomes usable once the work ends.
         PrimaryButtonText = "Close";
-        IsPrimaryButtonEnabled = false;
+        DialogButtons.EnablePrimary(this, false);
         CloseButtonText = "Cancel";
     }
 
     private void FinishProgress()
     {
-        IsPrimaryButtonEnabled = true;
+        // The work is over and nothing is left to type: Close is the default now.
+        DialogButtons.EnablePrimary(this, true);
         CloseButtonText = "";
     }
 

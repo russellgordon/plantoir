@@ -232,7 +232,7 @@ public class HowITeachTests : IDisposable
         File.WriteAllText(PagePath, "Words.\n");
         Assert.Contains(AssistWording.HowITeachListedAsWritten, new PlantoirTools(Open()).ListCourses());
 
-        var window = new AssistWorkspace(_folder, new FakeLauncher()) { ServesTheLocalWindow = true };
+        var window = new AssistWorkspace(_folder, new FakeLauncher()) { Surface = AssistSurface.LocalWindow };
         Assert.DoesNotContain("How I Teach", new PlantoirTools(window).ListCourses());
     }
 
