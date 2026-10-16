@@ -434,7 +434,7 @@ struct AssistPublishPlan {
     ///
     /// Rows come in this order: the changes, in plan order (named pages,
     /// then linked ones); the pages an unpublish keeps; the classes a
-    /// publish left hidden; the pages with no room for a key; the pages
+    /// publish left as they are; the pages with no room for a key; the pages
     /// already the way they were asked to be. None of them is capped.
     func tabulated(noun: ClassNoun, fromTheMenu: Bool, courseDirectoryURL: URL) -> AssistPlanTable {
         var rows: [AssistPlanTable.Row] = []
@@ -465,7 +465,7 @@ struct AssistPublishPlan {
                    AssistWording.planStaysVisibleBecause(staying.reason.finishing(noun: noun)))
         }
         for page in linkedClassesLeftAlone {
-            addRow(page, .staysHidden, AssistWording.menuPlanStaysHidden(noun: noun))
+            addRow(page, .staysAsItIs, AssistWording.menuPlanStaysAsItIs(noun: noun))
         }
         for page in noRoomForAKey {
             addRow(page, .staysExactlyAsItIs, AssistWording.menuPlanStaysExactlyAsItIs)

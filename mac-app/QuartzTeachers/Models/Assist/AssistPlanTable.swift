@@ -8,7 +8,7 @@ import Foundation
 /// parse would be a second reader of a format that changes.
 ///
 /// Every page the plan is about gets a row, not only the ones that change:
-/// the pages an unpublish keeps, the classes a publish left hidden, the pages
+/// the pages an unpublish keeps, the classes a publish left as they are, the pages
 /// whose settings have no room for a key, and the pages already the way they
 /// were asked to be. The card stopped at fifteen ("…and N more"); the table
 /// does not stop.
@@ -24,7 +24,7 @@ nonisolated struct AssistPlanTable: Sendable, Equatable {
         case willBecomeVisible
         case willBecomeHidden
         case staysVisible
-        case staysHidden
+        case staysAsItIs
         case staysExactlyAsItIs
         case alreadyVisible
         case alreadyHidden
@@ -68,7 +68,7 @@ nonisolated struct AssistPlanTable: Sendable, Equatable {
     let rows: [Row]
 
     /// The card's sentences that are not one page and one change — pages
-    /// left alone and why, linked classes left hidden, a date move with no
+    /// left alone and why, linked classes left as they are, a date move with no
     /// page of its own, names that fit no page — word for word as the card
     /// says them.
     let notes: [String]

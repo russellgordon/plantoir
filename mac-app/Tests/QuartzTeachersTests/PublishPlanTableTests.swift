@@ -187,6 +187,39 @@ final class PublishPlanTableTests: XCTestCase {
         XCTAssertTrue(outcome.forTheCard.contains(sentence))
     }
 
+    /// A linked class a publish leaves alone has a row worded as the card
+    /// words it — "as it is", never "hidden" — because one whose flag the
+    /// app will not read is listed too, and the app counts that page as
+    /// visible (#524's implementation review, M1). Both kinds are here: a
+    /// hidden class, and one whose flag sits on the line below its key.
+    func testALinkedClassLeftAloneStaysAsItIs() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false",
+                                body: "See [[Unit 1, Day 2]] and [[Unit 1, Day 3]].", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "false", date: "2026-09-09", body: "Two.", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 3", publish: "\n  true", date: "2026-09-10", body: "Three.", in: made.course)
+        let outcome: AssistToolOutcome = await made.runner.run(call: SectionVerbs.publishPages(
+            course: "ICS3U", section: 1, names: ["section1/All Classes/Unit 1, Day 1"], planning: true
+        ))
+        let table: AssistPlanTable = try XCTUnwrap(outcome.planTable, outcome.forTheCard)
+        var leftAlone: [String] = []
+        for row in table.rows where row.change == .staysAsItIs {
+            XCTAssertEqual(row.whatChanges, AssistWording.menuPlanStaysAsItIs(noun: .class))
+            leftAlone.append(row.title)
+        }
+        XCTAssertEqual(leftAlone.sorted(), ["Unit 1, Day 2", "Unit 1, Day 3"], outcome.forTheCard)
+        var listed: [String] = []
+        for page in ["Unit 1, Day 2", "Unit 1, Day 3"] {
+            listed.append(page)
+        }
+        XCTAssertTrue(table.notes.contains(AssistWording.linkedClassesWereLeftAlone(
+            AssistPublishPlan.listing(listed), count: 2, noun: .class
+        )), "\(table.notes)")
+    }
+
     /// Only a page plan asked for from the menu carries rows: not Re-date,
     /// and not the assistant's plan of the same pages.
     func testOnlyAMenuPagePlanCarriesATable() async throws {
