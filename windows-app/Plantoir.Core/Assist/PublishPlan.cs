@@ -104,10 +104,7 @@ public sealed class PublishPlan
     {
         get
         {
-            var worth = StoppedAtClasses
-                .Where(page => !(page.IsVisibleToStudents && page.VisibilityIsCertain))
-                .Select(page => page.DisplayTitle)
-                .ToList();
+            var worth = LeftAlonePages.Select(page => page.DisplayTitle).ToList();
             return worth.Count switch
             {
                 0 => null,
@@ -116,6 +113,39 @@ public sealed class PublishPlan
             };
         }
     }
+
+    /// <summary>
+    /// The linked classes a publish stopped at that students cannot CERTAINLY
+    /// see — the ones <see cref="LeftAloneSentence"/> names, and the ones the
+    /// menu's table lists as staying as they are (#548).
+    /// </summary>
+    public IReadOnlyList<PlannedPage> LeftAlonePages =>
+        StoppedAtClasses.Where(page => !(page.IsVisibleToStudents && page.VisibilityIsCertain)).ToList();
+
+    /// <summary>
+    /// The classes a changing page takes its date from, matched by PATH, in
+    /// the plan's order — the clause the card says beside the change and the
+    /// table says in its cell (#548).
+    /// </summary>
+    internal IReadOnlyList<string> ClassesWhoseDatesAreTakenBy(PlannedChange change) =>
+        DateMoves.Where(m => string.Equals(m.Page.RelativePath, change.Page.RelativePath, StringComparison.OrdinalIgnoreCase))
+                 .Select(m => m.TakenFrom)
+                 .ToList();
+
+    /// <summary>The date moves whose page is not one of the changes, said on their own lines.</summary>
+    internal IReadOnlyList<PlannedDateMove> OrphanedDateMoves()
+    {
+        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.RelativePath), StringComparer.OrdinalIgnoreCase);
+        return DateMoves.Where(m => !namedAlready.Contains(m.Page.RelativePath)).ToList();
+    }
+
+    /// <summary>A date move with no change of its own, as the card and the table's notes say it.</summary>
+    internal static string OrphanedDateMoveLine(PlannedDateMove move) =>
+        $"{move.Page.Named} will take the same date as “{move.TakenFrom}”.";
+
+    /// <summary>The names the teacher gave that fit no page of the section.</summary>
+    internal static string NoPageIsCalledLine(IReadOnlyList<string> unknownNames) =>
+        $"No page in this section is called {Listing(unknownNames)}.";
 
     public IEnumerable<PlannedPage> Named => NamedPages.Count > 0 ? NamedPages : Pages.Where(p => !p.ViaLink);
     public IEnumerable<PlannedPage> Linked => Pages.Where(p => p.ViaLink);
@@ -170,7 +200,7 @@ public sealed class PublishPlan
         }
         else if (Changes.Count == 0)
         {
-            lines.Add("No page's visibility would change.");
+            lines.Add(AssistWording.PlanNothingWouldChange);
         }
         else
         {
@@ -184,13 +214,7 @@ public sealed class PublishPlan
                     lines.Add($"…and {Changes.Count - listed} more.");
                     break;
                 }
-                string becoming = change.WillBeVisible ? "visible" : "hidden";
-                string line = $"{change.Page.Named} will become {becoming}";
-                foreach (var move in DateMoves.Where(m => string.Equals(m.Page.RelativePath, change.Page.RelativePath, StringComparison.OrdinalIgnoreCase)))
-                {
-                    line += $", with the same date as “{move.TakenFrom}”";
-                }
-                lines.Add(line + ".");
+                lines.Add($"{change.Page.Named} {AssistWording.PlanWillBecome(change.WillBeVisible, ClassesWhoseDatesAreTakenBy(change))}.");
                 listed++;
             }
         }
@@ -220,7 +244,7 @@ public sealed class PublishPlan
                     lines.Add($"…and {Kept.Count - listed} more.");
                     break;
                 }
-                lines.Add($"{staying.Page.Named} stays visible, because {staying.Reason}");
+                lines.Add($"{staying.Page.Named} {AssistWording.PlanStaysVisibleBecause(staying.Reason)}");
                 listed++;
             }
         }
@@ -231,21 +255,20 @@ public sealed class PublishPlan
             lines.Add(leftAlone);
         }
 
-        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.RelativePath), StringComparer.OrdinalIgnoreCase);
-        var orphaned = DateMoves.Where(m => !namedAlready.Contains(m.Page.RelativePath)).ToList();
+        var orphaned = OrphanedDateMoves();
         if (orphaned.Count > 0)
         {
             lines.Add("");
             foreach (var move in orphaned)
             {
-                lines.Add($"{move.Page.Named} will take the same date as “{move.TakenFrom}”.");
+                lines.Add(OrphanedDateMoveLine(move));
             }
         }
 
         if (UnknownNames.Count > 0)
         {
             lines.Add("");
-            lines.Add($"No page in this section is called {Listing(UnknownNames)}.");
+            lines.Add(NoPageIsCalledLine(UnknownNames));
         }
 
         return string.Join("\n", lines);
