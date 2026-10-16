@@ -1211,6 +1211,14 @@ public sealed partial class CourseSettingsView : UserControl
             sketchBottomLeft.Text = sketch.BottomLeft;
             sketchBottomRight.Text = sketch.BottomRight;
         }
+        // The ids go on the four TextBlocks, not on the box: a Border (and a
+        // Grid) has no automation peer in WinUI, so an id on the box is never
+        // offered to UI Automation (measured 2026-10-15, the first unlocked
+        // run of CourseSettingsPrintingUiTests: "Never found the corner sketch").
+        AutomationProperties.SetAutomationId(sketchTopLeft, "printCornersSketch_topLeft");
+        AutomationProperties.SetAutomationId(sketchTopRight, "printCornersSketch_topRight");
+        AutomationProperties.SetAutomationId(sketchBottomLeft, "printCornersSketch_bottomLeft");
+        AutomationProperties.SetAutomationId(sketchBottomRight, "printCornersSketch_bottomRight");
 
         var schoolNameField = new TextBox { Text = Config.PrintSchoolName, MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left };
         AutomationProperties.SetAutomationId(schoolNameField, "printSchoolNameField");
@@ -1280,7 +1288,6 @@ public sealed partial class CourseSettingsView : UserControl
         sketchGrid.Children.Add(sketchBottomRight);
         var sketchBox = FormBuilders.SampleBox(sketchGrid);
         sketchBox.Margin = new Thickness(0, 10, 0, 0);
-        AutomationProperties.SetAutomationId(sketchBox, "printCornersSketch");
         RefreshSketch();
         Form.Children.Add(sketchBox);
         Form.Children.Add(FormBuilders.ExampleCaption(CourseSettingsWording.PrintingCaption));

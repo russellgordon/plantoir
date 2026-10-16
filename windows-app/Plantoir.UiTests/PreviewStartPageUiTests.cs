@@ -150,7 +150,16 @@ public class PreviewStartPageUiTests
         app.BringToFront();
         var button = app.Find("previewButton", "the Preview button");
         Keyboard.Press(VirtualKeyShort.ALT);
-        try { app.ClickMiddleOf(button); }
+        try
+        {
+            app.ClickMiddleOf(button);
+            // Held a moment past the click, as a hand does: WinUI raises Click
+            // from its own input queue, after the mouse's button is up, and
+            // the press reads the keyboard THEN. Released at once (measured
+            // 2026-10-15, the first unlocked run, twice), the press read Alt
+            // as up and opened the front page.
+            Thread.Sleep(500);
+        }
         finally { Keyboard.Release(VirtualKeyShort.ALT); }
 
         Assert.True(app.WaitAnsweringDialogs(() => Loaded(app).Contains("/" + Page), LongEnoughToBuild),
@@ -177,8 +186,14 @@ public class PreviewStartPageUiTests
         var link = Retry.WhileNull(() => app.Window.FindFirstDescendant(cf =>
             cf.ByControlType(ControlType.Hyperlink).And(cf.ByName("Lesson Marker"))), TimeSpan.FromSeconds(60)).Result;
         Assert.True(link is not null, "the web view's accessibility tree never offered the link (seen in 3 of 8 bundle-11 runs; re-run alone)");
+        // The harness's window is short at 150% on a 1920 x 1080 screen
+        // (measured 2026-10-15, the first unlocked run: the link sat below
+        // the pane, "Lesson Marker is off screen"), so the page is scrolled
+        // to the link first, as a teacher would.
+        link!.Patterns.ScrollItem.PatternOrDefault?.ScrollIntoView();
+        Assert.True(Retry.WhileTrue(() => link.IsOffscreen, TimeSpan.FromSeconds(5)).Result, "the link could not be scrolled into view");
         app.BringToFront();
-        app.ClickMiddleOf(link!);
+        app.ClickMiddleOf(link);
         Assert.True(Retry.WhileFalse(() => Remembered(app) == Page, TimeSpan.FromSeconds(15)).Result,
                     $"the teacher's click was not remembered; the store holds {Remembered(app) ?? "nothing"}");
 

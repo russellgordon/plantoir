@@ -46,16 +46,21 @@ public class CourseSettingsPrintingUiTests
         app.Find("printBlank_class_number", "the Class # switch").AsToggleButton().Toggle();
         Assert.True(Retry.WhileFalse(() => app.Find("saveButton", "Save").IsEnabled, TimeSpan.FromSeconds(3)).Result,
                     "turning a blank on did not enable Save");
-        Assert.Contains("Class #", app.Find("printCornersSketch", "the corner sketch").Name + string.Join(" ",
-            DrivenApp.TextsUnder(app.Find("printCornersSketch", "the corner sketch"))));
+        // The sketch's four corners are TextBlocks with ids of their own: the
+        // box around them is a Border, which UI Automation never sees.
+        string Corners() => string.Join(" | ", new[] { "topLeft", "topRight", "bottomLeft", "bottomRight" }
+            .Select(corner => app.Find("printCornersSketch_" + corner, "the corner sketch's " + corner).Properties.Name.ValueOrDefault ?? ""));
+        Assert.True(Retry.WhileFalse(() => Corners().Contains("Class #"), TimeSpan.FromSeconds(3)).Result,
+                    "the corner sketch never showed Class #: " + Corners());
         app.Find("saveButton", "Save").AsButton().Invoke();
         Assert.True(Retry.WhileFalse(() => app.Find("savedConfirmation", "the note beside Save").Name.StartsWith("Saved"),
                                      TimeSpan.FromSeconds(3)).Result);
 
         var saved = JsonNode.Parse(File.ReadAllText(Path.Combine(app.WorkspacePath, "courses", CourseFixtures.NeverAsked, "course_config.json")))!;
         Assert.Equal("[\"name\",\"date\",\"class_number\"]", saved["print_blanks"]!.ToJsonString());
-        Assert.Contains($"saved the settings for {CourseFixtures.NeverAsked}; printing: blanks Name, Date → Name, Date, Class #",
-                        MenuBar.Trail(app));
+        string line = $"saved the settings for {CourseFixtures.NeverAsked}; printing: blanks Name, Date → Name, Date, Class #";
+        Assert.True(Retry.WhileFalse(() => MenuBar.Trail(app).Contains(line), TimeSpan.FromSeconds(5)).Result,
+                    "the trail never said: " + line + " | It said: " + MenuBar.Trail(app));
     }
 
     [UiFact]
@@ -136,8 +141,15 @@ public class PreviewHandsLinksToTheBrowserUiTests
         var link = Retry.WhileNull(() => app.Window.FindFirstDescendant(cf =>
             cf.ByControlType(ControlType.Hyperlink).And(cf.ByName("Answer key"))), TimeSpan.FromSeconds(60)).Result;
         Assert.NotNull(link);
-        app.BringToFront();
-        link!.Click();
+        // Invoked through UI Automation, which in Chromium is the link's
+        // default action, a click: measured 2026-10-15, the first unlocked
+        // run, a MOUSE click at the point UI Automation reported for the link
+        // (scrolled into view, Plantoir in front) never reached it — the
+        // window went behind the terminal and nothing was handed over, three
+        // runs out of three — while Invoke reached NewWindowRequested at once.
+        // The harness's mouse and the web view's coordinates disagree on this
+        // 150% console; what this test proves is the hand-over, not the mouse.
+        link!.Patterns.Invoke.Pattern.Invoke();
 
         string opened = Path.Combine(app.StateDirectory, "links-opened.txt");
         Assert.True(Retry.WhileFalse(() => File.Exists(opened) && File.ReadAllText(opened).Contains("Key.pdf"), TimeSpan.FromSeconds(15)).Result,
