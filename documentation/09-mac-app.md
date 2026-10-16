@@ -3029,9 +3029,9 @@ all. They are Section menu items now, in two groups after Open in Browser:
 
 | Item | What it opens | The tool it runs |
 |---|---|---|
-| Publish Pages… | a searchable checklist of the hidden pages, classes first, then the plan | `plan_publish_pages`, then `publish_pages` |
+| Publish Pages… | a searchable checklist of the hidden pages, classes first, then the plan as a table (#524) | `plan_publish_pages`, then `publish_pages` |
 | Hide Pages… | the same, of the visible pages | `plan_unpublish_pages`, then `unpublish_pages` |
-| Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan | `plan_publish_class_on`, then `publish_class_on` |
+| Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan as a table (#524) | `plan_publish_class_on`, then `publish_class_on` |
 | Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
 | Undo Last Change | nothing: it runs and says what it put back | `undo_last_change` |
 | Add Next Class | nothing: the page arrives hidden and Undo Last Change takes it away (Russell's decision 11) | `add_next_class` |
@@ -3051,9 +3051,11 @@ function the model, a fixed phrasing and MCP all reach — on a runner whose
 surface is `.menu`. Never through a model. The reference-course gate and the
 outside-change hold sit in `run(call:)` before dispatch, so the menu meets
 them exactly as the assistant does. The ellipsis items show the plan twin's
-own card (`forTheCard`) before anything changes — the assistant's plan card
-in the menu's form — and a twin that refuses ends the sheet with its sentence
-and OK alone. Pages are named by their folder AND name, as a JSON array
+plan before anything changes — the assistant's plan card in the menu's form:
+Publish Pages…, Hide Pages… and Publish Class for a Date… as a table of every
+page (`planTable`, next section), Re-date Classes… and Make Room for
+Classes… as the card's own text (`forTheCard`) — and a twin that refuses
+ends the sheet with its sentence and OK alone. Pages are named by their folder AND name, as a JSON array
 (`section1/All Classes/Unit 2, Day 3`): every shipped course has five to nine
 `_DUPLICATE ME` pages, which a bare name refuses as ambiguous, and a name
 holding a semicolon is split in two by the tool's list reading (the plan
@@ -3104,6 +3106,130 @@ Last Change (it belongs to text editing in Edit, and a key that took back a
 page change from inside a text field would be a surprise nobody could undo);
 hiding the items on a course kept for reference (greyed, as every item is);
 a plan sheet for Add Next Class (it is undoable and the page arrives hidden).
+
+### The plan as a table (#524)
+
+Reported by Russell on 1.7.1: the plan stage of Section ▸ Publish Pages… was
+one run of text — "N pages would change:" and a line per page — which with a
+unit's worth of pages is a wall nobody reads. (The issue called it an alert;
+it was never one. It is `SectionVerbSheet`'s `.planned` stage, drawn from
+`forTheCard` in a `CappedScrollArea`.) Since #524 the three page plans —
+Publish Pages…, Hide Pages… and Publish Class for a Date… — show instead:
+
+- **a summary line**, `menuPlanSummary`: how many pages would change and how
+  many are already the way asked (`menuPlanSummaryHiding`,
+  `menuPlanSummaryOnePage` are the other shapes; none changing is
+  `planNothingWouldChange`). The pages an unpublish keeps are not in the
+  count: they are rows of their own, with their reason;
+- **a read-only `Table`**, columns `menuPlanPageColumn` /
+  `menuPlanFolderColumn` / `menuPlanChangeColumn`, one row for EVERY page the
+  plan is about, in plan order: the changes (`planWillBecomeVisible`,
+  `planWillBecomeHidden`, or `planWillBecome(visible:withTheDatesOf:)` when
+  the page takes a class's date — every date, as the card says them), then
+  the pages an unpublish keeps (`planStaysVisibleBecause` + the kept reason),
+  the classes a publish followed a link onto and left alone
+  (`menuPlanStaysAsItIs` — "as it is", as the card says it, not "hidden": a
+  linked class whose flag the app will not read is listed too), the pages whose settings have no room for a key
+  (`menuPlanStaysExactlyAsItIs`), and the pages already right
+  (`menuPlanAlreadyVisible` / `menuPlanAlreadyHidden`). The headers sort
+  (`KeyPathComparator`, plan order first — the `AllBackupsView` precedent);
+  a cell's tooltip carries its whole text. Folder is the choosing stage's
+  folder string (`StartOfYearPageNaming.folder`), which is what tells a
+  course's `_DUPLICATE ME` pages apart;
+- **the card's other sentences under it**, word for word: the no-room
+  sentence (`pagesWhoseSettingsCannotBeAddedToFromTheMenu`, which says where
+  to set those pages instead), `linkedClassesWereLeftAlone`, a date move with
+  no page of its own, and the names that fit no page.
+
+Cancel and the default button are unchanged.
+
+**The data path.** `AssistPublishPlan.tabulated(noun:fromTheMenu:courseDirectoryURL:)`
+sits beside `describe()` and reads the same stored properties, and the card's
+per-page words moved out of inline literals in `describe()` into the named
+`AssistWording` members above, so the card and the table are made of the
+same pieces. The three plan sites in `AssistToolRunner` put the table on
+`AssistToolOutcome.planTable` ONLY when the surface is `.menu`; every other
+outcome carries nil, so MCP, the local model and the assistant's Go/Cancel
+card are exactly what they were. `planTheChoice` copies it onto
+`SectionVerbSheetModel.planTable` beside `body`; Re-date and Make Room carry
+no table and keep the text card.
+
+**The card had a cap the table does not.** `describe()` lists at most 15
+changes and then "…and N more" — so a whole unit ticked from the menu showed
+fifteen of its pages. The card keeps that cap (it is also what the model
+reads); the table lists all of them
+(`PublishPlanTableTests.testEveryPageIsListedPastTheCardsFifteen`, 21 rows
+against the card's 15). The no-room note still names three pages and counts
+the rest (`listingAFew`); every one of them has a row, which is why that row
+exists.
+
+**Height: one budget for the stage.** The table shows 12 rows
+(`SectionVerbSheet.mostPlanRowsShown`; 12 × 24 + 28 + 2 = 318 pt, the
+measured bordered-table metrics in `ListTableMetrics`) and then scrolls
+inside itself; the notes have their own 120-pt cap. Twenty rows plus a 340-pt
+notes area, as first planned, came to roughly 1,000 pt with the title and the
+buttons, which on a 13-inch display puts Cancel and Publish below the window.
+The table is `.bordered(alternatesRowBackgrounds: true)`, the style those
+metrics were measured on.
+
+**Measured, not assumed:**
+
+- *The card did not move.* A characterisation run printed `describe()` for
+  every branch (changes, two date moves on one page, a shared title, already
+  right, no room, linked classes left alone, kept pages with all five
+  reasons, an orphaned date move, unknown names, more than 15 changes and
+  more than 15 kept), each with `fromTheMenu` true and false and with
+  `.class` and `.meeting`, plus the menu's three real plan cards and their
+  `detail` — 358 lines, identical before and after the move. A one-space
+  change in `planStaysVisibleBecause` changed 80 of them (176 diff lines), so the run
+  could see a change. `git diff contracts/` added 16 keys and changed none.
+  (The tool-surface digest, `scripts/test_tool_surface_digest.py`, only
+  hashes descriptions and schemas, so it is evidence that the tool surface did
+  not move, not that `detail` did not.)
+- *Return and Escape with the table focused.* In-process first:
+  `TableHost` makes the table first responder and sends the key to the
+  window; Return reached the default button and Escape reached Cancel, with
+  the table focused and without
+  (`testReturnPublishesAndEscapeCancelsWhileTheTableHasFocus`), and taking
+  `.keyboardShortcut(.cancelAction)` off Cancel turned it red — so the harness
+  can see a key go missing. Then in the real app (Debug build, `--state-dir`,
+  a scratch folder with stub launchers, macOS 26.6, 2026-10-16), driven with
+  System Events: a class linking 16 hidden concept pages and one visible one
+  (17 rows to change, 1 already visible, so the table scrolled); Tab put the
+  focus on the table (Accessibility reported `AXOutline` focused; Full
+  Keyboard Access on), and Escape closed the sheet with nothing written,
+  then Return, with the table again focused, published the 17 pages. A
+  table with no `selection:` does not take Return or Escape for itself, so
+  no `.onKeyPress`/`.onExitCommand` was needed. Measured in the same drive:
+  three equal columns cut "What changes" at about twenty letters, so the
+  columns are sized (Page 130, Folder 110, What changes 240 ideal); a long
+  date-move cell still truncates, and its tooltip carries it whole.
+
+**The trail is unchanged, deliberately.** `ran from a menu` still records
+`carried out` / `cancelled at the plan` / `changed nothing` and the pages
+ticked. The table changes how the plan is SHOWN, not what Publish does or how
+the sheet ends, so rule 5's "a changed behaviour changes its line" does not
+bite. Adding a count of the pages that would change was REJECTED: the line is
+about what the teacher did, not what the plan held. Read after the drive
+above: `Section ▸ Publish Pages… — cancelled at the plan, 1 page ticked` for
+the Escape, then the menu's backup line and `… — carried out, 1 page ticked`
+for the Return.
+
+**REJECTED:** parsing the card back into rows (titles hold quotes and commas,
+and a parse is a second reader of a format that changes); `SectionVerbs`
+calling `AssistPublishPlanner` itself (it would skip `run(call:)`'s
+reference-course gate and outside-change hold); putting the rows in `detail`
+(that moves the model's bytes — a routing change); a new alert or a second
+sheet (the existing sheet's stage changes what it draws; `SheetTitleScanTests`
+still counts 17 sheets); a selectable table (the rows are read, not chosen,
+and the page names are no longer selectable text — the notes still are);
+widening the sheet mid-flow (it stays 560); twenty rows before scrolling
+(above); the table on the assistant window's Go/Cancel card (a narrow chat
+bubble; it stays text, Russell's ruling 3); "will be hidden" for the column
+(the card's shipped "will become hidden" is kept, ruling 6).
+
+Windows: the layout is visual, so it went as a `windows` issue, not a
+contract case; the 16 keys reach Windows through `assist-wording.json`.
 
 ### Classes dated after the next class, at Deploy (#475)
 

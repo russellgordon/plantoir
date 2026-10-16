@@ -3948,7 +3948,8 @@ of the runner's eleven surface sites:
   after a publish that stopped part way, `restoreFromBackupPutsItBack` in place
   of `restoreSectionPutsItBack`. Kept as they are, and why: everything the
   model alone reads (`detail` — the menu shows `summary` and the plan's
-  `forTheCard`, never `detail`); `morePagesThanOneAreCalled` (unreachable: the
+  `forTheCard`, or since #524 for the three page plans its `planTable`,
+  built only on this surface — never `detail`); `morePagesThanOneAreCalled` (unreachable: the
   menu names pages by folder); `nextClassNeedsItsOwnPhrasing` and
   `mayIAskForYourDates` (the conversation's settlers and offers, never reached
   by a code-built call); the no-timetable refusals (the window asks for dates

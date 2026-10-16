@@ -92,7 +92,8 @@ final class SectionVerbs {
     // MARK: - Functions
 
     /// The plan twin's answer: what the change WOULD do, with nothing
-    /// written — the sheet's body, read from `forTheCard`.
+    /// written — the sheet's plan: `planTable` for the three page plans
+    /// (#524), the card's text, `forTheCard`, for the rest.
     func plan(_ call: AssistToolCall) async -> AssistToolOutcome {
         return await toolRunner.run(call: call)
     }
