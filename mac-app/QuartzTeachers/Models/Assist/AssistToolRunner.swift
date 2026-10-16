@@ -974,6 +974,18 @@ final class AssistToolRunner {
 
     // MARK: - The commonest request of all
 
+    /// The plan as rows for the Section menu's sheet (#524), or nil on any
+    /// other surface — the assistant's card is text, and the model is never
+    /// given a table — so an outcome off the menu is exactly what it was.
+    private func planTableForTheMenu(_ plan: AssistPublishPlan, in course: Course) -> AssistPlanTable? {
+        if surface != .menu {
+            return nil
+        }
+        return plan.tabulated(
+            noun: course.configuration.classNoun, fromTheMenu: true, courseDirectoryURL: course.directoryURL
+        )
+    }
+
     private func planPublishClassOn(_ arguments: [String: Any]) -> AssistToolOutcome {
         switch classPlan(arguments) {
         case .failure(let refusal):
@@ -984,7 +996,8 @@ final class AssistToolRunner {
                 plan: planned.plan.describe(),
                 card: planned.plan.describe(
                     noun: planned.located.course.configuration.classNoun, fromTheMenu: surface == .menu
-                )
+                ),
+                table: planTableForTheMenu(planned.plan, in: planned.located.course)
             )
         }
     }
@@ -1108,7 +1121,8 @@ final class AssistToolRunner {
                 plan: planned.plan.describe(),
                 card: planned.plan.describe(
                     noun: planned.located.course.configuration.classNoun, fromTheMenu: surface == .menu
-                )
+                ),
+                table: planTableForTheMenu(planned.plan, in: planned.located.course)
             )
         }
     }
@@ -1148,7 +1162,8 @@ final class AssistToolRunner {
                 plan: planned.plan.describe(),
                 card: planned.plan.describe(
                     noun: planned.located.course.configuration.classNoun, fromTheMenu: surface == .menu
-                )
+                ),
+                table: planTableForTheMenu(planned.plan, in: planned.located.course)
             )
         }
     }
