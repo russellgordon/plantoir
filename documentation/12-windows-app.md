@@ -751,9 +751,10 @@ each case on its own; two Section-menu names against #489) and
 ledgered scenario must still FAIL, checked per case through
 `NamedGapLedger.Holding`/`ClosedMessage`, and
 `TheLedgeredScenariosAreStillInTheContract` checks the other direction; three
-Deploy-question scenarios against #489). The ledger file is the live list, and
-it has been **empty** since batch 6 (#514) closed its last two entries the same
-day; `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
+Deploy-question scenarios against #489). The ledger file is the live list. It was
+**empty** once batch 6 (#514) closed its last two entries the same day, until
+2026-10-16, when mac 1.7.2's sixteen plan-table sentences (#524) went in
+against #548 (v1.7.2), whose piece adds the members with the table; `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
 keeps the rule exercised on made-up entries meanwhile.
 
 **From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
@@ -1346,7 +1347,8 @@ the mac: the school name, three switches (Name, Date, Class #), two pickers
 - **Getters never write, and a setter given what it would read back is a
   no-op.** `HasUnsavedChanges` compares the raw values, so a getter that
   tidied `["seat","class_number","name"]` into the file would open the course
-  dirty (`savingSettings.freshOpenCases`, case 9). And WinUI raises
+  dirty (`savingSettings.freshOpenCases`, case 9; case 10, a `print_blanks` of
+  null, since #537/#551). And WinUI raises
   `TextChanged` for text set in code, LATER, after the handler is attached —
   so "set the value before attaching the handler" is no guarantee for a text
   box, and a stored `"   "` school name would have been removed on open
@@ -5431,6 +5433,22 @@ up for the mac as a question (does its `rebuild_preview` restart a serving
 preview?). A page change from the menu follows the runner's rule for every
 client: a showing preview is stopped, the tool runs with `preview: false`,
 and the preview starts again.
+
+**How the shared scenario reaches this seam (#549, 2026-10-16).** The mac's
+#528 scenario ("rebuild with a preview serving stops it and starts it
+again") expects `stopPreview.begins`, `stopPreview.ends`, `startPreview`.
+Here the runner calls `RebuildPreviewInApp` and returns at once, so the
+runner never awaits the stop itself; `AssistScenarioTests` wires a fake that
+does what `RebuildPreviewAsync` does — await the stop when a preview is up,
+then start — and awaits that work before reading the events. The fake can
+only mirror the order; `SectionVerbsUiTests.RebuildPreviewRebuildsAServingPreview`
+pins the real window's. REJECTED: making the runner await
+`StopPreviewInAppAsync` and then call `ShowPreviewInApp`, so the harness
+would only note what the runner calls. `RebuildPreviewFor` is more than stop
+and show — it refuses while the folder is getting ready (#473), selects the
+section, and will not start a preview in a view replaced during the stop —
+and Section ▸ Rebuild Preview shares it, so splitting it into the runner
+would move those guards out of the window for both callers.
 
 **The dialog is ONE `ContentDialog`** (`Views/SectionVerbDialog.cs`) moving
 through Choose → Plan → Working → Result (Working says "Working…", and "Saving a
