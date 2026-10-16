@@ -2291,13 +2291,22 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// so a teacher who read "Show this to the teacher and ask before going
     /// ahead" was being addressed as though they were the model, about
     /// machinery, directly above the asking it described.
+    ///
+    /// <para>From the Section menu's server only, a plan also carries its
+    /// table in <c>_meta</c> (#548, <see cref="AssistToolAnswer.PlanTableKey"/>)
+    /// — beside the card, never instead of it, and never in the text content,
+    /// so the model's bytes do not move. The two answers above are not plans
+    /// and carry none.</para>
     /// </summary>
-    private CallToolResult Proposing(PublishPlan plan) =>
-        plan.NothingToDoSentence is { } already
-            ? Answering(already)
-            : (plan.ChangesNothing && plan.UnknownNames.Count > 0)
-                ? Answering(plan.Describe())
-                : Proposing(plan.Describe());
+    private CallToolResult Proposing(PublishPlan plan)
+    {
+        if (plan.NothingToDoSentence is { } already) return Answering(already);
+        if (plan.ChangesNothing && plan.UnknownNames.Count > 0) return Answering(plan.Describe());
+        var proposal = Proposing(plan.Describe());
+        if (workspace.SpeaksFromTheMenu)
+            proposal.Meta![AssistToolAnswer.PlanTableKey] = workspace.Tabulate(plan).ToJson();
+        return proposal;
+    }
 
 
     /// <summary>
