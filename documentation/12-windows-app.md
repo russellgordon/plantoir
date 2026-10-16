@@ -5386,15 +5386,17 @@ pinned:
   page is written it notes the change and throws an `AssistRefusal`:
   `PublishStoppedPartWay("the section's class dates", …)` with its way back,
   then "The pages already re-dated:" and the pages, which are the mac's words.
-  It is an `AssistRefusal` so that both callers ANSWER it: `re_date_classes`
-  through `Guarded`, and `roll_over_section` through its own `catch
-  (AssistRefusal)`. (The plan said the re-date's error reached the teacher
-  "through Guarded"; that was half true. `re_date_classes` did, and said
-  "That couldn’t be read: {error}", the sentence for a READ failure, about a
-  write. `roll_over_section` caught only `AssistRefusal`, so an `IOException`
-  left that tool as a protocol error.) `TimetableMemory.Write` runs BEFORE
-  the loop, so the remembered dates have changed even when no page has. That
-  is true on the mac too, and the "Nothing was changed" below is about pages.
+  It is an `AssistRefusal` so that both callers ANSWER it, each through its
+  own `catch (AssistRefusal)`: `re_date_classes` and `roll_over_section`.
+  Neither goes through `Guarded`. (The plan said the re-date's error reached
+  the teacher "through Guarded", and that was wrong. Before #550 both tools
+  let an `IOException` escape, and the teacher's assistant got the SDK's
+  generic "An error occurred invoking '…'" protocol error. Neither tool ever
+  said "That couldn’t be read".) Any OTHER `IOException` in the re-date
+  still escapes, for example one from `TimetableMemory.Write`; that predates
+  #550. `TimetableMemory.Write` runs BEFORE the loop, so the remembered dates
+  have changed even when no page has. That is true on the mac too, and the
+  "Nothing was changed" below is about pages.
 
 **A first write that fails says the mac's "Nothing was changed: {reason}"**
 (`AssistWorkspace.NothingWasChanged`, with "Plantoir doesn’t have permission
@@ -5418,7 +5420,8 @@ undo, and `UndidPartly`/`UndidPartlyFromTheMenu` contain those words too, so
 a partial undo read as a whole one. A second press after the edit is undone is
 partial AGAIN: the file the first press restored no longer matches what the
 change wrote, so it is skipped and the entry stays. The mac behaves the same,
-and a `decision` issue asks whether an entry that blocks the list for good is
+and a `decision` issue
+([#555](https://github.com/russellgordon/plantoir/issues/555)) asks whether an entry that blocks the list for good is
 right. Pinned by `SectionVerbsTests.APartialUndo_TookPartOfTheLastChangeBack`,
 `APublishThatStoppedPartWay_IsCarriedOut`,
 `AWholeUnitThatStoppedPartWay_IsCarriedOut`,

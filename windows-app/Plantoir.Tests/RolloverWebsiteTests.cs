@@ -651,8 +651,8 @@ public class RolloverWebsiteTests : IDisposable
     }
 
     /// <summary>
-    /// re_date_classes, through Guarded, says the same rather than "That
-    /// couldn’t be read" — the sentence a READ failure gets.
+    /// re_date_classes, through its own catch (AssistRefusal), says the same;
+    /// before #550 the IOException escaped it as a protocol error.
     /// </summary>
     [Fact]
     public async Task ReDateWhoseFirstWriteFails_SaysNothingWasChanged()

@@ -4069,8 +4069,9 @@ paths, each pinned. The undo ending comes from the depth the menu's server
 sends plus its `changed` flag, never from the sentence; it used to count
 "is put back", which the partial sentence also contains. Re-date Classes… that
 stops part way says `publishStoppedPartWay` with the pages already re-dated,
-on both `re_date_classes` and `roll_over_section`. Before, the first said
-"That couldn’t be read" and the second let the error escape. A first write
+on both `re_date_classes` and `roll_over_section`, each through its own
+`catch (AssistRefusal)`. Before, both let the `IOException` escape as the
+SDK's generic protocol error. A first write
 that fails says the mac's "Nothing was changed: …", and that now includes a
 publish or hide, which had said "Only part of …" for any write failure. One
 difference was Windows' alone: Make Room's add-a-new-page save was not carried
@@ -5166,7 +5167,8 @@ by `ClubNounTests.AClubsTeacherReadsMeeting` (the meeting form), and by a
 scenario PROPOSED from Windows, `assist-cases.json` → "the make-room card says
 Undo will not take it back when other classes move (proposed from Windows,
 #530)". All of these were red before the change and are green after
-(MEASURED). The scenario is expected green on the mac, and a `mac` issue asks
+(MEASURED). The scenario is expected green on the mac, and a `mac` issue
+([#553](https://github.com/russellgordon/plantoir/issues/553)) asks
 for that to be confirmed. REJECTED: an `insertion.undoRule.planWarns` list in
 `class-planning.json`. It would be a second structure for one rule, and the
 scenario pins the CARD, which is what #530 is about.

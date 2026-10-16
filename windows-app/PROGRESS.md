@@ -1,6 +1,6 @@
 # Plantoir for Windows — Progress
 
-## Where the app stands (2026-10-16, `dev` after Windows 1.7.1 shipped; branches `issue/551-red-suite-172` and `issue/547-wording-endings-172` in flight)
+## Where the app stands (2026-10-16, `dev` after Windows 1.7.1 shipped; branch `issue/547-wording-endings-172` in flight)
 
 Read this first; the dated entries below are history, newest first, and an earlier batch's "the ledger holds…" or "comes with #514" was true on its own day only.
 

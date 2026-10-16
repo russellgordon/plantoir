@@ -342,7 +342,8 @@ public class SectionVerbsTests : IDisposable
 
     /// <summary>
     /// A re-date whose FIRST write fails changed no page: the mac's "Nothing
-    /// was changed" (it said "That couldn’t be read"), and "changed nothing".
+    /// was changed" (the IOException used to escape the tool as a protocol
+    /// error), and "changed nothing".
     /// </summary>
     [Fact]
     public async Task ReDateWhoseFirstWriteFails_SaysNothingWasChanged()
