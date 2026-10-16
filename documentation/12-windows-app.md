@@ -1817,9 +1817,12 @@ What replaces the old container concepts:
         `PreviewBuildNeedsAnAnswer`/`DeployNeedsAnAnswer`. Both now check
         `NeededAnAnswer` first and say what was done, then
         `PreviewBuildNeedsAnAnswer` (`APublishOrHideWhoseRebuildStopsForAQuestionSaysSo`).
-        The mac's own runner has the matching gap one level up — its
-        `carryOut` counts the headless failure sentences as "the preview was
-        left as it was" but not the question — and owes it as a `mac` issue.
+        The mac's own runner had the matching gap one level up — its
+        `carryOut` counted the headless failure sentences as "the preview was
+        left as it was" but not the question — closed by #522 (2026-10-16):
+        the mac now names the preview only when it restarted it in its
+        window (`documentation/10-local-ai-assistant.md`). Windows has no
+        such sentence, so owes nothing.
       - **Unpublishing single PAGES never rebuilt (#479).** `Apply` returned
         before the build whenever the plan hid pages (`if (!plan.Publishes)`).
         Nothing chose that: since the first commit (b3b7fc040) `Apply` tied
