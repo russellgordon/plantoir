@@ -100,18 +100,22 @@ public sealed class PublishPlan
     /// read is not left out, because "already published" has to be something
     /// the app is sure of.
     /// </summary>
-    public string? LeftAloneSentence
+    public string? LeftAloneSentence => LeftAloneSentenceFor(ClassNoun.Class);
+
+    /// <summary>
+    /// <see cref="LeftAloneSentence"/> in the course's noun — the menu table's
+    /// note (#548). The card keeps the class form (a separate issue).
+    /// </summary>
+    internal string? LeftAloneSentenceFor(ClassNoun noun)
     {
-        get
+        var worth = LeftAlonePages.Select(page => page.DisplayTitle).ToList();
+        bool meeting = noun == ClassNoun.Meeting;
+        return worth.Count switch
         {
-            var worth = LeftAlonePages.Select(page => page.DisplayTitle).ToList();
-            return worth.Count switch
-            {
-                0 => null,
-                1 => AssistWording.LinkedClassWasLeftAlone(worth),
-                _ => AssistWording.LinkedClassesWereLeftAlone(worth),
-            };
-        }
+            0 => null,
+            1 => meeting ? AssistWording.LinkedClassWasLeftAloneForAMeeting(worth) : AssistWording.LinkedClassWasLeftAlone(worth),
+            _ => meeting ? AssistWording.LinkedClassesWereLeftAloneForAMeeting(worth) : AssistWording.LinkedClassesWereLeftAlone(worth),
+        };
     }
 
     /// <summary>
@@ -272,6 +276,51 @@ public sealed class PublishPlan
         }
 
         return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// The plan as rows, for the Section menu's plan stage (#548, the mac's
+    /// <c>tabulated(noun:fromTheMenu:courseDirectoryURL:)</c>): the same stored
+    /// properties <see cref="Describe"/> reads, and the same
+    /// <see cref="AssistWording"/> pieces its lines are made of, so the table
+    /// and the card cannot say two different things. Rows in the contract's
+    /// order, none capped: the changes; the pages an unpublish keeps; the
+    /// classes a publish left as they are; the pages with no room for a key;
+    /// the pages already the way asked.
+    /// </summary>
+    /// <param name="folderOf">The Folder cell: the page's folder from the course folder, the course code at its root.</param>
+    /// <param name="noun">The course's noun. The table is the teacher's copy and never the model's, so a club's says "meeting" — in the kept reason, the left-alone cell and its note.</param>
+    public PlanTable Tabulate(Func<PlannedPage, string> folderOf, ClassNoun noun)
+    {
+        bool meeting = noun == ClassNoun.Meeting;
+        var rows = new List<PlanTable.Row>();
+        void Add(PlannedPage page, PlanTable.Change change, string whatChanges) =>
+            rows.Add(new PlanTable.Row(rows.Count, page.DisplayTitle, folderOf(page), change, whatChanges));
+
+        foreach (var change in Changes)
+            Add(change.Page, change.WillBeVisible ? PlanTable.Change.WillBecomeVisible : PlanTable.Change.WillBecomeHidden,
+                AssistWording.PlanWillBecome(change.WillBeVisible, ClassesWhoseDatesAreTakenBy(change)));
+        foreach (var staying in Kept)
+            Add(staying.Page, PlanTable.Change.StaysVisible, AssistWording.PlanStaysVisibleBecause(
+                meeting && staying.Reason == AssistWorkspace.ClassOfItsOwn ? AssistWorkspace.MeetingOfItsOwn : staying.Reason));
+        if (Publishes)
+            foreach (var page in LeftAlonePages)
+                Add(page, PlanTable.Change.StaysAsItIs,
+                    meeting ? AssistWording.MenuPlanStaysAsItIsForAMeeting : AssistWording.MenuPlanStaysAsItIs);
+        foreach (var page in CannotBeAddedTo)
+            Add(page, PlanTable.Change.StaysExactlyAsItIs, AssistWording.MenuPlanStaysExactlyAsItIs);
+        foreach (var page in AlreadyRight)
+            Add(page, Publishes ? PlanTable.Change.AlreadyVisible : PlanTable.Change.AlreadyHidden,
+                Publishes ? AssistWording.MenuPlanAlreadyVisible : AssistWording.MenuPlanAlreadyHidden);
+
+        // The card's other sentences, from the same functions it uses.
+        var notes = new List<string>();
+        if (CannotBeAddedToSentence is { } declined) notes.Add(declined);
+        if (Publishes && LeftAloneSentenceFor(noun) is { } leftAlone) notes.Add(leftAlone);
+        foreach (var move in OrphanedDateMoves()) notes.Add(OrphanedDateMoveLine(move));
+        if (UnknownNames.Count > 0) notes.Add(NoPageIsCalledLine(UnknownNames));
+
+        return new PlanTable(AssistWording.MenuPlanSummary(Changes.Count, AlreadyRight.Count, Publishes), rows, notes);
     }
 
     /// <summary>“a”, “a” and “b”, “a”, “b” and “c” — the way a sentence says a list.</summary>

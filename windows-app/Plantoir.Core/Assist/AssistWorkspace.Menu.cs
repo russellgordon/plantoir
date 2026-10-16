@@ -45,6 +45,19 @@ public sealed partial class AssistWorkspace
             : AssistWording.NoPagesCalledFromTheMenu(PublishPlan.Listing(titles), course, sectionText);
     }
 
+    /// <summary>
+    /// A page plan as the menu's table (#548): the Folder cell is the page's
+    /// folder from the course folder, the COURSE CODE for a page at its root
+    /// (the mac's <c>StartOfYearPageNaming.folder</c>), and the noun is the
+    /// course's. Sent only by the menu's server — see
+    /// <see cref="AssistToolAnswer.PlanTableKey"/>.
+    /// </summary>
+    public PlanTable Tabulate(PublishPlan plan)
+    {
+        var course = Course(plan.CourseCode);
+        return plan.Tabulate(page => FolderOf(course, page), course.Configuration.ClassNoun);
+    }
+
     /// <summary>"section1/All Classes/Unit 2, Day 5" → "Unit 2, Day 5".</summary>
     internal static string LastPartOfAName(string name)
     {
