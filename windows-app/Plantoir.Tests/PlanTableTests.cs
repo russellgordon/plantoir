@@ -255,12 +255,12 @@ public class PlanTableTests
         + (notesNatural > 0 ? Math.Min(notesNatural, fit.NotesCap) + PlanTableLayout.NotesSpacing : 0);
 
     /// <summary>
-    /// Whenever the window can hold the chrome, four rows and two lines of
-    /// notes, everything fits — so nothing is clipped from outside, where the
-    /// notes' own scroll bar could not reach it. Long notes give way first.
+    /// Whenever the window can hold the chrome, the fewest rows and two lines
+    /// of notes, everything fits — so nothing is clipped from outside, where
+    /// the notes' own scroll bar could not reach it. Long notes give way first.
     /// </summary>
     [Fact]
-    public void EverythingFitsWheneverFourRowsAndTwoLinesOfNotesCan()
+    public void EverythingFitsWheneverTwoRowsAndTwoLinesOfNotesCan()
     {
         double least = PlanTableLayout.Chrome + PlanTableLayout.TableBorder + PlanTableLayout.FewestRows * PlanTableLayout.RowPitch
                        + PlanTableLayout.NotesSpacing + PlanTableLayout.NotesFewest;
@@ -279,13 +279,32 @@ public class PlanTableTests
     {
         // The XAML root of the default window on 1920 x 1080 at 150%, measured 446 epx.
         var fit = PlanTableLayout.For(446, 128);
-        Assert.Equal(PlanTableLayout.FewestRows, fit.Rows);
+        Assert.Equal(4, PlanTableLayout.PreferredRows);
+        Assert.Equal(PlanTableLayout.PreferredRows, fit.Rows);
+        Assert.Equal(78, fit.NotesCap);
         Assert.InRange(fit.NotesCap, PlanTableLayout.NotesFewest, 127);   // shorter than the notes, so they scroll
         Assert.True(Needs(fit, 128) <= 446);
 
         var short1 = PlanTableLayout.For(446, 18);
         Assert.Equal(18, Math.Min(18, short1.NotesCap));                  // a short note is shown whole
         Assert.Equal(5, short1.Rows);
+    }
+
+    /// <summary>
+    /// A window too short for four rows and two lines of notes — the default
+    /// window at 200% on 1920 x 1080 gives a XAML root of about 325 epx — shows
+    /// fewer rows rather than clipping. At 330 a plan with no notes or a short
+    /// one still fits; long notes, given two lines, need a root of 344.
+    /// </summary>
+    [Fact]
+    public void AShortWindowShowsFewerRowsAndStillFits()
+    {
+        foreach (var (height, notes) in new (double, double)[] { (330, 0), (330, 18), (344, 128) })
+        {
+            var fit = PlanTableLayout.For(height, notes);
+            Assert.InRange(fit.Rows, PlanTableLayout.FewestRows, 3);
+            Assert.True(Needs(fit, notes) <= height, $"at {height} with {notes} epx of notes the stage needs {Needs(fit, notes)}");
+        }
     }
 
     [Fact]

@@ -87,6 +87,11 @@ internal sealed class SectionVerbDialog
             _dialog.Resources["ContentDialogMaxWidth"] = _planWidth;
         }
         _dialog.PrimaryButtonClick += PrimaryPressed;
+        // The plan table's resize handler is on the WINDOW's XamlRoot, which
+        // outlives this dialog: a close at the plan (Cancel, Escape) changes
+        // neither the stage nor the content, so the handler's own guard never
+        // fires, and it would stay for the window's life. Taken off here.
+        _dialog.Closed += (_, _) => StopRefitting();
         _dialog.Closing += (_, args) =>
         {
             // While a call runs, nothing closes it — Escape included.
@@ -358,6 +363,17 @@ internal sealed class SectionVerbDialog
 
     private double _planWidth = PlanTableDialogWidth;
 
+    /// <summary>The plan table's handler on the window's <c>XamlRoot.Changed</c>, while one is attached.</summary>
+    private Windows.Foundation.TypedEventHandler<XamlRoot, XamlRootChangedEventArgs>? _refit;
+    private XamlRoot? _refitRoot;
+
+    private void StopRefitting()
+    {
+        if (_refit is not null && _refitRoot is not null) _refitRoot.Changed -= _refit;
+        _refit = null;
+        _refitRoot = null;
+    }
+
     /// <summary>
     /// The plan stage of the three page items: the summary, a read-only table
     /// of EVERY page (sortable by its headers), and the card's other sentences
@@ -522,17 +538,18 @@ internal sealed class SectionVerbDialog
         Fit();
         if (_dialog.XamlRoot is { } root)
         {
-            Windows.Foundation.TypedEventHandler<XamlRoot, XamlRootChangedEventArgs>? refit = null;
-            refit = (changed, _) =>
+            StopRefitting();
+            _refit = (_, _) =>
             {
                 if (_stage != Stage.Plan || !ReferenceEquals(_dialog.Content, panel))
                 {
-                    changed.Changed -= refit;
+                    StopRefitting();
                     return;
                 }
                 Fit();
             };
-            root.Changed += refit;
+            _refitRoot = root;
+            root.Changed += _refit;
         }
 
         // Return is the verb's button while the table has focus, as it is

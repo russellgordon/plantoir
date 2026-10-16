@@ -5706,24 +5706,33 @@ OUTSIDE, where no scroll bar can reach it. A Windows window is often short:
 the default window on this PC (Windows 11, 1920 × 1080 at 150%) is 793 × 483
 epx, a XAML root 446 epx tall. So everything on the plan stage has to fit,
 and `PlanTableLayout.For` (Core, unit-tested) decides how much of each part
-shows. The NOTES give way first: their cap is
-clamp(min(H, 756) − 230 − 2 − 8 − 4 × 32, 40, 120) epx, and it is the notes
-scroller's `MaxHeight`, so a note cut short scrolls into view. Then the ROWS:
-clamp(floor((min(H, 756) − 230 − 2 − shown notes − 8) / 32), 4, 12), after
-which the table scrolls inside itself. 756 is ContentDialog's own maximum
-height; 230 is everything else on the stage (measured 220–222). The counts are
-made again on `XamlRoot.Changed` while the plan shows, so a window resized
-under the plan does not clip what was counted for its old size.
-`PlanTableTests.EverythingFitsWheneverFourRowsAndTwoLinesOfNotesCan` pins it:
-whenever the window can hold the chrome, four rows and 40 epx of notes (a XAML
-root of 408), the whole stage fits. Below that the floor of 4 rows wins and the
-bottom is clipped — at 175% or 200% on a 1920 × 1080 screen (a XAML root of
-about 350 or 317 epx; arithmetic, not measured) the table's bottom strip and
-the notes are cut off while the buttons still show. (This replaced a first
-version that capped the notes at a fixed 120 and counted the rows once. The
-#548 implementation review found that it clipped long notes out of reach at
-the default window, the floor of 4 rows winning against notes over about 88
-epx.)
+shows. The NOTES give way first, to keep four rows (`PreferredRows`): their
+cap is clamp(min(H, 756) − 230 − 2 − 8 − 4 × 32, 40, 120) epx, and it is the
+notes scroller's `MaxHeight`, so a note cut short scrolls into view. Then the
+ROWS: clamp(floor((min(H, 756) − 230 − 2 − shown notes − 8) / 32), 2, 12)
+(`FewestRows` 2), after which the table scrolls inside itself. 756 is
+ContentDialog's own maximum height; 230 is everything else on the stage
+(measured 220–222). The counts are made again on `XamlRoot.Changed` while the
+plan shows, so a window resized under the plan does not clip what was counted
+for its old size; the handler is on the WINDOW's XamlRoot, so it is taken off
+in the dialog's `Closed` as well as when the stage moves on — a close at the
+plan changes neither, and it would otherwise stay for the window's life
+(the third review). No unit test reaches that: it is window code.
+`PlanTableTests.EverythingFitsWheneverTwoRowsAndTwoLinesOfNotesCan` pins the
+layout: whenever the window can hold the chrome, two rows and 40 epx of notes
+(a XAML root of 230 + 2 + 64 + 8 + 40 = 344), the whole stage fits; a plan
+with no notes or a short one fits lower still (`AShortWindowShowsFewerRowsAndStillFits`,
+330). Below that the floor wins and the bottom is clipped while the buttons
+still show. By arithmetic, not measured: the default window is a fixed number
+of PIXELS, about 724 tall (483 epx at 150%), so at 175% it is about 414 epx
+and at 200% about 362, less about 37 epx of title bar and border — XAML roots
+of about 377 and 325. At 175% everything fits; at 200% a plan with long notes
+is about 19 epx short and loses the notes' bottom edge. (This replaced two
+earlier versions. The first capped the notes at a fixed 120 and counted the
+rows once; the #548 implementation review found it clipped long notes out of
+reach at the default window, a floor of 4 rows winning against notes over
+about 88 epx. The second kept 4 as the floor for the rows too, which the third
+review found still clipped below a root of 408.)
 
 MEASURED through UI Automation, 2026-10-16 (`PlanTableUiTests`; UIA hands the
 non-DPI-aware test process 96-dpi coordinates, so these are epx). Row pitch
@@ -5736,9 +5745,10 @@ rows), with everything inside. Whether that minimum is applied in epx or
 pixels, and why the default window opens below it, is settled under #542, not
 here; these are the numbers this piece saw. The 31-row fixture whose note
 names thirty linked classes (112 epx laid out): 4 rows, the notes given 78
-epx and their viewport showing 70% of them, scrolled to the end with the last
-line inside the notes area and the window; Publish 35 epx above the window's
-bottom. Earlier the same day, over a 200% remote session (window 937 × 625
+epx and their viewport showing 70% of them, scrolled to 100%, and the notes
+area inside the window (UI Automation clips a note's rectangle to the
+viewport, so the note's own rectangle cannot show more than that); Publish 35
+epx above the window's bottom. Earlier the same day, over a 200% remote session (window 937 × 625
 epx), 10 rows.
 
 **Return and Escape with the table focused — measured, and one key needed
@@ -5785,7 +5795,7 @@ shows 12). Through the window (`PlanTableUiTests`, opt-in, 4 of 4 on this PC,
 2 min 20 s): the table, its fit, the last row shown inside the table after
 scrolling, the Tab order and Escape; Return; the headers' names and order, and
 the rows recounted when the window is resized under the plan; long notes
-scrolled to their last line.
+scrolled to 100% with their area inside the window.
 `SectionVerbsUiTests.PublishPagesTicksPlansAndPublishes_…` still reads
 `sectionVerbPlan`, which is the summary now.
 
