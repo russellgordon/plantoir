@@ -191,7 +191,7 @@ class DownloadTests(unittest.TestCase):
         for entry in site["downloads"]:
             pins[entry["platform"]] = entry.get("pinned")
         self.assertIsNone(pins["macOS"])
-        self.assertEqual(pins["Windows"], "1.4.5")
+        self.assertEqual(pins["Windows"], "1.7.1")
 
 
 class ShortcutTests(unittest.TestCase):
