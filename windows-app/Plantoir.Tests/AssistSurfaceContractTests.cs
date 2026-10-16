@@ -1237,7 +1237,7 @@ public class AssistSurfaceContractTests
             "the contract no longer states it in those words.");
 
         // A requirement this app owes and has not built is held open by name
-        // (NamedGapLedger, the parity burn-down list) rather than left red;
+        // (NamedGapLedger, on the milestone of the issue that owns it) rather than left red;
         // the ledger fails the day a test here answers it.
         var allRules = doc["modelTiers"]!["requirements"]!.AsArray().Select(r => r!["rule"]!.ToString()).ToList();
         var deferred = NamedGapLedger.GapsIn(

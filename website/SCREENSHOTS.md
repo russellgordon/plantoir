@@ -260,6 +260,7 @@ python website/shots/capture_windows.py                  # every Windows picture
 python website/shots/capture_windows.py --sites [ids]    # the class sites, in Edge windows
 python website/shots/capture_windows.py --figures        # the hero and the colour figures
 python website/shots/capture_windows.py --app [scenes]   # the app's scenes, How I Teach, the schedule
+python website/shots/capture_windows.py --print-set      # what printing does: a preview of MPM2D (~/Plantoir Print)
 python website/shots/capture_windows.py --provision-demo <folder>   # no pictures: a demo folder's state (#445)
 ```
 
@@ -270,8 +271,44 @@ Obsidian's list of vaults and every process it started back. It builds
 of the tree (`windows-app/Plantoir/bin/x64/Debug/...` after
 `dotnet build -p:Platform=x64`). The scenes and what each sets up are
 `SCENES` in `app_scenes_windows.py`; the working folders are made by the
-app (`--stage-scene provision`). Windows has no text read-back yet, so each
-picture is looked at; every scene refuses the wrong states it can detect.
+app (`--stage-scene provision`). Text read-back on Windows is `windowshot
+--ocr <png>` (Windows.Media.Ocr); only `--print-set` checks `expectText` with
+it so far, so the other pictures are looked at; every scene refuses the wrong
+states it can detect.
+
+**What printing does (`--print-set`, since the 1.7.1 catch-up).** The two
+print shots (`capture.kind` `preview-page` and `handout`, scene `print-set`)
+are taken by `print_set_windows.py`, the twin of the mac's
+`capture_print_set`: it makes `~/Plantoir Print` when absent (the branch's
+launchers and `.toolchain/` copied in, MPM2D written from `print_set.py` — the
+one configuration both platforms use — and `setup.ps1` answered through
+`windows-app/PtyDriver`, because the colour-scheme picker reads keys from the
+console and a pipe never reaches it), previews it NATIVELY with `preview.ps1`
+and the bundled runtime (`windows-app/Vendor/runtime`, or `PLANTOIR_RUNTIME`),
+photographs *Similar Triangles Practice* from its top in an Edge `--app`
+window in light and dark (`print-page-windows-light/-dark.png`), prints the
+Questions only handout through `handout_pdf.mjs` with the runtime's Node
+(`--experimental-websocket`, since it carries Node 20) and headless Edge, and
+shows that PDF in an Edge `--app` window with the viewer's toolbar off
+(`print-handout-windows.png`, light: it is paper). Each picture is read back
+with Windows' own text recognition (`windowshot --ocr`) and must show
+`expectText`, as the mac's must show it to Vision; a word not read at the
+picture's size is read again from a copy three times larger (reading only —
+the handout's 10-pixel footer, "Page 1 of 1", was not read at all at 1x on a
+1080-pixel screen). The windows are the mac's sizes in DIPs, and on a screen
+too small for them at its own scale (1920 × 1080 at 150%, 2026-10-15) Edge
+is told to draw at a smaller one (`hero_windows.fitted_scale`, 1.15 there)
+so the page keeps the mac's framing with fewer pixels — 1427 × 961 for the
+page, 736 × 962 for the handout, shown whole (`view=Fit`). First taken on an
+unlocked desktop on 2026-10-15. When all three are taken
+the run marks both shots `windows: true`; take them off
+`WINDOWS_PICTURE_OWED` in `website/test_build_data.py` in the same commit.
+The preview is stopped with `preview.ps1 MPM2D 1 --stop`; the folder and its
+builds folder (`%LOCALAPPDATA%\Plantoir\builds\<id>`) are kept for the next
+run — delete both to start clean. **Everything before the shutter runs on a
+locked desktop; the photographs do not** (Windows.Graphics.Capture sends no
+frame for a window nobody can see, measured 2026-10-15), and the run stops
+there and says so.
 
 Every run first runs `test_demo_folders.py` and stops if it is red (no
 `dotnet test` discovers `website/shots` tests). The demo sites it photographs

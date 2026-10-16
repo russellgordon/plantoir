@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 using Plantoir.Services;
 
 namespace Plantoir.Views;
@@ -102,22 +103,25 @@ public sealed partial class SidebarPane
 
     /// <summary>
     /// <c>interface.whatIsOffered</c> and nothing else: Obsidian (with the calm
-    /// note first), Set School Year…, Back Up Now, the folder items. No Rename,
-    /// Add Section, Keep a Copy or Revise — not greyed, not drawn. Remove stays,
-    /// on the footer, and unlocks first.
+    /// note first), Set School Year…, Back Up Now, the folder items, and Remove
+    /// Course… last (#491 item 6; removing the whole course stays — it unlocks
+    /// the pages first, <c>CourseArchiver.ArchiveAndRemoveCourse</c>). No
+    /// Rename, Add Section, Keep a Copy or Revise — not greyed, not drawn.
     /// </summary>
     private MenuFlyout ReferenceCourseMenu(Course course)
     {
+        var row = new SidebarSelection.CourseItem(course.Code);
         var menu = new MenuFlyout();
-        menu.Items.Add(ReferenceObsidianItem(course, course.DirectoryPath));
+        menu.Items.Add(ObsidianItem(course, null, row));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem(ReferenceCourse.SetSchoolYearMenuItem, Glyphs.Clock, () => _ = SetSchoolYear(course)));
+        menu.Items.Add(MenuItem(ReferenceCourse.SetSchoolYearMenuItem, Glyphs.Clock, Selecting(row, () => _ = SetSchoolYear(course))));
         // Copy a Page only READS this course (#247): offered on every row.
-        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, () => _ = OpenCopyAPage(course)));
-        menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, () => _ = BackUpCourse(course)));
+        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, Selecting(row, () => _ = OpenCopyAPage(course))));
+        menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, Selecting(row, () => _ = BackUpCourse(course))));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(course.DirectoryPath)));
-        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, () => FolderActions.OpenTerminal(course.DirectoryPath)));
+        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(course.DirectoryPath))));
+        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(course.DirectoryPath))));
+        AddRemoval(menu, row, SubjectMenuRules.Item.RemoveCourse, "Remove Course…");
         return menu;
     }
 
@@ -126,29 +130,35 @@ public sealed partial class SidebarPane
     /// but Cancel Scheduled Deploy… whenever one exists, because the act that
     /// STOPS a deploy is never withheld (gate by direction).
     /// </summary>
+    /// <remarks>
+    /// The menu bar does NOT offer that Cancel (#488): <c>subjectMenus</c>
+    /// greys cancelScheduledDeploy on a course kept for reference, because the
+    /// mac's row has no Cancel and the mac turns such a schedule off by itself
+    /// (<c>ScheduledDeployCleanup</c>). Windows does not turn it off by itself
+    /// yet, so this row keeps the teacher's one way to stop it — written up for
+    /// the mac (documentation/12-windows-app.md → "Menus, the Section menu's
+    /// functions and #475 on Windows").
+    /// </remarks>
     private MenuFlyout ReferenceSectionMenu(Course course, int number)
     {
         string sectionDir = course.SectionDirectory(number);
+        var row = new SidebarSelection.SectionItem(course.Code, number);
         var menu = new MenuFlyout();
         if (Workspace.WorkspacePath is { } scheduledIn
             && Plantoir.Core.Assist.TaskScheduling.NextRun(scheduledIn, course.Code, number) is { } when)
         {
             menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
-                () => ConfirmCancelScheduledDeploy(course, number, when)));
+                Selecting(row, () => ConfirmCancelScheduledDeploy(course, number, when))));
             menu.Items.Add(new MenuFlyoutSeparator());
         }
-        menu.Items.Add(ReferenceObsidianItem(course, sectionDir));
+        menu.Items.Add(ObsidianItem(course, number, row));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(sectionDir)));
-        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, () => FolderActions.OpenTerminal(sectionDir)));
+        menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));
+        menu.Items.Add(MenuItem("Open in Terminal", TerminalGlyph, Selecting(row, () => FolderActions.OpenTerminal(sectionDir))));
+        // No Remove Section…, deliberately: interface.whatIsWithheld lists
+        // "Remove Section N (removing the whole course stays)", and the mac's
+        // row offering it was a bug #457 fixed. The course's row removes it all.
         return menu;
-    }
-
-    private MenuFlyoutItem ReferenceObsidianItem(Course course, string revealFolder)
-    {
-        var item = MenuItem("Open in Obsidian", ObsidianGlyph, () => _ = OpenReferenceInObsidian(course, revealFolder));
-        item.IsEnabled = FolderActions.ObsidianIsInstalled;
-        return item;
     }
 
     // ---- The calm note, before Obsidian opens, once per course ----------------
@@ -180,6 +190,24 @@ public sealed partial class SidebarPane
     /// </summary>
     private async Task OpenReferenceInObsidian(Course course, string revealFolder)
     {
+        // Lock the pages again FIRST, on every route (#491 item 4; the mac's
+        // OpenInObsidianRoute does lockAgain before anything): a page unlocked
+        // since the folder was last read — by hand, by a sync client, by a
+        // restore — must not open in Obsidian as editable. Off the UI thread:
+        // a large course is thousands of access-rule reads.
+        try
+        {
+            var outcome = await Task.Run(() => ReferenceLock.EnsureLocked(course));
+            if (!outcome.IsQuiet)
+                ActivityTrail.Note(ActivityTrail.Event.ReferenceCoursePagesLockedAgain,
+                    ReferenceCourseUpkeep.TrailLine(outcome, ReferenceCourse.ShownCode(course)));
+        }
+        catch (Exception error)
+        {
+            // The pages may already be locked; opening is still the teacher's call.
+            App.LogDiagnostic($"Open in Obsidian: locking {course.Code} again failed: {error.Message}");
+        }
+
         if (!NoteWasShown(course))
         {
             var note = new ContentDialog
@@ -236,7 +264,7 @@ public sealed partial class SidebarPane
                 ReferenceCourse.Shelf(Workspace.Courses, Today), ignoringFolder: course.Code);
             warning.Text = trouble ?? "";
             warning.Visibility = trouble is null ? Visibility.Collapsed : Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = trouble is null;
+            DialogButtons.EnablePrimary(dialog, trouble is null);
         }
         picker.SelectionChanged += (_, _) => Validate();
         Validate();
@@ -263,7 +291,6 @@ public sealed partial class SidebarPane
         var warning = new TextBlock { TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
         var addOns = ObsidianAddOns.FoundIn(course.DirectoryPath);
         var notes = new StackPanel { Spacing = 8 };
-        notes.Children.Add(new TextBlock { Text = ReferenceCourse.CopyIsASnapshot(shown), TextWrapping = TextWrapping.Wrap });
         if (!addOns.IsEmpty)
             notes.Children.Add(new TextBlock { Text = ReferenceCourse.KeepACopyLeavesAddOnsBehind(shown), TextWrapping = TextWrapping.Wrap });
         notes.Children.Add(new TextBlock { Text = ReferenceCourse.NeverDeployed(shown) + " " + ReferenceCourse.PagesAreLocked, TextWrapping = TextWrapping.Wrap });
@@ -272,7 +299,13 @@ public sealed partial class SidebarPane
         var dialog = new ContentDialog
         {
             Title = $"Keep a copy of {shown} for reference",
-            Content = new StackPanel { Spacing = 10, Children = { picker, nameBox, warning, notes } },
+            // What the copy IS goes under the title (#491 item 3); what it
+            // leaves behind and why it cannot be deployed stay below the form.
+            Content = new StackPanel
+            {
+                Spacing = 10,
+                Children = { FormBuilders.DialogExplanation(ReferenceCourse.CopyIsASnapshot(shown)), picker, nameBox, warning, notes },
+            },
             PrimaryButtonText = "Keep a Copy",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
@@ -294,7 +327,7 @@ public sealed partial class SidebarPane
                   ?? ReferenceCourse.ShelfTrouble(shown, ChosenYear(picker), ReferenceCourse.Shelf(Workspace.Courses, Today));
             warning.Text = trouble ?? "";
             warning.Visibility = trouble is null ? Visibility.Collapsed : Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = trouble is null && name.Length > 0;
+            DialogButtons.EnablePrimary(dialog, trouble is null && name.Length > 0);
         }
         picker.SelectionChanged += (_, _) => { Propose(); Validate(); };
         nameBox.TextChanged += (_, _) => { if (!settingName) nameEdited = true; Validate(); };
@@ -400,7 +433,7 @@ public sealed partial class SidebarPane
                 trouble.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             }
             tickSomething.Visibility = anyCanCome ? Visibility.Collapsed : Visibility.Visible;
-            importDialog.IsPrimaryButtonEnabled = anyCanCome;
+            DialogButtons.EnablePrimary(importDialog, anyCanCome);
         }
         foreach (var course in source.Courses)
         {

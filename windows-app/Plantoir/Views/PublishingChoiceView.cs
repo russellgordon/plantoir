@@ -16,10 +16,16 @@ namespace Plantoir.Views;
 /// <see cref="Problem"/> so a publish can never discover a bad setting after
 /// the fact.
 ///
-/// The Cloudflare account ID is asked for here rather than left to the
-/// launcher's console prompt, because the app publishes with nothing attached
-/// to answer a prompt — and a token scoped to Pages cannot look its own
-/// account up (checked against a real token).
+/// The Cloudflare account ID is SHOWN here, read-only, with Open Settings…
+/// beside it (#491, the mac's #457 item 4): it is the teacher's, not the
+/// course's, and is edited only in File ▸ Settings ▸ Deploying
+/// (<see cref="DeployingSettingsPane"/>). Typed here, it changed silently for
+/// every other course. A change made in Settings shows here — and
+/// re-validates — at once, through <see cref="AppSettings.CloudflareAccountIdChanged"/>.
+/// It is asked for in the app at all, rather than left to the launcher's
+/// console prompt, because the app publishes with nothing attached to answer a
+/// prompt — and a token scoped to Pages cannot look its own account up
+/// (checked against a real token).
 /// </summary>
 public sealed class PublishingChoiceView
 {
@@ -28,6 +34,14 @@ public sealed class PublishingChoiceView
     /// <summary>Raised after every change the teacher makes here.</summary>
     public event Action? Changed;
 
+    /// <summary>
+    /// Raised after the Account ID shown here was refreshed because it changed
+    /// in Settings — NOT a change to the course, so it is not <see cref="Changed"/>
+    /// (Course Settings must not read it as an unsaved edit). The wizard listens,
+    /// so Create follows the ID live.
+    /// </summary>
+    public event Action? AccountRefreshed;
+
     private const int NetlifyIndex = 0;
     private const int CloudflareIndex = 1;
     private const int FolderIndex = 2;
@@ -35,14 +49,13 @@ public sealed class PublishingChoiceView
     private readonly Func<string> _getTarget;
     private readonly Func<string> _getPath;
     private readonly Func<string> _getAccount;
-    private readonly Action<string> _setAccount;
     private readonly Func<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> _getAdditional;
     private readonly Action<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> _setAdditional;
     private readonly StackPanel _folderArea;
     private readonly StackPanel _cloudflareArea;
     private readonly StackPanel _additionalArea;
     private readonly TextBox _pathBox;
-    private readonly TextBox _accountBox;
+    private readonly TextBlock _accountValue;
     private readonly TextBlock _problemText;
     private readonly TextBlock _caption;
     private readonly TextBlock _cloudflareProblemText;
@@ -50,21 +63,19 @@ public sealed class PublishingChoiceView
     private readonly TextBlock _cloudflareSizeNote;
     private readonly Window _pickerOwner;
     private bool _updatingFromModel;
+    private bool _listeningForTheAccount;
 
     /// <summary>
-    /// The Account ID field shown inside the "Also publish to" row when
-    /// Cloudflare is the ADDITIONAL destination and the primary is something
-    /// else — the primary's own Cloudflare block (<see cref="_accountBox"/>)
-    /// is collapsed in that case, so without this field there would be
-    /// nowhere on screen to satisfy <see cref="Problem"/>'s requirement for
-    /// one, and Save would stay disabled with no way to fix it (found by
-    /// Russell 2026-08-22: toggling on "Also deploy to Cloudflare" with
-    /// Netlify as the primary target). Kept in sync with <see cref="_accountBox"/>
-    /// by <see cref="SyncAccountBoxes"/> since both write the same shared
-    /// value — mirrors the mac's <c>CloudflareDetailFields</c> reused inside
-    /// its additional-target row.
+    /// The Account ID shown inside the "Also deploy to" row when Cloudflare is
+    /// the ADDITIONAL destination and the primary is something else — the
+    /// primary's own Cloudflare block is collapsed then, so without this there
+    /// would be nowhere on screen to see why <see cref="Problem"/> holds Save
+    /// back, or to reach Settings to fix it (found by Russell 2026-08-22, when
+    /// it was still a field: toggling on "Also deploy to Cloudflare" with
+    /// Netlify as the primary). The same read-only display as the primary's —
+    /// the mac's <c>CloudflareDetailFields</c>, reused in both places.
     /// </summary>
-    private TextBox? _additionalCloudflareAccountBox;
+    private TextBlock? _additionalAccountValue;
     private TextBlock? _additionalCloudflareProblemText;
 
     /// <summary>
@@ -103,7 +114,7 @@ public sealed class PublishingChoiceView
     public PublishingChoiceView(Window pickerOwner,
                                 Func<string> getTarget, Action<string> setTarget,
                                 Func<string> getPath, Action<string> setPath,
-                                Func<string> getAccount, Action<string> setAccount,
+                                Func<string> getAccount,
                                 Func<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> getAdditional,
                                 Action<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> setAdditional)
     {
@@ -111,7 +122,6 @@ public sealed class PublishingChoiceView
         _getTarget = getTarget;
         _getPath = getPath;
         _getAccount = getAccount;
-        _setAccount = setAccount;
         _getAdditional = getAdditional;
         _setAdditional = setAdditional;
 
@@ -152,42 +162,15 @@ public sealed class PublishingChoiceView
         Root.Children.Add(_folderArea);
 
         // ---- Cloudflare ----
+        // The ID is SHOWN here and edited in File ▸ Settings ▸ Deploying (#491).
         _cloudflareArea = new StackPanel { Spacing = 4 };
-        _accountBox = new TextBox { Text = getAccount(), PlaceholderText = "Account ID" };
-        AutomationProperties.SetAutomationId(_accountBox, "cloudflareAccountField");
-        _cloudflareArea.Children.Add(FormBuilders.LabeledRow("Cloudflare Account ID", _accountBox));
-
-        var helpButton = new HyperlinkButton
-        {
-            Content = "Where do I find this?",
-            FontSize = 12,
-            Padding = new Thickness(0),
-            Margin = new Thickness(0, 2, 0, 4),
-        };
-        helpButton.Click += async (_, _) =>
-        {
-            Plantoir.Core.Scripting.ActivityTrail.Note(
-                Plantoir.Core.Scripting.ActivityTrail.Event.AskedForACredential,
-                "opened instructions for Cloudflare Account ID");
-            var help = Plantoir.Core.Scripting.CredentialRequests.CloudflareAccountIDHelp;
-            var panel = CredentialRequestPanel.Build(help);
-
-            var dialog = new ContentDialog
-            {
-                Title = help.Title,
-                Content = panel,
-                CloseButtonText = "Done",
-                DefaultButton = ContentDialogButton.Close,
-                XamlRoot = _pickerOwner.Content?.XamlRoot
-            };
-            await dialog.ShowAsync();
-        };
-        _cloudflareArea.Children.Add(helpButton);
+        _accountValue = AccountDisplay(_cloudflareArea, "cloudflareAccountValue", "cloudflareAccountOpenSettings");
 
         _cloudflareProblemText = CautionLine("cloudflareAccountProblem");
         _cloudflareArea.Children.Add(_cloudflareProblemText);
+        // Where to FIND the ID went to Settings with the field it explains.
         _cloudflareCaption = FormBuilders.ExampleCaption(
-            "Each section gets its own free site at yourproject.pages.dev. Sign in at dash.cloudflare.com and open Workers and Pages — the Account ID is shown on the right, and it’s also the long code in the address bar. You only enter it once. The first deploy asks for an API token with the Cloudflare Pages permission.");
+            "Each section gets its own free site at yourproject.pages.dev. The first deploy asks for an API token with the Cloudflare Pages permission.");
         _cloudflareArea.Children.Add(_cloudflareCaption);
 
         // Stays on screen the whole time Cloudflare is chosen — it is a
@@ -232,14 +215,6 @@ public sealed class PublishingChoiceView
             RefreshAreas();
             Changed?.Invoke();
         };
-        _accountBox.TextChanged += (_, _) =>
-        {
-            if (_updatingFromModel) return;
-            setAccount(_accountBox.Text.Trim());
-            SyncAccountBoxes(_accountBox);
-            RefreshAreas();
-            Changed?.Invoke();
-        };
         chooseButton.Click += async (_, _) =>
         {
             var picker = new Windows.Storage.Pickers.FolderPicker();
@@ -258,6 +233,86 @@ public sealed class PublishingChoiceView
 
         RefreshAreas();
         RebuildAdditionalArea();
+
+        // A change made in Settings shows here at once. Static event, so the
+        // view lets go of it when it leaves the screen: a wizard or a course
+        // closed must not be kept alive, or refreshed, by the app's settings.
+        //
+        // MEASURED, and the reason for the IsLoaded check: inside the wizard's
+        // ContentDialog, Unloaded arrives about 70 ms AFTER Loaded with the
+        // view still on screen (IsLoaded true, parent unchanged) and no second
+        // Loaded follows — WinUI's late Unloaded when the dialog re-hosts its
+        // content. Unsubscribing on it left the wizard deaf to Settings, and
+        // Create never followed a valid ID. An Unloaded that finds the view
+        // still loaded is that stale one, and is ignored; the real one, when
+        // the wizard was cancelled, measured IsLoaded false. The ignored one is
+        // written to the diagnostic log, so that if it ever turned out to be a
+        // real departure (and the view leaked its subscription) it would show.
+        Root.Loaded += (_, _) => ListenForTheAccount(true);
+        Root.Unloaded += (_, _) =>
+        {
+            if (!Root.IsLoaded) ListenForTheAccount(false);
+            else App.LogDiagnostic("Account ID display: a late Unloaded while still loaded was ignored (still listening)");
+        };
+    }
+
+    private void ListenForTheAccount(bool listen)
+    {
+        if (listen == _listeningForTheAccount) return;
+        _listeningForTheAccount = listen;
+        if (listen) AppSettings.CloudflareAccountIdChanged += OnAccountChangedInSettings;
+        else AppSettings.CloudflareAccountIdChanged -= OnAccountChangedInSettings;
+    }
+
+    /// <summary>Raised on the thread that changed it — the Settings window's — so marshalled to this view's own.</summary>
+    private void OnAccountChangedInSettings() => Root.DispatcherQueue?.TryEnqueue(() =>
+    {
+        RefreshAccountValues();
+        RefreshAreas();
+        AccountRefreshed?.Invoke();
+    });
+
+    /// <summary>
+    /// The read-only Account ID — "Kept in File ▸ Settings ▸ Deploying…"
+    /// first, then the value (or "Not set yet") with Open Settings… beside it —
+    /// added to <paramref name="into"/>. One builder for the primary's block
+    /// and the additional destination's, as the mac's <c>CloudflareDetailFields</c>.
+    /// </summary>
+    private TextBlock AccountDisplay(Panel into, string valueId, string openSettingsId)
+    {
+        // Said FIRST, where the row is read from: the value below is shown,
+        // not edited, and this is where it is edited.
+        into.Children.Add(FormBuilders.ExampleCaption(DeployingSettings.KeptIn));
+        var value = new TextBlock
+        {
+            IsTextSelectionEnabled = true,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        AutomationProperties.SetAutomationId(value, valueId);
+        var openSettings = new Button { Content = "Open Settings…" };
+        AutomationProperties.SetAutomationId(openSettings, openSettingsId);
+        openSettings.Click += (_, _) => SettingsWindow.Show(SettingsSection.Deploying);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        row.Children.Add(value);
+        row.Children.Add(openSettings);
+        into.Children.Add(FormBuilders.LabeledRow("Cloudflare Account ID", row));
+        ShowAccount(value);
+        return value;
+    }
+
+    private void ShowAccount(TextBlock value)
+    {
+        string id = _getAccount();
+        value.Text = DeployingSettings.Shown(id);
+        value.Foreground = (Brush)Application.Current.Resources[
+            id.Trim().Length == 0 ? "TextFillColorSecondaryBrush" : "TextFillColorPrimaryBrush"];
+    }
+
+    private void RefreshAccountValues()
+    {
+        ShowAccount(_accountValue);
+        if (_additionalAccountValue is not null) ShowAccount(_additionalAccountValue);
     }
 
     private static string FriendlyName(string type) => type switch
@@ -275,7 +330,7 @@ public sealed class PublishingChoiceView
     private void RebuildAdditionalArea()
     {
         _additionalArea.Children.Clear();
-        _additionalCloudflareAccountBox = null;
+        _additionalAccountValue = null;
         _additionalCloudflareProblemText = null;
         var availableTypes = CourseConfiguration.AvailableAdditionalDeployTargetTypes(_getTarget());
         if (availableTypes.Count == 0) return;
@@ -351,37 +406,18 @@ public sealed class PublishingChoiceView
             else if (type == "cloudflare_pages")
             {
                 // Cloudflare's account ID is per-teacher, in app settings —
-                // NOT stored per destination — so this reuses the exact same
-                // value the primary picker's own block asks for. But that
-                // block is only ON SCREEN when the primary destination IS
-                // Cloudflare; when it isn't (e.g. primary is Netlify), a
-                // note pointing at it points at nothing the teacher can see,
-                // and Problem still requires an account ID before Save can
-                // enable — so a real field belongs here too, kept in sync
-                // with the primary one by SyncAccountBoxes.
+                // NOT stored per destination — so this shows the same value
+                // the primary's block shows. That block is only ON SCREEN
+                // when the primary IS Cloudflare; when it isn't, Problem still
+                // requires an ID before Save can enable, so the ID, why it
+                // holds Save back, and the way to Settings belong here too.
                 detailArea = new StackPanel { Spacing = 4, Margin = new Thickness(0, 0, 0, 4) };
-                var accountBox = new TextBox
-                {
-                    Text = _getAccount(),
-                    PlaceholderText = "Account ID",
-                };
-                AutomationProperties.SetAutomationId(accountBox, "additionalCloudflareAccountField");
-                detailArea.Children.Add(FormBuilders.LabeledRow("Cloudflare Account ID", accountBox));
-
+                _additionalAccountValue = AccountDisplay(detailArea, "additionalCloudflareAccountValue",
+                                                         "additionalCloudflareAccountOpenSettings");
                 var problemText = CautionLine("additionalCloudflareAccountProblem");
                 detailArea.Children.Add(problemText);
-                _additionalCloudflareAccountBox = accountBox;
                 _additionalCloudflareProblemText = problemText;
                 RefreshAdditionalCloudflareProblem();
-
-                accountBox.TextChanged += (_, _) =>
-                {
-                    if (_updatingFromModel) return;
-                    _setAccount(accountBox.Text.Trim());
-                    SyncAccountBoxes(accountBox);
-                    RefreshAreas();
-                    Changed?.Invoke();
-                };
                 _additionalArea.Children.Add(detailArea);
             }
 
@@ -405,24 +441,6 @@ public sealed class PublishingChoiceView
         string? problem = CourseConfiguration.DeployFolderProblem(path);
         problemText.Text = problem ?? "";
         problemText.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
-    }
-
-    /// <summary>
-    /// The Account ID is one shared value, but it can be typed into either
-    /// of two text boxes (the primary Cloudflare block, or the additional-
-    /// target row's own field) depending on which is on screen — keeps
-    /// whichever box the teacher did NOT just type into showing the same
-    /// text, so switching the primary destination later shows what was
-    /// actually saved rather than a stale value from construction time.
-    /// </summary>
-    private void SyncAccountBoxes(TextBox editedBox)
-    {
-        _updatingFromModel = true;
-        string value = _getAccount();
-        if (!ReferenceEquals(editedBox, _accountBox)) _accountBox.Text = value;
-        if (_additionalCloudflareAccountBox is not null && !ReferenceEquals(editedBox, _additionalCloudflareAccountBox))
-            _additionalCloudflareAccountBox.Text = value;
-        _updatingFromModel = false;
     }
 
     private void RefreshAdditionalCloudflareProblem()

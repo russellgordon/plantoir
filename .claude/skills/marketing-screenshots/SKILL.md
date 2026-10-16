@@ -364,6 +364,16 @@ python3 website/shots/capture.py --provision-demo   # creates the three courses 
 python3 website/shots/capture.py --publish          # builds and publishes them
 ```
 
+**What printing does, on Windows:** `python website/shots/capture_windows.py
+--print-set` makes `~/Plantoir Print`, builds MPM2D's preview natively with
+the bundled runtime and takes `print-page-windows-light/-dark.png` and
+`print-handout-windows.png`, each read back with `windowshot --ocr` against
+`expectText`. It needs the desktop UNLOCKED for the shutter (everything
+before it runs locked, and the run stops there saying so); when it has all
+three it marks both shots `windows: true`, and they come off
+`WINDOWS_PICTURE_OWED` in `website/test_build_data.py` in the same commit.
+`website/SCREENSHOTS.md` → "Windows Capture" has the whole of it.
+
 On Windows the `--app` pass makes and states `~/Teaching` itself (#459): the
 `provision` scene makes folders.json's courses through the New Course panel,
 then `capture_windows.provision_demo` gives them their state. A `~/Teaching`

@@ -50,6 +50,27 @@ public static class FormBuilders
         Opacity = 0.7,
     };
 
+    /// <summary>
+    /// The explanation under a dialog's title (#491 item 3; the mac's two-line
+    /// <c>SheetTitle</c>): FIRST in the dialog's content, in the secondary text
+    /// colour at body size, so the five dialogs that carry one — Add Section,
+    /// Keep a Copy for Reference, Class Dates, Special Folders and a
+    /// credential request — read as one shape under WinUI's own title, which
+    /// stays a plain string everywhere (DialogTitleScanTests). Before, each
+    /// drew its own: 12 at 70% opacity, 13 at 80%, the default at 70%, and Keep
+    /// a Copy's at the BOTTOM.
+    /// </summary>
+    public static TextBlock DialogExplanation(string text) => new()
+    {
+        Text = text,
+        FontSize = 14,
+        TextWrapping = TextWrapping.Wrap,
+        MaxWidth = 460,
+        HorizontalAlignment = HorizontalAlignment.Left,
+        Margin = new Thickness(0, 0, 0, 12),
+        Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+    };
+
     /// <summary>Orange: worth a second look, but the control still does what it says.</summary>
     public static TextBlock WarningCaption(string text) => new()
     {

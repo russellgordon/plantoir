@@ -14,11 +14,17 @@ using Plantoir.Services;
 namespace Plantoir.Views;
 
 /// <summary>
-/// Settings dialog: Assistant confirmation switch, model choice (automatic, smaller, larger),
-/// and model housekeeping (download status, download, remove).
+/// File ▸ Settings ▸ Assistant: the confirmation switch, the model choice
+/// (automatic, smaller, larger), and model housekeeping (download status,
+/// download, remove). One section of <see cref="SettingsWindow"/> since #491;
+/// until then it was the whole of a Settings ContentDialog
+/// (<c>AssistantSettingsDialog</c>), moved here unchanged.
 /// </summary>
-public sealed class AssistantSettingsDialog : ContentDialog
+public sealed class AssistantSettingsPane
 {
+    /// <summary>What the Settings window shows for this section.</summary>
+    public FrameworkElement Root { get; }
+
     private readonly AppSettings _settings;
     private readonly AssistHardwareBudget _budget;
     private readonly StackPanel _panel;
@@ -32,21 +38,16 @@ public sealed class AssistantSettingsDialog : ContentDialog
     private readonly TextBlock _largerCaution;
     private readonly StackPanel _housekeepingList;
 
-    public AssistantSettingsDialog(AppSettings settings, AssistHardwareBudget? budget = null)
+    public AssistantSettingsPane(AppSettings settings, AssistHardwareBudget? budget = null)
     {
         _settings = settings;
         _budget = budget ?? new AssistHardwareBudget();
 
-        Title = "Settings";
-        CloseButtonText = "Done";
-        DefaultButton = ContentDialogButton.Close;
-
-        _panel = new StackPanel { Spacing = 18, MaxWidth = 520 };
-        Content = new ScrollViewer
+        _panel = new StackPanel { Spacing = 18, MaxWidth = 560, HorizontalAlignment = HorizontalAlignment.Left };
+        Root = new ScrollViewer
         {
             Content = _panel,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            MaxHeight = 560,
             // Right padding wider than the others: WinUI's scrollbar overlays
             // the content instead of reserving its own space, so with no
             // gutter it draws straight over whatever sits at the trailing
@@ -57,11 +58,9 @@ public sealed class AssistantSettingsDialog : ContentDialog
             Padding = new Thickness(0, 0, 20, 0)
         };
 
-        // Note trail on open
+        // The "opened Settings" line is the window's (SettingsWindow), written
+        // once when it opens, whichever section it opens on.
         string currentChoice = _settings.AssistantModelChoice;
-        ActivityTrail.Note(
-            ActivityTrail.Event.AppSettingsOpened,
-            $"opened Settings — the assistant is set to {AssistModelChoice.Label(currentChoice).ToLowerInvariant()}");
 
         // ---- Section 1: Before it changes your pages ----
         var section1 = new StackPanel { Spacing = 6 };
@@ -179,9 +178,9 @@ public sealed class AssistantSettingsDialog : ContentDialog
 
         // So the Remove button disables itself live if a teacher opens an
         // assistant window while Settings is already on screen, rather than
-        // only reflecting whatever was open when this dialog was built.
+        // only reflecting whatever was open when this pane was built.
+        // Undone by DetachFromStores, which SettingsWindow calls on Closed.
         AssistActivity.Changed += OnStoreChanged;
-        Closed += (_, _) => DetachFromStores();
 
         UpdateUI();
     }
@@ -189,12 +188,9 @@ public sealed class AssistantSettingsDialog : ContentDialog
     private bool _detached;
 
     /// <summary>
-    /// Undo the store subscriptions above. Idempotent, and public, so the
-    /// caller can detach in a try/finally around ShowAsync too — a
-    /// ContentDialog that never actually got shown (WinUI allows only one
-    /// on screen at a time; a second Settings… invocation before the first
-    /// closes throws) would otherwise never fire Closed, leaving this
-    /// instance subscribed to the app-lifetime AssistModelStores forever.
+    /// Undo the store subscriptions above. Idempotent; the Settings window
+    /// calls it when it closes (and at quit), since the stores live as long
+    /// as the app and would otherwise keep this pane — and its window — alive.
     /// </summary>
     public void DetachFromStores()
     {
@@ -207,10 +203,10 @@ public sealed class AssistantSettingsDialog : ContentDialog
 
     /// <summary>
     /// A store's progress arrives on whatever thread the download is running
-    /// on; every WinUI element this dialog owns must only be touched from
+    /// on; every WinUI element this pane owns must only be touched from
     /// the UI thread that created them.
     /// </summary>
-    private void OnStoreChanged() => DispatcherQueue?.TryEnqueue(UpdateUI);
+    private void OnStoreChanged() => Root.DispatcherQueue?.TryEnqueue(UpdateUI);
 
     private void SetChoice(string choice)
     {

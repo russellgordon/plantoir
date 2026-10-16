@@ -61,6 +61,22 @@ public static class TaskScheduling
     /// as possible after a start that was missed (the lateness window then
     /// decides whether it is still worth doing).
     /// </summary>
+    /// <remarks>
+    /// <c>MultipleInstancesPolicy</c> is <c>Queue</c> (#470, Russell's ruling
+    /// 2026-10-15): a deploy set again for a moment that comes while the earlier
+    /// run is still working starts when that run ends, and the run's own checks
+    /// — the token, the lateness window (#239), the lease wait — decide whether
+    /// it still deploys. Under <c>IgnoreNew</c> Task Scheduler refused that start
+    /// (Last Result 0x800710E0) and the deploy just set never ran, with no record.
+    /// Measured on an i5-8365U (Windows 11 Pro 26200, 2026-10-15): the queued
+    /// start came 2.1 s after the first instance ended and ran the NEWEST
+    /// definition; setting it again while a start was queued replaced the
+    /// queued start (so a queued start never carries a newer token), and
+    /// deleting the task threw the queued start away. Rejected: <c>Parallel</c>
+    /// (two runs of one task at once, the second waiting ten minutes on the
+    /// first's leases) and refusing the re-set with a sentence.
+    /// documentation/07-deployment.md → "Set again while the run works (#409)".
+    /// </remarks>
     internal static string TaskXml(string runner, string taskName, DateTime when, string token = "")
     {
         static string X(string v) => System.Security.SecurityElement.Escape(v);
@@ -72,7 +88,7 @@ public static class TaskScheduling
               <Triggers><TimeTrigger><StartBoundary>{start}</StartBoundary><Enabled>true</Enabled></TimeTrigger></Triggers>
               <Principals><Principal id="Author"><UserId>{X(user)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
               <Settings>
-                <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+                <MultipleInstancesPolicy>Queue</MultipleInstancesPolicy>
                 <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
                 <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
                 <StartWhenAvailable>true</StartWhenAvailable>

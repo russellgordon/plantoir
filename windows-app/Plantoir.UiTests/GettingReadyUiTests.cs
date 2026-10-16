@@ -100,4 +100,62 @@ public class GettingReadyUiTests
         }
         catch (System.Runtime.InteropServices.COMException) { return false; }
     }
+
+    /// <summary>
+    /// #484: closing the last window while the folder's tools are being
+    /// copied keeps the window up, with its banner, until the copy has
+    /// finished — and then Plantoir quits. Before, the copy was ended
+    /// part-way and left <c>.toolchain\</c> half old and half new. The fixture
+    /// deletes <c>.toolchain\support</c> (the skeletons and the example
+    /// content, about 12,000 files) so the copy outlasts the close.
+    /// </summary>
+    [UiFact]
+    public void ClosingDuringTheCopyWaitsForItThenQuits()
+    {
+        var launched = Stopwatch.StartNew();
+        using var app = new DrivenApp(
+            CourseFixtures.WriteBoth,
+            beforeLaunch: workspace =>
+            {
+                string support = Path.Combine(workspace, ".toolchain", "support");
+                Assert.True(Directory.Exists(support), "the fixture's folder had no support folder to take away");
+                Directory.Delete(support, recursive: true);
+                launched.Restart();
+            },
+            waitUntilReady: false);
+        TimeSpan windowAfter = launched.Elapsed;
+        if (app.Readiness() != "copying")
+        {
+            Console.WriteLine($"#484 fixture: the copy finished {windowAfter.TotalSeconds:0.0} s after launch, before the close " +
+                              "could be tried, so the wait was NOT checked on this run.");
+            return;
+        }
+
+        TimeSpan closedAt = launched.Elapsed;
+        app.Window.Close();
+        Thread.Sleep(700);
+        bool stillCopying = app.Readiness() == "copying";
+        if (stillCopying)
+        {
+            Assert.False(app.HasExited, "Plantoir quit while the folder's tools were still being copied");
+            Assert.True(Retry.WhileFalse(() => app.Readiness() != "copying" || HasText(app, ToolchainReadiness.GettingReadyTitle),
+                    TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result,
+                "the window stayed up but its banner did not say why");
+        }
+
+        Assert.True(Retry.WhileFalse(() => app.HasExited, CopyPatience, TimeSpan.FromMilliseconds(100)).Result,
+            "Plantoir never quit after the copy finished");
+        TimeSpan exitedAt = launched.Elapsed;
+        Console.WriteLine($"#484 fixture: window after {windowAfter.TotalSeconds:0.0} s, closed at {closedAt.TotalSeconds:0.0} s, " +
+                          $"still copying 0.7 s later: {stillCopying}, quit at {exitedAt.TotalSeconds:0.0} s.");
+
+        // Nothing was cut short: every file of the bundle's support folder is there.
+        string bundled = Path.Combine(Path.GetDirectoryName(DrivenApp.ExecutablePath)!, "Toolchain", "support");
+        string copied = Path.Combine(app.WorkspacePath, ".toolchain", "support");
+        Assert.Equal(Directory.EnumerateFiles(bundled, "*", SearchOption.AllDirectories).Count(),
+                     Directory.EnumerateFiles(copied, "*", SearchOption.AllDirectories).Count());
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(app.WorkspacePath, "courses", ".internal", "activity"),
+                                              ToolchainReadiness.MarkerPrefix + "*"));
+        if (stillCopying) Assert.Contains(", and Plantoir waited for it before closing", MenuBar.Trail(app));
+    }
 }

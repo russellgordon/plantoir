@@ -25,10 +25,12 @@ public class ScheduledRunTests : IDisposable
         _scheduler = new FakeScheduler(_root);
         _trail = Path.Combine(_root, "activity.txt");
         ActivityTrail.SetCustomLogPathForTesting(_trail);
+        ToolchainReadiness.Reset();   // the run's refresh (#477) goes through the process-wide registry
     }
 
     public void Dispose()
     {
+        ToolchainReadiness.Reset();
         _scheduler.Dispose();
         ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
         try { Directory.Delete(_root, recursive: true); } catch { }
@@ -277,6 +279,19 @@ public class ScheduledRunTests : IDisposable
         public DateTimeOffset Now = new(2026, 10, 1, 6, 30, 0, TimeSpan.FromHours(-4));
     }
 
+    /// <summary>
+    /// Half six on the 1st in THIS computer's time zone. The run reads the
+    /// classes on <c>world.Now().LocalDateTime</c>'s day, so a clock pinned
+    /// at −04:00 was the 2nd on a machine at UTC+14 (and the 30th at UTC−12),
+    /// and the #475 tests below would flag a different class there (2C's
+    /// implementation review, L-4).
+    /// </summary>
+    private static Clock HalfSixOnTheFirstHere()
+    {
+        var local = new DateTime(2026, 10, 1, 6, 30, 0, DateTimeKind.Unspecified);
+        return new Clock { Now = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)) };
+    }
+
     private ScheduledRun.World World(Clock clock, List<string> ran) => new()
     {
         Now = () => clock.Now,
@@ -285,6 +300,94 @@ public class ScheduledRunTests : IDisposable
         RunWrapper = script => { ran.Add(script); return 0; },
         OutcomeDirectory = Path.Combine(_root, "outcomes"),
     };
+
+    // ---- #475: classes dated after the next class, on a scheduled deploy ------
+
+    /// <summary>
+    /// A section whose class on the 5th is published while the next class is
+    /// the 2nd (the run's day is the 1st): flagged, and nobody to ask.
+    /// </summary>
+    private string FolderWithAClassPublishedEarly()
+    {
+        string folder = FakeScheduler.WorkingFolderWith(_root, "early", "ICS3U",
+            """{ "course_code": "ICS3U", "section_numbers": [1], "deploy_target": "netlify", "per_section_folders": ["All Classes"] }""");
+        string course = Path.Combine(folder, "courses", "ICS3U");
+        Directory.CreateDirectory(Path.Combine(course, ".netlify_sites"));
+        File.WriteAllText(Path.Combine(course, ".netlify_sites", "section1.json"), "{}");
+        string classes = Path.Combine(course, "section1", "All Classes");
+        Directory.CreateDirectory(classes);
+        File.WriteAllText(Path.Combine(classes, "Unit 1, Day 1.md"), "---\npublish: true\ncreated: 2026-10-01T07:00:00.000-0400\n---\n");
+        File.WriteAllText(Path.Combine(classes, "Unit 1, Day 2.md"), "---\npublish: true\ncreated: 2026-10-02T07:00:00.000-0400\n---\n");
+        File.WriteAllText(Path.Combine(classes, "Unit 1, Day 3.md"), "---\npublish: true\ncreated: 2026-10-05T07:00:00.000-0400\n---\n");
+        return folder;
+    }
+
+    [Fact]
+    public void AScheduledDeployThatWentOut_RecordsTheClassesDatedLater()
+    {
+        string folder = FolderWithAClassPublishedEarly();
+        var clock = HalfSixOnTheFirstHere();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var world = new ScheduledRun.World
+        {
+            Now = () => clock.Now,
+            Sleep = span => clock.Now += span,
+            CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            // What the real wrapper does when the deploy got through.
+            RunWrapper = _ =>
+            {
+                ScheduledPublishOutcome.Record(Path.Combine(_root, "outcomes"), "ICS3U", 1,
+                    ScheduledPublishOutcome.Kind.Succeeded, "Netlify", folder);
+                return 0;
+            },
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        Assert.Contains("ICS3U/1 · deployed with classes dated after the next class: section1/All Classes/Unit 1, Day 3",
+                        File.ReadAllText(_trail));
+    }
+
+    /// <summary>
+    /// The wrapper exits 0 whether or not the deploy got through, so the exit
+    /// code means nothing: a run that left no success record, or one from an
+    /// earlier night, writes no line (the mac's fixes review, A).
+    /// </summary>
+    [Theory]
+    [InlineData("did not finish")]
+    [InlineData("an earlier night's success")]
+    public void AScheduledDeployThatDidNotGoOut_RecordsNoClasses(string how)
+    {
+        string folder = FolderWithAClassPublishedEarly();
+        var clock = HalfSixOnTheFirstHere();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        string outcomes = Path.Combine(_root, "outcomes");
+        if (how == "an earlier night's success")
+        {
+            ScheduledPublishOutcome.Record(outcomes, "ICS3U", 1, ScheduledPublishOutcome.Kind.Succeeded, "Netlify", folder);
+            foreach (string record in Directory.GetFiles(outcomes))
+                File.SetLastWriteTime(record, DateTime.Now.AddDays(-1));
+        }
+        var world = new ScheduledRun.World
+        {
+            Now = () => clock.Now,
+            Sleep = span => clock.Now += span,
+            CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            RunWrapper = _ =>
+            {
+                if (how == "did not finish")
+                    ScheduledPublishOutcome.Record(outcomes, "ICS3U", 1, ScheduledPublishOutcome.Kind.DidNotFinish, "Netlify", folder);
+                return 0;
+            },
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        string trail = File.Exists(_trail) ? File.ReadAllText(_trail) : "";
+        Assert.DoesNotContain("deployed with classes dated after the next class", trail);
+    }
 
     [Fact]
     public void AJobTooLateStandsDownDeploysNothingAndClearsItsTask()
@@ -403,6 +506,78 @@ public class ScheduledRunTests : IDisposable
         Assert.Empty(_scheduler.Deleted);
     }
 
+    // ---- #470: a start queued behind the run still working --------------------
+
+    /// <summary>
+    /// The first run sets the section again while it works, for a moment five
+    /// minutes on (token 2); under <c>Queue</c> Task Scheduler starts the second
+    /// instance when the first ends — here forty minutes after its moment — with
+    /// the task's NEWEST definition (measured, #470). The first run leaves the
+    /// new task alone; the queued one passes the lateness window, finds no
+    /// leases, still stands, deploys and clears the task.
+    /// </summary>
+    [Fact]
+    public void AQueuedRunStartedAfterTheFirstFinishedStillDeploys()
+    {
+        string folder = Folder();
+        var first = DateTime.Now.AddMinutes(1);
+        var second = first.AddMinutes(5);
+        Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, first, [new("netlify", "")]));
+        string name = TaskScheduling.NameFor("ICS3U", 1, folder);
+        string jobPath = TaskScheduling.JobPath(name);
+        string token1 = ScheduledRun.ReadJob(jobPath)!.Token;
+        var clock = new Clock { Now = new DateTimeOffset(first) };
+        var ran = new List<string>();
+        var world = new ScheduledRun.World
+        {
+            Now = () => clock.Now, Sleep = span => clock.Now += span, CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            RunWrapper = script =>
+            {
+                ran.Add(script);
+                if (ran.Count == 1)
+                    Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, second, [new("netlify", "")]));
+                return 0;
+            },
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(jobPath, world, taskToken: token1));
+        Assert.Contains(name, _scheduler.Tasks.Keys);   // the first run left the deploy just set
+        string token2 = ScheduledRun.ReadJob(jobPath)!.Token;
+        Assert.NotEqual(token1, token2);
+        Assert.Empty(Directory.GetFiles(Path.Combine(folder, "courses", ".internal", "activity"), "*.lease"));
+
+        clock.Now = new DateTimeOffset(second).AddMinutes(40);   // the queued start, after the first ended
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(jobPath, world, taskToken: token2));
+        Assert.Equal(2, ran.Count);
+        Assert.DoesNotContain(name, _scheduler.Tasks.Keys);   // one-shot: cleared after it ran
+        Assert.Null(ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder));
+    }
+
+    /// <summary>
+    /// A queued start that comes later than the course's window allows (the
+    /// first run worked for days, or the computer slept) stands down as too
+    /// late, in the run's own words — the lateness check, not the queue, decides.
+    /// </summary>
+    [Fact]
+    public void AQueuedRunStartedLaterThanTheCoursesWindowStandsDownTooLate()
+    {
+        string folder = Folder();
+        var second = DateTime.Now.AddMinutes(5);
+        Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, second, [new("netlify", "")]));
+        string name = TaskScheduling.NameFor("ICS3U", 1, folder);
+        string jobPath = TaskScheduling.JobPath(name);
+        var clock = new Clock { Now = new DateTimeOffset(second).AddDays(CourseConfiguration.DefaultMayRunLateDays + 1) };
+        var ran = new List<string>();
+
+        Assert.Equal(ScheduledRun.Ending.StoodDown,
+            ScheduledRun.Execute(jobPath, World(clock, ran), taskToken: ScheduledRun.ReadJob(jobPath)!.Token));
+        Assert.Empty(ran);
+        Assert.DoesNotContain(name, _scheduler.Tasks.Keys);
+        var record = ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder);
+        Assert.Equal(ScheduledPublishOutcome.Kind.TooLateToRun, record!.Outcome);
+    }
+
     [Fact]
     public void ARunWhoseTaskWasCancelledMeanwhileDeploysNothing()
     {
@@ -477,6 +652,261 @@ public class ScheduledRunTests : IDisposable
         Assert.Equal(Path.Combine(folder, "courses", "Chess-Club"),
                      ScheduledRun.ReadCourse(folder, "CHESS-CLUB")!.DirectoryPath);   // one match ignoring case
         Assert.Null(ScheduledRun.ReadCourse(folder, "CHESS CLUB"));                   // one hyphen away: none
+    }
+
+    // ---- #477: a copy of the folder's tools, and the run's own refresh --------
+
+    private string Activity(string folder) => Path.Combine(folder, "courses", ".internal", "activity");
+
+    private string TrailLineContaining(string text) =>
+        File.ReadAllLines(_trail).Single(line => line.Contains(text));
+
+    [Fact]
+    public void ALiveCopyOfTheFolderIsWaitedForAndTheRunGoesAheadAfter()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        int looks = 0;
+        var world = World(clock, ran);
+        world = new ScheduledRun.World
+        {
+            Now = world.Now, Sleep = world.Sleep, CloudflareAccountID = world.CloudflareAccountID,
+            RunWrapper = world.RunWrapper, OutcomeDirectory = world.OutcomeDirectory,
+            CopyingTheFolder = _ => ++looks <= 3 ? 4242 : null,
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        Assert.Single(ran);
+        Assert.Equal(new Clock().Now.AddSeconds(45), clock.Now);
+        string line = TrailLineContaining("waited 45 s");
+        Assert.Contains("ICS3U/1", line);
+        Assert.Contains("waited 45 s for Plantoir to finish getting the working folder ready (process 4242), and went ahead", line);
+    }
+
+    [Fact]
+    public void AWaitForTheCourseAndForACopyNamesTheCopysProcessInOneLine()
+    {
+        // shared-rules.json -> activityTrail.mustRecord "scheduled publish
+        // waited for the course": "that copy's process id, or both obstacles
+        // in one line" — the mixed line names the copy's process too.
+        Assert.Equal("waited 90 s for another program on this computer to finish with the course " +
+                     "and for Plantoir to finish getting the working folder ready (process 4242), and went ahead",
+                     ScheduledRun.WaitedLine(90, metTheCourse: true, metACopy: true, copier: 4242));
+    }
+
+    [Fact]
+    public void ACopyStillRunningAfterTenMinutesStandsDownWithoutBlamingTheCourse()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        var world = World(clock, ran);
+        world = new ScheduledRun.World
+        {
+            Now = world.Now, Sleep = world.Sleep, CloudflareAccountID = world.CloudflareAccountID,
+            RunWrapper = world.RunWrapper, OutcomeDirectory = world.OutcomeDirectory,
+            CopyingTheFolder = _ => 4242,
+        };
+
+        Assert.Equal(ScheduledRun.Ending.StoodDown, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        Assert.Empty(ran);
+        Assert.True(clock.Now - new Clock().Now >= ScheduledRun.LongestWait, "it did not wait the whole ten minutes");
+        var record = ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder)!;
+        Assert.Equal(ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, record.Outcome);   // never CourseWasBusy
+        Assert.Equal(ScheduledRun.WrapperCouldNotBeWritten, record.Destination);
+        Assert.Contains("waited 600 s for Plantoir to finish getting the working folder ready (process 4242), and stood down",
+                        File.ReadAllText(_trail));
+        Assert.Empty(Directory.Exists(Activity(folder)) ? Directory.GetFiles(Activity(folder), "*.lease") : []);
+        Assert.DoesNotContain(name, _scheduler.Tasks.Keys);
+    }
+
+    [Fact]
+    public void ARealMarkerIsWhatTheRunWaitsFor()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        using var other = Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 60 127.0.0.1 >nul")
+                                        { CreateNoWindow = true, UseShellExecute = false })!;
+        try
+        {
+            Directory.CreateDirectory(Activity(folder));
+            File.WriteAllText(ToolchainReadiness.MarkerPath(folder, other.Id),
+                              $"{other.Id}\n{other.ProcessName}\n{DateTime.UtcNow:O}\n");
+            int sleeps = 0;
+            var world = new ScheduledRun.World
+            {
+                Now = () => clock.Now, CloudflareAccountID = () => "", OutcomeDirectory = Path.Combine(_root, "outcomes"),
+                RunWrapper = script => { ran.Add(script); return 0; },
+                Sleep = span =>
+                {
+                    clock.Now += span;
+                    if (++sleeps == 2) { other.Kill(); other.WaitForExit(); }   // the copy finishes
+                },
+            };
+
+            Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+            Assert.Single(ran);
+            Assert.Contains($"waited 30 s for Plantoir to finish getting the working folder ready (process {other.Id}), and went ahead",
+                            File.ReadAllText(_trail));
+        }
+        finally { try { other.Kill(); } catch { } }
+    }
+
+    /// <summary>A recipe beside "the program": the files the run must copy before it builds.</summary>
+    private string Bundle(string scriptText = "NEW fingerprint")
+    {
+        string bundle = Path.Combine(_root, "bundle");
+        Directory.CreateDirectory(Path.Combine(bundle, "scripts"));
+        File.WriteAllText(Path.Combine(bundle, "Dockerfile"), "FROM new");
+        File.WriteAllText(Path.Combine(bundle, "scripts", "section_fingerprint.py"), scriptText);
+        File.WriteAllText(Path.Combine(bundle, "deploy.ps1"), "# new deploy");
+        File.WriteAllText(Path.Combine(bundle, "preview.ps1"), "# new preview");
+        return bundle;
+    }
+
+    private ScheduledRun.World WithBundle(ScheduledRun.World world, string? bundle) => new()
+    {
+        Now = world.Now, Sleep = world.Sleep, CloudflareAccountID = world.CloudflareAccountID,
+        RunWrapper = world.RunWrapper, OutcomeDirectory = world.OutcomeDirectory,
+        BundledToolchainRoot = bundle, CopyingTheFolder = _ => null,
+    };
+
+    [Fact]
+    public void TheRunBringsTheFoldersToolsUpToDateBeforeItWritesTheWrapper()
+    {
+        string folder = Folder();
+        string old = Path.Combine(folder, ".toolchain", "scripts", "section_fingerprint.py");
+        Directory.CreateDirectory(Path.GetDirectoryName(old)!);
+        File.WriteAllText(old, "OLD fingerprint");
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var seen = new List<string>();
+        var world = WithBundle(new ScheduledRun.World
+        {
+            Now = () => clock.Now, Sleep = span => clock.Now += span, CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            RunWrapper = script =>
+            {
+                seen.Add(File.ReadAllText(old));
+                seen.Add(File.ReadAllText(Path.Combine(folder, "deploy.ps1")));
+                seen.Add(File.ReadAllText(Path.Combine(folder, "preview.ps1")));
+                // Both leases were held across the copy, and still are.
+                Assert.Equal(2, Directory.GetFiles(Activity(folder), $"*.{Environment.ProcessId}.lease").Length);
+                return 0;
+            },
+        }, Bundle());
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        Assert.Equal(new[] { "NEW fingerprint", "# new deploy", "# new preview" }, seen);
+        string line = TrailLineContaining("got the working folder ready for a scheduled deploy");
+        Assert.Contains("ICS3U/1", line);
+        Assert.Empty(Directory.GetFiles(Activity(folder), ToolchainReadiness.MarkerPrefix + "*"));   // its marker went too
+        Assert.DoesNotContain(name, _scheduler.Tasks.Keys);
+    }
+
+    [Fact]
+    public void AFailedRefreshStandsDownAndBuildsNothing()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        ToolchainReadiness.Copier = (_, _) => new ToolchainMirror.CopyResult(0, 1, @".toolchain\scripts\x.py", "Access is denied.");
+
+        Assert.Equal(ScheduledRun.Ending.StoodDown,
+            ScheduledRun.Execute(TaskScheduling.JobPath(name), WithBundle(World(clock, ran), Bundle())));
+
+        Assert.Empty(ran);
+        var record = ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder)!;
+        Assert.Equal(ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, record.Outcome);
+        Assert.Equal(ScheduledRun.WrapperCouldNotBeWritten, record.Destination);
+        string line = TrailLineContaining("could not finish getting the working folder ready for a scheduled deploy");
+        Assert.Contains("ICS3U/1", line);
+        Assert.Contains("; the scheduled deploy stood down", line);
+        Assert.Empty(Directory.GetFiles(Activity(folder), "*.lease"));
+        Assert.DoesNotContain(name, _scheduler.Tasks.Keys);
+    }
+
+    [Fact]
+    public void ACopyThatStartsJustBeforeTheRefreshIsWaitedForUntilTheRunsTenMinutes()
+    {
+        // Step 2 found no copy (the seam), but a window opened on the folder
+        // in the moment between: the run's own copy writes its marker, finds
+        // the earlier live one, and waits its turn — on the run's clock.
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        using var other = Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 60 127.0.0.1 >nul")
+                                        { CreateNoWindow = true, UseShellExecute = false })!;
+        try
+        {
+            Directory.CreateDirectory(Activity(folder));
+            File.WriteAllText(ToolchainReadiness.MarkerPath(folder, other.Id),
+                              $"{other.Id}\n{other.ProcessName}\n{DateTime.UtcNow.AddMinutes(-1):O}\n");
+            var copied = 0;
+            ToolchainReadiness.Copier = (_, _) => { copied++; return new ToolchainMirror.CopyResult(1, 0); };
+
+            Assert.Equal(ScheduledRun.Ending.StoodDown,
+                ScheduledRun.Execute(TaskScheduling.JobPath(name), WithBundle(World(clock, ran), Bundle())));
+
+            Assert.Equal(0, copied);
+            Assert.Empty(ran);
+            Assert.True(clock.Now - new Clock().Now >= ScheduledRun.LongestWait);
+            var record = ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder)!;
+            Assert.Equal(ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, record.Outcome);
+            Assert.Contains($"for Plantoir to finish getting the working folder ready (process {other.Id}), and stood down",
+                            File.ReadAllText(_trail));
+            Assert.False(File.Exists(ToolchainReadiness.MarkerPath(folder, Environment.ProcessId)));
+            Assert.Empty(Directory.GetFiles(Activity(folder), "*.lease"));
+        }
+        finally { try { other.Kill(); } catch { } }
+    }
+
+    [Fact]
+    public void NoBundleBesideTheProgramRemovesNothing()
+    {
+        string folder = Folder();
+        string kept = Path.Combine(folder, ".toolchain", "scripts", "build_site.py");
+        Directory.CreateDirectory(Path.GetDirectoryName(kept)!);
+        File.WriteAllText(kept, "the folder's own");
+        string empty = Path.Combine(_root, "no-recipe");
+        Directory.CreateDirectory(empty);
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+
+        Assert.Equal(ScheduledRun.Ending.Deployed,
+            ScheduledRun.Execute(TaskScheduling.JobPath(name), WithBundle(World(clock, ran), empty)));
+
+        Assert.Single(ran);
+        Assert.Equal("the folder's own", File.ReadAllText(kept));
+        Assert.Equal("# stub", File.ReadAllText(Path.Combine(folder, "deploy.ps1")));
+    }
+
+    [Fact]
+    public void ATaskCancelledWhileTheToolsWereCopiedDeploysNothing()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        ToolchainReadiness.Copier = (_, _) => { _scheduler.Tasks.Remove(name); return new ToolchainMirror.CopyResult(3, 0); };
+
+        Assert.Equal(ScheduledRun.Ending.NoLongerStands,
+            ScheduledRun.Execute(TaskScheduling.JobPath(name), WithBundle(World(clock, ran), Bundle())));
+
+        Assert.Empty(ran);
+        Assert.Empty(Directory.GetFiles(Activity(folder), "*.lease"));
+        Assert.Null(ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder));
     }
 
     private static Process StartALongRunningChild() =>

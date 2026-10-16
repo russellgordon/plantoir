@@ -565,6 +565,107 @@ public static class ActivityTrail
         /// same files with only an os_log line.
         /// </summary>
         WorkingFolderToolsCopied,
+        /// <summary>
+        /// File ▸ Open Recent ▸ Clear Menu emptied the list of working folders
+        /// opened (#488, the mac's #457): how many it held. The list is only
+        /// ever added to otherwise, so "Open Recent is empty and I never cleared
+        /// it" has no answer without this line.
+        /// </summary>
+        RecentWorkingFoldersCleared,
+        /// <summary>
+        /// One of the assistant's functions run from the menu bar (#489, the
+        /// mac's #457 batch B): where the item is (Section ▸ Publish Pages…),
+        /// how it ended — carried out, changed nothing, took the last change
+        /// back, cancelled at the plan, rebuilt, not rebuilt — and counts, never
+        /// a page's title. The assistant's own lines are written by its
+        /// conversation, which the menu does not have; without this a page
+        /// published from the menu is a page nobody can say who published.
+        /// </summary>
+        RanFromAMenu,
+        /// <summary>
+        /// The copy the Section menu saves before EVERY change it makes (#489):
+        /// the backup's FILE NAME (<c>_menu-section&lt;N&gt;</c>), its size and
+        /// seconds; or that it could not, and why. Answers "where did this zip
+        /// come from" and "why did Publish take ten seconds".
+        /// </summary>
+        SectionMenuBackedUpACourse,
+        /// <summary>
+        /// The question about classes dated after the next class (#475):
+        /// where it was asked (Deploy, the in-app assistant's deploy, Section ▸
+        /// Publish Pages…), how many were flagged, and the answer — how many
+        /// hidden, how many kept published, or cancelled. Counts, never a
+        /// title. Answers "why did my class disappear from the site?" and "why
+        /// does it keep asking me?".
+        /// </summary>
+        LaterClassesAsked,
+        /// <summary>
+        /// A scheduled deploy went out with classes dated after the next class
+        /// (#475): nobody is awake to ask, so it goes as it is, and this
+        /// records the PLACES (at most ten, then how many more). Written only
+        /// once the wrapper's success record says it deployed.
+        /// </summary>
+        LaterClassesWentOut,
+        /// <summary>
+        /// An assistant's deploy was refused while classes dated after the next
+        /// class wait on an answer in the section's window (#475): how many.
+        /// Without it, "why didn't Claude deploy it?" has no answer on the trail.
+        /// </summary>
+        LaterClassesHeldADeployBack,
+        /// <summary>
+        /// File ▸ Settings ▸ Deploying changed the Cloudflare Account ID (#491,
+        /// the mac's #457 item 4): cleared, changed, or changed to something not
+        /// yet a valid ID — NEVER the ID. Written when the teacher leaves the
+        /// field, switches section, closes Settings or quits, so typing writes
+        /// one line rather than one per key. A deploy to Cloudflare that suddenly
+        /// fails for every course is answered by this line.
+        /// </summary>
+        CloudflareAccountIdChangedInSettings,
+        /// <summary>
+        /// Help ▸ Plantoir Help (or F1) opened the support page in the browser
+        /// (#491). A teacher who looked for help just before something went
+        /// wrong is a teacher whose report should say so.
+        /// </summary>
+        PlantoirHelpOpened,
+
+        // ---- Printable pages (#496; the mac's #454), one block ----
+        /// <summary>
+        /// The preview handed a page to the teacher's web browser (#496): the
+        /// course and section, the page the teacher was ON, and why — to print
+        /// it (the way of printing and, when landscape, the paper) or a link
+        /// that opens in a new window, by its KIND only (the page's own PDF,
+        /// another page of the site, another site). Never where a link led.
+        /// </summary>
+        PreviewPageOpenedInBrowser,
+        /// <summary>
+        /// Plantoir asked before adding its section to a teacher's own
+        /// AGENTS.md or CLAUDE.md at the working folder's root (#496): the
+        /// file's NAME and the answer, added or not now.
+        /// </summary>
+        GuidanceFileAskedAbout,
+        /// <summary>
+        /// The guidance for assistants could not be written into a working
+        /// folder (#496): how many problems, and the first (a file or a
+        /// skill's folder, and the system's reason). It holds nothing back,
+        /// so this line and a quiet notice are its only record.
+        /// </summary>
+        GuidanceCouldNotBeWritten,
+
+        // ---- Preview at Last Viewed (#514; the mac's #504), one block ----
+        /// <summary>
+        /// A teacher's press of Preview asked for the page last viewed, or
+        /// the page is opened, or the front page opened instead and why —
+        /// gone, did not answer, nothing remembered, the front page was the
+        /// page last viewed, today's class was just put on it. The page's
+        /// PLACE (its decoded path), never its words. Falling back is silent
+        /// on screen, so this line is its only record.
+        /// </summary>
+        PreviewStartedAtThePageLastViewed,
+        /// <summary>
+        /// File ▸ Settings ▸ Preview changed where a press of Preview opens
+        /// (#514): the front page or the page last viewed. One line per
+        /// change, so "Preview opened somewhere odd" can be answered.
+        /// </summary>
+        PreviewStartPageChosenInSettings,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -678,6 +779,19 @@ public static class ActivityTrail
         Event.UpdateSetAside => "update set aside",
         Event.UpdateStopped => "update stopped",
         Event.WorkingFolderToolsCopied => "working folder tools copied",
+        Event.RecentWorkingFoldersCleared => "recent working folders cleared",
+        Event.RanFromAMenu => "ran from a menu",
+        Event.SectionMenuBackedUpACourse => "section menu backed up a course",
+        Event.LaterClassesAsked => "asked about classes dated after the next class",
+        Event.LaterClassesWentOut => "deployed with classes dated after the next class",
+        Event.LaterClassesHeldADeployBack => "a deploy was held back for classes dated after the next class",
+        Event.CloudflareAccountIdChangedInSettings => "Cloudflare account ID changed in Settings",
+        Event.PlantoirHelpOpened => "opened Plantoir Help",
+        Event.PreviewPageOpenedInBrowser => "preview page opened in the web browser",
+        Event.GuidanceFileAskedAbout => "asked before adding guidance to a file",
+        Event.GuidanceCouldNotBeWritten => "guidance for assistants could not be written",
+        Event.PreviewStartedAtThePageLastViewed => "preview started at the page last viewed",
+        Event.PreviewStartPageChosenInSettings => "preview start page chosen in Settings",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

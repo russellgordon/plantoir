@@ -122,6 +122,17 @@ public sealed class CopyAPageDialog
             _chosenPage = _offered.FirstOrDefault(p => Shown(p).Equals(box.Text, StringComparison.Ordinal));
             RefreshAsk();
         };
+        // Escape is never trapped (#491 item 1): measured, the AutoSuggestBox
+        // swallows every Escape, list open or not. While its list is drawn the
+        // press closes the list (WinUI's own handling); otherwise the dialog
+        // closes, as its Cancel would.
+        _picker.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key != Windows.System.VirtualKey.Escape) return;
+            if (PickerEscape.For(_picker.IsSuggestionListOpen) != PickerEscape.Result.LetTheDialogHaveIt) return;
+            args.Handled = true;
+            _dialog.Hide();
+        };
         _picker.SuggestionChosen += (_, args) =>
         {
             _chosenPage = _offered.FirstOrDefault(p => Shown(p) == args.SelectedItem as string);
@@ -190,7 +201,7 @@ public sealed class CopyAPageDialog
                 : null;
         _askNote.Text = problem ?? "";
         _askNote.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
-        _dialog.IsPrimaryButtonEnabled = problem is null && _chosenPage is not null && _folder.SelectedItem is string;
+        DialogButtons.EnablePrimary(_dialog, problem is null && _chosenPage is not null && _folder.SelectedItem is string);
     }
 
     // ---- Stage 2: the checklist, in the future tense ------------------------
@@ -277,7 +288,7 @@ public sealed class CopyAPageDialog
         foreach (var skip in plan.Skipped)
             Add(_sentences, Say(CoursePageCopy.FutureOf(skip.Reason), ("page", skip.Name)));
         if (plan.LinksLeadingNowhere.Count > 0) Add(_sentences, CopyPageWording.Names(plan.LinksLeadingNowhere));
-        _dialog.IsPrimaryButtonEnabled = plan.Pages.Count > 0;
+        DialogButtons.EnablePrimary(_dialog, plan.Pages.Count > 0);
     }
 
     private static void Add(Panel panel, string text) =>
@@ -314,7 +325,7 @@ public sealed class CopyAPageDialog
         var plan = _plan!;
         var destination = request.Destination;
         string course = ReferenceCourse.ShownCode(destination);
-        _dialog.IsPrimaryButtonEnabled = false;
+        DialogButtons.EnablePrimary(_dialog, false);
         if (_session.BackupName is null)
             _dialog.Content = new TextBlock { Text = Say("savingACopyFirst", ("course", course)), TextWrapping = TextWrapping.Wrap };
 
@@ -340,7 +351,7 @@ public sealed class CopyAPageDialog
             Add(outer, Say(refusal, ("course", course)));
             _dialog.Content = outer;
             _dialog.PrimaryButtonText = Say("copyAnother");
-            _dialog.IsPrimaryButtonEnabled = true;
+            DialogButtons.EnablePrimary(_dialog, true);
             _dialog.CloseButtonText = "Done";
             return;
         }
@@ -377,7 +388,7 @@ public sealed class CopyAPageDialog
             outer.Children.Add(new TextBlock { Text = Say("theBackupTaken", ("course", course), ("named", named)), TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
         _dialog.Content = outer;
         _dialog.PrimaryButtonText = Say("copyAnother");
-        _dialog.IsPrimaryButtonEnabled = true;
+        DialogButtons.EnablePrimary(_dialog, true);
         _dialog.CloseButtonText = "Done";
     }
 

@@ -231,7 +231,8 @@ public static class LinksChecklist
     /// ReleaseSite, which runs only for a new website): each fragment moves
     /// into <c>section&lt;N&gt;.published-pages.previous-yyyy-MM-dd_HHmmss/</c>,
     /// the folder itself is KEPT so an undo can write them back, and the
-    /// answered file goes. Every write is reported to <paramref name="undo"/>
+    /// answered file goes — and so does the record of classes kept at their
+    /// dates (#475, <see cref="LaterClassesKept"/>). Every write is reported to <paramref name="undo"/>
     /// so it joins the rollover's own undo entry when one is open.
     /// </summary>
     /// <returns>Where the fragments went, or null when there were none.</returns>
@@ -267,6 +268,15 @@ public static class LinksChecklist
             undo?.Touch(answered, File.ReadAllText(answered));
             File.Delete(answered);
             undo?.Wrote(answered, null);
+        }
+        // The classes kept at their dates (#475, laterClassesKept) are last
+        // term's answer too, released with it — under the same undo entry.
+        string kept = LaterClassesKept.PathFor(courseDirectory, section);
+        if (File.Exists(kept))
+        {
+            undo?.Touch(kept, File.ReadAllText(kept));
+            File.Delete(kept);
+            undo?.Wrote(kept, null);
         }
         return moved;
     }

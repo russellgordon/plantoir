@@ -444,7 +444,7 @@ public sealed partial class TaskProgressView : UserControl
                     {
                         Title = req.Title,
                         Content = panel,
-                        PrimaryButtonText = "Save and continue",
+                        PrimaryButtonText = "Save and Continue",
                         CloseButtonText = "Cancel",
                         DefaultButton = ContentDialogButton.Primary,
                         XamlRoot = XamlRoot,

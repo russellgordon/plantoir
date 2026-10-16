@@ -89,6 +89,22 @@ public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan
     /// <summary>What <see cref="NextClassKey"/> carried, or null. See there.</summary>
     public AssistNextClassReading? NextClass { get; init; }
 
+    /// <summary>
+    /// Whether the answer said where the last change was made
+    /// (<see cref="AssistWorkspace.LastChangeKey"/>) — sent by the Section
+    /// menu's server only (#489). False means "not told", never "nothing to undo".
+    /// </summary>
+    public bool CarriesLastChange { get; init; }
+
+    /// <summary>Where the change at the top of the server's undo list was made, <c>CODE/N</c>; null for none (when <see cref="CarriesLastChange"/>).</summary>
+    public string? LastChange { get; init; }
+
+    /// <summary>How many changes the server's undo list holds after the call (<see cref="AssistWorkspace.ChangesToUndoKey"/>); null when not told.</summary>
+    public int? ChangesToUndo { get; init; }
+
+    /// <summary>Whether the call changed anything (<see cref="AssistWorkspace.ChangedKey"/>); null when not told — the menu's server alone tells.</summary>
+    public bool? Changed { get; init; }
+
     /// <summary>The same words to both, which is most tools.</summary>
     public static AssistToolAnswer Same(string both) => new(both, both);
 
@@ -106,8 +122,16 @@ public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan
         string? backup = meta?[ConversationBackupKey]?.GetValue<string>();
         bool noPage = meta?[NoPageFoundKey]?.GetValue<bool>() == true;
         var nextClass = AssistNextClassReading.FromJson(meta?[NextClassKey]);
+        bool carriesLastChange = meta is JsonObject carrying && carrying.ContainsKey(AssistWorkspace.LastChangeKey);
+        string? lastChange = carriesLastChange ? meta?[AssistWorkspace.LastChangeKey]?.GetValue<string>() : null;
+        int? changesToUndo = meta?[AssistWorkspace.ChangesToUndoKey]?.GetValue<int>();
+        bool? changed = meta?[AssistWorkspace.ChangedKey]?.GetValue<bool>();
         return string.IsNullOrWhiteSpace(summary)
-            ? Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage, NextClass = nextClass }
-            : new AssistToolAnswer(summary, detail, isPlan, backup, noPage) { NextClass = nextClass };
+            ? Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage, NextClass = nextClass,
+                                  CarriesLastChange = carriesLastChange, LastChange = lastChange, ChangesToUndo = changesToUndo,
+                                  Changed = changed }
+            : new AssistToolAnswer(summary, detail, isPlan, backup, noPage)
+              { NextClass = nextClass, CarriesLastChange = carriesLastChange, LastChange = lastChange, ChangesToUndo = changesToUndo,
+                Changed = changed };
     }
 }

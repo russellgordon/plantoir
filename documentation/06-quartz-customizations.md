@@ -421,7 +421,7 @@ expectations; a map with none leaves out every sentence about them.
 Nothing Plantoir ships contains the College Board's pages: the framework's
 text is the teacher's to bring. A teacher makes a folder such as
 `College Board Curriculum`, ticks it under Course Settings → "Curriculum
-folders", and asks "Revise with Claude…" to draft one page per expectation
+folders", and asks Revise With ▸ Claude… to draft one page per expectation
 code from the framework they have — `1.A`, `CRD-1.A` and so on, one page
 each, named by the code alone. The next preview or publish draws a second
 coverage map for it, linked from Key Links under that folder's entry.
@@ -700,7 +700,12 @@ Edge's first launch from a Homebrew cask waits on macOS's "downloaded from
 the Internet" prompt, and until it is answered `requestAnimationFrame` never
 fires, which made Paged.js hang and looked exactly like an Edge bug.
 Not measured here: a site published to Netlify or Cloudflare (the files are
-identical to the preview's), Windows browsers (the `windows` issue asks).
+identical to the preview's). Windows, after #499's look (so not comparable
+row for row with this table): `print_handout.mjs` OK in headless Edge 155 on
+a native build, questions only 12 / answers only 1 / both 13 pages portrait,
+14 / 2 / 16 landscape (#496, 2026-10-15; `12-windows-app.md` → "Printable
+pages", which since 2026-10-15 also has the headed measurements: the
+browser's print window after the hand-over, 1 sheet questions only).
 These counts are from before #499's look; F8 has the counts after it.
 
 ### F8. On paper: the look of a handout, and nothing lost (#499, v1.6.0)
@@ -843,8 +848,12 @@ page, and the sentence is conditional, so it is true there too).
 **Not done / open:**
 the answer key has no strand headings; a displayed formula taller than the
 page, or one unbreakable term wider than it, cannot print (refused, with the
-sentence). Windows owes all of this:
-#496.
+sentence). The Windows app's share (Course Settings → Printing, the
+`settings saved` clause, the guidance for assistants, the preview pane's
+hand-over to the browser) landed on 2026-10-15 under #496:
+`12-windows-app.md` → "Printable pages", with its browser measurements
+(headless, and on 2026-10-15 the pane and the hand-over on an unlocked
+desktop: the fragment survives ShellExecute and Edge prints at once).
 
 ### F9. ⌘P on every other page (#501, v1.7.0)
 
@@ -944,7 +953,14 @@ handout handle them (F8). Mermaid drawn dark prints near-white labels (28
 words on What This Site Can Do).
 
 **Windows inherits it free** — the block is in `support/quartz`, installed by
-`build_site.py` on every build. It owes one measurement: ⌘P → Save as PDF in
+`build_site.py` on every build. It owed one measurement, taken on #496
+(2026-10-15, headless Edge 155 by `print_plain_page.mjs` unchanged, Intel
+i5-8365U, Windows 11 Pro 26200): Plain Long Page 4 pages portrait, 5
+landscape, 40/40 sentinels inked, 0 past the edge, no sidebar on paper,
+light and dark — the same result as Chrome here. Ctrl+P in the preview
+pane (WebView2, 2026-10-15) printed *Similar Triangles Practice* on 2 sheets
+with its corners; a headed Edge run of the checks themselves is not possible
+(`Page.printToPDF` is headless only), and Chrome is not installed there. The measurement as asked was: ⌘P → Save as PDF in
 Edge and Chrome on a long page that is not printable, portrait and landscape,
 light and dark, because Windows' DPI and default margins can put the paper
 width on the other side of 800 px.
