@@ -15,7 +15,7 @@
 //
 // The selector wins over Quartz's explorer rules by SPECIFICITY alone - this
 // file's rules come BEFORE explorer.scss's in index.css - so do not shorten
-// it. No Quartz rule sets padding or text-indent on a sidebar li today.
+// it. No Quartz rule sets padding or position on a sidebar li today.
 //
 // The dot's colour is the page title's own: --dark at the opacity Quartz gives
 // the title. scripts/test_sidebar_page_marker.py reads the two declarations
@@ -25,27 +25,32 @@
 // Left and right are written physically, as Quartz's own `.folder-outer > ul`
 // rule is: the sidebar is laid out left to right.
 
-$hang: 0.8em; // how far the title sits in from the row's edge
+$hang: 0.8em; // how far the title sits in from the row's edge (the dot is inside it)
 $dot: 0.32em; // the dot's width and height
 
 .explorer .explorer-content .folder-outer > ul > li:has(> a) {
+  // The title starts $hang in, on every line, so a wrapped second line starts
+  // under its first letter; the dot sits in that padding.
+  position: relative;
   padding-left: $hang;
-  // The first line starts back at the row's edge, so the dot hangs in the
-  // padding and a wrapped second line starts under the title's first letter.
-  text-indent: -$hang;
 
+  // Drawn OUT of the line (absolutely, against the row), not as an inline box
+  // before the title: an inline dot can be left alone on the first line when
+  // the title's first word is wider than the sidebar (#515 review). `lh` is the
+  // row's own line height, so the dot stays level with the first line
+  // whatever the scheme's font and line height; `top: .5em` is for a browser
+  // without `lh`.
   &::before {
     content: "";
-    display: inline-block;
+    position: absolute;
+    left: 0;
+    top: 0.5em;
+    top: calc(0.5lh - #{$dot * 0.5});
     width: $dot;
     height: $dot;
-    // dot + gap == hang, so the title's first letter lands on the content edge
-    margin-right: $hang - $dot;
     border-radius: 50%;
     background-color: var(--dark);
     opacity: 0.75;
-    vertical-align: middle;
-    text-indent: 0;
   }
 }
 
