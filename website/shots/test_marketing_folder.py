@@ -309,6 +309,118 @@ class Ics4uFileStepTests(unittest.TestCase):
         self.assertTrue(any(line.startswith("ICS4U") for line in report.named_and_skipped), report.named_and_skipped)
 
 
+def installed(payload_page: str) -> str:
+    """A shared page as the course installer writes it into a two-section
+    course: per-section dates and publish states, curriculum markers gone."""
+    import setup_course
+    text = payload_page.replace("__CREATED__", "2026-09-14T07:00:00.000+0000")
+    return setup_course.per_section_frontmatter(setup_course.strip_curriculum_blocks(text, True), [1, 2])
+
+
+class CodePageTests(unittest.TestCase):
+    """The code figures' pages (#562): ICS3U's runnable pages brought into a
+    folder made before #561, and the two planted pages."""
+
+    @staticmethod
+    def before_it_was_runnable(text: str) -> str:
+        """A page as #561 found it: no codeRunner line, no `run` flags."""
+        lines: list[str] = []
+        for line in text.split("\n"):
+            if line.strip() == "codeRunner: true":
+                continue
+            lines.append(line.replace("```python run readonly", "```python").replace("```python run", "```python"))
+        return "\n".join(lines)
+
+    def runnable_page_with_embeds(self) -> str:
+        """A runnable ICS3U page that this set-up also gives College Board
+        embeds, by its place without .md."""
+        for row in mf.load_correlation():
+            page = SUPPORT / "example_content" / "ICS3U" / "shared" / (row["page"] + ".md")
+            if page.is_file() and "codeRunner: true" in page.read_text(encoding="utf-8"):
+                return row["page"]
+        self.fail("no runnable ICS3U page carries College Board embeds")
+
+    def test_a_page_installed_before_it_was_runnable_is_brought_up_to_date_with_its_embeds(self):
+        place = self.runnable_page_with_embeds()
+        source = SUPPORT / "example_content" / "ICS3U" / "shared" / (place + ".md")
+        earlier = self.before_it_was_runnable(source.read_text(encoding="utf-8"))
+        self.assertNotEqual(earlier, source.read_text(encoding="utf-8"))
+
+        def versions(path: Path) -> list:
+            return [earlier] if path == source else []
+
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            kept = folder / "courses" / "ICS3U" / (place + ".md")
+            kept.write_text(installed(source.read_text(encoding="utf-8")), encoding="utf-8")
+            mf.apply_file_steps(folder, FAKE_PAGES)
+            up_to_date = kept.read_text(encoding="utf-8")
+            self.assertIn("publishForSection2: true\ncodeRunner: true\n", up_to_date)
+            self.assertIn("\n\n![[", up_to_date[up_to_date.index("## Curriculum connection"):])
+            kept.write_text(self.before_it_was_runnable(up_to_date), encoding="utf-8")
+            report = mf.Report()
+            mf.apply_code_steps(folder, report, earlier_versions=versions)
+            refreshed = kept.read_text(encoding="utf-8")
+        self.assertIn(f"made: ICS3U/{place}.md runnable", report.lines)
+        self.assertEqual(refreshed, up_to_date, "the payload's runnable page, with the embeds put back where they were")
+
+    def test_a_page_somebody_changed_is_left_as_they_changed_it(self):
+        place = "Warm-Ups/Spot the Bug"
+        source = SUPPORT / "example_content" / "ICS3U" / "shared" / (place + ".md")
+        earlier = self.before_it_was_runnable(source.read_text(encoding="utf-8"))
+
+        def versions(path: Path) -> list:
+            return [earlier] if path == source else []
+
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            kept = folder / "courses" / "ICS3U" / (place + ".md")
+            changed = earlier + "\nRussell's own closing line.\n"
+            kept.write_text(changed, encoding="utf-8")
+            report = mf.Report()
+            mf.apply_code_steps(folder, report, earlier_versions=versions)
+            after = kept.read_text(encoding="utf-8")
+        self.assertEqual(after, changed)
+        self.assertIn(f"left as you changed it: ICS3U/{place}.md runnable", report.lines)
+
+    def test_without_an_earlier_version_nothing_is_taken_for_one(self):
+        place = "Warm-Ups/Spot the Bug"
+        source = SUPPORT / "example_content" / "ICS3U" / "shared" / (place + ".md")
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            kept = folder / "courses" / "ICS3U" / (place + ".md")
+            earlier = self.before_it_was_runnable(source.read_text(encoding="utf-8"))
+            kept.write_text(earlier, encoding="utf-8")
+            mf.apply_code_steps(folder, mf.Report(), earlier_versions=lambda path: [])
+            self.assertEqual(kept.read_text(encoding="utf-8"), earlier)
+
+    @unittest.skipIf(not (REPO / ".git").exists(), "needs the repository's history")
+    def test_git_holds_the_page_as_it_was_before_it_was_runnable(self):
+        source = SUPPORT / "example_content" / "ICS3U" / "shared" / "Warm-Ups" / "Spot the Bug.md"
+        versions = mf.git_versions(source)
+        self.assertEqual(versions[0], source.read_text(encoding="utf-8"), "newest first, and it is the committed one")
+        self.assertTrue(any("```python run" not in version for version in versions),
+                        "an earlier payload, with a plain fence, is in the history")
+
+    def test_the_code_pages_are_planted_and_are_what_the_figures_need(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            report = mf.apply_file_steps(folder, FAKE_PAGES)
+            swift = (folder / "courses" / "ICS4U" / "Programs" / "Reading Input in Swift.md").read_text(encoding="utf-8")
+            quiz = (folder / "courses" / "ICS3U" / "Exercises" / "Check Your Loops.md").read_text(encoding="utf-8")
+            self.assertFalse((folder / "courses" / "ICS3U" / "Programs" / "Reading Input in Swift.md").exists())
+        self.assertIn("made: ICS4U/Programs/Reading Input in Swift.md", report.lines)
+        self.assertIn("made: ICS3U/Exercises/Check Your Loops.md", report.lines)
+        self.assertIn("\ncodeRunner: true\n", swift.split("\n---", 1)[0] + "\n")
+        self.assertIn("```swift run\n", swift)
+        self.assertIn("readLine()", swift)
+        # The first quiz is what code-quiz.js answers: its second choice is the ticked one.
+        first = quiz[quiz.index("> [!quiz]"):]
+        choices = [line for line in first.split("\n") if line.startswith("> - [")][:4]
+        self.assertEqual([line[4:7] for line in choices], ["[ ]", "[x]", "[ ]", "[ ]"])
+        self.assertIn("> > [!explain]", first.split("\n\n")[0])
+
+
 def cached_ced() -> Path | None:
     candidates = []
     if os.environ.get("PLANTOIR_CED_PDF"):
