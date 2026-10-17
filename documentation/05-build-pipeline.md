@@ -1543,6 +1543,10 @@ expectations and chips; a map with none leaves out the chip sentence, the
 notes, and an empty chips `div` is never written. The old sort key read
 `int(code.split(".")[0][1:])`, which is `int("")` for `1.A`: widening the rule
 without replacing it would have stopped every such build with a traceback.
+The same `overall_of` decides what an overall expectation's page lists under
+"When did we do this?": every page that links it or any of its specific
+expectations in the same folder (#505, `documentation/06-quartz-customizations.md`
+→ D1).
 
 **Nested pages and repeats.** Pages are collected RECURSIVELY, shallowest
 first then by path — a plain path sort puts `(old)/A1.1` and `2019 version/A1.1`
