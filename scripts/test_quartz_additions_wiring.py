@@ -2,9 +2,10 @@
 """
 The edits that connect support/quartz to a section's Quartz copy
 (build_site.wire_quartz_additions): the Print button's (#454), the figures
-transformer's (#485 E1) and, since #455, the runnable code's - its
-transformer straight before SyntaxHighlighting and its component at the head
-of the shared afterBody list.
+transformer's (#485 E1), since #455 the runnable code's - its transformer
+straight before SyntaxHighlighting and its component at the head of the
+shared afterBody list - and since #563 the self-check quizzes' transformer,
+straight after the figures transformer.
 
 Run against embedded copies of Quartz v4.5.0's own files (measured in
 quartz-teacher:dev-test, 2026-10-17): wired once, a second build changes
@@ -111,6 +112,11 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(config.count("Plugin.CodeRunnerFences(),"), 1)
         self.assertIn("      Plugin.CodeRunnerFences(),\n      Plugin.SyntaxHighlighting({", config,
                       "the runner's transformer goes straight before SyntaxHighlighting, at its indent")
+        self.assertEqual(self.text("transformers").count('export { PlantoirQuizzes } from "./plantoirQuizzes"'), 1)
+        self.assertEqual(config.count("Plugin.PlantoirQuizzes(),"), 1)
+        self.assertIn("      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n"
+                      "      Plugin.Latex(", config,
+                      "the quizzes' transformer goes straight after the figures', so after Description, at its indent")
         layout = self.text("layout")
         self.assertIn("afterBody: [Component.CodeRunner()],", layout)
         self.assertIn("Component.PlantoirMetaLine(Component.ContentMeta())", layout)
@@ -141,6 +147,21 @@ class WiringTests(unittest.TestCase):
                                         encoding="utf-8")
         build_site.wire_quartz_additions(self.output)
         self.assertIn("afterBody: [Component.CodeRunner(), Component.Comments()],", self.text("layout"))
+
+    def test_a_section_wired_before_563_gets_the_quizzes_after_its_figures(self):
+        self.files["config"].write_text(CONFIG.replace(
+            "      Plugin.Description(),\n", "      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n", 1),
+            encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        config = self.text("config")
+        self.assertEqual(config.count("Plugin.PlantoirFigures("), 1)
+        self.assertIn("Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n", config)
+
+    def test_quizzes_without_the_figures_anchor_are_said_and_left_out(self):
+        changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")
+        self.files["config"].write_text(changed, encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        self.assertNotIn("PlantoirQuizzes", self.text("config"))
 
     def test_a_moved_anchor_is_left_alone(self):
         changed = CONFIG.replace("Plugin.SyntaxHighlighting(", "Plugin.Highlighting(")

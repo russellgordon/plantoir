@@ -206,6 +206,10 @@ COPY scripts/print_settings.py /opt/scripts/print_settings.py
 # through support/figures/plantoir-figures.mjs, caches, and gates what the site
 # carries. Imported by build_site.py by bare name.
 COPY scripts/figures.py /opt/scripts/figures.py
+# Self-check quizzes (#563): the folder check that reads every `> [!quiz]` by
+# the site's own rules and writes the words the site's quizzes use. Imported
+# by build_site.py by bare name (test_baked_modules.py).
+COPY scripts/quizzes.py /opt/scripts/quizzes.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).
