@@ -318,6 +318,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-20 | **mhchem enabled** | `quartz/plugins/transformers/latex.ts` | Adds `import "katex/contrib/mhchem"`, so `$\ce{CaCO3(s) <=> CaO(s) + CO2(g)}$` renders. KaTeX runs at build time here, and the `katex` package Quartz already installs ships the extension, so this downloads nothing. |
 | C2-21 | **Curriculum coverage map styles** | `quartz/styles/base.scss` (appended) | The grid, chips, and the five-step red → orange → yellow → green → blue scale for the generated `Curriculum Coverage` page. The colours are deliberately NOT taken from the course's colour scheme — the map's whole meaning is that ordered reading, and a scheme that recoloured it would destroy that. The scale was SEARCHED rather than picked by eye: `scripts/choose_coverage_scale.py` scores candidates on CIEDE2000 separation and through deuteranopia and protanopia simulation, which is why the top step is blue rather than a darker green — the closest pair an ordinary-sighted reader now sees is ΔE 31, against ΔE 10 before. Cells carry the expectation's code and nothing else: a digit in every cell turned the map into a table of numbers, so the count now reaches a screen reader through the cell's label and a teacher through the hover preview. The legend is a vertical list below a rule, worded "addressed once", "addressed twice", and so on. The ring marking assessed work is two rings — white inside dark — so that it stays legible on all five cell colours; a single tone disappeared on either the yellow or the darkest step depending on which was chosen. The style block is REPLACED rather than skipped when it is already present, so a stylesheet surviving from an earlier build still picks up changes. |
 | C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form. Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
+| C2-22b | **Backlinks overall-expectation map (#505)** | `quartz/components/Backlinks.tsx` | Rewrites the one `const overallChildren = new Map<string, string[]>([…])` line behind the `// CQ4T-OVERALL-ANCHOR` comment, on every build and with or without a coverage map (`set_backlinks_overall_children`, called right after C2-22): each overall expectation page's slug, mapped to its specific expectations' slugs (`overall_backlink_children`). See D1. |
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
 | C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
@@ -392,13 +393,65 @@ Contents" are likewise renamed to plain-language labels.
 
 ### D1. Patched `Backlinks.tsx` (`support/Backlinks.tsx`)
 
-Complements the locale change, and carries two changes. First, an
+Complements the locale change, and carries three changes. First, an
 `excludeBacklinks: true` frontmatter flag that suppresses the backlinks panel
 on a specific page — useful where "when did we do this?" makes no sense (a
 style guide, a syllabus) or where the link graph would mislead. Second, the
 `CQ4T-STRUCTURAL-ANCHOR` set that C2-22 rewrites each build, which keeps the
 curriculum indexes and the generated coverage maps out of every other page's
-backlinks.
+backlinks. Third, the `CQ4T-OVERALL-ANCHOR` map that C2-22b rewrites each
+build, which makes an overall expectation's page list the lessons that did
+its specific expectations (#505, below).
+
+#### An overall expectation lists its specific expectations' lessons (#505)
+
+**The rule** (`contracts/shared-rules.json` → `curriculumRules.overallBacklinks`,
+run by `scripts/test_overall_backlinks.py`): "When did we do this?" on an
+overall expectation's page (B1) lists every page that links B1 **or** any of
+its specific expectations (B1.1, B1.2, `b1.3`) in the same curriculum folder.
+One unlabelled list, each page once, in Quartz's order: the component runs
+ONE filter over `allFiles` with `targets = [slug, ...overallChildren.get(slug)]`,
+which de-duplicates for free. A specific expectation's page is unchanged
+(direct links only), and structural pages stay out exactly as before.
+
+**Why the overall page was empty.** Not the embed form and not Quartz skipping
+the page: the data. Classes connect to SPECIFIC expectations. Measured on the
+MPM2D example course: the only page linking "B1. Using Linear Systems to Solve
+Problems" was the Curriculum index, which is structural; across all example
+content, 44 pages outside a curriculum folder link an overall page directly,
+almost all of them a Learning Goals page. Built with this change (MPM2D,
+section 1 and section 2 alike), every one of the ten overall pages went from 0
+listed pages to between 4 and 15 (B1: 13), each list equal to the union of the
+direct links to the overall page and its specific expectations, while all
+specific expectation pages list exactly their direct links (B1.3: 2, as
+before).
+
+**How.** `overall_backlink_children(content_root, plan)` reads each mapped
+folder with `_collect_expectations` and groups specific expectations under
+`overall_of(code)` — the coverage map's own rule, so the panel and the map's
+overall chips count the same work. It is built PER FOLDER (two curriculum
+folders can each have a B1, and each gathers only its own), and slugs are
+written as Quartz v4.5.0's `sluggify` writes them (white space to `-`, `&` to
+`-and-`, `%` to `-percent`, `?` and `#` dropped) by `_quartz_page_slug`; the
+older `_quartz_slug` handles only spaces, which the coverage map's links can
+live with but an exact slug comparison cannot. A digit-first or College
+Board code has no overall expectation, so it gathers nothing. The map is a
+JavaScript `Map`, not an object literal, so a page whose slug is
+`constructor` finds nothing rather than a function.
+
+**Rejected.** Direct links only (the panel would say "Not yet addressed in
+class." for work the coverage map counts). Two lists — direct links first,
+then the specific expectations' pages — or a labelled second list ("through
+B1.3"): a page linking B1 and B1.3 would appear twice, and the label draws a
+distinction the coverage map does not make. A map keyed by code across every
+folder: two folders' B1 pages would each collect the other's lessons.
+
+**Checked** by `verify.sh` 6h (continued), on a real EXC2O build: a page
+embedding only `![[A2.1]]` must be listed once on the A2 page (it is listed
+nowhere there on the old component — measured), and a page embedding both
+`![[A2.1]]` and the A2 page must be listed once on A2 and once on A2.1.
+Windows builds with the same `build_site.py` and the same component, so it
+inherits this unchanged; `PythonToolchainTests` discovers the test.
 
 ### Curriculum maps: a second curriculum, and the codes a map reads (#128)
 
