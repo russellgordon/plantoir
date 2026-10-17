@@ -251,7 +251,7 @@ enum FolderActions {
     /// The paths marked open in a registry. Split out from
     /// `openVaultPathsNow` so the parsing can be tested without an
     /// Obsidian on the machine.
-    static func openVaultPaths(registryData: Data?) -> [String] {
+    nonisolated static func openVaultPaths(registryData: Data?) -> [String] {
         guard let registryData else {
             return []
         }

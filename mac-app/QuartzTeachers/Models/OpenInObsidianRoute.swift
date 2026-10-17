@@ -50,9 +50,10 @@ struct ObsidianOpening {
         return FolderActions.obsidianIsInstalled
     }
 
-    /// The vaults Obsidian has open now (`FolderActions.openVaultPathsNow`).
-    var openVaultPaths: @MainActor () -> [String] = {
-        return FolderActions.openVaultPathsNow
+    /// Whether Obsidian is running at all — hidden, minimised, full-screen
+    /// or on another Space included.
+    var isRunning: @MainActor () -> Bool = {
+        return FolderActions.obsidianIsRunning
     }
 
     /// Obsidian's registry, as it is on disk now.
@@ -231,7 +232,7 @@ extension WorkspaceModel {
                 vaultIsTheCourse: ObsidianFigureAddOnsOffer.vaultIsTheCourse(
                     targetPath: coursePath, coursePath: coursePath, registryData: self.obsidianOpening.registryData()
                 ),
-                courseOpenInObsidian: self.obsidianOpening.openVaultPaths().contains(coursePath)
+                courseOpenInObsidian: self.vaultsOpenInObsidian().contains(coursePath)
             )
             if decision == .install {
                 await self.addObsidianAddOns(toCourse: course, scanned.needed, trigger: .afterAPreview)
@@ -255,7 +256,7 @@ extension WorkspaceModel {
             vaultIsTheCourse: ObsidianFigureAddOnsOffer.vaultIsTheCourse(
                 targetPath: target.path, coursePath: coursePath, registryData: obsidianOpening.registryData()
             ),
-            courseOpenInObsidian: obsidianOpening.openVaultPaths().contains(coursePath),
+            courseOpenInObsidian: vaultsOpenInObsidian().contains(coursePath),
             reopenDeclinedThisRun: ObsidianFigureAddOnsThisRun.reopenDeclined.contains(coursePath)
         )
         switch ObsidianFigureAddOnsOffer.decision(situation) {
@@ -285,10 +286,11 @@ extension WorkspaceModel {
     /// own quit-and-reopen (`FolderActions.open`). If Obsidian does not close
     /// (a question of its own on screen), nothing is written.
     private func reopenObsidianWithAddOns(_ request: ObsidianAddOnsRequest) async {
-        let coursePath: String = request.course.directoryURL.path
-        let wereOpen: [String] = obsidianOpening.openVaultPaths()
+        let wereOpen: [String] = vaultsOpenInObsidian()
         await obsidianOpening.quitAndWait()
-        if obsidianOpening.openVaultPaths().contains(coursePath) {
+        // Write only once Obsidian is GONE — not merely without a window on
+        // screen (#495 implementation review B1).
+        if obsidianOpening.isRunning() {
             ActivityTrail.note(.obsidianReopenedForAddOns, ObsidianFigureAddOnsTrail.didNotClose(course: request.course.code))
             obsidianOpening.open(request.folder, request.course.directoryURL)
             return
@@ -297,6 +299,20 @@ extension WorkspaceModel {
         ActivityTrail.note(.obsidianReopenedForAddOns, ObsidianFigureAddOnsTrail.reopened(course: request.course.code))
         obsidianOpening.reopen(wereOpen)
         obsidianOpening.open(request.folder, request.course.directoryURL)
+    }
+
+    /// The vaults #495 treats as open: Obsidian is running and its registry
+    /// marks them open. Windows are NOT counted (implementation review B1,
+    /// measured: Russell's hidden Obsidian had 16 vault windows and 0 on
+    /// screen, so `FolderActions.openVaultPathsNow` — which needs a window on
+    /// screen, for the rename feature's sake — read every course as closed).
+    /// Over-reporting is the safe direction here: the preview pass waits and
+    /// Open in Obsidian asks to reopen.
+    private func vaultsOpenInObsidian() -> [String] {
+        return ObsidianFigureAddOnsOffer.vaultsOpen(
+            obsidianRunning: obsidianOpening.isRunning(),
+            registryData: obsidianOpening.registryData()
+        )
     }
 
     /// One pass, through the queue, and its trail line.
