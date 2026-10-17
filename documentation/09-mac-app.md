@@ -2880,7 +2880,7 @@ One run per row unless the row says otherwise, as for printing.
 **The runnable-code skill (#455), measured the same way, 2026-10-17.**
 `plantoir-runnable-code` is ONE skill for every language in
 `codeRunnerBlocks.languages` (a language that joins adds a section, not a
-second skill); today it carries Python's: the opt-in, the fence and its
+second skill); it carries Python's and, since #493, Swift's. Python's: the opt-in, the fence and its
 flags, `input()` and EOFError, the measured list of what imports and what
 does not, files, `%%`, adding blocks after existing ones, where it works,
 printing, checking. Scratch working folder with the guidance as the app
@@ -2891,6 +2891,7 @@ the second calling `input()`):
 | Launcher | Started at | Prompt | Result |
 |---|---|---|---|
 | `claude -p` (2.1.302, `--permission-mode acceptEdits`) | working folder root | `Make the examples on the page "courses/ICS3U/Unit 2/Loops.md" runnable, so students can try them.` | PASS — `codeRunner: true` added to the settings, both fences ` ```python run ` (no flag, so the sum stays editable for the page's "Try it" task), and a sentence before the input example telling students to type a number in the input box before pressing Run; read by `page_features.runner_fences` as two runnable blocks. It ended by saying to preview and press Run on each block, as the skill's last section says |
+| `claude -p` (2.1.302, `--permission-mode acceptEdits`), #493 | working folder root, `courses/ICS4U/Unit 1/Reading Input.md` holding one plain ` ```swift ` example that reads a name and an age | `Make this Swift example runnable: courses/ICS4U/Unit 1/Reading Input.md` | PASS — `codeRunner: true` added, the fence ` ```swift run ` (no flag: every Swift block is read-only already), a sentence before it telling students to type their name and age on two lines of the input box, and "Try it" rewritten around running it again with a different age. The block compiled Embedded (49,370 bytes) and ran through the site's WASI shim with `Ada` and `16`. It said it could not check the compile itself (no compiler it was allowed to run), as the skill's section 4 asks |
 
 **Why Codex fails inside a course, measured.** Codex reads `AGENTS.md`
 files from its PROJECT ROOT down to where it was started, and finds the root
