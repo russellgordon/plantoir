@@ -1159,6 +1159,11 @@ struct CourseSettingsView: View {
             line += ", with its index page and a page to duplicate"
         } else if outcome.indexPagesWritten > 0 {
             line += ", with its index page"
+        } else if outcome.templatesWritten > 0 {
+            // Its index.md appeared between the folder being made and the
+            // pages being written, and stays the teacher's; the template is
+            // still Plantoir's, so the line still says so.
+            line += ", with a page to duplicate"
         }
         return line
     }

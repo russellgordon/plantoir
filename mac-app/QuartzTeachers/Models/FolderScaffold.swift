@@ -125,7 +125,7 @@ enum FolderScaffold {
     /// (`setup_course.py`, "Create shared structure").
     nonisolated static func sharedIndexText(forFolderNamed name: String, sectionNumbers: [Int], created: String) -> String {
         var text: String = "---\n"
-        text += "title: \(name)\n"
+        text += "title: \(frontmatterTitle(name))\n"
         for number in sectionNumbers {
             text += "createdSection\(number): \(created)\n"
             text += "publishForSection\(number): true\n"
@@ -141,12 +141,92 @@ enum FolderScaffold {
     /// sentence `SectionAdder` writes when it has no sibling to copy.
     nonisolated static func sectionIndexText(forFolderNamed name: String, created: String) -> String {
         var text: String = "---\n"
-        text += "title: \(name)\n"
+        text += "title: \(frontmatterTitle(name))\n"
         text += "created: \(created)\n"
         text += "publish: true\n"
         text += "---\n"
         text += "This is the **\(name)** folder. Add Markdown files to this folder to build out your site.\n"
         return text
+    }
+
+    /// What follows `title: ` for a folder's or file's name: the name itself,
+    /// or — when written plain it would not read back as the name — the name
+    /// double-quoted with JSON's escapes, which YAML reads as the same text.
+    ///
+    /// Measured (#506's review): a folder called `Unit: One`, `'Tis the
+    /// Season` or `& Friends` got an index page the build could not read, so
+    /// the folder stayed out of the sidebar and the teacher was told to fix a
+    /// page Plantoir had just written. Setup's `frontmatter_title` is the same
+    /// rule, and `contracts/course-management.json` →
+    /// `foldersAddedLater.titleQuoting` pins both.
+    nonisolated static func frontmatterTitle(_ name: String) -> String {
+        if !titleNeedsQuoting(name) {
+            return name
+        }
+        var quoted: String = "\""
+        for scalar in name.unicodeScalars {
+            switch scalar {
+            case "\"":
+                quoted += "\\\""
+            case "\\":
+                quoted += "\\\\"
+            case "\n":
+                quoted += "\\n"
+            case "\r":
+                quoted += "\\r"
+            case "\t":
+                quoted += "\\t"
+            case "\u{08}":
+                quoted += "\\b"
+            case "\u{0C}":
+                quoted += "\\f"
+            default:
+                if scalar.value < 0x20 {
+                    quoted += "\\u" + String(format: "%04x", scalar.value)
+                } else {
+                    quoted.unicodeScalars.append(scalar)
+                }
+            }
+        }
+        quoted += "\""
+        return quoted
+    }
+
+    /// Setup's `title_needs_quoting`, the same rule character for character:
+    /// empty; a first character that is neither an ASCII letter nor beyond
+    /// ASCII (every YAML indicator, a space, a digit); a last character that
+    /// is a space, a tab or a colon; `: `, ` #` or a control character
+    /// anywhere; or one of YAML 1.1's plain words for true, false and null.
+    /// Generous on purpose — a quoted title is still the same title.
+    nonisolated static func titleNeedsQuoting(_ name: String) -> Bool {
+        let scalars: [Unicode.Scalar] = Array(name.unicodeScalars)
+        guard let first = scalars.first, let last = scalars.last else {
+            return true
+        }
+        let firstIsASCIILetter: Bool = (first >= "A" && first <= "Z") || (first >= "a" && first <= "z")
+        if !firstIsASCIILetter && first.value <= 127 {
+            return true
+        }
+        if last == " " || last == "\t" || last == ":" {
+            return true
+        }
+        // Read scalar by scalar, as Python reads code points: a `String`
+        // search would miss ": " when a combining mark follows the space.
+        var previous: Unicode.Scalar? = nil
+        for scalar in scalars {
+            if scalar.value < 0x20 || scalar.value == 0x7F {
+                return true
+            }
+            if previous == ":" && scalar == " " {
+                return true
+            }
+            if previous == " " && scalar == "#" {
+                return true
+            }
+            previous = scalar
+        }
+        let plainNonTextWords: Set<String> = ["true", "false", "yes", "no", "on", "off", "y", "n", "null", "~"]
+        return plainNonTextWords.contains(name.lowercased())
     }
 
     /// The template as setup would pour it: the date filled in, the

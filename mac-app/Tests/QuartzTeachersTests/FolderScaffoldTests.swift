@@ -177,6 +177,47 @@ final class FolderScaffoldTests: XCTestCase {
         XCTAssertEqual(untouched, ["Monday.md"], "a section that already had the folder gets nothing")
     }
 
+    // MARK: - What the trail says
+
+    /// The "folder created" line names what was put inside the folder, and
+    /// only that — including the template written alone, when the folder's
+    /// `index.md` appeared between the folder being made and the pages being
+    /// written (#506's review, N2).
+    func testTheTrailLineNamesWhatWasWritten() {
+        let base: String = "created the folder Labs in ICS3U (shared_folders)"
+        let expectations: [(outcome: FolderScaffold.Outcome, ending: String)] = [
+            (FolderScaffold.Outcome(foldersCreated: 1, indexPagesWritten: 1, templatesWritten: 1),
+             ", with its index page and a page to duplicate"),
+            (FolderScaffold.Outcome(foldersCreated: 1, indexPagesWritten: 1, templatesWritten: 0),
+             ", with its index page"),
+            (FolderScaffold.Outcome(foldersCreated: 1, indexPagesWritten: 0, templatesWritten: 1),
+             ", with a page to duplicate"),
+            (FolderScaffold.Outcome(foldersCreated: 1, indexPagesWritten: 0, templatesWritten: 0),
+             ""),
+        ]
+        for expectation in expectations {
+            XCTAssertEqual(
+                CourseSettingsView.folderCreatedTrailLine(
+                    name: "Labs", courseCode: "ICS3U", scope: .shared, outcome: expectation.outcome
+                ),
+                base + expectation.ending
+            )
+        }
+    }
+
+    /// A folder whose name YAML would misread gets a quoted title, so the
+    /// build can read its index page (#506's review, S1).
+    func testAFolderNamedWithAColonGetsAQuotedTitle() throws {
+        let course: Course = try makeCourse(curriculumPages: [])
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+
+        _ = view.noticeAfterFolderChange("Unit: One", change: .added, scope: .shared)
+
+        let index: String = try XCTUnwrap(text(at: course.directoryURL
+            .appendingPathComponent("Unit: One").appendingPathComponent("index.md")))
+        XCTAssertTrue(index.hasPrefix("---\ntitle: \"Unit: One\"\n"), index)
+    }
+
     // MARK: - The template is every skeleton's
 
     /// The template a folder added later gets is the generic family's, and

@@ -2072,14 +2072,24 @@ shared index to `publish: true` and the split template to `publish: false`
 for every listed section. `SectionAdder` already mirrored setup's per-section
 folder page natively, and is the precedent for mirroring rather than calling.
 
+The title is `FolderScaffold.frontmatterTitle(name)`: quoted whenever YAML
+would misread the name plain (`Unit: One`, `'Tis the Season`, `& Friends` were
+measured unreadable by the build), by the rule `contracts/course-management.json`
+→ `foldersAddedLater.titleQuoting` pins and setup's `frontmatter_title` shares
+— doc 04 "5. Content structure" has it. `SectionAdder.scaffoldFrontmatter`'s
+fallback (no sibling page to copy) uses the same function.
+
 The trail's `folder created` line now ends ", with its index page and a page
-to duplicate" (", with its index page" if the template was missing from the
-bundle), from `CourseSettingsView.folderCreatedTrailLine`. Tests:
+to duplicate", or names the one that was written (", with its index page" if
+the template was missing from the bundle; ", with a page to duplicate" if the
+folder's `index.md` appeared in between and stayed the teacher's), from
+`CourseSettingsView.folderCreatedTrailLine`. Tests:
 `CourseManagementContractTests.testEveryFolderAddedLaterCase` (the contract's
-six cases, bytes), `FolderScaffoldTests` (the click itself through
-`noticeAfterFolderChange` — three of its five fail on the code before #506 —
-and every skeleton template, in the repository and the bundle, byte for byte
-the contract's `templateSource`).
+seven cases, bytes) and `testEveryTitleQuotingCase`, `FolderScaffoldTests` (the
+click itself through `noticeAfterFolderChange` — three of its first five fail on
+the code before #506 — the trail line's four endings, a colon name's quoted
+title, and every skeleton template, in the repository and the bundle, byte for
+byte the contract's `templateSource`).
 
 ### Curriculum folders: several maps, protection and the offer (#128)
 
