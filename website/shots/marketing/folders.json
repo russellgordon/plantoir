@@ -13,6 +13,14 @@
       "about": "Every section's front page shows the LATEST class dated on or before this month and day of the school year (never a fixed date: January 15 is a Friday in 2027 and a Saturday in 2028), and every class after it is unpublished. Made through the app's own door (Plantoir --mcp-stdio on the Mac, plantoir-mcp.exe on Windows) with unpublish_pages from the next class's date onward, so the app repoints the front page itself.",
       "latestClassOnOrBefore": "01-15"
     },
+    "plantedPages": {
+      "about": "Pages of our own that no ready-made course carries, planted in each course after the app has made it: the self-check quizzes plantoir.app's Quizzes page photographs (#587), one per subject. Each source is in website/shots/demo/ (a path relative to website/shots). Written when absent, brought up to date when the kept page is still an earlier committed version of its source, and otherwise left as somebody changed it and named. They are ordinary published pages, so they also reach the live demo sites the next time those are deployed, and the hero and app-window pictures taken after they are planted.",
+      "pages": [
+        {"course": "MCV4U", "place": "Exercises/Check Your Curve Sketching.md", "source": "demo/Check Your Curve Sketching.md"},
+        {"course": "SCH3U", "place": "Exercises/Check Your Stoichiometry.md", "source": "demo/Check Your Stoichiometry.md"},
+        {"course": "ENG2D", "place": "Exercises/Check Your Reading.md", "source": "demo/Check Your Reading.md"}
+      ]
+    },
     "siteMarkers": "The live sites belong to the kept folder: its .netlify_sites/section1.json carry Netlify's own ids and are never committed. A folder made from this file gets stand-in markers naming the same sites, which is enough for every picture (the site shots photograph the LIVE addresses) and NOT enough to deploy to them: deploying from a stand-in marker makes a new Netlify site."
   },
   "marketing": {
