@@ -76,7 +76,14 @@ mkdir -p "$WORK"
 # folder is an argument, so this could be a real course.
 ORIGINAL_CONFIG="$WORK/course_config.original.json"
 STASHED_INDEX="$WORK/index.md.stashed"
+# A page with runnable code and a formula (#455, #494), borrowed into the
+# section so every destination carries the Python engine and the site's own
+# KaTeX; removed on any exit.
+RUNNER_PAGE="$WORKING_FOLDER/courses/$COURSE/section$SECTION/Runner Deploy Check.md"
 restore_what_was_borrowed() {
+  if [ -f "$RUNNER_PAGE" ]; then
+    rm -f "$RUNNER_PAGE" && echo "  ↩︎  took the borrowed page of runnable code away"
+  fi
   if [ -f "$STASHED_INDEX" ]; then
     mv -f "$STASHED_INDEX" "$WORKING_FOLDER/courses/$COURSE/section$SECTION/index.md" 2>/dev/null \
       && echo "  ↩︎  put the section's front page back"
@@ -201,8 +208,120 @@ url_from_log() {  # url_from_log <logfile>
   grep -aoE "https://[a-zA-Z0-9._-]+\.(netlify\.app|pages\.dev)" "$1" | tail -1
 }
 
+# Runnable code (#455) and the site's own KaTeX (#494): every host must send
+# the engine's files with types a browser will run - .wasm as
+# application/wasm (WebAssembly.instantiateStreaming refuses anything else),
+# .mjs and the worker as JavaScript - and any CSP it sends must let wasm
+# compile ('unsafe-eval' or 'wasm-unsafe-eval'); KaTeX's stylesheet and a
+# face must come back from the site itself, and Netlify's CSP must no longer
+# name the CDN. contracts/shared-rules.json -> codeRunnerBlocks.loading.
+check_engine() {  # check_engine <label> <site base url ending in />
+  local base="$2" name type code headers csp
+  for name in pyodide.asm.wasm pyodide.asm.mjs pyodide.mjs plantoir-worker.js python_stdlib.zip pyodide-lock.json; do
+    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/pyodide/$name" 2>/dev/null | tr -d '\r')
+    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
+    case "$name" in
+      *.wasm) want="application/wasm" ;;
+      *.mjs|*.js) want="javascript" ;;
+      *) want="" ;;
+    esac
+    if [ "$code" != "200" ]; then
+      no "$1 answered HTTP $code for static/pyodide/$name"
+    elif [ -n "$want" ] && ! printf '%s' "$type" | grep -q "$want"; then
+      no "$1 sends static/pyodide/$name as '$type', which a browser will not run as $want"
+    else
+      ok "$1 sends static/pyodide/$name (HTTP 200${type:+, $type})"
+    fi
+  done
+  headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/pyodide/plantoir-worker.js" 2>/dev/null | tr -d '\r')
+  csp=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-security-policy:"{ $1=""; print }' | tail -1)
+  if [ -z "$csp" ] || printf '%s' "$csp" | grep -Eq "'(unsafe-eval|wasm-unsafe-eval)'"; then
+    ok "$1's worker may compile WebAssembly (${csp:+CSP allows it}${csp:-no CSP})"
+  else
+    no "$1's worker CSP allows no wasm: $csp"
+  fi
+  # Hosts answer the .html address with a redirect to the pretty one (Netlify
+  # 301, Cloudflare 308), so the page is fetched following it.
+  code=$(curl -sL -o "$WORK/runner-page.html" -w "%{http_code}" --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null)
+  if [ "$code" = "200" ] && grep -q 'class="plantoir-runner"' "$WORK/runner-page.html"; then
+    ok "$1's page of runnable code carries its runnable block"
+  else
+    no "$1's page of runnable code answered HTTP $code or carries no runnable block"
+  fi
+  headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/katex/katex.min.css" 2>/dev/null | tr -d '\r')
+  if printf '%s\n' "$headers" | head -1 | grep -q " 200" && printf '%s\n' "$headers" | grep -iq "^content-type: text/css"; then
+    ok "$1 serves KaTeX's stylesheet itself (text/css)"
+  else
+    no "$1 does not serve static/katex/katex.min.css as text/css"
+  fi
+  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" 2>/dev/null)
+  [ "$code" = "200" ] && ok "$1 serves KaTeX's faces itself" || no "$1 answered HTTP $code for a KaTeX face"
+  headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null | tr -d '\r')
+  if printf '%s\n' "$headers" | grep -iq "^content-security-policy:.*jsdelivr"; then
+    no "$1's CSP still names cdn.jsdelivr.net"
+  else
+    ok "$1's CSP names no CDN for the maths"
+  fi
+}
+
+# The pinned engine files, byte for byte, in a folder publish.
+check_engine_folder() {  # check_engine_folder <label> <dir>
+  local problems
+  problems=$(python3 - "$2" "$(cd "$(dirname "$0")" && pwd)/contracts/toolchain.json" <<'PY'
+import hashlib, json, sys
+from pathlib import Path
+site, pins = Path(sys.argv[1]), {p["pin"]: p for p in json.load(open(sys.argv[2]))["pins"]}
+problems = []
+for name, digest in pins["pyodide"]["files"].items():
+    path = site / "static" / "pyodide" / name
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        problems.append(f"static/pyodide/{name}")
+for name, digest in pins["katex"]["files"].items():
+    path = site / "static" / "katex" / name.replace("dist/", "", 1)
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        problems.append(f"static/katex/{name.replace('dist/', '', 1)}")
+if not (site / "static" / "pyodide" / "plantoir-worker.js").is_file():
+    problems.append("static/pyodide/plantoir-worker.js")
+print(", ".join(problems))
+PY
+)
+  [ -z "$problems" ] && ok "$1 carries the pinned Python engine and KaTeX, byte for byte" \
+                     || no "$1 lacks or changed: $problems"
+}
+
+# How long a publish takes, and how many bytes it sends: seconds around the
+# launcher, and the Obytes delta of the interface the default route uses
+# (read on a quiet machine, or it counts everything else too).
+NET_IFACE=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
+obytes() { netstat -ibn 2>/dev/null | awk -v i="$NET_IFACE" '$1==i && $3 ~ /Link/ {print $10; exit}'; }
+MEASURED=()
+measure_deploy() {  # measure_deploy <label> <logfile> <args...>
+  local label="$1" log="$2"; shift 2
+  local before after start finish rc files
+  before=$(obytes); start=$(date +%s)
+  run_deploy "$log" "$@"; rc=$?
+  finish=$(date +%s); after=$(obytes)
+  files=$(grep -aoE "Netlify requires [0-9]+ file|Uploaded [0-9]+ files \([0-9]+ already uploaded\)" "$log" | tail -1)
+  MEASURED+=("$label: $((finish - start)) s, ${files:-no upload count}, $(( (${after:-0} - ${before:-0}) / 1024 )) KiB sent on ${NET_IFACE:-?}")
+  return $rc
+}
+
 # ------------------------------------------------------- the preview itself
 hdr "Preview — serve mode, which is what a teacher actually uses"
+cat > "$RUNNER_PAGE" <<'RUNNERPAGE'
+---
+title: Runner Deploy Check
+codeRunner: true
+---
+A page of runnable code borrowed by verify-deploy.sh (plantoir-runner-deploy-7f3a), and a formula: $\frac{a}{b} = c^2$.
+
+```python run stdin
+name = input("Name? ")
+print("Hello,", name)
+```
+RUNNERPAGE
+ok "a page of runnable code borrowed into section $SECTION (removed on any exit)"
 ( cd "$WORKING_FOLDER" && nohup ./preview.sh "$COURSE" "$SECTION" >"$WORK/preview.log" 2>&1 & )
 PREVIEW_PORT=""
 for _ in $(seq 1 120); do
@@ -218,6 +337,7 @@ if [ -n "$PREVIEW_PORT" ]; then
   CODE=$(curl -s -o "$WORK/preview.html" -w "%{http_code}" --max-time 10 "http://localhost:$PREVIEW_PORT/" 2>/dev/null)
   [ "$CODE" = "200" ] && ok "preview serves its front page (HTTP 200 on :$PREVIEW_PORT)" \
                       || no "preview answered HTTP $CODE"
+  check_engine "the preview" "http://localhost:$PREVIEW_PORT/"
   if grep -q "ws://localhost" "$WORK/preview.html"; then
     ok "the preview carries the live-reload client, as a preview should"
     # The only place anything reads a REAL serve-mode page: the client must
@@ -282,15 +402,17 @@ set_destination "local_folder" "$FOLDER_TARGET" ""
 run_deploy "$WORK/deploy-folder.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_TARGET" \
   && ok "publish to a folder exited 0" || no "publish to a folder failed"
 check_folder "folder" "$FOLDER_TARGET/section$SECTION"
+check_engine_folder "the folder" "$FOLDER_TARGET/section$SECTION"
 
 hdr "Destination 2 of 3 — Netlify"
 if [ "$HAVE_NETLIFY" = true ]; then
   set_destination "netlify" "" ""
   : >"$WORK/deploy-netlify.log"
-  run_deploy "$WORK/deploy-netlify.log" "$COURSE" "$SECTION" \
+  measure_deploy "Netlify, first publish with the engine" "$WORK/deploy-netlify.log" "$COURSE" "$SECTION" \
     && ok "publish to Netlify exited 0" || no "publish to Netlify failed"
   NETLIFY_URL=$(url_from_log "$WORK/deploy-netlify.log")
   [ -n "$NETLIFY_URL" ] && check_url "Netlify" "$NETLIFY_URL" || no "no Netlify address in the output"
+  [ -n "$NETLIFY_URL" ] && check_engine "Netlify" "$NETLIFY_URL/"
 else
   skip "Netlify (no token)"
 fi
@@ -299,10 +421,11 @@ hdr "Destination 3 of 3 — Cloudflare Pages"
 if [ "$HAVE_CLOUDFLARE" = true ]; then
   set_destination "cloudflare_pages" "" ""
   : >"$WORK/deploy-cloudflare.log"
-  run_deploy "$WORK/deploy-cloudflare.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
+  measure_deploy "Cloudflare, first publish with the engine" "$WORK/deploy-cloudflare.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "publish to Cloudflare exited 0" || no "publish to Cloudflare failed"
   CF_URL=$(url_from_log "$WORK/deploy-cloudflare.log")
   [ -n "$CF_URL" ] && check_url "Cloudflare Pages" "$CF_URL" || no "no Cloudflare address in the output"
+  [ -n "$CF_URL" ] && check_engine "Cloudflare Pages" "$CF_URL/"
 else
   skip "Cloudflare (no credentials)"
 fi
@@ -315,14 +438,16 @@ hdr "Pairing 1 of 3 — Netlify primary, Cloudflare also"
 if [ "$HAVE_NETLIFY" = true ] && [ "$HAVE_CLOUDFLARE" = true ]; then
   set_destination "netlify" "" '[{"type":"cloudflare_pages"}]'
   : >"$WORK/pair-nc.log"
-  run_deploy "$WORK/pair-nc.log" "$COURSE" "$SECTION" && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
+  measure_deploy "Netlify, second publish" "$WORK/pair-nc.log" "$COURSE" "$SECTION" && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
   N_URL=$(url_from_log "$WORK/pair-nc.log")
   : >"$WORK/pair-nc2.log"
-  run_deploy "$WORK/pair-nc2.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
+  measure_deploy "Cloudflare, second publish" "$WORK/pair-nc2.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "leg 2 (Cloudflare) exited 0" || no "leg 2 (Cloudflare) failed"
   C_URL=$(url_from_log "$WORK/pair-nc2.log")
   [ -n "$N_URL" ] && check_url "Netlify (of the pair)" "$N_URL" || no "no Netlify address"
   [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" || no "no Cloudflare address"
+  [ -n "$N_URL" ] && check_engine "Netlify (of the pair)" "$N_URL/"
+  [ -n "$C_URL" ] && check_engine "Cloudflare (of the pair)" "$C_URL/"
 else
   skip "Netlify + Cloudflare (credentials missing)"
 fi
@@ -339,6 +464,7 @@ if [ "$HAVE_NETLIFY" = true ]; then
     && ok "leg 2 (folder) exited 0" || no "leg 2 (folder) failed"
   [ -n "$N_URL" ] && check_url "Netlify (of the pair)" "$N_URL" || no "no Netlify address"
   check_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
+  check_engine_folder "the folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
 else
   skip "Netlify + folder (no Netlify token)"
 fi
@@ -356,6 +482,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
     && ok "leg 2 (folder) exited 0" || no "leg 2 (folder) failed"
   [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" || no "no Cloudflare address"
   check_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
+  check_engine_folder "the folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
 else
   skip "Cloudflare + folder (no credentials)"
 fi
@@ -435,6 +562,11 @@ grep -q "kept_for_reference" "$CONFIG" \
 
 hdr "Result"
 echo "  $PASS passed, $FAIL failed, $SKIP skipped"
+if [ "${#MEASURED[@]}" -gt 0 ]; then
+  echo
+  echo "  Publishing a site that carries the Python engine (#455), measured:"
+  for line in "${MEASURED[@]}"; do echo "    $line"; done
+fi
 echo
 echo "  Sites this created (delete them when you are done):"
 [ -n "${NETLIFY_URL:-}${N_URL:-}" ] && echo "    Netlify:    ${NETLIFY_URL:-$N_URL}"

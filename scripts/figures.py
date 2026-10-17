@@ -139,7 +139,11 @@ def figures_on_page(text: str) -> list:
     counts = {engine: 0 for engine in ENGINES}
     for block in markdown_code.fenced_blocks(text):
         engine = block["lang"]
-        if engine not in ENGINES:
+        if engine not in ENGINES or block["nested"]:
+            # A fence opened after a second container on a list marker's line
+            # (`- - ```tikz`) was never read here, and still is not drawn; the
+            # reader now opens it only so the fences after it are read as the
+            # site reads them (#455 review S2).
             continue
         counts[engine] += 1
         found.append({

@@ -473,12 +473,31 @@ fi
 # Printable pages (#454): which pages opt in and which make a site carry the
 # print engine, a teacher's own PDF resolved against Media, the gate, and the
 # printPdfNotFound finding; then the corners, page labels and words a printed
-# page carries. Both read the contract; stdlib only.
+# page carries. Both read the contract; stdlib only. Since #455 the same file
+# runs runnable code's cases too: the language table, which fences run and
+# where they can sit, ids, what a site carries, the engine's overlay, and the
+# words file.
 if (cd scripts && python3 test_page_features.py) >/tmp/verify_page_features_test.log 2>&1; then
-  pass "printable pages: opting in, a page's own PDF, and the per-site print engine (scripts/test_page_features.py, #454)"
+  pass "pages that ask for more: printing, a page's own PDF, runnable code, and the engines a site carries (scripts/test_page_features.py, #454, #455)"
 else
-  fail "printable pages: opting in, a page's own PDF, and the per-site print engine (scripts/test_page_features.py, #454)"
+  fail "pages that ask for more: printing, a page's own PDF, runnable code, and the engines a site carries (scripts/test_page_features.py, #454, #455)"
   cat /tmp/verify_page_features_test.log
+fi
+
+# KaTeX served by the site itself (#494): the copy from Quartz's own package
+# and the latex.ts patch that links it; and (#455) the edits that wire
+# Plantoir's additions into a section's Quartz copy. Stdlib only.
+if (cd scripts && python3 test_katex_assets.py) >/tmp/verify_katex_assets_test.log 2>&1; then
+  pass "maths: KaTeX's stylesheet, copy-tex and faces copied into every site, and latex.ts linking them instead of a CDN (scripts/test_katex_assets.py, #494)"
+else
+  fail "maths: KaTeX's stylesheet, copy-tex and faces copied into every site, and latex.ts linking them instead of a CDN (scripts/test_katex_assets.py, #494)"
+  cat /tmp/verify_katex_assets_test.log
+fi
+if (cd scripts && python3 test_quartz_additions_wiring.py) >/tmp/verify_quartz_wiring_test.log 2>&1; then
+  pass "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
+else
+  fail "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
+  cat /tmp/verify_quartz_wiring_test.log
 fi
 
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
@@ -1025,6 +1044,25 @@ else
   cat /tmp/verify_print_rules_site.log
 fi
 
+# ---- Runnable code (#455): the rules, run where they really run ----
+# codeRunnerRule.ts (the file the site's transformer and the page's script
+# both import) is bundled with Quartz's own parser, and every fences,
+# pageShapes and ids case is run through it in Node; the transformer is run
+# over a page whose engine the site does and does not carry (siteDisagrees);
+# the build's fence reader reads every pageShapes case too; and every typed
+# codeRunner: line goes through the build's own reader.
+echo ""
+echo "🔎 Checking the runnable-code rules against what the site and the build run…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_runner_rules_against_the_site.py" /opt/scripts/check_runner_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_runner_rules_against_the_site.py \
+  >/tmp/verify_runner_rules_site.log 2>&1; then
+  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
+else
+  fail "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
+  cat /tmp/verify_runner_rules_site.log
+fi
+
 # ---- Diagrams and graphs (#485 E1): the rules, run against the real engines ----
 # figureRules.js (the file the site's transformer and the build's helper both
 # import) runs every tidy and cacheKey case in Node; the helper, driven as a
@@ -1369,7 +1407,7 @@ check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
 check_baked scripts/figures.py            /opt/scripts/figures.py
 while IFS= read -r addition; do
   check_baked "$addition" "/opt/$addition"
-done < <(find support/quartz support/agent_guidance support/figures -type f ! -name '.*' | sort)
+done < <(find support/quartz support/agent_guidance support/figures support/gated -type f ! -name '.*' | sort)
 # The print engine itself, by the hash the pin carries (contracts/toolchain.json).
 PAGEDJS_PIN="$(python3 -c 'import json; print([p["fileSha256"] for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "pagedjs"][0])')"
 PAGEDJS_BAKED="$(docker run --rm "$DEV_TEST_IMAGE" sha256sum /opt/vendor/pagedjs/paged.min.js 2>/dev/null | cut -d' ' -f1)"
@@ -1434,6 +1472,41 @@ if [[ -z "$FIGURE_ENGINE_PROBLEMS" ]]; then
   pass "The image carries function-plot and node-tikzjax at /opt/vendor, matching their pins, with their licences (#485)"
 else
   fail "The image's figure engines do not match contracts/toolchain.json: $FIGURE_ENGINE_PROBLEMS"
+fi
+# Runnable code's engine (#455) and the site's own KaTeX (#494), by their
+# pins: exactly the five Pyodide files, each matching, with the README that
+# names the licence; and Quartz's katex at the pinned version, with the three
+# files a site carries hashed.
+RUNNER_ENGINE_PROBLEMS="$(python3 - "$DEV_TEST_IMAGE" <<'REPY'
+import json, subprocess, sys
+pins = {p["pin"]: p for p in json.load(open("contracts/toolchain.json"))["pins"]}
+pyodide, katex = pins["pyodide"], pins["katex"]
+names = sorted(pyodide["files"])
+kfiles = sorted(katex["files"])
+script = ("cd /opt/vendor/pyodide && ls -1 && echo LISTED && sha256sum " + " ".join(names)
+          + " && cat README.txt && cd /opt/quartz/node_modules/katex && node -p 'require(\"./package.json\").version' && sha256sum " + " ".join(kfiles))
+out = subprocess.run(["docker", "run", "--rm", sys.argv[1], "sh", "-c", script], capture_output=True, text=True).stdout
+problems = []
+listed = out.split("LISTED\n", 1)[0].split()
+if sorted(listed) != sorted(names + ["README.txt"]):
+    problems.append(f"/opt/vendor/pyodide holds {sorted(listed)}, not the five pinned files and the README")
+for name in names:
+    if pyodide["files"][name] + "  " + name not in out:
+        problems.append(f"Pyodide's {name} does not match its pin")
+if "MPL-2.0" not in out:
+    problems.append("Pyodide's README does not name its licence")
+if "\n" + katex["value"] + "\n" not in "\n" + out:
+    problems.append(f"Quartz's katex is not {katex['value']}")
+for name in kfiles:
+    if katex["files"][name] + "  " + name not in out:
+        problems.append(f"katex's {name} does not match its pin")
+print("; ".join(problems))
+REPY
+)"
+if [[ -z "$RUNNER_ENGINE_PROBLEMS" ]]; then
+  pass "The image carries Pyodide at /opt/vendor/pyodide (the five pinned files and its README) and Quartz's katex at the pinned version, matching their pins (#455, #494)"
+else
+  fail "The image's Pyodide or katex does not match contracts/toolchain.json: $RUNNER_ENGINE_PROBLEMS"
 fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
@@ -1566,6 +1639,9 @@ restore_hit_fixture() {
         "$HIT_COURSE/Printable Too Tall.md" \
         "$HIT_COURSE/Figures Fixture.md" "$HIT_COURSE/Figures Hidden.md" \
         "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
+        "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
+        "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
+        "$HIT_COURSE/Discussions/Runner Printable.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2240,6 +2316,61 @@ printf -- '---\ntitle: Figures Math Heading\n---\nA graph under a heading named 
 printf -- '---\ntitle: Figures Exports Heading\n---\nA graph under a heading named Exports (plantoir-figures-exports-7f3a).\n\n# Exports\n\n```functionplot\ny = x^3 - 2x\n```\n' \
   > "$HIT_COURSE/Figures Exports Heading.md"
 
+# ---- #455: runnable code, planted for the same build ----
+# Runner Fixture: one fence per contracts/shared-rules.json ->
+# codeRunnerBlocks.fences case that opts in (each prints its own case number),
+# then a fence on two list markers' line (never runnable: pageShapes) and a
+# runner after it (counted). Runner Not Opted: the same fences on a page that
+# does not opt in; Runner Plain Twin: the same code in plain ```python
+# fences - the two must come out alike. Runner Playground: three blocks for
+# the browser check; Discussions/Runner Printable: a printable page one
+# folder down with a runner and a formula (the print-after-a-page-change
+# check, #455 review S1); Runner Hidden: a page students cannot see, which
+# must not make the site carry the engine or earn a plantoir: error: line.
+# Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE" <<'RUNNERPLANTS'
+import json, sys
+from pathlib import Path
+course = Path(sys.argv[1])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["codeRunnerBlocks"]
+fences = []
+for number, case in enumerate(rules["fences"]["cases"], start=1):
+    if not case["optedIn"]:
+        continue
+    fences.append((f"{case['lang']} {case['meta']}".rstrip(), f'print("case {number}")'))
+body = "Runnable code planted by verify.sh (plantoir-runner-sentinel-7f3a).\n\n"
+for info, code in fences:
+    body += f"```{info}\n{code}\n```\n\n"
+nested = '- - ```python run\n    print("nested shape")\n    ```\n\n```python run\nprint("after the nested shape")\n```\n'
+(course / "Runner Fixture.md").write_text("---\ntitle: Runner Fixture\ncodeRunner: yes\n---\n" + body + nested, encoding="utf-8")
+(course / "Runner Not Opted.md").write_text("---\ntitle: Runner Not Opted\n---\n" + body, encoding="utf-8")
+# The twin keeps every other word of the info string (a title, line
+# highlighting), so the only difference is the runner's own tokens.
+import re
+twin = "Runnable code planted by verify.sh (plantoir-runner-sentinel-7f3a).\n\n"
+for info, code in fences:
+    # Words as the site's parser splits them: on space and tab only, so a
+    # no-break space stays inside its word (codeRunnerBlocks.fences, N2).
+    words = [w for w in re.findall(r'[^ \t"]*"[^"]*"[^ \t]*|[^ \t]+', info) if w not in ("run", "readonly", "stdin", "autorun")]
+    twin += f"```{' '.join(words)}\n{code}\n```\n\n"
+(course / "Runner Plain Twin.md").write_text("---\ntitle: Runner Plain Twin\n---\n" + twin, encoding="utf-8")
+(course / "Runner Playground.md").write_text(
+    "---\ntitle: Runner Playground\ncodeRunner: true\n---\nThree blocks to run (plantoir-runner-playground-7f3a).\n\n"
+    "```python run\nprint(\"one\")\n```\n\n```python run\nprint(\"two\")\n```\n\n"
+    "> [!example]- In a folded callout\n> ```python run\n> print(\"three\")\n> ```\n", encoding="utf-8")
+(course / "Discussions" / "Runner Printable.md").write_text(
+    "---\ntitle: Runner Printable\nprintable: true\ncodeRunner: true\n---\n"
+    "A printable page with code (plantoir-runner-printable-7f3a), and a formula $\\frac{a}{b} = c^2$.\n\n"
+    "1. What does this print?\n\n```python run\nprint(\"printed\")\n```\n", encoding="utf-8")
+(course / "Runner Autorun.md").write_text(
+    "---\ntitle: Runner Autorun\ncodeRunner: true\n---\nTwo blocks that run by themselves (plantoir-runner-autorun-7f3a).\n\n"
+    "```python run autorun\nimport time\ntime.sleep(4)\nprint(\"first\")\n```\n\n"
+    "```python run autorun\nimport time\ntime.sleep(3)\nprint(\"second\")\n```\n", encoding="utf-8")
+(course / "Runner Hidden.md").write_text(
+    "---\ntitle: Runner Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-runner-hidden-7f3a).\n\n"
+    "```python run\nprint(\"hidden\")\n```\n", encoding="utf-8")
+RUNNERPLANTS
+
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
 echo "🚦 Running: ./preview.sh EXC2O 1 --image $DEV_TEST_IMAGE --full-rebuild --build-only"
@@ -2527,7 +2658,7 @@ if not engine.is_file() or hashlib.sha256(engine.read_bytes()).hexdigest() != pi
 for path in [page_path, engine] + [path for path in tikz.glob("*.css")]:
     text = path.read_text(encoding="utf-8", errors="ignore") if path.is_file() else ""
     for found in re.findall(r"https?://[^\s\"')]+", text):
-        if "w3.org" in found or "jsdelivr.net/npm/katex" in found or "plausible.io" in found:
+        if "w3.org" in found or "plausible.io" in found:
             continue
         if path == page_path and not any(found in body for _, _, body in figures):
             continue
@@ -2542,6 +2673,105 @@ then
   pass "diagrams and graphs: every fence drawn as an SVG in the page or reported by page and line, the faces and function-plot carried by the site itself, descriptions free of lettering, a hidden graph nowhere (#485)"
 else
   fail "diagrams and graphs: one of the checks above failed (#485)"
+fi
+
+# ---- 6j. Runnable code (#455) and the site's own KaTeX (#494), as the build left them ----
+# The planted Runner Fixture's runnable blocks are exactly the contract's (in
+# order, with their ids, flags, language and the teacher's code); the nested
+# shape stays plain code; the page that does not opt in is untouched and
+# comes out like its twin in plain fences; the site carries the pinned
+# engine with the worker and nothing a CDN would have served, every word
+# the page's code says is in the site's script, and every page links the
+# site's own KaTeX.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log <<'RUNNERPY'
+import hashlib, html, json, re, sys
+from pathlib import Path
+public, log = Path(sys.argv[1]), Path(sys.argv[2])
+problems = []
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["codeRunnerBlocks"]
+pins = {pin["pin"]: pin for pin in json.load(open("contracts/toolchain.json"))["pins"]}
+def page(name):
+    path = public / name
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+fixture = page("Runner-Fixture.html")
+if not fixture:
+    problems.append("Runner-Fixture.html was not built")
+found = re.findall(r'<div class="plantoir-runner" data-runner-id="([^"]*)" data-runner-flags(?:="([^"]*)")? data-runner-language="([^"]*)" data-runner-runtime="([^"]*)" data-runner-engine="([^"]*)" data-original="([^"]*)"', fixture)
+expected = []
+counter = 0
+for number, case in enumerate(rules["fences"]["cases"], start=1):
+    if case["optedIn"] and case["runner"]:
+        counter += 1
+        expected.append((f"Runner-Fixture-py-{counter}", " ".join(case["flags"]), "python", "pyodide", "pyodide", f'print("case {number}")'))
+expected.append((f"Runner-Fixture-py-{counter + 1}", "", "python", "pyodide", "pyodide", 'print("after the nested shape")'))
+got = [(rid, flags or "", language, runtime, engine, html.unescape(original)) for rid, flags, language, runtime, engine, original in found]
+if got != expected:
+    problems.append(f"the fixture's runnable blocks are {got}, not the contract's {expected}")
+if "nested shape" not in fixture or re.search(r'data-original="print\(&quot;nested shape', fixture):
+    problems.append("the fence on two list markers' line was made runnable, or is missing")
+not_opted, twin = page("Runner-Not-Opted.html"), page("Runner-Plain-Twin.html")
+if 'class="plantoir-runner"' in not_opted or "data-runner-id" in not_opted:
+    problems.append("the page that does not opt in has a runnable block")
+figures = lambda text: re.findall(r"<figure data-rehype-pretty-code-figure.*?</figure>", text, re.S)
+if not figures(not_opted) or figures(not_opted) != figures(twin):
+    problems.append(f"the page that does not opt in does not come out like its twin in plain fences ({len(figures(not_opted))} and {len(figures(twin))} blocks)")
+if (public / "Runner-Hidden.html").exists():
+    problems.append("the hidden page with code reached the site")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+if re.search(r"plantoir: error: [^\n]*Runner", said):
+    problems.append("the build named a runner page on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*Runner[^\n]*", said).group(0))
+if not re.search(r"This site carries what runs Python for 4 pages\.", said):
+    problems.append("the build did not say the site carries Python for the four pages students can see (not the hidden one)")
+engine = public / "static" / "pyodide"
+carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
+if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
+    problems.append(f"static/pyodide holds {carried}")
+for name, digest in pins["pyodide"]["files"].items():
+    if (engine / name).is_file() and hashlib.sha256((engine / name).read_bytes()).hexdigest() != digest:
+        problems.append(f"static/pyodide/{name} does not match its pin")
+if (engine / "plantoir-worker.js").read_bytes() != Path("support/gated/pyodide/plantoir-worker.js").read_bytes():
+    problems.append("the site's worker is not support/gated/pyodide/plantoir-worker.js")
+script = page("postscript.js")
+for key, text in rules["words"].items():
+    if key in ("note", "blockNotPrepared"):
+        continue
+    if text not in script and json.dumps(text)[1:-1] not in script:
+        problems.append(f"the site's script does not carry words.{key}")
+# Nothing from the CDN, anywhere: one string inside pyodide.mjs is allowed
+# (a fallback the worker pins out), and nothing else.
+for path in sorted(public.rglob("*")):
+    if path.suffix not in (".html", ".js", ".mjs", ".css") or not path.is_file():
+        continue
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    hits = text.count("cdn.jsdelivr.net")
+    allowed = 1 if path == engine / "pyodide.mjs" else 0
+    if hits != allowed:
+        problems.append(f"{path.relative_to(public)} names cdn.jsdelivr.net {hits} time(s)")
+katex = public / "static" / "katex"
+kfiles = sorted(str(path.relative_to(katex)) for path in katex.rglob("*") if path.is_file()) if katex.is_dir() else []
+faces = [name for name in kfiles if name.startswith("fonts/")]
+if len(faces) != 20 or any(not name.endswith(".woff2") for name in faces) or sorted(set(kfiles) - set(faces)) != ["LICENSE", "contrib/copy-tex.min.js", "katex.min.css"]:
+    problems.append(f"static/katex holds {kfiles}")
+for name, digest in pins["katex"]["files"].items():
+    local = katex / name.replace("dist/", "", 1)
+    if not local.is_file() or hashlib.sha256(local.read_bytes()).hexdigest() != digest:
+        problems.append(f"static/katex/{name.replace('dist/', '', 1)} does not match the pin's {name}")
+for name, depth in (("Help-Sessions.html", 0), ("Discussions/Runner-Printable.html", 1)):
+    head = page(name)
+    links = re.findall(r'<link rel="stylesheet" href="([^"]*katex\.min\.css)"', head)
+    want = ("./" if depth == 0 else "../") + "static/katex/katex.min.css"
+    if links != [want]:
+        problems.append(f"{name} links KaTeX's stylesheet as {links}, not {want}")
+if any("katex-error" in path.read_text(encoding="utf-8", errors="ignore") for path in public.rglob("*.html")):
+    problems.append("a formula on the site failed to render (katex-error)")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+RUNNERPY
+then
+  pass "runnable code: every block the contract says runs is wrapped with its id, flags and the teacher's code, the nested shape stays plain, a page that does not opt in is untouched, the hidden page counts for nothing, the site carries the pinned Python with its worker and its script carries every word; maths styled from the site's own KaTeX, and nothing on the site names a CDN but the one string the worker pins out (#455, #494)"
+else
+  fail "runnable code or the site's own KaTeX: one of the checks above failed (#455, #494)"
 fi
 
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
@@ -2638,10 +2868,29 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang (browser-checks/sidebar_page_marker.mjs, #515)"
     cat /tmp/verify_sidebar_page_marker.log
   fi
+  # #494: maths offline from the site's own KaTeX, and (#455 review S1)
+  # print after a change of page keeps the stylesheets.
+  if node browser-checks/maths_offline.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
+       "http://127.0.0.1:$PRINT_PORT/Runner-Playground.html" \
+       "http://127.0.0.1:$PRINT_PORT/Discussions/Runner-Printable.html" >/tmp/verify_maths_offline.log 2>&1; then
+    pass "maths with every other website refused: set in KaTeX's own faces from the site, nothing asked of a CDN; and a page printed after the site's own page change from a page one folder up keeps KaTeX's and the site's stylesheets (#494, #455 review S1, browser-checks/maths_offline.mjs)"
+  else
+    fail "maths did not render from the site's own KaTeX offline, or print after a page change lost its stylesheets (browser-checks/maths_offline.mjs, #494)"
+    cat /tmp/verify_maths_offline.log
+  fi
   kill "$PRINT_SERVER_PID" 2>/dev/null || true
+  # #455: runnable code as a student runs it, against a server the check
+  # starts itself so it can also play the hosts that break it.
+  if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \
+       >/tmp/verify_code_runner.log 2>&1; then
+    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
+  else
+    fail "runnable code did not run in a browser as the contract says (browser-checks/code_runner.mjs, #455)"
+    cat /tmp/verify_code_runner.log
+  fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), and the sidebar's page dot (#515): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), and the sidebar's page dot (#515): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), and runnable code in a browser (#455): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), and runnable code in a browser (#455): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
@@ -2816,6 +3065,13 @@ for entry in os.listdir("/proc"):
     pass "and with no figure left, the site carries neither figure engine, nothing is drawn, and a page without figures is byte-identical (#485)"
   else
     fail "a site with no figures still carries static/function-plot or static/tikz, drew something, or changed a page without figures (#485)"
+  fi
+  # And no runnable code (#455): the engine is taken out again, while the
+  # site's own KaTeX stays - every site carries it (#494).
+  if [[ -f "$SITE_INDEX" && ! -e "$SITE_PUBLIC/static/pyodide" && -f "$SITE_PUBLIC/static/katex/katex.min.css" ]]; then
+    pass "and with no runnable code left, the site no longer carries Python, and still carries its own KaTeX (#455, #494)"
+  else
+    fail "a site with no runnable code still carries static/pyodide, or lost static/katex (#455, #494)"
   fi
 else
   fail "could not put back a container without the builds mount"

@@ -321,6 +321,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
 | C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
+| C2-26 | **KaTeX from the site itself (#494)** | `quartz/plugins/transformers/latex.ts`; `quartz/static/katex/` | Quartz v4.5.0's `externalResources` linked `cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css` and `contrib/copy-tex.min.js` on EVERY page (400 links each on a built ICS3U site), while its own lockfile installs **0.16.21** and rehype-katex renders every formula with that at build time — so sites were rendered with one version and styled with another, and the maths depended on a third party and a network. `patch_katex_local` (marker `PLANTOIR-KATEX-LOCAL`, idempotent, independent of C2-20's import) replaces that block with two `additionalHead` functions: `<link rel=stylesheet href="<pathToRoot>/static/katex/katex.min.css" spa-preserve>` and `<script src=".../static/katex/contrib/copy-tex.min.js" defer spa-preserve>`, relative to each page so a site served under a folder finds them, kept across the site's page changes like `index.css`; the 404 page, served at any depth, links from the `baseUrl`'s path (review N6, Head.tsx's own rule). `install_katex_assets` copies the files from Quartz's own `node_modules/katex` every build (05 → Runnable code, step 4): the stylesheet (23,352 bytes), copy-tex (1,673), the **20 woff2 faces** (259,792) and the MIT licence — 284,817 bytes on EVERY site, woff2 only because every browser that can run a site's code takes woff2 first. Netlify's CSP loses `https://cdn.jsdelivr.net` by itself (07). **Rejected:** gating it per site on maths (Python cannot tell maths the way remark-math does — `$` in prose, currency — and a wrong guess breaks every formula silently; the cost is about 2% of Pyodide, uploaded once by content hash); all three font formats (1.10 MB); inlining the CSS into index.css (a generated SCSS file from node_modules every build); absolute `/static/katex/` (breaks a folder published under a subpath). **The print path had to follow** (#455 review S1): a link kept across page changes keeps its RELATIVE href, which then resolves against the new page — one folder off. print.inline.ts now takes every stylesheet for the print frame from the address the sheet was really fetched from (`link.sheet.href`), which fixed the same latent fault in its `index.css` lookup; measured by `browser-checks/maths_offline.mjs`: with the old code a handout printed after a page change from the top of the site to a page one folder down got a 404 KaTeX stylesheet (0 rules), now 249 rules. **The regression the plan expected did not happen:** a folder publish OPENED AS A FILE was expected to lose KaTeX's faces in Chrome (an opaque origin); measured 2026-10-17, Chrome for Testing 155 and Safari 26.6 both loaded `KaTeX_Main` and `KaTeX_Math` from `static/katex/fonts/` beside a page opened from disk, so the maths keeps its look offline from a file too (it used to need the network for the CDN). |
 
 ### C3. Content-level transformations (every build)
 
@@ -1360,18 +1361,310 @@ has every folder CLOSED, and the dot appears only inside an open one, so none
 is expected to change by a pixel; the cut spot-checks them rather than
 retaking (ruling 5).
 
+## I. Runnable code (#455, v1.8.0)
+
+A page whose settings say `codeRunner: true` turns each ` ```python run `
+block into a small program students edit and run in their own browser, with
+nothing installed: an editor, an input box when the program reads input,
+**Run**, **Stop** and **Reset**, a status line and the output, and their edits
+kept in the browser. The rules are data in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`codeRunnerBlocks` and [`file-formats.json`](../contracts/file-formats.json) →
+`pageOptIns`; the build's half is
+[05 → Runnable code](05-build-pipeline.md#runnable-code-what-the-build-does-455-v180),
+the engine's layer [02](02-docker-image.md#optvendorpyodide-455-v180-and-katexs-pin-494).
+
+**Compatibility.** A page that does not opt in, and every block that is not
+runnable, comes out exactly as before: the transformer acts only on a page
+whose frontmatter is the boolean `true`, and wraps only runnable blocks.
+verify.sh 6j checks a page with every contract fence that does NOT opt in
+has no runner markup and its code blocks come out byte for byte as the same
+code in plain ` ```python ` fences (the word `run` changes nothing the
+highlighter does). The page's script and styles are in every site's shared
+`postscript.js` and `index.css` (every rule under `.plantoir-runner`, B2;
+the script returns at once without a wrapper), so those two files grow on
+every site — I8 has the numbers.
+
+### I1. The files (all installed every build)
+
+| File | What it does |
+|---|---|
+| `support/quartz/plugins/transformers/codeRunnerRule.ts` | The rules, with nothing of Quartz's: the language table (`LANGUAGES`, the literal mirror of `codeRunnerBlocks.languages`), `runnerFor` (the fence rule), `runnerId`, `findRunners` (document order, per-language numbering, and the nested-container skip below), the `{language}` filler and FNV-1a. `check_runner_rules_against_the_site.py` bundles it with Quartz's own parser and runs every case in Node. |
+| `support/quartz/plugins/transformers/codeRunner.ts` | `CodeRunnerFences`, wired straight BEFORE `Plugin.SyntaxHighlighting(` in `quartz.config.ts`: on a `codeRunner: true` page it wraps each runnable block, at the MARKDOWN stage, in `<div class="plantoir-runner" data-runner-id data-runner-flags data-runner-language data-runner-runtime data-runner-engine data-original>`. A wrapper rather than attributes because rehype-pretty-code 0.14 drops every property on `<pre>` and `<code>` (measured 2026-10-09); the wrapper survives at the top level, in lists, in quotes and in folded callouts, and the block inside is highlighted exactly as before (the meta is left alone). `data-original` is mdast's `value`, the teacher's code exactly. Reads `quartz/plantoir_code_runner.json` with `fs` (mtime-cached) for the engines the site carries (I6). |
+| `support/quartz/components/CodeRunner.tsx` | Renders NOTHING. Placed at the head of `sharedPageComponents.afterBody` (Quartz renders `page-footer` on every page whatever it holds, so no page's HTML changes), it carries the script and styles into the site's one `postscript.js` and `index.css`. |
+| `support/quartz/components/scripts/codeRunner.inline.ts` | Everything in the browser (I2–I5). Imports `quartz/plantoir_code_runner.json` (words and limits; bundled by esbuild, as the patched explorer imports `course_config.json`). |
+| `support/quartz/components/styles/codeRunner.scss` | Every rule under `.plantoir-runner`; the editor's font is the site's code font at `max(16px, …)`; touch targets 44 px. |
+| `support/gated/pyodide/plantoir-worker.js` | The thread a page's Python runs in, laid over `VENDOR_DIR/pyodide` by the gate, so it reaches a site only beside the engine it starts (I3). |
+
+### I2. The block on the page
+
+Built on Quartz's `nav` event, for every `.plantoir-runner` without
+`data-built` (elements, never one looked up by id: an embedded page brings
+its blocks with their ids, N1). In this order (Q3): the editor (or, for
+`readonly`, the highlighted code as it is); the input box, shown when the
+block has the `stdin` flag or its CURRENT code matches the row's
+`inputPattern` (`\binput\s*\(`), filled before Run, one line per `input()`,
+never stored; Run, Stop, Reset (Reset only when editable); a status line
+(`role="status" aria-live="polite"`); the output (`<pre aria-label>`,
+stderr in `span.plantoir-runner-err`). The highlighted copy is put away by a
+CLASS (`.plantoir-runner-original`), never `hidden` or an inline style, so
+the print rules can bring it back (N2). Popovers, a page without script and
+a page opened from a feed show the highlighted code alone.
+
+**The editor** is a `<textarea>` in the site's code font, at least 16 px
+(iPadOS zooms the page on focus below 16 px), spellcheck, autocapitalise,
+autocorrect and autocomplete off, `wrap=off`. It grows with its code up to
+24 lines, then scrolls; growing (and the editor replacing the shorter
+highlighted copy) lifts an OPEN ancestor callout's inline `max-height`,
+which Quartz's `callout.inline.ts` fixed when the callout opened and would
+otherwise clip it (2026-10-09 finding D). Tab inserts four spaces or indents
+every selected line, Shift-Tab takes up to four off; Escape then Tab leaves
+the editor (the keyboard-trap rule); nothing while an input method is
+composing; Enter is never intercepted. Cmd/Ctrl-Enter runs (from the editor
+or the input box). Edits go through `execCommand("insertText")` so they can
+be undone, with `setRangeText` where a browser refuses.
+
+### I3. The thread, the harness and the language table's seam
+
+`RUNTIMES = { pyodide: … }`; a block's `data-runner-runtime` picks one, and
+`PyodideRuntime` is the only class. It starts
+`<pathToRoot>/static/<engine>/<worker>` — from the CURRENT page's slug, so an
+embedded block works at any depth — as a **module worker** on the first Run
+on a page (#455 review B1: Pyodide 314's `pyodide.js` probes
+`importScripts("data:…")` and throws "Classic web workers are not
+supported" wherever no CSP blocks `data:`: the preview, Cloudflare, a folder
+publish, the app's pane). It is kept warm for the rest of the page's visit
+and ended by `addCleanup` when the page changes. **One program per page**
+(Q2): Run on another block ends the thread (`words.stoppedForAnother`) and
+starts a fresh one; an `autorun` block that comes into view while another
+program runs waits its turn (N4). **Stop** ends the thread — without
+cross-origin isolation (which a folder publish cannot send) there is no
+other way to interrupt Python — and the next Run starts a new one. Online
+that costs a few `304`s (Netlify's and Cloudflare's default `cache-control`
+is `max-age=0, must-revalidate`); OFFLINE it fails with `couldNotLoad`
+(measured by the implementation review: a warm Run offline finished; Stop,
+then Run, failed in 53 ms). So the page works without a connection only
+until a program is stopped, another block runs (that ends the thread too),
+the output cap is reached, or the page changes; the skill says so.
+
+The worker imports `./pyodide.mjs` and calls `loadPyodide` with `indexURL`,
+`lockFileURL`, `packageBaseUrl` and `cdnUrl` all its own folder; nothing is
+ever fetched for an `import`. Its harness (`codeRunnerBlocks.harness`):
+`compile(source, "main.py", "exec")` with fresh globals and the source in
+`linecache`, the traceback trimmed to start at the first `main.py` frame, so
+its line numbers are the editor's and its wording CPython's (measured:
+`File "main.py", line 3, in <module>` for a NameError on the editor's third
+line); a SyntaxError prints without the Traceback header, as CPython does;
+SystemExit is silent. **Before every run** (review S3, measured: one block's
+`builtins.print = lambda *a: None` silenced the next run on the page) the
+builtins are restored from a copy taken at load, the three streams and the
+recursion limit reset, and the program starts in a fresh empty folder that
+is removed after. stdout and stderr are `isatty` writers decoded with a
+streaming `TextDecoder`, so output arrives line by line as CPython's would in
+a terminal (a `time.sleep(0.3)` loop arrived at 0, 300 and 600 ms in Node);
+`print("a", end="")` waits for its line, as in a terminal.
+
+**Adding a language** is: a row in `codeRunnerBlocks.languages` and in its
+two mirrors (`LANGUAGES` here, `RUNNER_LANGUAGES` in `page_features.py`; the
+tests pin both field for field), a runtime class in `RUNTIMES`, a vendor
+layer in the Dockerfile (and `fetch-runtime.ps1`), and a pin in
+`toolchain.json`. Nothing else: the fence rule, the ids, the gate, the words
+and the print rules read the table, never the word "python" (Russell,
+2026-10-09).
+
+### I4. Input, output and the words
+
+`input()` takes the box's lines in order; each line read is echoed into the
+output straight after its prompt (Q4: `Name? Ada`, not `Name? Hello Ada`),
+and past the last line `input()` raises `EOFError` (measured: `EOFError: EOF
+when reading a line`). Output is gathered once per animation frame; at
+100,000 characters the program is stopped and `words.outputTooLong` shown
+(Q5), and only what was left of the allowance reaches the page — one
+`print("x" * 50_000_000)` used to be painted whole (implementation review
+S1, measured: 50 million characters in the `<pre>`); now at most 100,000. The words are `codeRunnerBlocks.words` with `{language}` and
+`{inputCall}` filled from the table row; none names the engine, WebAssembly,
+a worker or a thread (`test_page_features.py` sweeps them).
+
+### I5. Loading, and the hosts that break it
+
+Nothing is fetched until Run: verify's browser check counts zero requests
+under `static/pyodide/` on page load. A site opened as files: Safari 26.6
+and Chrome for Testing 155 run NONE of a Quartz page's scripts from
+`file://` (its `postscript.js` is a module script, which a file's opaque
+origin may not load — measured 2026-10-17: no block built, no SPA), so the
+blocks show as their highlighted code with no Run button; a browser that did
+run the script would start nothing and say `words.needsWebAddress`. A 45 s watchdog after the thread starts ends in
+`words.couldNotLoad` (review S1: a server that sends `.wasm` as
+`application/octet-stream`, or a CSP with no wasm permission, otherwise
+leaves "Loading Python…" for ever — measured in Chrome for Testing 155 as a
+silent hang in BOTH cases, caught at 45 s by the watchdog). A thread that
+fails to start is classified by ONE `HEAD` request for the worker file: 404
+→ `words.engineMissing`, anything else → `words.couldNotLoad` (a worker
+error event carries no reason, and a wrong type looks exactly like a 404).
+
+### I6. When the build and the site disagree (review S2)
+
+The build counts runnable blocks with the toolchain's fence reader; the site
+reads them with Quartz's parser. Measured with remark against
+`markdown_code.fenced_blocks`: callouts, folded callouts, tab-indented list
+items and `%%` in code read alike; a fence opened on a line that opens a
+list item holding another container (`- - ```python run`) was a block to the
+site and nothing to the build, and a lazy line in a list item ends the block
+on the site and not in the build. Russell's ruling (2026-10-17): the site
+never shows "isn't on this site yet" for ever because of it. So:
+
+- the build's reader now opens the nested-container block too (`nested`),
+  and neither side makes it runnable (`findRunners` skips a block whose
+  opening line opens a list item followed by another container on that
+  line), so it stays plain highlighted code and the fences after it are read
+  alike;
+- the lazy line gives one runner on both sides (the site's body runs);
+- and the SAFETY NET: the transformer leaves any runnable block whose
+  engine the site does not carry as plain code and prints
+  `plantoir: error: <page>.md: python block <n>: ` +
+  `words.blockNotPrepared`, or `words.blockAfterUnclosedFence` when a fenced
+  block above it on the page was never closed (the likeliest cause, review
+  N3: the site closes such a fence at the end of its list item, the build's
+  reader carries on) — never for a page students cannot see (the
+  transformer applies `patches/publish.ts`'s test). The line is in the
+  build's output only: the transformer runs after the folder checks are
+  said, so it is not a folder problem in the app (a gap recorded on #455).
+- both sides split the info string on the SAME separators (`INFO_SPACE`:
+  tab, space and Unicode's space separators, NBSP — Option-Space — among
+  them; review N2: micromark leaves `python<NBSP>run` all in `lang`, and the
+  build used to call it a runner the site did not).
+
+**Fuzzed** (review N2's generator, 2026-10-17): 856 random pages over 28
+placements (428 with Unicode separators, 428 ASCII), each read by
+`findRunners` over Quartz's parser and by `runner_fences`. 38 disagree, all
+in known groups: the build alone counts a fence indented four spaces at the
+top of a page or inside an HTML block (the site carries the engine for
+nothing); the site alone decodes a character reference in the info string
+(`&#114;un`), keeps a fence inside `$$` as maths, rejects a backtick in a
+backtick fence's info string differently, and reads a few deeper
+quote-and-list nestings differently — each of those shows as plain code
+with the line above; and a lazy line that leaves a list fence open makes the
+build's reader carry on and count a block the site shows as code text (the
+fixes review's second fuzz, 1,284 pages, met it 3 times; bytes only)
+(`knownLimits`). `blockAfterUnclosedFence` tells a teacher to close the open
+block with a line like the one that opened it, indented the same: a closer at
+column 0 under a list item or callout closes nothing on the site (measured
+by the review; `pageShapes` pins the indented close).
+
+`check_runner_rules_against_the_site.py` runs every `pageShapes` case
+through both readers, and the transformer itself with the engine carried,
+not carried, and on an unpublished page.
+
+### I7. Saved edits, and print
+
+**Storage** (`codeRunnerBlocks.storage`): `localStorage` key
+`plantoir:runner:<base>:<id>`, `<base>` the site root's path as this page
+resolves it (N5: previews reuse ports and folder publishes share a host),
+holding `{originalHash, code}` (FNV-1a 32 of the teacher's code — not
+`crypto.subtle`, which a preview reached over a school network's plain http
+lacks). Written 400 ms after the last keystroke and at once on `pagehide`,
+`beforeprint` and `addCleanup` (an edit then a link within 400 ms is kept).
+Code equal to the teacher's removes the key. When the teacher's code has
+changed since (the hash differs) the saved value moves to `<key>:set-aside`,
+the live key is removed, the new code is shown and `words.teacherChangedIt`
+said — once, because the live key is gone (S4); set-aside work is NOT
+offered back. Ids are positional, so a block inserted ABOVE others sets aside
+the edits on every block below it (knownLimits; the skill says to add blocks
+after existing ones). `readonly` stores nothing.
+
+**Print** (decision 8, `codeRunnerBlocks.print`): a synced
+`<pre class="plantoir-runner-print" aria-hidden="true">` holds the current
+code and the wrapper is `.plantoir-runner-edited` while it differs from the
+teacher's (a textarea's typed value is not part of a printed or cloned
+page). `@media print` hides the editor, input, buttons, status and output;
+an unedited block prints its highlighted code, an edited one the student's
+code. Paged.js promotes the same rules for the Print button, which awaits a
+flush-and-sync pushed onto `window.plantoirPrint.prepare` (and removed in
+`addCleanup`). print.inline.ts's code numbering sees the print copy as a
+`pre` without `data-line` and counts its text lines.
+
+### I8. Measured (2026-10-17, M4 Pro, macOS 26.6)
+
+Against the verify fixture and a measuring page in EXC2O, served by
+Plantoir's own preview unless the row says otherwise. "First Run" is the
+press of Run to the first program's last line, Python loading included;
+nothing of the engine was fetched on page load in any of them.
+
+| Browser | First Run | Second Run | After Stop | `time.sleep(0.5)` lines arrived | Other |
+|---|---:|---:|---:|---|---|
+| Safari 26.6 | 954 ms | 25 ms | 887 ms | 15, 501, 1,001 ms | editor 16 px; on Netlify 1,509 ms, on Cloudflare 1,368 ms (6.1 and 6.3 MB brotli) |
+| Chrome for Testing 155 (headless, verify.sh) | 1,077 ms | 159 ms | — | — | the whole of `browser-checks/code_runner.mjs` |
+| Microsoft Edge 155.0.4283.45 (headless) | 1,069 ms | 255 ms | — | — | the whole of `code_runner.mjs` |
+| iPad (A16) simulator, iOS 18.6, Safari by WebDriver | 1,040–1,050 ms | 21 ms | 990–1,056 ms | 4, 500, 1,000 ms | no zoom on focus (`visualViewport.scale` 1 → 1); Tab, Shift-Tab and Escape-then-Tab as I2 says (Escape-then-Tab only after the fix below) |
+| WKWebView, the preview pane's configuration (an off-screen window) | 1,718 ms | 999 ms | 999 ms | all at once at the end | works end to end; its times are not comparable — macOS throttles timers and animation frames in a window nobody can see |
+
+In Chrome and Edge the three broken servers end as I5 says: worker missing
+→ `engineMissing` in 0.1 s; `.wasm` as octet-stream and a CSP without wasm →
+`couldNotLoad` at the 45 s watchdog (both silent hangs otherwise). Five page
+changes leave at most one worker (CDP `Target.setAutoAttach`). A simulator
+can drive neither the on-screen keyboard nor a real iPad's Wi-Fi: those are
+Russell's smoke test (Q6).
+
+**Found by measuring, and fixed:** in the iPad simulator, Escape then Tab did
+NOT leave the editor. Quartz's own Escape handler (`search.inline.ts` →
+`hideSearch`) moves the focus to the search button on EVERY page, so the next
+Tab (which in Safari visits form controls only) came straight back to the
+editor. The editor now keeps its Escape (`stopPropagation`), and
+`code_runner.mjs` checks that Escape alone leaves the focus in the editor —
+red against the earlier script, green now.
+
+**Print** (Chrome for Testing 155, `pdftotext`): ⌘P of an unedited block
+prints the teacher's code and no button, input box or output; of an edited
+one the student's code and not the teacher's; the Print button's handout,
+after the edit, the student's code. ⌘P of pages that do not opt in, built
+before and after this branch: Help Sessions 1 page and Building Series and
+Parallel Circuits 3 pages each time, identical text.
+
+**What every site's bundles cost** (EXC2O built with `origin/dev` 1f29ff04a's
+image and with this branch's): `postscript.js` 106,596 → 121,277 bytes
+(+14,681), `index.css` 57,824 → 60,812 (+2,988). Of 299 pages, 293 are
+identical once the two KaTeX lines in the head (C2-26) and Quartz's own build
+variance (the explorer's random id) are set aside; the other 6 (Curriculum
+and tag listings) differ only in the order of entries that share a
+build-time date — the variance F names.
+
+
+### I9. Teacher note: "Writing a runnable block"
+
+Add `codeRunner: true` to the page's settings and `run` after `python` on the
+block's first line; add `readonly`, `stdin` or (sparingly) `autorun` after
+it. Tell students what to type in the input box, one line per `input()`.
+Preview and press Run on each block; a block that shows as plain code is
+named on a `plantoir: error:` line. The skill `plantoir-runnable-code`
+(support/agent_guidance) carries the whole of this for an assistant.
+
+**Rejected** (with the reasons above and in 02 and 05): Skulpt; Custom
+Frames or JupyterLite; SharedArrayBuffer for input and interrupts (a folder
+publish cannot send COOP/COEP); window.prompt for input; CodeMirror (a large
+editor per page for indentation); a Blob worker (Netlify's CSP has no
+`worker-src`, so `blob:` is refused there); a classic worker (B1); an html-
+stage plugin after pretty-code (the properties are gone by then); the
+transformer's `externalResources` (inlined into every page); auto-indent on
+Enter (it fights the iPadOS keyboard and IME); a `# plantoir: run` first
+line (Obsidian takes only the info string's first word, so ` ```python run `
+is an ordinary Python block there — verified from Obsidian 1.12.7's and
+1.13.7's own code, 2026-10-08).
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
-except the page marker H adds on top of them from `support/quartz` — with five asset exceptions, all in
+except the page marker H adds on top of them from `support/quartz` — with six asset exceptions, all in
 `quartz/static/` and all written every build: `og-image.png` is redrawn as the
 section's social sharing card (C2-13), and `favicon.ico`, `icon.svg`,
-`apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25). Two of
+`apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25); since
+#494 every site also carries `static/katex/`, KaTeX's own stylesheet, copy-tex
+and faces, which its maths was linked to on a CDN before (C2-26). Two of
 those OVERWRITE files Quartz itself ships — `og-image.png` and `icon.png` —
 which is deliberate: a built site should carry no Quartz artwork, including
 where nothing links to it. (`quartz/util/og.tsx` reaches for `static/icon.png`
 when it draws generated OG images, so it now picks up Plantoir's mark too.)
-Beyond those: the Markdown/OFM transformer
+Beyond those (and the gated engines F, G and I carry only where a page asks):
+the Markdown/OFM transformer
 pipeline, full-text search (FlexSearch), syntax highlighting, LaTeX
 rendering, callouts, popovers, RSS/sitemap emitters, mobile layout, and
 light/dark mode. The customizations are deliberately thin wrappers around

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
 Pages that ask for something extra on the built site (#454): `printable:` and
-`printPdf:`, against the CONTRACT.
+`printPdf:`, against the CONTRACT - and since #455 `codeRunner:` and its
+runnable blocks (contracts/shared-rules.json -> codeRunnerBlocks: the language
+table, the fence rule, where a fence can sit, the ids, what a site carries, the
+engine's overlay and the words the page reads).
 
 The cases are not retyped here. They are deserialised from
 `contracts/file-formats.json` -> `pageOptIns` (readingCases, printPdfCases) and
@@ -268,6 +271,266 @@ class PrintPdfFindingTests(unittest.TestCase):
         found = self._found([{"page": "{course} notes", "file": "{section}.pdf", "problem": "missing"}])
         self.assertIn("“{course} notes”", found[0].sentence)
         self.assertIn("{section}.pdf", found[0].detail)
+
+
+# ---- Runnable code (#455): contracts/shared-rules.json -> codeRunnerBlocks ----
+
+def runner_rules(*keys):
+    return contracts.section("shared-rules", "codeRunnerBlocks", *keys)
+
+
+class RunnerLanguageTableTests(unittest.TestCase):
+    """The ONE table: page_features' literal mirror equals the contract's, field for field."""
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contract()
+
+    def test_the_mirror_is_the_contracts_table_field_for_field(self):
+        rows = runner_rules("languages")
+        self.assertEqual(len(rows), len(page_features.RUNNER_LANGUAGES))
+        for row in rows:
+            with self.subTest(fence=row["fence"]):
+                mirror = page_features.RUNNER_LANGUAGES.get(row["fence"])
+                self.assertIsNotNone(mirror, "the mirror has no row for this fence")
+                for field, value in row.items():
+                    if field == "fence":
+                        continue
+                    got = mirror[field]
+                    if isinstance(got, tuple):
+                        got = list(got)
+                    self.assertEqual(got, value, field)
+                self.assertEqual(set(mirror), set(row) - {"fence"}, "the mirror has a field the contract does not")
+
+    def test_every_language_engine_is_gated_by_the_codeRunner_key(self):
+        for row in runner_rules("languages"):
+            self.assertEqual(page_features.GATED_ASSETS.get(row["engine"]), "codeRunner")
+            self.assertIn(row["engine"], page_features.ENGINE_WORDS)
+
+
+class RunnerFenceTests(unittest.TestCase):
+    """Which fences run, with which flags, where they can sit, and their ids."""
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contract()
+
+    def test_the_contract_still_carries_its_cases(self):
+        self.assertGreaterEqual(len(runner_rules("fences", "cases")), 17)
+        self.assertGreaterEqual(len(runner_rules("fences", "pageShapes", "cases")), 8)
+
+    def test_every_fence_case_is_a_runner_as_the_contract_says(self):
+        for case in runner_rules("fences", "cases"):
+            with self.subTest(case=case["name"]):
+                found = page_features.runner_for(case["lang"], case["meta"], case["optedIn"])
+                if not case["runner"]:
+                    self.assertIsNone(found)
+                    continue
+                self.assertIsNotNone(found)
+                self.assertEqual(found["fence"], case.get("fence", case["lang"]))
+                self.assertEqual(found["flags"], case["flags"])
+
+    def test_every_page_shape_has_as_many_runners_as_the_contract_says(self):
+        for case in runner_rules("fences", "pageShapes", "cases"):
+            with self.subTest(case=case["name"]):
+                found = page_features.runner_fences(case["page"], True)
+                self.assertEqual(len(found), case["runners"])
+                self.assertEqual(page_features.runner_fences(case["page"], False), [],
+                                 "a page that does not opt in has no runner")
+
+    def test_every_ids_case_names_its_runners_as_the_contract_says(self):
+        for case in runner_rules("ids", "cases"):
+            with self.subTest(slug=case["slug"]):
+                self.assertEqual(page_features.runner_ids(case["slug"], case["page"]), case["ids"])
+
+    def test_the_engines_a_page_needs(self):
+        body = "```python run\nprint(1)\n```\n"
+        self.assertEqual(page_features.runner_engines_on_page(True, body), {"pyodide"})
+        self.assertEqual(page_features.runner_engines_on_page(None, body), set())
+        self.assertEqual(page_features.runner_engines_on_page("true", body), set())
+        self.assertEqual(page_features.runner_engines_on_page(True, "```python\nprint(1)\n```\n"), set())
+
+
+class CodeRunnerReadingCaseTests(unittest.TestCase):
+    """`codeRunner:` - only the boolean true opts a page in."""
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contract()
+        cls.cases = contracts.section("file-formats", "pageOptIns", "codeRunnerReadingCases", "cases")
+
+    def test_the_contract_still_carries_its_cases(self):
+        self.assertGreaterEqual(len(self.cases), 6)
+
+    def test_every_reading_case_opts_in_as_the_contract_says(self):
+        for case in self.cases:
+            with self.subTest(lines=case["lines"]):
+                self.assertIs(page_features.opts_in(case["codeRunner"]), case["optsIn"])
+
+    def test_the_key_is_listed_with_the_other_opt_ins(self):
+        keys = [entry["key"] for entry in contracts.section("file-formats", "pageOptIns", "keys")]
+        self.assertIn("codeRunner", keys)
+
+
+class RunnerEngineWorkspace:
+    """A section's output folder, a vendor folder holding stand-ins for every
+    engine, and a support folder holding the runner overlay."""
+
+    def __init__(self):
+        self.folder = Path(tempfile.mkdtemp(prefix="plantoir-runner-gate-"))
+        self.vendor = self.folder / "vendor"
+        (self.vendor / "pagedjs").mkdir(parents=True)
+        (self.vendor / "pagedjs" / "paged.min.js").write_text("/* print */\n", encoding="utf-8")
+        (self.vendor / "pyodide").mkdir(parents=True)
+        for name in ("pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip",
+                     "pyodide-lock.json", "README.txt"):
+            (self.vendor / "pyodide" / name).write_text(f"/* {name} */\n", encoding="utf-8")
+        self.support = self.folder / "support"
+        (self.support / "gated" / "pyodide").mkdir(parents=True)
+        (self.support / "gated" / "pyodide" / "plantoir-worker.js").write_text("/* worker */\n", encoding="utf-8")
+        self.output = self.folder / "section1"
+        (self.output / "quartz" / "static").mkdir(parents=True)
+        self.said = []
+
+    def gate(self, counts):
+        return page_features.install_gated_assets(
+            self.output, counts, vendor_dir=self.vendor, printer=self.said.append,
+            support_dir=self.support)
+
+    def static(self, engine):
+        return self.output / "quartz" / "static" / engine
+
+    def remove(self):
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+
+class RunnerGateTests(unittest.TestCase):
+    """What a site carries (siteCarriesEngine), the overlay, and the missing engine."""
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contract()
+
+    def setUp(self):
+        self.space = RunnerEngineWorkspace()
+
+    def tearDown(self):
+        self.space.remove()
+
+    def test_every_site_carries_engine_case_holds(self):
+        for case in runner_rules("siteCarriesEngine", "cases"):
+            with self.subTest(case=case["name"]):
+                counts = {}
+                for page in case["pages"]:
+                    if not page["visible"]:
+                        continue
+                    for engine in page_features.runner_engines_on_page(page["codeRunner"], page["body"]):
+                        counts[engine] = counts.get(engine, 0) + 1
+                    if page_features.opts_in(page["printable"]):
+                        counts["pagedjs"] = counts.get("pagedjs", 0) + 1
+                self.space.gate(counts)
+                for engine, carried in case["engines"].items():
+                    self.assertIs(self.space.static(engine).is_dir(), carried, engine)
+
+    def test_the_overlay_arrives_with_the_engine_and_leaves_with_it(self):
+        self.space.gate({"pyodide": 1})
+        carried = sorted(path.name for path in self.space.static("pyodide").iterdir())
+        self.assertEqual(carried, ["README.txt", "plantoir-worker.js", "pyodide-lock.json", "pyodide.asm.mjs",
+                                   "pyodide.asm.wasm", "pyodide.mjs", "python_stdlib.zip"])
+        self.assertTrue(any("1 page" in line for line in self.space.said), self.space.said)
+        self.space.gate({"pyodide": 0})
+        self.assertFalse(self.space.static("pyodide").exists())
+
+    def test_a_second_build_copies_nothing_and_keeps_the_overlay(self):
+        first = self.space.gate({"pyodide": 2})
+        second = self.space.gate({"pyodide": 2})
+        self.assertEqual(first["pyodide"]["copied"], 7)
+        self.assertEqual(second["pyodide"]["copied"], 0)
+        self.assertTrue((self.space.static("pyodide") / "plantoir-worker.js").is_file())
+
+    def test_the_overlay_wins_over_a_vendor_file_of_the_same_name(self):
+        (self.space.vendor / "pyodide" / "plantoir-worker.js").write_text("/* old */\n", encoding="utf-8")
+        self.space.gate({"pyodide": 1})
+        self.assertEqual((self.space.static("pyodide") / "plantoir-worker.js").read_text(encoding="utf-8"),
+                         "/* worker */\n")
+
+    def test_a_stale_file_in_the_sites_copy_is_removed(self):
+        self.space.gate({"pyodide": 1})
+        (self.space.static("pyodide") / "stale.js").write_text("old\n", encoding="utf-8")
+        self.space.gate({"pyodide": 1})
+        self.assertFalse((self.space.static("pyodide") / "stale.js").exists())
+
+    def test_a_missing_engine_with_its_overlay_installs_nothing_and_warns(self):
+        shutil.rmtree(self.space.vendor / "pyodide")
+        outcome = self.space.gate({"pyodide": 3})
+        self.assertFalse(self.space.static("pyodide").exists(), "the overlay alone is not an engine")
+        self.assertFalse(outcome["pyodide"]["installed"])
+        self.assertTrue(self.space.said, "a page asked for runnable code and nothing said the engine was missing")
+
+    def test_the_words_a_teacher_reads_name_the_language_and_no_machinery(self):
+        self.space.gate({"pyodide": 1})
+        shutil.rmtree(self.space.vendor / "pyodide")
+        self.space.gate({"pyodide": 1})
+        said = " ".join(self.space.said)
+        self.assertIn("Python", said)
+        for word in ("pyodide", "webassembly", "wasm", "worker", "docker", "container", "toolchain", "{"):
+            self.assertNotIn(word, said.lower())
+
+    def test_engines_with_no_overlay_are_unchanged(self):
+        outcome = self.space.gate({"pagedjs": 1})
+        self.assertEqual(outcome["pagedjs"]["copied"], 1)
+        self.assertEqual(sorted(path.name for path in self.space.static("pagedjs").iterdir()), ["paged.min.js"])
+
+
+class RunnerWordsTests(unittest.TestCase):
+    """quartz/plantoir_code_runner.json - what the page's code and the transformer read."""
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contract()
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp(prefix="plantoir-runner-words-"))
+        (self.folder / "quartz").mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def read(self):
+        import json
+        return json.loads((self.folder / "quartz" / page_features.RUNNER_WORDS_FILE).read_text(encoding="utf-8"))
+
+    def test_the_file_carries_the_contracts_words_limits_and_what_the_site_carries(self):
+        page_features.write_runner_words(self.folder, {"pyodide"})
+        written = self.read()
+        words = dict(runner_rules("words"))
+        words.pop("note")
+        self.assertEqual(written["words"], words)
+        self.assertEqual(written["carried"], ["pyodide"])
+        self.assertEqual(written["limits"], {
+            "outputCharacters": runner_rules("output", "maxCharacters"),
+            "loadSeconds": runner_rules("loading", "watchdogSeconds"),
+            "debounceMilliseconds": runner_rules("storage", "debounceMilliseconds"),
+            "editorLines": runner_rules("editor", "maxLines"),
+            "indent": runner_rules("editor", "indent"),
+        })
+
+    def test_writing_twice_gives_the_same_bytes_and_changes_nothing(self):
+        self.assertTrue(page_features.write_runner_words(self.folder, {"pyodide"}))
+        first = (self.folder / "quartz" / page_features.RUNNER_WORDS_FILE).read_bytes()
+        self.assertFalse(page_features.write_runner_words(self.folder, {"pyodide"}))
+        self.assertEqual((self.folder / "quartz" / page_features.RUNNER_WORDS_FILE).read_bytes(), first)
+        page_features.write_runner_words(self.folder, set())
+        self.assertEqual(self.read()["carried"], [])
+
+    def test_no_word_a_student_reads_names_the_machinery(self):
+        for key, text in runner_rules("words").items():
+            if key == "note":
+                continue
+            with self.subTest(key=key):
+                for word in ("pyodide", "webassembly", "wasm", "worker", "thread", "docker", "container",
+                             "toolchain", "script", "quartz", "json"):
+                    self.assertNotIn(word, text.lower())
 
 
 if __name__ == "__main__":
