@@ -45,7 +45,7 @@ PARTS = SCRATCH / "parts-hero-windows"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from composite import diagonal_hero, FIGURE_WIDTH  # noqa: E402
-from images import prepare, WIDEST_WINDOW_PIXELS  # noqa: E402
+from images import prepare  # noqa: E402
 
 WORKSPACE = Path.home() / "Teaching"
 # Read from the one table both capture scripts share (folders.json, #445).
@@ -202,6 +202,51 @@ def place(hwnd: int, x: int, y: int, width: int, height: int) -> None:
     user32.AttachThreadInput(theirs, ours, False)
     time.sleep(0.6)
 
+
+
+def visible_frame(hwnd: int) -> tuple[int, int, int, int]:
+    """The window as it is SEEN -- `DWMWA_EXTENDED_FRAME_BOUNDS`, without the
+    invisible resize border Windows 11 keeps outside it -- as left, top,
+    width, height in physical pixels. windowshot photographs this frame."""
+    rect = wintypes.RECT()
+    result = dwmapi.DwmGetWindowAttribute(wintypes.HWND(hwnd), 9,  # DWMWA_EXTENDED_FRAME_BOUNDS
+                                          ctypes.byref(rect), ctypes.sizeof(rect))
+    if result != 0 or rect.right <= rect.left or rect.bottom <= rect.top:
+        raise SystemExit(f"DWM gave no frame for the window (HRESULT {result & 0xFFFFFFFF:#010x}, "
+                         f"rectangle {rect.left},{rect.top},{rect.right},{rect.bottom}). "
+                         "Nothing past this point was taken.")
+    return rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
+
+
+def place_visible(hwnd: int, x: int, y: int, width: int, height: int) -> None:
+    """`place`, sized so the VISIBLE frame -- what windowshot photographs --
+    is `width` x `height`, not the window rectangle with its invisible
+    border (#544). Measured 2026-10-15 at the fitted 1.127 scale: a window
+    asked for 766 x 992 photographed at 736 x 962. The border is read, not
+    guessed (`GetWindowRect` against `DWMWA_EXTENDED_FRAME_BOUNDS`), from the
+    window as it stands BEFORE each placement, so the window is only ever
+    given the corrected rectangle: a second call on a window already right
+    re-places it at the same size instead of shrinking it by the border and
+    growing it back just before the shutter. At most three placements; a
+    frame still not the size asked for stops the run, since a picture of the
+    wrong size frames a different page from the mac's."""
+    for _ in range(3):
+        seen_x, seen_y, seen_w, seen_h = visible_frame(hwnd)
+        window = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(window))
+        place(hwnd,
+              x - (seen_x - window.left),
+              y - (seen_y - window.top),
+              width + (window.right - window.left) - seen_w,
+              height + (window.bottom - window.top) - seen_h)
+        _, _, seen_w, seen_h = visible_frame(hwnd)
+        if abs(seen_w - width) <= 1 and abs(seen_h - height) <= 1:
+            return
+    window = wintypes.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(window))
+    raise SystemExit(f"The window's visible frame is {seen_w}x{seen_h}, not the {width}x{height} asked for "
+                     f"(window rectangle {window.right - window.left}x{window.bottom - window.top}). "
+                     "Nothing past this point was taken.")
 
 
 def press_escape() -> None:
@@ -667,7 +712,8 @@ def capture_page(url: str, title_fragment: str, destination: Path, *,
                           flags=device_scale_flags(scale) if fit else ())
     try:
         hwnd = edge_window(process, "")
-        place(hwnd, x, y, width, height)
+        position = place_visible if fit else place
+        position(hwnd, x, y, width, height)
         press_escape()
         with sync_playwright() as playwright:
             browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
@@ -710,7 +756,7 @@ def capture_page(url: str, title_fragment: str, destination: Path, *,
                 # photographs with a heavy outline round it.
                 page.evaluate("document.activeElement && document.activeElement.blur()")
             time.sleep(1.0)
-            place(hwnd, x, y, width, height)   # in front, so its title bar is the active one
+            position(hwnd, x, y, width, height)   # in front, so its title bar is the active one
             if fragment and anchor_problem(page, fragment) is not None:
                 raise SystemExit(f"{url}: {anchor_problem(page, fragment)} (it moved before the shutter)")
             return photograph(hwnd, destination)
