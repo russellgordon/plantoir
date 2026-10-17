@@ -3729,7 +3729,7 @@ against the pins (5–8 ms for all seven) and writes nothing on a mismatch.
    `community-plugins.json` and the manifests only when a vault loads
    (exploration F4).
 8. Yes, course open: `wording.reopenTitle`. Reopen quits Obsidian
-   (`quitObsidianAndWait`), adds them only if the course is no longer open,
+   (`quitObsidianAndWait`), adds them only if Obsidian is no longer running,
    then reopens every vault that was open, this one last — the registration
    path's own quit-and-reopen. Later opens as it is and is not asked again
    for that course this run.
@@ -3739,12 +3739,19 @@ against the pins (5–8 ms for all seven) and writes nothing on a mismatch.
 back on every add-on switch and every trusted load, so an id Plantoir added
 under it is dropped the next time the teacher touches any add-on — and the
 marker would then read as "the teacher switched it off", so it would never be
-listed again. "Open" is `FolderActions.openVaultPathsNow`: Obsidian running,
-with a window, and the registry marking the course open. It over-reports
-(a stale mark with another vault's window up), which is the safe direction
-here: the pass waits, and the next Open in Obsidian asks to reopen. The
-preview pass checks it after its scan, right before writing; the remaining
-window is the milliseconds between that check and the write.
+listed again. **"Open" is: Obsidian is running AND its registry marks the
+course open — windows are never counted** (implementation review B1, measured
+2026-10-17: Russell's Obsidian was hidden with ⌘H, 16 layer-0 windows of
+which 0 on screen, four vaults marked open — so `FolderActions.openVaultPathsNow`,
+which needs a window on screen for the rename feature's sake and is left as it
+is there, read MPM2D as closed while it was loaded). A hidden, minimised,
+full-screen or other-Space Obsidian holds the list in memory all the same. The
+rule over-reports (a stale mark), which is the safe direction: the pass waits
+and Open in Obsidian asks to reopen. The vaults reopened afterwards are every
+one marked open, hidden ones included. After Plantoir's quit request, a pass
+writes only once Obsidian is no longer RUNNING. The preview pass checks after
+its scan, right before writing; the remaining window is the milliseconds
+between that check and the write.
 
 **What a pass writes** (`ObsidianFigureAddOns.install`, serialised by the
 `ObsidianFigureAddOnsQueue` actor — review S2: Open in Obsidian and a finished

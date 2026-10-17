@@ -577,11 +577,26 @@ nonisolated enum ObsidianFigureAddOns {
         }
         var patterns: [String] = []
         for name in ObsidianFigureAddOns.plantoirAddOnFolders(inPluginsAt: pluginsURL) {
-            let path: String = folderURL.lastPathComponent + "/" + ObsidianAddOns.settingsFolderName + "/plugins/" + name
+            let path: String = ObsidianFigureAddOns.zipLiteral(folderURL.lastPathComponent)
+                + "/" + ObsidianAddOns.settingsFolderName + "/plugins/" + ObsidianFigureAddOns.zipLiteral(name)
             patterns.append(path + "/*")
             patterns.append(path)
         }
         return patterns
+    }
+
+    /// A name as `zip -x` reads it literally: zip treats `[`, `]`, `*` and `?`
+    /// as wildcards, so a course called `MPM2D [old]` matched nothing and kept
+    /// its add-ons (implementation review N1, measured).
+    static func zipLiteral(_ name: String) -> String {
+        var escaped: String = ""
+        for character in name {
+            if character == "[" || character == "]" || character == "*" || character == "?" || character == "\\" {
+                escaped.append("\\")
+            }
+            escaped.append(character)
+        }
+        return escaped
     }
 
     /// The folders under `plugins` that carry Plantoir's marker, sorted —

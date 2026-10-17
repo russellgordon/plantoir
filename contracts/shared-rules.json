@@ -24256,7 +24256,7 @@
     "knownLimits": [
       "Quartz removes every `%%` pair from a page before it reads anything, inside fences too, so a TeX comment written `%% like this` is altered on the site and not in Obsidian. Write single `%` comments.",
       "One picture per fence: TikZJax draws only the first tikzpicture in a fence (measured).",
-      "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so it cannot be installed from Obsidian's own Browse list; without it Obsidian shows a functionplot fence as plain text, while the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site once it is installed and switched on in the course. Plantoir carries both, pinned (obsidianAddOnsForFigures, #495), and that key says where it adds them.",
+      "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so it cannot be installed from Obsidian's own Browse list; without it Obsidian shows a functionplot fence as plain text, while the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site once it is installed and switched on in the course. obsidianAddOnsForFigures (#495) says which app adds them, and where.",
       "A site opened as files on a computer, rather than served, shows a diagram's lettering in the browser's own font: browsers do not load fonts beside a page opened that way.",
       "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5)."
     ]
@@ -26686,7 +26686,7 @@
       {
         "step": 8,
         "when": "the answer is yes and the course is open in Obsidian",
-        "then": "ask wording.reopenTitle - unless Later was chosen for this course earlier in this run, then just open. Reopen: note the vaults open now, quit Obsidian and wait; if the course is still open (Obsidian did not close), write nothing and open; otherwise add them, open every vault that was open again and this course last. Later: open as it is; nothing is written"
+        "then": "ask wording.reopenTitle - unless Later was chosen for this course earlier in this run, then just open. Reopen: note the vaults open now (every one the registry marks open), quit Obsidian and wait; if Obsidian is still RUNNING (it did not close), write nothing and open; otherwise add them, open every vault that was open again and this course last. Later: open as it is; nothing is written"
       }
     ],
     "answer": {
@@ -26739,7 +26739,7 @@
       ]
     },
     "offerCases": {
-      "note": "Open in Obsidian's decision (sequence), as data. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
+      "note": "Open in Obsidian's decision (sequence), as data. `courseOpenInObsidian` means Obsidian is RUNNING and its registry marks the course open - however many of its windows are on screen: a hidden, minimised, full-screen or other-Space Obsidian still holds the course's add-on list in memory (implementation review B1, measured on a hidden Obsidian with 16 vault windows and none on screen). Over-reporting is the safe direction. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
       "cases": [
         {
           "name": "a reference course is never scanned",
@@ -26939,7 +26939,7 @@
       ]
     },
     "previewCases": {
-      "note": "The second trigger: a section's preview has shown a fresh build. Nothing is ever shown to the teacher; a pass that adds something writes trail.pass. `decision` is nothing or install.",
+      "note": "The second trigger: a section's preview has shown a fresh build. `courseOpenInObsidian` as in offerCases: running, and marked open in the registry, windows never counted. Nothing is ever shown to the teacher; a pass that adds something writes trail.pass. `decision` is nothing or install.",
       "cases": [
         {
           "name": "the answer yes, the course needs them",
@@ -27088,7 +27088,7 @@
       ]
     },
     "vaultCases": {
-      "note": "What one pass writes (the install order: links, carried copy, defaults, list, then each add-on), as data. `before.settings`: absent | present (with app.json) | presentWithoutAppJson | link. `before.plugins`: link, when `.obsidian/plugins` is a link. `before.list`: the text of community-plugins.json, or null for no file. `before.addOns`: what is at plugins/<id> - {version, marker} (manifest.json says version; marker is Plantoir's .plantoir file), {manifest: \"unreadable\", marker}, or \"file\" (not a folder). `before.partial`: ids with a leftover <id>.plantoir-partial. `carried`: ok | mismatch. `defaults`: ok | missing (the bundled course defaults). `outcomes`: per id, an Outcome name, with `:<version>` for the left-alone ones. `listAfter`: the list's text after the pass, or null for no file. `written`: ids whose folder holds the carried files and the marker after the pass. Unless a case says otherwise: settings present, list null, no add-ons, carried ok, defaults ok.",
+      "note": "What one pass writes (the install order: links, carried copy, defaults, list, then each add-on), as data. `before.settings`: absent | present (with app.json) | presentWithoutAppJson | link. `before.plugins`: link, when `.obsidian/plugins` is a link; readOnly, when it is a folder nobody may write in. `before.list`: the text of community-plugins.json, or null for no file. `before.addOns`: what is at plugins/<id> - {version, marker} (manifest.json says version; marker is Plantoir's .plantoir file), {manifest: \"unreadable\", marker}, or \"file\" (not a folder). `before.partial`: ids with a leftover <id>.plantoir-partial. `carried`: ok | mismatch. `defaults`: ok | missing (the bundled course defaults). `outcomes`: per id, an Outcome name, with `:<version>` for the left-alone ones. `listAfter`: the list's text after the pass, or null for no file. `written`: ids whose folder holds the carried files and the marker after the pass. Unless a case says otherwise: settings present, list null, no add-ons, carried ok, defaults ok.",
       "outcomeNames": [
         "added",
         "alreadyThere",
@@ -27471,6 +27471,23 @@
           "listAfter": null,
           "carried": "mismatch",
           "written": []
+        },
+        {
+          "name": "a write fails: the list is written, the add-ons are not",
+          "needs": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ],
+          "before": {
+            "plugins": "readOnly"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "couldNotWrite",
+            "obsidian-functionplot": "couldNotWrite"
+          },
+          "listAfter": "[\n  \"obsidian-tikzjax\",\n  \"obsidian-functionplot\"\n]",
+          "written": [],
+          "why": "Implementation review N2, measured with a read-only .obsidian/plugins. Harmless: Obsidian 1.13.7's initialize returns before the trust question when no manifest loads, so a listed id with no folder asks nothing, and the next pass adds it."
         }
       ]
     },

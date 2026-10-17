@@ -205,6 +205,16 @@ nonisolated enum ObsidianFigureAddOnsOffer {
         return .install
     }
 
+    /// The vaults counted as open in Obsidian: every one the registry marks
+    /// open, while Obsidian is running — however many of its windows are on
+    /// screen (`offerCases` / `previewCases` notes; implementation review B1).
+    static func vaultsOpen(obsidianRunning: Bool, registryData: Data?) -> [String] {
+        if !obsidianRunning {
+            return []
+        }
+        return FolderActions.openVaultPaths(registryData: registryData)
+    }
+
     /// The vault Obsidian opens for a path: the longest registered vault
     /// that is the path or holds it (measured from 1.13.7's `main.js`), or
     /// nil when none does — and then Plantoir registers the course itself.

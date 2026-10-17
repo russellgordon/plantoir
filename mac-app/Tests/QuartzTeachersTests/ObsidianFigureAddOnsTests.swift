@@ -530,6 +530,7 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
     /// first, writes, then reopens every vault that was open.
     func testWithTheCourseOpenItAsksToReopenAndNeverWritesUnderIt() async throws {
         let made: Driven = try drive(answer: .yes)
+        made.log.running = true
         made.log.openVaults = [made.course.directoryURL.path, "/elsewhere/Other"]
         made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
         await made.workspace.obsidianAddOnsWork?.value
@@ -539,14 +540,39 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
                        "written into a course open in Obsidian")
         await made.workspace.answerObsidianReopen(request, reopen: true)
         XCTAssertEqual(made.log.quits, 1)
-        XCTAssertEqual(made.log.reopened, [[made.course.directoryURL.path, "/elsewhere/Other"]])
+        // Every vault the registry marked open, sorted, so the hidden ones come back too.
+        XCTAssertEqual(made.log.reopened, [["/elsewhere/Other", made.course.directoryURL.path].sorted()])
         XCTAssertEqual(made.log.pluginsAtOpen, [["obsidian-tikzjax"]])
         XCTAssertTrue(ActivityTrail.store.activityText(includingPrompts: false).contains(ObsidianFigureAddOnsTrail.reopened(course: made.course.code)))
+    }
+
+    /// Implementation review B1, the measured shape: Obsidian running and
+    /// HIDDEN (no window on screen at all), the registry marking the course
+    /// open. It counts as open — the reopen question, never a write — and the
+    /// preview pass waits.
+    func testAHiddenObsidianStillCountsAsOpen() async throws {
+        XCTAssertEqual(
+            ObsidianFigureAddOnsOffer.vaultsOpen(obsidianRunning: true, registryData: try ObsidianFigureAddOnsTests.registry(vaults: ["/w/MPM2D"], open: true)),
+            ["/w/MPM2D"], "no window is counted"
+        )
+        XCTAssertEqual(ObsidianFigureAddOnsOffer.vaultsOpen(obsidianRunning: false, registryData: try ObsidianFigureAddOnsTests.registry(vaults: ["/w/MPM2D"], open: true)), [])
+        let made: Driven = try drive(answer: .yes)
+        made.log.running = true
+        made.log.registry = try ObsidianFigureAddOnsTests.registry(vaults: [made.course.directoryURL.path], open: true)
+        made.workspace.addObsidianAddOnsAfterAPreview(course: made.course)
+        await made.workspace.obsidianAddOnsWork?.value
+        made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
+        await made.workspace.obsidianAddOnsWork?.value
+        XCTAssertNotNil(made.workspace.obsidianReopenRequest, "the reopen question, not a write")
+        XCTAssertEqual(made.log.opened, [])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: made.course.directoryURL.appendingPathComponent(".obsidian/plugins").path),
+                       "written under a hidden Obsidian")
     }
 
     /// Later: opened as it is, nothing written, not asked again this run.
     func testLaterWritesNothingAndIsNotAskedAgain() async throws {
         let made: Driven = try drive(answer: .yes)
+        made.log.running = true
         made.log.openVaults = [made.course.directoryURL.path]
         made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
         await made.workspace.obsidianAddOnsWork?.value
@@ -563,6 +589,7 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
     /// If Obsidian does not close, nothing is written.
     func testObsidianThatDoesNotCloseIsNeverWrittenUnder() async throws {
         let made: Driven = try drive(answer: .yes)
+        made.log.running = true
         made.log.openVaults = [made.course.directoryURL.path]
         made.log.quitCloses = false
         made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
@@ -591,11 +618,12 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
     /// but never into a course open in Obsidian (plan review S3).
     func testAPreviewAddsThemOnlyWhileTheCourseIsClosed() async throws {
         let made: Driven = try drive(answer: .yes)
+        made.log.running = true
         made.log.openVaults = [made.course.directoryURL.path]
         made.workspace.addObsidianAddOnsAfterAPreview(course: made.course)
         await made.workspace.obsidianAddOnsWork?.value
         XCTAssertFalse(FileManager.default.fileExists(atPath: made.course.directoryURL.appendingPathComponent(".obsidian/plugins").path))
-        made.log.openVaults = []
+        made.log.running = false
         made.workspace.addObsidianAddOnsAfterAPreview(course: made.course)
         await made.workspace.obsidianAddOnsWork?.value
         XCTAssertTrue(FileManager.default.fileExists(atPath: made.course.directoryURL.appendingPathComponent(".obsidian/plugins/obsidian-tikzjax/manifest.json").path))
@@ -727,10 +755,12 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
     /// teacher's own is kept, and so is the list.
     func testBackupsLeavePlantoirsAddOnsOut() async throws {
         let rules: [String: Any] = try XCTUnwrap(try ObsidianFigureAddOnsTests.rules()["backups"] as? [String: Any])
+        // A folder name zip would read as wildcards (implementation review N1).
+        for folderName in ["MPM2D", "MPM2D [old]"] {
         for (index, testCase) in try XCTUnwrap(rules["cases"] as? [[String: Any]]).enumerated() {
-            let name: String = try XCTUnwrap(testCase["name"] as? String)
-            let coursesURL: URL = rootURL.appendingPathComponent("backups-\(index)/courses")
-            let courseURL: URL = coursesURL.appendingPathComponent("MPM2D")
+            let name: String = try XCTUnwrap(testCase["name"] as? String) + " (" + folderName + ")"
+            let coursesURL: URL = rootURL.appendingPathComponent("backups-\(index)-\(folderName.count)/courses")
+            let courseURL: URL = coursesURL.appendingPathComponent(folderName)
             let pluginsURL: URL = courseURL.appendingPathComponent(".obsidian/plugins")
             try FileManager.default.createDirectory(at: pluginsURL, withIntermediateDirectories: true)
             try Data("{}".utf8).write(to: courseURL.appendingPathComponent(".obsidian/app.json"))
@@ -749,11 +779,12 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             )
             let listing: Set<String> = try ObsidianFigureAddOnsTests.zipListing(zipURL)
             for path in try XCTUnwrap(testCase["inZip"] as? [String]) {
-                XCTAssertTrue(listing.contains("MPM2D/" + path), "\(name): \(path) is missing from the zip")
+                XCTAssertTrue(listing.contains(folderName + "/" + path), "\(name): \(path) is missing from the zip")
             }
             for path in try XCTUnwrap(testCase["notInZip"] as? [String]) {
-                XCTAssertFalse(listing.contains("MPM2D/" + path), "\(name): \(path) is in the zip")
+                XCTAssertFalse(listing.contains(folderName + "/" + path), "\(name): \(path) is in the zip")
             }
+        }
         }
     }
 
@@ -767,6 +798,8 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         var scans: Int = 0
         var quits: Int = 0
         var quitCloses: Bool = true
+        /// Obsidian is running (hidden or not: no window is ever counted).
+        var running: Bool = false
         var reopened: [[String]] = []
         var openVaults: [String] = []
         var registry: Data?
@@ -804,8 +837,13 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         var opening: ObsidianOpening = ObsidianOpening()
         opening.settings = settings
         opening.isInstalled = { return true }
-        opening.openVaultPaths = { return log.openVaults }
-        opening.registryData = { return log.registry }
+        opening.isRunning = { return log.running }
+        opening.registryData = {
+            if let registry = log.registry {
+                return registry
+            }
+            return try? ObsidianFigureAddOnsTests.registry(vaults: log.openVaults, open: true)
+        }
         opening.open = { folder, vault in
             log.opened.append(folder.path)
             let entries: [String] = (try? FileManager.default.contentsOfDirectory(atPath: vault.appendingPathComponent(".obsidian/plugins").path)) ?? []
@@ -814,7 +852,7 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         opening.quitAndWait = {
             log.quits += 1
             if log.quitCloses {
-                log.openVaults = []
+                log.running = false
             }
         }
         opening.reopen = { paths in
@@ -911,6 +949,13 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             try Data("{}".utf8).write(to: settingsURL.appendingPathComponent("app.json"))
         }
         let pluginsURL: URL = settingsURL.appendingPathComponent("plugins")
+        if before["plugins"] as? String == "readOnly" {
+            try fileManager.createDirectory(at: pluginsURL, withIntermediateDirectories: true)
+            try fileManager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: pluginsURL.path)
+            addTeardownBlock {
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pluginsURL.path)
+            }
+        }
         if before["plugins"] as? String == "link" {
             let elsewhere: URL = caseURL.appendingPathComponent("elsewhere-plugins")
             try fileManager.createDirectory(at: elsewhere, withIntermediateDirectories: true)
@@ -977,10 +1022,14 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         return result
     }
 
-    static func registry(vaults: [String]) throws -> Data {
+    static func registry(vaults: [String], open: Bool = false) throws -> Data {
         var entries: [String: Any] = [:]
         for (index, path) in vaults.enumerated() {
-            entries[String(format: "%016x", index + 1)] = ["path": path, "ts": 1]
+            if open {
+                entries[String(format: "%016x", index + 1)] = ["path": path, "ts": 1, "open": true]
+            } else {
+                entries[String(format: "%016x", index + 1)] = ["path": path, "ts": 1]
+            }
         }
         return try JSONSerialization.data(withJSONObject: ["vaults": entries])
     }
