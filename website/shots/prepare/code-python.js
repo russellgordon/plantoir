@@ -26,10 +26,9 @@ const output = block.querySelector(".plantoir-runner-output")
 while (Date.now() < until && status.textContent !== FINISHED) await pause(100)
 if (status.textContent !== FINISHED) return "the status line reads \"" + status.textContent + "\", not \"" + FINISHED + "\""
 if (output.textContent !== "Ali\nBea\nCy\n") return "the output is " + JSON.stringify(output.textContent)
-// Framing: the page stays where the scroll to its top left it unless the
-// block's bottom (its output included) would be cut off; then the block's
-// bottom is brought to a little above the window's edge, so the text above
-// it, which says what it is for, stays in the picture.
-const overhang = block.getBoundingClientRect().bottom - (window.innerHeight - 56)
-if (overhang > 0) window.scrollBy(0, overhang)
+// Framing: the block's bottom (its output included) just inside the
+// window's bottom edge, always. The page's next paragraph describes the BUG
+// ("It prints two names and swallows the first one"), so it must be out of
+// the picture, which shows the bug fixed (#562's review, N1).
+window.scrollBy(0, block.getBoundingClientRect().bottom - (window.innerHeight - 20))
 return "ready"

@@ -12,7 +12,7 @@ nav_label: Code
 <hr class="rule">
 
 <section>
-  <p>Each part of this page shows the text you type, exactly as you type it, beside what students get from it. The Python examples come from the ready-made course for ICS3U, so you can open the same pages in a course of your own.</p>
+  <p>Each part of this page shows the text you type, exactly as you type it, beside what students get from it. The two Python examples come from the ready-made course for ICS3U, so you can open the same pages in a course of your own. The Swift program and the quiz were written for this page.</p>
   <p>Nothing here changes a page you already have. A code block without the extra word, or a page that doesn't ask for it, is built exactly as before.</p>
 </section>
 
@@ -45,7 +45,7 @@ for index in range(1, len(names)):
     <li>A file a program writes lasts for that one run. Each Run starts fresh.</li>
     <li>One program runs on a page at a time, and <strong>Stop</strong> ends any of them, a loop that never ends included.</li>
   </ul>
-  <p>The first Run on a page takes a moment while Python loads; later Runs start at once. On paper a runnable block prints as code — the student's own, if they changed it. In Obsidian it stays an ordinary Python block.</p>
+  <p>The first Run on a page takes a moment while Python loads; later Runs start at once, until a program is stopped or another block's Run interrupts it. On paper a runnable block prints as code — the student's own, if they changed it. In Obsidian it stays an ordinary Python block.</p>
   {{availability:runnable-python}}
 </section>
 
@@ -58,7 +58,14 @@ for index in range(1, len(names)):
   <pre class="fence"><code>```swift run
 print("What is your name?")
 let name = readLine() ?? ""
-print("Hello, \(name)! Your name has \(name.count) letters.")
+print("How old are you?")
+let ageText = readLine() ?? ""
+
+if let age = Int(ageText) {
+    print("Hello, \(name)! Next year you will be \(age + 1).")
+} else {
+    print("Hello, \(name)! \"\(ageText)\" is not a whole number.")
+}
 ```</code></pre>
   <h4 class="label">What students get</h4>
   <p>The code, highlighted, with an input box, <strong>Run</strong> and <strong>Stop</strong>, and a line saying the code itself can't be edited. Each line in the box is one <code>readLine()</code>, shown after its prompt as a terminal would:</p>
@@ -114,7 +121,7 @@ print("Hello, \(name)! Your name has \(name.count) letters.")
   <h2>Or ask Claude or Codex</h2>
   <p>You don't have to learn any of this. Plantoir writes its guidance for runnable code and for quizzes into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows how to opt a page in, which blocks are worth running, what to tell students to type in the input box, and how to write each kind of question. There is nothing to install or paste.</p>
   <p>Asked, in a working folder holding an ICS3U course, something like:</p>
-  <pre class="fence ask"><code>Make the examples on the page "courses/ICS3U/Unit 2/Loops.md" runnable, so students can try them.</code></pre>
+  <pre class="fence ask"><code>Make the examples on the page "courses/ICS3U/Concepts/Lists.md" runnable, so students can try them.</code></pre>
   <p>its guidance has it add <code>codeRunner: true</code> to the page's settings, the word <code>run</code> to each block worth running, and a sentence telling students what to type in the input box. Asked to <em>add a 5-question check to this page</em>, it writes five <code>[!quiz]</code> callouts of different kinds, each with its answer.</p>
   <p>Open either from a course's menu with <a href="{{up}}features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
 </section>
