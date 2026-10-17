@@ -124,6 +124,27 @@ RUN curl -fsSL -o /tmp/function-plot.tgz https://registry.npmjs.org/function-plo
  && cp /tmp/function-plot/package/dist/function-plot.js /tmp/function-plot/package/LICENSE /opt/vendor/function-plot/ \
  && rm -rf /tmp/function-plot /tmp/function-plot.tgz
 
+# Python that runs in the student's browser, for a page's ```python run
+# blocks (#455): Pyodide 314.0.7, CPython 3.14.2 compiled to WebAssembly.
+# Into /opt/vendor beside the other engines, under the same gate: a section's
+# site carries it (static/pyodide, with support/gated/pyodide/plantoir-worker.js
+# laid over it) only while a page students can see opts in with a runnable
+# block, so a course without one ships none of its 13,531,207 bytes. The core
+# tarball is fetched by exact version and checked against its SHA-256; five of
+# its files are kept - pyodide.mjs (the module a module worker imports: #455
+# review B1), pyodide.asm.mjs, pyodide.asm.wasm, python_stdlib.zip and
+# pyodide-lock.json - with a README naming the licence, MPL-2.0 (the tarball
+# carries no LICENSE file). `python3 -m tarfile`, because the slim base has no
+# bzip2. Before the tikz-engine COPY, so editing a script never downloads it
+# again; contracts/toolchain.json -> pins carries the why.
+RUN curl -fsSL -o /tmp/pyc.tar.bz2 https://github.com/pyodide/pyodide/releases/download/314.0.7/pyodide-core-314.0.7.tar.bz2 \
+ && echo "2abdcc2e35208af406e07724cffa85bc582ced97e9028383ecf5462541393f95  /tmp/pyc.tar.bz2" | sha256sum -c - \
+ && python3 -m tarfile -e /tmp/pyc.tar.bz2 /tmp/pyx && mkdir -p /opt/vendor/pyodide \
+ && cd /tmp/pyx/pyodide \
+ && cp pyodide.mjs pyodide.asm.mjs pyodide.asm.wasm python_stdlib.zip pyodide-lock.json /opt/vendor/pyodide/ \
+ && printf 'Pyodide 314.0.7 (MPL-2.0). Source: https://github.com/pyodide/pyodide/tree/314.0.7\n' > /opt/vendor/pyodide/README.txt \
+ && rm -rf /tmp/pyx /tmp/pyc.tar.bz2
+
 # TikZ diagrams drawn at BUILD time from a page's ```tikz fence (#485 E1):
 # node-tikzjax 1.0.5, whose TeX engine (tex.wasm, core.dump and all 212 TeX
 # files) is byte for byte the one the Obsidian TikZJax plugin carries, so a
