@@ -1699,7 +1699,9 @@ blindly: the undo compares what is on disk now against what the change LEFT. A
 page the teacher has since written in does not match, so it is skipped — their
 work is safe. A page the teacher deleted themselves reads back as absent, also
 does not match, and is skipped rather than "restored" by deleting something
-already gone.
+already gone. *(Superseded on 2026-10-17 by #555: a created page that is gone
+is now ALREADY BACK — nothing deleted, and it no longer holds the change on
+the list for ever. See `10-local-ai-assistant.md` → "Three verdicts, not two".)*
 
 The line telling teachers `"Undo that" does not take away a page it created`
 was corrected in the same change. A line describing what a feature used to do

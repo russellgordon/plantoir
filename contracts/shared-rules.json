@@ -20038,6 +20038,7 @@
       "undoTitle": "Undo Getting {course} Section {section} Ready?",
       "undoIntro": "Going back to how they were before you got this section ready for the start of the year: {pages}. Nothing changes for students until you deploy.",
       "undoSkipped": "Changed after that, so staying as they are: {pages}.",
+      "undoAllAlreadyBack": "Everything is already as it was before this change.",
       "undoButton": "Put Them Back",
       "undone": "Put back as they were: {pages}.",
       "undoLeftSome": "Left as they are, because they changed after the section was got ready: {pages}. The backup “{backup}” holds them as they were.",
