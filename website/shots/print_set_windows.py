@@ -293,8 +293,8 @@ def desktop_is_locked() -> bool:
 def photograph_pdf(pdf: Path, destination: Path) -> Path:
     """The PDF in an Edge `--app` window with the viewer's toolbar off: the
     page on the viewer's own background, as the Mac's handout window shows it."""
-    from hero_windows import (device_scale_flags, edge_window, fitted_scale, launch_edge, photograph, place,
-                              stop_matching, work_area, EDGE_PROFILE)
+    from hero_windows import (device_scale_flags, edge_window, fitted_scale, launch_edge, photograph,
+                              place_visible, stop_matching, work_area, EDGE_PROFILE)
     left, top, _, _ = work_area()
     scale = fitted_scale(HANDOUT_SIZE_DIP)
     width, height = round(HANDOUT_SIZE_DIP[0] * scale), round(HANDOUT_SIZE_DIP[1] * scale)
@@ -306,9 +306,9 @@ def photograph_pdf(pdf: Path, destination: Path) -> Path:
                           flags=device_scale_flags(scale))
     try:
         hwnd = edge_window(process, "")
-        place(hwnd, x, y, width, height)
+        place_visible(hwnd, x, y, width, height)   # the frame seen, not the border round it (#544)
         time.sleep(4.0)   # the viewer draws the page after the window appears
-        place(hwnd, x, y, width, height)
+        place_visible(hwnd, x, y, width, height)
         return photograph(hwnd, destination)
     finally:
         stop_matching("msedge.exe", str(EDGE_PROFILE))
@@ -345,7 +345,7 @@ def at_the_top(page) -> None:
 
 def capture_print_set(folder: Path = PRINT_FOLDER) -> None:
     from hero_windows import capture_page, make_dpi_aware, read_theme, write_theme
-    from images import prepare, WIDEST_WINDOW_PIXELS
+    from images import prepare
     page_shots = shots_of_kind("preview-page")
     handout_shots = shots_of_kind("handout")
     announce(f"Photographing what printing does, in {folder}")
@@ -370,7 +370,7 @@ def capture_print_set(folder: Path = PRINT_FOLDER) -> None:
                     must_show(part, shot)
                     destination = IMAGE_DIR / part.name
                     shutil.copyfile(part, destination)
-                    prepare(destination, WIDEST_WINDOW_PIXELS)
+                    prepare(destination, None)   # never scaled: 2x, like the mac's (#544)
                     print(f"   saved {destination.name} + WebP")
                 taken.append(shot["id"])
             write_theme(1, 1)   # paper is light
@@ -381,7 +381,7 @@ def capture_print_set(folder: Path = PRINT_FOLDER) -> None:
                 must_show(part, shot)
                 destination = IMAGE_DIR / part.name
                 shutil.copyfile(part, destination)
-                prepare(destination, WIDEST_WINDOW_PIXELS)
+                prepare(destination, None)   # never scaled: 2x, like the mac's (#544)
                 print(f"   saved {destination.name} + WebP")
                 taken.append(shot["id"])
         finally:

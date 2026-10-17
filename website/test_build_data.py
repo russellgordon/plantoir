@@ -513,6 +513,24 @@ class DarkStaticFigureTests(unittest.TestCase):
                 build.IMAGE_DIR = saved
 
 
+class WindowsPrintDensityTests(unittest.TestCase):
+
+    def test_the_windows_print_pictures_are_twice_their_window(self):
+        # #544: the Windows print pictures stand beside the mac's 2x ones in
+        # the same <picture>, so they are taken at 2x too -- the 680 x 880 DIP
+        # handout window and the 1280 x 860 page window, in a 3840 x 2034
+        # session at 200% (2026-10-16) -- and served unscaled
+        # (`images.prepare(path, None)`). At the 1080-pixel console's fitted
+        # scale they were 736 x 962 and 1427 x 961, and looked soft.
+        from PIL import Image
+        with Image.open(build.IMAGE_DIR / "print-handout-windows.png") as handout:
+            self.assertGreaterEqual(handout.size[0], 1360)
+            self.assertGreaterEqual(handout.size[1], 1760)
+        for theme in ("light", "dark"):
+            with Image.open(build.IMAGE_DIR / f"print-page-windows-{theme}.png") as page:
+                self.assertGreaterEqual(page.size[0], 2560, theme)
+
+
 class AwaitingCaptureTests(unittest.TestCase):
 
     def test_a_shot_awaiting_capture_renders_nothing_and_is_not_a_problem(self):
