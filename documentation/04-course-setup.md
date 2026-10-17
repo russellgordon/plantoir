@@ -774,6 +774,62 @@ skill `.claude/skills/example-content/` and checked by its
 holds the skeleton generator and `lint_skeletons.py`; the skeletons are
 generated output, so never hand-edit `support/skeletons/`.
 
+**Runnable Python in the ready-made pages** ([#561](https://github.com/russellgordon/plantoir/issues/561),
+v1.8.0). ICS3U is the first payload whose code students RUN on the class
+website (the runner itself: [06 → I](06-quartz-customizations.md#i-runnable-code-455-v180)).
+The installer needs nothing new — `codeRunner: true` is an ordinary
+frontmatter line it copies through, beside the per-section keys it writes —
+so the work is a judgement about every block, recorded where a later edit
+cannot quietly undo it:
+
+- **Measured scope**: 145 ```` ```python ```` blocks on 49 pages (the issue
+  guessed 79 on 40). **83 run on 41 pages** — 59 editable, 24
+  `readonly` (Concepts and Programs pages, the worked examples to read), 24
+  of them reading input — and **62 stay plain**, so 8 pages with Python get
+  no `codeRunner` at all. Plain means the block would fail or show nothing
+  alone: a fragment (names defined elsewhere on the page, or it does not
+  parse), definitions only, one `input()` line, a read of a file no run can
+  leave behind (each Run starts in a fresh empty folder), the multi-file
+  `from toolbox import …`, `breakpoint()`.
+- **The record is executable**: `.claude/skills/example-content/lint_runnable.py`
+  carries the table (every block: run / readonly / plain and why) and
+  `lint_payload.py` holds the payload to it exactly, plus rules every
+  payload keeps — a run block needs `codeRunner: true` and the reverse,
+  near-miss fences (```` ```Python run ````, `run,stdin`, a nested fence) and
+  unknown flags are refused, and a run block must parse, bind every name it
+  uses, import only the standard library the site runs, never call
+  `breakpoint()`, and write a file before reading it unless the read is
+  guarded by `except FileNotFoundError` (a module-level constant naming the
+  file counts — Programs/Reading and Writing Files does that).
+- **Measured end to end** (2026-10-17, M4 Pro): ICS3U installed by the baked
+  wizard and built with the branch's image — 83 runners on 41 pages, 24
+  readonly, every runner's code identical to its block, `static/pyodide` in
+  the site, no `plantoir: error:` line. All 82 finite blocks run in the
+  image's own Pyodide 314.0.7 (Node, sample input lines, a fresh folder
+  each): 79 finish, and the 3 that end in an error do so ON PURPOSE —
+  two NameErrors that teach scope and the debugger tutorial's
+  ZeroDivisionError (`ENDS_IN_AN_ERROR`).
+- **What the browser showed**, Chrome for Testing 155 on the built site:
+  Repetition's endless loop (`while count > 0: print(count)`) reached the
+  100,000-character cap and stopped itself in under 1.5 s, before Stop
+  could be pressed, so its prose says so instead of "Ctrl + C in the
+  terminal"; an `input()` block with the box left empty ends in
+  `EOFError`, which is why a page that reads input shows a sample run.
+- **Rejected**: making every complete program runnable regardless of page
+  (a Concepts page's examples are to be read, not rewritten — `readonly`);
+  a `stdin` flag on blocks that visibly call `input(` (the box appears by
+  itself); `autorun` anywhere; rewriting fragments into complete programs
+  (it changes the teaching, and no code body was changed); a lint rule that
+  tracks which name is used before it is bound (the rule is "bound nowhere
+  in the block", so a scope lesson's deliberate NameError passes — and so,
+  a known limit, does `count = count + 1` with no start).
+- **Known mismatches**, left as they are: a traceback on the site names
+  `main.py` where Reading an Error Message and The Bad Input Hunt show
+  `/home/student/hours.py` and `pay.py` (the prose is about a program on
+  the student's own computer); Programs/Reading and Writing Files shows a
+  "second run" transcript that the site cannot reproduce, because files
+  last one run.
+
 **How the installer reads a link** ([#314](https://github.com/russellgordon/plantoir/issues/314),
 [#326](https://github.com/russellgordon/plantoir/issues/326)): the three
 readers — which class's date a ready-made page takes (`first_use_dates`),
