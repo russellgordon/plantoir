@@ -82,7 +82,7 @@ ValueError: invalid literal for int() with base 10: 'seven'
 ```
 
 You can catch that instead of crashing. Type `seven` in the input box,
-then press Run; try `185` too:
+then press Run:
 
 ```python run readonly
 answer = input("Minutes practised: ")

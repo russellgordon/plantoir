@@ -70,8 +70,9 @@ accurate and unusable. `{per_day:.0f}` shows none at all, because
 "about 26 minutes a day" is the honest precision for this number.
 
 > [!bug]- What the program does without the try block
-> Delete the `try`/`except` and keep only `minutes = int(answer)`, then
-> type `seven` at the prompt:
+> The block above is read-only, so try this in your own copy: delete the
+> `try`/`except`, keep only `minutes = int(answer)`, run it and answer
+> `seven`:
 > ```
 > Traceback (most recent call last):
 >   File "/home/student/practice.py", line 3, in <module>

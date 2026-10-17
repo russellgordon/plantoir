@@ -33,7 +33,9 @@ Two jobs, both read the page the way the site does (the toolchain's own
        write used (a name the user typed);
    plus: an import outside the standard library (or one the site cannot
    run - turtle, tkinter ...), `breakpoint()`, and `sys.stdin` without the
-   `stdin` flag (the input box appears by itself only for `input(`).
+   `stdin` flag, `from sys import stdin` included (the input box appears by
+   itself only for `input(`). `notes = Path("w.txt")` then `notes.read_text()`
+   is read as a read of w.txt.
 
 2. The JUDGEMENT TABLE for a payload that has one (ICS3U): every Python block
    on every page, top to bottom, is `run`, `readonly`, or plain with the
@@ -285,9 +287,29 @@ def guarded_against_a_missing_file(node, parents) -> bool:
     return False
 
 
+def is_path_call(node) -> bool:
+    """Is `node` a call of Path(...) (or pathlib.Path(...)) with an argument?"""
+    if not isinstance(node, ast.Call) or not node.args:
+        return False
+    function = node.func
+    return (isinstance(function, ast.Name) and function.id == "Path") \
+        or (isinstance(function, ast.Attribute) and function.attr == "Path")
+
+
+def path_variables(tree, constants) -> dict:
+    """NAME -> file for each `NAME = Path(...)` in the block."""
+    paths = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], ast.Name) and is_path_call(node.value):
+            paths[node.targets[0].id] = file_name_of(node.value.args[0], constants)
+    return paths
+
+
 def file_accesses(tree, constants) -> list:
     """Every file the block opens, in source order: (call, name, writes)."""
     found = []
+    paths = path_variables(tree, constants)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -302,19 +324,24 @@ def file_accesses(tree, constants) -> list:
             mode = mode_of(node)
             found.append((node, file_name_of(target, constants), any(letter in mode for letter in "wax")))
         elif isinstance(function, ast.Attribute) \
-                and function.attr in ("read_text", "read_bytes", "write_text", "write_bytes") \
-                and isinstance(function.value, ast.Call) \
-                and isinstance(function.value.func, (ast.Name, ast.Attribute)) \
-                and getattr(function.value.func, "id", getattr(function.value.func, "attr", "")) == "Path" \
-                and function.value.args:
-            found.append((node, file_name_of(function.value.args[0], constants),
-                          function.attr.startswith("write")))
+                and function.attr in ("read_text", "read_bytes", "write_text", "write_bytes"):
+            name = None
+            if is_path_call(function.value):
+                name = file_name_of(function.value.args[0], constants)
+            elif isinstance(function.value, ast.Name) and function.value.id in paths:
+                name = paths[function.value.id]
+            if name is not None:
+                found.append((node, name, function.attr.startswith("write")))
     found.sort(key=lambda access: (access[0].lineno, access[0].col_offset))
     return found
 
 
 def reads_sys_stdin(tree) -> bool:
     for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "sys":
+            for alias in node.names:
+                if alias.name == "stdin":
+                    return True
         if isinstance(node, ast.Attribute) and node.attr == "stdin" \
                 and isinstance(node.value, ast.Name) and node.value.id == "sys":
             return True
@@ -632,6 +659,8 @@ PAGE_MUST_BE_REFUSED = [
     "---\ncodeRunner: true\n---\n```python run\nwith open(file='w.txt') as f:\n    print(f.read())\n```\n",
     "---\ncodeRunner: true\n---\n```python run\nfrom pathlib import Path\nprint(Path('w.txt').read_text())\n```\n",
     "---\ncodeRunner: true\n---\n```python run\nimport sys\nprint(sys.stdin.readline())\n```\n",
+    "---\ncodeRunner: true\n---\n```python run\nfrom sys import stdin\nprint(stdin.readline())\n```\n",
+    "---\ncodeRunner: true\n---\n```python run\nfrom pathlib import Path\nnotes = Path('w.txt')\nprint(notes.read_text())\n```\n",
     "---\npublish: true\n---\n```python run\nprint(1)\n```\n```swift run\nprint(2)\n```\n",
     "---\ncodeRunner: true\n---\n```python run autorun\nprint(1)\n```\n```python run autorun\nprint(2)\n```\n",
 ]
