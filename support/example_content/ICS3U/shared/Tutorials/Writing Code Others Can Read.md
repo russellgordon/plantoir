@@ -88,9 +88,9 @@ stranger.
 ## Output is part of the code
 
 Everything above is for programmers. The person using your program
-reads something else entirely — your prompts and your messages. Type a
-number of hours in the input box, then try `twelve`, pressing Run each
-time:
+reads something else entirely — your prompts and your messages. When it
+asks, answer with a number of hours; then run it again and answer
+`twelve`:
 
 ```python run
 hours = input("How many hours did you work? ")

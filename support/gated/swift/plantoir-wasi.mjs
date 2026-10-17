@@ -29,6 +29,11 @@
 //   output as it is taken, straight after the prompt (review S6; the same
 //   transcript as Python's input(), codeRunnerBlocks.stdin). Past the last
 //   line, fd_read answers 0 bytes: the end of input, so readLine() is nil.
+// * `ask` (#583, live input): when the box's lines are used up, fd_read
+//   calls ask() for the next line - on a live page it waits for the
+//   student's answer - and echoes it like a box line; ask() answering null
+//   is the end of input, and that is STICKY for the rest of the run (fd_read
+//   never asks again), as past the box's last line.
 // * proc_exit throws ProgramExit carrying the code; a trap is the engine's
 //   own error (WebAssembly.RuntimeError, or RangeError when the program
 //   recursed past the engine's stack - review S5), which the caller maps.
@@ -53,14 +58,16 @@ export class ProgramExit {
 // `lines`: the input box's lines, without their newlines. `out(text, err)`:
 // called with each piece of output as it is written, decoded per stream
 // (a character split across two writes is held until it is whole), and with
-// each input line as it is read (err false) unless `echo` is false. `rights`
-// and `echo` are for the gate alone.
-export function wasiFor(module, { lines = [], out = () => {}, rights = TERMINAL_RIGHTS, echo = true } = {}) {
+// each input line as it is read (err false) unless `echo` is false. `ask()`:
+// the next line once `lines` is used up, or null for the end of input (#583).
+// `rights` and `echo` are for the gate alone.
+export function wasiFor(module, { lines = [], out = () => {}, rights = TERMINAL_RIGHTS, echo = true, ask = null } = {}) {
   let memory = null
   const encoder = new TextEncoder()
   const decoders = { 1: new TextDecoder(), 2: new TextDecoder() }
   const waiting = lines.slice()
   let pending = null // the bytes of a line not yet handed over whole
+  let ended = false // ask() said the input has ended: sticky for this run
   const calls = new Map()
 
   const view = () => new DataView(memory.buffer)
@@ -88,6 +95,11 @@ export function wasiFor(module, { lines = [], out = () => {}, rights = TERMINAL_
     },
     fd_read(fd, iovs, count, read) {
       if (fd !== 0) return ERRNO.BADF
+      if (pending === null && waiting.length === 0 && ask !== null && !ended) {
+        const answer = ask()
+        if (answer === null) ended = true
+        else waiting.push(answer)
+      }
       if (pending === null && waiting.length > 0) {
         const line = waiting.shift()
         if (echo) out(line + "\n", false)
@@ -198,8 +210,8 @@ export function wasiFor(module, { lines = [], out = () => {}, rights = TERMINAL_
 // Run one program to its end: a fresh instance every time (a Swift program
 // runs once). Answers {exit: code} when it returned or called exit, or
 // {crashed: true, error} when it trapped.
-export async function runProgram(module, { lines = [], out = () => {}, rights = TERMINAL_RIGHTS, echo = true } = {}) {
-  const wasi = wasiFor(module, { lines, out, rights, echo })
+export async function runProgram(module, { lines = [], out = () => {}, rights = TERMINAL_RIGHTS, echo = true, ask = null } = {}) {
+  const wasi = wasiFor(module, { lines, out, rights, echo, ask })
   const instance = await WebAssembly.instantiate(module, wasi.imports)
   wasi.attach(instance)
   try {

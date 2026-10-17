@@ -26,6 +26,7 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import toolchain_paths
 import reference_course
 import contracts
+import isolation_headers
 from collections import Counter
 
 # ---- Host OS signaling & example command helper -----------------------------
@@ -883,6 +884,13 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
     host = marker.get("subdomain") or f"{project_name}.pages.dev"
     ensure_base_url_and_rebuild(public_dir.parent, host, course_code, str(section), _HOST_OS)
 
+    # Live input (#583): the pages whose code may ask for input as it runs
+    # get the headers that isolate them - after any rebuild above, which
+    # would take the file away, and before the upload, which carries it.
+    # Cloudflare's own spelling of each page's path (measured), and its
+    # 100-rule limit (codeRunnerBlocks.isolation.hosts).
+    isolation_headers.publish_headers(public_dir, "cloudflare")
+
     print(" Uploading the built site to Cloudflare…")
     deploy_to_cloudflare(public_dir, project_name, token, account_id)
 
@@ -1485,6 +1493,11 @@ def main():
     # site — this rule keeps it off without touching anything students see.
     # Must run after any rebuild above and before the manifest below, so the
     # file it writes is part of what gets uploaded.
+    # Live input (#583): BEFORE the badge rule below, which keeps the lines
+    # it did not write, so both blocks reach Netlify; after any rebuild
+    # above, which would take the file away (codeRunnerBlocks.isolation).
+    isolation_headers.publish_headers(public_dir, "netlify")
+
     print("\n Netlify can add its own advertisement badge to free-plan sites.")
     print(" Writing a website rule that keeps it off your students' pages…")
     protected_scripts = write_netlify_headers_file(public_dir)

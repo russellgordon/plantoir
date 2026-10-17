@@ -58,6 +58,13 @@
     color: var(--darkgray);
   }
 
+  // Where the page cannot stop to ask (#583): one quiet line under the label.
+  & .plantoir-runner-input-ahead {
+    margin: 0 0 0.3rem;
+    font-size: 0.85em;
+    color: var(--darkgray);
+  }
+
   & .plantoir-runner-controls {
     display: flex;
     flex-wrap: wrap;
@@ -129,6 +136,35 @@
 
   & .plantoir-runner-err {
     color: #b42318;
+  }
+
+  // Live input (#583): the answer field sits at the end of the output, on
+  // the prompt's line, and fills the rest of it (codeRunner.inline.ts sizes
+  // it; never narrower than 8 characters). 16 px at least, or iPadOS zooms
+  // the page when it takes the focus (the editor's rule).
+  & .plantoir-runner-answer {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 8ch;
+    min-width: 8ch;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 0.2em;
+    font: inherit;
+    font-size: max(16px, 1em);
+    line-height: inherit;
+    vertical-align: baseline;
+    color: var(--dark);
+    background: var(--light);
+    border: none;
+    border-bottom: 2px solid var(--secondary);
+    border-radius: 0;
+    outline: none;
+  }
+
+  & .plantoir-runner-answer:focus-visible,
+  & .plantoir-runner-answer:focus {
+    background: var(--lightgray);
   }
 
   & .plantoir-runner-print {

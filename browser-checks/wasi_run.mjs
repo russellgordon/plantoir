@@ -11,7 +11,12 @@
 //    with the shim's rights it is kept - so the rule cannot be dropped
 //    without this check going red;
 //  * a program that grows a list for ever traps at the memory cap quickly;
-//  * a program that recurses for ever ends as a crash, not a hang.
+//  * a program that recurses for ever ends as a crash, not a hang;
+//  * live input (#583, the shim's `ask`): lines handed over one at a time
+//    as the program asks give the SAME transcript as the box's lines, in
+//    both libraries and after a prompt with no newline; a box line is used
+//    before anything is asked; and the end of input (ask answering null) is
+//    sticky - the shim never asks again in that run.
 //
 // Kept beside the browser checks, out of scripts/ and the image: it needs a
 // Node 22 on the Mac. verify.sh runs it after compiling the fragments in the
@@ -52,9 +57,10 @@ async function run(name, options = {}) {
   let stderr = ""
   const began = performance.now()
   const result = await runProgram(module, {
-    lines: linesOf(name),
+    lines: options.lines ?? linesOf(name),
     echo: options.echo ?? false,
     rights: options.rights,
+    ask: options.ask ?? null,
     out: (text, err) => {
       if (err) stderr += text
       else stdout += text
@@ -142,6 +148,50 @@ for (const [name, wants] of Object.entries(expected)) {
     failures.push("G5 must-fail did not fail: with seek and tell rights the Fatal-error line was still kept, so the check proves nothing")
   }
   rows.push(`| G5 must-fail | rights with seek and tell | - | - | Fatal-error line ${(lost.stdout + lost.stderr).includes(fatal) ? "KEPT (check broken)" : "lost, as it must be"} |`)
+}
+
+// Live input (#583): the shim's `ask`, as a live page's thread uses it.
+{
+  const asking = (answers) => {
+    const queue = answers.slice()
+    const asked = { count: 0 }
+    asked.ask = () => {
+      asked.count += 1
+      return queue.length > 0 ? queue.shift() : null
+    }
+    return asked
+  }
+  for (const name of ["13-prompt", "14-prompt-full", "01-greeting"]) {
+    if (!existsSync(join(compiled, `${name}.wasm`))) continue
+    const box = await run(name, { echo: true })
+    const live = asking(linesOf(name))
+    const asked = await run(name, { echo: true, lines: [], ask: live.ask })
+    if (asked.stdout !== box.stdout || asked.result.exit !== 0) {
+      failures.push(`live input: ${name} asked line by line gives ${JSON.stringify(asked.stdout.slice(0, 120))}, not the box's ${JSON.stringify(box.stdout.slice(0, 120))}`)
+    }
+    if (live.count !== linesOf(name).length) {
+      failures.push(`live input: ${name} asked ${live.count} times for ${linesOf(name).length} lines`)
+    }
+    rows.push(`| live: ${name} | asked ${live.count} time(s) | - | - | ${asked.stdout === box.stdout ? "the box's transcript" : "DIFF"} |`)
+  }
+  // A box line first, then what is asked for.
+  {
+    const live = asking(["2"])
+    const asked = await run("13-prompt", { echo: true, lines: ["Ada"], ask: live.ask })
+    if (asked.stdout !== expected["13-prompt"].transcript || live.count !== 1) {
+      failures.push(`live input: a box line then an asked one gives ${JSON.stringify(asked.stdout)} after ${live.count} ask(s)`)
+    }
+  }
+  // The end of input is sticky: no answer at the first ask means both
+  // readLine()s see nil, and the shim asks once.
+  {
+    const live = asking([])
+    const asked = await run("13-prompt", { echo: true, lines: [], ask: live.ask })
+    const want = "What is your name? Nice to meet you, .\nHow many pets do you have? 0 pets. Lovely!\n"
+    if (asked.stdout !== want || live.count !== 1) {
+      failures.push(`live input: the end of input gives ${JSON.stringify(asked.stdout)} after ${live.count} ask(s), not ${JSON.stringify(want)} after 1`)
+    }
+  }
 }
 
 console.log("| fragment | library | bytes | imports | result |")

@@ -425,6 +425,7 @@ def runner_words() -> dict:
             "debounceMilliseconds": rules["storage"]["debounceMilliseconds"],
             "editorLines": rules["editor"]["maxLines"],
             "indent": rules["editor"]["indent"],
+            "answerCharacters": rules["liveInput"]["answerCharacters"],
         },
     }
 
