@@ -370,7 +370,7 @@ def capture_print_set(folder: Path = PRINT_FOLDER) -> None:
                     must_show(part, shot)
                     destination = IMAGE_DIR / part.name
                     shutil.copyfile(part, destination)
-                    prepare(destination, None)   # never scaled: 2x, like the mac's (#544)
+                    prepare(destination)   # never scaled: 2x, like the mac's (#544)
                     print(f"   saved {destination.name} + WebP")
                 taken.append(shot["id"])
             write_theme(1, 1)   # paper is light
@@ -381,7 +381,7 @@ def capture_print_set(folder: Path = PRINT_FOLDER) -> None:
                 must_show(part, shot)
                 destination = IMAGE_DIR / part.name
                 shutil.copyfile(part, destination)
-                prepare(destination, None)   # never scaled: 2x, like the mac's (#544)
+                prepare(destination)   # never scaled: 2x, like the mac's (#544)
                 print(f"   saved {destination.name} + WebP")
                 taken.append(shot["id"])
         finally:
