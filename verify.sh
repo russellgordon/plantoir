@@ -1650,6 +1650,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
+        "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2379,6 +2380,20 @@ for info, code in fences:
     "```python run\nprint(\"hidden\")\n```\n", encoding="utf-8")
 RUNNERPLANTS
 
+# ---- #505: an overall expectation's backlinks, planted for the same build ----
+# Two pages in a shared folder (so the course's settings are not touched),
+# connected the way a class page embeds expectations, each with a sentinel in
+# its title. "Overall Backlinks Specific" embeds ONLY the specific expectation
+# A2.1: the overall page A2 must list it, which is the aggregation itself (a
+# direct-links-only panel lists it on A2.1 alone - measured: this check passed
+# against the old component until this page was added). "Overall Backlinks
+# Fixture" embeds BOTH A2.1 and A2: A2 must list it ONCE (one filter over A2
+# and its specific expectations, not two lists). Removed by restore_hit_fixture.
+printf -- '---\ntitle: Overall Fixture plantoir-overall-both-7f3a\n---\nA page planted by verify.sh that connects to an overall expectation and one of its specific expectations.\n\n![[A2.1]]\n\n![[A2. Applications, Careers, and Connections]]\n' \
+  > "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md"
+printf -- '---\ntitle: Overall Specific plantoir-overall-specific-7f3a\n---\nA page planted by verify.sh that connects to one specific expectation only.\n\n![[A2.1]]\n' \
+  > "$HIT_COURSE/Discussions/Overall Backlinks Specific.md"
+
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
 echo "🚦 Running: ./preview.sh EXC2O 1 --image $DEV_TEST_IMAGE --full-rebuild --build-only"
@@ -2493,6 +2508,54 @@ for planted in "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md
   fi
 done
 [[ "$HIT_OK" == "true" ]] && pass "No How I Teach page reaches the built site, the look-alike does, and the teacher's own pages are untouched (#209)"
+
+# ---- 6h, continued: an overall expectation's backlinks (#505) ----
+# The two pages planted above, read from the built pages. The "When did we do
+# this?" panel on the overall page A2 must name each exactly once - the page
+# that links only A2.1 (aggregated) and the page that links A2 and A2.1
+# (de-duplicated) - and the panel on A2.1 must name each once (unchanged).
+# Counted inside the panel only, so a title shown anywhere else on the page
+# cannot make it pass. Before #505 the A2 page had no panel at all.
+if python3 - "$SITE_PUBLIC" <<'OVERALLCHECK'
+import glob, sys
+public = sys.argv[1]
+sentinels = {"plantoir-overall-both-7f3a": "the page linking A2 and A2.1",
+             "plantoir-overall-specific-7f3a": "the page linking only A2.1"}
+heading = "When did we do this?"
+problems = []
+overall = glob.glob(public + "/Curriculum/A2.-*.html")
+pages = {"the overall expectation A2": overall[0] if len(overall) == 1 else None,
+         "the specific expectation A2.1": public + "/Curriculum/A2.1.html"}
+for what, path in pages.items():
+    if path is None:
+        problems.append(f"{what}: expected one built page Curriculum/A2.-*.html, found {len(overall)}")
+        continue
+    try:
+        html = open(path, encoding="utf-8").read()
+    except OSError:
+        problems.append(f"{what}: no built page at {path}")
+        continue
+    start = html.find('class="backlinks')
+    if start < 0:
+        problems.append(f'{what}: no "{heading}" panel on {path}')
+        continue
+    end = html.find("</ul>", start)
+    panel = html[start:end if end > start else len(html)]
+    if heading not in panel:
+        problems.append(f'{what}: the panel on {path} has no "{heading}" heading')
+    for sentinel, planted in sentinels.items():
+        count = panel.count(sentinel)
+        if count != 1:
+            problems.append(f"{what}: {planted} is listed {count} time(s) in the panel on {path}, not once")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+OVERALLCHECK
+then
+  pass "An overall expectation's page lists the pages of its specific expectations, a page linking both is listed once, and the specific expectation's page is unchanged (#505)"
+else
+  fail "An overall expectation's \"When did we do this?\" panel is wrong (#505) - see the lines above"
+fi
 
 # ---- 6h, continued: printable pages (#454) ----
 # The pages planted with the How I Teach ones, read from the site the launcher

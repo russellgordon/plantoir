@@ -14,7 +14,7 @@ real support/Backlinks.tsx (a copy), and the lines they wrote are read back:
 the map must be the case's `children`, and the component's filter — modelled
 here over the case's pages, in the case's (Quartz's) order, with the
 structural set the build wrote beside it — must give the case's `backlinks`.
-verify.sh 6k checks the real thing in a built site.
+verify.sh 6h (continued) checks the real thing in a built site.
 
 Pure Python, temporary folders, no Docker: verify.sh runs it on the mac host
 and Windows' PythonToolchainTests discovers it.
