@@ -30,12 +30,18 @@ enum FolderScaffold {
 
     /// One page to write, by its path inside the course folder.
     struct Page: Equatable {
+
+        // MARK: - Stored properties
+
         let relativePath: String
         let text: String
     }
 
     /// What a folder added later was given, for the trail.
     struct Outcome: Equatable {
+
+        // MARK: - Stored properties
+
         var foldersCreated: Int = 0
         var indexPagesWritten: Int = 0
         var templatesWritten: Int = 0
