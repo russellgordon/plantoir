@@ -2344,9 +2344,13 @@ for info, code in fences:
 nested = '- - ```python run\n    print("nested shape")\n    ```\n\n```python run\nprint("after the nested shape")\n```\n'
 (course / "Runner Fixture.md").write_text("---\ntitle: Runner Fixture\ncodeRunner: yes\n---\n" + body + nested, encoding="utf-8")
 (course / "Runner Not Opted.md").write_text("---\ntitle: Runner Not Opted\n---\n" + body, encoding="utf-8")
+# The twin keeps every other word of the info string (a title, line
+# highlighting), so the only difference is the runner's own tokens.
+import re
 twin = "Runnable code planted by verify.sh (plantoir-runner-sentinel-7f3a).\n\n"
 for info, code in fences:
-    twin += f"```{info.split()[0]}\n{code}\n```\n\n"
+    words = [w for w in re.findall(r'\S*"[^"]*"\S*|\S+', info) if w not in ("run", "readonly", "stdin", "autorun")]
+    twin += f"```{' '.join(words)}\n{code}\n```\n\n"
 (course / "Runner Plain Twin.md").write_text("---\ntitle: Runner Plain Twin\n---\n" + twin, encoding="utf-8")
 (course / "Runner Playground.md").write_text(
     "---\ntitle: Runner Playground\ncodeRunner: true\n---\nThree blocks to run (plantoir-runner-playground-7f3a).\n\n"
