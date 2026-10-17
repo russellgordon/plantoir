@@ -230,3 +230,28 @@ def install_gated_assets(output_dir, counts: dict, vendor_dir=None, printer=prin
         except OSError as error:
             printer(ENGINE_WORDS[engine]["failed"].format(error=error))
     return outcome
+
+
+# ---- Runnable code (#455) - STUBS, replaced by the next commit ----
+RUNNER_LANGUAGES = {}
+RUNNER_WORDS_FILE = "plantoir_code_runner.json"
+
+
+def runner_for(lang, meta, opted_in):
+    raise NotImplementedError("#455")
+
+
+def runner_fences(body, opted_in):
+    raise NotImplementedError("#455")
+
+
+def runner_ids(slug, body):
+    raise NotImplementedError("#455")
+
+
+def runner_engines_on_page(code_runner_value, body):
+    raise NotImplementedError("#455")
+
+
+def write_runner_words(output_dir, carried):
+    raise NotImplementedError("#455")

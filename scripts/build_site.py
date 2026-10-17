@@ -4140,6 +4140,17 @@ def patch_katex_mhchem(latex_ts_path: Path):
         print(f"⚠️ Error enabling mhchem: {e}")
 
 
+KATEX_LOCAL_MARKER = "PLANTOIR-KATEX-LOCAL"
+
+
+def install_katex_assets(output_dir, katex_dir=None, printer=print):
+    raise NotImplementedError("#494")
+
+
+def patch_katex_local(latex_ts_path, printer=print):
+    raise NotImplementedError("#494")
+
+
 def patch_google_font_href(theme_ts_path: Path, head_tsx_path: Path):
     """
     Stop asking Google Fonts for fonts that are not Google Fonts.
