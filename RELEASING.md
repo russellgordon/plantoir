@@ -127,6 +127,16 @@ commit that moves the version line.
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
 
+## Trim the roadmap
+
+[`ROADMAP.md`](ROADMAP.md) is the plain-words view of the open milestones,
+written for teachers. **When the tag goes up, delete the released version's
+section** and update its "Last updated" line and current release number, in
+the same commit that moves the version line. A roadmap that still lists a
+shipped release as "next" is the same failure as a "Landed since" table that
+survives its own release. Its last section says how it is kept between
+releases.
+
 ## The short version
 
 For future-you, mid-school-year, who remembers nothing. The whys are below.
