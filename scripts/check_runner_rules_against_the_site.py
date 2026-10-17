@@ -442,8 +442,11 @@ def colour_corpus() -> dict:
             if language in corpus and block["body"] not in seen:
                 seen.add(block["body"])
                 corpus[language].append(block["body"])
-    for language, suffix in (("python", ".py"), ("swift", ".swift")):
-        for fixture in sorted(COLOUR_FIXTURES.glob("*" + suffix)):
+    # Plain text, not .py: the Python one holds what a student might type,
+    # some of it no longer valid Python 3 (`<>`), so no tool takes it for a script.
+    for language in corpus:
+        fixture = COLOUR_FIXTURES / f"{language}.txt"
+        if fixture.is_file():
             corpus[language].append(fixture.read_text(encoding="utf-8").rstrip("\n"))
     if SWIFT_GATE is not None:
         for program in sorted(SWIFT_GATE.glob("*.swift")):

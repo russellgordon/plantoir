@@ -25528,7 +25528,7 @@
           "python": 99.5,
           "swift": 99.0
         },
-        "agreementRule": "The least share of non-space characters the tokenizer must colour as the image's own Shiki does, over every ```python and ```swift block in support/example_content plus scripts/fixtures/runner-colour. Measured 2026-10-17 (Shiki 1.26.2): Python 100 % over the example content's 4,180 lines and 99.99 % over 4,603 held-out lines of the repository's own Python (scripts/*.py); Swift 100 % over the example content and the Swift gate. Only an edited line can show a difference, since an untouched line is Shiki's own; `knownDifferences` are the measured ones a student can type.",
+        "agreementRule": "The least share of non-space characters the tokenizer must colour as the image's own Shiki does, over every ```python and ```swift block in support/example_content, scripts/fixtures/runner-colour (python.txt, swift.txt: what a student might type, the known differences among it) and the Swift gate's programs (swift-gate/; the example content has no Swift). Measured 2026-10-17 (Shiki 1.26.2): Python 100 % over the example content's 558 blocks (109,250 characters), 99.99 % with the fixture, and 99.99 % over 4,603 held-out lines of the repository's own Python (scripts/*.py); Swift 100 % over the Swift gate and the marketing page's block, 99.92 % with the fixture. Only an edited line can show a difference, since an untouched line is Shiki's own; `knownDifferences` are the measured ones a student can type.",
         "cases": [
           {
             "name": "keywords and operators",
