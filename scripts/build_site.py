@@ -4175,15 +4175,147 @@ def patch_katex_mhchem(latex_ts_path: Path):
         print(f"⚠️ Error enabling mhchem: {e}")
 
 
+# ---- KaTeX served by the site itself (#494) ----------------------------------
+#
+# Quartz v4.5.0's latex.ts links KaTeX's stylesheet and copy-tex from
+# cdn.jsdelivr.net on EVERY page, at version 0.16.11, while its own lockfile
+# installs 0.16.21 and renders every formula with that at build time: sites
+# rendered with one version and were styled with another, and maths depended
+# on a third party and a network. Every build now copies the installed
+# package's stylesheet, copy-tex, woff2 faces and licence into
+# quartz/static/katex (284,817 bytes plus the licence), and latex.ts links
+# them relative to each page. Both ALWAYS and idempotent, so a section built
+# before #494 is healed by its next build. documentation/06 -> "C2".
 KATEX_LOCAL_MARKER = "PLANTOIR-KATEX-LOCAL"
+KATEX_STATIC_FOLDER = "katex"
+
+# Quartz v4.5.0's externalResources block, exactly. Anything else is a
+# latex.ts this patch was not written for: it says so and leaves it alone.
+_KATEX_CDN_BLOCK = """    externalResources() {
+      switch (engine) {
+        case "katex":
+          return {
+            css: [{ content: "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" }],
+            js: [
+              {
+                // fix copy behaviour: https://github.com/KaTeX/KaTeX/blob/main/contrib/copy-tex/README.md
+                src: "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/copy-tex.min.js",
+                loadTime: "afterDOMReady",
+                contentType: "external",
+              },
+            ],
+          }
+      }
+    },"""
+
+_KATEX_LOCAL_BLOCK = """    externalResources(ctx) {
+      switch (engine) {
+        case "katex": {
+          // PLANTOIR-KATEX-LOCAL (#494): the site's own copy of the KaTeX
+          // that rendered the page (build_site.install_katex_assets), linked
+          // relative to each page so a site served under a folder finds it,
+          // and kept across the site's page changes like index.css. The 404
+          // page is served at any depth, so it links from the site's root
+          // path, the rule Head.tsx uses.
+          const root = new URL(`https://${ctx.cfg.configuration.baseUrl || "example.com"}`).pathname as FullSlug
+          const base = (slug: FullSlug) => (slug === "404" ? root : pathToRoot(slug))
+          return {
+            additionalHead: [
+              (fileData: QuartzPluginData) =>
+                h("link", {
+                  rel: "stylesheet",
+                  href: joinSegments(base(fileData.slug!), "static/katex/katex.min.css"),
+                  "spa-preserve": true,
+                }),
+              (fileData: QuartzPluginData) =>
+                h("script", {
+                  src: joinSegments(base(fileData.slug!), "static/katex/contrib/copy-tex.min.js"),
+                  defer: true,
+                  "spa-preserve": true,
+                }),
+            ],
+          }
+        }
+      }
+    },"""
+
+_KATEX_LOCAL_IMPORTS = """import { QuartzTransformerPlugin } from "../types"
+// PLANTOIR-KATEX-LOCAL (#494): what the site's own links are made with.
+import { h } from "preact"
+import { QuartzPluginData } from "../vfile"
+import { FullSlug, joinSegments, pathToRoot } from "../../util/path\""""
 
 
-def install_katex_assets(output_dir, katex_dir=None, printer=print):
-    raise NotImplementedError("#494")
+def install_katex_assets(output_dir, katex_dir=None, printer=print) -> int:
+    """
+    Copy KaTeX's stylesheet, copy-tex, woff2 faces and LICENSE from Quartz's
+    own node_modules/katex into the section's quartz/static/katex, where the
+    bytes differ, removing anything else there. Answers how many files were
+    copied. A missing package is one plain line, and the build carries on:
+    the formulas are still rendered, only unstyled.
+    """
+    source = Path(katex_dir) if katex_dir is not None else toolchain_paths.QUARTZ_DIR / "node_modules" / "katex"
+    target = Path(output_dir) / "quartz" / "static" / KATEX_STATIC_FOLDER
+    wanted = {}
+    try:
+        stylesheet = source / "dist" / "katex.min.css"
+        copy_tex = source / "dist" / "contrib" / "copy-tex.min.js"
+        licence = source / "LICENSE"
+        if not (stylesheet.is_file() and copy_tex.is_file() and licence.is_file()):
+            printer("⚠️ The maths on this site will show without its fonts: this copy of Plantoir is missing them.")
+            return 0
+        wanted[Path("katex.min.css")] = stylesheet
+        wanted[Path("contrib") / "copy-tex.min.js"] = copy_tex
+        wanted[Path("LICENSE")] = licence
+        for face in sorted((source / "dist" / "fonts").glob("*.woff2")):
+            wanted[Path("fonts") / face.name] = face
+        copied = 0
+        for relative in sorted(wanted):
+            item = wanted[relative]
+            destination = target / relative
+            if destination.is_file() and destination.read_bytes() == item.read_bytes():
+                continue
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(item, destination)
+            copied += 1
+        for existing in sorted(target.rglob("*"), reverse=True):
+            if existing.is_file() and existing.relative_to(target) not in wanted:
+                existing.unlink()
+        return copied
+    except OSError as error:
+        printer(f"⚠️ Could not set up the fonts for the maths on this site: {error}")
+        return 0
 
 
-def patch_katex_local(latex_ts_path, printer=print):
-    raise NotImplementedError("#494")
+def patch_katex_local(latex_ts_path, printer=print) -> bool:
+    """
+    Point latex.ts's KaTeX links at the site's own copy instead of
+    cdn.jsdelivr.net (#494). Idempotent (its own marker), and independent of
+    patch_katex_mhchem, which edits the imports above. Answers whether the
+    file changed; a file of another shape is said once and left alone.
+    """
+    path = Path(latex_ts_path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
+        printer(f"⚠️ Could not serve the maths fonts from the site: latex.ts could not be read ({error})")
+        return False
+    if KATEX_LOCAL_MARKER in text:
+        return False
+    imports_anchor = 'import { QuartzTransformerPlugin } from "../types"'
+    if text.count(_KATEX_CDN_BLOCK) != 1 or text.count(imports_anchor) != 1:
+        printer("⚠️ Could not serve the maths fonts from the site: latex.ts has changed shape, "
+                "so the maths still loads them from another website.")
+        return False
+    text = text.replace(imports_anchor, _KATEX_LOCAL_IMPORTS, 1)
+    text = text.replace(_KATEX_CDN_BLOCK, _KATEX_LOCAL_BLOCK, 1)
+    try:
+        path.write_text(text, encoding="utf-8")
+    except OSError as error:
+        printer(f"⚠️ Could not serve the maths fonts from the site: {error}")
+        return False
+    printer("✅ Patched latex.ts to serve KaTeX from the site itself")
+    return True
 
 
 def patch_google_font_href(theme_ts_path: Path, head_tsx_path: Path):
@@ -7542,6 +7674,7 @@ def build_section_site(
     append_coverage_styles(output_dir / "quartz" / "styles" / "base.scss")
     latex_ts = output_dir / "quartz" / "plugins" / "transformers" / "latex.ts"
     patch_katex_mhchem(latex_ts)
+    patch_katex_local(latex_ts)
     patch_mermaid_font_wait(mermaid_ts)
     patch_mermaid_pie_title_fit(mermaid_ts)
     patch_mermaid_pie_colours(mermaid_ts)
@@ -7898,6 +8031,9 @@ def build_section_site(
         page_features.write_runner_words(output_dir, carried_runner_engines)
     except OSError as error:
         print(f"⚠️ Could not set up the code students run: {error}")
+    # KaTeX from the site itself (#494), ALWAYS and on every site: the
+    # stylesheet, copy-tex and the woff2 faces the maths is set in.
+    install_katex_assets(output_dir)
     try:
         print_settings.write(output_dir, config, displayed_course_code(config, course_code))
     except Exception as error:
