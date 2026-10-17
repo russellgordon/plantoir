@@ -24470,7 +24470,7 @@
       "Each Run starts from a reset interpreter (harness), but a program can still leave residue in the same page visit: a standard-library module it changed stays changed, and `random`'s state carries on (S3). Stop, then Run, starts clean.",
       "The build's fence reader and the site's parser can still read a shape nobody has measured differently (pageShapes); the site then shows plain code and says so on a `plantoir: error:` line (siteDisagrees).",
       "The page's code needs a browser that runs module workers: Safari and iPadOS 15 or later, Chrome 80 or later, Firefox 114 or later.",
-      "A site opened as files on a computer, rather than from its web address, cannot run code (words.needsWebAddress): browsers do not start a program's thread for a page opened that way."
+      "A site opened as files on a computer, rather than from its web address, cannot run code: Safari 26.6 and Chrome for Testing 155 run none of a page's scripts from a file (measured 2026-10-17), so the blocks show as their highlighted code with no Run button; a browser that does run them is told words.needsWebAddress. KaTeX's faces DID load from a file in both (measured), so the maths keeps its look."
     ]
   }
 }

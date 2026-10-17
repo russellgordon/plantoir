@@ -142,8 +142,8 @@ in the editor.
   school Wi-Fi); later Runs start at once. Once loaded it works offline for
   the rest of the visit.
 - NOT from a site opened as files on a computer (a folder publish
-  double-clicked): the block then says it runs only from the page's web
-  address.
+  double-clicked): browsers run none of the page's scripts that way, so the
+  blocks show as ordinary code with no Run button.
 
 ### 7. Printing
 

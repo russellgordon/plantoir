@@ -241,7 +241,9 @@ check_engine() {  # check_engine <label> <site base url ending in />
   else
     no "$1's worker CSP allows no wasm: $csp"
   fi
-  code=$(curl -s -o "$WORK/runner-page.html" -w "%{http_code}" --max-time 30 "${base}Runner-Deploy-Check.html" 2>/dev/null)
+  # Hosts answer the .html address with a redirect to the pretty one (Netlify
+  # 301, Cloudflare 308), so the page is fetched following it.
+  code=$(curl -sL -o "$WORK/runner-page.html" -w "%{http_code}" --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null)
   if [ "$code" = "200" ] && grep -q 'class="plantoir-runner"' "$WORK/runner-page.html"; then
     ok "$1's page of runnable code carries its runnable block"
   else
@@ -255,7 +257,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
   fi
   code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" 2>/dev/null)
   [ "$code" = "200" ] && ok "$1 serves KaTeX's faces itself" || no "$1 answered HTTP $code for a KaTeX face"
-  headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}Runner-Deploy-Check.html" 2>/dev/null | tr -d '\r')
+  headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null | tr -d '\r')
   if printf '%s\n' "$headers" | grep -iq "^content-security-policy:.*jsdelivr"; then
     no "$1's CSP still names cdn.jsdelivr.net"
   else
