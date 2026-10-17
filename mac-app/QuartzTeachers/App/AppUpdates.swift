@@ -93,7 +93,9 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// install — `installNow`, and the postponed install let go in
     /// `heldWorkIsDone` — never from `willInstallUpdate`, which also fires
     /// when the teacher quits with an update ready (that quit is theirs).
-    /// Cleared when the updater stops.
+    /// Cleared when the updater stops, and when the installer's last look
+    /// postpones the relaunch for work under way (a ⌘Q in that wait is the
+    /// teacher's).
     @ObservationIgnored private(set) var isQuittingToInstall: Bool = false
 
     /// Watches for held work to end.
@@ -408,6 +410,11 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         }
         postponedInstall = installHandler
         prepared = .postponedAtInstall
+        // The relaunch is waiting on the work, so a quit during the wait is
+        // the teacher's (#560 review): the update installs as Plantoir quits,
+        // as Install on Quit does, and its own line says so. Set again when
+        // the held work ends and the app lets the install go.
+        isQuittingToInstall = false
         hold(for: work)
         return true
     }
