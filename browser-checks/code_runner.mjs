@@ -15,7 +15,8 @@
 //     so; one block's `builtins.print = ...` does not reach the next run;
 //  3. an edit is kept (localStorage) and printed (the print copy), Reset
 //     takes it away; a saved edit of code the teacher has since changed is
-//     put aside and the teacher's code shown, once;
+//     put aside and the teacher's code shown, once; Tab indents, Shift-Tab
+//     takes it off, and Escape then Tab leaves the editor;
 //  4. five changes of page by the site's own navigation, each followed by a
 //     run, leave at most ONE thread alive;
 //
@@ -322,6 +323,28 @@ async function connect(chunk) {
       await open(base + pagePath)
       state = await evaluate("window.__runner.state(2)")
       expect("the teacher's change is said once", state.status === "", state.status)
+
+      // Keyboard: Tab indents, Shift-Tab takes it off, Escape then Tab leaves
+      // the editor - and not for the search button (Quartz's own Escape).
+      await evaluate(`(() => { const e = window.__runner.block(0).querySelector("textarea.plantoir-runner-editor"); e.value = "print(1)\\n"; e.dispatchEvent(new Event("input", { bubbles: true })); e.focus(); e.setSelectionRange(0, 0); return 1 })()`)
+      const press = async (key, keyCode, modifiers = 0) => {
+        await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key, code: key, windowsVirtualKeyCode: keyCode, modifiers })
+        await send("Input.dispatchKeyEvent", { type: "keyUp", key, code: key, windowsVirtualKeyCode: keyCode, modifiers })
+        await pause(150)
+      }
+      const editorState = `(() => { const e = window.__runner.block(0).querySelector("textarea.plantoir-runner-editor"); return { value: e.value, focused: document.activeElement === e, active: document.activeElement ? (document.activeElement.className || document.activeElement.tagName) : null } })()`
+      await press("Tab", 9)
+      const tabbed = await evaluate(editorState)
+      await press("Tab", 9, 8)
+      const untabbed = await evaluate(editorState)
+      await press("Escape", 27)
+      const escaped = await evaluate(editorState)
+      await press("Tab", 9)
+      const left = await evaluate(editorState)
+      expect("Escape alone keeps the focus in the editor (Quartz's own Escape would move it to the search button)", escaped.focused, escaped)
+      expect("Tab indents by four spaces and keeps the focus", tabbed.value === "    print(1)\n" && tabbed.focused, tabbed)
+      expect("Shift-Tab takes the indent off", untabbed.value === "print(1)\n" && untabbed.focused, untabbed)
+      expect("Escape then Tab leaves the editor, and not for the search button", !left.focused && !/search/.test(String(left.active)), left)
 
       // 4. Page changes leave at most one thread.
       await runBlock(0, 'print("warm")')

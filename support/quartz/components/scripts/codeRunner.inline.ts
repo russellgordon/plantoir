@@ -594,8 +594,12 @@ function build(wrapper: HTMLElement, base: string): Block | null {
         return
       }
       if (event.key === "Escape") {
-        // Escape, then Tab, leaves the editor (the keyboard-trap rule).
+        // Escape, then Tab, leaves the editor (the keyboard-trap rule). Kept
+        // from Quartz's own Escape handler, which would move the focus to the
+        // search button (search.inline.ts, hideSearch) and so make the next
+        // Tab land back in this editor (measured in the iPad simulator).
         escapeArmed = true
+        event.stopPropagation()
         return
       }
       if (event.key !== "Tab" || event.metaKey || event.ctrlKey || event.altKey) {
