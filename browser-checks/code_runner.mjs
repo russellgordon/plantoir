@@ -20,6 +20,24 @@
 //  4. five changes of page by the site's own navigation, each followed by a
 //     run, leave at most ONE thread alive;
 //
+//  5. live input (#583), with the files served as a host serves them with
+//     the isolation headers (the preview's own rule, quartz/cli/
+//     plantoirIsolation.mjs, decides which): the box never shows; Run on
+//     code that reads input makes and focuses the answer field; the prompt
+//     is on the page before the field is used; Return answers, and the
+//     transcript is BYTE FOR BYTE the box's for the same program and
+//     answers; Ctrl-D, and the end button, give EOFError and the end is
+//     sticky; a two-line paste answers two input() calls; an answer being
+//     composed by an input method is not sent; Escape keeps the focus;
+//     Stop while it waits, and another block's Run, end it; the echoes
+//     count toward the cap; an autorun that asks takes no focus and holds
+//     the queue; and the site's own links load a page WHOLE across the
+//     isolation line (both ways, the frame on the far side loading) while a
+//     page change that stays on one side is still the site's own; and a
+//     printable runner page's handout, made on an isolated page, still
+//     loads KaTeX's stylesheet and faces in its print frame. Served
+//     without the headers, the box shows its words.inputAhead line;
+//
 // then, against the same files served three wrong ways, that the student is
 // told rather than left on "Loading…": the worker missing (engineMissing),
 // .wasm sent as application/octet-stream and a CSP that allows no wasm
@@ -31,6 +49,7 @@
 //   node browser-checks/code_runner.mjs <chrome> <site folder> <page path> <second page path> [<autorun page path>]
 
 import { spawn } from "node:child_process"
+import { headersFor } from "../support/quartz/cli/plantoirIsolation.mjs"
 import { createServer } from "node:http"
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -45,6 +64,9 @@ if (!chromePath || !siteFolder || !pagePath || !secondPath) {
 const RULES = JSON.parse(readFileSync(new URL("../contracts/shared-rules.json", import.meta.url), "utf-8")).codeRunnerBlocks
 const LANGUAGE = RULES.languages[0]
 const said = (key) => RULES.words[key].split("{language}").join(LANGUAGE.displayName).split("{inputCall}").join(LANGUAGE.inputCall)
+// The live-input pages verify.sh plants beside the runner pages (#583).
+const LIVE_PLAIN = "/Live-Plain-Link.html"
+const LIVE_AUTORUN = "/Live-Autorun.html"
 
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
@@ -54,6 +76,7 @@ const TYPES = {
 
 // mode: "good" | "missing" (the worker is a 404) | "wasm-type" (.wasm as
 // octet-stream) | "no-eval" (a CSP that allows scripts from the site and no wasm)
+// | "isolated" (as a host with #583's headers serves it: the preview's rule)
 function serve(mode) {
   const engineRequests = []
   const server = createServer((request, response) => {
@@ -84,6 +107,7 @@ function serve(mode) {
     if (mode === "wasm-type" && file.endsWith(".wasm")) type = "application/octet-stream"
     const headers = { "Content-Type": type, "Cache-Control": "no-cache" }
     if (mode === "no-eval") headers["Content-Security-Policy"] = "script-src 'self' 'unsafe-inline'"
+    if (mode === "isolated") Object.assign(headers, headersFor(siteFolder, new URL(request.url, "http://x").pathname))
     try {
       const body = readFileSync(file)
       response.writeHead(200, headers)
@@ -117,7 +141,7 @@ function finish(code, message) {
     process.exit(code)
   }, 300)
 }
-const timer = setTimeout(() => finish(1, "FAIL: the runnable code was not checked within 360 s"), 360000)
+const timer = setTimeout(() => finish(1, "FAIL: the runnable code was not checked within 600 s"), 600000)
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
 // Helpers that run in the page.
@@ -135,12 +159,22 @@ window.__runner = {
       editor: !!block.querySelector("textarea.plantoir-runner-editor"),
       code: block.querySelector("textarea.plantoir-runner-editor")?.value ?? null,
       inputShown: !block.querySelector(".plantoir-runner-input").hidden,
-      buttons: Array.from(block.querySelectorAll(".plantoir-runner-controls > button")).map((button) => button.textContent),
+      buttons: Array.from(block.querySelectorAll(".plantoir-runner-controls > button")).filter((button) => !button.hidden).map((button) => button.textContent),
       runDisabled: block.querySelector(".plantoir-runner-run").disabled,
       status: block.querySelector(".plantoir-runner-status").textContent,
       output: output.textContent,
       outputShown: !output.hidden,
       errText: Array.from(output.querySelectorAll(".plantoir-runner-err")).map((span) => span.textContent).join(""),
+      answerShown: !!block.querySelector("input.plantoir-runner-answer"),
+      answerFocused: document.activeElement === block.querySelector("input.plantoir-runner-answer"),
+      beforeAnswer: (() => {
+        const field = block.querySelector("input.plantoir-runner-answer")
+        let text = ""
+        for (let node = output.firstChild; node !== null && node !== field; node = node.nextSibling) text += node.textContent
+        return field ? text : null
+      })(),
+      endShown: !(block.querySelector(".plantoir-runner-end")?.hidden ?? true),
+      ahead: block.querySelector(".plantoir-runner-input-ahead")?.textContent ?? null,
       printCopy: block.querySelector(".plantoir-runner-print").textContent,
       edited: block.classList.contains("plantoir-runner-edited"),
     }
@@ -154,6 +188,12 @@ window.__runner = {
     window.__runner.block(index).querySelector(".plantoir-runner-input-lines").value = text
   },
   press: (index, name) => window.__runner.block(index).querySelector(".plantoir-runner-" + name).click(),
+  answer: (index) => window.__runner.block(index).querySelector("input.plantoir-runner-answer"),
+  paste: (index, text) => {
+    const data = new DataTransfer()
+    data.setData("text/plain", text)
+    window.__runner.answer(index).dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }))
+  },
   settled: async (index, words, seconds) => {
     const until = Date.now() + seconds * 1000
     while (Date.now() < until) {
@@ -406,6 +446,221 @@ async function connect(chunk) {
         }
       }
 
+      // 5. Live input (#583).
+      const ASKING = 'name = input("Name? ")\nprint("Hello", name)\nage = input("Age? ")\nprint(int(age) + 1)\n'
+      const ANSWERS = ["Zoë", "15"]
+      // The box's transcript first, on a page that is not isolated.
+      await open(base + pagePath)
+      expect("served without the headers, the page is not isolated", (await evaluate("self.crossOriginIsolated === true")) === false)
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify(ASKING)})`)
+      state = await evaluate("window.__runner.state(0)")
+      expect("where the page cannot stop to ask, the box shows with its words.inputAhead line", state.inputShown && state.ahead === said("inputAhead"), state)
+      await evaluate(`window.__runner.setInput(0, ${JSON.stringify(ANSWERS.join("\n"))})`)
+      const boxRun = await runBlock(0, null)
+      expect("the box's run of the asking program finishes", boxRun.status === said("finished") && boxRun.output === "Name? Zoë\nHello Zoë\nAge? 15\n16\n", boxRun)
+
+      const isolatedServer = await serve("isolated")
+      servers.push(isolatedServer)
+      const liveBase = `http://127.0.0.1:${isolatedServer.port}`
+      const waitFor = async (index, words, seconds = 20) => evaluate(`window.__runner.settled(${index}, ${JSON.stringify(words)}, ${seconds})`)
+      const WAITING = [said("waitingForInput")]
+      const answerWith = async (text) => {
+        if (text.length > 0) await send("Input.insertText", { text })
+        await press("Enter", 13)
+      }
+      await open(liveBase + pagePath)
+      expect("served with the headers, the page is cross-origin isolated", (await evaluate("self.crossOriginIsolated === true")) === true)
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify(ASKING)})`)
+      state = await evaluate("window.__runner.state(0)")
+      expect("on a live page the box never shows", !state.inputShown, state)
+      await evaluate(`window.__runner.press(0, "run")`)
+      state = await evaluate("window.__runner.state(0)")
+      expect("Run on code that reads input makes the answer field and focuses it at once", state.answerShown && state.answerFocused && state.endShown, state)
+      let asked = await waitFor(0, WAITING)
+      state = await evaluate("window.__runner.state(0)")
+      expect("the program waits at its first prompt, painted before the field", asked === said("waitingForInput") && state.beforeAnswer === "Name? ", state)
+      // An answer still being composed by an input method is not sent (N1).
+      await evaluate(`(() => { const field = window.__runner.answer(0); field.value = "かな"
+        field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true, cancelable: true }))
+        const late = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })
+        Object.defineProperty(late, "keyCode", { get: () => 229 })
+        field.dispatchEvent(late); return 1 })()`)
+      await pause(300)
+      state = await evaluate("window.__runner.state(0)")
+      const composing = await evaluate("window.__runner.answer(0).value")
+      expect("Return while an input method composes sends nothing", state.status === said("waitingForInput") && composing === "かな", { status: state.status, composing })
+      await evaluate("(() => { window.__runner.answer(0).value = ''; return 1 })()")
+      await press("Escape", 27)
+      state = await evaluate("window.__runner.state(0)")
+      expect("Escape in the answer field keeps the focus there", state.answerFocused, state)
+      await answerWith(ANSWERS[0])
+      asked = await waitFor(0, WAITING)
+      state = await evaluate("window.__runner.state(0)")
+      expect("Return answers, the answer is echoed after the prompt, and the program asks again with the field still focused",
+        state.beforeAnswer === "Name? Zoë\nHello Zoë\nAge? " && state.answerFocused, state)
+      await answerWith(ANSWERS[1])
+      await waitFor(0, [said("finished"), said("finishedWithError")])
+      await pause(150)
+      state = await evaluate("window.__runner.state(0)")
+      expect("the live transcript is byte for byte the box's", state.output === boxRun.output && state.errText === boxRun.errText
+        && state.status === said("finished") && !state.answerShown && !state.endShown, { live: state.output, box: boxRun.output })
+
+      // The end of input: Ctrl-D, and the button; sticky.
+      const TWO = 'print(input("A? "))\nprint(input("B? "))\n'
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify(TWO)})`)
+      await evaluate(`window.__runner.press(0, "run")`)
+      await waitFor(0, WAITING)
+      await answerWith("x")
+      await waitFor(0, WAITING)
+      await press("d", 68, 2)
+      await waitFor(0, [said("finished"), said("finishedWithError")])
+      state = await evaluate("window.__runner.state(0)")
+      await evaluate(`window.__runner.setInput(0, "x")`)
+      expect("Ctrl-D ends the input: EOFError, after the transcript so far", state.output.startsWith("A? x\nx\nB? ") && /EOFError/.test(state.errText)
+        && state.status === said("finishedWithError"), state)
+      await evaluate(`window.__runner.press(0, "run")`)
+      await waitFor(0, WAITING)
+      await evaluate(`window.__runner.press(0, "end")`)
+      await waitFor(0, [said("finished"), said("finishedWithError")])
+      state = await evaluate("window.__runner.state(0)")
+      expect("the words.endInput button ends the input too", state.output.startsWith("A? ") && /EOFError/.test(state.errText), state)
+      const EVERY = 'import sys\nfor line in sys.stdin:\n    print(line.strip().upper())\nprint("done")\n'
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify(EVERY)})`)
+      await evaluate(`window.__runner.press(0, "run")`)
+      await waitFor(0, WAITING)
+      await answerWith("a")
+      await waitFor(0, WAITING)
+      await answerWith("b")
+      await waitFor(0, WAITING)
+      await press("d", 68, 2)
+      await waitFor(0, [said("finished"), said("finishedWithError")])
+      state = await evaluate("window.__runner.state(0)")
+      expect("a program that reads every line ends at Ctrl-D", state.output === "a\nA\nb\nB\ndone\n" && state.status === said("finished"), state)
+
+      // A paste of two lines answers two input() calls (S2).
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify(ASKING)})`)
+      await evaluate(`window.__runner.press(0, "run")`)
+      await waitFor(0, WAITING)
+      await evaluate(`window.__runner.paste(0, ${JSON.stringify("Ada\n15\n")})`)
+      await waitFor(0, [said("finished"), said("finishedWithError")])
+      state = await evaluate("window.__runner.state(0)")
+      expect("a paste of two lines answers two input() calls", state.output === "Name? Ada\nHello Ada\nAge? 15\n16\n", state)
+
+      // Stop while it waits; another block's Run while it waits.
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify('input("Wait? ")\n')})`)
+      await evaluate(`window.__runner.press(0, "run")`)
+      await waitFor(0, WAITING)
+      await evaluate(`window.__runner.press(0, "stop")`)
+      state = await evaluate("window.__runner.state(0)")
+      expect("Stop ends a program that waits, and the field goes", state.status === said("stopped") && !state.answerShown && !state.endShown, state)
+      state = await runBlock(0, 'print("after a stop")')
+      expect("Run works again after stopping a program that waited", state.output === "after a stop\n", state)
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify('input("Wait? ")\n')})`)
+      await evaluate(`window.__runner.press(0, "run")`)
+      await waitFor(0, WAITING)
+      state = await runBlock(1, 'print("the other block")')
+      const stoppedWaiting = await evaluate("window.__runner.state(0)")
+      expect("another block's Run stops a program that waits", stoppedWaiting.status === said("stoppedForAnother") && !stoppedWaiting.answerShown
+        && state.output === "the other block\n", { first: stoppedWaiting, second: state.output })
+
+      // The echoes count toward the cap.
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify("while True:\n    input()\n")})`)
+      await evaluate(`window.__runner.press(0, "run")`)
+      await waitFor(0, WAITING)
+      await evaluate(`window.__runner.paste(0, ${JSON.stringify(("x".repeat(4000) + "\n").repeat(26))})`)
+      const capped = await waitFor(0, [said("outputTooLong"), said("finished"), said("finishedWithError")])
+      expect("the echoes of the answers count toward the output cap", capped === said("outputTooLong"), capped)
+
+      // An autorun that asks takes no focus and holds the queue.
+      await open(liveBase + LIVE_AUTORUN)
+      const autorunWaits = await waitFor(0, WAITING)
+      // The second autorun comes into view only now, while the first waits.
+      await evaluate("(() => { window.__runner.block(1).scrollIntoView(); return 1 })()")
+      await pause(1000)
+      state = await evaluate("window.__runner.state(0)")
+      const queuedBlock = await evaluate("window.__runner.state(1)")
+      expect("an autorun that asks waits, takes no focus, and the next autorun waits its turn", autorunWaits === said("waitingForInput")
+        && state.answerShown && !state.answerFocused && queuedBlock.status === "", { first: state, second: queuedBlock.status })
+      await evaluate("window.__runner.answer(0).focus()")
+      await answerWith("Ada")
+      await waitFor(1, [said("finished")])
+      state = await evaluate("window.__runner.state(0)")
+      const queuedAfter = await evaluate("window.__runner.state(1)")
+      expect("answered, the autorun finishes and the queued one runs", state.output === "Name? Ada\nHi Ada\n" && queuedAfter.output === "second\n", { first: state.output, second: queuedAfter.output })
+
+      // Across the isolation line by the site's own links: a whole load.
+      const follow = async (fromPath, linkPart) => {
+        await open(liveBase + fromPath)
+        await evaluate("(() => { window.__plantoirSamePage = true; return 1 })()")
+        const before = await evaluate("self.crossOriginIsolated === true")
+        await evaluate(`(() => { const link = Array.from(document.querySelectorAll("article a, .center a")).find((a) => decodeURIComponent(a.getAttribute("href") || "").includes(${JSON.stringify(linkPart)})); link.click(); return 1 })()`)
+        for (let tries = 0; tries < 80; tries += 1) {
+          await pause(250)
+          const here = await evaluate(`decodeURIComponent(location.pathname).includes(${JSON.stringify(linkPart)}) && document.readyState === "complete"`)
+          if (here) break
+        }
+        await pause(800)
+        return { before, after: await evaluate("self.crossOriginIsolated === true"), whole: await evaluate("window.__plantoirSamePage !== true") }
+      }
+      let crossing = await follow(LIVE_PLAIN, "Runner-Playground")
+      expect("a link from a plain page to a runner page loads it whole, isolated", !crossing.before && crossing.after && crossing.whole, crossing)
+      await evaluate(PAGE_HELPERS)
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify('print(input("Name? "))\n')})`)
+      await evaluate(`window.__runner.press(0, "run")`)
+      expect("reached by a link, the runner page asks live", (await waitFor(0, WAITING)) === said("waitingForInput"))
+      crossing = await follow(LIVE_AUTORUN, "Live-Framed")
+      const frameLoaded = await evaluate(`(() => { const frame = document.querySelector("iframe.plantoir-live-frame"); try { return !!frame && !!frame.contentDocument && frame.contentDocument.body.textContent.length > 0 } catch { return false } })()`)
+      expect("a link from a runner page to a page with a frame loads it whole, not isolated, and the frame loads", crossing.before && !crossing.after && crossing.whole && frameLoaded, { crossing, frameLoaded })
+      const staying = await evaluate(`(async () => {
+        window.__plantoirSamePage = true
+        const arrived = new Promise((resolve) => document.addEventListener("nav", () => resolve(true), { once: true }))
+        window.spaNavigate(new URL(${JSON.stringify(liveBase + LIVE_PLAIN)}))
+        return await Promise.race([arrived, new Promise((resolve) => setTimeout(() => resolve(false), 15000))]) && window.__plantoirSamePage === true
+      })()`)
+      expect("a page change that stays on one side of the line is still the site's own", staying)
+
+      // A printable runner page's handout on an isolated page: the print
+      // frame inherits the page's headers and must still load KaTeX's
+      // stylesheet and faces from the site (caught at the moment it is
+      // printed, the way maths_offline.mjs catches it).
+      await open(liveBase + pagePath)
+      await evaluate(`(() => {
+        window.__printFrame = null
+        new MutationObserver((changes) => {
+          for (const change of changes) for (const node of change.addedNodes) {
+            if (node.tagName !== "IFRAME") continue
+            node.contentWindow.print = () => {
+              const frame = node.contentDocument
+              window.__printFrame = {
+                sheets: Array.from(frame.querySelectorAll('link[rel="stylesheet"]')).map((link) => {
+                  let rules = -1
+                  try { rules = link.sheet ? link.sheet.cssRules.length : 0 } catch { rules = -1 }
+                  return { href: link.href, rules }
+                }),
+                faces: Array.from(frame.fonts).filter((face) => face.status === "loaded").map((face) => face.family.replace(/["']/g, "")),
+                formulas: frame.querySelectorAll(".katex").length,
+              }
+            }
+          }
+        }).observe(document.body, { childList: true })
+        return 1
+      })()`)
+      await evaluate(`(async () => {
+        const arrived = new Promise((resolve) => document.addEventListener("nav", () => resolve(true), { once: true }))
+        window.spaNavigate(new URL(${JSON.stringify(liveBase + secondPath + "#plantoir-print=questionsOnly&paper=portrait")}))
+        return await Promise.race([arrived, new Promise((resolve) => setTimeout(() => resolve(false), 15000))])
+      })()`)
+      let printFrame = null
+      for (let tries = 0; tries < 120 && printFrame === null; tries += 1) {
+        await pause(250)
+        printFrame = await evaluate("window.__printFrame")
+      }
+      const printableIsolated = await evaluate("self.crossOriginIsolated === true")
+      const katexSheet = (printFrame?.sheets ?? []).filter((sheet) => sheet.href.includes("katex.min.css"))
+      expect("a printable runner page's handout on an isolated page loads KaTeX's stylesheet and faces in its print frame",
+        printableIsolated && printFrame !== null && katexSheet.length === 1 && katexSheet[0].rules > 0 && printFrame.formulas > 0
+        && printFrame.faces.some((face) => face.startsWith("KaTeX")), { printableIsolated, printFrame })
+
       // The three wrong servers.
       const wrong = {}
       for (const [mode, word] of [["missing", said("engineMissing")], ["wasm-type", said("couldNotLoad")], ["no-eval", said("couldNotLoad")]]) {
@@ -424,7 +679,7 @@ async function connect(chunk) {
       finish(ok ? 0 : 1, (ok ? "OK: " : "FAIL: " + problems.join("\n  ") + "\n")
         + JSON.stringify({ firstRunMs, secondRunMs, engineFiles: new Set(good.engineRequests).size, wrong }))
     } catch (error) {
-      finish(1, "FAIL: " + (error?.stack ?? error))
+      finish(1, "FAIL: " + (problems.length > 0 ? problems.join("\n  ") + "\n  and then: " : "") + (error?.stack ?? error))
     }
   }
 }

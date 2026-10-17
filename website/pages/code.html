@@ -20,7 +20,7 @@ nav_label: Code
 
 <section id="python">
   <h2>Python students can run</h2>
-  <p>Mark a page with one line in its settings, add the word <code>run</code> to a Python block, and students get the program in an editor with a <strong>Run</strong> button. They change it, run it, and read what it prints underneath — in the browser they already have, with nothing to install and no account.</p>
+  <p>Mark a page with one line in its settings, add the word <code>run</code> to a Python block, and students get the program in an editor with a <strong>Run</strong> button. They change it, run it, and read what it prints underneath — in the browser they already have, with nothing to install and no account. A program that asks for input stops and waits: the student types the answer right in the output and presses Return, just as in a terminal.</p>
   <h4 class="label">What you type</h4>
   <pre class="fence"><code>---
 codeRunner: true
@@ -34,13 +34,16 @@ for index in range(1, len(names)):
   <h4 class="label">What students get</h4>
   <p>The program in an editor, with <strong>Run</strong>, <strong>Stop</strong> and <strong>Reset</strong> under it and the output below. Their changes are kept in their own browser for next time; Reset brings back yours. This is <em>Spot the Bug</em>, with the bug found and fixed:</p>
   {{shot:code-python}}
-  <p>A program that asks for input gets a box under it, one line for each <code>input()</code>. An error ends in Python's own traceback, and its line numbers are the lines in the editor:</p>
+  <p>A program that asks for input stops at each <code>input()</code> and waits, with its prompt in the output and a place right after it to type the answer. Return sends it and the program carries on. This is <em>Talking to the User</em>, answered once and waiting for its second answer:</p>
+  {{shot:code-python-live}}
+  <p>An error ends in Python's own traceback, and its line numbers are the lines in the editor:</p>
   {{shot:code-python-error}}
+  <p>Where the site can't stop to ask — a copy of the site put in a folder on a school's own web space, or a page that also shows a video or a picture from another website — students type the answers in a box before they press Run, one line for each <code>input()</code>, and Plantoir says which pages do that and why.</p>
   <h4 class="label">What it accepts</h4>
   <ul class="plain">
     <li><code>codeRunner: true</code> in the settings block opts the page in. Written exactly like that.</li>
     <li><code>```python run</code> makes a block runnable. A plain <code>```python</code> block on the same page stays code to read, so a page can mix the two.</li>
-    <li><code>```python run readonly</code> runs but can't be changed — for a worked example. <code>stdin</code> always shows the input box; <code>autorun</code> runs the block once when it scrolls into view.</li>
+    <li><code>```python run readonly</code> runs but can't be changed — for a worked example. <code>stdin</code> treats a block as asking for input even when its code doesn't visibly call <code>input()</code>; <code>autorun</code> runs the block once when it scrolls into view.</li>
     <li>Python's own standard library: <code>math</code>, <code>random</code>, <code>datetime</code>, <code>json</code>, <code>csv</code> and the rest. Not <code>turtle</code> or <code>tkinter</code>, and nothing that needs <code>pip install</code>.</li>
     <li>A file a program writes lasts for that one run. Each Run starts fresh.</li>
     <li>One program runs on a page at a time, and <strong>Stop</strong> ends any of them, a loop that never ends included.</li>
@@ -52,8 +55,8 @@ for index in range(1, len(names)):
 <hr class="rule">
 
 <section id="swift">
-  <h2>Swift, with the input students type</h2>
-  <p>A <code>```swift run</code> block runs too, on the same page setting. Swift blocks are read-only: students change the input and run it again, and the code stays as you wrote it. Plantoir gets each Swift program ready when you preview the section, so it is waiting when a student opens the page.</p>
+  <h2>Swift that asks, and waits for the answer</h2>
+  <p>A <code>```swift run</code> block runs too, on the same page setting. Swift blocks are read-only: students run the program, answer it as it asks, and run it again with other answers, and the code stays as you wrote it. Plantoir gets each Swift program ready when you preview the section, so it is waiting when a student opens the page.</p>
   <h4 class="label">What you type</h4>
   <pre class="fence"><code>```swift run
 print("What is your name?")
@@ -68,7 +71,9 @@ if let age = Int(ageText) {
 }
 ```</code></pre>
   <h4 class="label">What students get</h4>
-  <p>The code, highlighted, with an input box, <strong>Run</strong> and <strong>Stop</strong>, and a line saying the code itself can't be edited. Each line in the box is one <code>readLine()</code>, shown after its prompt as a terminal would:</p>
+  <p>The code, highlighted, with <strong>Run</strong> and <strong>Stop</strong> and a line saying the code itself can't be edited. Press Run, and each <code>readLine()</code> waits for an answer typed right after its prompt:</p>
+  {{shot:code-swift-live}}
+  <p>With its answers, it carries on — the same transcript a terminal would show. Where the site can't stop to ask, the answers go in a box before Run, as for Python:</p>
   {{shot:code-swift}}
   <h4 class="label">What it accepts</h4>
   <ul class="plain">
@@ -111,9 +116,9 @@ if let age = Int(ageText) {
 
 <section id="ask">
   <h2>Or ask Claude or Codex</h2>
-  <p>You don't have to learn any of this. Plantoir writes its guidance for runnable code and for quizzes into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows how to opt a page in, which blocks are worth running, what to tell students to type in the input box, and how to write each kind of question. There is nothing to install or paste.</p>
+  <p>You don't have to learn any of this. Plantoir writes its guidance for runnable code and for quizzes into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows how to opt a page in, which blocks are worth running, what to tell students to type when a program asks, and how to write each kind of question. There is nothing to install or paste.</p>
   <p>Asked, in a working folder holding an ICS3U course, something like:</p>
   <pre class="fence ask"><code>Make the examples on the page "courses/ICS3U/Concepts/Functions.md" runnable, so students can try them.</code></pre>
-  <p>its guidance has it add <code>codeRunner: true</code> to the page's settings, the word <code>run</code> to each block worth running, and a sentence telling students what to type in the input box. Asked to <em>add a 5-question check to this page</em>, it writes five <code>[!quiz]</code> callouts of different kinds, each with its answer.</p>
+  <p>its guidance has it add <code>codeRunner: true</code> to the page's settings, the word <code>run</code> to each block worth running, and a sentence telling students what to type when the program asks. Asked to <em>add a 5-question check to this page</em>, it writes five <code>[!quiz]</code> callouts of different kinds, each with its answer.</p>
   <p>Open either from a course's menu with <a href="{{up}}features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
 </section>

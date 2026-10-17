@@ -659,6 +659,37 @@ the build itself. Pinned structurally in
 so a future refactor that moves the badge-suppression call earlier fails
 that test rather than shipping a silent regression.
 
+### Live input: the headers that isolate a runner page (#583, v1.8.1)
+
+A page whose runnable code can ask for input, and that shows nothing from
+another website the headers would break, is sent
+`Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`; `static/pyodide/*` and
+`static/swift/*` get COEP (06 → I11 says why each, and what was measured).
+`deploy.py` writes them as ONE marked block in `public/_headers`
+(`isolation_headers.publish_headers`), replaced on every publish:
+
+- **Netlify** - before the badge rule's block, which keeps lines it did not
+  write; Netlify applies every matching rule, so a page gets the `/*` policy
+  and its own. Paths as a browser asks, lower-cased (Netlify 301s capitals);
+  no rule cap.
+- **Cloudflare Pages** - before wrangler uploads. Paths fully
+  percent-encoded, case-sensitive. **At most 100 rules** per `_headers`:
+  input pages first; the rest keep the box, and the publish prints one
+  `plantoir: note:` line with the count. Rules already in the file (a
+  teacher's own `_headers` from the course root, or the badge block left by
+  a Netlify publish) count toward it.
+- **Folder** - nothing written; a stale `_headers` in `public/` rides along
+  in the copy as in 1.8.0, and a school server ignores it.
+- **Preview** - the patched Quartz server sends the same headers by the same
+  rule (`quartz/cli/plantoirIsolation.mjs`).
+
+A page that keeps the box although its code reads input is named by the
+publish (and the preview) on a `plantoir: note:` line with why
+(`words.notLiveBecause`). `verify-deploy.sh`'s `check_engine` reads the
+headers back on the preview and both hosts. Windows publishes through the
+same `deploy.py`, so it writes the same block.
+
 ### Rate limiting
 
 Netlify's API rate-limits aggressively enough that a class-worth of teachers

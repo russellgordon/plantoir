@@ -108,6 +108,22 @@ export function runnerFor(
   return { language, flags }
 }
 
+// Can a block ask for input as it runs (#583, codeRunnerBlocks.liveInput.asks)?
+// "input" when it reads input as written (the stdin flag, or the row's input
+// pattern in its code), "edit" when only because a student can edit it (an
+// editable language without `readonly` - they may add the call), or null. The
+// transformer writes it on the wrapper as data-runner-asks; a page's headers
+// and the publish's note line read that, never the language table.
+export function asksFor(language: RunnerLanguage, flags: string[], code: string): "input" | "edit" | null {
+  if (flags.includes("stdin") || new RegExp(language.inputPattern).test(code)) {
+    return "input"
+  }
+  if (language.editable && !flags.includes("readonly")) {
+    return "edit"
+  }
+  return null
+}
+
 export function runnerId(slug: string, language: RunnerLanguage, n: number): string {
   return `${slug}-${language.idPrefix}-${n}`
 }

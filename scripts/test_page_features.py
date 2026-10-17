@@ -544,6 +544,7 @@ class RunnerWordsTests(unittest.TestCase):
             "debounceMilliseconds": runner_rules("storage", "debounceMilliseconds"),
             "editorLines": runner_rules("editor", "maxLines"),
             "indent": runner_rules("editor", "indent"),
+            "answerCharacters": runner_rules("liveInput", "answerCharacters"),
         })
 
     def test_writing_twice_gives_the_same_bytes_and_changes_nothing(self):

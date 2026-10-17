@@ -13,10 +13,38 @@
 // type (review N4: a self-hosted folder often does) - and run in a FRESH
 // instance every time (a Swift program runs once). Talks back in the shapes
 // contracts/shared-rules.json -> codeRunnerBlocks.swift.workerTalks names.
+//
+// Live input (#583, codeRunnerBlocks.liveInput): on a cross-origin isolated
+// page the run carries a SharedArrayBuffer (`line`), and each readLine()
+// past the box's lines posts {type: "ask"} and waits for the student's
+// answer - the same reader, buffer layout and copy-before-decode rule as
+// Python's worker (written once in each overlay, because support/gated/swift
+// and support/gated/pyodide are carried independently).
 
 import { runProgram } from "./plantoir-wasi.mjs"
 
 const modules = new Map()
+
+// The worker's half of a live line (codeRunnerBlocks.liveInput.buffer): Int32
+// [0] is the state (0 waiting, 1 a line is there, 2 end of input), Int32 [1]
+// the line's length in bytes, and its UTF-8 bytes start at byte 8. Copied
+// (slice) before they are decoded: Chrome refuses to decode shared memory.
+function liveReader(buffer) {
+  const control = new Int32Array(buffer, 0, 2)
+  const data = new Uint8Array(buffer, 8)
+  return () => {
+    Atomics.store(control, 0, 0)
+    self.postMessage({ type: "ask" })
+    while (Atomics.load(control, 0) === 0) {
+      Atomics.wait(control, 0, 0)
+    }
+    if (Atomics.load(control, 0) !== 1) {
+      return null
+    }
+    const length = Atomics.load(control, 1)
+    return new TextDecoder().decode(data.slice(0, length))
+  }
+}
 
 async function moduleFor(url) {
   const known = modules.get(url)
@@ -51,8 +79,10 @@ self.onmessage = async (event) => {
   self.postMessage({ type: "started" })
   const lines = Array.isArray(message.stdin) ? message.stdin.slice() : []
   const out = (text, err) => self.postMessage({ type: "out", text, err })
+  const live = typeof SharedArrayBuffer === "function" && message.line instanceof SharedArrayBuffer
+  const ask = live ? liveReader(message.line) : null
   try {
-    const result = await runProgram(module, { lines, out })
+    const result = await runProgram(module, { lines, out, ask })
     if (result.crashed) {
       self.postMessage({ type: "done", error: true, crashed: true })
     } else {

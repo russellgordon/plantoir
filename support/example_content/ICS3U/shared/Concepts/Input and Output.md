@@ -81,8 +81,8 @@ People type `seven`. People type nothing at all and press return.
 ValueError: invalid literal for int() with base 10: 'seven'
 ```
 
-You can catch that instead of crashing. Type `seven` in the input box,
-then press Run:
+You can catch that instead of crashing. When it asks, type
+`seven`:
 
 ```python run readonly
 answer = input("Minutes practised: ")
@@ -104,7 +104,7 @@ error handling — which is what [[The Bad Input Hunt]] is for.
 > [!question]- Self-check: what does this print if the user types 3.5?
 > (click to expand)
 >
-> Type `3.5` in the input box, then press Run to check.
+> To check, type `3.5` when it asks.
 > ```python run readonly
 > count = int(input("How many? "))
 > print(count)
