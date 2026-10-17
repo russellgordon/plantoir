@@ -1455,20 +1455,33 @@ def install_quartz_additions(output_dir: Path) -> int:
     return copied
 
 
+# Plantoir's components, each added to the components list once, in the
+# same block: the Print button's date line (#454), then the runnable code's
+# script carrier (#455). A list that already has the first gets the second.
+_PLANTOIR_COMPONENTS = (
+    ("PlantoirMetaLine", "./PlantoirMetaLine", "the Print button"),
+    ("CodeRunner", "./CodeRunner", "the code students run"),
+)
+
+
 def _wire_components_index(index_ts: Path) -> None:
     text = index_ts.read_text(encoding="utf-8")
-    if "PlantoirMetaLine" in text:
-        return
-    if "\nexport {\n" not in text:
-        print("⚠️ Could not add the Print button: the components list has changed shape.")
-        return
-    text = text.replace(
-        "\nexport {\n",
-        f'\nimport PlantoirMetaLine from "./PlantoirMetaLine" // {QUARTZ_ADDITIONS_MARKER}\n'
-        "\nexport {\n  PlantoirMetaLine,\n",
-        1,
-    )
-    index_ts.write_text(text, encoding="utf-8")
+    changed = False
+    for name, module, what in _PLANTOIR_COMPONENTS:
+        if f"import {name} from" in text:
+            continue
+        if "\nexport {\n" not in text:
+            print(f"⚠️ Could not add {what}: the components list has changed shape.")
+            continue
+        text = text.replace(
+            "\nexport {\n",
+            f'\nimport {name} from "{module}" // {QUARTZ_ADDITIONS_MARKER}\n'
+            f"\nexport {{\n  {name},\n",
+            1,
+        )
+        changed = True
+    if changed:
+        index_ts.write_text(text, encoding="utf-8")
 
 
 def _wire_content_layout(layout_ts: Path) -> None:
@@ -1494,14 +1507,59 @@ def _wire_content_layout(layout_ts: Path) -> None:
 
 
 def _wire_transformers_index(index_ts: Path) -> None:
-    """Export the figures transformer (#485 E1) beside Quartz's own."""
+    """Export the figures transformer (#485 E1) and the runnable code's
+    (#455) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
-    if "PlantoirFigures" in text:
+    changed = False
+    for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner")):
+        if f"export {{ {name} }}" in text:
+            continue
+        if not text.endswith("\n"):
+            text += "\n"
+        text += f'export {{ {name} }} from "{module}" // {QUARTZ_ADDITIONS_MARKER}\n'
+        changed = True
+    if changed:
+        index_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_code_runner_transformer(config_ts: Path) -> None:
+    """Put the runnable code's transformer (#455) straight BEFORE
+    SyntaxHighlighting: it wraps a block at the markdown stage, and the
+    highlighter must then see the block exactly as it always did."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.CodeRunnerFences(" in text:
         return
-    if not text.endswith("\n"):
-        text += "\n"
-    text += f'export {{ PlantoirFigures }} from "./plantoirFigures" // {QUARTZ_ADDITIONS_MARKER}\n'
-    index_ts.write_text(text, encoding="utf-8")
+    anchor = "Plugin.SyntaxHighlighting("
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the code students run: the site's settings have changed shape.")
+        return
+    at = text.index(anchor)
+    line_start = text.rfind("\n", 0, at) + 1
+    indent = text[line_start:at]
+    if indent.strip():
+        print("⚠️ Could not add the code students run: the site's settings have changed shape.")
+        return
+    text = text[:line_start] + indent + "Plugin.CodeRunnerFences(),\n" + text[line_start:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_code_runner_component(layout_ts: Path) -> None:
+    """Put the runnable code's component (#455) at the head of the shared
+    afterBody list. It renders nothing; it carries the page's script and
+    styles into every page."""
+    text = layout_ts.read_text(encoding="utf-8")
+    if "Component.CodeRunner()" in text:
+        return
+    anchor = "afterBody: ["
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the code students run: the page layout has changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    if text.startswith("]", at):
+        text = text[:at] + "Component.CodeRunner()" + text[at:]
+    else:
+        text = text[:at] + "Component.CodeRunner(), " + text[at:]
+    layout_ts.write_text(text, encoding="utf-8")
 
 
 def _wire_figures_transformer(config_ts: Path) -> None:
@@ -1524,7 +1582,9 @@ def _wire_figures_transformer(config_ts: Path) -> None:
 
 def wire_quartz_additions(output_dir: Path) -> None:
     """The edits that connect support/quartz to Quartz: the Print button's two
-    (#454) and the figures transformer's two (#485 E1). Idempotent; an
+    (#454), the figures transformer's two (#485 E1), and the runnable code's
+    two more (#455: its transformer before SyntaxHighlighting, its component
+    in afterBody; its exports ride the two index edits). Idempotent; an
     anchor that has moved warns and leaves the file alone.
 
     Deliberately NOT a third edit to mermaid.inline.ts (an event saying the
@@ -1536,6 +1596,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.layout.ts", _wire_content_layout),
         (output_dir / "quartz" / "plugins" / "transformers" / "index.ts", _wire_transformers_index),
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
+        (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
+        (output_dir / "quartz.layout.ts", _wire_code_runner_component),
     ):
         try:
             wire(path)
