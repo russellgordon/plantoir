@@ -1580,7 +1580,11 @@ all").
 
 ### I4. Input, output and the words
 
-`input()` takes the box's lines in order; each line read is echoed into the
+Two paths since #583 (I11): on a page its host isolates, the program ASKS -
+each `input()` waits for the student's answer, typed in a field at the end of
+the output - and everywhere else the box, as below, with one line saying why
+(`words.inputAhead`). The transcript is the same on both, byte for byte.
+On the box path, `input()` takes the box's lines in order; each line read is echoed into the
 output straight after its prompt (Q4: `Name? Ada`, not `Name? Hello Ada`),
 and past the last line `input()` raises `EOFError` (measured: `EOFError: EOF
 when reading a line`). Output is gathered once per animation frame; at
@@ -1739,14 +1743,17 @@ build-time date — the variance F names.
 
 Add `codeRunner: true` to the page's settings and `run` after `python` on the
 block's first line; add `readonly`, `stdin` or (sparingly) `autorun` after
-it. Tell students what to type in the input box, one line per `input()`.
+it. Write instructions that work whether the page asks as the program runs
+or uses the box ("when it asks, type your name"), never "type in the box".
 Preview and press Run on each block; a block that shows as plain code is
 named on a `plantoir: error:` line. The skill `plantoir-runnable-code`
 (support/agent_guidance) carries the whole of this for an assistant.
 
 **Rejected** (with the reasons above and in 02 and 05): Skulpt; Custom
 Frames or JupyterLite; SharedArrayBuffer for input and interrupts (a folder
-publish cannot send COOP/COEP); window.prompt for input; CodeMirror (a large
+publish cannot send COOP/COEP) - **overturned for the isolated case,
+2026-10-17** (#583, I11: on a page its host isolates, input is live; the box
+stays the fallback; the interrupt buffer stays rejected); window.prompt for input; CodeMirror (a large
 editor per page for indentation); a Blob worker (Netlify's CSP has no
 `worker-src`, so `blob:` is refused there); a classic worker (B1); an html-
 stage plugin after pretty-code (the properties are gone by then); the
@@ -1897,6 +1904,121 @@ runs once); mapping only RuntimeError to the crash words (S5); a dedicated
 "called itself too many times" word (considered; one crash sentence, and the
 known limit tells teachers how deep is safe); stopping the build on a compile
 error (ruling Q1).
+
+### I11. Live input (#583, v1.8.1)
+
+A runnable block on a page that is **cross-origin isolated** asks for each
+line as the program reads it; everywhere else the box (I4) stays. Rules:
+`codeRunnerBlocks.liveInput` and `.isolation`; Python and Swift alike
+(Russell's ruling R1).
+
+**How it works.** The page checks `crossOriginIsolated`, `SharedArrayBuffer`
+and `Atomics.wait` once per page. A live run sends a `SharedArrayBuffer`
+(`Int32[0]` state 0 waiting / 1 a line / 2 end of input, `Int32[1]` the byte
+length, UTF-8 from byte 8, room for 4,096 characters); at each read past the
+box's lines the worker posts `ask` and blocks in `Atomics.wait`; the page
+writes the answer and `notify`s. The worker echoes the line through the box's
+own `out` path, so the transcript is identical (pinned in `code_runner.mjs`
+and `swift_runner.mjs`, which compare the two paths' output for the same
+program and answers). Swift's shim gained `ask` (sticky end of input).
+ONE `<input>` per run sits at the end of the output for the whole run (review
+S7: removing a focused field takes an iPad's keyboard down); Run on code that
+reads input makes and focuses it INSIDE the press, because iPadOS raises its
+keyboard only for a focus inside a tap. Return sends (not while an IME
+composes: `isComposing` or `keyCode` 229); Ctrl-D or the "No more input"
+button ends the input (ruling Q2); a multi-line paste is split by the page (a
+one-line field strips line breaks, review S2); Escape and Return go no
+further (quizzes, folds, Quartz's search). An autorun never takes the focus.
+
+**Gotchas, measured.** (1) Chrome refuses `TextDecoder.decode` of, and
+`TextEncoder.encodeInto` into, a view of shared memory - the worker copies
+with `slice()` before decoding and the page encodes then copies with `set()`
+(Safari accepts both, so the wrong code works in one browser only). (2) The
+engine's folder needs COEP too: Chrome checks the worker script, Safari every
+module it imports (COEP on the two worker files alone failed in Safari).
+(3) The worker's `ask` arrives before the next animation frame's paint, so
+the page paints the prompt synchronously before using the field (review S1).
+
+**Measured (2026-10-17, M4 Pro, macOS 26.6).** Plan spikes: Python
+`Name? Zoë⏎Hello Zoë⏎Age? 15⏎16⏎` identical to the box path in Chrome for
+Testing 155, Safari 26.6, the iPad (A16) simulator on iPadOS 18.6 and a plain
+WKWebView; Swift Embedded and full library correct in each; ready 868-1,107
+ms; `terminate()` ends a waiting worker and the next Run is ready in 754-1,062
+ms. Implementation: the preview served by the patched Quartz server in Safari
+26.6 - first prompt 1.07-1.46 s after Run (Python loading), transcript as the
+box's, Swift 01-greeting live, a link from a plain page loaded the runner page
+whole and isolated. Every browser check above runs headless in Chrome for
+Testing 155 under `verify.sh`. **Not measured: the iPad simulator's on-screen
+keyboard between two prompts** (review S7) - this session could not send taps
+to the Simulator (no Accessibility permission; System Events answered
+-25204); the design follows S7 and the closing comment records it as owed.
+
+**Which pages, and the hosts (measured on the test site, 2026-10-17).** A
+page gets COOP `same-origin` + COEP `require-corp` only when a block can ask
+(`data-runner-asks`, written by the transformer) and the built page carries
+nothing COEP would break: any `iframe`/`frame`/`embed`/`object` (YouTube,
+GeoGebra, PhET and Media PDF frames - Safari blocks a same-origin PDF frame
+unless the PDF has COEP itself), or a cross-origin picture, `srcset`, poster,
+script, stylesheet/preload or CSS `url()` outside cdnjs and Google Fonts
+(which send CORP `cross-origin`). Quartz's own Plausible script is added at
+run time and sends CORP `cross-origin` (curl), so it loads. Such a page keeps
+the box, and the publish and the preview name it on a `plantoir: note:` line
+when a block reads input (ruling Q1). The rule exists twice -
+`scripts/isolation_headers.py` (publish) and
+`support/quartz/cli/plantoirIsolation.mjs` (preview) - and both run
+`isolation.cases`.
+
+How each host matches a `_headers` path was measured by deploying the ICS3U
+test site with planted pages (`Café Menu`, `Unit 4, Day 22`, `Q&A Time`,
+`100% Done`, `It's (fine)!`, `C++ Basics`, `Ünïcödé Straße`, `日本語`,
+`Mixed CASE Page`, `Set {1, 2}`, `Ratio a:b`, an NFD `Crème`, a folder
+index), one marker header per spelling, then fetching each page as a browser
+asks (uppercase-hex percent-encoding, redirects followed and re-encoded):
+
+| | Netlify | Cloudflare Pages |
+|---|---|---|
+| Raw UTF-8 rule (`/Café-Menu`) | never matches | never matches |
+| Fully percent-encoded rule (`/C%2B%2B-Basics`, `/Unit-4%2C-Day-22`) | no match for encoded ASCII punctuation | **matches** (and the raw `+ , ' ( ) ! :` forms do NOT) |
+| Browser form (`/c++-basics`, `/set-%7B1,-2%7D`, `/caf%C3%A9-menu`) | **matches**, ASCII case ignored | - |
+| Capitals | every path is 301'd to its lower case, Ü to ü too, so a rule must be lower-cased (`%C3%9C` never matches `%C3%BC`) | case-sensitive; a lower-case request is a 404 |
+| `/x.html`, `/x/` | 301 to the lower-case pretty path | 308 to `/x` |
+| folder `/x`, `/x/index.html` | 301 to `/x/` | 308 to `/x/` |
+
+So Cloudflare's rule is Python's `urllib.parse.quote(path, safe="/")`, and
+Netlify's the browser form of the lower-cased path, plus the as-is form when
+lower-casing changed more than ASCII (so a site Netlify does not redirect
+still matches); a second deploy with exactly those spellings matched every
+page and every redirected form on both hosts. Pinned as `isolation.pathCases`.
+A `*` (a splat on both) gets no rule. Cloudflare reads at most 100 rules:
+input pages first, the rest keep the box, and the publish says how many. A
+teacher's own `_headers` at the course's root reaches `public/` (Quartz copies
+it) and is kept, counting toward that limit.
+
+**Where the headers are written.** `deploy.py`, after any rebuild:
+Netlify before the badge rule's block (which keeps it), Cloudflare before
+wrangler; a block between two markers, replaced every publish. Nothing for a
+folder publish; a `_headers` left in `public/` by an earlier host publish
+rides along in the folder copy, as the badge rule already did in 1.8.0
+(review S6, decided: the folder publish stays byte for byte as before). The
+preview's server sends the same headers (Quartz's `cli/handlers.js`, marker
+`PLANTOIR-ISOLATION-SERVE`), failing open. Quartz's router (`spa.inline.ts`,
+marker `PLANTOIR-ISOLATION-NAV`) loads a page whole when the fetched page's
+COEP disagrees with `crossOriginIsolated` - isolation is fixed when a
+document is made, so morphing would leave a runner page reached by a link
+un-isolated, or carry COEP into a plain page and block its frames (both
+pinned in `code_runner.mjs`; red against the unpatched router).
+
+**Rejected.** `Cross-Origin-Embedder-Policy: credentialless` (Safari 26.6 does
+not isolate under it, and Chrome blocks the frames anyway); COEP site-wide
+(every page's frames break for a feature on a few); the interrupt buffer as
+Stop (1-2 ms, but a waiting program prints a chained EOFError/KeyboardInterrupt
+traceback and a long C call cannot be stopped - a candidate later for saving
+the ~0.9 s reload after Stop); COEP on `/Media/*` to keep PDF frames live
+(measured to work in Safari; ruling Q4: not in v1.8.1); per-folder splats to
+get under Cloudflare's cap (one splat would isolate the folder's plain pages
+too); `window.prompt`; `<iframe credentialless>` (Chrome only); removing and
+re-adding the field per prompt (the plan's first shape - the iPad keyboard);
+`encodeInto` into shared memory (Chrome).
 
 ## J. Self-check quizzes (#563, v1.8.0)
 
