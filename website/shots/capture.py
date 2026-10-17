@@ -2006,6 +2006,20 @@ def capture_print_set(folder: Path) -> None:
 PREPARE_DIR = Path(__file__).resolve().parent / "prepare"
 
 
+def committed_recipe() -> Path:
+    """The tree's recipe exactly as committed (`git archive HEAD`), never the
+    working tree: an uncommitted edit or an untracked file (a __pycache__)
+    must not ride into the kept folder's .toolchain/ (#562's review, N5)."""
+    destination = SCRATCH / "committed-recipe"
+    if destination.exists():
+        shutil.rmtree(destination)
+    destination.mkdir(parents=True)
+    archive = subprocess.run(["git", "-C", str(REPO), "archive", "--format=tar", "HEAD"],
+                             capture_output=True, check=True)
+    subprocess.run(["tar", "-x", "-C", str(destination)], input=archive.stdout, check=True)
+    return destination
+
+
 def start_preview(folder: Path, code: str) -> tuple[subprocess.Popen, str]:
     """`preview.sh <code> 1` in the folder, and the address it serves at,
     once Quartz says it has started. Its output is echoed, so the first
@@ -2028,12 +2042,12 @@ def start_preview(folder: Path, code: str) -> tuple[subprocess.Popen, str]:
     return server, address
 
 
-def capture_code_set(folder: Path) -> list[str]:
+def capture_code_set(folder: Path, only: list[str] | None = None) -> list[str]:
     """The Code page's figures: runnable Python (after Run, and ending in a
     traceback), runnable Swift with its input, and a quiz just checked.
 
     Taken in the kept marketing folder (ICS3U and ICS4U), from previews built
-    by THIS tree's recipe — mirrored from the repository, not from an app
+    by THIS tree's recipe — its committed files (`git archive HEAD`), not an app
     bundle, because these are pictures of the class site and the app plays no
     part in them. The folder is first given what the figures need
     (`marketing_folder.apply_code_steps`): ICS3U's runnable pages brought up to
@@ -2046,7 +2060,12 @@ def capture_code_set(folder: Path) -> list[str]:
     Returns the pictures taken, as `<id>-light` / `<id>-dark`.
     """
     import marketing_folder
-    shots = shots_of_kind("preview-page", scene="code")
+    shots: list[dict] = []
+    for shot in shots_of_kind("preview-page", scene="code"):
+        if only is None or shot["id"] in only:
+            shots.append(shot)
+    if only is not None and len(shots) != len(only):
+        raise SystemExit(f"Not every one of {only} is a Code page figure in shots.json.")
     announce(f"Photographing the Code page's figures, in {folder}")
     marketing_folder.refuse_foreign_courses(folder)
     report = marketing_folder.Report()
@@ -2055,8 +2074,9 @@ def capture_code_set(folder: Path) -> list[str]:
     if report.named_and_skipped:
         raise SystemExit("The marketing folder is missing what the code figures need. "
                          "Make it first: capture.py --provision.")
-    ensure_launchers(folder, resources=REPO)
-    mirror_toolchain(folder, resources=REPO)
+    recipe = committed_recipe()
+    ensure_launchers(folder, resources=recipe)
+    mirror_toolchain(folder, resources=recipe)
     helper = Path(__file__).resolve().parent / "webwindow.swift"
     taken: list[str] = []
     courses: list[str] = []
@@ -2136,6 +2156,8 @@ def main() -> int:
     parser.add_argument("--code", action="store_true",
                         help="only photograph the Code page's figures: runnable Python and Swift blocks "
                              "after Run, and a quiz just checked, from previews of the marketing folder (#562)")
+    parser.add_argument("--code-shots", default=None,
+                        help="with --code, only these figures, comma-separated ids (code-python,…)")
     parser.add_argument("--hero", action="store_true",
                         help="only reassemble the hero composite from parts already captured")
     arguments = parser.parse_args()
@@ -2206,7 +2228,8 @@ def main() -> int:
         SCRATCH.mkdir(parents=True, exist_ok=True)
         keeping_awake = stay_awake()
         try:
-            taken = capture_code_set(marketing)
+            only_code = arguments.code_shots.split(",") if arguments.code_shots else None
+            taken = capture_code_set(marketing, only_code)
         finally:
             keeping_awake.terminate()
         announce("Checking every picture's corners")

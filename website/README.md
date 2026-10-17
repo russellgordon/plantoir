@@ -422,7 +422,7 @@ Board embeds set aside and put back), so a page somebody changed is left and
 named; and two pages of our own are planted, `shots/marketing/Reading Input
 in Swift.md` in ICS4U's Programs (no payload has Swift) and `Check Your
 Loops.md` in ICS3U's Exercises (no payload has a quiz). The previews are built
-from THIS tree's recipe, copied from the repository rather than an app bundle
+from THIS tree's recipe as committed (`git archive HEAD`, so nothing uncommitted rides along) rather than an app bundle
 (the app plays no part in a class-site picture), so the first run builds the
 website builder and, for ICS4U, gets Swift ready. Each page is photographed
 in `webwindow.swift` with `--prepare shots/prepare/<id>.js`: after the settle
@@ -434,7 +434,12 @@ as it takes to bring the block's bottom (its output included) inside the
 window, and only then is the window photographed; it fails the
 run with its reason, or when `--prepare-timeout` (120 s here) runs out.
 Vision must read each shot's `expectText`. The print set (both platforms)
-takes only scene `print-set`, so these never reach MPM2D's preview.
+takes only scene `print-set`, so these never reach MPM2D's preview. `--code-shots code-python` retakes some of them. Two things in
+the pictures are the page's own, not the capture's: `code-python-error`'s
+traceback names `main.py` while the page's prose says `hours.py` (#561's
+known mismatch: that prose is about a program on the student's computer),
+and `code-python` keeps the paragraph under Spot the Bug's block, which
+describes the bug, out of frame, because the picture shows it fixed.
 
 **Before starting:** the screen unlocked and left alone for about an hour,
 
