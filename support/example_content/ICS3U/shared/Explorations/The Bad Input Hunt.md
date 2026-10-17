@@ -11,8 +11,8 @@ Your program works. You have run it perhaps thirty times, and every one
 of those thirty times you typed exactly what it was expecting, because
 you wrote it and you know what it wants.
 
-Your client does not know what it wants. Your client will type "seven". Type `seven` in the input box under the
-program and press Run to see what happens.
+Your client does not know what it wants. Your client will type "seven". Press Run, type `seven` when the
+program asks, and see what happens.
 
 ```python run
 hours = int(input("How many hours did you work? "))

@@ -19,8 +19,8 @@ Ask for a speed in kilometres per hour and a time in hours, print the
 distance to one decimal place.
 
 > [!success]- Answer 1
-> Type a speed and a time on two lines of the input box, then press
-> Run.
+> Press Run, then type a speed and a time when it asks for
+> them.
 > ```python run
 > speed = float(input("Speed, in km/h: "))
 > time_taken = float(input("Time, in hours: "))
@@ -41,7 +41,7 @@ Ask for a radius, print the area to two decimals. Use `math.pi`, not
 3.14.
 
 > [!success]- Answer 2
-> Type a radius in the input box, then press Run.
+> Press Run, and type a radius when it asks.
 > ```python run
 > import math
 >
@@ -59,7 +59,7 @@ Ask for a radius, print the area to two decimals. Use `math.pi`, not
 $$F = \frac{9}{5}C + 32$$
 
 > [!success]- Answer 3
-> Type a temperature in the input box, then press Run.
+> Press Run, and type a temperature when it asks.
 > ```python run
 > celsius = float(input("Temperature, in Celsius: "))
 >
@@ -79,8 +79,8 @@ Ask for watts, hours per day, and the price per kilowatt-hour. Print
 the daily cost and the cost over a 194-day school year.
 
 > [!success]- Answer 4
-> Type the watts, the hours per day and the price on three lines of
-> the input box, then press Run.
+> Press Run, then type the watts, the hours per day and the price
+> as it asks for each.
 > ```python run
 > watts = float(input("Power, in watts: "))
 > hours = float(input("Hours per day: "))
@@ -105,8 +105,8 @@ then prints the mean — and does not crash when the user types `done`
 immediately.
 
 > [!success]- Answer 5
-> Type one reading on each line of the input box and `done` on the
-> last, then press Run.
+> Press Run, then type one reading each time it asks, and `done`
+> to finish.
 > ```python run
 > readings = []
 >

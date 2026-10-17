@@ -149,6 +149,26 @@
       ]
     },
     {
+      "id": "code-python-live",
+      "capture": {
+        "kind": "preview-page",
+        "workspace": "marketing",
+        "course": "ICS3U",
+        "path": "/Programs/Talking-to-the-User",
+        "scene": "code",
+        "prepare": "code-python-live.js"
+      },
+      "alt": "A Python program on the Talking to the User page, run and waiting: the output shows Player name: Priya, then Minutes practised this week: with 185 being typed in a field right after the prompt, and the line Waiting for your answer under the buttons.",
+      "caption": "The program stops at each input() and waits. The student types the answer right in the output and presses Return.",
+      "windows": false,
+      "expectText": [
+        "The program",
+        "Player name: Priya",
+        "Minutes practised this week",
+        "Waiting for your answer"
+      ]
+    },
+    {
       "id": "code-python-error",
       "capture": {
         "kind": "preview-page",
@@ -158,8 +178,8 @@
         "scene": "code",
         "prepare": "code-python-error.js"
       },
-      "alt": "A Python program on the Reading an Error Message page with abc typed in the input box under it, and the traceback it ended in: line 2, then ValueError: invalid literal for int() with base 10: 'abc'.",
-      "caption": "Input typed ahead, one line for each input(). An error names the line in the editor, in Python's own words.",
+      "alt": "A Python program on the Reading an Error Message page that asked how many hours, was answered abc, and ended in a traceback: line 2, then ValueError: invalid literal for int() with base 10: 'abc'.",
+      "caption": "Answered abc where it wanted a number. An error names the line in the editor, in Python's own words.",
       "windows": false,
       "expectText": [
         "A crash, in full",
@@ -167,6 +187,27 @@
         "line 2",
         "ValueError",
         "Finished with an error"
+      ]
+    },
+    {
+      "id": "code-swift-live",
+      "capture": {
+        "kind": "preview-page",
+        "workspace": "marketing",
+        "course": "ICS4U",
+        "path": "/Programs/Reading-Input-in-Swift",
+        "scene": "code",
+        "prepare": "code-swift-live.js"
+      },
+      "alt": "A Swift program on a class website, highlighted and not editable, run and waiting: its output shows What is your name?, the answer Priya, How old are you?, and 14 being typed in a field under it, with Waiting for your answer beside the No more input button.",
+      "caption": "Each readLine() waits for an answer, typed where the program asked for it.",
+      "windows": false,
+      "expectText": [
+        "Ask, then answer",
+        "What is your name?",
+        "Priya",
+        "How old are you?",
+        "Waiting for your answer"
       ]
     },
     {
@@ -179,8 +220,8 @@
         "scene": "code",
         "prepare": "code-swift.js"
       },
-      "alt": "A Swift program on a class website, highlighted and not editable, with Priya and 14 typed on two lines of its input box, and its output: each question with the answer read for it, then Hello, Priya! Next year you will be 15.",
-      "caption": "Swift runs with the input students type. The code stays as you wrote it.",
+      "alt": "A Swift program on a class website, highlighted and not editable, answered Priya and 14, and its output: each question with its answer after it, then Hello, Priya! Next year you will be 15.",
+      "caption": "With its answers, the program carries on. The code stays as you wrote it.",
       "windows": false,
       "expectText": [
         "Ask, then answer",
