@@ -78,7 +78,8 @@ PLACEHOLDER = b"cannot print value in embedded Swift"
 MAX_MEMORY = 268435456
 
 # A compile that takes longer than this is abandoned and NOT cached (review
-# S3: a failure that is not the compiler's must never be remembered).
+# S3: a failure that is not the compiler's must never be remembered - nor is
+# one of wasm-opt or of the readLine flush, NotTheCompilers).
 JOB_SECONDS = 180
 
 # Diagnostics kept per block: enough for the first errors, never a page.
@@ -124,6 +125,12 @@ class TookTooLong(Exception):
     pass
 
 
+class NotTheCompilers(Exception):
+    """A step after Swift accepted the code failed (wasm-opt, or compiling
+    the readLine flush): the code is not at fault, so nothing is cached and
+    the next preview tries again (review S3)."""
+
+
 def run(arguments: list) -> tuple:
     try:
         done = subprocess.run(arguments, capture_output=True, text=True, env=environment(),
@@ -152,7 +159,7 @@ def compile_one_way(sources: list, compile_flags: list, link_flags: list, work: 
     status, optimised = run([WASM_OPT] + WASM_OPT_FLAGS + [str(objects / "main.wasm"),
                                                            "-o", str(objects / "main.opt.wasm")])
     if status != 0:
-        return None, said + linked + optimised
+        raise NotTheCompilers(optimised)
     return objects / "main.opt.wasm", said
 
 
@@ -191,9 +198,8 @@ def compile_job(job: Path, out: Path) -> str:
             flush = work / "flush.o"
             status, flush_said = run([CLANG] + FLUSH_COMPILE + [str(FLUSH), "-o", str(flush)])
             if status != 0:
-                binary, said = None, flush_said
-            else:
-                binary, said = compile_one_way([main], FULL_COMPILE, FULL_LINK, work, extra_objects=[flush])
+                raise NotTheCompilers(flush_said)
+            binary, said = compile_one_way([main], FULL_COMPILE, FULL_LINK, work, extra_objects=[flush])
         seconds = round(time.monotonic() - began, 2)
         if binary is None:
             entry = {"ok": False, "reason": "compileError", "diagnostics": tidy(said, work),
@@ -212,6 +218,10 @@ def compile_job(job: Path, out: Path) -> str:
     except TookTooLong:
         job.unlink(missing_ok=True)
         return f"{key[:12]} took longer than {JOB_SECONDS} s and was not kept"
+    except NotTheCompilers as failure:
+        job.unlink(missing_ok=True)
+        first = (str(failure).strip().splitlines() or [""])[0][:200]
+        return f"{key[:12]} could not be finished and was not kept: {first}"
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

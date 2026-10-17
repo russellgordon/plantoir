@@ -437,5 +437,115 @@ class RecipeTests(unittest.TestCase):
         self.assertTrue((REPO / "support" / "gated" / row["engine"] / "plantoir-wasi.mjs").is_file())
 
 
+FAKE_SWIFTC = r'''#!{python}
+# A stand-in for swiftc: "compiles" by copying the sources into the object,
+# "links" by copying the object (adding the placeholder sentence when an
+# Embedded link is given code that asks for it), and fails as the code says.
+import sys
+from pathlib import Path
+args = sys.argv[1:]
+out = Path(args[args.index("-o") + 1])
+embedded = "Embedded" in args
+if "-c" in args:
+    sources = [a for a in args if a.endswith(".swift")]
+    text = "".join(Path(s).read_text() for s in sources)
+    if "BOTH_FAIL" in text or ("EMBEDDED_FAILS" in text and embedded):
+        print("main.swift:2:7: error: cannot find 'nmae' in scope", file=sys.stderr)
+        sys.exit(1)
+    out.write_text(text)
+else:
+    objects = [a for a in args if a.endswith(".o")]
+    text = "".join(Path(o).read_text() for o in objects)
+    if "PLACEHOLDER" in text and embedded:
+        text += "cannot print value in embedded Swift"
+    out.write_text(("EMBEDDED " if embedded else "FULL ") + text)
+'''
+
+FAKE_TOOL = r'''#!{python}
+# A stand-in for wasm-opt and clang: copies its input to -o, or fails when
+# the code asks it to.
+import sys
+from pathlib import Path
+args = sys.argv[1:]
+out = Path(args[args.index("-o") + 1])
+inputs = [a for a in args[:args.index("-o")] if not a.startswith("-") and Path(a).is_file()]
+text = "".join(Path(i).read_text(errors="replace") for i in inputs)
+if "OPT_FAILS" in text:
+    print("wasm-opt: something broke", file=sys.stderr)
+    sys.exit(1)
+out.write_text(text)
+'''
+
+
+@unittest.skipIf(os.name == "nt", "the stand-in tools are scripts with a #! line")
+class CompileStepTests(unittest.TestCase):
+    """support/swift/compile.py's choices, with stand-ins for swiftc, clang
+    and wasm-opt (codeRunnerBlocks.swift.compile and cache): Embedded first;
+    the full library when Embedded does not compile or would print its
+    placeholder; a compile error cached with the compiler's words; a failure
+    that is not the compiler's never cached (review S3); the jobs folder
+    removed. The real compiler is verify.sh's Swift gate."""
+
+    def setUp(self):
+        import importlib.util
+        import sys
+        self.folder = Path(tempfile.mkdtemp(prefix="plantoir-swift-compile-"))
+        tools = self.folder / "tools"
+        tools.mkdir()
+        for name, body in (("swiftc", FAKE_SWIFTC), ("clang", FAKE_TOOL), ("wasm-opt", FAKE_TOOL)):
+            path = tools / name
+            path.write_text(body.replace("{python}", sys.executable), encoding="utf-8")
+            path.chmod(0o755)
+        self.saved = {name: os.environ.get(name) for name in ("PLANTOIR_SWIFTC", "PLANTOIR_SWIFT_SDK", "PLANTOIR_WASM_OPT")}
+        os.environ["PLANTOIR_SWIFTC"] = str(tools / "swiftc")
+        os.environ["PLANTOIR_SWIFT_SDK"] = str(self.folder / "sdk")
+        os.environ["PLANTOIR_WASM_OPT"] = str(tools / "wasm-opt")
+        spec = importlib.util.spec_from_file_location("plantoir_compile", REPO / "support" / "swift" / "compile.py")
+        self.compile = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.compile)
+        self.compile.OBJECT_ROOT = self.folder / "objects"
+        self.jobs = self.folder / "jobs"
+        self.jobs.mkdir()
+        self.out = self.folder / "out"
+
+    def tearDown(self):
+        for name, value in self.saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def job(self, key, code):
+        (self.jobs / f"{key}.swift").write_text(code + "\n", encoding="utf-8")
+
+    def entry(self, key):
+        path = self.out / f"{key}.json"
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+    def test_each_block_takes_the_library_it_needs(self):
+        self.job("a" * 64, 'print("plain")')
+        self.job("b" * 64, 'print([1]) // PLACEHOLDER')
+        self.job("c" * 64, 'let x = 1 // EMBEDDED_FAILS')
+        self.job("d" * 64, 'print(nmae) // BOTH_FAIL')
+        self.assertEqual(self.compile.main(["compile.py", str(self.jobs), str(self.out)]), 0)
+        self.assertEqual(self.entry("a" * 64)["sdk"], "embedded")
+        self.assertTrue((self.out / ("a" * 64 + ".wasm")).read_text().startswith("EMBEDDED "))
+        self.assertEqual(self.entry("b" * 64)["sdk"], "full", "the placeholder means the full library")
+        self.assertTrue((self.out / ("b" * 64 + ".wasm")).read_text().startswith("FULL "))
+        self.assertEqual(self.entry("c" * 64)["sdk"], "full", "Embedded refusing means the full library")
+        broken = self.entry("d" * 64)
+        self.assertEqual((broken["ok"], broken["reason"]), (False, "compileError"))
+        self.assertIn("main.swift:2:7: error: cannot find 'nmae' in scope", broken["diagnostics"])
+        self.assertFalse((self.out / ("d" * 64 + ".wasm")).exists())
+        self.assertFalse(self.jobs.exists(), "the run's job folder is removed")
+
+    def test_a_failure_that_is_not_the_compilers_is_never_cached(self):
+        self.job("e" * 64, 'print("x") // OPT_FAILS')
+        self.compile.main(["compile.py", str(self.jobs), str(self.out)])
+        self.assertIsNone(self.entry("e" * 64), "a wasm-opt failure was cached as the code's fault")
+        self.assertFalse((self.out / ("e" * 64 + ".wasm")).exists())
+
+
 if __name__ == "__main__":
     unittest.main()
