@@ -288,6 +288,9 @@ publishing.
   helps, why the tempting wrong one is wrong - not just "the answer is B".
 - Match the page: ask about what the page teaches, at the level of the
   course's expectations, using its own words and notation.
+- On a page about graphs or figures, make at least one question SHOW one -
+  graphs as the choices, or a graph in the explanation (section 4) - so the
+  check asks students to read a graph, not only to manipulate an equation.
 - Short answers with a few accepted forms; check a numeric answer is not
   rejected for an equivalent form a student would reasonably type.
 
