@@ -14,6 +14,9 @@ all she wanted.
 
 ## The program
 
+To run it, type a name and a number of minutes on two lines of the
+input box — `Priya` and `185`, as in the run below — then press Run.
+
 ```python run readonly
 # Weekly practice check-in for Ms. Roy, who coaches the senior team.
 # She wanted players to see their own week without her doing

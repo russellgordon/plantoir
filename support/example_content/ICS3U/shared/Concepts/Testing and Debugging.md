@@ -45,7 +45,7 @@ nobody checked. Error messages use a small, learnable vocabulary, and
 When there is no error message, become the computer. Write the
 variables across the top of a page and fill in a row per pass.
 
-```python run readonly
+```python run
 marks = [46, 52, 78]
 
 for mark in marks:

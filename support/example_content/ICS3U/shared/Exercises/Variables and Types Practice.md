@@ -88,6 +88,8 @@ one of those two sentences being ignored.
 > `is_form` too.
 
 > [!success]- Answer 7
+> Type a name and a number of days on two lines of the input box,
+> then press Run.
 > ```python run
 > name = input("Name: ")
 > days = int(input("Days until the trip: "))

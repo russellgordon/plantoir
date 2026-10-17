@@ -64,7 +64,7 @@ sensible number of days.
 >     print(count)
 > ```
 > `count` is never reduced, so this prints `3` forever. Run it: within
-> a second the page stops it for printing too much. A stuck loop that
+> a second or two the page stops it for printing too much. A stuck loop that
 > prints nothing runs until you press **Stop**. Either way, look for
 > what the loop was supposed to be changing, fix it, and run it again.
 
