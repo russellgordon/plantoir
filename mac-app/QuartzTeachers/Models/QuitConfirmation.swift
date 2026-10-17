@@ -43,6 +43,36 @@ enum QuitConfirmation {
         case theMacIsLoggingOutOrShuttingDown
     }
 
+    /// Why Plantoir closed, for the trail's `app closed` line (#560). Finer
+    /// than `Reason`, which only needs to know whether a question may be put
+    /// up: the trail says WHICH system quit it was, and whether the app was
+    /// quitting to install an update.
+    nonisolated enum ClosingReason: Equatable, Sendable {
+        case quitByTheTeacher
+        case toInstallANewVersion
+        case theMacIsLoggingOut
+        case theMacIsRestarting
+        case theMacIsShuttingDown
+
+        // MARK: - Computed properties
+
+        /// The words on the trail, after "Plantoir closed — ".
+        var words: String {
+            switch self {
+            case .quitByTheTeacher:
+                return "quit by the teacher"
+            case .toInstallANewVersion:
+                return "to install a new version"
+            case .theMacIsLoggingOut:
+                return "because the Mac is logging out"
+            case .theMacIsRestarting:
+                return "because the Mac is restarting"
+            case .theMacIsShuttingDown:
+                return "because the Mac is shutting down"
+            }
+        }
+    }
+
     /// What the teacher answered.
     enum Choice: String {
         case keepWorking
@@ -185,6 +215,32 @@ enum QuitConfirmation {
             }
         }
         return .theTeacherAskedToQuit
+    }
+
+    /// Why this quit is happening, for the `app closed` line (#560).
+    ///
+    /// The Apple event's quit reason wins, because it is the system saying
+    /// so: the same six codes `systemQuitReasonCodes` lists, split three
+    /// ways. Then `installingAnUpdate` — true only once the app itself has
+    /// handed the installer the teacher's Install (`AppUpdates.isQuittingToInstall`).
+    /// Anything else, the Dock's Quit and a scripted quit included, arrives
+    /// as the same request ⌘Q makes and is the teacher's.
+    static func closingReason(quitReasonCode code: OSType?, installingAnUpdate: Bool) -> ClosingReason {
+        if let code {
+            if code == OSType(kAELogOut) || code == OSType(kAEReallyLogOut) {
+                return .theMacIsLoggingOut
+            }
+            if code == OSType(kAEShowRestartDialog) || code == OSType(kAERestart) {
+                return .theMacIsRestarting
+            }
+            if code == OSType(kAEShowShutdownDialog) || code == OSType(kAEShutDown) {
+                return .theMacIsShuttingDown
+            }
+        }
+        if installingAnUpdate {
+            return .toInstallANewVersion
+        }
+        return .quitByTheTeacher
     }
 
     /// The question itself.

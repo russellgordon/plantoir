@@ -93,6 +93,52 @@ final class ActivityTrailWiringTests: XCTestCase {
         XCTAssertEqual(writtenLines.count, 3, "A launch must leave exactly its three lines — the app, the machine, and the helpers.")
     }
 
+    /// #560 item 1, a GUARD rather than a fix: Windows printed 1.7.2 as
+    /// "Plantoir 1.7 (2)". The mac prints CFBundleShortVersionString, the
+    /// three-part version, then the build in brackets. Passes on the code
+    /// before #560 too — it is here so a change to `appDescription` cannot
+    /// bring the Windows fault to the mac.
+    func testTheOpenedLineCarriesTheThreePartVersionThenTheBuild() throws {
+        let description: String = ProblemReportEnvironment.appDescription
+        let pattern: String = #"^Plantoir [0-9]+\.[0-9]+\.[0-9]+ \([0-9]+\) · pid [0-9]+ · "#
+        XCTAssertNotNil(description.range(of: pattern, options: .regularExpression), description)
+    }
+
+    /// #560 item 2: a quit leaves one "app closed" line, with its reason and
+    /// this process's id — the same pid the opened line carries. Fires the
+    /// event rather than only referencing it.
+    @MainActor
+    func testClosingWritesOneLineWithTheReasonAndThePid() throws {
+        let scratchFolderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("trail-closing-\(UUID().uuidString)", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        let previousReason: QuitConfirmation.ClosingReason? = AppDelegate.closingReason
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            AppDelegate.closingReason = previousReason
+            try? FileManager.default.removeItem(at: scratchFolderURL)
+        }
+
+        AppDelegate.closingReason = .theMacIsRestarting
+        AppDelegate.noteClosed()
+
+        let trailText: String = ActivityTrail.store.activityText(includingPrompts: true)
+        var writtenLines: [String] = []
+        for line in trailText.components(separatedBy: "\n") {
+            if !line.trimmingCharacters(in: .whitespaces).isEmpty {
+                writtenLines.append(line)
+            }
+        }
+        XCTAssertEqual(writtenLines.count, 1, trailText)
+        let pid: Int32 = ProcessInfo.processInfo.processIdentifier
+        XCTAssertTrue(
+            writtenLines.first?.hasSuffix(ActivityTrail.closedLine(reason: .theMacIsRestarting)) ?? false, trailText
+        )
+        XCTAssertTrue(ProblemReportEnvironment.appDescription.contains("· pid \(pid) ·"), "the two lines carry different pids")
+        XCTAssertTrue(trailText.contains("· pid \(pid)"), trailText)
+    }
+
     // MARK: - Functions
 
     /// The product source folder, reached from this file's own location so
