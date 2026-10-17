@@ -61,6 +61,10 @@ TestResults/
 mac-app/Vendor/helpers/
 mac-app/Vendor/helpers
 mac-app/Vendor/.helpers.*/
+# mac-app/Vendor/fetch-obsidian-addons.sh (GitHub #495): pinned in
+# contracts/shared-rules.json → obsidianAddOnsForFigures, never committed.
+mac-app/Vendor/obsidian-addons/
+mac-app/Vendor/.obsidian-addons.*/
 
 # Update-signing keys never live in the repository (#337): the private key stays
 # in %USERPROFILE%\.plantoir-release, outside every clone.

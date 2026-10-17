@@ -271,7 +271,10 @@ enum CourseArchiver {
     /// Quartz checkout with its dependencies, which dwarfs the course a
     /// teacher actually wrote and can always be produced again.
     ///
-    /// The same list the setup wizard uses for its own backups.
+    /// The same list the setup wizard uses for its own backups. Plantoir's
+    /// own Obsidian add-ons are left out too, by marker rather than by name
+    /// (`ObsidianFigureAddOns.backupExclusions`, #495) — and by the wizard
+    /// (`setup_course.backup_existing_course_dir`).
     nonisolated static let excludedFromArchives: [String] = [
         ".merged_output",
         "node_modules",
@@ -396,6 +399,14 @@ enum CourseArchiver {
         for name in excludedFromArchives {
             arguments.append("*/\(name)/*")
             arguments.append("*/\(name)")
+        }
+        // Plantoir's own Obsidian add-ons for diagrams and graphs (#495):
+        // 12.9 MB per course that the next pass puts back, on any Mac whose
+        // answer is yes. Only the folders carrying Plantoir's marker — the
+        // teacher's own add-ons are theirs and are kept — and the list stays,
+        // so a restored course has them listed when they come back.
+        for pattern in ObsidianFigureAddOns.backupExclusions(forFolderAt: folderURL) {
+            arguments.append(pattern)
         }
 
         let zipper: Process = Process()

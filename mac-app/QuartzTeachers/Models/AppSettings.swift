@@ -142,6 +142,24 @@ class AppSettings {
         }
     }
 
+    /// The key holding the answer about Obsidian's add-ons (#495).
+    static let obsidianFigureAddOnsKey: String = "obsidianFigureAddOns"
+
+    /// Whether Plantoir adds Obsidian's add-ons for diagrams and graphs to
+    /// the courses that have them (#495): asked once, at Open in Obsidian,
+    /// and changed in Plantoir ▸ Settings ▸ Obsidian.
+    ///
+    /// App-wide, not per course: one yes covers every course (director
+    /// ruling on #495). Stored as the raw value, so an unreadable one reads
+    /// as not asked (`obsidianAddOnsForFigures.answer` in the contract).
+    var obsidianFigureAddOns: ObsidianFigureAddOnsAnswer {
+        didSet {
+            if canRemember {
+                defaults.set(obsidianFigureAddOns.rawValue, forKey: AppSettings.obsidianFigureAddOnsKey)
+            }
+        }
+    }
+
     // MARK: - Computed properties
 
     /// False while the hosted tests drive the real app, so a test run
@@ -163,6 +181,10 @@ class AppSettings {
 
         self.previewOpensAt = PreviewStartPage.setting(
             fromStored: defaults.string(forKey: AppSettings.previewOpensAtKey)
+        )
+
+        self.obsidianFigureAddOns = ObsidianFigureAddOnsAnswer.reading(
+            stored: defaults.string(forKey: AppSettings.obsidianFigureAddOnsKey)
         )
 
         self.plansAccepted = defaults.integer(forKey: AppSettings.plansAcceptedKey)

@@ -931,6 +931,30 @@
         "carries": "the choice made: the front page or the page last viewed (previewStartPage.setting.values). One line per change, written when the teacher changes it.",
         "line": "Settings ▸ Preview — Preview now opens at the page last viewed",
         "why": "#504. The setting changes what the plain Preview press does in every course, so 'Preview stopped opening the front page' is answered by when it was changed - on the 'assistant model chosen' precedent."
+      },
+      {
+        "event": "obsidian add-ons offered",
+        "carries": "the course's code and the answer to obsidianAddOnsForFigures' offer - Add Them, Not Now, or Not Now with don't ask again - OR why nothing was asked although the course needs add-ons it lacks: Obsidian opens the course as part of a larger vault (once per course per run). The exact words are obsidianAddOnsForFigures.trail.offered and .notTheVault.",
+        "line": "MPM2D · asked to add Obsidian's add-ons for diagrams and graphs — Add Them",
+        "why": "#495. The answer is app-wide and changes what Open in Obsidian does for every course from then on, so \"Plantoir added things to my course's Obsidian settings\" and \"Obsidian never shows my graphs\" are both answered by when, and how, it was asked - and the larger-vault line is the only record of why a course that needs them was never asked about."
+      },
+      {
+        "event": "obsidian add-ons added",
+        "carries": "the course's code, what started the pass (at Open in Obsidian, after a preview, after reopening Obsidian), and for each add-on the course needs, by name and version: added, already there, already there and switched off (so left off), or left alone and why (the teacher's own copy and its version; another version than Plantoir added; unreadable) or could not be added and the system's reason - OR why nothing at all was added (the list could not be read, a link, the carried copy did not match, the settings could not be set up). Written when something was added, otherwise at most once per course per run; never when every add-on was simply already there. Never a page's words. The exact words are obsidianAddOnsForFigures.trail.pass.",
+        "line": "MPM2D · Obsidian add-ons for diagrams and graphs (after a preview): TikZJax 0.5.2 added; Functionplot 1.2.1 already there",
+        "why": "#495. The preview pass is SILENT on screen, so this is the only record that Plantoir wrote into a course's .obsidian - and the refusals and left-alones are the only record of why a teacher who said yes still sees code in Obsidian."
+      },
+      {
+        "event": "obsidian reopened for add-ons",
+        "carries": "the course's code and what happened to the reopen question: Obsidian was closed and opened again to show the add-ons, Later was chosen (nothing written), or Obsidian did not close (nothing written). The exact words are obsidianAddOnsForFigures.trail.reopened.",
+        "line": "MPM2D · reopened Obsidian to show the add-ons for diagrams and graphs",
+        "why": "#495. Plantoir closes the teacher's Obsidian here, on their click; \"Obsidian closed by itself while I was writing\" has its answer only on this line."
+      },
+      {
+        "event": "obsidian add-ons setting changed",
+        "carries": "on or off, written when the teacher changes Settings > Obsidian (obsidianAddOnsForFigures.trail.settingChanged). The offer's answers are the other event's.",
+        "line": "Settings ▸ Obsidian — add-ons for diagrams and graphs on",
+        "why": "#495. The toggle is the only way back from \"Don't ask again\" and changes what happens in every course, on the 'preview start page chosen in Settings' precedent."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -12882,6 +12906,48 @@
             "publishSiteIsSet": true
           },
           "expectSaid": true
+        },
+        {
+          "name": "Plantoir's own add-ons for diagrams and graphs (#495): left behind, and nothing said",
+          "course": "courses/MPM2D",
+          "tree": [
+            "courses/MPM2D/course_config.json",
+            "courses/MPM2D/section1/index.md",
+            "courses/MPM2D/.obsidian/app.json",
+            "courses/MPM2D/.obsidian/plugins/obsidian-tikzjax/main.js",
+            {
+              "file": "courses/MPM2D/.obsidian/plugins/obsidian-tikzjax/.plantoir",
+              "text": "{\"addedBy\":\"Plantoir\",\"version\":\"0.5.2\"}"
+            },
+            {
+              "file": "courses/MPM2D/.obsidian/plugins/obsidian-functionplot.plantoir-partial/.plantoir",
+              "text": "{\"addedBy\":\"Plantoir\",\"version\":\"1.2.1\"}"
+            },
+            {
+              "file": "courses/MPM2D/.obsidian/community-plugins.json",
+              "text": "[\n  \"obsidian-tikzjax\"\n]"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectUnchanged": [
+            ".obsidian/app.json",
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "plantoirAddOnNames": [
+              "obsidian-functionplot.plantoir-partial",
+              "obsidian-tikzjax"
+            ],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": false,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": false,
+          "why": "The teacher did not choose them, so the sheet does not tell them their add-ons were left behind; ObsidianAddOns.found tells them apart by Plantoir's .plantoir marker (obsidianAddOnsForFigures.sidecar). The trail still names them."
         }
       ],
       "howToRunACase": "Build the tree, then make a reference course from root/<course> BOTH ways - Keep a Copy (the course as a live one) and a modern import (choosing root, a working folder holding courses/) - into a different working folder. Every expectAbsent path is not in the made course (not as a file, a folder or a link); every expectUnchanged path is byte-identical to its source; every expectNotALink path is not a link; the ENTIRE source tree, links' targets included, is byte-identical afterwards; what was found is expectFound; the sheet's note is said exactly when expectSaid. Two things are Swift-only because they are platform mechanics rather than data: a folder inside an add-on that nobody can read does not refuse the course on any of the four routes, and the sheet's size leaves the add-ons out.",
@@ -24190,7 +24256,7 @@
     "knownLimits": [
       "Quartz removes every `%%` pair from a page before it reads anything, inside fences too, so a TeX comment written `%% like this` is altered on the site and not in Obsidian. Write single `%` comments.",
       "One picture per fence: TikZJax draws only the first tikzpicture in a fence (measured).",
-      "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so a teacher's Obsidian shows a functionplot fence as plain text; the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site, once the teacher installs it there.",
+      "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so it cannot be installed from Obsidian's own Browse list; without it Obsidian shows a functionplot fence as plain text, while the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site once it is installed and switched on in the course. obsidianAddOnsForFigures (#495) says which app adds them, and where.",
       "A site opened as files on a computer, rather than served, shows a diagram's lettering in the browser's own font: browsers do not load fonts beside a page opened that way.",
       "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5)."
     ]
@@ -26403,6 +26469,1253 @@
       "A popover preview of a page shows its quizzes without Check (the page's script runs on the page itself, not in a popover); their answers stay hidden.",
       "The folder check reads a page line by line, not with the site's parser (documentation/05): pages written the way the skill shows agree, and where an unusual nesting is read differently the site's safety net says so on a `plantoir: error:` line.",
         "Two HTML shapes are still read differently by the site and the folder check (#563 final review, 2026-10-17): a tag whose quoted attribute holds a `>` (`<img alt=\"x>y\">`) and an open `<pre>`, `<script>`, `<style>` or `<textarea>` before the choices. The safety net catches both and the page says so on its `plantoir: error:` line; neither is a shape the skill shows."
+    ]
+  },
+  "obsidianAddOnsForFigures": {
+    "note": "#495, v1.8.0, mac first. Obsidian draws a ```tikz or ```functionplot fence only with the add-on for it installed and switched on in the course; until #495 a teacher was told to find TikZJax in Obsidian's directory, and functionplot was not in it at all. Plantoir now carries both add-ons, pinned by hash, and adds the ones a course uses on the teacher's one yes (DECISIONS 18; director rulings on #495). Windows owes the whole key (its windows issue). documentation/09-mac-app.md -> \"Obsidian's add-ons for diagrams and graphs (#495)\" says what was measured and rejected.",
+    "rule": "Asked ONCE, app-wide, at Open in Obsidian and before Obsidian opens - never at course creation, in Course Settings, after a preview or by an assistant. After the yes, every course that uses a figure fence gets the add-ons it uses, at Open in Obsidian and silently when a section's preview finishes, never into a course that is open in Obsidian (Obsidian holds the list in memory and writes it back whole, so an add-on written under it is dropped - plan review S3) and never into a course kept for reference (#255's line). Obsidian itself then asks once per course whether the teacher trusts its author: Plantoir never answers that for them, and says beforehand which button to click.",
+    "addOns": [
+      {
+        "kind": "tikz",
+        "id": "obsidian-tikzjax",
+        "name": "TikZJax",
+        "version": "0.5.2",
+        "releaseURL": "https://github.com/artisticat1/obsidian-tikzjax/releases/tag/0.5.2",
+        "licence": "MIT, (c) 2022 artisticat1. Its main.js embeds the TikZJax engine (LPPL-1.3c) and its styles.css the BaKoMa faces as data: URLs - THIRD_PARTY_LICENSES.md.",
+        "files": [
+          {
+            "name": "main.js",
+            "bytes": 7861284,
+            "sha256": "cbae1ad4362d44173e56ba512f01e65de1f7cc69a4bf4733bc5711a2de101f41",
+            "from": "https://github.com/artisticat1/obsidian-tikzjax/releases/download/0.5.2/main.js"
+          },
+          {
+            "name": "manifest.json",
+            "bytes": 261,
+            "sha256": "09fbbb05aeffc32bc65365d8526fc2222ee971417dcd4afddeb989498a5e1de1",
+            "from": "https://github.com/artisticat1/obsidian-tikzjax/releases/download/0.5.2/manifest.json"
+          },
+          {
+            "name": "styles.css",
+            "bytes": 4791190,
+            "sha256": "d9a7f741ec8fdcbe5e0145152c799238cee8df5a14ddc7dc9feb3bb835ce068d",
+            "from": "https://github.com/artisticat1/obsidian-tikzjax/releases/download/0.5.2/styles.css"
+          },
+          {
+            "name": "LICENSE.md",
+            "bytes": 1068,
+            "sha256": "f2cb60614f038ec0db9a04546c05cc72d6c68a2cdb39bce0a853b692a5739291",
+            "from": "https://raw.githubusercontent.com/artisticat1/obsidian-tikzjax/0.5.2/LICENSE.md"
+          }
+        ]
+      },
+      {
+        "kind": "functionplot",
+        "id": "obsidian-functionplot",
+        "name": "Functionplot",
+        "version": "1.2.1",
+        "releaseURL": "https://github.com/leonhma/obsidian-functionplot/releases/tag/1.2.1",
+        "licence": "MIT, (c) 2022 Leonhard Masche. Its main.js bundles function-plot (MIT). No longer in Obsidian's directory (figureFences.knownLimits), so Obsidian's updater never offers another version.",
+        "files": [
+          {
+            "name": "main.js",
+            "bytes": 220867,
+            "sha256": "8b490af5fd3015e15237dbaadbb98fcdf823a42086029527381e48c5080be43f",
+            "from": "https://github.com/leonhma/obsidian-functionplot/releases/download/1.2.1/main.js"
+          },
+          {
+            "name": "manifest.json",
+            "bytes": 287,
+            "sha256": "991ffea318c2483c4dd3eef2fdec47479d05dea8d04993becc2f74c186318195",
+            "from": "https://github.com/leonhma/obsidian-functionplot/releases/download/1.2.1/manifest.json"
+          },
+          {
+            "name": "LICENSE",
+            "bytes": 1072,
+            "sha256": "6e1b8deb29dc68d12c965b32600d1fe6089cee56dbb3b8662361296bcb221eed",
+            "from": "https://raw.githubusercontent.com/leonhma/obsidian-functionplot/1.2.1/LICENSE"
+          }
+        ]
+      }
+    ],
+    "carried": {
+      "rule": "The app carries every file above, licences included, and RE-HASHES the ones it is about to write against these pins before writing anything (a missing or mismatched file is refusedCarriedCopy). Nothing is ever downloaded when the teacher says yes: the functionplot repository is delisted and could disappear, a download fails offline and on school networks that block GitHub, and the cost is about 8 MB in the download. Not in support/: everything there is hashed into the website builder's image and mirrored into every working folder's .toolchain, and editor add-ons belong in neither.",
+      "mac": "Plantoir.app/Contents/Resources/obsidian-addons/<id>/<file>, fetched by mac-app/Vendor/fetch-obsidian-addons.sh from THESE pins (it carries none of its own) and required before `xcodegen generate`, like the other three fetches.",
+      "windows": "Owed: the same <id>/<file> folder beside the app, fetched by a Vendor script reading these pins."
+    },
+    "whichPages": {
+      "rule": "Which add-ons a course needs: the add-ons whose `kind` is the language of a figure fence on any `.md` page under the course folder - drafts, shared pages and every section, because Obsidian opens the whole course - found exactly as figureFences.fences finds them (a nested fence is not drawn, so it is not needed). Not read: anything inside a folder whose name starts with a dot (.obsidian, .trash, .merged_output), any file that is not `.md`, and a page the cloud has not downloaded (reading it would force the download; an iCloud page is skipped by its dataless flag). `files` is a course as paths relative to its folder; `needs` is in addOns order.",
+      "cases": [
+        {
+          "name": "a tikz fence on a section page",
+          "files": {
+            "Section 1/Unit 1/Lesson.md": "```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n"
+          },
+          "needs": [
+            "obsidian-tikzjax"
+          ]
+        },
+        {
+          "name": "a functionplot fence on a shared page",
+          "files": {
+            "Shared/Graphs.md": "Intro.\n\n```functionplot\ny = x^2\n```\n"
+          },
+          "needs": [
+            "obsidian-functionplot"
+          ]
+        },
+        {
+          "name": "both, on two pages",
+          "files": {
+            "a.md": "```functionplot\ny = x^2\n```\n",
+            "b/c.md": "```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n"
+          },
+          "needs": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ]
+        },
+        {
+          "name": "a page that is not published yet still counts",
+          "files": {
+            "Section 1/Draft.md": "---\ndraft: true\n---\n```functionplot\ny = x^2\n```\n"
+          },
+          "needs": [
+            "obsidian-functionplot"
+          ]
+        },
+        {
+          "name": "no figure fence",
+          "files": {
+            "index.md": "# Welcome\n\n```python\nprint(1)\n```\n"
+          },
+          "needs": []
+        },
+        {
+          "name": "the words alone are not a fence",
+          "files": {
+            "a.md": "We draw with tikz and functionplot.\n"
+          },
+          "needs": []
+        },
+        {
+          "name": "inside a folder whose name starts with a dot",
+          "files": {
+            ".trash/Old.md": "```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n",
+            ".obsidian/snippet.md": "```functionplot\ny = x^2\n```\n"
+          },
+          "needs": []
+        },
+        {
+          "name": "a fence inside a %% comment",
+          "files": {
+            "a.md": "%%\n```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n%%\n"
+          },
+          "needs": []
+        },
+        {
+          "name": "TikZ in capitals",
+          "files": {
+            "a.md": "```TikZ\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n"
+          },
+          "needs": []
+        },
+        {
+          "name": "only Markdown pages are read",
+          "files": {
+            "notes.txt": "```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n",
+            "Page.MD": "```functionplot\ny = x^2\n```\n"
+          },
+          "needs": [
+            "obsidian-functionplot"
+          ]
+        },
+        {
+          "name": "a fence after a second list marker is not drawn, so not needed",
+          "files": {
+            "a.md": "- - ```tikz\n    \\begin{document}\n    \\end{document}\n    ```\n"
+          },
+          "needs": []
+        },
+        {
+          "name": "opened on a bullet's own line",
+          "files": {
+            "a.md": "- ```tikz\n  \\begin{document}\n  \\end{document}\n  ```\n"
+          },
+          "needs": [
+            "obsidian-tikzjax"
+          ]
+        }
+      ]
+    },
+    "sequence": [
+      {
+        "step": 1,
+        "when": "the course is kept for reference",
+        "then": "as before #495: lock its pages again and, the first time, show the locked-pages note; never scan, never offer, never add"
+      },
+      {
+        "step": 2,
+        "when": "Obsidian is not installed, the answer is no, or Not Now was chosen earlier in this run",
+        "then": "open as before, without scanning"
+      },
+      {
+        "step": 3,
+        "then": "scan the course off the main thread (whichPages) and work out, without writing, which needed add-ons a pass would ADD (vaultCases); a second click on the same course while it scans does nothing"
+      },
+      {
+        "step": 4,
+        "when": "a pass would add nothing",
+        "then": "open"
+      },
+      {
+        "step": 5,
+        "when": "the vault Obsidian opens for this course is not the course itself (whichVaultOpens)",
+        "then": "open, and write trail.notTheVault once per course per run; nothing is offered or added (plan review S7)"
+      },
+      {
+        "step": 6,
+        "when": "the answer is notAsked",
+        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian. Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
+      },
+      {
+        "step": 7,
+        "when": "the answer is yes and the course is not open in Obsidian",
+        "then": "add them, then open"
+      },
+      {
+        "step": 8,
+        "when": "the answer is yes and the course is open in Obsidian",
+        "then": "ask wording.reopenTitle - unless Later was chosen for this course earlier in this run, then just open. Reopen: note the vaults open now (every one the registry marks open), quit Obsidian and wait; if Obsidian is still RUNNING (it did not close), write nothing and open; otherwise add them, open every vault that was open again and this course last. Later: open as it is; nothing is written"
+      }
+    ],
+    "answer": {
+      "note": "Stored app-wide (the mac's obsidianFigureAddOns preference). Anything unreadable reads as notAsked. Settings > Obsidian holds one toggle: on stores yes, off stores no, notAsked shows as off; turning it off adds nothing new and removes nothing already added.",
+      "values": [
+        "notAsked",
+        "yes",
+        "no"
+      ],
+      "default": "notAsked",
+      "cases": [
+        {
+          "stored": "yes",
+          "reads": "yes"
+        },
+        {
+          "stored": "no",
+          "reads": "no"
+        },
+        {
+          "stored": "notAsked",
+          "reads": "notAsked"
+        },
+        {
+          "stored": null,
+          "reads": "notAsked"
+        },
+        {
+          "stored": "",
+          "reads": "notAsked"
+        },
+        {
+          "stored": "Yes",
+          "reads": "notAsked"
+        },
+        {
+          "stored": "later",
+          "reads": "notAsked"
+        }
+      ],
+      "toggle": [
+        {
+          "on": true,
+          "stores": "yes"
+        },
+        {
+          "on": false,
+          "stores": "no"
+        }
+      ]
+    },
+    "offerCases": {
+      "note": "Open in Obsidian's decision (sequence), as data. `courseOpenInObsidian` means Obsidian is RUNNING and its registry marks the course open (or cannot be read while it runs - it is rewritten in place) - however many of its windows are on screen: a hidden, minimised, full-screen or other-Space Obsidian still holds the course's add-on list in memory (implementation review B1, measured on a hidden Obsidian with 16 vault windows and none on screen). Over-reporting is the safe direction. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
+      "cases": [
+        {
+          "name": "a reference course is never scanned",
+          "reference": true,
+          "obsidianInstalled": true,
+          "answer": "notAsked",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": false,
+          "decision": "justOpen"
+        },
+        {
+          "name": "a reference course with the answer yes",
+          "reference": true,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": false,
+          "decision": "justOpen"
+        },
+        {
+          "name": "no Obsidian",
+          "reference": false,
+          "obsidianInstalled": false,
+          "answer": "notAsked",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": false,
+          "decision": "justOpen"
+        },
+        {
+          "name": "the answer is no",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "no",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": false,
+          "decision": "justOpen"
+        },
+        {
+          "name": "Not Now earlier in this run",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "notAsked",
+          "suppressedThisRun": true,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": false,
+          "decision": "justOpen"
+        },
+        {
+          "name": "Not Now does not stop a yes given since",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "suppressedThisRun": true,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "installThenOpen"
+        },
+        {
+          "name": "nothing to add",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "notAsked",
+          "suppressedThisRun": false,
+          "wouldAdd": false,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "justOpen"
+        },
+        {
+          "name": "nothing to add, the answer yes",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "suppressedThisRun": false,
+          "wouldAdd": false,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "justOpen"
+        },
+        {
+          "name": "needs them, not asked yet",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "notAsked",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "offer"
+        },
+        {
+          "name": "needs them, not asked yet, open in Obsidian",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "notAsked",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": true,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "offerWhileOpen"
+        },
+        {
+          "name": "Obsidian opens a larger vault holding the course",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "notAsked",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": false,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "notTheVault"
+        },
+        {
+          "name": "a larger vault, the answer yes",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": false,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "notTheVault"
+        },
+        {
+          "name": "the answer yes, not open in Obsidian",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "installThenOpen"
+        },
+        {
+          "name": "the answer yes, open in Obsidian",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": true,
+          "reopenDeclinedThisRun": false,
+          "scans": true,
+          "decision": "askReopen"
+        },
+        {
+          "name": "the answer yes, open in Obsidian, Later earlier in this run",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "suppressedThisRun": false,
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": true,
+          "reopenDeclinedThisRun": true,
+          "scans": true,
+          "decision": "justOpen"
+        }
+      ]
+    },
+    "previewCases": {
+      "note": "The second trigger: a section's preview has shown a fresh build. `courseOpenInObsidian` as in offerCases: running, and marked open in the registry, windows never counted. Nothing is ever shown to the teacher; a pass that adds something writes trail.pass. `decision` is nothing or install.",
+      "cases": [
+        {
+          "name": "the answer yes, the course needs them",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "decision": "install"
+        },
+        {
+          "name": "not asked yet",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "notAsked",
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "decision": "nothing"
+        },
+        {
+          "name": "the answer no",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "no",
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "decision": "nothing"
+        },
+        {
+          "name": "a reference course",
+          "reference": true,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "decision": "nothing"
+        },
+        {
+          "name": "no Obsidian",
+          "reference": false,
+          "obsidianInstalled": false,
+          "answer": "yes",
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "decision": "nothing"
+        },
+        {
+          "name": "nothing to add",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "wouldAdd": false,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": false,
+          "decision": "nothing"
+        },
+        {
+          "name": "a larger vault holds the course",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "wouldAdd": true,
+          "vaultIsTheCourse": false,
+          "courseOpenInObsidian": false,
+          "decision": "nothing"
+        },
+        {
+          "name": "open in Obsidian: never written into",
+          "reference": false,
+          "obsidianInstalled": true,
+          "answer": "yes",
+          "wouldAdd": true,
+          "vaultIsTheCourse": true,
+          "courseOpenInObsidian": true,
+          "decision": "nothing"
+        }
+      ]
+    },
+    "whichVaultOpens": {
+      "rule": "The vault Obsidian opens for a path is the LONGEST registered vault path that is the path or holds it (path + \"/\" prefix; read from Obsidian 1.13.7's main.js); none means Plantoir registers the course itself, which is the course. `target` is what Open in Obsidian hands Obsidian (a section's index.md, or the course).",
+      "cases": [
+        {
+          "name": "nothing registered",
+          "vaults": [],
+          "course": "/w/courses/MPM2D",
+          "target": "/w/courses/MPM2D",
+          "opens": null,
+          "isTheCourse": true
+        },
+        {
+          "name": "the course is registered",
+          "vaults": [
+            "/w/courses/MPM2D"
+          ],
+          "course": "/w/courses/MPM2D",
+          "target": "/w/courses/MPM2D/Section 1/index.md",
+          "opens": "/w/courses/MPM2D",
+          "isTheCourse": true
+        },
+        {
+          "name": "only the folder of courses is registered",
+          "vaults": [
+            "/w/courses"
+          ],
+          "course": "/w/courses/MPM2D",
+          "target": "/w/courses/MPM2D",
+          "opens": "/w/courses",
+          "isTheCourse": false
+        },
+        {
+          "name": "both: the longer wins",
+          "vaults": [
+            "/w/courses",
+            "/w/courses/MPM2D"
+          ],
+          "course": "/w/courses/MPM2D",
+          "target": "/w/courses/MPM2D/Section 1/index.md",
+          "opens": "/w/courses/MPM2D",
+          "isTheCourse": true
+        },
+        {
+          "name": "a section registered on its own",
+          "vaults": [
+            "/w/courses/MPM2D/Section 1"
+          ],
+          "course": "/w/courses/MPM2D",
+          "target": "/w/courses/MPM2D/Section 1/index.md",
+          "opens": "/w/courses/MPM2D/Section 1",
+          "isTheCourse": false
+        },
+        {
+          "name": "a name that only starts the same",
+          "vaults": [
+            "/w/courses/MPM2D-old"
+          ],
+          "course": "/w/courses/MPM2D",
+          "target": "/w/courses/MPM2D",
+          "opens": null,
+          "isTheCourse": true
+        }
+      ]
+    },
+    "vaultCases": {
+      "note": "What one pass writes (the install order: links, carried copy, defaults, list, then each add-on), as data. `before.settings`: absent | present (with app.json) | presentWithoutAppJson | link. `before.plugins`: link, when `.obsidian/plugins` is a link; readOnly, when it is a folder nobody may write in. `before.list`: the text of community-plugins.json, or null for no file. `before.addOns`: what is at plugins/<id> - {version, marker} (manifest.json says version; marker is Plantoir's .plantoir file), {manifest: \"unreadable\", marker}, or \"file\" (not a folder). `before.partial`: ids with a leftover <id>.plantoir-partial. `carried`: ok | mismatch. `defaults`: ok | missing (the bundled course defaults). `outcomes`: per id, an Outcome name, with `:<version>` for the left-alone ones. `listAfter`: the list's text after the pass, or null for no file. `written`: ids whose folder holds the carried files and the marker after the pass. Unless a case says otherwise: settings present, list null, no add-ons, carried ok, defaults ok.",
+      "outcomeNames": [
+        "added",
+        "alreadyThere",
+        "alreadyThereSwitchedOff",
+        "leftAloneTheirs",
+        "leftAloneOtherVersion",
+        "leftAloneUnreadable",
+        "refusedListUnreadable",
+        "refusedLink",
+        "refusedCarriedCopy",
+        "refusedSettingsNotSeeded",
+        "couldNotWrite"
+      ],
+      "cases": [
+        {
+          "name": "no Obsidian settings yet: the course defaults come first",
+          "needs": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ],
+          "before": {
+            "settings": "absent"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "added",
+            "obsidian-functionplot": "added"
+          },
+          "listAfter": "[\n  \"obsidian-tikzjax\",\n  \"obsidian-functionplot\"\n]",
+          "written": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ],
+          "seeded": true
+        },
+        {
+          "name": "the defaults cannot be copied: nothing is written",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "settings": "absent"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "refusedSettingsNotSeeded"
+          },
+          "listAfter": null,
+          "defaults": "missing",
+          "written": []
+        },
+        {
+          "name": "settings without app.json: nothing is written",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "settings": "presentWithoutAppJson"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "refusedSettingsNotSeeded"
+          },
+          "listAfter": null,
+          "written": []
+        },
+        {
+          "name": "only what the course uses",
+          "needs": [
+            "obsidian-functionplot"
+          ],
+          "before": {},
+          "outcomes": {
+            "obsidian-functionplot": "added"
+          },
+          "listAfter": "[\n  \"obsidian-functionplot\"\n]",
+          "written": [
+            "obsidian-functionplot"
+          ]
+        },
+        {
+          "name": "an empty list",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "[]"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "added"
+          },
+          "listAfter": "[\n  \"obsidian-tikzjax\"\n]",
+          "written": [
+            "obsidian-tikzjax"
+          ]
+        },
+        {
+          "name": "the teacher's list keeps its ids and their order",
+          "needs": [
+            "obsidian-functionplot"
+          ],
+          "before": {
+            "list": "[\"dataview\",\"calendar\"]"
+          },
+          "outcomes": {
+            "obsidian-functionplot": "added"
+          },
+          "listAfter": "[\n  \"dataview\",\n  \"calendar\",\n  \"obsidian-functionplot\"\n]",
+          "written": [
+            "obsidian-functionplot"
+          ]
+        },
+        {
+          "name": "an id listed already is not listed twice",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "[\"obsidian-tikzjax\"]"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "added"
+          },
+          "listAfter": "[\"obsidian-tikzjax\"]",
+          "written": [
+            "obsidian-tikzjax"
+          ]
+        },
+        {
+          "name": "Plantoir's copy, listed: nothing changes",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "[\n  \"obsidian-tikzjax\"\n]",
+            "addOns": {
+              "obsidian-tikzjax": {
+                "version": "0.5.2",
+                "marker": true
+              }
+            }
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "alreadyThere"
+          },
+          "listAfter": "[\n  \"obsidian-tikzjax\"\n]"
+        },
+        {
+          "name": "Plantoir's copy switched off in Obsidian stays off",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "[]",
+            "addOns": {
+              "obsidian-tikzjax": {
+                "version": "0.5.2",
+                "marker": true
+              }
+            }
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "alreadyThereSwitchedOff"
+          },
+          "listAfter": "[]"
+        },
+        {
+          "name": "the teacher's own copy is left alone",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "[]",
+            "addOns": {
+              "obsidian-tikzjax": {
+                "version": "0.5.2",
+                "marker": false
+              }
+            }
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "leftAloneTheirs:0.5.2"
+          },
+          "listAfter": "[]"
+        },
+        {
+          "name": "the teacher's own copy at another version",
+          "needs": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ],
+          "before": {
+            "addOns": {
+              "obsidian-tikzjax": {
+                "version": "0.6.0",
+                "marker": false
+              }
+            }
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "leftAloneTheirs:0.6.0",
+            "obsidian-functionplot": "added"
+          },
+          "listAfter": "[\n  \"obsidian-functionplot\"\n]",
+          "written": [
+            "obsidian-functionplot"
+          ]
+        },
+        {
+          "name": "Plantoir's copy that Obsidian updated is never downgraded",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "[\n  \"obsidian-tikzjax\"\n]",
+            "addOns": {
+              "obsidian-tikzjax": {
+                "version": "0.6.0",
+                "marker": true
+              }
+            }
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "leftAloneOtherVersion:0.6.0"
+          },
+          "listAfter": "[\n  \"obsidian-tikzjax\"\n]"
+        },
+        {
+          "name": "a manifest that cannot be read, without the marker",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "addOns": {
+              "obsidian-tikzjax": {
+                "manifest": "unreadable",
+                "marker": false
+              }
+            }
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "leftAloneUnreadable"
+          },
+          "listAfter": null
+        },
+        {
+          "name": "not a folder at the add-on's place",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "addOns": {
+              "obsidian-tikzjax": "file"
+            }
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "leftAloneUnreadable"
+          },
+          "listAfter": null
+        },
+        {
+          "name": "Plantoir's unfinished copy (marker, no manifest) is replaced",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "[\n  \"obsidian-tikzjax\"\n]",
+            "addOns": {
+              "obsidian-tikzjax": {
+                "manifest": "unreadable",
+                "marker": true
+              }
+            }
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "added"
+          },
+          "listAfter": "[\n  \"obsidian-tikzjax\"\n]",
+          "written": [
+            "obsidian-tikzjax"
+          ]
+        },
+        {
+          "name": "a leftover partial folder is removed first",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "partial": [
+              "obsidian-tikzjax"
+            ]
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "added"
+          },
+          "listAfter": "[\n  \"obsidian-tikzjax\"\n]",
+          "written": [
+            "obsidian-tikzjax"
+          ],
+          "partialAfter": []
+        },
+        {
+          "name": "a list that is not JSON: nothing at all is written",
+          "needs": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ],
+          "before": {
+            "list": "[\"dataview\","
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "refusedListUnreadable",
+            "obsidian-functionplot": "refusedListUnreadable"
+          },
+          "listAfter": "[\"dataview\",",
+          "written": []
+        },
+        {
+          "name": "a list that is an object",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "{\"dataview\": true}"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "refusedListUnreadable"
+          },
+          "listAfter": "{\"dataview\": true}",
+          "written": []
+        },
+        {
+          "name": "a list with a member that is not text",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "list": "[\"dataview\", 1]"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "refusedListUnreadable"
+          },
+          "listAfter": "[\"dataview\", 1]",
+          "written": []
+        },
+        {
+          "name": "Obsidian's settings folder is a link",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "settings": "link"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "refusedLink"
+          },
+          "listAfter": null,
+          "written": []
+        },
+        {
+          "name": "the add-ons folder is a link",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {
+            "plugins": "link"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "refusedLink"
+          },
+          "listAfter": null,
+          "written": []
+        },
+        {
+          "name": "the carried copy does not match its pin",
+          "needs": [
+            "obsidian-tikzjax"
+          ],
+          "before": {},
+          "outcomes": {
+            "obsidian-tikzjax": "refusedCarriedCopy"
+          },
+          "listAfter": null,
+          "carried": "mismatch",
+          "written": []
+        },
+        {
+          "name": "a write fails: the list is written, the add-ons are not",
+          "needs": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ],
+          "before": {
+            "plugins": "readOnly"
+          },
+          "outcomes": {
+            "obsidian-tikzjax": "couldNotWrite",
+            "obsidian-functionplot": "couldNotWrite"
+          },
+          "listAfter": "[\n  \"obsidian-tikzjax\",\n  \"obsidian-functionplot\"\n]",
+          "written": [],
+          "why": "Implementation review N2, measured with a read-only .obsidian/plugins. Harmless: Obsidian 1.13.7's initialize returns before the trust question when no manifest loads, so a listed id with no folder asks nothing, and the next pass adds it."
+        }
+      ]
+    },
+    "listCases": {
+      "note": "community-plugins.json, as data: `list` is its text (null: no file), `adding` the ids a pass adds, `after` the text written, \"unchanged\" (the file is not touched) or \"refused\" (never overwritten - and then the pass writes nothing at all). Written as Obsidian writes it: JSON.stringify(ids, undefined, 2), no newline at the end (Obsidian 1.13.7's writeConfigJson); Obsidian rewrites the list on every trusted load, so \"a second pass changes no byte\" is a promise about Plantoir's writes only.",
+      "cases": [
+        {
+          "name": "no file yet",
+          "list": null,
+          "adding": [
+            "obsidian-tikzjax"
+          ],
+          "after": "[\n  \"obsidian-tikzjax\"\n]"
+        },
+        {
+          "name": "an empty list",
+          "list": "[]",
+          "adding": [
+            "obsidian-tikzjax"
+          ],
+          "after": "[\n  \"obsidian-tikzjax\"\n]"
+        },
+        {
+          "name": "two at once, in order",
+          "list": null,
+          "adding": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ],
+          "after": "[\n  \"obsidian-tikzjax\",\n  \"obsidian-functionplot\"\n]"
+        },
+        {
+          "name": "the teacher's ids keep their order",
+          "list": "[\"dataview\",\"calendar\"]",
+          "adding": [
+            "obsidian-functionplot"
+          ],
+          "after": "[\n  \"dataview\",\n  \"calendar\",\n  \"obsidian-functionplot\"\n]"
+        },
+        {
+          "name": "listed already",
+          "list": "[\n  \"obsidian-tikzjax\"\n]",
+          "adding": [
+            "obsidian-tikzjax"
+          ],
+          "after": "unchanged"
+        },
+        {
+          "name": "one listed, one not",
+          "list": "[\n  \"obsidian-functionplot\"\n]",
+          "adding": [
+            "obsidian-tikzjax",
+            "obsidian-functionplot"
+          ],
+          "after": "[\n  \"obsidian-functionplot\",\n  \"obsidian-tikzjax\"\n]"
+        },
+        {
+          "name": "not JSON",
+          "list": "[\"dataview\",",
+          "adding": [
+            "obsidian-tikzjax"
+          ],
+          "after": "refused"
+        },
+        {
+          "name": "an object",
+          "list": "{\"dataview\": true}",
+          "adding": [
+            "obsidian-tikzjax"
+          ],
+          "after": "refused"
+        },
+        {
+          "name": "a member that is not text",
+          "list": "[\"dataview\", 1]",
+          "adding": [
+            "obsidian-tikzjax"
+          ],
+          "after": "refused"
+        },
+        {
+          "name": "null",
+          "list": "null",
+          "adding": [
+            "obsidian-tikzjax"
+          ],
+          "after": "refused"
+        },
+        {
+          "name": "an empty file",
+          "list": "",
+          "adding": [
+            "obsidian-tikzjax"
+          ],
+          "after": "refused"
+        }
+      ]
+    },
+    "sidecar": {
+      "name": ".plantoir",
+      "text": "{\"addedBy\":\"Plantoir\",\"version\":\"{version}\"}",
+      "partialSuffix": ".plantoir-partial",
+      "why": "The marker is how Plantoir tells its own add-on from the teacher's: it never writes over a folder without one, never re-lists one switched off, and leaves only folders WITH one out of backups. The same bytes every pass, so a second pass changes nothing. Obsidian reads only manifest.json, main.js and styles.css from the folder, Sync's add-on file list leaves the marker out, and build_site skips .obsidian, so nobody else ever sees it. A folder is written as <id>.plantoir-partial (every file but manifest.json, with the marker), renamed to <id>, and manifest.json goes in last: Obsidian ignores a folder without a manifest, so a pass stopped at any point leaves nothing Obsidian loads half-written, and the next pass replaces it."
+    },
+    "backups": {
+      "rule": "A backup of a course leaves out every folder under .obsidian/plugins that carries the marker - about 12.9 MB per course - and keeps the teacher's own add-ons and the list. A restored course gets them back at the next pass on a computer whose answer is yes. Every writer that zips a whole course does this: the mac's CourseArchiver (backups and archives), and the setup wizard's own backup (setup_course.backup_existing_course_dir). Windows owes it in its archiver.",
+      "cases": [
+        {
+          "name": "Plantoir's add-on is left out, the teacher's own is kept",
+          "plugins": {
+            "obsidian-tikzjax": {
+              "marker": true
+            },
+            "dataview": {
+              "marker": false
+            }
+          },
+          "inZip": [
+            ".obsidian/community-plugins.json",
+            ".obsidian/plugins/dataview/main.js"
+          ],
+          "notInZip": [
+            ".obsidian/plugins/obsidian-tikzjax/main.js",
+            ".obsidian/plugins/obsidian-tikzjax/.plantoir"
+          ]
+        },
+        {
+          "name": "a half-written copy is Plantoir's too",
+          "plugins": {
+            "obsidian-functionplot.plantoir-partial": {
+              "marker": true
+            }
+          },
+          "inZip": [
+            ".obsidian/community-plugins.json"
+          ],
+          "notInZip": [
+            ".obsidian/plugins/obsidian-functionplot.plantoir-partial/main.js"
+          ]
+        }
+      ]
+    },
+    "referenceCopies": {
+      "rule": "A reference copy (#255) already leaves .obsidian/plugins and community-plugins.json behind on every route, and still does. Plantoir's own add-ons are not a reason to tell the teacher their add-ons were left behind (ObsidianAddOns.found keeps them apart, by the marker): the teacher did not choose them. The trail line still names them: \"Plantoir's add-ons for diagrams and graphs left behind (obsidian-tikzjax)\". A reference course is never scanned and never gets them, so its figure fences show as code in Obsidian; the site draws them."
+    },
+    "wording": {
+      "note": "English, as data. {course} is the course's code. Obsidian's own labels are quoted exactly as Obsidian 1.13.7 shows them in English (its i18n.js), and only inside quotation marks: rule 1's ban (plugin, vault, json, folder, script, toolchain, cannot, and the machinery) applies to everything outside them. Obsidian puts the trust question's focus on \"Browse vault in Restricted Mode\", so Return chooses it; after \"Trust author and enable plugins\" Obsidian opens Settings > Community plugins by itself.",
+      "offerTitle": "Show diagrams and graphs in Obsidian too?",
+      "offerMessage": "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Return chooses the other button. Obsidian then opens its settings to show the add-ons switched on; close them to go on writing.",
+      "offerWhileOpen": "{course} is open in Obsidian now, so Obsidian closes and opens it again to show them. What you've written is kept.",
+      "offerAdd": "Add Them",
+      "offerNotNow": "Not Now",
+      "dontAskAgain": "Don't ask again",
+      "reopenTitle": "Reopen Obsidian to show diagrams and graphs?",
+      "reopenMessage": "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”.",
+      "reopen": "Reopen Obsidian",
+      "later": "Later",
+      "paneTitle": "Obsidian",
+      "settingLabel": "Add the add-ons that draw diagrams and graphs to courses that have them",
+      "settingFooter": "Plantoir adds them when you open such a course in Obsidian from Plantoir, and after you preview it. The first time each course opens with them, Obsidian asks whether you trust its author: click “Trust author and enable plugins” — pressing Return chooses “Browse vault in Restricted Mode”. If a course still shows a drawing's text, open Obsidian's Settings ▸ “Community plugins” and click “Exit Restricted mode”. Turning this off adds nothing new and leaves what was added in place."
+    },
+    "windowsWording": {
+      "note": "Where Windows says it differently: the key is Enter, and the menu path is written with Windows' own separator if it has one. Every other key reads as `wording`.",
+      "offerMessage": "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Enter chooses the other button. Obsidian then opens its settings to show the add-ons switched on; close them to go on writing.",
+      "settingFooter": "Plantoir adds them when you open such a course in Obsidian from Plantoir, and after you preview it. The first time each course opens with them, Obsidian asks whether you trust its author: click “Trust author and enable plugins” — pressing Enter chooses “Browse vault in Restricted Mode”. If a course still shows a drawing's text, open Obsidian's Settings ▸ “Community plugins” and click “Exit Restricted mode”. Turning this off adds nothing new and leaves what was added in place."
+    },
+    "trail": {
+      "note": "The four activityTrail.mustRecord events' words. Add-ons by name and version, never a page's words. A pass line is written when something was added, and otherwise at most once per course per run (a refusal, a left-alone, a failed write - plan review N4); a pass where every add-on is simply already there writes nothing.",
+      "offered": {
+        "addThem": "{course} · asked to add Obsidian's add-ons for diagrams and graphs — Add Them",
+        "notNow": "{course} · asked to add Obsidian's add-ons for diagrams and graphs — Not Now",
+        "notNowDontAskAgain": "{course} · asked to add Obsidian's add-ons for diagrams and graphs — Not Now, don't ask again"
+      },
+      "notTheVault": "{course} · did not offer Obsidian's add-ons for diagrams and graphs: Obsidian opens this course as part of a larger vault, which never reads the course's own settings",
+      "pass": {
+        "shape": "{course} · Obsidian add-ons for diagrams and graphs ({trigger}): {part}; {part}",
+        "triggers": {
+          "openInObsidian": "at Open in Obsidian",
+          "afterAPreview": "after a preview",
+          "afterReopening": "after reopening Obsidian"
+        },
+        "parts": {
+          "added": "{name} {pinned} added",
+          "alreadyThere": "{name} {pinned} already there",
+          "alreadyThereSwitchedOff": "{name} {pinned} already there and switched off in Obsidian, so left off",
+          "leftAloneTheirs": "{name} left alone (the teacher's own copy, {version})",
+          "leftAloneOtherVersion": "{name} left alone ({version}, not the {pinned} Plantoir added)",
+          "leftAloneUnreadable": "{name} left alone (what is there could not be read)",
+          "couldNotWrite": "{name} could not be added: {reason}"
+        },
+        "refusals": {
+          "refusedListUnreadable": "nothing added: Obsidian's list of add-ons could not be read",
+          "refusedLink": "nothing added: Obsidian's settings folder or its add-ons folder is a link",
+          "refusedCarriedCopy": "nothing added: this copy of Plantoir's add-ons is missing or does not match",
+          "refusedSettingsNotSeeded": "nothing added: Obsidian's settings for the course could not be set up first"
+        },
+        "refusalShape": "{course} · Obsidian add-ons for diagrams and graphs ({trigger}): {refusal}",
+        "example": "MPM2D · Obsidian add-ons for diagrams and graphs (at Open in Obsidian): TikZJax 0.5.2 added; Functionplot 1.2.1 already there"
+      },
+      "reopened": {
+        "reopened": "{course} · reopened Obsidian to show the add-ons for diagrams and graphs",
+        "later": "{course} · chose Later: Obsidian was not reopened and its add-ons for diagrams and graphs were not added",
+        "didNotClose": "{course} · Obsidian did not close, so its add-ons for diagrams and graphs were not added"
+      },
+      "settingChanged": {
+        "on": "Settings ▸ Obsidian — add-ons for diagrams and graphs on",
+        "off": "Settings ▸ Obsidian — add-ons for diagrams and graphs off"
+      }
+    },
+    "knownLimits": [
+      "One trust question per course: Obsidian keeps the answer per vault, in its own storage, so six courses with figures mean six clicks on “Trust author and enable plugins”.",
+      "A teacher who chose “Browse vault in Restricted Mode” (Obsidian asks again on every open until they trust) or later turned Restricted mode back on in Obsidian sees the fences as code; Plantoir cannot see either, since the answer is in Obsidian's own storage.",
+      "Obsidian's labels are quoted in English; an Obsidian set to another language shows its own.",
+      "A course inside a larger vault (a teacher who opened the folder of courses as one vault) gets nothing: that vault never reads the course's own settings. Nothing is offered, and the trail says why.",
+      "A page the cloud has not downloaded is not read, so a course whose only figure page is still in the cloud is offered nothing until the page is downloaded.",
+      "Obsidian Sync carries about 12.9 MB per course to other devices if the teacher turned on its add-on categories; the add-ons say they run on iPad too (isDesktopOnly false), which was not tried.",
+      "If Obsidian updates TikZJax, Plantoir leaves the newer copy alone, and Obsidian may then draw a diagram differently from the site, whose engine stays the one TikZJax 0.5.2 carries.",
+      "A restored backup has the list and not the folders; the next pass on a computer whose answer is yes adds them back - switched on, even if the teacher had switched one off before the backup."
+    ],
+    "rejected": [
+      "Writing Obsidian's trust answer (enable-plugin-<appId>) into its LevelDB storage: Obsidian-internal, unsafe while Obsidian runs, and it removes a security question the teacher should answer.",
+      "Turning on Obsidian's command-line interface (\"cli\": true in its registry) to run plugins:restrict off: it changes a global preference the teacher did not choose to get round the same question.",
+      "Putting the add-ons in support/obsidian_defaults: every course would get code it does not use, and the trust question with it - #255's reasoning reversed.",
+      "Downloading the add-ons when the teacher says yes: fails offline and on school networks, and the functionplot repository could disappear (carried).",
+      "Asking at course creation, in Course Settings, after a preview, or through an assistant: Open in Obsidian is the moment the question means something, and asking before Obsidian opens means no reopen in the common case. No assistant tool or schema changes.",
+      "A marker printed by the build saying which kinds a course uses: the build sees one section's student-visible pages, the vault is the whole course; a scan works at Open in Obsidian with no preview ever run.",
+      "Writing into a course while it is open in Obsidian: Obsidian writes its in-memory list back on every add-on switch and drops the new id, and the marker would then read as the teacher switching it off - so the preview pass waits and Open in Obsidian asks to reopen.",
+      "Re-enabling an add-on the teacher switched off, writing over the teacher's own copy, or downgrading one Obsidian updated."
     ]
   }
 }

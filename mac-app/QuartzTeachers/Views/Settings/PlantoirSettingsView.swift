@@ -11,7 +11,8 @@ import SwiftUI
 /// answer in one list, and the teacher would have to work out which was which
 /// every time they opened it.
 ///
-/// **Three panes since #504 — Assistant, Preview and Deploying.** Two panes,
+/// **Four panes since #495 — Assistant, Preview, Obsidian and Deploying.**
+/// Three panes since #504 — Assistant, Preview and Deploying. Two panes,
 /// Assistant and Deploying, in a `TabView` since the HIG sweep
 /// (#457 item 4; Russell, 2026-10-08: the Cloudflare Account ID moves here).
 /// Until then this was one pane with NO `TabView`, and that was a decision:
@@ -49,6 +50,14 @@ struct PlantoirSettingsView: View {
                     Label(PreviewStartPageWording.paneTitle, systemImage: "play.rectangle")
                 }
                 .tag(SettingsPane.preview.rawValue)
+            // Obsidian's add-ons for diagrams and graphs (#495): after
+            // Preview, the one way back from "Don't ask again".
+            ObsidianSettingsView()
+                .frame(minHeight: 220)
+                .tabItem {
+                    Label(ObsidianFigureAddOnsWording.paneTitle, systemImage: "square.and.pencil")
+                }
+                .tag(SettingsPane.obsidian.rawValue)
             DeployingSettingsView()
                 .frame(minHeight: 240)
                 .tabItem {

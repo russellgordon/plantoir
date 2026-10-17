@@ -1195,13 +1195,22 @@ script's and the styles' size; a site without figures carries neither
 
 Write ` ```functionplot ` for a graph students can explore and ` ```tikz `
 for a precise diagram; preview, and anything that cannot be drawn is named
-with its page and line. In Obsidian, a TikZ fence shows as a picture only
-with the community plugin **TikZJax** installed (Plantoir does not install
-it yet — #495); the functionplot plugin is no longer in Obsidian's plugin
-directory (review S1, checked 2026-10-09 against `community-plugins.json`
-and the removed list), so there a graph shows as its text — the site draws
-it. The skill `plantoir-math-graphs` (support/agent_guidance) carries the
-whole syntax for an assistant.
+with its page and line. In Obsidian, a fence shows as a picture only with
+its add-on installed and switched on in that course: **TikZJax** for
+` ```tikz `, and **Functionplot** 1.2.1 for ` ```functionplot ` — which is no
+longer in Obsidian's plugin directory (review S1, checked 2026-10-09 against
+`community-plugins.json` and the removed list), so it cannot be installed
+from Obsidian itself. Without them the fence shows as its text; the site
+draws it either way. **On the Mac, Plantoir carries both and offers to add
+them** when a course with figures is opened in Obsidian from Plantoir (#495,
+09 → "Obsidian's add-ons for diagrams and graphs (#495)"); Obsidian then asks
+once per course whether the teacher trusts its author — "Trust author and
+enable plugins". On Windows, until its issue lands, TikZJax comes from
+Obsidian's directory and functionplot fences stay text in Obsidian. If
+Obsidian updates TikZJax past 0.5.2, a diagram may draw differently there
+from the site, whose engine is 0.5.2's (`obsidianAddOnsForFigures.knownLimits`).
+The skill `plantoir-math-graphs` (support/agent_guidance) carries the whole
+syntax for an assistant.
 
 **Rejected** (with the reasons in 05 and 02): TikZJax in the browser;
 `<img>` SVGs; every Computer Modern face on every site (140 faces, 20–33 KB

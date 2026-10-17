@@ -114,11 +114,13 @@ let the diff tell you what to list rather than your memory of the afternoon.
 
 ### 4. Run the tests, and read what they say
 
-A new clone or worktree needs the three vendored folders first —
-`mac-app/Vendor/fetch-llama.sh`, `fetch-sparkle.sh` and, since #312,
+A new clone or worktree needs the four vendored folders first —
+`mac-app/Vendor/fetch-llama.sh`, `fetch-sparkle.sh`, since #312
 `fetch-helpers.sh` (~470 MB the first time on a Mac; its cache lives outside
-the repository, so later worktrees take seconds) — or `xcodegen generate`
-fails ("Setting up on a new machine" in CLAUDE.md).
+the repository, so later worktrees take seconds) and, since #495,
+`fetch-obsidian-addons.sh` (12.9 MB, pinned in the contract, cached the same
+way) — or `xcodegen generate` fails ("Setting up on a new machine" in
+CLAUDE.md).
 
 ```bash
 cd mac-app && xcodegen generate && \
