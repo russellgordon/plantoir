@@ -4030,7 +4030,12 @@ undo list's depth moved, the change it would take back moved, or
 the last change back" when its entry came off the list, and "took part of the
 last change back" when files went back but the entry stayed because others
 were edited since (Undo can be pressed again; the director's ruling L2 — the
-contract's `ran from a menu` `carries` names this ending). The counter covers
+contract's `ran from a menu` `carries` names this ending). Since #555 a second
+press, once the teacher has set the edited page back, finds the first page
+already back, takes the entry off and ends "took the last change back"
+(`testASecondUndoAfterThePageIsSetBackTakesTheChangeOff`); the three endings
+are `SectionVerbs.undoEnding`, so the contract's `undoFiles.presses` rows can
+name one per press. The counter covers
 EVERY path that writes files without adding an entry, each pinned in
 `SectionVerbsEndingTests`:
 - **Make Room for Classes** (no entry, on purpose — `makingRoomCannotBeUndone`),
@@ -4960,6 +4965,71 @@ It has one property worth copying exactly: before restoring a file it
 compares what is on disk to what it wrote, and **skips anything the teacher
 has edited since**. Publishing a class, then spending ten minutes writing it
 in Obsidian, then saying "undo that" must not cost those ten minutes.
+
+### Three verdicts, not two: a file that is already back (#555, 2026-10-17)
+
+Until #555 the rule had two outcomes: a file that still held what the change
+left was put back, and ANYTHING else was skipped — and a change with a
+skipped file stayed on the list. A file an earlier press had already put back
+holds the copy from BEFORE, which is not what the change left, so it was
+skipped too. Once one press had taken a change back in part (one page put
+back, an edited one left alone), the change could never come off the list:
+the teacher set the edited page back, pressed Undo again, and was told the
+page they had already got back "has been edited since". Measured on
+`origin/dev` 1a52f3a45: the second press of `SectionVerbsEndingTests`' partial
+undo ended "took part of the last change back" with the entry still there.
+
+Every file now gets ONE verdict, `AssistUndoVerdict.of` in
+`AssistChangeHistory.swift`, and the rows are `contracts/assist-cases.json` →
+`undoFiles.files`:
+
+- **alreadyBack** — the disk holds the copy from before. Nothing is written,
+  it is NOT counted as put back (`AssistUndoResult.restored` still means
+  "written by this press", so the trail's counts, the start-of-year
+  `putBack` count and `writesWithNoNewUndoEntry` stay true), and it does not
+  hold the change on the list.
+- **putBack** — the disk holds what the change left; the copy from before is
+  written back, or a created page removed.
+- **leftAlone** — neither; the teacher's newer work. Nothing is written and
+  the change stays.
+
+Three details, each from the plan review, each a contract row:
+
+- **"No file" means NOTHING is at the path**, never "could not be read as
+  text". A folder or a non-UTF-8 file reads back as nil through
+  `String(contentsOf:)` exactly as an absent file does; treating that as gone
+  would call a created page that is still there "already back" and take the
+  change off with the page never removed. So an unreadable file matches
+  neither copy and is left alone. The same rule now applies to the source
+  half of a move (`after` nil): before #555 a non-UTF-8 file at that path
+  compared equal to nil and was WRITTEN OVER (measured by the must-fail run).
+- **Before is compared first.** It only matters when before equals after —
+  the all-absent row is the plain case — where nothing would be written;
+  comparing after first would try to remove a file that is not there, fail,
+  and hold the change on the list on every press.
+- **A modified page the teacher has since deleted stays leftAlone**, as it
+  was — decided, not an accident: the deletion is the teacher's newer work,
+  so the change waits for them.
+
+The runner's sentence is chosen in one place, `AssistUndoResult.answer`
+(raw values are the `AssistWording` keys the contract's `undoFiles.presses`
+rows name): every file back → `undid` (the change came off, whether this
+press wrote anything or not); something written and something left →
+`undidPartly`; nothing written and something left → `couldNotUndo`, which is
+also what a repeat press gets while a page is still edited (no new
+sentence). A press that only finds files already back still reaches step (c)
+of `undoLastChange`, so the preview comes back up; and an undo that wrote
+nothing now starts the preview it stopped at step (a) — until #555 those two
+refusals left a running preview down, and a repeat press always lands there
+(`AssistToolRunnerTests.testAnUndoThatFindsEveryFileAlreadyBack…`,
+`testAnUndoThatWritesNothingPutsThePreviewBackAsItWas`).
+
+**Rejected** (Russell chose option 2 of three in the issue): **option 1**,
+taking the change off after any press that wrote something — it silently
+throws away the undo of the page that is still edited, which is the thing the
+skip rule exists to protect; **option 3**, keeping the old rule and telling
+the teacher to use the backup — the change stays stuck on the list and every
+later press refuses, which is the fault reported.
 
 ### Which tools record an undo entry, and which deliberately do not
 
@@ -8092,7 +8162,10 @@ plan code, or every attempt is refused.
   sheet says so. Go and Put Them Back both refuse while this app is deploying
   the course. After that, the backup is the way back. **Not seen:** a deploy
   run by an outside assistant in another process, and `deploy.sh` run from a
-  terminal; the skip rule and the sheet's listing still hold then.
+  terminal; the skip rule and the sheet's listing still hold then. The sheet
+  sorts files by the undo's own verdict (`AssistUndoVerdict.of`, #555): a
+  page already as it was before is in neither list, so the sheet's count and
+  the finished undo's agree.
 - **The assistant window's** "undo that" (`AssistChangeHistory`) never holds
   this change and cannot take it back.
 
