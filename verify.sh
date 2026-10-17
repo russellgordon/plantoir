@@ -484,6 +484,17 @@ else
   cat /tmp/verify_page_features_test.log
 fi
 
+# Runnable Swift (#493): the key a block is cached by, the toolchain id, what
+# the launcher's plan writes and what the build's prepare gives the site and
+# says, and that the Swift image's recipe holds every pin and flag the
+# contract names. Stdlib only; the compiler itself is the Swift gate below.
+if (cd scripts && python3 test_swift_blocks.py) >/tmp/verify_swift_blocks_test.log 2>&1; then
+  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+else
+  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+  cat /tmp/verify_swift_blocks_test.log
+fi
+
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
 # and the latex.ts patch that links it; and (#455) the edits that wire
 # Plantoir's additions into a section's Quartz copy. Stdlib only.
