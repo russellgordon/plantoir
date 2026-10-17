@@ -142,8 +142,8 @@ in the editor.
   Firefox 114 or later. The first Run on a page loads Python (about 13 MB,
   once; about a second on a Mac on a good connection, longer on an iPad on
   school Wi-Fi); later Runs start at once. Once loaded it keeps working
-  without a connection until a program is stopped, another block runs, or
-  the page changes - then it needs the connection again (a few small checks
+  without a connection until a program is stopped, another block runs, its
+  output reaches the limit, or the page changes - then it needs the connection again (a few small checks
   with the site, not the whole download).
 - NOT from a site opened as files on a computer (a folder publish
   double-clicked): browsers run none of the page's scripts that way, so the

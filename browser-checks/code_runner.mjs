@@ -395,6 +395,9 @@ async function connect(chunk) {
           await evaluate(`(() => { window.__finishes = 0; window.__log = []; const status = window.__runner.block(${waiting}).querySelector(".plantoir-runner-status"); new MutationObserver((records) => { for (const record of records) for (const node of record.addedNodes) { window.__log.push(node.textContent); if (node.textContent === ${JSON.stringify(said("finished"))}) window.__finishes += 1 } }).observe(status, { childList: true, characterData: true, subtree: true }); return 1 })()`)
           // Give the waiting block's own view-watcher time to queue it.
           await pause(600)
+          // Still waiting at the press, or the case proves nothing.
+          const stillWaiting = await evaluate(`window.__runner.block(${waiting}).querySelector(".plantoir-runner-status").textContent === ""`)
+          expect("the waiting autorun is still waiting when Run is pressed", stillWaiting)
           await evaluate(`window.__runner.press(${waiting}, "run")`)
           await pause(12000)
           const finishes = await evaluate("window.__finishes")
