@@ -823,6 +823,45 @@ thing — a teacher wants to learn the one the site uses, not to adjudicate
 between them. Keep the honest warnings that are still true (display maths
 stays on one physical line; a bare `H_2O` comes out in variable italic).
 
+**Runnable Python is the convention for a payload that teaches Python**
+(#455, #561; ICS3U is the reference). A ```` ```python run ```` block is a
+program students edit and run in the browser; the page opts in with
+`codeRunner: true` on its own line after `publish: true`. The how-to is the
+`plantoir-runnable-code` skill (`support/agent_guidance/skills/`) — follow it,
+not memory. Judge EVERY block in context, top to bottom:
+
+- **`run`** — a complete program that prints something or reads input.
+  Exercises, Explorations, Tasks, Tutorials, Warm-Ups and the Style showcase:
+  the students' to change.
+- **`run readonly`** — the same, on a Concepts or Programs page, where the
+  block is a worked example to read.
+- **plain ```` ```python ````** — and say why in the judgement table:
+  a fragment that uses names it never defines or does not parse alone; a
+  block that shows nothing when run (definitions only, one `input()` line);
+  a block that reads a file it did not write first (each Run starts in a
+  fresh, empty folder — write before read in ONE block, or catch
+  `FileNotFoundError`); a multi-file import (`from toolbox import …`);
+  `breakpoint()`; a one-line print shown for its wording; a find-the-fault
+  question whose output would give the answer away.
+- `codeRunner: true` goes on every page with at least one run block and on no
+  other. Never `autorun`. No `stdin` flag where `input(` is visible — the
+  input box appears by itself. Standard library only.
+- A block that reads input: the page should show a sample run or say what to
+  type — an empty input box is `EOFError` on the first `input()`.
+- A block that ends in an error ON PURPOSE (a scope lesson's NameError, the
+  debugger tutorial's ZeroDivisionError) stays runnable; list it in
+  `lint_runnable.py` → `ENDS_IN_AN_ERROR` so a check that presses Run on
+  every block knows.
+- Prose that says "in the terminal" or "press Ctrl + C" beside a run block is
+  wrong on the site: a loop that prints is stopped by the page at 100,000
+  characters (well under a second, measured), one that prints nothing by
+  **Stop**. Tracebacks name `main.py`, not the file the prose names.
+- On a page already in use, new run blocks go AFTER the existing ones (saved
+  edits are kept by position).
+- Record the judgement in `lint_runnable.py` → `TABLES[<CODE>]`: one entry per
+  Python block, `run`, `readonly`, or `plain: <why>`. The linter holds the
+  payload to it exactly.
+
 **Required pages beyond the subject folders**: the Setup set (How <X> Class
 Works, the safety/trust agreement in subject-appropriate form, What to
 Wear/Bring, How Marks Work, Getting Help), the Style set (How This Site Is
@@ -970,6 +1009,17 @@ the linter.
    which only shows up when you compare two of them. Check the days named
    are days that task actually runs on.
 
+   It also runs **`lint_runnable.py`** (alone: `python3
+   .claude/skills/example-content/lint_runnable.py <CODE>`, which prints the
+   runnable/readonly/plain counts): a run block on a page without
+   `codeRunner: true` or the reverse, a near-miss fence (```` ```Python run ````,
+   `run,stdin`, a fence nested after two list markers), an unknown flag, a run
+   block that does not parse, uses a name it never binds, imports outside the
+   standard library, calls `breakpoint()` or reads a file it never writes
+   (unless guarded by `except FileNotFoundError`; a file name through a
+   module-level constant counts) — and the payload against its judgement
+   table, if it has one.
+
    If you touched the Example Course (`support/example_course/`, EXC2O),
    also run `lint_skeletons.py` with no family named: EXC2O has no
    manifest, so it gets only the two rules a copied template sentence can
@@ -1008,7 +1058,11 @@ the linter.
    unpublished finale is absent, `%%` comments invisible, All Classes and one
    category listing sort correctly (check the `page-listing` region of the
    HTML, not the whole page — index prose also mentions page names), and
-   `grep -rl katex-error <public dir>` finds NOTHING — a katex-error span
+   for a payload with runnable Python, count `<div class="plantoir-runner"`
+   per page against the judgement table (and its `data-runner-flags`
+   readonly), check `static/pyodide` is in the site, that the build's
+   `carried` line for Python (`page_features.ENGINE_WORDS`) names the number
+   of pages the table expects, and that no line starts `plantoir: error:`; and    `grep -rl katex-error <public dir>` finds NOTHING — a katex-error span
    means an equation shattered at a markdown seam (see the math rules in
    Phase 5). For a payload with heavy notation, render every `$…$` span through
    the build's own KaTeX with `throwOnError: true`. **The module is not on
