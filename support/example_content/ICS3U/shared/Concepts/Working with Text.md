@@ -58,7 +58,7 @@ right.
 | `.startswith(s)` | `"Fifteen Dogs".startswith("Fifteen")` | `True` |
 
 Two of them fix the corridor bug in one line. Type a name in the input
-box — try `  PRIYA ` with spaces round it — then press Run:
+box — try two spaces, then PRIYA, then a space — then press Run:
 
 ```python run readonly
 typed = input("Name: ")

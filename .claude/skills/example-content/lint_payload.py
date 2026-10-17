@@ -2,6 +2,9 @@
 
 Usage:  python3 .claude/skills/example-content/lint_payload.py ADA1O
 
+Runs under Python 3.9 or later (macOS's own /usr/bin/python3 is 3.9), and is
+run by hand - the example-content skill's Phase 7; no automated gate runs it.
+
 Checks every rule the installer and the site build depend on. Exit code 0
 means clean; 1 means problems were printed; 2 means the linter's own
 self-check failed. The Example Course (`support/example_course/`, EXC2O) is
