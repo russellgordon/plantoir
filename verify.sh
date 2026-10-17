@@ -2700,7 +2700,7 @@ if got != expected:
 if "nested shape" not in fixture or re.search(r'data-original="print\(&quot;nested shape', fixture):
     problems.append("the fence on two list markers' line was made runnable, or is missing")
 not_opted, twin = page("Runner-Not-Opted.html"), page("Runner-Plain-Twin.html")
-if "plantoir-runner" in not_opted:
+if 'class="plantoir-runner"' in not_opted or "data-runner-id" in not_opted:
     problems.append("the page that does not opt in has a runnable block")
 figures = lambda text: re.findall(r"<figure data-rehype-pretty-code-figure.*?</figure>", text, re.S)
 if not figures(not_opted) or figures(not_opted) != figures(twin):
