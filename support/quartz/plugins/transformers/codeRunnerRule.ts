@@ -10,7 +10,9 @@
 // needs, the words' {language}). The check script compares it with the
 // contract field for field; scripts/page_features.py holds the Python mirror.
 // A second language is a row here, a row there, a runtime class in
-// codeRunner.inline.ts, a vendor layer and a pin - nothing else.
+// codeRunner.inline.ts, a vendor layer and a pin - nothing else. Swift (#493)
+// is the second: `prebuilt`, so its vendor layer is the compile step
+// (scripts/swift_blocks.py, support/swift) and its pin the Swift image's.
 
 export type RunnerLanguage = {
   fence: string // the info string's first word, exactly (lowercase, Q1)
@@ -23,7 +25,7 @@ export type RunnerLanguage = {
   flags: string[] // the tokens after `run` this language accepts
   inputCall: string // fills {inputCall}
   inputPattern: string // shows the input box without the stdin flag
-  prebuilt: boolean // false: the browser runs the source as written
+  prebuilt: boolean // false: the browser runs the source as written; true: the build compiled it (#493)
 }
 
 export const LANGUAGES: RunnerLanguage[] = [
@@ -39,6 +41,19 @@ export const LANGUAGES: RunnerLanguage[] = [
     inputCall: "input()",
     inputPattern: "\\binput\\s*\\(",
     prebuilt: false,
+  },
+  {
+    fence: "swift",
+    idPrefix: "swift",
+    displayName: "Swift",
+    runtime: "swift-wasm",
+    engine: "swift",
+    worker: "plantoir-swift-worker.js",
+    editable: false,
+    flags: ["stdin", "autorun"],
+    inputCall: "readLine()",
+    inputPattern: "\\breadLine\\s*\\(",
+    prebuilt: true,
   },
 ]
 
@@ -185,6 +200,47 @@ export function findRunners(tree: MdNode, optedIn: boolean, slug: string): Found
 // {language} and {inputCall} filled from the table row.
 export function filled(text: string, language: RunnerLanguage): string {
   return text.split("{language}").join(language.displayName).split("{inputCall}").join(language.inputCall)
+}
+
+// The code a `prebuilt` block's program was compiled from (#493:
+// contracts/shared-rules.json -> codeRunnerBlocks.swift.cacheKey), the SAME
+// rule as scripts/swift_blocks.normalise: split on "\n"; spaces, tabs and
+// carriage returns (and form feeds and vertical tabs) off the end of each
+// line; the indentation every non-blank line shares off; blank lines at the
+// start and the end dropped. Its SHA-256 is the block's key, which the
+// transformer computes with node's crypto (not here: this file is bundled
+// into the page's script too).
+export function normaliseProgram(body: string): { text: string; droppedAtTop: number } {
+  let lines = body.split("\n").map((line) => line.replace(/[ \t\r\f\v]+$/, ""))
+  let shared: string | null = null
+  for (const line of lines) {
+    if (line === "") {
+      continue
+    }
+    const indent = /^[ \t]*/.exec(line)![0]
+    if (shared === null) {
+      shared = indent
+    } else {
+      let common = 0
+      while (common < shared.length && common < indent.length && shared[common] === indent[common]) {
+        common += 1
+      }
+      shared = shared.slice(0, common)
+    }
+  }
+  if (shared !== null && shared.length > 0) {
+    const cut = shared.length
+    lines = lines.map((line) => (line === "" ? line : line.slice(cut)))
+  }
+  let droppedAtTop = 0
+  while (lines.length > 0 && lines[0] === "") {
+    lines.shift()
+    droppedAtTop += 1
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === "") {
+    lines.pop()
+  }
+  return { text: lines.join("\n"), droppedAtTop }
 }
 
 // FNV-1a, 32 bits, over UTF-16 code units, as hex: the hash a student's
