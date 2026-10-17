@@ -61,6 +61,14 @@ RUN git clone --depth 1 --branch v4.5.0 https://github.com/jackyzha0/quartz.git 
 # Pre-install dependencies inside the image so npm install does not run over slow 9P mounts
 RUN cd /opt/quartz && npm install --no-audit && npm cache clean --force
 
+# KaTeX 0.16.21 is what Quartz's lockfile installs and renders every formula
+# with; since #494 every site also carries ITS stylesheet, copy-tex and woff2
+# faces (build_site.install_katex_assets copies them from here), instead of
+# linking 0.16.11's from cdn.jsdelivr.net. This fails the image build if the
+# lockfile ever resolves another version (measured: npm ls katex@0.16.22
+# exits 1), so the pin in contracts/toolchain.json cannot drift unnoticed.
+RUN cd /opt/quartz && npm ls katex@0.16.21
+
 # Paged.js, the print layout for pages whose settings say `printable: true`
 # (#454). Into /opt/vendor, NOT into the Quartz scaffold's static/: a site
 # carries it only when one of its pages asks for it (build_site.py copies it
