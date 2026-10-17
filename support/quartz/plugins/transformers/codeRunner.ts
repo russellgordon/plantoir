@@ -25,6 +25,11 @@
 // student never meets a Run button that can never work - and one line says
 // so for the teacher and any assistant reading the build.
 //
+// A block that can ask for input as it runs carries data-runner-asks="input"
+// or "edit" (#583, codeRunnerRule.asksFor): which pages the host isolates
+// (scripts/isolation_headers.py, the preview's quartz/cli/plantoirIsolation.mjs)
+// is read from it.
+//
 // A `prebuilt` language's block (Swift, #493) carries one more attribute:
 // data-runner-wasm="static/swift-wasm/<key>.wasm" when the build has its
 // program (quartz/plantoir-runners/swift.json, written by
@@ -40,7 +45,7 @@ import { createHash } from "crypto"
 import { readFileSync, statSync } from "fs"
 import { join } from "path"
 import { QuartzTransformerPlugin } from "../types"
-import { findRunners, filled, MdNode, normaliseProgram, unclosedFenceBefore } from "./codeRunnerRule"
+import { asksFor, findRunners, filled, MdNode, normaliseProgram, unclosedFenceBefore } from "./codeRunnerRule"
 
 type RunnerFile = { words: Record<string, string>; carried: string[] }
 // quartz/plantoir-runners/<engine>.json, for a `prebuilt` language (#493):
@@ -146,6 +151,10 @@ export const CodeRunnerFences: QuartzTransformerPlugin = () => ({
             } else {
               programProperties.dataRunnerUnready = program.reason ?? "notCompiled"
             }
+          }
+          const asks = asksFor(runner.language, runner.flags, code.value)
+          if (asks !== null) {
+            programProperties.dataRunnerAsks = asks
           }
           const wrapper = {
             type: "plantoirRunner",

@@ -24946,10 +24946,448 @@
     },
     "harness": {
       "rule": "What a Run does, in the engine's own thread (a module worker, plantoir-worker.js: B1 measured that Pyodide 314 refuses a classic worker wherever the page's CSP allows data: scripts). The program is compiled as `main.py` and run with fresh globals; its traceback is trimmed to start at the first `main.py` frame, so a line number in the output is the line in the editor (CPython's own wording); a SyntaxError prints without the `Traceback` header, as CPython prints one; SystemExit is silent. BEFORE EVERY RUN (S3, measured: one block's `builtins.print = ...` silenced the next block on the page): builtins are restored from a copy taken at load, sys.stdout / stderr / stdin and the recursion limit are reset, and the program starts in a fresh empty folder. Files a program writes exist for that run only. Nothing is ever fetched for an `import`: packages outside the standard library are not there (no pip, numpy or matplotlib), and turtle, tkinter, curses, readline, venv, ensurepip and pip fail; sqlite3, decimal, zoneinfo, hashlib, ssl, lzma, csv, json, asyncio and threading work (measured, review 2026-10-09).",
-      "workerTalks": "page -> worker: {type: \"run\", source, stdin: [lines]}. worker -> page: {type: \"ready\", ms}, {type: \"out\", text, err: boolean}, {type: \"done\", error: boolean}, {type: \"fail\", message}."
+      "workerTalks": "page -> worker: {type: \"run\", source, stdin: [lines], line?: SharedArrayBuffer} - `line` only on a cross-origin isolated page (liveInput.buffer). worker -> page: {type: \"ready\", ms}, {type: \"out\", text, err: boolean}, {type: \"ask\"} when a live program waits for a line (#583), {type: \"done\", error: boolean}, {type: \"fail\", message}."
     },
     "stdin": {
-      "rule": "The input box shows when the block has the `stdin` flag or its CURRENT code matches the row's `inputPattern`; it sits between the code and the buttons (Q3) and is filled BEFORE Run, one line for each {inputCall}. It is never stored. Each line the program reads is echoed into the output straight after the prompt (Q4), so the transcript reads `Name? Ada` and not `Name? Hello Ada`; past the last line the program's {inputCall} raises EOFError, as at the end of a file. REJECTED: a prompt box per call driven by SharedArrayBuffer (the page would need cross-origin isolation headers, which a folder publish cannot send) and window.prompt (blocks the page, and iPadOS styles it as an alert)."
+      "rule": "Where the page is NOT cross-origin isolated (liveInput.detection), the input box shows when the block has the `stdin` flag or its CURRENT code matches the row's `inputPattern`; it sits between the code and the buttons (Q3), carries one line under its label (words.inputAhead, #583) and is filled BEFORE Run, one line for each {inputCall}. It is never stored. Where the page IS isolated, the box never shows and the program asks as it runs (liveInput). Either way each line the program reads is echoed into the output straight after the prompt (Q4), so the transcript reads `Name? Ada` and not `Name? Hello Ada` - byte for byte the same on both paths (#583, browser-checks/code_runner.mjs and swift_runner.mjs) - and past the last line, or after the end of input (liveInput.endOfInput), the program's {inputCall} raises EOFError, as at the end of a file. REJECTED: window.prompt (blocks the page, and iPadOS styles it as an alert); SharedArrayBuffer on a page that is not isolated (the browser does not offer it there, so the box is the fallback - #455's rejection of SharedArrayBuffer was overturned for the isolated case on 2026-10-17, #583); the interrupt buffer as Stop (measured: 1-2 ms, but a waiting program prints a chained EOFError and KeyboardInterrupt traceback, and a long C call cannot be interrupted); `Cross-Origin-Embedder-Policy: credentialless` (measured: Safari 26.6 does not isolate under it, and Chrome blocks the frames anyway); COEP site-wide (every page's YouTube, GeoGebra and PhET frames would break for a feature on a few pages)."
+    },
+    "liveInput": {
+      "rule": "#583, v1.8.1. On a page that is cross-origin isolated (detection), Run starts the program with NO input box: at each {inputCall} the prompt is in the output and the student types the answer in a field at the end of it, and Return hands the line over while the program WAITS - its thread blocks in Atomics.wait on a SharedArrayBuffer sent with the run (harness.workerTalks, swift.workerTalks) - and the program goes on. Both languages (Russell's ruling R1: Swift too). The same page markup either way: a teacher changes nothing. Where the page is not isolated, the input box (stdin). Measured 2026-10-17 (documentation/06-quartz-customizations.md -> I11): Chrome for Testing 155, Safari 26.6, the iPad (A16) simulator on iPadOS 18.6 and a plain WKWebView all give the box path's transcript.",
+      "detection": "Read once per page (each `nav`): self.crossOriginIsolated === true, and SharedArrayBuffer and Atomics.wait exist. A document's isolation is fixed when it is made, and a change of page across the isolation line by the site's own links is a full load (isolation.spa), so it holds for the page's life.",
+      "field": "ONE <input type=\"text\" class=\"plantoir-runner-answer\"> per run, the output's LAST child - what the program prints, the echo of each answer among it, goes in before it - kept until the run ends, so the focus never has to leave it between prompts (review S7: removing a focused field takes an iPad's keyboard down, and a focus outside a tap does not raise it again). aria-label words.answerLabel; enterkeyhint send; autocapitalize, autocorrect and autocomplete off and spellcheck false; at least 16 px, so iPadOS does not zoom (the editor's rule); it fills the rest of the prompt's line, never narrower than 8 characters. While the program waits the status says words.waitingForInput, and words.running once it has the line. The prompt is painted BEFORE the field is used: the worker's ask arrives before the next animation frame's paint (review S1, measured).",
+      "focus": "When a person presses Run (or Cmd/Ctrl-Enter) on code that reads input as it stands (the stdin flag or the row's inputPattern), the field is made and focused at once, inside the press: iPadOS raises its keyboard only for a focus inside a tap, and the first ask comes about a second later, when the language has loaded. Otherwise the field is made at the first ask and takes the focus only when a person started the run (that first ask) or the focus is already inside the block. An autorun never takes the focus.",
+      "returnKey": "Return sends the field's line and empties the field - but not while an input method is composing (isComposing, or keyCode 229: Safari commits a candidate with a Return whose isComposing is false - review N1). Its default is prevented and it goes no further, so it never submits a form, checks a quiz or opens a fold. Escape goes no further either: Quartz's own Escape would move the focus to the search button (review N2). A line sent before the program asks for it waits its turn, as typing ahead in a terminal does.",
+      "endOfInput": "Ctrl-D in the field (anything typed on the line is sent first) or the words.endInput button beside Stop - an iPad's keyboard has no Ctrl-D, so the button shows while the field does (ruling Q2) - ends the input: the program's {inputCall} then behaves as past the box's last line (EOFError in Python, nil in Swift), and the end is STICKY for the rest of that run, in the page and in both workers. A program that reads every line (`for line in sys.stdin`, `while let line = readLine()`) needs it.",
+      "paste": "A field of one line strips the line breaks out of a paste (review S2, measured in both browsers), so a paste with line breaks is taken by the page: every line but the last is sent, as typing it and pressing Return would, and the last stays in the field. Pasting \"Ada\\n15\\n\" answers two {inputCall}s.",
+      "answerCharacters": 4096,
+      "answerRule": "An answer is cut at answerCharacters characters - code points, never inside a surrogate pair (review N8) - and the shared buffer holds 8 + 4 x answerCharacters bytes.",
+      "buffer": "Int32 [0] is the state: 0 waiting, 1 a line is there, 2 end of input; Int32 [1] the line's length in bytes; the line's UTF-8 bytes start at byte 8. The worker sets 0, posts {type: \"ask\"} and waits while the state is 0; the page writes the bytes, then the length, then the state, and calls Atomics.notify. The page ENCODES the line and then COPIES the bytes in with set(); the worker COPIES them out with slice() before it decodes: Chrome 155 refuses TextEncoder.encodeInto into, and TextDecoder.decode of, a view of shared memory (review S3 and #583 gotcha 1, measured), where Safari accepts both. The reader is written once in each overlay (support/gated/pyodide and support/gated/swift are carried independently).",
+      "stop": "As before: Stop, another block's Run, leaving the page and the output cap end the thread with terminate(), which ends a thread that is waiting in Atomics.wait (measured in every browser above: ready again 754-1,062 ms later), and the field goes with the run. The echo counts toward output.maxCharacters. A waiting program holds the page's one run, so queued autoruns wait.",
+      "asks": "A runnable block CAN ASK when it reads input as written (the `stdin` flag, or the row's inputPattern in its code) - `data-runner-asks=\"input\"` on its wrapper - or when a student can edit it (an editable language without `readonly`, where they may add an {inputCall}) - `data-runner-asks=\"edit\"`; otherwise the wrapper has no such attribute. The transformer (codeRunner.ts, through codeRunnerRule.asksFor) writes it, and a page's headers (isolation) and the publish's note line read it, so neither needs the language table.",
+      "asksCases": [
+        {
+          "name": "Python a student can edit",
+          "language": "python",
+          "flags": [],
+          "code": "print(1)",
+          "asks": "edit"
+        },
+        {
+          "name": "Python that calls input()",
+          "language": "python",
+          "flags": [],
+          "code": "name = input(\"Name? \")",
+          "asks": "input"
+        },
+        {
+          "name": "readonly Python with no input",
+          "language": "python",
+          "flags": [
+            "readonly"
+          ],
+          "code": "print(1)",
+          "asks": null
+        },
+        {
+          "name": "readonly Python that calls input()",
+          "language": "python",
+          "flags": [
+            "readonly"
+          ],
+          "code": "print(input())",
+          "asks": "input"
+        },
+        {
+          "name": "readonly Python with the stdin flag",
+          "language": "python",
+          "flags": [
+            "readonly",
+            "stdin"
+          ],
+          "code": "print(1)",
+          "asks": "input"
+        },
+        {
+          "name": "Swift with no input",
+          "language": "swift",
+          "flags": [],
+          "code": "print(1)",
+          "asks": null
+        },
+        {
+          "name": "Swift that calls readLine()",
+          "language": "swift",
+          "flags": [],
+          "code": "let name = readLine() ?? \"\"",
+          "asks": "input"
+        },
+        {
+          "name": "Swift with the stdin flag",
+          "language": "swift",
+          "flags": [
+            "stdin"
+          ],
+          "code": "print(1)",
+          "asks": "input"
+        }
+      ]
+    },
+    "isolation": {
+      "rule": "Which pages are sent the headers that isolate them, on which host, and what such a page must not carry. A page gets them only when it holds a runnable block that can ask (liveInput.asks) and NOTHING the headers would break (notLive): under `Cross-Origin-Embedder-Policy: require-corp`, a frame from another website (YouTube, GeoGebra, PhET), a same-origin PDF frame (in Safari, unless the PDF itself carries the header), and any cross-origin picture, script or stylesheet whose server sends no Cross-Origin-Resource-Policy (Wikimedia, imgur, GeoGebra's deployggb.js, the Desmos API) are all blocked - measured in Chrome for Testing 155 and Safari 26.6 (#583 plan section 0c; review S4). Such a page keeps the input box, and the publish and the preview say why on a `plantoir: note:` line when one of its blocks reads input (words.notLiveBecause). Never site-wide, and nothing on a folder publish. Ruling Q1: a student never meets a broken video; Media PDF frames count as frames (Q4).",
+      "headers": {
+        "page": {
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Cross-Origin-Embedder-Policy": "require-corp"
+        },
+        "engine": {
+          "Cross-Origin-Embedder-Policy": "require-corp"
+        }
+      },
+      "engineFolders": [
+        "static/pyodide",
+        "static/swift"
+      ],
+      "engineRule": "The engine's own folder carries COEP too, every file in it: Chrome checks the worker script, and Safari also every module the worker imports (#583 gotcha 2, measured: COEP on the two worker files alone failed in Safari, and none on the engine failed in Chrome). It costs nothing on a page that is not isolated (measured in both browsers). Written only for an engine the site carries; static/swift-wasm/ is fetched by the worker from the same site and needs nothing.",
+      "notLive": "Read from the BUILT page (public/<page>.html), outside scripts' and styles' text and comments, tag and attribute names in any case: any iframe, frame, embed or object, from any site (reason `frame`); a cross-origin `src` on video, or on a source without srcset (`frame`); a cross-origin img src or srcset, source srcset, video poster, input type=image src or SVG image href (`picture`); a cross-origin audio or track src, script src, link href whose rel holds stylesheet, preload or modulepreload, or url(...) in a style attribute or a <style> (`other`). Several: frame, then picture, then other is named. CROSS-ORIGIN means an absolute http(s) URL, or a protocol-relative //host one, whose host is not exactly one of allowedHosts; relative, data: and blob: URLs are the site's own. Preconnect, dns-prefetch, alternate and icon links fetch nothing that COEP blocks and are not read.",
+      "allowedHosts": [
+        "cdnjs.cloudflare.com",
+        "fonts.googleapis.com",
+        "fonts.gstatic.com"
+      ],
+      "allowedRule": "They send Cross-Origin-Resource-Policy: cross-origin (curl, 2026-10-17) and load under require-corp (measured in both browsers): Quartz's own Google Fonts stylesheet and faces, and cdnjs (Mermaid, twemoji).",
+      "markers": {
+        "begin": "# Plantoir: lets runnable code ask for input while it runs. Rewritten on every publish; edit the lines outside this block, not these.",
+        "end": "# Plantoir: end of the runnable-code block."
+      },
+      "hosts": {
+        "netlify": "public/_headers: the block between the two markers, REPLACED on every publish and never appended (the #462 lesson), written BEFORE the badge rule's block (write_netlify_headers_file keeps the lines it did not write; Netlify applies every rule that matches, so a page gets the `/*` policy and its own rule). A page's path is written as a browser asks for it - non-ASCII, space and \" # < > ? ` { } percent-encoded with uppercase hex, every other ASCII character as it is - and LOWER-CASED: Netlify answers a path with capitals with a 301 to its lower-case form (Ü to ü as well) and matches rules without regard to ASCII case (measured, pathCases). The as-is form is written as well when lower-casing changed more than ASCII letters, so a site Netlify does not redirect still matches. A page's .html form is not written: Netlify redirects it to the path above (measured).",
+        "cloudflare": "public/_headers: the same block, written before wrangler uploads the folder. A page's path with EVERY character but A-Z a-z 0-9 _ . - ~ and / percent-encoded, uppercase hex (Python's urllib.parse.quote): Cloudflare matches the request path in that form and case-sensitively, and a rule with a raw comma, plus, apostrophe, bracket, colon or non-ASCII letter matched nothing (measured, pathCases). /x.html and /x/ are 308-redirected to /x, and /dir and /dir/index.html to /dir/, so only those forms are written.",
+        "cloudflareMostRules": 100,
+        "cloudflareCap": "Cloudflare reads at most 100 rules from _headers (its documented limit). The block takes the engine rules and then pages - those whose blocks read input first, then the rest, each in path order - up to 100 less every other rule already in the file (a teacher's own _headers, which reaches public/ from the course's root, or the badge rule from a Netlify publish); the pages past that keep the box, and the publish says how many on one `plantoir: note:` line (words.notLiveCapped). Netlify documents no such limit.",
+        "preview": "The preview's server (Quartz's cli/handlers.js, patched with the marker PLANTOIR-ISOLATION-SERVE; the rule is quartz/cli/plantoirIsolation.mjs) sends the same headers to the same pages and engine files, decided per request from the page's HTML by the same rule - both run `cases` - so a teacher previews what students get, and says the note line once per page. It fails OPEN: any error reading or testing a file serves it without the headers (review N7).",
+        "folder": "Nothing: a folder publish never enters deploy.py, and a school's web server reads no _headers. A _headers file left in public/ by an earlier Netlify or Cloudflare publish rides along in the folder's copy, as the badge rule's block already did in 1.8.0 (review S6, decided: the folder publish stays byte for byte as 1.8.0's, and nothing there serves that file as headers).",
+        "skip": "A page whose path holds `*` gets no rule on either host (a `*` is a splat on both); Obsidian refuses the character in a note's name."
+      },
+      "pathCases": [
+        {
+          "file": "index.html",
+          "netlify": [
+            "/"
+          ],
+          "cloudflare": [
+            "/"
+          ]
+        },
+        {
+          "file": "Measure-583/index.html",
+          "netlify": [
+            "/measure-583/"
+          ],
+          "cloudflare": [
+            "/Measure-583/"
+          ]
+        },
+        {
+          "file": "Measure-583/Plain-ASCII.html",
+          "netlify": [
+            "/measure-583/plain-ascii"
+          ],
+          "cloudflare": [
+            "/Measure-583/Plain-ASCII"
+          ]
+        },
+        {
+          "file": "Measure-583/100-percent-Done.html",
+          "netlify": [
+            "/measure-583/100-percent-done"
+          ],
+          "cloudflare": [
+            "/Measure-583/100-percent-Done"
+          ]
+        },
+        {
+          "file": "Measure-583/Q-and-A-Time.html",
+          "netlify": [
+            "/measure-583/q-and-a-time"
+          ],
+          "cloudflare": [
+            "/Measure-583/Q-and-A-Time"
+          ]
+        },
+        {
+          "file": "Measure-583/Unit-4,-Day-22.html",
+          "netlify": [
+            "/measure-583/unit-4,-day-22"
+          ],
+          "cloudflare": [
+            "/Measure-583/Unit-4%2C-Day-22"
+          ]
+        },
+        {
+          "file": "Measure-583/It's-(fine)!.html",
+          "netlify": [
+            "/measure-583/it's-(fine)!"
+          ],
+          "cloudflare": [
+            "/Measure-583/It%27s-%28fine%29%21"
+          ]
+        },
+        {
+          "file": "Measure-583/C++-Basics.html",
+          "netlify": [
+            "/measure-583/c++-basics"
+          ],
+          "cloudflare": [
+            "/Measure-583/C%2B%2B-Basics"
+          ]
+        },
+        {
+          "file": "Measure-583/Ratio-a:b.html",
+          "netlify": [
+            "/measure-583/ratio-a:b"
+          ],
+          "cloudflare": [
+            "/Measure-583/Ratio-a%3Ab"
+          ]
+        },
+        {
+          "file": "Measure-583/Set-{1,-2}.html",
+          "netlify": [
+            "/measure-583/set-%7B1,-2%7D"
+          ],
+          "cloudflare": [
+            "/Measure-583/Set-%7B1%2C-2%7D"
+          ]
+        },
+        {
+          "file": "Measure-583/Café-Menu.html",
+          "netlify": [
+            "/measure-583/caf%C3%A9-menu"
+          ],
+          "cloudflare": [
+            "/Measure-583/Caf%C3%A9-Menu"
+          ]
+        },
+        {
+          "file": "Measure-583/Crème-NFD.html",
+          "netlify": [
+            "/measure-583/cre%CC%80me-nfd"
+          ],
+          "cloudflare": [
+            "/Measure-583/Cre%CC%80me-NFD"
+          ]
+        },
+        {
+          "file": "Measure-583/Ünïcödé-Straße.html",
+          "netlify": [
+            "/measure-583/%C3%BCn%C3%AFc%C3%B6d%C3%A9-stra%C3%9Fe",
+            "/Measure-583/%C3%9Cn%C3%AFc%C3%B6d%C3%A9-Stra%C3%9Fe"
+          ],
+          "cloudflare": [
+            "/Measure-583/%C3%9Cn%C3%AFc%C3%B6d%C3%A9-Stra%C3%9Fe"
+          ]
+        },
+        {
+          "file": "Measure-583/日本語.html",
+          "netlify": [
+            "/measure-583/%E6%97%A5%E6%9C%AC%E8%AA%9E"
+          ],
+          "cloudflare": [
+            "/Measure-583/%E6%97%A5%E6%9C%AC%E8%AA%9E"
+          ]
+        },
+        {
+          "file": "Warm-Ups/Which-One-Doesn't-Belong.html",
+          "netlify": [
+            "/warm-ups/which-one-doesn't-belong"
+          ],
+          "cloudflare": [
+            "/Warm-Ups/Which-One-Doesn%27t-Belong"
+          ]
+        },
+        {
+          "file": "Odd*Name.html",
+          "netlify": [],
+          "cloudflare": []
+        }
+      ],
+      "spa": "Quartz's router (spa.inline.ts, patched with the marker PLANTOIR-ISOLATION-NAV) loads a page WHOLE when the fetched page's Cross-Origin-Embedder-Policy (require-corp or not) disagrees with this document's crossOriginIsolated. A document's isolation is fixed when it is made, so morphing a runner page in from a plain page would leave it not isolated, and morphing a plain page in from a runner page would carry COEP to it and block its frames. Back and forward take the same path (location.assign to the address already shown replaces it and adds no history entry - review). Where no host sends the headers (a folder publish) it never fires. Cost: one load, from cache, only when crossing.",
+      "cases": [
+        {
+          "name": "a page with no runnable block",
+          "html": "<head><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\"/><link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM Plex Mono:wght@400;600&amp;display=swap\"/><link rel=\"preconnect\" href=\"https://cdnjs.cloudflare.com\" crossorigin=\"anonymous\"/><link rel=\"icon\" href=\"../static/favicon.ico\" sizes=\"32x32\"/><link href=\"../index.css\" rel=\"stylesheet\" type=\"text/css\" spa-preserve/><script src=\"../prescript.js\" type=\"application/javascript\" spa-preserve></script><link rel=\"stylesheet\" href=\"../static/katex/katex.min.css\" spa-preserve/><link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"https://ics3u-s1-2026-testing.netlify.app/index.xml\"/><script src=\"../postscript.js\" type=\"module\"></script></head><p>Loops</p>",
+          "verdict": "none",
+          "readsInput": false
+        },
+        {
+          "name": "Quartz's own head and a block a student can edit",
+          "html": "<head><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\"/><link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM Plex Mono:wght@400;600&amp;display=swap\"/><link rel=\"preconnect\" href=\"https://cdnjs.cloudflare.com\" crossorigin=\"anonymous\"/><link rel=\"icon\" href=\"../static/favicon.ico\" sizes=\"32x32\"/><link href=\"../index.css\" rel=\"stylesheet\" type=\"text/css\" spa-preserve/><script src=\"../prescript.js\" type=\"application/javascript\" spa-preserve></script><link rel=\"stylesheet\" href=\"../static/katex/katex.min.css\" spa-preserve/><link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"https://ics3u-s1-2026-testing.netlify.app/index.xml\"/><script src=\"../postscript.js\" type=\"module\"></script></head><div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"edit\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div>",
+          "verdict": "live",
+          "readsInput": false
+        },
+        {
+          "name": "a block that reads input",
+          "html": "<head><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\"/><link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM Plex Mono:wght@400;600&amp;display=swap\"/><link rel=\"preconnect\" href=\"https://cdnjs.cloudflare.com\" crossorigin=\"anonymous\"/><link rel=\"icon\" href=\"../static/favicon.ico\" sizes=\"32x32\"/><link href=\"../index.css\" rel=\"stylesheet\" type=\"text/css\" spa-preserve/><script src=\"../prescript.js\" type=\"application/javascript\" spa-preserve></script><link rel=\"stylesheet\" href=\"../static/katex/katex.min.css\" spa-preserve/><link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"https://ics3u-s1-2026-testing.netlify.app/index.xml\"/><script src=\"../postscript.js\" type=\"module\"></script></head><div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"input()\"><pre><code>input()</code></pre></div>",
+          "verdict": "live",
+          "readsInput": true
+        },
+        {
+          "name": "a Swift block that cannot ask",
+          "html": "<head><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\"/><link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM Plex Mono:wght@400;600&amp;display=swap\"/><link rel=\"preconnect\" href=\"https://cdnjs.cloudflare.com\" crossorigin=\"anonymous\"/><link rel=\"icon\" href=\"../static/favicon.ico\" sizes=\"32x32\"/><link href=\"../index.css\" rel=\"stylesheet\" type=\"text/css\" spa-preserve/><script src=\"../prescript.js\" type=\"application/javascript\" spa-preserve></script><link rel=\"stylesheet\" href=\"../static/katex/katex.min.css\" spa-preserve/><link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"https://ics3u-s1-2026-testing.netlify.app/index.xml\"/><script src=\"../postscript.js\" type=\"module\"></script></head><div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-swift-1\" data-runner-flags data-runner-language=\"swift\" data-runner-runtime=\"swift-wasm\" data-runner-engine=\"swift\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div>",
+          "verdict": "none",
+          "readsInput": false
+        },
+        {
+          "name": "a YouTube frame",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><iframe src=\"https://www.youtube.com/embed/abc\" allowfullscreen></iframe>",
+          "verdict": "frame",
+          "readsInput": true
+        },
+        {
+          "name": "a GeoGebra frame",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"edit\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><iframe src=\"https://www.geogebra.org/material/iframe/id/x\" width=\"800\"></iframe>",
+          "verdict": "frame",
+          "readsInput": false
+        },
+        {
+          "name": "a Media PDF frame (same site)",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><iframe src=\"../Media/notes.pdf\" class=\"pdf\"></iframe>",
+          "verdict": "frame",
+          "readsInput": true
+        },
+        {
+          "name": "an embed",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><embed src=\"../Media/notes.pdf\" type=\"application/pdf\"/>",
+          "verdict": "frame",
+          "readsInput": true
+        },
+        {
+          "name": "an object",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><object data=\"../Media/notes.pdf\"></object>",
+          "verdict": "frame",
+          "readsInput": true
+        },
+        {
+          "name": "an upper-case frame tag",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><IFRAME SRC=\"https://phet.colorado.edu/sims/html/x.html\"></IFRAME>",
+          "verdict": "frame",
+          "readsInput": true
+        },
+        {
+          "name": "a video from another website",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><video controls><source src=\"https://example.com/clip.mp4\" type=\"video/mp4\"/></video>",
+          "verdict": "frame",
+          "readsInput": true
+        },
+        {
+          "name": "a hotlinked picture",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><img src=\"https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg\" alt=\"x\"/>",
+          "verdict": "picture",
+          "readsInput": true
+        },
+        {
+          "name": "a protocol-relative picture",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><img src=\"//i.imgur.com/x.png\"/>",
+          "verdict": "picture",
+          "readsInput": true
+        },
+        {
+          "name": "a cross-origin srcset",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><img src=\"../Media/a.png\" srcset=\"../Media/a.png 1x, https://example.com/a@2x.png 2x\"/>",
+          "verdict": "picture",
+          "readsInput": true
+        },
+        {
+          "name": "a video poster from another website",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><video src=\"../Media/clip.mp4\" poster=\"https://example.com/still.jpg\"></video>",
+          "verdict": "picture",
+          "readsInput": true
+        },
+        {
+          "name": "a picture whose host only starts like an allowed one",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><img src=\"https://cdnjs.cloudflare.com.example.com/x.png\"/>",
+          "verdict": "picture",
+          "readsInput": true
+        },
+        {
+          "name": "a picture from cdnjs",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><img src=\"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f600.svg\"/>",
+          "verdict": "live",
+          "readsInput": true
+        },
+        {
+          "name": "the site's own picture and video",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><img src=\"../Media/a.png\"/><video src=\"../Media/clip.mp4\" poster=\"../Media/still.jpg\"></video>",
+          "verdict": "live",
+          "readsInput": true
+        },
+        {
+          "name": "a data: picture",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><img src=\"data:image/png;base64,iVBORw0KGgo=\"/>",
+          "verdict": "live",
+          "readsInput": true
+        },
+        {
+          "name": "GeoGebra's script",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><script src=\"https://www.geogebra.org/apps/deployggb.js\"></script>",
+          "verdict": "other",
+          "readsInput": true
+        },
+        {
+          "name": "a stylesheet from another website",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><link rel=\"stylesheet\" href=\"https://example.com/x.css\"/>",
+          "verdict": "other",
+          "readsInput": true
+        },
+        {
+          "name": "a preconnect anywhere",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><link rel=\"preconnect\" href=\"https://example.com\"/><link rel=\"dns-prefetch\" href=\"https://example.org\"/>",
+          "verdict": "live",
+          "readsInput": true
+        },
+        {
+          "name": "a picture from another website in a style attribute",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><div style=\"background-image: url('https://example.com/bg.png')\">x</div>",
+          "verdict": "other",
+          "readsInput": true
+        },
+        {
+          "name": "a picture from another website in a style element",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><style>.x { background: url(https://example.com/bg.png) }</style>",
+          "verdict": "other",
+          "readsInput": true
+        },
+        {
+          "name": "frame words inside an inline script are not a frame",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><script type=\"module\">const tag = \"<iframe src=\\\"https://example.com\\\"></iframe>\"</script>",
+          "verdict": "live",
+          "readsInput": true
+        },
+        {
+          "name": "frame words inside a block's code are not a frame",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(&quot;&lt;iframe src=https://example.com&gt;&quot;); input()\" data-note=\"<iframe src=https://example.com>\"><pre><code>print(&quot;&lt;iframe src=https://example.com&gt;&quot;); input()</code></pre></div>",
+          "verdict": "live",
+          "readsInput": true
+        },
+        {
+          "name": "a frame inside a comment is not a frame",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><!-- <iframe src=\"https://www.youtube.com/embed/abc\"></iframe> -->",
+          "verdict": "live",
+          "readsInput": true
+        },
+        {
+          "name": "a frame and a hotlinked picture: the frame is named",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><img src=\"https://upload.wikimedia.org/x.jpg\"/><iframe src=\"https://www.youtube.com/embed/abc\"></iframe>",
+          "verdict": "frame",
+          "readsInput": true
+        },
+        {
+          "name": "a frame on a page that cannot ask",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-swift-1\" data-runner-flags data-runner-language=\"swift\" data-runner-runtime=\"swift-wasm\" data-runner-engine=\"swift\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><iframe src=\"https://www.youtube.com/embed/abc\"></iframe>",
+          "verdict": "none",
+          "readsInput": false
+        }
+      ]
     },
     "output": {
       "rule": "Output streams as the program prints it, gathered once per animation frame; stderr is set apart (span.plantoir-runner-err). At `maxCharacters` characters the program is stopped and words.outputTooLong shown (Q5): it protects an iPad's tab - a 200,000-line flood reached the page in 645 ms on a Mac, so the cap is protective rather than essential. Stop ends the program at once by ending its thread; the next Run starts a new one, which asks the site for its files again (a few small checks online - about 1 s on a Mac, 1.7 s in the iPad simulator, measured 2026-10-09 - and couldNotLoad offline).",
@@ -24972,7 +25410,7 @@
       "rule": "DECISION 8. On paper a runnable block prints as code and nothing else - no buttons, input box, status or output: an UNEDITED block prints its highlighted code as every other block does; an EDITED one prints the student's current code, from a copy kept in step with the editor (pre.plantoir-runner-print, wrapper class plantoir-runner-edited), because a textarea's typed value is not part of what a printed or copied page holds. The same rules serve ⌘P and the Print button (Paged.js promotes @media print), and the Print button waits for the copy to be brought up to date (window.plantoirPrint.prepare). Every rule is scoped under .plantoir-runner, so a page with no runnable block prints exactly as before (B2)."
     },
     "words": {
-      "note": "English, as data, on a page students read. {language} is the table row's displayName and {inputCall} its inputCall. No word names the machinery (CLAUDE.md rule 1): never the engine's name, WebAssembly, a worker or a thread. blockNotPrepared, blockAfterUnclosedFence and blockNotCompiled are reasons on a `plantoir: error:` line (siteDisagrees), which an assistant and a teacher read. cannotEdit, notReady, crashed and exitCode ({code}: the number the program gave exit()) are #493's: the note under a block whose language is not editable, the status of a block with no program, a program that trapped (its `Fatal error:` line, when it printed one, is already in the output), and a program that ended with a non-zero exit code.",
+      "note": "English, as data, on a page students read. {language} is the table row's displayName and {inputCall} its inputCall. No word names the machinery (CLAUDE.md rule 1): never the engine's name, WebAssembly, a worker or a thread. blockNotPrepared, blockAfterUnclosedFence and blockNotCompiled are reasons on a `plantoir: error:` line (siteDisagrees), which an assistant and a teacher read. cannotEdit, notReady, crashed and exitCode ({code}: the number the program gave exit()) are #493's: the note under a block whose language is not editable, the status of a block with no program, a program that trapped (its `Fatal error:` line, when it printed one, is already in the output), and a program that ended with a non-zero exit code. #583's: inputAhead (the box's line where the page cannot stop to ask), answerLabel, waitingForInput and endInput (live input), and notLiveBecause ({what}: notLiveFrame, notLivePicture or notLiveOther) and notLiveCapped ({count}), which are reasons on a `plantoir: note:` line (isolation) that a teacher and an assistant read.",
       "run": "Run",
       "stop": "Stop",
       "reset": "Reset",
@@ -24998,7 +25436,16 @@
       "notReady": "This program isn't ready to run yet.",
       "crashed": "The program stopped because of an error.",
       "exitCode": "The program ended with exit code {code}.",
-      "blockNotCompiled": "this block shows as plain code because it was not made ready to run when the site was prepared - preview the site again, and if this line comes back, start the block's ``` on a line of its own and indent every line of the block alike"
+      "blockNotCompiled": "this block shows as plain code because it was not made ready to run when the site was prepared - preview the site again, and if this line comes back, start the block's ``` on a line of its own and indent every line of the block alike",
+      "inputAhead": "This page can't stop to ask, so type the answers here before you press Run.",
+      "answerLabel": "Your answer",
+      "waitingForInput": "Waiting for your answer…",
+      "endInput": "No more input",
+      "notLiveBecause": "students type this page's input in a box before Run, because the page also shows {what} - put that on a page of its own to let students answer as the program asks",
+      "notLiveFrame": "a video or page from another website",
+      "notLivePicture": "a picture from another website",
+      "notLiveOther": "something from another website",
+      "notLiveCapped": "{count} page(s) with code students run take their input in a box before Run on this Cloudflare website, which can be set up for only so many pages - publishing to Netlify lets every page ask as the program runs"
     },
     "swift": {
       "rule": "#493, v1.8.0. A ```swift run block is compiled AHEAD OF TIME to a small WebAssembly program, and the student runs that program: Swift has no interpreter a browser can carry, so the code is read-only and the input box is what a student changes (Path A of the Phase 0 report on #493: Embedded Swift per block, with an automatic fall back to the full standard library). Three steps, in three places. PLAN, by the launcher through the main container, before the build: scripts/swift_blocks.py reads every page of the course that opts in (generously: hidden pages and other sections too) and writes each block the cache does not hold into a job folder of this run's own. COMPILE, only when there are jobs, in a SECOND image the launcher builds the first time it is needed (contracts/toolchain.json -> swiftImage; `teaching-quartz-swift:src-<hash of support/swift>`), one container per preview with no network (support/swift/compile.py). PREPARE, in the build, every build: each block's program is copied into the site and every block without one is said (siteHealth -> swiftCouldNotBePrepared, and a `plantoir: error:` line). The build never compiles (it runs in the main container, which cannot start another) and is never stopped by a block that does not compile (#493 ruling Q1: the preview must open so the teacher can fix it). Scheduled publishes run the same launcher, so they compile too (ruling Q4); deploy.py's own rebuild for a different web address (rebuild_for_production) runs inside the container and uses the cache only - a block it finds no program for ships not ready, said the same way.",
@@ -25109,7 +25556,7 @@
       "site": {
         "rule": "What the build gives the site: quartz/static/swift-wasm/<key>.wasm for every block on a page students can see whose program exists (and nothing else: the folder is synced every build, so a program no page uses any more is removed - the garbage collection), and quartz/plantoir-runners/swift.json, {<key>: {ok: true, file, sdk} | {ok: false, reason}}. The transformer wraps a Swift block as any runnable block, plus data-runner-wasm=\"static/swift-wasm/<key>.wasm\" (joined to the page's path to the site root by the page's script) when its key is ok, or data-runner-unready=\"<reason>\" when it is not: then the block shows its code with Run disabled and words.notReady. The engine folder static/swift/ holds the overlay only: plantoir-swift-worker.js and plantoir-wasi.mjs."
       },
-      "workerTalks": "page -> worker: {type: \"run\", wasm: the program's address, stdin: [lines]}. worker -> page: {type: \"ready\"} once started; then per run {type: \"started\"} when the program is fetched, compiled and about to run, {type: \"out\", text, err}, and {type: \"done\", error, crashed?, exitCode?}; or {type: \"fail\", reason: missing | couldNotLoad} when the program could not be fetched (missing: the site has no such file - words.notReady) or compiled (a CSP without wasm - words.couldNotLoad). The program is fetched once per page visit and compiled from its BYTES (WebAssembly.compile, never compileStreaming, so a host that sends .wasm with the wrong type still works: review N4); every run is a FRESH instance (a Swift program runs once). Stop ends the thread, as for Python.",
+      "workerTalks": "page -> worker: {type: \"run\", wasm: the program's address, stdin: [lines], line?: SharedArrayBuffer} - `line` only on a cross-origin isolated page (liveInput.buffer; the shim's `ask`). worker -> page: {type: \"ready\"} once started; then per run {type: \"started\"} when the program is fetched, compiled and about to run, {type: \"out\", text, err}, {type: \"ask\"} when a live program waits for a line (#583), and {type: \"done\", error, crashed?, exitCode?}; or {type: \"fail\", reason: missing | couldNotLoad} when the program could not be fetched (missing: the site has no such file - words.notReady) or compiled (a CSP without wasm - words.couldNotLoad). The program is fetched once per page visit and compiled from its BYTES (WebAssembly.compile, never compileStreaming, so a host that sends .wasm with the wrong type still works: review N4); every run is a FRESH instance (a Swift program runs once). Stop ends the thread, as for Python.",
       "wasi": {
         "rule": "The hand-rolled wasi_snapshot_preview1 (support/gated/swift/plantoir-wasi.mjs), the same file in the page's thread and in verify.sh's gate (browser-checks/wasi_run.mjs). fds 0-2 are a CHARACTER DEVICE whose rights do NOT include FD_SEEK (0x4) or FD_TELL (0x20): wasi-libc's isatty() needs both, and without them stdout is fully buffered - output arrives all at once at the end, and Embedded Swift's `Fatal error:` line, which goes to stdout, is LOST on a trap (spike G5, corrected Phase 0; the gate's must-fail). stdin hands over ONE line per fd_read and echoes it into the output as it is taken, straight after the prompt (review S6: the transcript reads as Python's does); past the last line fd_read answers 0 bytes, the end of input, and readLine() is nil. stdout and stderr are decoded per stream, holding a character split across two writes until it is whole (review N4). argv is [\"main\"], the environment empty, random_get is crypto.getRandomValues in pieces of 65,536 bytes, no folder is given (fd_prestat_get answers EBADF, path_open ENOTCAPABLE), fd_seek on fds 0-2 ESPIPE, proc_exit throws the exit code, and any other import of the module answers ENOSYS, so a toolchain that imports one more call never fails to link.",
         "imports": {
@@ -25298,7 +25745,15 @@
       "`Int` is 32 bits here (wasm32): it holds up to 2,147,483,647, so `13!`, Fibonacci(47) or a large running total overflows - and an overflow stops the program with words.crashed and NO `Fatal error:` line, in both libraries (measured 2026-10-17: `-assert-config Debug` keeps preconditions' messages, but an arithmetic overflow check compiles to a bare trap - even with `-Onone` (7.4 MB unoptimised, the full library), which is therefore no cheap way to a message; swift-gate 15 pins the silent trap). On a Mac or an iPad the same program runs, because Int is 64 bits there. Use `Int64` (or `Double`) for factorials and large totals, or check the range.",
       "A Swift block whose code the build's fence reader and the site's parser read differently (a lazy line in a list item: pageShapes) has two different keys; the site shows it as plain code with a `plantoir: error:` line naming it (siteDisagrees, words.blockNotCompiled). A Swift fence the build's reader cannot see is never compiled, for the same reason.",
       "Swift is compiled by the launcher on a Mac. Windows has no container and compiles nothing in v1.8 (swift.reasons.notOnWindows); deploy.py's own rebuild for a different web address uses only what a preview already compiled.",
-      "The first preview with a Swift block downloads about 1.3 GB and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once."
+      "The first preview with a Swift block downloads about 1.3 GB and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once.",
+      "Live input (#583) needs a page its host sends the isolation headers for (isolation): a folder publish, a host that strips headers, a page shown inside a learning platform's frame, a preview opened from another device over the network (not a secure context) and Safari or iPadOS before 15.2 all get the input box, with words.inputAhead.",
+      "A runner page that also shows a frame, or a picture, script or stylesheet from another website, keeps the input box (isolation.notLive, ruling Q1); Media PDF frames count as frames (ruling Q4 - COEP on /Media/* was measured to fix the frame in Safari, and is not done in v1.8.1). The rule reads the built page's own HTML, not the stylesheets it links: a picture from another website named only inside a linked stylesheet is not seen (none of Plantoir's own does).",
+      "An autorun that asks for input holds the page's one run until the student answers, and queued autoruns wait (liveInput.stop).",
+      "On a live page a popover that previews another page shows that page's frames from other websites blank (COEP applies to what the popover shows).",
+      "Where a host sends the headers but the browser cannot isolate (a learning platform's frame, a plain-http address, Safari before 15.2), every link INTO a runner page is a full load (isolation.spa): it works and cannot loop, at the cost of one load from cache (review N3).",
+      "Cloudflare reads at most 100 header rules per site (isolation.hosts.cloudflareCap): past that, pages keep the box and the publish says how many.",
+      "Netlify page paths are written lower-cased (and as-is where that differs beyond ASCII): measured with é, Ü, ß, è as a combining accent and 日本語; a name whose lower case Netlify and Python spell differently (the Turkish dotted İ) was not measured.",
+      "The first ask of a program that a person did not start with Run - an autorun - raises no on-screen keyboard on an iPad until the student taps the field: iPadOS raises it only for a focus inside a tap (liveInput.focus)."
     ]
   },
   "quizCallouts": {
