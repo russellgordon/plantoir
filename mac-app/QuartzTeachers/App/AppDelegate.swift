@@ -123,6 +123,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// shrinks to nothing.
     nonisolated func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         return MainActor.assumeIsolated {
+            // Why this quit is happening, read FIRST (#560): the Apple
+            // event's quit reason is only there while this request is being
+            // handled, so read inside the `.terminateLater` wait below it
+            // would be gone and a log out would read as the teacher's quit.
+            let closing: QuitConfirmation.ClosingReason = QuitConfirmation.closingReason(
+                quitReasonCode: AppDelegate.quitReasonCode(),
+                installingAnUpdate: AppUpdates.shared.isQuittingToInstall
+            )
+
             // The question comes FIRST, and nothing is written down before it
             // is answered: a quit the teacher then calls off must leave the
             // app exactly as it was, and `isTerminating` is not a flag that
@@ -142,6 +151,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     return .terminateCancel
                 }
             }
+            // The quit is going ahead: kept for `applicationWillTerminate`,
+            // which writes the line. A quit called off above leaves nothing.
+            AppDelegate.closingReason = closing
 
             // A copy of a folder's tools still running (#476) is waited
             // for, never cut short: the copy used to hold the main thread,
@@ -162,6 +174,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return AppDelegate.finishTerminating()
         }
+    }
+
+    /// The trail's last word from this process (#560), written as late as
+    /// AppKit allows: reached after `.terminateNow` and after a
+    /// `.terminateLater` is answered yes (the set-aside update, a tool copy
+    /// waited for). Nothing here enables sudden termination, and the trail
+    /// writes synchronously, so the line is on disk before the process
+    /// ends. Guarded exactly as the "Plantoir opened" line is — neither
+    /// guards it beyond the test redirect of the store — so the two stay
+    /// paired: a headless run (the assistant's server, a scheduled publish,
+    /// writing the contracts) reaches neither.
+    nonisolated func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            AppDelegate.noteClosed()
+        }
+    }
+
+    /// Why the quit under way is happening — set by
+    /// `applicationShouldTerminate` once the quit is going ahead.
+    @MainActor static var closingReason: QuitConfirmation.ClosingReason?
+
+    /// Writes "Plantoir closed — … · pid N". A quit that never passed
+    /// through `applicationShouldTerminate` is the teacher's.
+    @MainActor
+    static func noteClosed() {
+        let reason: QuitConfirmation.ClosingReason = closingReason ?? .quitByTheTeacher
+        ActivityTrail.note(.appClosed, ActivityTrail.closedLine(reason: reason))
     }
 
     /// Everything a quit decides once nothing is holding it back: the

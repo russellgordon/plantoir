@@ -6,9 +6,15 @@
     },
     "mustRecord": [
       {
-        "carries": "app version, build number, process id, bundle path",
+        "carries": "the three-part app version a teacher sees in About and on the update lines (1.7.2, never 1.7 with the patch number shown as a build), then the build number in brackets, the process id and the bundle path",
         "event": "app opened",
-        "why": "The bundle path and process id are not decoration. Two copies of the app can run at once, and when they do they take turns rewriting the same working folder; two process ids in one trail is the fastest way to see it. The bundle path answers 'is this build the one I think it is' without asking."
+        "why": "#560: a problem report opens with this line, so its version has to be the one the teacher can name; Windows printed 1.7.2 as '1.7 (2)' while the update lines on the same trail said 'from 1.7.1 to 1.7.2'. The bundle path and process id are not decoration. Two copies of the app can run at once, and when they do they take turns rewriting the same working folder; two process ids in one trail is the fastest way to see it. The bundle path answers 'is this build the one I think it is' without asking."
+      },
+      {
+        "carries": "why it closed — quit by the teacher, to install a new version, or because the computer is logging out, restarting or shutting down (on Windows: asked to close by Windows) — and the process id, matching its 'app opened' line",
+        "event": "app closed",
+        "line": "Plantoir closed — quit by the teacher · pid 4711",
+        "why": "#560: without it a report cannot tell a crash from a quit, because a trail that simply stops reads the same either way; the pid pairs the line with its own 'app opened' when two copies ran. The reason is read the moment the quit is asked for (on the mac the Apple event's quit reason is only there while the request is being handled), and 'to install a new version' comes from the point where the app decides to install, never from the updater's own install notice, which also fires when the teacher quits with an update ready. Not always the LAST line of a session on the mac: the quit script that lets the website builder rest runs on after the app has gone and writes its '…because Plantoir was quitting' lines then. Rejected: a fourth 'asked by another program' reason — the Dock's Quit and a scripted quit arrive as the same request ⌘Q makes, and only a log out, restart or shut down carries a reason of its own."
       },
       {
         "carries": "OS version, OS build, architecture, core count, memory",

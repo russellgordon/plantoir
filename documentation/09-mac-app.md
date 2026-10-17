@@ -1681,6 +1681,81 @@ directory (which `Program.Main` sets to the app's folder), then System32, and
 only then PATH — so PATH could not reach them, but a stray `wsl.exe` beside
 the app could have. Full paths close that.
 
+### The last line: "Plantoir closed" (#560, 2026-10-17)
+
+Until #560 a quit left no line on the trail of its own — only the quit
+script's "…because Plantoir was quitting" lines, and only when it freed
+something — so a report could not tell a crash from a quit. Found on
+Windows while proving the 1.7.2 update; measured on the mac the same day
+(live trail: "Plantoir opened — Plantoir 1.7.1 (3596) · pid …", and nothing
+at the end).
+
+**What it writes:** "Plantoir closed — {reason} · pid N", event `appClosed`
+("app closed" in `activityTrail.mustRecord`). The pid is the one on the
+session's "Plantoir opened" line, so two copies running at once still pair
+up. The reasons are `QuitConfirmation.ClosingReason`:
+
+| Reason | Words | From |
+|---|---|---|
+| `quitByTheTeacher` | quit by the teacher | no quit reason on the Apple event — ⌘Q, the Dock's Quit, a scripted quit |
+| `toInstallANewVersion` | to install a new version | `AppUpdates.isQuittingToInstall` |
+| `theMacIsLoggingOut` | because the Mac is logging out | `kAELogOut`, `kAEReallyLogOut` |
+| `theMacIsRestarting` | because the Mac is restarting | `kAEShowRestartDialog`, `kAERestart` |
+| `theMacIsShuttingDown` | because the Mac is shutting down | `kAEShowShutdownDialog`, `kAEShutDown` |
+
+**Where each part is decided, and why there:**
+
+- **The reason is read at the very top of `applicationShouldTerminate`**,
+  before the question and before the `.terminateLater` wait for a tool copy
+  (#476). `quitReasonCode()` reads `NSAppleEventManager.currentAppleEvent`,
+  which only exists while the quit request is being handled; read inside
+  that wait's `Task`, a log out would be written down as the teacher's quit
+  (plan review N3). It is KEPT (`AppDelegate.closingReason`) only after
+  "Keep Working" has had its chance, so a quit called off leaves nothing.
+- **"To install a new version" comes from where the app decides to
+  install**: `installNow` (the teacher's Install, straight away or after held
+  work) and `heldWorkIsDone`'s postponed-install branch set
+  `isQuittingToInstall`; `didAbortWithError` (4007, a password not given,
+  among others) and any update cycle that ends in an error clear it. NOT
+  from `noteInstalling`/`willInstallUpdate`: that callback also runs when the
+  teacher quits with an update ready ("installs as Plantoir quits"), and that
+  quit is the teacher's — its "update installing … as Plantoir quits" line
+  already says the update went with it (plan review S5). **Unmeasured:**
+  whether Sparkle ever calls `willInstallUpdate` during a teacher's ⌘Q in a
+  way that would have mislabelled it under the rejected design — Sparkle
+  ships as a binary here and the case was designed around rather than
+  observed.
+- **The line is written in `applicationWillTerminate`**, reached after
+  `.terminateNow` and after a `.terminateLater` is answered yes (the
+  set-aside update and the tool-copy wait both reply that way). Nothing
+  enables sudden termination, and `ActivityTrail.note` writes synchronously,
+  so the line is on disk before the process goes (review N4).
+- **Guarded exactly as the opened line is** (review N5): neither has a guard
+  of its own beyond the suite's throwaway store, and the headless runs —
+  `--mcp-stdio`, a scheduled publish, `--write-contracts` — reach neither
+  `applicationDidFinishLaunching` nor `applicationWillTerminate`, so the two
+  lines stay paired.
+
+**It is not always the session's last line.** The quit script that lets the
+website builder rest (`FolderContainers.releaseEverythingAtQuit`) is
+detached and runs on after the app has gone, so its "…because Plantoir was
+quitting" lines can land AFTER "Plantoir closed". Read the pid, not the
+position.
+
+**The opened line was already right here**, and a guard pins it:
+`ProblemReportEnvironment.appDescription` is "Plantoir <CFBundleShortVersionString>
+(<CFBundleVersion>)", the three-part version a teacher sees in About and on the
+update lines. Windows printed 1.7.2 as "1.7 (2)"; the mac's guard
+(`ActivityTrailWiringTests.testTheOpenedLineCarriesTheThreePartVersionThenTheBuild`)
+passed before #560 too and exists so the Windows fault cannot arrive here.
+
+**Rejected:** a fourth reason, "asked to quit by another program". The Dock's
+Quit, Activity Monitor's Quit and an AppleScript `quit` all arrive as the same
+`kAEQuitApplication` request ⌘Q makes, with no quit reason; only a log out,
+restart or shut down carries one, so a fourth reason would be a guess dressed
+as a measurement. A `Force Quit` writes nothing, by construction — that is the
+"crash" the line exists to tell apart.
+
 ## A preview that never appears: bounding the QUIET, not the run
 
 Written 2026-09-20 for [issue #225](https://github.com/russellgordon/plantoir/issues/225),

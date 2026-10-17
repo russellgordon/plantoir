@@ -1624,6 +1624,12 @@ corrected `subjectMenus` reference-section cases now hold Windows' − button
 too, and `outsideAgents.agents[].menuItem` is read by
 `ContractTests.TheOutsideAgentsMenuTitles_AreTheContracts`.
 
+**#560 (2026-10-17)**, on `issue/560-trail-open-close` off `dev` 1a52f3a45: no
+list added, so the census is unchanged (347). `shared-rules.json` →
+`activityTrail.mustRecord` 140 → **141** ("app closed", for both platforms —
+it turns Windows red until it records it), and "app opened" has a new
+`carries` and `why` (the three-part version) in place.
+
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
 objects only*: an array inside a case is a FIELD of that case (each
