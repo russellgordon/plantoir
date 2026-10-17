@@ -15,10 +15,26 @@
 // here.
 
 import settings from "../../plantoir_quiz.json"
-import { FullSlug, getFullSlug, pathToRoot } from "../../util/path"
 import { accepts, filledWords, parseAnswerLine, shuffledOrder } from "../../plugins/transformers/quizRules"
 
 const WORDS = ((settings as { words?: Record<string, string> }).words ?? {}) as Record<string, string>
+
+// The page's slug and the site's root path, as Quartz's util/path works them
+// out (getFullSlug, pathToRoot) - written out here because each of the site's
+// scripts is bundled on its own, and importing util/path would put a second
+// copy of the whole module into postscript.js (measured: 3,266 bytes).
+function pageSlug(): string {
+  return document.body.dataset.slug ?? ""
+}
+
+function siteRootPath(slug: string): string {
+  const ups: string[] = []
+  const parts = slug.split("/").filter((part) => part !== "")
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    ups.push("..")
+  }
+  return ups.length === 0 ? "." : ups.join("/")
+}
 
 function word(key: string, values: Record<string, string | number> = {}): string {
   return filledWords(WORDS[key] ?? "", values)
@@ -439,8 +455,8 @@ document.addEventListener("nav", () => {
   if (roots.length === 0) {
     return
   }
-  const slug = getFullSlug(window)
-  const base = new URL(pathToRoot(slug as FullSlug) + "/", location.href).pathname
+  const slug = pageSlug()
+  const base = new URL(siteRootPath(slug) + "/", location.href).pathname
   const key = `plantoir:quiz:${base}:${slug}`
   const saved = readSaved(key)
   const cleanups: Array<() => void> = []
