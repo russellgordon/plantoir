@@ -53,7 +53,7 @@ SCRATCH = Path(os.environ.get("TEMP", "C:/temp")) / "plantoir-marketing-shots"
 PARTS = SCRATCH / "parts-windows"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from images import prepare, WIDEST_PHONE_PIXELS, WIDEST_WINDOW_PIXELS  # noqa: E402
+from images import prepare, WIDEST_PHONE_PIXELS  # noqa: E402
 from composite import fan, side_by_side  # noqa: E402
 
 # The demo courses and their sites: marketing/folders.json → demo.courses, the
@@ -168,7 +168,7 @@ def capture_browser_sites(only: list[str] | None = None) -> None:
                     capture_page(url, "", part)
                 destination = IMAGE_DIR / part.name
                 shutil.copyfile(part, destination)
-                widest = WIDEST_PHONE_PIXELS if capture["kind"] == "browser-phone" else WIDEST_WINDOW_PIXELS
+                widest = WIDEST_PHONE_PIXELS if capture["kind"] == "browser-phone" else None   # a window: never scaled (#557)
                 prepare(destination, widest)
                 print(f"   saved {destination.name} + WebP")
     finally:

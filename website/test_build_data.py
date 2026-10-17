@@ -191,7 +191,10 @@ class DownloadTests(unittest.TestCase):
         for entry in site["downloads"]:
             pins[entry["platform"]] = entry.get("pinned")
         self.assertIsNone(pins["macOS"])
-        self.assertEqual(pins["Windows"], "1.7.1")
+        # PlantoirSetup.exe joined v1.7.1 on 2026-10-16, Windows was pinned
+        # to 1.7.1 for the mac-first v1.7.2 cut, and its installer joined
+        # v1.7.2 later that day: both cards are unpinned since.
+        self.assertIsNone(pins["Windows"])
 
 
 class ShortcutTests(unittest.TestCase):
@@ -511,6 +514,25 @@ class DarkStaticFigureTests(unittest.TestCase):
                 self.assertNotIn("prefers-color-scheme", html)
             finally:
                 build.IMAGE_DIR = saved
+
+
+class WindowsPrintDensityTests(unittest.TestCase):
+
+    def test_the_windows_print_pictures_are_twice_their_window(self):
+        # #544: the Windows print pictures stand beside the mac's 2x ones in
+        # the same <picture>, so they are taken at 2x of the very windows the
+        # harness opens -- in a 3840 x 2034 session at 200% (2026-10-16) --
+        # and served unscaled (`images.prepare`). At the 1080-pixel console's
+        # fitted scale they were 736 x 962 and 1427 x 961, and looked soft.
+        import sys
+        from PIL import Image
+        sys.path.insert(0, str(build.WEBSITE / "shots"))
+        from print_set_windows import HANDOUT_SIZE_DIP, PAGE_SIZE_DIP
+        with Image.open(build.IMAGE_DIR / "print-handout-windows.png") as handout:
+            self.assertEqual(handout.size, (2 * HANDOUT_SIZE_DIP[0], 2 * HANDOUT_SIZE_DIP[1]))
+        for theme in ("light", "dark"):
+            with Image.open(build.IMAGE_DIR / f"print-page-windows-{theme}.png") as page:
+                self.assertEqual(page.size, (2 * PAGE_SIZE_DIP[0], 2 * PAGE_SIZE_DIP[1]), theme)
 
 
 class AwaitingCaptureTests(unittest.TestCase):

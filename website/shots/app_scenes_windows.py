@@ -64,7 +64,7 @@ REPO = HERE.parent.parent
 IMAGE_DIR = REPO / "site" / "img"
 sys.path.insert(0, str(HERE))
 
-from images import prepare, WIDEST_WINDOW_PIXELS  # noqa: E402
+from images import prepare  # noqa: E402
 import demo_folders  # noqa: E402
 import hero_windows as desk  # noqa: E402
 
@@ -463,7 +463,7 @@ def capture_app_scenes(exe: Path, only: list[str] | None = None, parts: Path | N
                             continue
                         destination = IMAGE_DIR / part.name
                         shutil.copyfile(part, destination)
-                        prepare(destination, WIDEST_WINDOW_PIXELS)
+                        prepare(destination)   # never scaled (#557)
                         print(f"   saved {destination.name} + WebP")
                     assemble(parts, theme)
     finally:
@@ -537,7 +537,7 @@ def capture_how_i_teach(parts: Path | None = None) -> None:
                 desk.stop("Obsidian.exe")
             destination = IMAGE_DIR / part.name
             shutil.copyfile(part, destination)
-            prepare(destination, WIDEST_WINDOW_PIXELS)
+            prepare(destination)   # never scaled (#557)
             print(f"   saved {destination.name} + WebP")
     finally:
         desk.write_theme(was_apps, was_system)
@@ -697,7 +697,7 @@ def retake(exe: Path, pairs: list[tuple[str, str]], parts: Path | None = None) -
             if identifier not in PARTS_ONLY:
                 destination = IMAGE_DIR / part.name
                 shutil.copyfile(part, destination)
-                prepare(destination, WIDEST_WINDOW_PIXELS)
+                prepare(destination)   # never scaled (#557)
                 print(f"   saved {destination.name} + WebP")
             assemble(parts, theme)
     finally:
