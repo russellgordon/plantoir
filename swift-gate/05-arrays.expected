@@ -1,0 +1,7 @@
+Type some whole numbers separated by spaces:
+Skipping x because it is not a whole number.
+You entered 5 numbers: [7, 3, 12, 5, 9]
+Sorted: [3, 5, 7, 9, 12]
+Doubled: [14, 6, 24, 10, 18]
+Total: 36
+Largest: 12
