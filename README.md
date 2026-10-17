@@ -11,7 +11,9 @@ for macOS and Windows, a tour of what Plantoir does, and instructions written
 for teachers, not developers. The apps install and run without administrator
 rights, so they work on managed school computers.
 
-You do not need anything from this repository to use Plantoir.
+You do not need anything from this repository to use Plantoir. If you are
+curious what is coming next, [ROADMAP.md](ROADMAP.md) lists what is planned
+for each upcoming release, in plain words.
 
 ## Developers
 
