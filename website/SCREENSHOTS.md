@@ -339,8 +339,9 @@ density; since #557 it scales no Windows window picture at all), and `hero_windo
 VISIBLE frame — `DWMWA_EXTENDED_FRAME_BOUNDS`, which windowshot photographs —
 rather than the window rectangle with Windows 11's invisible border round it
 (at the fitted 1.127 scale a window asked for 766 × 992 photographed at
-736 × 962), placing again at most twice and stopping the run if the frame is
-still not the size asked for. `website/test_build_data.py` →
+736 × 962), reading the border off the window before every placement so it
+is only ever given the corrected rectangle, at most three times, and stopping
+the run if the frame is still not the size asked for (or DWM gives no frame). `website/test_build_data.py` →
 `test_the_windows_print_pictures_are_twice_their_window` pins the sizes.
 When all three are taken
 the run marks both shots `windows: true`; take them off
