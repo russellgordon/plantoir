@@ -4554,7 +4554,7 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
         "reversed": {
           "check": "linksIntoHiddenPages",
@@ -4885,6 +4885,20 @@
         "fixable": false,
         "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's runnable Swift blocks from 1; {line} is the line in the teacher's own file - the first error's line for compileError, the opening fence's otherwise - and when it cannot be found the block is named through blockLineNoLine; {reason} is codeRunnerBlocks.swift.reasons[reason] filled with {said} (the compiler's first error) and {gigabytes} (codeRunnerBlocks.swift.room.needGigabytes). `sentence` when ONE block has no program and `sentenceForSeveral` otherwise ({count} blocks). `detail` names each compileError block through blockLine or blockLineNoLine (each has its own message), and every OTHER reason ONCE, through oneReasonForSeveral - the count first, then reasonsForSeveral[reason] (worded without a pronoun, so it reads after a count; the fixes review's nit 2) - with blockCount and pageCount (implementation review S4: a cause every block shares - offline, too little room, Windows - was said once per block, ten times and 'and 7 more'); compile errors first in page order, then the shared reasons in reasonCases' order; at most ten pieces, joined with \"; \" (a compiler's message can hold a comma), then `andMore` with the number of pieces left over. `groupingCases` pin it. Every value is filled in ONE pass. ONE finding per section build (#246).",
         "why": "#493 ruling Q1: a Swift block that does not compile used to be planned as a failed build (the issue's acceptance 11); a failed build would also stop the preview the teacher needs to fix it, the #485 E1 precedent. So the build carries on, the block shows its code with Run disabled and words.notReady, and the teacher - who previews in the app and never reads the build's console - is told where: page, block, line and the compiler's own first error. An assistant reads the same facts on `plantoir: error:` lines. The same finding says when a block could not be prepared at all (offline the first time, too little room, or on Windows), because to a teacher it is the same thing: students cannot run that program yet. Not repairable: only the teacher can correct the code, and getting Swift ready is the next preview's own job (review S8: in repair.neverOffered)."
+      },
+      {
+        "name": "quizzesNotReady",
+        "sentence": "A self-check question on “{page}” in {course} Section {section} can’t be checked yet.",
+        "sentenceForSeveral": "{count} self-check questions in {course} Section {section} can’t be checked yet.",
+        "detail": "Students see the question with a short note instead of Check and Show answer until it is fixed in your notes: {quizzes}.",
+        "quizLine": "“{page}”, question {n}, line {line}: {reason}",
+        "quizLineNoLine": "“{page}”, question {n}: {reason}",
+        "quizLineNotNumbered": "“{page}”, line {line}: {reason}",
+        "quizPageOnly": "“{page}”: {reason}",
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md; {n} the question's place among the page's top-level quizzes (quizLine and quizLineNoLine), absent for one that is not at the top level (quizLineNotNumbered, or quizPageOnly when its line is not known either); {line} the line in the teacher's own file - the quiz's first line, or the answer line a problem is about; {reason} is quizCallouts.words.problems[reason] filled with the quiz's own values. `sentence` when ONE question cannot be checked and `sentenceForSeveral` otherwise ({count} questions). `detail` names at most ten, joined with \"; \" (a reason can hold a comma), then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per section build (#246), after every other finding.",
+        "why": "#563: a quiz that cannot be checked shows students its question and a short note in place of Check (ruling Q6), and the teacher, who previews in the app and never reads the build's console, has to be told where - page, question and line - or the note stays on the site. An assistant reads the same facts on `plantoir: error:` lines. It never stops a build (the ruling for #493): one question must not keep a whole site from being built or deployed, and refusing would break the preview the teacher is using to fix it. Not repairable: only the teacher knows what the question was meant to ask."
       }
     ],
     "linksIntoHiddenPages": {
@@ -25150,6 +25164,1245 @@
       "A Swift block whose code the build's fence reader and the site's parser read differently (a lazy line in a list item: pageShapes) has two different keys; the site shows it as plain code with a `plantoir: error:` line naming it (siteDisagrees, words.blockNotCompiled). A Swift fence the build's reader cannot see is never compiled, for the same reason.",
       "Swift is compiled by the launcher on a Mac. Windows has no container and compiles nothing in v1.8 (swift.reasons.notOnWindows); deploy.py's own rebuild for a different web address uses only what a preview already compiled.",
       "The first preview with a Swift block downloads about 1.3 GB and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once."
+    ]
+  },
+  "quizCallouts": {
+    "note": "#563, v1.8.0 (the first half of #511). A `> [!quiz]` callout on any page becomes a self-check question a student answers and checks in the browser: multiple choice (one box ticked), select all that apply (two or more), short answer and fill in the blank (an [!answer] callout inside the quiz, one line per blank), with an optional [!explain] shown after the student answers. Self-check only, never a grade book: no accounts, no network, nothing reaches the teacher. The site's half is support/quartz (quizRules.ts - the ONE implementation of these rules, used by the build and by the page's script - plantoirQuizzes.ts, quiz.inline.ts, quiz.scss); the folder check is scripts/quizzes.py, which mirrors recognise and answers.parse and never checks an answer. No frontmatter key: the callout itself opts the page in (documentation/06-quartz-customizations.md -> 'J. Self-check quizzes (#563)'). No trail event: the app does nothing new a teacher sees.",
+    "rule": "Only a TOP-LEVEL quiz is interactive (ruling Q3): a blockquote that starts at the page's left edge - outside any list, fenced code or other blockquote - whose first line, after ONE `>` (at most three spaces in, any spaces after), is a callout of kind `quiz` in any case (`[!quiz]`, `[!QUIZ]-`, `[!quiz|shuffle]+`), read as Quartz's ObsidianFlavoredMarkdown reads a callout: `[!` then the kind (letters, digits, `_`, `-`), an optional `|` and settings up to the first `]`, an optional fold mark, then the title. It runs while its lines carry `>` and over lazy lines that continue a paragraph; an empty line ends it. Inside it, the FIRST list holding a task box (`- [ ]`, `- [x]` or `- [X]`, then a space and more on that line - a box with nothing after it is plain text to the site's parser, measured) is the choices; a nested blockquote at the quiz's own level whose first line is `[!answer]` or `[!explain]` is that callout; everything else is the question. Line endings are read as LF (a CR LF or a lone CR is one ending, review S1), and `%%` comments are taken out before anything is counted, as the site takes them out (review S10). `[!question]`, `[!answer]` and `[!explain]` OUTSIDE a quiz, and `[!quizzes]`, are left exactly as they were, byte for byte; so is a page that only shows quiz syntax inside fenced or indented code (review S2; the implementation review's S1: a `>` four or more columns past its container's content opens nothing, at the page's level, in a quote or under a list item). An HTML block - CommonMark's type 6 (a block-level tag) or type 7 (a line holding only one tag, not after a paragraph), to the next empty line - swallows what it holds on both sides: quiz syntax inside one at the page's level is no quiz and is left byte for byte, and a list of choices inside one makes the quiz `choicesInHtml`.",
+    "recognise": {
+      "note": "Each case is a page's markdown and every quiz on it, in order: `kind` (single | multiple | short | fill) with `correct` (the ticked choices' 0-based places, in Markdown order) or `answers` (the [!answer]'s lines as written, markers off, trimmed, empty lines left out) and `shuffle`; or `problem` (a words.problems key) with its `fill`. `line` is the quiz's first line on the page, 1-based, or for a problem about one answer line (emptyAlternative, badTolerance) that line. `untouched` true: nothing on the page is a quiz, and it renders exactly as without this feature. The order problems are looked for is `order`. Python (scripts/test_quizzes.py) runs every case; the site's side is verify.sh 6k, which plants every case on one page (and the CRLF one on a page saved with CR LF) and reads each quiz's data-quiz-kind and data-quiz-problem back from the built page.",
+      "order": [
+        "unknownOption",
+        "twoChoiceLists",
+        "choiceWithoutBox",
+        "twoAnswers",
+        "choicesAndAnswer",
+        "oneChoice",
+        "noCorrectChoice",
+        "noAnswerLine",
+        "emptyAlternative",
+        "badTolerance",
+        "oneAnswerLine",
+        "blanksAndLines",
+        "choicesInHtml",
+        "nothingToCheck"
+      ],
+      "blanks": "A blank is a code span holding only three or more underscores (`____`), after CommonMark takes one space off each end of a span that has both. Blanks are counted in the quiz's title and its question's own paragraphs - never inside a choice, a fence, a table or a heading. A quiz with blanks and an [!answer] is fill in the blank and needs one answer line per blank, in order.",
+      "settings": "The words after `|` in `[!quiz|...]`, split on `|` and spaces. `shuffle` is the only one; any other is unknownOption.",
+      "cases": [
+        {
+          "name": "multipleChoiceOneTicked",
+          "markdown": "> [!quiz] Which graph shows $y = (x-3)^2 + 2$?\n> - [ ] Vertex at $(-3, 2)$\n> - [x] Vertex at $(3, 2)$\n> - [ ] Vertex at $(3, -2)$\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                1
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "twoTickedIsSelectAll",
+          "markdown": "> [!quiz] Which are prime?\n> - [x] 2\n> - [ ] 4\n> - [x] 5\n",
+          "quizzes": [
+            {
+              "kind": "multiple",
+              "correct": [
+                0,
+                2
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "capitalX",
+          "markdown": "> [!quiz] Pick the even number.\n> - [ ] 3\n> - [X] 4\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                1
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "shortAnswerStraightAfterTitle",
+          "markdown": "> [!quiz] Simplify $2^3 \\cdot 2^4$.\n> > [!answer]- Answer\n> > $2^7$\n>\n> > [!explain]- Why\n> > Same base: add the exponents.\n",
+          "quizzes": [
+            {
+              "kind": "short",
+              "answers": [
+                "$2^7$"
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "shortAnswerWithEmptyLine",
+          "markdown": "> [!quiz] Simplify $2^3 \\cdot 2^4$.\n> > [!answer]- Answer\n> >\n> > $2^7$\n>\n> > [!explain]- Why\n> >\n> > Same base: add the exponents.\n",
+          "quizzes": [
+            {
+              "kind": "short",
+              "answers": [
+                "$2^7$"
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "fillTwoBlanksTwoLines",
+          "markdown": "> [!quiz] Water boils at `____` °C at `____` pressure.\n> > [!answer]-\n> > 100 ± 1 | one hundred\n> > sea level | standard | atmospheric\n",
+          "quizzes": [
+            {
+              "kind": "fill",
+              "answers": [
+                "100 ± 1 | one hundred",
+                "sea level | standard | atmospheric"
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "twoBlanksOneLine",
+          "markdown": "> [!quiz] Water boils at `____` °C at `____` pressure.\n> > [!answer]-\n> > 100\n",
+          "quizzes": [
+            {
+              "problem": "blanksAndLines",
+              "fill": {
+                "blanks": 2,
+                "lines": 1
+              },
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "shuffle",
+          "markdown": "> [!quiz|shuffle] Which is a factor of $x^2 - 5x + 6$?\n> - [x] $x - 2$\n> - [ ] $x + 2$\n> - [ ] $x + 3$\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": true,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "misspeltSetting",
+          "markdown": "> [!quiz|shufle] Which is a factor of $x^2 - 5x + 6$?\n> - [x] $x - 2$\n> - [ ] $x + 2$\n",
+          "quizzes": [
+            {
+              "problem": "unknownOption",
+              "fill": {
+                "option": "shufle"
+              },
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "foldedAnyCase",
+          "markdown": "> [!QUIZ]- Pick the odd number.\n> - [x] 3\n> - [ ] 4\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "nothingToCheck",
+          "markdown": "> [!quiz] What do you notice about the graph?\n> Write a sentence.\n",
+          "quizzes": [
+            {
+              "problem": "nothingToCheck",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "noTickedChoice",
+          "markdown": "> [!quiz] Pick one.\n> - [ ] a\n> - [ ] b\n",
+          "quizzes": [
+            {
+              "problem": "noCorrectChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "oneChoice",
+          "markdown": "> [!quiz] Pick one.\n> - [x] a\n",
+          "quizzes": [
+            {
+              "problem": "oneChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "choicesAndAnswer",
+          "markdown": "> [!quiz] Pick one.\n> - [x] a\n> - [ ] b\n>\n> > [!answer]-\n> > a\n",
+          "quizzes": [
+            {
+              "problem": "choicesAndAnswer",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "itemWithoutABox",
+          "markdown": "> [!quiz] Pick one.\n> - [x] a\n> - b\n> - [ ] c\n",
+          "quizzes": [
+            {
+              "problem": "choiceWithoutBox",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "shortAnswerTwoLines",
+          "markdown": "> [!quiz] Name the capital of Canada.\n> > [!answer]-\n> > Ottawa\n> > ottawa\n",
+          "quizzes": [
+            {
+              "problem": "oneAnswerLine",
+              "fill": {
+                "lines": 2
+              },
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "emptyAnswer",
+          "markdown": "> [!quiz] Name the capital of Canada.\n> > [!answer]-\n",
+          "quizzes": [
+            {
+              "problem": "noAnswerLine",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "tickInAFenceIsNotAChoice",
+          "markdown": "> [!quiz] What does this print?\n> ```python\n> - [x] not a choice\n> ```\n> > [!answer]-\n> > 3\n",
+          "quizzes": [
+            {
+              "kind": "short",
+              "answers": [
+                "3"
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "quizInAList",
+          "markdown": "- A list item\n  > [!quiz] Pick one.\n  > - [x] a\n  > - [ ] b\n",
+          "quizzes": [
+            {
+              "problem": "notAtTopLevel",
+              "line": 2
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "quizInAnotherCallout",
+          "markdown": "> [!example] Try this\n> > [!quiz] Pick one.\n> > - [x] a\n> > - [ ] b\n",
+          "quizzes": [
+            {
+              "problem": "notAtTopLevel",
+              "line": 2
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "questionCalloutUntouched",
+          "markdown": "> [!question] Pick one.\n> - [x] a\n> - [ ] b\n",
+          "quizzes": [],
+          "untouched": true
+        },
+        {
+          "name": "topLevelAnswerUntouched",
+          "markdown": "> [!answer]- Answer\n> 42\n",
+          "quizzes": [],
+          "untouched": true
+        },
+        {
+          "name": "quizzesIsAnotherKind",
+          "markdown": "> [!quizzes] Pick one.\n> - [x] a\n> - [ ] b\n",
+          "quizzes": [],
+          "untouched": true
+        },
+        {
+          "name": "choiceWithAGraph",
+          "markdown": "> [!quiz] Which is the graph of $y = -x^2$?\n> - [ ] Graph A\n>   ```functionplot\n>   y = x^2\n>   ```\n> - [x] Graph B\n>   ```functionplot\n>   y = -x^2\n>   ```\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                1
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "explainWithRunnableCode",
+          "markdown": "> [!quiz] What is 2 + 3?\n> - [x] 5\n> - [ ] 6\n>\n> > [!explain]- Why\n> > Run it:\n> > ```python run\n> > print(2 + 3)\n> > ```\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "lazyLineInTheStem",
+          "markdown": "> [!quiz] Read this.\n> The number\nthat is prime is:\n> - [ ] 4\n> - [x] 5\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                1
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "blankInAChoiceIsNotABlank",
+          "markdown": "> [!quiz] Which sentence is complete?\n> - [x] The cat sat.\n> - [ ] The `____` sat.\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "crlfLineEndings",
+          "markdown": "> [!quiz] Simplify $2^3 \\cdot 2^4$.\r\n> > [!answer]- Answer\r\n> > $2^7$\r\n>\r\n> > [!explain]- Why\r\n> > Same base: add the exponents.\r\n",
+          "quizzes": [
+            {
+              "kind": "short",
+              "answers": [
+                "$2^7$"
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "quizSyntaxShownInAFence",
+          "markdown": "```markdown\n> [!quiz] Pick one.\n> - [x] a\n> > [!answer]- Answer\n> > a\n```\n",
+          "quizzes": [],
+          "untouched": true
+        },
+        {
+          "name": "commentedOutQuizBetweenTwo",
+          "markdown": "> [!quiz] One?\n> - [x] a\n> - [ ] b\n\n%%\n> [!quiz] Hidden?\n> - [ ] a\n%%\n\n> [!quiz] Two?\n> - [ ] a\n> - [x] b\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            },
+            {
+              "kind": "single",
+              "correct": [
+                1
+              ],
+              "shuffle": false,
+              "line": 10
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "badToleranceOnLineTwo",
+          "markdown": "> [!quiz] Water boils at `____` °C at `____` pressure.\n> > [!answer]-\n> > 100\n> > 3.14 ± x\n",
+          "quizzes": [
+            {
+              "problem": "badTolerance",
+              "fill": {
+                "n": 2
+              },
+              "line": 4
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "emptyAlternative",
+          "markdown": "> [!quiz] Name it.\n> > [!answer]-\n> > a |  | b\n",
+          "quizzes": [
+            {
+              "problem": "emptyAlternative",
+              "fill": {
+                "n": 1
+              },
+              "line": 3
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "plusMinusThreeIsAnAnswer",
+          "markdown": "> [!quiz] Solve $x^2 = 9$.\n> > [!answer]-\n> > ±3 | x = ±3\n",
+          "quizzes": [
+            {
+              "kind": "short",
+              "answers": [
+                "±3 | x = ±3"
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "twoAnswers",
+          "markdown": "> [!quiz] Name it.\n> > [!answer]-\n> > a\n>\n> > [!answer]-\n> > b\n",
+          "quizzes": [
+            {
+              "problem": "twoAnswers",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "twoChoiceLists",
+          "markdown": "> [!quiz] Pick one.\n> - [x] a\n> - [ ] b\n>\n> * [ ] c\n> * [x] d\n",
+          "quizzes": [
+            {
+              "problem": "twoChoiceLists",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "lazyLineInTheAnswer",
+          "markdown": "> [!quiz] Water boils at `____` °C at `____` pressure.\n> > [!answer]-\n> > 100\n> sea level\n",
+          "quizzes": [
+            {
+              "kind": "fill",
+              "answers": [
+                "100",
+                "sea level"
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "noSpaceAfterMarkers",
+          "markdown": ">[!quiz] Name it.\n>> [!answer]-\n>> a\n",
+          "quizzes": [
+            {
+              "kind": "short",
+              "answers": [
+                "a"
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aBoxNeedsWordsAfterIt",
+          "markdown": "> [!quiz] Which is the graph of $y = x^2$?\n> - [x] Graph A\n> - [ ] \n>   ```functionplot\n>   y = -x^2\n>   ```\n",
+          "quizzes": [
+            {
+              "problem": "choiceWithoutBox",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "quizAfterAParagraph",
+          "markdown": "Try this one.\n> [!quiz] Pick one.\n> - [x] a\n> - [ ] b\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 2
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "quizSyntaxInIndentedCode",
+          "markdown": "Some text.\n\n    > [!quiz] Shown as code.\n    > > [!answer]- Answer\n    > > a\n",
+          "quizzes": [],
+          "untouched": true
+        },
+        {
+          "name": "quizSyntaxInIndentedCodeInACallout",
+          "markdown": "> [!note] How to write one\n>\n>     > [!quiz] Shown as code.\n>     > > [!answer]- Answer\n>     > > a\n",
+          "quizzes": [],
+          "untouched": true
+        },
+        {
+          "name": "quizSyntaxInIndentedCodeUnderAListItem",
+          "markdown": "- Step one: type this\n\n      > [!quiz] Shown as code.\n      > > [!answer]- Answer\n      > > a\n",
+          "quizzes": [],
+          "untouched": true
+        },
+        {
+          "name": "anHtmlBlockSwallowsTheList",
+          "markdown": "> [!quiz] Pick one.\n> <div>Read this first.</div>\n> - [x] a\n> - [ ] b\n",
+          "quizzes": [
+            {
+              "problem": "choicesInHtml",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aLineHoldingOnlyATagSwallowsTheList",
+          "markdown": "> [!quiz] Pick the smaller picture.\n> <img src=\"Media/a.png\" width=\"20\">\n> - [x] a\n> - [ ] b\n",
+          "quizzes": [
+            {
+              "problem": "choicesInHtml",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "quizSyntaxInAnHtmlBlock",
+          "markdown": "<div>\n> [!quiz] Shown in HTML.\n> > [!answer]-\n> > 4\n</div>\n",
+          "quizzes": [],
+          "untouched": true
+        }
+      ]
+    },
+    "answers": {
+      "note": "One answer line of a short answer or fill-in-the-blank quiz. Both sides PARSE a line (the folder check reports what cannot be read); only the site CHECKS what a student typed (quizRules.accepts). The values given for numbers are compared to within 1e-9.",
+      "separator": "Alternatives are separated by a `|` with a space or tab - or the line's edge - on both sides, so `a|b` and `$|x|$` are one alternative each. `\\|` is a `|` that separates nothing; every other backslash stays as typed. Each alternative is trimmed (JavaScript's trim; figures.js_trim is the Python twin). An empty one - leading, trailing or doubled - is emptyAlternative.",
+      "numbers": "A number is a decimal with an optional sign (+, - or the minus sign U+2212), with or without a leading digit (`.5`, `5.`, `0.50`), or a fraction of two whole numbers whose denominator is not 0, spaces allowed around the slash. ASCII digits only. A number answer accepts any number of the same value: 0.5 = .5 = 1/2 = 2/4 = 1 / 2, and -0 = 0. NOT numbers (ruling Q7, knownLimits): 1e3, 0x10, Infinity, an empty answer, a decimal comma (1,5), a thousands separator (1 000 or 1,000), a mixed number (1 1/2), ½.",
+      "tolerance": "`A ± T` or `A +- T`, where A is a number and T a number that is not negative, accepts every number from A - T to A + T inclusive. Only that shape is a tolerance (ruling S8): text whose part before the first ± is not a number (`±3`, `x = ±3`) is an ordinary answer, and a number then ± then anything but such a number (`3.14 ± x`, `3 ± -1`, `1 ± 2 ± 3`) is badTolerance.",
+      "math": "An alternative that is wholly `$...$` (no `$` inside) is compared on its inner text, and a student's answer wholly in `$...$` is read the same way: `$2^7$` accepts 2^7 and $2^7$, not 2 ^ 7 and not 128. The skill tells a teacher to add plain alternatives.",
+      "normalise": "Before comparing, both the student's answer and a text or math alternative are made NFKC, then lowercased with toLowerCase() and no locale (ruling: so STRASSE is not straße and İstanbul is not istanbul - knownLimits), trimmed, runs of whitespace made one space, curly quotes made straight (’ ‘ ʼ to ', “ ” „ to \", which iPad and iPhone keyboards type), and +- made ±. An empty answer is never checked: the page says words.site.typeFirst.",
+      "parse": {
+        "cases": [
+          {
+            "line": "100",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "number",
+                  "value": 100
+                }
+              ]
+            }
+          },
+          {
+            "line": "100 ± 1 | one hundred",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "tolerance",
+                  "value": 100,
+                  "tolerance": 1
+                },
+                {
+                  "kind": "text",
+                  "text": "one hundred"
+                }
+              ]
+            }
+          },
+          {
+            "line": "3.14 +- 0.01",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "tolerance",
+                  "value": 3.14,
+                  "tolerance": 0.01
+                }
+              ]
+            }
+          },
+          {
+            "line": "0.5 ± 0.01 | one half",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "tolerance",
+                  "value": 0.5,
+                  "tolerance": 0.01
+                },
+                {
+                  "kind": "text",
+                  "text": "one half"
+                }
+              ]
+            }
+          },
+          {
+            "line": "1/2 ± 0.01",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "tolerance",
+                  "value": 0.5,
+                  "tolerance": 0.01
+                }
+              ]
+            }
+          },
+          {
+            "line": "a |  | b",
+            "expect": {
+              "problem": "emptyAlternative"
+            }
+          },
+          {
+            "line": "| a",
+            "expect": {
+              "problem": "emptyAlternative"
+            }
+          },
+          {
+            "line": "a |",
+            "expect": {
+              "problem": "emptyAlternative"
+            }
+          },
+          {
+            "line": "3.14 ± x",
+            "expect": {
+              "problem": "badTolerance"
+            }
+          },
+          {
+            "line": "3 ± -1",
+            "expect": {
+              "problem": "badTolerance"
+            }
+          },
+          {
+            "line": "1 ± 2 ± 3",
+            "expect": {
+              "problem": "badTolerance"
+            }
+          },
+          {
+            "line": "5 +-",
+            "expect": {
+              "problem": "badTolerance"
+            }
+          },
+          {
+            "line": "± 1",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "± 1"
+                }
+              ]
+            }
+          },
+          {
+            "line": "±3 | x = ±3",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "±3"
+                },
+                {
+                  "kind": "text",
+                  "text": "x = ±3"
+                }
+              ]
+            }
+          },
+          {
+            "line": "$2^7$",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "math",
+                  "text": "2^7"
+                }
+              ]
+            }
+          },
+          {
+            "line": "$|x|$",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "math",
+                  "text": "|x|"
+                }
+              ]
+            }
+          },
+          {
+            "line": "a|b",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "a|b"
+                }
+              ]
+            }
+          },
+          {
+            "line": "a \\| b",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "a | b"
+                }
+              ]
+            }
+          },
+          {
+            "line": "C:\\temp | none",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "C:\\temp"
+                },
+                {
+                  "kind": "text",
+                  "text": "none"
+                }
+              ]
+            }
+          },
+          {
+            "line": "sea level | standard | atmospheric",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "sea level"
+                },
+                {
+                  "kind": "text",
+                  "text": "standard"
+                },
+                {
+                  "kind": "text",
+                  "text": "atmospheric"
+                }
+              ]
+            }
+          },
+          {
+            "line": "-3",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "number",
+                  "value": -3
+                }
+              ]
+            }
+          },
+          {
+            "line": "−3",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "number",
+                  "value": -3
+                }
+              ]
+            }
+          },
+          {
+            "line": ".5",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "number",
+                  "value": 0.5
+                }
+              ]
+            }
+          },
+          {
+            "line": "1e3",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "1e3"
+                }
+              ]
+            }
+          },
+          {
+            "line": "0x10",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "0x10"
+                }
+              ]
+            }
+          },
+          {
+            "line": "Infinity",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "Infinity"
+                }
+              ]
+            }
+          },
+          {
+            "line": "1/0",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "1/0"
+                }
+              ]
+            }
+          },
+          {
+            "line": "1,5",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "1,5"
+                }
+              ]
+            }
+          },
+          {
+            "line": "1 1/2",
+            "expect": {
+              "alternatives": [
+                {
+                  "kind": "text",
+                  "text": "1 1/2"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "check": {
+        "note": "`accepted` is whether the student's `input` matches `line`. An empty input is never checked (the page says typeFirst before anything is compared), so it is never accepted.",
+        "cases": [
+          {
+            "line": "100 ± 1 | one hundred",
+            "input": "101",
+            "accepted": true
+          },
+          {
+            "line": "100 ± 1 | one hundred",
+            "input": "99",
+            "accepted": true
+          },
+          {
+            "line": "100 ± 1 | one hundred",
+            "input": "101.01",
+            "accepted": false
+          },
+          {
+            "line": "100 ± 1 | one hundred",
+            "input": "One  Hundred",
+            "accepted": true
+          },
+          {
+            "line": "0.5",
+            "input": ".5",
+            "accepted": true
+          },
+          {
+            "line": "0.5",
+            "input": "1/2",
+            "accepted": true
+          },
+          {
+            "line": "0.5",
+            "input": "2/4",
+            "accepted": true
+          },
+          {
+            "line": "0.5",
+            "input": "0.50",
+            "accepted": true
+          },
+          {
+            "line": "0.5",
+            "input": "1 / 2",
+            "accepted": true
+          },
+          {
+            "line": "0.5",
+            "input": "½",
+            "accepted": false
+          },
+          {
+            "line": "0.5",
+            "input": "1/0",
+            "accepted": false
+          },
+          {
+            "line": "-3",
+            "input": "−3",
+            "accepted": true
+          },
+          {
+            "line": "0",
+            "input": "-0",
+            "accepted": true
+          },
+          {
+            "line": "1000",
+            "input": "1e3",
+            "accepted": false
+          },
+          {
+            "line": "16",
+            "input": "0x10",
+            "accepted": false
+          },
+          {
+            "line": "0",
+            "input": "",
+            "accepted": false
+          },
+          {
+            "line": "0",
+            "input": "   ",
+            "accepted": false
+          },
+          {
+            "line": "$2^7$",
+            "input": "2^7",
+            "accepted": true
+          },
+          {
+            "line": "$2^7$",
+            "input": "$2^7$",
+            "accepted": true
+          },
+          {
+            "line": "$2^7$",
+            "input": "2 ^ 7",
+            "accepted": false
+          },
+          {
+            "line": "$2^7$",
+            "input": "128",
+            "accepted": false
+          },
+          {
+            "line": "don't",
+            "input": "don’t",
+            "accepted": true
+          },
+          {
+            "line": "1/3",
+            "input": "0.333",
+            "accepted": false
+          },
+          {
+            "line": "1/3",
+            "input": "2/6",
+            "accepted": true
+          },
+          {
+            "line": "±3 | x = ±3",
+            "input": "+-3",
+            "accepted": true
+          },
+          {
+            "line": "±3 | x = ±3",
+            "input": "x = +-3",
+            "accepted": true
+          },
+          {
+            "line": "±3 | x = ±3",
+            "input": "3",
+            "accepted": false
+          },
+          {
+            "line": "3.14 +- 0.01",
+            "input": "3.15",
+            "accepted": true
+          },
+          {
+            "line": "3.14 +- 0.01",
+            "input": "3.16",
+            "accepted": false
+          },
+          {
+            "line": "straße",
+            "input": "STRASSE",
+            "accepted": false
+          },
+          {
+            "line": "istanbul",
+            "input": "İstanbul",
+            "accepted": false
+          },
+          {
+            "line": "Ottawa",
+            "input": "  ottawa ",
+            "accepted": true
+          },
+          {
+            "line": "a \\| b",
+            "input": "a | b",
+            "accepted": true
+          },
+          {
+            "line": "sea level | standard | atmospheric",
+            "input": "Standard",
+            "accepted": true
+          },
+          {
+            "line": "１２",
+            "input": "12",
+            "accepted": true
+          }
+        ]
+      }
+    },
+    "shuffle": {
+      "rule": "`|shuffle` puts a quiz's choices in a new order in the student's browser on every load, by moving them - so reading order and keyboard order follow what is seen (CSS `order` was rejected: it breaks WCAG 1.3.2). Without `|shuffle` the order is as written. Markdown order is what prints - under ⌘P and in a printable page's handout - and what a page shows without its script. The order is Fisher-Yates from the last place down: for each place i from n-1 to 1, j = floor(random() * (i + 1)) and the two swap. `cases` give the random numbers in the order drawn and the order that results (the choices' Markdown places). The skill tells an assistant never to shuffle a quiz whose choices name a position (\"All of the above\", \"Both A and B\").",
+      "cases": [
+        {
+          "n": 4,
+          "random": [
+            0,
+            0,
+            0
+          ],
+          "order": [
+            1,
+            2,
+            3,
+            0
+          ]
+        },
+        {
+          "n": 4,
+          "random": [
+            0.99,
+            0.99,
+            0.99
+          ],
+          "order": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "n": 3,
+          "random": [
+            0.5,
+            0.5
+          ],
+          "order": [
+            0,
+            2,
+            1
+          ]
+        },
+        {
+          "n": 5,
+          "random": [
+            0.1,
+            0.7,
+            0.3,
+            0.9
+          ],
+          "order": [
+            3,
+            1,
+            4,
+            2,
+            0
+          ]
+        },
+        {
+          "n": 2,
+          "random": [
+            0.6
+          ],
+          "order": [
+            0,
+            1
+          ]
+        },
+        {
+          "n": 1,
+          "random": [],
+          "order": [
+            0
+          ]
+        }
+      ]
+    },
+    "markup": "What the page's script builds on (quiz.inline.ts), and what a page shows without it. The quiz keeps Quartz's callout (its colours, title and fold) and gains the class plantoir-quiz, data-quiz-n (its place among the page's top-level quizzes), data-quiz-source (the slug of the page it was written on), data-quiz-kind, data-quiz-shuffle, data-quiz-hash (FNV-1a 32 of its source, so a saved score from before the teacher changed it is ignored) and data-quiz (the correct places, or the answer lines: a self-check, so view-source showing answers is accepted, knownLimits). Choices are a <fieldset> labelled by the question (aria-labelledby the title's id), each a real radio button or checkbox inside a <label> with the choice's first line; anything after that line (a graph, an image, code to run) sits OUTSIDE the label, so pressing Run never ticks it, and the box is described by it (aria-describedby), so a choice whose words are 'Graph A' is read with the graph's description or an image's alt text (review S7). A choice with no words of its own - which only markup the site's parser reads as a box can give - is named words.site.choiceNumber, with the figure's description after it. Select all that apply carries words.site.selectAll as its description. No `name` is set when the site is built: the page's script gives each quiz on the page its own, so a quiz shown twice (a transclusion) is never one radio group. A short answer has one text box labelled words.site.answerLabel; a blank becomes a text box labelled words.site.blankLabel. Every box has autocomplete, autocapitalize, autocorrect and spellcheck off and a 16px font (no zoom on focus). The answer is shown in a hidden block (words.site.answerIs - blankAnswerIs for each blank of a fill-in-the-blank question - then alsoAccepted; a tolerance through words.site.tolerance; a `$...$` answer as a formula; in the page's summary and search text each blank reads as `…`), and the explanation is Quartz's own callout inside a hidden block, revealed - and opened - after the first Check or Show answer. Fold titles inside a quiz are role=button, tabindex=0, aria-expanded, and open and close with Enter and Space; the content of a folded quiz or explanation is `inert` until it is opened (review S6). Every task box's tick is taken off the page, so the key never reaches it (plan M7).",
+    "notReady": "A quiz that cannot be checked - any problem in recognise, or one that is not at the top level - shows its question and its choices with every box empty, then words.site.notReady; its answer and explanation are removed from the page (ruling Q6). The folder check names it (siteHealth -> quizzesNotReady, and a `plantoir: error:` line).",
+    "checking": "Check compares the selected choices with the ticked ones exactly (single and multiple), or each box with its answer line (quizRules.accepts). A blank's box is marked right or not right in words AND a sign (words.site.markRight / markWrong), never colour alone, and aria-invalid. The feedback (words.site.right, notRight, someBlanksRight, chooseFirst, typeFirst, answerShown) is a polite live region. Enter in a box is Check. Show answer marks the correct choices with words.site.correctChoice, or shows the answer block.",
+    "storage": {
+      "rule": "Per viewer, in this browser only, and never needed: the page's score is kept in localStorage under `plantoir:quiz:<the site's root path>:<page slug>` as {\"v\": 1, \"quizzes\": {\"<source slug>#<n>\": {\"hash\": \"<data-quiz-hash>\", \"firstTry\": true|false}}}. Keyed by the quiz's SOURCE page and place, so a quiz transcluded from another page keeps its own entry (review S5). An entry whose hash no longer matches is ignored. The score is the quizzes answered right on the FIRST Check (ruling Q4) - a first Check that is wrong, or Show answer before any right Check, counts as not right first time - shown after the page's last quiz as words.site.score once one has been answered, with words.site.startAgain, which clears the page's entry and its answers. Every call to storage is inside try/catch, and a quiz works with storage refused.",
+      "why": "Self-check, never a grade book (#511): nothing leaves the browser and nothing is collected; what is kept is a convenience for the one student at that browser."
+    },
+    "print": "On paper a quiz prints as its question only (ruling Q8; the answer key is #511's): the buttons, feedback, score, answer block, explanation, correctness marks and the not-ready line are hidden; native boxes are hidden and an empty ○ (one answer) or □ (select all) is drawn instead, so a student's selection never prints; a blank prints as an empty line. Choices print in Markdown order. In a printable page's handout the answers of a quiz are in NEITHER the questions part nor the key, and its explanations never print: print.inline.ts gives callouts inside a quiz no role, and the handout's copy removes what a quiz holds back.",
+    "safetyNet": "The folder check writes quartz/plantoir_quiz_pages.json on every build: `examined` (each page it read, by its path in the site's content) and, for each page with a quiz, {quizzes, problems (the n of each it reported), nested, nestedProblems, lines (each top-level quiz's first line in the teacher's file, or null), nestedLines (the same for each quiz that is not at the top level)}. The site compares, page by page, only for pages examined and published: a different count, or a quiz one side reports and the other does not, prints `plantoir: error: <page>: quiz <n>, line <L>: <words.problems.readDifferently>` (the line in the teacher's file when the folder check knows it, from `lines`; when the top-level counts differ, `the quiz at line <L>` of the first quiz the folder check found, or `quiz 1`; when only the quizzes inside a list or callout differ, `a quiz inside a list or another callout at line <L>` from `nestedLines`; never a count). A quiz is matched by its place among the page's top-level quizzes, guarded by the count (a count that differs is one line for the page, since no place can then be trusted); one that is not at the top level by its place among those. The site renders what IT read; the line says the two disagree. It works because the site builds with --concurrency 1 (build_site.py), so the line reaches the build's output (review N1).",
+    "words": {
+      "site": {
+        "note": "English, as data, on a page students read. No word names the machinery (CLAUDE.md rule 1). {n} and {count} are numbers; {answer} and {answers} stand for the answer as shown (a formula stays a formula); {value} and {tolerance} are as the teacher wrote them; {right} and {total} count quizzes on the page.",
+        "check": "Check",
+        "showAnswer": "Show answer",
+        "right": "Right!",
+        "notRight": "Not quite. Try again, or show the answer.",
+        "someBlanksRight": "{right} of {count} blanks are right. Try again, or show the answer.",
+        "chooseFirst": "Choose an answer first.",
+        "typeFirst": "Type an answer first.",
+        "answerShown": "Here is the answer.",
+        "selectAll": "Select all that apply.",
+        "answerLabel": "Your answer",
+        "blankLabel": "Blank {n} of {count}",
+        "choiceNumber": "Choice {n}",
+        "correctChoice": "Correct answer",
+        "markRight": "✓ Right",
+        "markWrong": "✗ Not right",
+        "answerIs": "Answer: {answer}",
+        "blankAnswerIs": "Blank {n}: {answer}",
+        "alsoAccepted": "(also accepted: {answers})",
+        "tolerance": "{value} (± {tolerance})",
+        "score": "{right} of {total} right on the first try",
+        "startAgain": "Start again",
+        "notReady": "This question can’t be checked on this site yet."
+      },
+      "problems": {
+        "note": "Why a quiz cannot be checked, as the folder check and the site's safety net say it - on a `plantoir: error:` line, which an assistant and a teacher read, and in the quizzesNotReady finding. {n} is the answer line's place in the [!answer] (from 1), {lines} and {blanks} counts, {option} the setting as typed.",
+        "nothingToCheck": "it has no ticked choices and no [!answer], so there is nothing to check - tick the right choice with [x], or add an [!answer] inside the quiz",
+        "noCorrectChoice": "none of its choices is ticked - mark the right one with [x]",
+        "oneChoice": "it has only one choice - give it at least two",
+        "choiceWithoutBox": "one of its choices has no box - start every choice with [ ] or [x]",
+        "twoChoiceLists": "it has two lists of choices - keep the choices in one list",
+        "choicesAndAnswer": "it has both choices and an [!answer] - use one or the other",
+        "twoAnswers": "it has two [!answer] callouts - put every answer in one",
+        "noAnswerLine": "its [!answer] has no answer in it - put the answer on the line under its title",
+        "oneAnswerLine": "its [!answer] has {lines} lines but the question has no blank - put every accepted answer on one line, separated by \" | \", or add a `____` blank for each line",
+        "blanksAndLines": "it has {blanks} blanks but {lines} answer lines - give one answer line for each blank, in order",
+        "emptyAlternative": "answer line {n} has an empty answer between its | marks",
+        "badTolerance": "answer line {n} has a ± that is not a number ± a number, like 3.14 ± 0.01",
+        "unknownOption": "“{option}” is not a quiz setting - the only one is shuffle",
+        "choicesInHtml": "a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out",
+      "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
+        "readDifferently": "the site and the folder check read this question differently - preview the site again, and if this line comes back, rewrite it from one of the patterns in the plantoir-quizzes skill"
+      }
+    },
+    "agentGuidance": {
+      "rule": "The skill `plantoir-quizzes` sits beside `plantoir-printing`, `plantoir-math-graphs` and `plantoir-runnable-code` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): paste-ready patterns for every type, alternatives, tolerance and the number forms, `|shuffle` and when not to use it, a choice with a graph, an explanation with a graph or code to run, a mixed five-question check, top level only, what a folder problem looks like, question-writing guidance, and what not to do. It points at plantoir-math-graphs and plantoir-runnable-code rather than repeating them. The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
+      "skill": "plantoir-quizzes"
+    },
+    "knownLimits": [
+      "Only a top-level quiz is interactive (ruling Q3): one inside a list or another callout shows its question with the not-ready line, and the folder check names it.",
+      "`%%` comments are taken out of a page before it is read, even inside an answer line (ObsidianFlavoredMarkdown); an answer cannot contain `%%`.",
+      "An answer line cannot start with `>`: the quiz's and the answer's own markers are taken off, and a third would be read as a quote.",
+      "A `$...$` answer containing ` | ` (spaces around the bar) splits there; write `\\|`.",
+      "Numbers are decimals and fractions only (ruling Q7): no decimal comma (French immersion's 1,5 is a later issue if wanted), no thousands separators, no scientific notation, no mixed numbers, no ½.",
+      "Case is folded with toLowerCase() and no locale: STRASSE is not straße, and İstanbul is not istanbul.",
+      "A self-check, never a grade: the page's source shows the answers to anyone who looks.",
+      "A quiz shown by transclusion (![[Other page#Quiz]]) is checked and scored as its own page's quiz, under the host page's score.",
+      "A popover preview of a page shows its quizzes without Check (the page's script runs on the page itself, not in a popover); their answers stay hidden.",
+      "The folder check reads a page line by line, not with the site's parser (documentation/05): pages written the way the skill shows agree, and where an unusual nesting is read differently the site's safety net says so on a `plantoir: error:` line.",
+        "Two HTML shapes are still read differently by the site and the folder check (#563 final review, 2026-10-17): a tag whose quoted attribute holds a `>` (`<img alt=\"x>y\">`) and an open `<pre>`, `<script>`, `<style>` or `<textarea>` before the choices. The safety net catches both and the page says so on its `plantoir: error:` line; neither is a shape the skill shows."
     ]
   }
 }
