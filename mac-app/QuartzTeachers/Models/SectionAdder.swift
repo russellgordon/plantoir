@@ -757,13 +757,16 @@ enum SectionAdder {
     /// The text a `title:` line's value stands for, or nil when this reader
     /// does not take its form.
     ///
-    /// Plain: the value itself. Double-quoted: decoded as a JSON string, which
-    /// is exactly what `FolderScaffold.frontmatterTitle` writes; YAML's
-    /// double-quoted escapes are a superset of JSON's (`\x41`, `\e`), so a
-    /// value only YAML can decode, or one with a comment after its closing
-    /// quote, is nil. Single-quoted: the quotes stripped and `''` read as `'`.
-    /// A nil sends `sectionTitle` to the wizard's form, which is what an
-    /// unreadable sibling has always given.
+    /// Wrapped in double quotes: decoded as a JSON string, which is exactly
+    /// what `FolderScaffold.frontmatterTitle` writes; YAML's double-quoted
+    /// escapes are a superset of JSON's (`\x41`, `\e`), so a value only YAML
+    /// can decode is nil, and nil sends `sectionTitle` to the wizard's form —
+    /// what an unreadable sibling has always given. Wrapped in single quotes:
+    /// the quotes stripped and `''` read as `'`. Anything else, including a
+    /// quote that never closes (`'Tis the Season, Section 1`, which the build
+    /// cannot read either), is taken as written, so the teacher's wording is
+    /// kept and the new title is quoted readably; a comment after a closing
+    /// quote then hides "Section 1" from the swap, which gives the form too.
     static func plainTitle(fromValue value: String) -> String? {
         if value.count >= 2 && value.hasPrefix("\"") && value.hasSuffix("\"") {
             let wrapped: String = "[" + value + "]"
@@ -774,15 +777,9 @@ enum SectionAdder {
             }
             return decoded[0]
         }
-        if value.hasPrefix("\"") {
-            return nil
-        }
         if value.count >= 2 && value.hasPrefix("'") && value.hasSuffix("'") {
             let inside: String = String(value.dropFirst().dropLast())
             return inside.replacingOccurrences(of: "''", with: "'")
-        }
-        if value.hasPrefix("'") {
-            return nil
         }
         return value
     }
