@@ -33,6 +33,12 @@ nonisolated enum ActivityTrail {
     /// an event is not.
     enum Event: String, CaseIterable, Sendable {
         case appOpened = "app opened"
+        /// Plantoir closed (#560): why — quit by the teacher, to install a
+        /// new version, or because the Mac is logging out, restarting or
+        /// shutting down — and the process id, so it pairs with its own
+        /// `appOpened` line. Without it a trail that stops cannot tell a
+        /// crash from a quit.
+        case appClosed = "app closed"
         case machine = "machine described"
         case helpers = "helpers described"
         case workingFolderOpened = "working folder opened"
@@ -1381,6 +1387,17 @@ nonisolated enum ActivityTrail {
     static func noteLaunch() {
         ActivityTrail.note(.appOpened, "Plantoir opened — " + ProblemReportEnvironment.appDescription)
         ActivityTrail.note(.machine, "running on " + ProblemReportEnvironment.systemDescription)
+    }
+
+    /// The line that closes a session (#560): "Plantoir closed — quit by
+    /// the teacher · pid 4711". The pid is the same one the session's
+    /// "Plantoir opened" line carries, so two copies running at once still
+    /// pair up.
+    static func closedLine(
+        reason: QuitConfirmation.ClosingReason,
+        processIdentifier: Int32 = ProcessInfo.processInfo.processIdentifier
+    ) -> String {
+        return "Plantoir closed — \(reason.words) · pid \(processIdentifier)"
     }
 
     /// The helper programs this launch found, as measured.
