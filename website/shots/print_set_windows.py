@@ -90,8 +90,17 @@ def launcher_environment() -> dict:
 
 
 def shots_of_kind(kind: str) -> list[dict]:
+    """The print set's shots of `kind`: scene `print-set` only. Other
+    `preview-page` shots are pages of other previews — the Code page's
+    figures (#562, scene `code`) are ICS3U's and ICS4U's, which MPM2D's
+    preview would answer with a 404 — and Windows takes none of them yet."""
     manifest = json.loads((WEBSITE / "shots.json").read_text(encoding="utf-8"))
-    return [shot for shot in manifest["shots"] if shot.get("capture", {}).get("kind") == kind]
+    wanted = []
+    for shot in manifest["shots"]:
+        capture = shot.get("capture", {})
+        if capture.get("kind") == kind and capture.get("scene") == "print-set":
+            wanted.append(shot)
+    return wanted
 
 
 def recipe_folders() -> list[str]:
