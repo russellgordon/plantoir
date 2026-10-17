@@ -112,12 +112,13 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-10-16 | Pages inside an open folder of a class site's sidebar have a small dot, so a long title that wraps reads as one page | mac (Windows when its toolchain next ships; shared `support/quartz`) | #515 |
+| 2026-10-16 | Pages inside an open folder of a class site's sidebar have a small dot, so a long title that wraps reads as one page | mac; Windows in 1.7.2 (shared `support/quartz`; confirmed natively, #546) | #515 |
 | 2026-10-16 | A scheduled deploy no longer asks for the computer to be plugged in; the plan says a PC on battery sleeps sooner, so keep it awake | Windows (mac shipped it in v1.7.2, #521) | #547 |
 | 2026-10-16 | An outside assistant's How I Teach plan refuses a course kept for reference, as the write does | Windows (mac already did) | #540 |
 | 2026-10-16 | The assistant's Make Room for Classes plan says Undo will not take it back when other classes move | Windows (mac already did) | #530 |
 | 2026-10-16 | Section menu trail endings: a partial undo says it took part of the last change back; a Re-date, publish or hide that stops part way says which pages were written, and one whose first write fails says nothing was changed | Windows (mac shipped it in v1.7.2, #531) | #550 |
 | 2026-10-16 | Section ▸ Publish Pages…, Hide Pages… and Publish Class for a Date… show their plan as a table: a summary line, one row per page (Page / Folder / What changes, sortable), the card's other sentences under it | Windows (mac shipped it in v1.7.2, #524) | #548 |
+| 2026-10-16 | The window opens no narrower than its minimum (900 epx), so at 150% scaling it no longer starts at 793 epx with the section title cut short; the toolbar's Preview, Deploy and Browser buttons are whole from the first launch | Windows (the mac's minimum already held) | #542 |
 
 ## Warnings the release notes MUST carry
 

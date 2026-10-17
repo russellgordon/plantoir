@@ -68,7 +68,9 @@ public class CopyAPageDialogUiTests
     {
         using var app = new DrivenApp(WriteCourses);
         var window = app.Window;
-        // The smallest height the window allows: asked for 100, given its minimum.
+        // The smallest height the window allows: asked for 100, given its
+        // minimum, 600 epx (900 px at 150%; the width likewise goes to at least
+        // 900 epx, #542).
         window.Patterns.Transform.Pattern.Resize(1100, 100);
         double scale = GetDpiForWindow(window.Properties.NativeWindowHandle.Value) / 96.0;
 

@@ -49,17 +49,49 @@ public sealed partial class MainWindow : Window
         int defaultHeight = Math.Clamp((int)(workArea.Height * 0.72), 680, 1400);
         int width = frame is { Width: > 200 } ? (int)frame.Width : defaultWidth;
         int height = frame is { Height: > 200 } ? (int)frame.Height : defaultHeight;
+        // The minimum goes on BEFORE the first Resize, and the size is clamped
+        // up to it (#542). Setting a minimum does not grow a window that is
+        // already narrower, so the old order opened a first run at 1190 px on a
+        // 1920 work area, 793 epx at 150%, under the 900 epx minimum: the
+        // section title cut to "MP…" until the teacher touched the edge.
+        //
+        // The window is MOVED first, so the scale and the work area are read
+        // from the display it will be sized for: a remembered frame to where it
+        // was (kept in pixels, a frame from a 150% screen is narrower in epx on
+        // a 225% one), a first run to the primary work area it is sized from
+        // (WinUI may have created the window on another monitor), and centred
+        // there after the Resize.
+        bool remembered = frame is { X: > -10000, Y: > -10000 };
+        AppWindow.Move(remembered ? new PointInt32((int)frame!.X, (int)frame.Y)
+                                  : new PointInt32(workArea.X, workArea.Y));
+        var (minWidth, minHeight) = ApplyMinimumSize(ScaleOfDisplay());
+        width = Math.Max(width, minWidth);
+        height = Math.Max(height, minHeight);
         AppWindow.Resize(new SizeInt32(width, height));
-        if (frame is { } f && f.X > -10000 && f.Y > -10000)
-            AppWindow.Move(new PointInt32((int)f.X, (int)f.Y));
-        else   // First run: sit centred on the work area rather than at (0,0).
+        if (!remembered)   // First run: sit centred on the work area rather than at (0,0).
             AppWindow.Move(new PointInt32(
                 workArea.X + (workArea.Width - width) / 2,
                 workArea.Y + (workArea.Height - height) / 2));
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-            presenter.PreferredMinimumWidth = 900;
-        if (AppWindow.Presenter is OverlappedPresenter minPresenter)
-            minPresenter.PreferredMinimumHeight = 600;
+        // Once the content has a XamlRoot, and whenever its scale changes (a
+        // monitor move, a display-scale change), the minimum is re-applied AND
+        // a window left below it is grown to it, since the minimum alone does
+        // not grow one. This path, and the multi-monitor case above, are held
+        // by reading the code: the UiFact runs on one display at one scale.
+        bool watchingScale = false;
+        if (Content is FrameworkElement rootElement)
+            rootElement.Loaded += (_, _) =>
+            {
+                if (watchingScale || Content?.XamlRoot is not { } xamlRoot) return;
+                watchingScale = true;
+                EnforceMinimumSize(xamlRoot.RasterizationScale);
+                double applied = xamlRoot.RasterizationScale;
+                xamlRoot.Changed += (root, _) =>
+                {
+                    if (root.RasterizationScale == applied) return;
+                    applied = root.RasterizationScale;
+                    EnforceMinimumSize(applied);
+                };
+            };
 
         // Title-bar and Alt-Tab icon. The exe's ApplicationIcon covers
         // Explorer and pinned taskbar buttons; a live window wants its own.
@@ -523,6 +555,76 @@ public sealed partial class MainWindow : Window
 
     /// <summary>True once this window has closed; a closed window cannot show anything.</summary>
     public bool IsClosed { get; private set; }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int dpiType, out uint dpiX, out uint dpiY);
+
+    /// <summary>The scale of the display the window is on NOW, read from the
+    /// monitor rather than the window: before the window is shown, a Move to
+    /// another monitor need not have changed the window's own DPI yet.</summary>
+    private double ScaleOfDisplay()
+    {
+        IntPtr monitor = MonitorFromWindow(WinRT.Interop.WindowNative.GetWindowHandle(this), 2 /* nearest */);
+        return GetDpiForMonitor(monitor, 0 /* effective */, out uint dpi, out _) == 0 && dpi > 0 ? dpi / 96.0 : 1.0;
+    }
+
+    /// <summary>Re-applies the minimum for this scale and grows a window
+    /// that is below it — unless it is maximised, where the display decides
+    /// the size, or minimised, where a Resize would act on an icon.</summary>
+    private void EnforceMinimumSize(double scale)
+    {
+        var (minWidth, minHeight) = ApplyMinimumSize(scale);
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized or OverlappedPresenterState.Minimized }) return;
+        var size = AppWindow.Size;
+        if (size.Width < minWidth || size.Height < minHeight)
+            AppWindow.Resize(new SizeInt32(Math.Max(size.Width, minWidth), Math.Max(size.Height, minHeight)));
+    }
+
+    /// <summary>
+    /// The window's minimum, 900 × 600 epx (the mac's 900 × 600 points,
+    /// <c>WindowChrome.minimumWindowWidth</c>), clamped to the work area of the
+    /// display the window is on, and returned in PHYSICAL pixels for sizing.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>PreferredMinimumWidth</c>/<c>Height</c> are effectively epx:
+    /// MEASURED 2026-10-16 (i5-8365U, Windows 11 Pro 26200, 1920 × 1080 at
+    /// 150%), a UI Automation resize to 400 × 400 px stopped at 1350 × 900 px
+    /// read by a per-monitor-aware <c>GetWindowRect</c>, which is 900 × 600
+    /// epx. #542 was filed on the reading that they are pixels; what was
+    /// actually wrong is the ORDER in the constructor (see the call site).</para>
+    ///
+    /// <para>The clamp is the one thing a scale changes: 900 epx is 2025 px at
+    /// 225%, wider than a 1920 work area, and a minimum wider than the screen
+    /// would trap the window. So it is re-applied, and a window below it is
+    /// grown (<see cref="EnforceMinimumSize"/>), when the XamlRoot's scale
+    /// changes (a monitor move or a display-scale change). That path is held
+    /// by reading the code, not by a test: there is one screen here, and the
+    /// display scale is not changed by a test. At 225% and above the clamped
+    /// window is narrower than 900 epx, so the toolbar can still be cut there
+    /// (doc 12, "Toolbar width").</para>
+    ///
+    /// <para>REJECTED: <c>900 × scale</c> as the minimum, which #542 proposed.
+    /// The presenter scales it already, so that would ask for 1350 epx (2025 px)
+    /// at 150%. NOT TAKEN: buttons that shrink to their glyphs, which the mac
+    /// does not have; at 200% and below nothing needs them, and at 225% and
+    /// above they are the remaining option.</para>
+    /// </remarks>
+    private (int width, int height) ApplyMinimumSize(double scale)
+    {
+        if (scale <= 0) scale = 1;
+        var work = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        int minWidth = Math.Min(900, (int)(work.Width / scale));
+        int minHeight = Math.Min(600, (int)(work.Height / scale));
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.PreferredMinimumWidth = minWidth;
+            presenter.PreferredMinimumHeight = minHeight;
+        }
+        return ((int)Math.Round(minWidth * scale), (int)Math.Round(minHeight * scale));
+    }
 
     /// <summary>
     /// Bring this window onto the screen ONLY if it is not already there —
