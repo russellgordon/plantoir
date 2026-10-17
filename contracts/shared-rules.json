@@ -1338,6 +1338,57 @@
         }
       ]
     },
+    "coverageMapLinks": {
+      "rule": "The coverage map's links — each specific expectation's cell and each overall expectation's chip — are the slugs Quartz serves those pages at: Quartz v4.5.0's sluggify on every path segment (white space to -, & to -and-, % to -percent, ? and # dropped), the same slugs the backlinks panel compares. Each case lays out `pages` (relative to the content folder) in the curriculum folders `folders`, builds the map, and reads the href of the `reads` link (a cell or a chip) for `code`.",
+      "why": "#569: the map's links replaced only spaces, so a % in an expectation's file name stopped the build (URI malformed in Quartz's transformInternalLink) and a # or & gave a link to a page that is not there. Escaping was chosen over refusing the name with a folder problem: Quartz already serves the page at its slug, so only our href was wrong, and a refusal would have been a new sentence for a teacher to act on where nothing needs doing. Only scripts/test_coverage_maps.py runs these: the map is written by the build alone. verify.sh 6h plants a page with % in the Example Course and reads the built map. No case uses ? or :, which NTFS refuses in a name.",
+      "cases": [
+        {
+          "name": "a % in an overall expectation's name: the chip links Quartz's slug",
+          "folders": ["Curriculum"],
+          "pages": ["Curriculum/A3. Subprograms 100% Done.md", "Curriculum/A3.1.md"],
+          "reads": "chip",
+          "code": "A3",
+          "href": "Curriculum/A3.-Subprograms-100-percent-Done",
+          "why": "Measured (#569): the old href kept the raw %, and Quartz's decodeURI stopped the build with URI malformed on the coverage map. Quartz serves the page at -percent already. A chip needs a specific expectation of its overall in the folder, hence A3.1."
+        },
+        {
+          "name": "a # in an overall expectation's name is dropped, as Quartz drops it",
+          "folders": ["Curriculum"],
+          "pages": ["Curriculum/A3. C# Basics.md", "Curriculum/A3.1.md"],
+          "reads": "chip",
+          "code": "A3",
+          "href": "Curriculum/A3.-C-Basics",
+          "why": "The old href kept the #, which a browser reads as the start of a fragment: the chip pointed at Curriculum/A3.-C. C# is the likeliest real name to carry one, and NTFS allows #."
+        },
+        {
+          "name": "a curriculum folder named with &: the cell links Quartz's slug",
+          "folders": ["Q&A Curriculum"],
+          "pages": ["Q&A Curriculum/B1.1.md"],
+          "reads": "cell",
+          "code": "B1.1",
+          "href": "Q-and-A-Curriculum/B1.1",
+          "why": "The old href was Q&A-Curriculum/B1.1, a page Quartz does not serve."
+        },
+        {
+          "name": "a folder name holding a full stop is slugged whole, not as a file stem",
+          "folders": ["Gr. 9 Curriculum"],
+          "pages": ["Gr. 9 Curriculum/B1.1.md"],
+          "reads": "cell",
+          "code": "B1.1",
+          "href": "Gr.-9-Curriculum/B1.1",
+          "why": "Not a failure before #569: the old spaces-only helper gave the same href. It guards the shared helper, which works on whole segments; Path.stem on the folder would give Gr."
+        },
+        {
+          "name": "a name with nothing to escape keeps the href it always had",
+          "folders": ["Curriculum"],
+          "pages": ["Curriculum/B1. Systems.md", "Curriculum/B1.1.md"],
+          "reads": "chip",
+          "code": "B1",
+          "href": "Curriculum/B1.-Systems",
+          "why": "Measured on the #569 review: the new rule and the old one agree on all 13,998 file and folder names under support/, so no existing link moves."
+        }
+      ]
+    },
     "coverageMapOrder": {
       "rule": "How a coverage map lays out its codes. Each code sits in a column: a letter-first code under its letter, UPPER-CASED (b2.3 is column B); a skill under its number (1.A is column 1); a learning objective under its prefix (CRD-1.A is column CRD). Columns: letters alphabetically, then skill numbers in number order, then learning-objective prefixes alphabetically. Within a column: by number, then by the part after the dot (A2.1 before A10.1; CRD-2.A before CRD-10.A). Only letter-first codes have an overall expectation (B2 for b2.3), and so chips.",
       "why": "The map is drawn by the build alone, so only scripts/test_coverage_maps.py runs these; they are here because the order is a decision somebody will be asked about, and the old sort key crashed on the first code it had not been written for (int('') for 1.A).",
@@ -1449,7 +1500,7 @@
             "Curriculum/C1.-Research--and--Inquiry-Skills": ["Lessons/Day-5", "Lessons/Day-8"],
             "Curriculum/D1.-Nothing-Below": ["Lessons/Day-6"]
           },
-          "why": "c1.2 is C1's (overall_of upper-cases); a specific expectation in a unit subfolder still counts; Quartz writes & as -and-, which the coverage map's own slug helper does not."
+          "why": "c1.2 is C1's (overall_of upper-cases); a specific expectation in a unit subfolder still counts; Quartz writes & as -and-; the coverage map's links use the same slug since #569."
         },
         {
           "name": "College Board codes have no overall expectation and gather nothing",
@@ -1463,6 +1514,24 @@
             "AP-Framework/1.A": ["Lessons/Day-1"]
           },
           "why": "overall_of is None for a digit-first code or a learning objective; their pages keep their direct links."
+        },
+        {
+          "name": "a curriculum folder named with & is left out of the panel by its slug (#569)",
+          "folders": ["Q&A Curriculum"],
+          "curriculumPages": ["Q&A Curriculum/B1. Asking Questions", "Q&A Curriculum/B1.1", "Q&A Curriculum/index"],
+          "sitePages": [
+            {"slug": "Q-and-A-Curriculum/index", "links": ["Q-and-A-Curriculum/B1.1"]},
+            {"slug": "Curriculum-Coverage", "links": ["Q-and-A-Curriculum/B1.1"]},
+            {"slug": "Lessons/Day-3", "links": ["Q-and-A-Curriculum/B1.1"]}
+          ],
+          "children": {
+            "Q-and-A-Curriculum/B1.-Asking-Questions": ["Q-and-A-Curriculum/B1.1"]
+          },
+          "backlinks": {
+            "Q-and-A-Curriculum/B1.1": ["Lessons/Day-3"],
+            "Q-and-A-Curriculum/B1.-Asking-Questions": ["Lessons/Day-3"]
+          },
+          "why": "The structural set named the folder Q&A Curriculum and Q&A-Curriculum, while its index page's slug starts Q-and-A-Curriculum: the index, which transcludes everything, was listed on every expectation (measured on the #569 plan). The set now carries Quartz's slug of each folder and map title."
         }
       ],
       "rejected": [
