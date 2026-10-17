@@ -151,9 +151,10 @@ internal static class NamedGapLedger
         keys.Select(key => new Entry(area, key, issue, milestone, reason));
 
     // Reasons, one per owning issue, as `private const string` beside the
-    // milestones above. EMPTY since 2026-10-15: the catch-up to mac 1.7.1
-    // (#481) closed its last two entries — #514's two trail events — when
-    // Preview at Last Viewed landed in batch 6.
+    // milestones above. EMPTY since 2026-10-16: #548 closed the sixteen
+    // plan-table sentences (mac #524) that #551's piece held open that
+    // morning, when the plan table landed. (Empty before that from
+    // 2026-10-15, when the catch-up to mac 1.7.1, #481, closed its last two.)
 
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
@@ -177,8 +178,9 @@ internal static class NamedGapLedger
         // ---- app-rules.json → modelTiers.requirements
 
         // ---- assist-wording.json → wording: none held open. The Section
-        // menu's sentences landed with #489's 2B, and the Deploy question's
-        // seventeen (mac #475) with 2C.
+        // menu's sentences landed with #489's 2B, the Deploy question's
+        // seventeen (mac #475) with 2C, and mac #524's sixteen plan-table
+        // sentences (plan*, menuPlan*) with #548's plan table.
 
         // ---- assist-cases.json → scenarios.cases: none held open. #475's
         // three landed with #489's 2C.

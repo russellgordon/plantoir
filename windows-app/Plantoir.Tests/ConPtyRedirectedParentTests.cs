@@ -22,7 +22,13 @@ public class ConPtyRedirectedParentTests
 
         using var pty = ConPtyProcess.Start("cmd.exe /c echo PTY-OK", Path.GetTempPath());
         var transcript = new StringBuilder();
-        var reader = Task.Run(() =>
+        // A DEDICATED thread reads, as the product's does (ScriptRunner's
+        // reader is a `new Thread`), not a pool one (#427). Read blocks, and a
+        // pool reader at the start of a full run can wait for a thread longer
+        // than the test waits for it: the child exits at once and the
+        // transcript comes back EMPTY, which is not #155's shape (mode
+        // sequences and no PTY-OK). Both waits are 30 s; a pass takes ~50 ms.
+        var reader = new Thread(() =>
         {
             var buffer = new byte[4096];
             int read;
@@ -31,13 +37,14 @@ public class ConPtyRedirectedParentTests
                 lock (transcript) transcript.Append(Encoding.UTF8.GetString(buffer, 0, read));
                 lock (transcript) if (transcript.ToString().Contains("PTY-OK")) return;
             }
-        });
-        bool exited = pty.WaitForExit(10_000);
-        reader.Wait(TimeSpan.FromSeconds(10));
+        }) { IsBackground = true, Name = "ConPTY test reader" };
+        reader.Start();
+        bool exited = pty.WaitForExit(30_000);
+        reader.Join(TimeSpan.FromSeconds(30));
         string seen;
         lock (transcript) seen = transcript.ToString();
         Assert.True(seen.Contains("PTY-OK"),
-            $"The child's output did not reach its pseudo console within 10 s (exited: {exited}; {handles}). " +
+            $"The child's output did not reach its pseudo console within 30 s (exited: {exited}; {handles}). " +
             $"Transcript: [{seen.Replace("\u001b", "ESC")}]");
     }
 

@@ -99,7 +99,7 @@ Found while qualifying the mac for v1.1.0. The Windows bundle should adopt
 the same number as its version's fourth field when convenient (its trail
 currently prints the patch digit, which conflates two ideas).
 
-## Landed since v1.7.1 — ships in the next release
+## Landed since v1.7.2 — ships in the next release
 
 Features that are **complete, merged to `dev`, and waiting only for a tag**.
 This is a reading aid, not a source of truth: the release notes are drafted
@@ -112,7 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-10-16 | Pages inside an open folder of a class site's sidebar have a small dot, so a long title that wraps reads as one page | mac (Windows when its toolchain next ships; shared `support/quartz`) | #515 |
+
 
 ## Warnings the release notes MUST carry
 

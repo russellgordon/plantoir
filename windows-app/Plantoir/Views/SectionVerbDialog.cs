@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Item = Plantoir.Core.Models.SubjectMenuRules.Item;
@@ -16,7 +17,8 @@ namespace Plantoir.Views;
 /// The Section menu's ONE dialog (#489, the mac's <c>SectionVerbSheet</c>):
 /// a single <see cref="ContentDialog"/> that moves through its stages —
 /// Choose (the pages, the day, the class and how many) → Plan (the plan
-/// twin's own card, with the verb's button) → Working → Result — rather than
+/// twin's own card, with the verb's button; for the three page items a TABLE
+/// since #548) → Working → Result — rather than
 /// a dialog per stage, because WinUI shows one ContentDialog at a time and a
 /// second asked for while the first is closing is refused.
 /// </summary>
@@ -72,7 +74,26 @@ internal sealed class SectionVerbDialog
             DefaultButton = ContentDialogButton.Primary,
         };
         AutomationProperties.SetAutomationId(_dialog, "sectionVerbDialog");
+        if (ShowsAPlanTable(item))
+        {
+            // Wide enough for the plan table's three columns, and the SAME
+            // width at every stage: a dialog that widened at the plan would
+            // jump (the mac rejected widening mid-flow for that, #524). Never
+            // wider than the window less a margin. The window opens at its
+            // 900 epx minimum at every scale since #542 (it was 680 and 595
+            // epx wide at 175% and 200% before), but that minimum is clamped
+            // to the work area, so a narrow display still gets a narrower root.
+            if (root.Size.Width > 0)
+                _planWidth = Math.Min(PlanTableDialogWidth, root.Size.Width - 2 * PlanDialogMargin);
+            _dialog.Resources["ContentDialogMinWidth"] = _planWidth;
+            _dialog.Resources["ContentDialogMaxWidth"] = _planWidth;
+        }
         _dialog.PrimaryButtonClick += PrimaryPressed;
+        // The plan table's resize handler is on the WINDOW's XamlRoot, which
+        // outlives this dialog: a close at the plan (Cancel, Escape) changes
+        // neither the stage nor the content, so the handler's own guard never
+        // fires, and it would stay for the window's life. Taken off here.
+        _dialog.Closed += (_, _) => StopRefitting();
         _dialog.Closing += (_, args) =>
         {
             // While a call runs, nothing closes it — Escape included.
@@ -327,6 +348,240 @@ internal sealed class SectionVerbDialog
         _dialog.CloseButtonText = AssistWording.MenuCancelButton;
     }
 
+    // ---- The plan as a table (#548, the mac's #524) -----------------------------------
+
+    /// <summary>The three items whose plan is a page plan, shown as a table.</summary>
+    private static bool ShowsAPlanTable(Item item) =>
+        item is Item.PublishPages or Item.HidePages or Item.PublishClassForADate;
+
+    /// <summary>The dialog's width for those three at most, pinned at construction.</summary>
+    private const double PlanTableDialogWidth = 680;
+
+    /// <summary>What the dialog leaves of the window at each side when the window is narrower than that.</summary>
+    private const double PlanDialogMargin = 24;
+
+    /// <summary>The ContentDialog's own padding at each side of its content.</summary>
+    private const double DialogPadding = 24;
+
+    private double _planWidth = PlanTableDialogWidth;
+
+    /// <summary>The plan table's handler on the window's <c>XamlRoot.Changed</c>, while one is attached.</summary>
+    private Windows.Foundation.TypedEventHandler<XamlRoot, XamlRootChangedEventArgs>? _refit;
+    private XamlRoot? _refitRoot;
+
+    private void StopRefitting()
+    {
+        if (_refit is not null && _refitRoot is not null) _refitRoot.Changed -= _refit;
+        _refit = null;
+        _refitRoot = null;
+    }
+
+    /// <summary>
+    /// The plan stage of the three page items: the summary, a read-only table
+    /// of EVERY page (sortable by its headers), and the card's other sentences
+    /// under it. Built from the rows the menu's server sent, never by parsing
+    /// the card. Return still presses the verb's button and Escape Cancel while
+    /// the table has focus (measured, doc 12).
+    /// </summary>
+    private void ShowPlanTable(PlanTable table)
+    {
+        _stage = Stage.Plan;
+        var panel = new StackPanel { Spacing = 8 };
+
+        var summary = Words(table.Summary);
+        summary.MaxWidth = double.PositiveInfinity;
+        summary.IsTextSelectionEnabled = true;
+        AutomationProperties.SetAutomationId(summary, "sectionVerbPlan");
+        panel.Children.Add(summary);
+
+        Grid Columns()
+        {
+            var grid = new Grid { ColumnSpacing = 12 };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            return grid;
+        }
+
+        // The notes first, so their height is known before the rows are counted.
+        StackPanel? notes = null;
+        double notesNatural = 0;
+        if (table.Notes.Count > 0)
+        {
+            notes = new StackPanel { Spacing = 6 };
+            for (int i = 0; i < table.Notes.Count; i++)
+            {
+                var note = Words(table.Notes[i]);
+                note.MaxWidth = double.PositiveInfinity;
+                note.IsTextSelectionEnabled = true;
+                AutomationProperties.SetAutomationId(note, $"sectionVerbPlanNote{i}");
+                notes.Children.Add(note);
+            }
+            notes.Measure(new Windows.Foundation.Size(_planWidth - 2 * DialogPadding, double.PositiveInfinity));
+            notesNatural = notes.DesiredSize.Height;
+        }
+
+        var list = new ListView
+        {
+            SelectionMode = ListViewSelectionMode.None,
+            IsItemClickEnabled = false,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            TabIndex = 1,
+        };
+        if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out var stroke) && stroke is Brush brush)
+            list.BorderBrush = brush;
+        AutomationProperties.SetAutomationId(list, "sectionVerbPlanTable");
+        AutomationProperties.SetName(list, table.Summary);
+
+        var rowItems = new Dictionary<int, ListViewItem>();
+        foreach (var row in table.Rows)
+        {
+            var grid = Columns();
+            string[] cells = { row.Title, row.Folder, row.WhatChanges };
+            for (int i = 0; i < cells.Length; i++)
+            {
+                var cell = new TextBlock
+                {
+                    Text = cells[i],
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextWrapping = TextWrapping.NoWrap,
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+                // A cell's tooltip carries its whole text, as on the mac.
+                ToolTipService.SetToolTip(cell, cells[i]);
+                Grid.SetColumn(cell, i);
+                grid.Children.Add(cell);
+            }
+            var item = new ListViewItem { Content = grid, MinHeight = PlanTableLayout.RowPitch, Padding = new Thickness(12, 0, 12, 0) };
+            AutomationProperties.SetAutomationId(item, $"sectionVerbPlanRow{row.Position}");
+            AutomationProperties.SetName(item, $"{row.Title}, {row.Folder}, {row.WhatChanges}");
+            rowItems[row.Position] = item;
+        }
+
+        var order = PlanTableOrder.Opening;
+        void Fill()
+        {
+            list.Items.Clear();
+            foreach (var row in PlanTableOrder.Sorted(table.Rows, order.Column, order.Ascending))
+                list.Items.Add(rowItems[row.Position]);
+        }
+
+        // The headers sort. They stay in the Tab order, AFTER the table
+        // (TabIndex 2), so Tab reaches the table first; Return on a focused
+        // header sorts, as a button does (doc 12).
+        var header = Columns();
+        header.Margin = new Thickness(13, 0, 13, 0);   // over the table's border and the rows' padding
+        var sortButtons = new List<(Button Button, string Title, PlanTableOrder.Column Column)>();
+        void TitleTheHeaders()
+        {
+            foreach (var (button, title, column) in sortButtons)
+            {
+                button.Content = PlanTableOrder.Header(title, column, order);
+                // The arrow is drawn, so Narrator is TOLD it too.
+                AutomationProperties.SetName(button, column != order.Column ? $"Sort by {title}"
+                    : $"Sort by {title}, sorted {(order.Ascending ? "ascending" : "descending")}");
+            }
+        }
+        foreach (var (title, column, slot, id) in new[]
+                 {
+                     (AssistWording.MenuPlanPageColumn, PlanTableOrder.Column.Page, 0, "sectionVerbPlanSortPage"),
+                     (AssistWording.MenuPlanFolderColumn, PlanTableOrder.Column.Folder, 1, "sectionVerbPlanSortFolder"),
+                     (AssistWording.MenuPlanChangeColumn, PlanTableOrder.Column.Change, 2, "sectionVerbPlanSortChange"),
+                 })
+        {
+            var button = new Button
+            {
+                Padding = new Thickness(0),
+                Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                TabIndex = 2,
+            };
+            AutomationProperties.SetAutomationId(button, id);
+            button.Click += (_, _) =>
+            {
+                order = PlanTableOrder.AfterPressing(column, order);
+                TitleTheHeaders();
+                Fill();
+            };
+            Grid.SetColumn(button, slot);
+            header.Children.Add(button);
+            sortButtons.Add((button, title, column));
+        }
+        TitleTheHeaders();
+        Fill();
+        panel.Children.Add(header);
+        panel.Children.Add(list);
+        ScrollViewer? scroller = null;
+        if (notes is not null)
+        {
+            scroller = new ScrollViewer { Content = notes };
+            AutomationProperties.SetAutomationId(scroller, "sectionVerbPlanNotes");
+            panel.Children.Add(scroller);
+        }
+
+        // Rows and the notes' cap from the window's height (PlanTableLayout),
+        // and again whenever the window changes size while the plan shows —
+        // counted once, a window made shorter would clip what was counted.
+        PlanTableLayout.Fit? fitted = null;
+        void Fit()
+        {
+            double windowHeight = _dialog.XamlRoot?.Size.Height ?? PlanTableLayout.DialogMaxHeight;
+            var fit = PlanTableLayout.For(windowHeight, notesNatural);
+            if (fit == fitted) return;
+            fitted = fit;
+            list.MaxHeight = fit.TableHeight;
+            if (scroller is not null) scroller.MaxHeight = fit.NotesCap;
+            App.LogDiagnostic($"Plan table: window {windowHeight:0} epx tall, notes {notesNatural:0} epx (shown at most " +
+                              $"{fit.NotesCap:0}), {fit.Rows} rows shown of {table.Rows.Count}");
+        }
+        Fit();
+        if (_dialog.XamlRoot is { } root)
+        {
+            StopRefitting();
+            _refit = (_, _) =>
+            {
+                if (_stage != Stage.Plan || !ReferenceEquals(_dialog.Content, panel))
+                {
+                    StopRefitting();
+                    return;
+                }
+                Fit();
+            };
+            _refitRoot = root;
+            root.Changed += _refit;
+        }
+
+        // Return is the verb's button while the table has focus, as it is
+        // everywhere else in the dialog. MEASURED (doc 12): with the focus on
+        // a row, the ListView took Return for itself and nothing happened, so
+        // Return is caught on its way down, before the list sees it — as
+        // CopyAPageDialog does for the AutoSuggestBox and Escape. Escape needed
+        // nothing: it reached the dialog and cancelled. Handled here, the key
+        // never reaches the dialog too, so the change cannot run twice.
+        list.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key != Windows.System.VirtualKey.Enter || _stage != Stage.Plan) return;
+            args.Handled = true;
+            _ = Advance();
+        };
+
+        // The table takes the focus when it appears. Measured (doc 12): the
+        // focus was on the stage just replaced, and with it gone Tab went to
+        // the main window BEHIND the dialog, not into the table. Programmatic,
+        // not Keyboard: Keyboard drew the focus ring on the first row however
+        // Continue was pressed (measured, a picture each way); Programmatic
+        // follows the last input, so a mouse user is not shown a ring.
+        list.Loaded += (_, _) => list.Focus(FocusState.Programmatic);
+
+        _dialog.Content = panel;
+        _dialog.PrimaryButtonText = _verbButton;
+        DialogButtons.EnablePrimary(_dialog, true);
+        _dialog.CloseButtonText = AssistWording.MenuCancelButton;
+    }
+
     private void ShowResult(string said)
     {
         _stage = Stage.Result;
@@ -343,14 +598,21 @@ internal sealed class SectionVerbDialog
     {
         args.Cancel = true;
         var deferral = args.GetDeferral();
-        try
-        {
-            if (_stage == Stage.Choose && _item == Item.PublishPages && AskAboutClassesDatedLater()) return;
-            if (_stage == Stage.Choose && _planCall is not null) await RunPlan(_planCall());
-            else if (_stage == Stage.LaterClasses) await AnswerAboutClassesDatedLater();
-            else if (_stage == Stage.Plan && _pendingCall is not null) await RunChange(_pendingCall);
-        }
+        try { await Advance(); }
         finally { deferral.Complete(); }
+    }
+
+    /// <summary>
+    /// What the verb's button does at the stage showing: the plan after the
+    /// choice, the change after the plan. Also reached by Return on the plan
+    /// table, which keeps that key for itself (<see cref="ShowPlanTable"/>).
+    /// </summary>
+    private async Task Advance()
+    {
+        if (_stage == Stage.Choose && _item == Item.PublishPages && AskAboutClassesDatedLater()) return;
+        if (_stage == Stage.Choose && _planCall is not null) await RunPlan(_planCall());
+        else if (_stage == Stage.LaterClasses) await AnswerAboutClassesDatedLater();
+        else if (_stage == Stage.Plan && _pendingCall is not null) await RunChange(_pendingCall);
     }
 
     private async Task RunPlan(JsonObject planCall)
@@ -359,7 +621,10 @@ internal sealed class SectionVerbDialog
         var answer = await _verbs.Perform(planCall, MenuPath(_item), _course.Code, _section, Counts());
         if (answer.IsPlan)
         {
-            ShowPlan(answer.Summary);
+            // The table when the menu's server sent one (#548); the text card
+            // for any plan without — Re-date, Make Room, and a whole unit.
+            if (answer.PlanTable is { } table && ShowsAPlanTable(_item)) ShowPlanTable(table);
+            else ShowPlan(answer.Summary);
             return;
         }
         // A plan twin that refused: its sentence and OK, nothing to approve.

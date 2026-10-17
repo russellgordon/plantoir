@@ -1314,6 +1314,13 @@ first line and left of it; the current page's
   link test, and the import left out of `concatenateResources` fails the
   carrier test.
 
+**On Windows** (#546, 2026-10-16): the same check, unchanged, against a
+native build gave the same `OK: light 5.63:1, dark 9.45:1, forced colours
+10.41:1`; the dot was looked at in the app's preview pane, light and dark,
+and under a REAL High Contrast Black theme in Edge and in the pane
+(`forced-colors` true, the dot CanvasText, 9.64:1 against that theme's
+Canvas) — `12-windows-app.md` → "The sidebar's page dot on Windows".
+
 **Tuned by eye** in Chrome for Testing, light and dark, at 1512 × 900 and at
 phone width (390 × 844, the explorer opened from its button): `.8em` hang and
 `.32em` dot kept. The hang is compact on purpose (ruling 4): a hang as wide as
