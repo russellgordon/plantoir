@@ -309,6 +309,62 @@ final class QuitConfirmationTests: XCTestCase {
         )
     }
 
+    // MARK: - Why Plantoir closed (#560)
+
+    /// Each system quit code names its own reason; no code is the teacher's;
+    /// an install the app decided on is "to install a new version" unless
+    /// the system's reason says otherwise.
+    func testEachQuitReasonCodeClosesForItsOwnReason() {
+        let expectations: [(code: OSType?, installing: Bool, reason: QuitConfirmation.ClosingReason)] = [
+            (nil, false, .quitByTheTeacher),
+            (nil, true, .toInstallANewVersion),
+            (OSType(kAELogOut), false, .theMacIsLoggingOut),
+            (OSType(kAEReallyLogOut), false, .theMacIsLoggingOut),
+            (OSType(kAEShowRestartDialog), false, .theMacIsRestarting),
+            (OSType(kAERestart), false, .theMacIsRestarting),
+            (OSType(kAEShowShutdownDialog), false, .theMacIsShuttingDown),
+            (OSType(kAEShutDown), true, .theMacIsShuttingDown),
+            (OSType(0x61626364), false, .quitByTheTeacher),
+        ]
+        for expectation in expectations {
+            XCTAssertEqual(
+                QuitConfirmation.closingReason(
+                    quitReasonCode: expectation.code, installingAnUpdate: expectation.installing
+                ),
+                expectation.reason,
+                "code \(String(describing: expectation.code)), installing \(expectation.installing)"
+            )
+        }
+    }
+
+    /// Every system code the question already stands down for has a closing
+    /// reason of its own, so a seventh code added to one list and not the
+    /// other is caught.
+    func testEverySystemQuitCodeIsASystemClosingReason() {
+        for code in QuitConfirmation.systemQuitReasonCodes {
+            let reason: QuitConfirmation.ClosingReason = QuitConfirmation.closingReason(
+                quitReasonCode: code, installingAnUpdate: false
+            )
+            XCTAssertNotEqual(reason, .quitByTheTeacher, "code \(code)")
+        }
+    }
+
+    /// The words, as the trail writes them.
+    func testTheClosedLineReadsAsASentenceWithThePid() {
+        XCTAssertEqual(
+            ActivityTrail.closedLine(reason: .quitByTheTeacher, processIdentifier: 4711),
+            "Plantoir closed — quit by the teacher · pid 4711"
+        )
+        XCTAssertEqual(
+            ActivityTrail.closedLine(reason: .toInstallANewVersion, processIdentifier: 4711),
+            "Plantoir closed — to install a new version · pid 4711"
+        )
+        XCTAssertEqual(
+            ActivityTrail.closedLine(reason: .theMacIsLoggingOut, processIdentifier: 4711),
+            "Plantoir closed — because the Mac is logging out · pid 4711"
+        )
+    }
+
     // MARK: - Functions
 
     private static func section(_ name: String) throws -> [String: Any] {
