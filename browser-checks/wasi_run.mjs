@@ -106,6 +106,17 @@ for (const [name, wants] of Object.entries(expected)) {
     failures.push(`${name}: output differs:\n${stdout}\n--- expected ---\n${want}`)
     verdict = "DIFF"
   }
+  if (wants.transcript && verdict === "MATCH") {
+    // As the page shows it: each input line echoed straight after its
+    // prompt, even a prompt with no newline (readLine() flushes first).
+    const echoed = await run(name, { echo: true })
+    if (echoed.stdout !== wants.transcript) {
+      failures.push(`${name}: the transcript is ${JSON.stringify(echoed.stdout)}`)
+      verdict = "TRANSCRIPT DIFF"
+    } else {
+      verdict = "MATCH, transcript too"
+    }
+  }
   const imports = WebAssembly.Module.imports(await WebAssembly.compile(readFileSync(join(compiled, `${name}.wasm`)))).length
   rows.push(`| ${name} | ${info.sdk} | ${info.bytes.toLocaleString("en-CA")} | ${imports} | ${verdict} (${seconds.toFixed(2)} s) |`)
 }
@@ -135,4 +146,4 @@ console.log("|---|---|---|---|---|")
 for (const row of rows) console.log(row)
 for (const failure of failures) console.log("FAIL " + failure)
 if (failures.length > 0) process.exit(1)
-console.log(`OK: ${Object.keys(expected).length} fragments and the shim's four checks`)
+console.log(`OK: ${Object.keys(expected).length} fragments and the shim's own checks`)

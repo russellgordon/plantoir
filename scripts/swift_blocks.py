@@ -14,7 +14,7 @@ start another one.
 So there are two halves, and this module is both:
 
 * `plan` - run by the LAUNCHER through `docker exec`, before the build
-  (`python3 /opt/scripts/swift_blocks.py plan --course=C --section=S`). It
+  (`python3 /opt/scripts/swift_blocks.py plan --course=C --format=lines`). It
   reads the course's own pages, finds every Swift block on a page that opts
   in, and writes each one the cache does not hold yet into a job folder of
   this run's own (review S3: two builds of one course never share one). It
@@ -76,7 +76,7 @@ MANIFEST = Path("plantoir-runners") / "swift.json"
 
 # The Swift image's recipe: what the toolchain id is made of (and what the
 # launcher hashes, with the rest of support/swift, to tag the image).
-RECIPE_FILES = ("Dockerfile", "compile.py", "ReadLineShim.swift")
+RECIPE_FILES = ("Dockerfile", "compile.py", "ReadLineShim.swift", "FlushBeforeRead.c")
 
 PRUNE_DAYS = 90
 # A job folder no run cleaned up (a killed launcher) is removed after a day.
@@ -478,15 +478,16 @@ def _argument(argv: list, name: str):
 
 def main(argv: list) -> int:
     if len(argv) < 2 or argv[1] != "plan":
-        print("usage: swift_blocks.py plan --course=CODE [--section=N]", file=sys.stderr)
+        print("usage: swift_blocks.py plan --course=CODE [--format=lines]", file=sys.stderr)
         return 2
     course = _argument(argv, "course")
     if not course:
-        print("usage: swift_blocks.py plan --course=CODE [--section=N]", file=sys.stderr)
+        print("usage: swift_blocks.py plan --course=CODE [--format=lines]", file=sys.stderr)
         return 2
     course_dir = toolchain_paths.COURSES_DIR / course
     if not course_dir.is_dir():
-        print(json.dumps({"root": None, "cache": None, "jobs": None, "count": 0}))
+        print("count=0" if _argument(argv, "format") == "lines"
+              else json.dumps({"root": None, "cache": None, "jobs": None, "count": 0}))
         return 0
     cache_root = toolchain_paths.merged_output_root(course_dir) / CACHE_FOLDER
     # The real place, so the launcher on the host mounts the same string
@@ -496,7 +497,16 @@ def main(argv: list) -> int:
         cache_root = cache_root.resolve()
     except OSError:
         pass
-    print(json.dumps(plan(course_dir, cache_root)))
+    planned = plan(course_dir, cache_root)
+    if _argument(argv, "format") == "lines":
+        # For the launcher, which has no JSON reader on a teacher's Mac: one
+        # KEY=value line each, the value everything after the first "=".
+        print(f"root={planned['root'] or ''}")
+        print(f"cache={planned['cache'] or ''}")
+        print(f"jobs={planned['jobs'] or ''}")
+        print(f"count={planned['count']}")
+    else:
+        print(json.dumps(planned))
     return 0
 
 
