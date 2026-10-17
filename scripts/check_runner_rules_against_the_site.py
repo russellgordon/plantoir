@@ -78,7 +78,7 @@ for (const c of rules.fences.cases) {
     continue
   }
   if (got === null) failures.push(`fences ${c.name}: not a runner`)
-  else if (got.language.fence !== c.lang || JSON.stringify(got.flags) !== JSON.stringify(c.flags)) {
+  else if (got.language.fence !== (c.fence ?? c.lang) || JSON.stringify(got.flags) !== JSON.stringify(c.flags)) {
     failures.push(`fences ${c.name}: ${got.language.fence} ${JSON.stringify(got.flags)}`)
   }
 }
@@ -102,11 +102,15 @@ for (const c of rules.ids.cases) {
 const words = Object.fromEntries(Object.entries(rules.words).filter(([key]) => key !== "note"))
 const transform = CodeRunnerFences().markdownPlugins()[0]()
 const page = "```python run\nprint(1)\n```\n"
-const expectedLine = "plantoir: error: Units/Loops.md: python block 1: " + filled(words.blockNotPrepared, LANGUAGES[0])
+const notPrepared = "plantoir: error: Units/Loops.md: python block 1: " + filled(words.blockNotPrepared, LANGUAGES[0])
+const afterUnclosed = "plantoir: error: Units/Loops.md: python block 1: " + filled(words.blockAfterUnclosedFence, LANGUAGES[0])
+// Review N3's page: a fence left open in a list item, then a runnable block.
+const unclosedPage = "- step one\n  ```python\n  print(1)\n- step two\n\n```python run\nprint(2)\n```\n"
 const transformerCases = [
-  { name: "the engine is carried", carried: ["pyodide"], publish: undefined, wrapped: true, line: false },
-  { name: "the engine is not carried", carried: [], publish: undefined, wrapped: false, line: true },
-  { name: "the engine is not carried, on a page students cannot see", carried: [], publish: false, wrapped: false, line: false },
+  { name: "the engine is carried", carried: ["pyodide"], publish: undefined, wrapped: true, line: null },
+  { name: "the engine is not carried", carried: [], publish: undefined, wrapped: false, line: notPrepared },
+  { name: "the engine is not carried, on a page students cannot see", carried: [], publish: false, wrapped: false, line: null },
+  { name: "the engine is not carried, after an unclosed fence", carried: [], publish: undefined, wrapped: false, line: afterUnclosed, page: unclosedPage },
 ]
 const home = process.cwd()
 for (const c of transformerCases) {
@@ -119,13 +123,14 @@ for (const c of transformerCases) {
   const said = []
   const log = console.log
   console.log = (line) => said.push(String(line))
-  const tree = parse(page)
-  transform(tree, { data: { frontmatter: { codeRunner: true, publish: c.publish }, slug: "Units/Loops", relativePath: "Units/Loops.md" } })
+  const text = c.page ?? page
+  const tree = parse(text)
+  transform(tree, { value: text, data: { frontmatter: { codeRunner: true, publish: c.publish }, slug: "Units/Loops", relativePath: "Units/Loops.md" } })
   console.log = log
   process.chdir(home)
-  const wrapped = tree.children[0].type === "plantoirRunner"
-  const lined = said.includes(expectedLine)
-  if (wrapped !== c.wrapped || lined !== c.line || said.length !== (c.line ? 1 : 0)) {
+  const wrapped = JSON.stringify(tree).includes('"plantoirRunner"')
+  const lined = c.line === null ? said.length === 0 : said.length === 1 && said[0] === c.line
+  if (wrapped !== c.wrapped || !lined) {
     failures.push(`transformer, ${c.name}: wrapped ${wrapped}, said ${JSON.stringify(said)}`)
   }
 }

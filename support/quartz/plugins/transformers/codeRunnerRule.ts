@@ -51,10 +51,19 @@ export function languageFor(fence: string): RunnerLanguage | null {
   return null
 }
 
+// The separators between the words of an info string, the SAME set as the
+// build's (page_features.INFO_SPACE): tab, space and Unicode's space
+// separators, NBSP among them (Option-Space on a Mac) - #455 review N2.
+// micromark splits mdast's `lang` from `meta` on space and tab only, so a
+// fence written `python<NBSP>run` arrives with all of it in `lang`; joining
+// the two and splitting again reads it as the build does. Not \s, which adds
+// U+FEFF where Python's str.split() adds \x1c-\x1f and \x85.
+export const INFO_SPACE = /[\t \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]+/
+
 // Is a fence with this info string runnable (codeRunnerBlocks.fences)? The
-// language is mdast's `lang` (the info string's first word); `run` must be a
-// whitespace-separated token of `meta`; flags are the row's own, exact, each
-// once, in the row's order.
+// info string (mdast's `lang`, then `meta`) is split on INFO_SPACE; its first
+// word is the language, exactly; `run` must be one of the other words; flags
+// are the row's own, exact, each once, in the row's order.
 export function runnerFor(
   lang: string | null | undefined,
   meta: string | null | undefined,
@@ -63,11 +72,15 @@ export function runnerFor(
   if (!optedIn) {
     return null
   }
-  const language = languageFor(lang ?? "")
+  const words = `${lang ?? ""} ${meta ?? ""}`.split(INFO_SPACE).filter((word) => word.length > 0)
+  if (words.length === 0) {
+    return null
+  }
+  const language = languageFor(words[0])
   if (language === null) {
     return null
   }
-  const tokens = (meta ?? "").split(/\s+/).filter((token) => token.length > 0)
+  const tokens = words.slice(1)
   if (!tokens.includes("run")) {
     return null
   }
@@ -85,7 +98,7 @@ export function runnerId(slug: string, language: RunnerLanguage, n: number): str
 }
 
 // The pieces of mdast this needs, so the file stays free of Quartz's types.
-type Position = { start: { line: number } }
+type Position = { start: { line: number; offset?: number }; end?: { offset?: number } }
 export type MdNode = {
   type: string
   lang?: string | null
@@ -185,4 +198,44 @@ export function fnv1a(text: string): string {
     hash = Math.imul(hash, 0x01000193) >>> 0
   }
   return hash.toString(16).padStart(8, "0")
+}
+
+// Was a fenced code block ABOVE this one on the page never closed? The
+// likeliest reason the build's reader and the site disagree about a block
+// (#455 review N3: an unclosed fence in a list item, which the site closes at
+// the end of the item and the build's reader carries on through). Read from
+// the page's own text at each earlier code node's position: a block whose
+// first line opens a fence (``` or ~~~, after quote and list markers) and
+// whose last line is not a closing run of the same character, at least as
+// long, was never closed.
+const OPENER = /^(?:[ \t]*(?:>|[-*+]|[0-9]{1,9}[.)])[ \t]*)*(`{3,}|~{3,})/
+export function unclosedFenceBefore(tree: MdNode, source: string, block: MdNode): boolean {
+  const before = block.position?.start.offset
+  if (before === undefined) {
+    return false
+  }
+  let unclosed = false
+  const walk = (node: MdNode) => {
+    for (const child of node.children ?? []) {
+      if (child.type === "code") {
+        const start = child.position?.start.offset
+        const end = child.position?.end?.offset
+        if (start !== undefined && end !== undefined && start < before) {
+          const lines = source.slice(start, end).split("\n")
+          const opened = OPENER.exec(lines[0])
+          if (opened !== null) {
+            const last = lines.length > 1 ? lines[lines.length - 1].replace(/^[ \t>]*/, "") : ""
+            const closing = /^(`{3,}|~{3,})[ \t]*$/.exec(last)
+            if (closing === null || closing[1][0] !== opened[1][0] || closing[1].length < opened[1].length) {
+              unclosed = true
+            }
+          }
+        }
+        continue
+      }
+      walk(child)
+    }
+  }
+  walk(tree)
+  return unclosed
 }

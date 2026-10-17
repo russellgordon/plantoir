@@ -1640,7 +1640,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Figures Fixture.md" "$HIT_COURSE/Figures Hidden.md" \
         "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
-        "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" \
+        "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
@@ -2360,6 +2360,10 @@ for info, code in fences:
     "---\ntitle: Runner Printable\nprintable: true\ncodeRunner: true\n---\n"
     "A printable page with code (plantoir-runner-printable-7f3a), and a formula $\\frac{a}{b} = c^2$.\n\n"
     "1. What does this print?\n\n```python run\nprint(\"printed\")\n```\n", encoding="utf-8")
+(course / "Runner Autorun.md").write_text(
+    "---\ntitle: Runner Autorun\ncodeRunner: true\n---\nTwo blocks that run by themselves (plantoir-runner-autorun-7f3a).\n\n"
+    "```python run autorun\nimport time\ntime.sleep(4)\nprint(\"first\")\n```\n\n"
+    "```python run autorun\nprint(\"second\")\n```\n", encoding="utf-8")
 (course / "Runner Hidden.md").write_text(
     "---\ntitle: Runner Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-runner-hidden-7f3a).\n\n"
     "```python run\nprint(\"hidden\")\n```\n", encoding="utf-8")
@@ -2714,8 +2718,8 @@ if (public / "Runner-Hidden.html").exists():
 said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
 if re.search(r"plantoir: error: [^\n]*Runner", said):
     problems.append("the build named a runner page on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*Runner[^\n]*", said).group(0))
-if not re.search(r"This site carries what runs Python for 3 pages\.", said):
-    problems.append("the build did not say the site carries Python for the three pages students can see (not the hidden one)")
+if not re.search(r"This site carries what runs Python for 4 pages\.", said):
+    problems.append("the build did not say the site carries Python for the four pages students can see (not the hidden one)")
 engine = public / "static" / "pyodide"
 carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
 if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
@@ -2875,9 +2879,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   kill "$PRINT_SERVER_PID" 2>/dev/null || true
   # #455: runnable code as a student runs it, against a server the check
   # starts itself so it can also play the hosts that break it.
-  if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html \
+  if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \
        >/tmp/verify_code_runner.log 2>&1; then
-    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
+    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
   else
     fail "runnable code did not run in a browser as the contract says (browser-checks/code_runner.mjs, #455)"
     cat /tmp/verify_code_runner.log

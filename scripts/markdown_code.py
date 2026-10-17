@@ -423,7 +423,8 @@ def fenced_blocks(text: str) -> list:
      to the opener's own indent taken off each line, joined with "\\n",
      "line": the 1-based line of the OPENING fence in `text` as given,
      "nested": True when the opening line also opened another container
-     after a list marker}.
+     after a list marker, "info": the whole info string, ASCII whitespace
+     trimmed}.
 
     The rule is the one `code_ranges` uses (readingALink.whatIsCode); an
     unclosed fence runs to the end of the page, and a line at a smaller quote
@@ -448,6 +449,7 @@ def fenced_blocks(text: str) -> list:
             found.append({
                 "lang": open_block["lang"],
                 "meta": open_block["meta"],
+                "info": open_block["info"],
                 "body": "\n".join(open_block["lines"]),
                 "line": open_block["line"],
                 "nested": open_block["nested"],
@@ -510,6 +512,7 @@ def fenced_blocks(text: str) -> list:
                     # without it ends the block, as the site reads it.
                     "depth": depth + quotes_after_marker,
                     "indent": 0 if quotes_after_marker else indent,
+                    "info": info,
                     "lang": words[0] if words else "",
                     "meta": words[1] if len(words) > 1 else "",
                     "line": text.count("\n", 0, where) + 1,

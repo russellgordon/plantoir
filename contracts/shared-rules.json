@@ -24202,6 +24202,16 @@
           ]
         },
         {
+          "name": "a no-break space between the words (Option-Space)",
+          "lang": "python\u00a0run",
+          "meta": "",
+          "optedIn": true,
+          "runner": true,
+          "flags": [],
+          "fence": "python",
+          "why": "Review N2: micromark leaves all of it in `lang`; both sides split the info string on the same set of spaces (INFO_SPACE), NBSP among them."
+        },
+        {
           "name": "flags come in the table's order",
           "lang": "python",
           "meta": "run autorun readonly",
@@ -24406,7 +24416,7 @@
       ]
     },
     "siteDisagrees": {
-      "rule": "Review S2's safety net. The build writes the engines the site carries into quartz/plantoir_code_runner.json (`carried`) before the site is made. When the site's transformer finds a runnable block whose language's engine is NOT carried - the build's reader missed the block, the engine is missing from this copy of Plantoir, or the page was changed while a preview was running - it leaves the block as the plain highlighted code it was (a student never sees words.engineMissing for ever) and prints one line an assistant can read: `plantoir: error: <page>.md: <fence> block <n>: ` + words.blockNotPrepared. The live preview's own rebuild cannot run the gate again (documentation/05-build-pipeline.md -> 'The live-preview edge'), so a block added while a preview runs shows as plain code until the next preview.",
+      "rule": "Review S2's safety net. The build writes the engines the site carries into quartz/plantoir_code_runner.json (`carried`) before the site is made. When the site's transformer finds a runnable block whose language's engine is NOT carried - the build's reader missed the block, the engine is missing from this copy of Plantoir, or the page was changed while a preview was running - it leaves the block as the plain highlighted code it was (a student never sees words.engineMissing for ever) and prints one line an assistant can read: `plantoir: error: <page>.md: <fence> block <n>: ` + words.blockNotPrepared - or words.blockAfterUnclosedFence when a fenced code block above it on the page was never closed, the likeliest cause (review N3: the site closes such a fence at the end of its list item, the build's reader carries on through the block below). The line stays in the build's output; it is not a folder problem in the app (the transformer runs after the folder checks are said) - a gap recorded on #455. The live preview's own rebuild cannot run the gate again (documentation/05-build-pipeline.md -> 'The live-preview edge'), so a block added while a preview runs shows as plain code until the next preview.",
       "example": "plantoir: error: Units/Loops.md: python block 2: words.blockNotPrepared"
     },
     "harness": {
@@ -24437,7 +24447,7 @@
       "rule": "DECISION 8. On paper a runnable block prints as code and nothing else - no buttons, input box, status or output: an UNEDITED block prints its highlighted code as every other block does; an EDITED one prints the student's current code, from a copy kept in step with the editor (pre.plantoir-runner-print, wrapper class plantoir-runner-edited), because a textarea's typed value is not part of what a printed or copied page holds. The same rules serve ⌘P and the Print button (Paged.js promotes @media print), and the Print button waits for the copy to be brought up to date (window.plantoirPrint.prepare). Every rule is scoped under .plantoir-runner, so a page with no runnable block prints exactly as before (B2)."
     },
     "words": {
-      "note": "English, as data, on a page students read. {language} is the table row's displayName and {inputCall} its inputCall. No word names the machinery (CLAUDE.md rule 1): never the engine's name, WebAssembly, a worker or a thread. blockNotPrepared is the reason on a `plantoir: error:` line (siteDisagrees), which an assistant and a teacher read.",
+      "note": "English, as data, on a page students read. {language} is the table row's displayName and {inputCall} its inputCall. No word names the machinery (CLAUDE.md rule 1): never the engine's name, WebAssembly, a worker or a thread. blockNotPrepared and blockAfterUnclosedFence are reasons on a `plantoir: error:` line (siteDisagrees), which an assistant and a teacher read.",
       "run": "Run",
       "stop": "Stop",
       "reset": "Reset",
@@ -24457,7 +24467,8 @@
       "engineMissing": "{language} isn't on this site yet. Preview the site again to add it.",
       "couldNotLoad": "{language} couldn't start. Check the connection, then press Run again.",
       "teacherChangedIt": "Your teacher has changed this code, so it shows their new version.",
-      "blockNotPrepared": "this block shows as plain code because the site was prepared without {language} - preview the site again, and if this line comes back, start the block's ``` on a line of its own"
+      "blockNotPrepared": "this block shows as plain code because the site was prepared without {language} - preview the site again, and if this line comes back, start the block's ``` on a line of its own",
+      "blockAfterUnclosedFence": "this block shows as plain code because a code block above it on this page is never closed - end that block with its own ``` line, then preview the site again"
     },
     "agentGuidance": {
       "rule": "The skill `plantoir-runnable-code` sits beside `plantoir-printing` and `plantoir-math-graphs` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): the opt-in, the fence, the flags, input and EOFError, the measured list of what imports and what does not, files, `%%`, adding blocks after existing ones, offline and file:// behaviour, how it prints, and checking it in Preview. One skill for every language in the table: a language that joins it adds a section, not a second skill. The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
@@ -24469,6 +24480,7 @@
       "Ids are positional: a runnable block inserted ABOVE others gives every block below it a new id, which sets aside students' saved edits on those blocks. Add new blocks after the ones students already use.",
       "Each Run starts from a reset interpreter (harness), but a program can still leave residue in the same page visit: a standard-library module it changed stays changed, and `random`'s state carries on (S3). Stop, then Run, starts clean.",
       "The build's fence reader and the site's parser can still read a shape nobody has measured differently (pageShapes); the site then shows plain code and says so on a `plantoir: error:` line (siteDisagrees).",
+      "Measured by fuzzing (review N2, 2026-10-17): the build's reader also counts a fence indented four spaces at the top of a page (indented code to the site) and a fence inside an HTML block such as <div> - the site then carries the engine for nothing, which costs bytes and nothing else; the site, for its part, decodes a character reference in the info string (`&#114;un` reads as `run`), keeps a fence inside a `$$` maths block as maths, and reads a few deeper quote-and-list nestings differently - each of those shows as plain code with the safety net's line. Fuzz: 856 random pages, 38 disagreeing, every one in these groups.",
       "The page's code needs a browser that runs module workers: Safari and iPadOS 15 or later, Chrome 80 or later, Firefox 114 or later.",
       "A site opened as files on a computer, rather than from its web address, cannot run code: Safari 26.6 and Chrome for Testing 155 run none of a page's scripts from a file (measured 2026-10-17), so the blocks show as their highlighted code with no Run button; a browser that does run them is told words.needsWebAddress. KaTeX's faces DID load from a file in both (measured), so the maths keeps its look."
     ]

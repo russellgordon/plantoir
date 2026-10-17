@@ -32,7 +32,7 @@ import { Root as MdRoot, Code } from "mdast"
 import { readFileSync, statSync } from "fs"
 import { join } from "path"
 import { QuartzTransformerPlugin } from "../types"
-import { findRunners, filled, MdNode } from "./codeRunnerRule"
+import { findRunners, filled, MdNode, unclosedFenceBefore } from "./codeRunnerRule"
 
 type RunnerFile = { words: Record<string, string>; carried: string[] }
 
@@ -85,9 +85,14 @@ export const CodeRunnerFences: QuartzTransformerPlugin = () => ({
           const code = runner.node as unknown as Code
           if (!carried.includes(runner.language.engine) || !known?.words?.blockNotPrepared) {
             if (known?.words?.blockNotPrepared && published) {
+              // Say what is wrong when it can be seen: an unclosed fence above.
+              const unclosed =
+                known.words.blockAfterUnclosedFence !== undefined &&
+                unclosedFenceBefore(tree as unknown as MdNode, String(file.value ?? ""), runner.node)
+              const reason = unclosed ? known.words.blockAfterUnclosedFence : known.words.blockNotPrepared
               console.log(
                 `plantoir: error: ${page}: ${runner.language.fence} block ${runner.n}: ` +
-                  filled(known.words.blockNotPrepared, runner.language),
+                  filled(reason, runner.language),
               )
             }
             continue

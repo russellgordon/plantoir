@@ -28,7 +28,7 @@
 // Kept OUT of scripts/ for the reason print_handout.mjs is: it needs a
 // browser on the Mac, not the image. No packages: Node 22's own WebSocket.
 //
-//   node browser-checks/code_runner.mjs <chrome> <site folder> <page path> <second page path>
+//   node browser-checks/code_runner.mjs <chrome> <site folder> <page path> <second page path> [<autorun page path>]
 
 import { spawn } from "node:child_process"
 import { createServer } from "node:http"
@@ -36,7 +36,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
 
-const [chromePath, siteFolder, pagePath, secondPath] = process.argv.slice(2)
+const [chromePath, siteFolder, pagePath, secondPath, autorunPath] = process.argv.slice(2)
 if (!chromePath || !siteFolder || !pagePath || !secondPath) {
   console.error("usage: node code_runner.mjs <chrome> <site folder> <page path> <second page path>")
   process.exit(2)
@@ -297,6 +297,11 @@ async function connect(chunk) {
       // Too much output.
       state = await runBlock(1, 'while True:\n    print("x" * 1000)')
       expect("too much output stops the program and says so", state.status === said("outputTooLong"), state.status)
+      // One print far over the cap is cut at the cap on the page (review S1:
+      // it used to be painted whole - 5 million characters here).
+      state = await runBlock(1, 'print("x" * 5_000_000)')
+      expect("one huge print is cut at the cap", state.status === said("outputTooLong")
+        && state.output.length <= RULES.output.maxCharacters, { status: state.status, painted: state.output.length })
 
       // 3. Saved edits, print, Reset, and the teacher's change.
       await evaluate(`window.__runner.setCode(2, "print('my edit')\\n")`)
@@ -368,6 +373,35 @@ async function connect(chunk) {
       }
       await pause(500)
       expect("five page changes leave at most one thread alive", workers.size <= 1 && most <= 1, { now: workers.size, most })
+
+      // Autoruns (N4): the second waits for the first; started by hand while
+      // it waits, it runs once, not again when its turn comes (review N1).
+      if (autorunPath) {
+        await open(base + autorunPath)
+        // Whichever block comes into view first runs; the other waits, with
+        // nothing in its status. Press Run on the one that waits.
+        const waiting = await evaluate(`(async () => {
+          const busy = [${JSON.stringify(said("loading"))}, ${JSON.stringify(said("running"))}]
+          const status = (i) => window.__runner.block(i).querySelector(".plantoir-runner-status").textContent
+          for (let tries = 0; tries < 300; tries += 1) {
+            if (busy.includes(status(0)) && status(1) === "") return 1
+            if (busy.includes(status(1)) && status(0) === "") return 0
+            await new Promise((resolve) => setTimeout(resolve, 20))
+          }
+          return -1
+        })()`)
+        expect("one autorun runs while the other waits", waiting >= 0, waiting)
+        if (waiting >= 0) {
+          await evaluate(`(() => { window.__finishes = 0; window.__log = []; const status = window.__runner.block(${waiting}).querySelector(".plantoir-runner-status"); new MutationObserver((records) => { for (const record of records) for (const node of record.addedNodes) { window.__log.push(node.textContent); if (node.textContent === ${JSON.stringify(said("finished"))}) window.__finishes += 1 } }).observe(status, { childList: true, characterData: true, subtree: true }); return 1 })()`)
+          // Give the waiting block's own view-watcher time to queue it.
+          await pause(600)
+          await evaluate(`window.__runner.press(${waiting}, "run")`)
+          await pause(12000)
+          const finishes = await evaluate("window.__finishes")
+          const log = await evaluate("window.__log")
+          expect("an autorun started by hand while it waits runs once", finishes === 1, { finishes, log })
+        }
+      }
 
       // The three wrong servers.
       const wrong = {}
