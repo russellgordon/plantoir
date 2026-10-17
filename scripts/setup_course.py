@@ -194,11 +194,31 @@ def _iter_nonempty(p: Path) -> bool:
     except StopIteration:
         return False
 
+# Plantoir's own Obsidian add-ons for diagrams and graphs (#495) carry this
+# marker in their folder under .obsidian/plugins. They are left out of a backup
+# by MARKER, never by name - the teacher's own add-ons are theirs and are kept -
+# as the mac's CourseArchiver does (shared-rules.json ->
+# obsidianAddOnsForFigures.backups). The app puts them back at its next pass.
+PLANTOIR_ADDON_MARKER = ".plantoir"
+
+
+def _plantoir_addon_folders(plugins_dir: str, names: list) -> set:
+    """The names among `names` (folders in .obsidian/plugins) that carry
+    Plantoir's marker, as a regular file."""
+    found = set()
+    for name in names:
+        marker = os.path.join(plugins_dir, name, PLANTOIR_ADDON_MARKER)
+        if os.path.isfile(marker) and not os.path.islink(marker):
+            found.add(name)
+    return found
+
+
 def backup_existing_course_dir(course_dir: Path, backup_root: Path, excludes: set[str] | None = None) -> Path | None:
     """
     If course_dir exists and is non-empty, create a zip backup at:
       backup_root / course_dir.name / YYYY-MM-DD_HHMMSS.zip
-    Skips folders/files listed in `excludes` (merged_output, caches, etc.).
+    Skips folders/files listed in `excludes` (merged_output, caches, etc.),
+    and Plantoir's own Obsidian add-ons (#495, `_plantoir_addon_folders`).
     Returns the created zip path, or None if nothing was backed up.
     """
     excludes = (excludes or set()) | BACKUP_DEFAULT_EXCLUDES
@@ -222,6 +242,9 @@ def backup_existing_course_dir(course_dir: Path, backup_root: Path, excludes: se
             rel_root = os.path.relpath(root, course_dir)
             if rel_root == ".":
                 rel_root = ""
+            if Path(rel_root).parts == (".obsidian", "plugins"):
+                plantoirs = _plantoir_addon_folders(root, dirs)
+                dirs[:] = [d for d in dirs if d not in plantoirs]
             for name in files:
                 if name in excludes:
                     continue

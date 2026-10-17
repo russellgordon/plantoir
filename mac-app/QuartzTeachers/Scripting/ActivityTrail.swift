@@ -1222,6 +1222,24 @@ nonisolated enum ActivityTrail {
         case previewStartedAtLastViewed = "preview started at the page last viewed"
         /// Settings ▸ Preview changed where Preview opens (#504): which.
         case previewStartPageChosenInSettings = "preview start page chosen in Settings"
+        /// Open in Obsidian asked about Obsidian's add-ons for diagrams and
+        /// graphs (#495): the course and the answer — Add Them, Not Now, or
+        /// Not Now with "don't ask again" — or why nothing was asked
+        /// although the course needs them: Obsidian opens it as part of a
+        /// larger vault.
+        case obsidianAddOnsOffered = "obsidian add-ons offered"
+        /// A pass over a course's Obsidian add-ons for diagrams and graphs
+        /// (#495): the course, what started it, and for each add-on by name
+        /// and version whether it was added, already there, switched off
+        /// and left off, or left alone and why — or why nothing was added.
+        /// Written when something was added, and otherwise once per course
+        /// per run; never a page's words.
+        case obsidianAddOnsAdded = "obsidian add-ons added"
+        /// The reopen question was answered (#495): Obsidian was closed and
+        /// opened again to show the add-ons, or Later.
+        case obsidianReopenedForAddOns = "obsidian reopened for add-ons"
+        /// Settings ▸ Obsidian turned the add-ons on or off (#495).
+        case obsidianAddOnsSettingChanged = "obsidian add-ons setting changed"
     }
 
     // MARK: - Stored properties
