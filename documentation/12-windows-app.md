@@ -5864,11 +5864,17 @@ layout: whenever the window can hold the chrome, two rows and 40 epx of notes
 (a XAML root of 230 + 2 + 64 + 8 + 40 = 344), the whole stage fits; a plan
 with no notes or a short one fits lower still (`AShortWindowShowsFewerRowsAndStillFits`,
 330). Below that the floor wins and the bottom is clipped while the buttons
-still show. By arithmetic, not measured: the default window is a fixed number
-of PIXELS, about 724 tall (483 epx at 150%), so at 175% it is about 414 epx
-and at 200% about 362, less about 37 epx of title bar and border — XAML roots
-of about 377 and 325. At 175% everything fits; at 200% a plan with long notes
-is about 19 epx short and loses the notes' bottom edge. (This replaced two
+still show. By arithmetic, not measured, ON THE PREMISE THIS WAS WRITTEN
+UNDER — that the default window is a fixed number of PIXELS, about 724 tall
+(483 epx at 150%): at 175% it would be about 414 epx and at 200% about 362,
+less about 37 epx of title bar and border — XAML roots of about 377 and 325.
+At 175% everything fits; at 200% a plan with long notes is about 19 epx short
+and loses the notes' bottom edge. **Since #542 that premise no longer holds:**
+the launch size is clamped up to the 900 × 600 epx minimum at every scale, so
+the default window no longer makes a short root. The minimum is itself clamped
+to the display's work area, so the short-window case now arises only where the
+WORK AREA is under 600 epx tall — a 1080p screen at 200% is 540 epx — and
+there the 325-ish root above is still the one the layout meets. (This replaced two
 earlier versions. The first capped the notes at a fixed 120 and counted the
 rows once; the #548 implementation review found it clipped long notes out of
 reach at the default window, a floor of 4 rows winning against notes over
@@ -5878,7 +5884,7 @@ review found still clipped below a root of 408.)
 MEASURED through UI Automation, 2026-10-16 (`PlanTableUiTests`; UIA hands the
 non-DPI-aware test process 96-dpi coordinates, so these are epx). Row pitch
 32 epx (UIA rounds it to 31 or 32). The 19-row fixture with one short note, at
-the default window: 5 rows, the table's bottom 157 epx above the window's, the
+the 793 × 483 window the app opened at when this was written: 5 rows, the table's bottom 157 epx above the window's, the
 note's 131, Publish's 49; the chrome measured 220–222 epx against the 230
 budgeted. The window resized UNDER the open plan, asked for 300 epx, stopped
 at 900 × 600 (XAML root 563), and the table grew from 161 to 290 epx (5 to 9
@@ -5897,7 +5903,9 @@ scroll" in the full UI run of 2026-10-16 on `dev` b0af8d3fd (window 900x600;
 notes area 112; note 112 tall). The product was right and the FIXTURE too
 short, so it now links seventy classes: a note well past the notes' 120-epx
 cap, which scrolls at ANY window height rather than only at the one it was
-first measured at. Earlier the same day, over a 200% remote session (window 937 × 625
+first measured at. MEASURED at 900 × 600 (root 563), 2026-10-16: a 243-epx
+note, the notes capped at 120, their viewport showing 49%, scrolled to 100%;
+6 rows shown of 71; Publish 42 epx above the window's bottom. Earlier the same day, over a 200% remote session (window 937 × 625
 epx), 10 rows.
 
 **Return and Escape with the table focused — measured, and one key needed
