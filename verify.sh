@@ -3020,10 +3020,12 @@ if (public / "Runner-Hidden.html").exists():
 said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
 if re.search(r"plantoir: error: [^\n]*Runner", said):
     problems.append("the build named a runner page on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*Runner[^\n]*", said).group(0))
-if not re.search(r"This site carries what runs Swift for 2 pages\.", said):
-    problems.append("the build did not say the site carries Swift for the two pages students can see with Swift (Runner Fixture, Swift Playground)")
-if not re.search(r"This site carries what runs Python for 4 pages\.", said):
-    problems.append("the build did not say the site carries Python for the four pages students can see (not the hidden one)")
+# Quiz Playground (#563) runs Python and Swift inside its quizzes, so it is
+# one more page for each engine.
+if not re.search(r"This site carries what runs Swift for 3 pages\.", said):
+    problems.append("the build did not say the site carries Swift for the three pages students can see with Swift (Runner Fixture, Swift Playground, Quiz Playground)")
+if not re.search(r"This site carries what runs Python for 5 pages\.", said):
+    problems.append("the build did not say the site carries Python for the five pages students can see (not the hidden one; Quiz Playground is the fifth)")
 engine = public / "static" / "pyodide"
 carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
 if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
@@ -3471,9 +3473,13 @@ else
   grep -n "Drew\|plantoir:" /tmp/verify_figures_second.log | head -5
 fi
 # Runnable Swift (#493 acceptance 10): the same build compiled nothing - the
-# launcher found every block in the cache - and the Swift page came out the same.
+# launcher found every block in the cache - the site has the same programs as
+# the first build said (read from it, not a number written here: the quiz
+# playground's two programs, #563, made a written "8 of 9" wrong), and the
+# Swift page came out the same.
+SWIFT_READY_FIRST="$(grep -Eo "[0-9]+ of [0-9]+ Swift programs on this site ready to run" /tmp/verify_main_build.log | tail -1)"
 if ! grep -q "Swift program.* ready to run…" /tmp/verify_figures_second.log \
-   && grep -Eq "8 of 9 Swift programs on this site ready to run" /tmp/verify_figures_second.log \
+   && [[ -n "$SWIFT_READY_FIRST" ]] && grep -q "$SWIFT_READY_FIRST" /tmp/verify_figures_second.log \
    && same_page_but_for_quartz_ids "$SITE_PUBLIC/Swift-Playground.html" /tmp/verify_swift_first.html; then
   pass "runnable Swift: a second build compiles nothing and the Swift page is byte-identical (#493)"
 else
