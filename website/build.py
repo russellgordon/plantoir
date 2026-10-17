@@ -301,8 +301,12 @@ def awaiting_capture_notes(shots: dict) -> list[str]:
         else:
             issue = waiting_on_issue(shot)
             owner = f", waiting on {issue}" if issue else ""
+            scene = shot.get("capture", {}).get("scene", identifier)
+            # The print set and the Code page's figures are taken by flags of
+            # their own (previews, not app scenes); every other scene by --only.
+            command = f"--{scene}" if scene in ("print-set", "code") else f"--only {scene}"
             notes.append(f"'{identifier}' is not captured yet, so its page shows no picture there{owner} "
-                         f"(capture.py --only {shot.get('capture', {}).get('scene', identifier)})")
+                         f"(capture.py {command})")
     return notes
 
 
@@ -466,9 +470,11 @@ COUNT_NOUNS = re.compile(r"^(course|courses|code|codes)$", re.IGNORECASE)
 # a teacher, so it is enforced here too. "token" is deliberately NOT on the
 # list: Cloudflare asks the teacher for an "API token" by that name, and the
 # Deploying page has to call it what the dashboard calls it.
+# What runs a student's code is machinery too (#562): the page says Python
+# and Swift run on the site, never what carries them there.
 MACHINERY = re.compile(
     r"\b(toolchain|scripts?|docker|colima|containers?|launchd|launchagents?|mcp|"
-    r"models?|sparkle|appcast|feeds?)\b",
+    r"models?|sparkle|appcast|feeds?|pyodide|webassembly|wasm|workers?)\b",
     re.IGNORECASE,
 )
 # Exact phrases a page needs although they contain a word above. Empty today;

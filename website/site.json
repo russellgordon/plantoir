@@ -53,6 +53,15 @@
       },
       "preview-start-page": {
         "windows": true
+      },
+      "runnable-python": {
+        "windows": false
+      },
+      "runnable-swift": {
+        "windows": false
+      },
+      "quizzes": {
+        "windows": false
       }
     }
   },
@@ -61,6 +70,7 @@
     "features",
     "visualizations",
     "printing",
+    "code",
     "day-to-day",
     "deploying",
     "support"

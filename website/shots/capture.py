@@ -17,6 +17,10 @@ Run it from the top of the repository::
     # from a preview in a folder of its own (~/Plantoir Print, made when absent):
     python3 website/shots/capture.py --print-set
 
+    # The Code page (#562): runnable Python and Swift blocks after Run, and a
+    # quiz just checked, from previews of the kept marketing folder:
+    python3 website/shots/capture.py --code
+
 See website/README.md, "Regenerating every image", and scenes.py.
 
 What it does, in order:
@@ -435,7 +439,7 @@ def _recipe_folders() -> list:
     )
 
 
-def mirror_toolchain(workspace: Path) -> None:
+def mirror_toolchain(workspace: Path, resources: Path | None = None) -> None:
     """Put the app's build recipe into the demo folder's `.toolchain/`.
 
     The app does this itself whenever it touches a working folder — except
@@ -453,8 +457,13 @@ def mirror_toolchain(workspace: Path) -> None:
     telling the next person to keep it in step, and it was the one that did
     not — a `.toolchain/` holding the new Dockerfile without the folder that
     Dockerfile COPYs is not stale, it is UNBUILDABLE.
+
+    `resources` is where the recipe is copied from: the app bundle's
+    Resources by default; the repository itself for the code figures (#562),
+    which need no app — the bundle carries exactly these files.
     """
-    resources = app_bundle_resources()
+    if resources is None:
+        resources = app_bundle_resources()
     toolchain = workspace / ".toolchain"
     toolchain.mkdir(parents=True, exist_ok=True)
 
@@ -497,14 +506,16 @@ def workspace_has_course(workspace: Path, code: str) -> bool:
     return (workspace / "courses" / code / "course_config.json").exists()
 
 
-def ensure_launchers(workspace: Path) -> None:
+def ensure_launchers(workspace: Path, resources: Path | None = None) -> None:
     """A brand-new folder needs the three launchers before anything else —
     and a `courses/` folder. The app reads a folder with launchers and no
     `courses/` as a problem ("There are no courses in this folder yet") and
     keeps the folder picker up, so the new-course button a provisioning test
-    clicks is never shown; that is how the first marketing set-up failed."""
+    clicks is never shown; that is how the first marketing set-up failed.
+    `resources` as for mirror_toolchain."""
     (workspace / "courses").mkdir(parents=True, exist_ok=True)
-    resources = app_bundle_resources()
+    if resources is None:
+        resources = app_bundle_resources()
     for name in ["setup.sh", "preview.sh", "deploy.sh"]:
         destination = workspace / name
         source = resources / name
@@ -1005,12 +1016,21 @@ def search_shots() -> list[dict]:
     return shots_of_kind("browser-search")
 
 
-def shots_of_kind(kind: str) -> list[dict]:
+def shots_of_kind(kind: str, scene: str | None = None) -> list[dict]:
+    """The shots captured as `kind`, and only those of `scene` when one is
+    named. A `preview-page` shot is a page of a local preview, and which
+    preview depends on its scene: `print-set` photographs MPM2D in
+    ~/Plantoir Print, `code` photographs ICS3U and ICS4U in the marketing
+    folder (#562). Taking every preview-page shot against the print preview
+    would ask MPM2D's site for ICS3U's pages, and webwindow refuses the 404."""
     manifest = json.loads((WEBSITE / "shots.json").read_text(encoding="utf-8"))
     wanted: list[dict] = []
     for shot in manifest["shots"]:
-        if shot["capture"].get("kind") == kind:
-            wanted.append(shot)
+        if shot["capture"].get("kind") != kind:
+            continue
+        if scene is not None and shot["capture"].get("scene") != scene:
+            continue
+        wanted.append(shot)
     return wanted
 
 
@@ -1914,8 +1934,8 @@ def capture_print_set(folder: Path) -> None:
     the PDF is shown in the same kind of window, so both pictures are whole
     window captures with their own corners and shadow (#434).
     """
-    page_shots = shots_of_kind("preview-page")
-    handout_shots = shots_of_kind("handout")
+    page_shots = shots_of_kind("preview-page", scene="print-set")
+    handout_shots = shots_of_kind("handout", scene="print-set")
     announce(f"Photographing what printing does, in {folder}")
     provision_print_course(folder)
     code = PRINT_COURSE_CONFIG["course_code"]
@@ -1978,6 +1998,104 @@ def capture_print_set(folder: Path) -> None:
         server.terminate()
 
 
+# ---------- The Code page (#562) ----------
+
+# Where the prepare scripts live: each puts a page into the state its figure
+# promises (presses Run and waits for "Finished.", answers a quiz and presses
+# Check) before webwindow.swift photographs it.
+PREPARE_DIR = Path(__file__).resolve().parent / "prepare"
+
+
+def start_preview(folder: Path, code: str) -> tuple[subprocess.Popen, str]:
+    """`preview.sh <code> 1` in the folder, and the address it serves at,
+    once Quartz says it has started. Its output is echoed, so the first
+    preview's long steps (building the website builder, compiling Swift) are
+    seen happening rather than waited on in silence."""
+    server = subprocess.Popen(
+        ["./preview.sh", code, "1", "--non-interactive"], cwd=folder,
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )
+    address = None
+    for line in server.stdout:
+        print(f"   | {line.rstrip()}", flush=True)
+        if "Preview will be available at:" in line:
+            address = line.split("at:", 1)[1].strip().rstrip("/")
+        if "Started a Quartz server" in line:
+            break
+    if address is None:
+        server.terminate()
+        raise SystemExit(f"The preview of {code} did not start.")
+    return server, address
+
+
+def capture_code_set(folder: Path) -> list[str]:
+    """The Code page's figures: runnable Python (after Run, and ending in a
+    traceback), runnable Swift with its input, and a quiz just checked.
+
+    Taken in the kept marketing folder (ICS3U and ICS4U), from previews built
+    by THIS tree's recipe — mirrored from the repository, not from an app
+    bundle, because these are pictures of the class site and the app plays no
+    part in them. The folder is first given what the figures need
+    (`marketing_folder.apply_code_steps`): ICS3U's runnable pages brought up to
+    date from the ready-made course, and the Swift and quiz pages planted.
+    Each page is photographed whole in a plain window (webwindow.swift) after
+    its prepare script has pressed Run or Check and seen the result, in both
+    appearances; Vision must read `expectText` on each picture. The folder is
+    NOT moved to ~/Desktop/Teaching: no path shows in these pictures.
+
+    Returns the pictures taken, as `<id>-light` / `<id>-dark`.
+    """
+    import marketing_folder
+    shots = shots_of_kind("preview-page", scene="code")
+    announce(f"Photographing the Code page's figures, in {folder}")
+    marketing_folder.refuse_foreign_courses(folder)
+    report = marketing_folder.Report()
+    marketing_folder.apply_code_steps(folder, report)
+    print(f"   {marketing_folder.summary(report)}")
+    if report.named_and_skipped:
+        raise SystemExit("The marketing folder is missing what the code figures need. "
+                         "Make it first: capture.py --provision.")
+    ensure_launchers(folder, resources=REPO)
+    mirror_toolchain(folder, resources=REPO)
+    helper = Path(__file__).resolve().parent / "webwindow.swift"
+    taken: list[str] = []
+    courses: list[str] = []
+    for shot in shots:
+        if shot["capture"]["course"] not in courses:
+            courses.append(shot["capture"]["course"])
+    for code in courses:
+        server, address = start_preview(folder, code)
+        try:
+            print(f"   The preview of {code} is at {address}")
+            for shot in shots:
+                capture = shot["capture"]
+                if capture["course"] != code:
+                    continue
+                url = address + capture["path"]
+                script = PREPARE_DIR / capture["prepare"]
+                for dark in (False, True):
+                    suffix = "dark" if dark else "light"
+                    with Appearance(dark=dark):
+                        time.sleep(2)
+                        destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
+                        result = subprocess.run(
+                            ["swift", str(helper), url, "1280", "860", str(destination), "4",
+                             "--prepare", str(script), "--prepare-timeout", "120"],
+                            capture_output=True, text=True,
+                        )
+                        if result.returncode != 0 or not destination.exists():
+                            raise SystemExit(f"Could not photograph {url}: {result.stderr.strip()}")
+                        verify_appearance(destination, dark, shot["id"])
+                        must_show(destination, shot)
+                        serve_as_captured(destination)
+                        taken.append(f"{shot['id']}-{suffix}")
+                        print(f"   saved {destination.name}")
+        finally:
+            subprocess.run(["./preview.sh", code, "1", "--stop"], cwd=folder, capture_output=True)
+            server.terminate()
+    return taken
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Capture every screenshot plantoir.app uses.")
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE),
@@ -2015,6 +2133,9 @@ def main() -> int:
     parser.add_argument("--print-folder", default=str(PRINT_FOLDER),
                         help="the working folder the print pictures are taken in (made when absent; "
                              "must be inside your home folder)")
+    parser.add_argument("--code", action="store_true",
+                        help="only photograph the Code page's figures: runnable Python and Swift blocks "
+                             "after Run, and a quiz just checked, from previews of the marketing folder (#562)")
     parser.add_argument("--hero", action="store_true",
                         help="only reassemble the hero composite from parts already captured")
     arguments = parser.parse_args()
@@ -2080,6 +2201,19 @@ def main() -> int:
         rebuild_site()
         announce("Checking every picture's corners")
         return refuse_drawn_corners()
+
+    if arguments.code:
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        keeping_awake = stay_awake()
+        try:
+            taken = capture_code_set(marketing)
+        finally:
+            keeping_awake.terminate()
+        announce("Checking every picture's corners")
+        result = refuse_drawn_corners()
+        promote_captured_shots(taken)
+        rebuild_site()
+        return result
 
     if arguments.hero:
         build_hero_figures()

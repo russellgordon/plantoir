@@ -137,6 +137,13 @@ class MachineryTests(unittest.TestCase):
         for page in build.load_pages():
             self.assertEqual(build.machinery_problems(page["slug"], page["body"], page["body_line"]), [])
 
+    def test_what_runs_the_code_is_never_named(self):
+        # #562: the Code page says what students get, never what runs it.
+        for sentence in ("Python runs on Pyodide.", "Swift is compiled to WebAssembly.",
+                         "A wasm file per block.", "It runs in a worker.", "Two web workers."):
+            with self.subTest(sentence=sentence):
+                self.assertEqual(len(build.machinery_problems("x.html", f"<p>{sentence}</p>")), 1)
+
 
 class AvailabilityTests(unittest.TestCase):
 
@@ -263,7 +270,7 @@ class RedirectTests(unittest.TestCase):
         # points at /printing/, so an old link still lands somewhere useful.
         site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
         self.assertIn({"from": "interactive", "to": "visualizations"}, build.moved_pages(site))
-        self.assertEqual(site["nav"], ["index", "features", "visualizations", "printing",
+        self.assertEqual(site["nav"], ["index", "features", "visualizations", "printing", "code",
                                        "day-to-day", "deploying", "support"])
         self.assertFalse((build.WEBSITE / "pages" / "interactive.html").exists())
         visualizations = (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8")
@@ -416,7 +423,74 @@ class ReleaseReadinessTests(unittest.TestCase):
 # 2026-10-15: v1.7.0's two print pictures (`print-page`, `print-handout`),
 # mac only at first, were taken on Windows by `capture_windows.py
 # --print-set` on the first unlocked desktop after the 1.7.1 catch-up.
-WINDOWS_PICTURE_OWED: dict = {}
+WINDOWS_PICTURE_OWED: dict = {
+    # The Code page (#562). Windows' v1.8 builds carry no Python runtime yet
+    # and make no Swift program runnable, and the pictures are taken from a
+    # preview of the marketing folder, which capture_windows.py does not make.
+    # Owed by the windows issue that follows #562 (its draft:
+    # 562-windows-issue.md); code-swift stays owed until Windows compiles Swift.
+    "code-python": "Windows carries no Python for runnable blocks yet (#568)",
+    "code-python-error": "Windows carries no Python for runnable blocks yet (#568)",
+    "code-swift": "Windows makes no Swift block runnable yet (#570)",
+    "code-quiz": "no Windows capture of the marketing folder's previews yet",
+}
+
+
+class CodePagePictureTests(unittest.TestCase):
+
+    def test_every_picture_on_the_code_page_is_there_in_both_appearances(self):
+        # #562: each figure on /code/ is a page of a class site after Run or
+        # Check, photographed in light AND dark (capture.py --code). A shot
+        # with one appearance missing would show a dark-mode visitor the
+        # other one, or nothing.
+        import re
+        page = (build.WEBSITE / "pages" / "code.html").read_text(encoding="utf-8")
+        identifiers = re.findall(r"\{\{shot:([a-z0-9-]+)\}\}", page)
+        self.assertEqual(identifiers, ["code-python", "code-python-error", "code-swift", "code-quiz"])
+        manifest = json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))
+        shots = {shot["id"]: shot for shot in manifest["shots"]}
+        for identifier in identifiers:
+            with self.subTest(shot=identifier):
+                self.assertEqual(shots[identifier]["capture"]["scene"], "code")
+                self.assertNotIn("awaiting_capture", shots[identifier])
+                for suffix in ("light", "dark"):
+                    for extension in ("png", "webp"):
+                        picture = build.IMAGE_DIR / f"{identifier}-{suffix}.{extension}"
+                        self.assertTrue(picture.is_file(), f"{picture.name} is missing")
+
+
+class PreviewPageSceneTests(unittest.TestCase):
+    """A `preview-page` shot is a page of ONE local preview, named by its
+    scene. The print set (both platforms) previews MPM2D only, so it must
+    take only its own: given the Code page's ICS3U and ICS4U pages it asked
+    MPM2D's preview for them, which answers 404, and webwindow refuses a 404
+    — the whole print-set run stopped (#562's plan review, S12)."""
+
+    def manifest_shots(self) -> list:
+        return json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))["shots"]
+
+    def test_every_preview_shot_names_a_scene_that_takes_it(self):
+        for shot in self.manifest_shots():
+            if shot["capture"].get("kind") in ("preview-page", "handout"):
+                with self.subTest(shot=shot["id"]):
+                    self.assertIn(shot["capture"].get("scene"), ("print-set", "code"))
+
+    def test_the_windows_print_set_takes_only_its_own(self):
+        sys.path.insert(0, str(build.WEBSITE / "shots"))
+        import print_set_windows
+        self.assertEqual([shot["id"] for shot in print_set_windows.shots_of_kind("preview-page")], ["print-page"])
+        self.assertEqual([shot["id"] for shot in print_set_windows.shots_of_kind("handout")], ["print-handout"])
+
+    @unittest.skipUnless(sys.platform == "darwin", "capture.py is the Mac's")
+    def test_the_mac_print_set_and_code_set_take_only_their_own(self):
+        sys.path.insert(0, str(build.WEBSITE / "shots"))
+        import capture
+        self.assertEqual([shot["id"] for shot in capture.shots_of_kind("preview-page", scene="print-set")], ["print-page"])
+        self.assertEqual([shot["id"] for shot in capture.shots_of_kind("preview-page", scene="code")],
+                         ["code-python", "code-python-error", "code-swift", "code-quiz"])
+        for shot in capture.shots_of_kind("preview-page", scene="code"):
+            with self.subTest(shot=shot["id"]):
+                self.assertTrue((capture.PREPARE_DIR / shot["capture"]["prepare"]).is_file())
 
 
 class WindowsSwapTests(unittest.TestCase):
