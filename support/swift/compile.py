@@ -20,7 +20,7 @@ Each block is compiled the way #493's Phase 0 measured (contracts/
 shared-rules.json -> codeRunnerBlocks.swift.compile):
 
 1. Embedded Swift (`-Osize`, the readLine shim beside the block, the Unicode
-   tables linked): about 20-55 KB a block.
+   tables linked): about 12-110 KB a block.
 2. If that does not compile, OR the optimised binary contains
    PLACEHOLDER (Embedded Swift compiled a `print` of a value it cannot print
    and would show that sentence instead), the full standard library (`-O`):
@@ -51,9 +51,11 @@ against a Mac's own toolchain while developing; the image never sets them.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -86,6 +88,9 @@ JOB_SECONDS = 180
 MOST_DIAGNOSTIC_CHARACTERS = 4000
 
 OBJECT_ROOT = Path("/tmp/plantoir-swift")
+
+# The driver's own words when a step it started was killed.
+KILLED = re.compile(r"(failed|terminated) due to signal|Killed", re.I)
 
 COMMON = ["-target", "wasm32-unknown-wasip1", "-sdk", f"{SDK}/WASI.sdk", "-static-stdlib",
           # spike G2: the wasm builtins live in the SDK, not the Linux toolchain.
@@ -137,7 +142,12 @@ def run(arguments: list) -> tuple:
                               timeout=JOB_SECONDS)
     except subprocess.TimeoutExpired as error:
         raise TookTooLong(str(error)) from error
-    return done.returncode, (done.stdout or "") + (done.stderr or "")
+    said = (done.stdout or "") + (done.stderr or "")
+    # Killed (out of memory, a signal): not the code's fault (review S3 of
+    # the implementation review, measured under --memory 50m).
+    if done.returncode < 0 or KILLED.search(said):
+        raise NotTheCompilers(said or f"stopped by signal {-done.returncode}")
+    return done.returncode, said
 
 
 def compile_one_way(sources: list, compile_flags: list, link_flags: list, work: Path, extra_objects=()) -> tuple:
@@ -173,9 +183,14 @@ def tidy(said: str, work: Path) -> str:
 
 
 def write_atomically(path: Path, data: bytes) -> None:
-    temporary = path.with_name(path.name + ".tmp")
+    """By a temporary name that is this process's and thread's own, so two
+    launchers compiling the same key never take each other's (review N3)."""
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     temporary.write_bytes(data)
-    os.replace(temporary, path)
+    try:
+        os.replace(temporary, path)
+    except FileNotFoundError:
+        pass
 
 
 def compile_job(job: Path, out: Path) -> str:
@@ -201,6 +216,10 @@ def compile_job(job: Path, out: Path) -> str:
                 raise NotTheCompilers(flush_said)
             binary, said = compile_one_way([main], FULL_COMPILE, FULL_LINK, work, extra_objects=[flush])
         seconds = round(time.monotonic() - began, 2)
+        if binary is None and not tidy(said, work):
+            # A failure with no words from the compiler is not a verdict on
+            # the code: never cached (review S3).
+            raise NotTheCompilers("the compiler stopped without saying why")
         if binary is None:
             entry = {"ok": False, "reason": "compileError", "diagnostics": tidy(said, work),
                      "swift": SWIFT_VERSION, "wasmOpt": WASM_OPT_VERSION}

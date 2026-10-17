@@ -233,23 +233,51 @@ the browser:
   with associated values, protocols, closures, errors with `do`/`catch`,
   `Int.random(in:)`, `Double` maths, and printing any of these with
   `print(...)` or `"\(...)"`.
-- **Bigger, still works**: a block that prints an array, an optional, a
-  struct or an error inside a string, or uses `String.contains` with a
-  string, is compiled with Swift's full library - about 1 MB for a student's
-  browser to fetch on its first Run, instead of about 50-100 KB. If a page
-  has many such blocks, that adds up on an iPad on school Wi-Fi; a loop that
-  prints each item is smaller than `print(array)`.
+- **`Int` is 32 bits here**: it holds up to 2,147,483,647, so `13!`
+  (6,227,020,800), Fibonacci(47) or a big running total overflows - and an
+  overflow stops the program with "The program stopped because of an
+  error." and NO Fatal error line, though the same code runs on a Mac or an
+  iPad. For factorials and large totals use `Int64` (or `Double`), or check
+  the range first:
+
+  ````markdown
+  ```swift run
+  var factorial: Int64 = 1
+  for n in 1...20 {
+      factorial *= Int64(n)
+      print("\(n)! = \(factorial)")
+  }
+  ```
+  ````
+- **Bigger, still works**: these are compiled with Swift's full library -
+  about 3.4 MB on a preview and about 1 MB compressed on Netlify or
+  Cloudflare for a student's browser to fetch on its first Run, instead of
+  about 12-110 KB:
+  - a `print` with more than one argument - `print("Total:", total)`.
+    This is the commonest one. Write `print("Total: \(total)")` instead:
+    one string, with the values inside `\(...)`, stays small;
+  - `print(array)`, and an array, an optional, a struct or an error inside a
+    string;
+  - `String.contains` with a string.
+  If a page has many such blocks that adds up on an iPad on school Wi-Fi; a
+  loop that prints each item is smaller than `print(array)`.
+- **Foundation works, and is big**: `import Foundation` gives `Date`,
+  formatters, `JSONEncoder` and `String(format:)` (measured), but a block
+  using `Date` is about 3.4 MB and one using formatters and JSON about
+  46 MB, which every student downloads. The build names any program over
+  5 MB on a `plantoir: note:` line. Prefer plain Swift for teaching
+  examples; use Foundation only where the lesson is about it.
 - **Does not work**: anything needing an app or a screen (SwiftUI, UIKit),
-  files on the student's computer, the network, the time of day, or a
-  package from outside Swift itself. `import Foundation` compiles but makes
-  the program over 40 MB - do not use it.
+  files on the student's computer, the network, or a package from outside
+  Swift itself.
 - A program that **crashes** (an index past the end of an array,
   unwrapping a `nil` with `!`) stops with its `Fatal error: ...` line and
   "The program stopped because of an error." - which is often worth
   showing students on purpose.
 - Deep **recursion** stops early: Safari allows only about 2,000 nested
-  calls (Chrome about 5,000), and a program past that just crashes, with
-  no Fatal error line. Keep recursive examples well under 1,000 calls deep.
+  calls (Chrome about 5,000; the iPad simulator about 2,000 too), and a
+  program past that just crashes, with no Fatal error line. Keep recursive
+  examples well under 1,000 calls deep.
 - A list that grows for ever stops at 256 MB; Swift then says, misleadingly,
   "Unexpectedly found nil while unwrapping an Optional value".
 - `exit(n)` from WASILibc shows "The program ended with exit code n."
@@ -272,6 +300,9 @@ Fix the code and preview again. Check every Swift block you write compiles
   the first time leaves the blocks "not ready" until the next preview online.
 - Plantoir on Windows cannot make Swift blocks runnable yet: they show "not
   ready". Preview the course on a Mac.
+- After Plantoir is updated, the next preview makes every Swift program
+  again; until it can (offline, or not enough free space), the site keeps the
+  programs from before, and the build says so on a `plantoir: note:` line.
 - `%%`, adding blocks after existing ones, printing and opening the site as
   files work exactly as for Python (sections 5-7 above).
 - If a Swift block shows as plain code with no Run button and no "not

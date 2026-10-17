@@ -1,5 +1,5 @@
 {
-  "note": "What each fragment must do, read by browser-checks/wasi_run.mjs (verify.sh's Swift gate). `sdk` is the standard library compile.py must choose: embedded, or full when Embedded Swift cannot compile the fragment (03: String.contains(String)) or would print its placeholder (05: an [Int] in a string, 09: an error in a string). `trap` means the program must end by trapping, `fatal` the text its output must hold when it does, `withinSeconds` how soon. Every other fragment must exit 0 with its .expected as its output; `transcript` is what the page shows with the input echoed (the prompt BEFORE the echoed line, though the prompt has no newline: readLine() flushes first). Measured verdicts: swift-gate/README.md.",
+  "note": "What each fragment must do, read by browser-checks/wasi_run.mjs (verify.sh's Swift gate). `sdk` is the standard library compile.py must choose: embedded, or full when Embedded Swift cannot compile the fragment (03: String.contains(String)) or would print its placeholder (05: an [Int] in a string, 09: an error in a string). `trap` means the program must end by trapping, `fatal` the text its output must hold when it does, `noFatal` that it holds NO `Fatal error:` line (15: an Int overflow traps silently - Int is 32 bits on wasm32), `withinSeconds` how soon. Every other fragment must exit 0 with its .expected as its output; `transcript` is what the page shows with the input echoed (the prompt BEFORE the echoed line, though the prompt has no newline: readLine() flushes first). Measured verdicts: swift-gate/README.md.",
   "fragments": {
     "01-greeting": { "sdk": "embedded" },
     "02-average": { "sdk": "embedded" },
@@ -14,6 +14,7 @@
     "11-recursion": { "sdk": "embedded", "trap": true },
     "12-growth": { "sdk": "embedded", "trap": true, "withinSeconds": 5 },
     "13-prompt": { "sdk": "embedded", "transcript": "What is your name? Ada\nNice to meet you, Ada.\nHow many pets do you have? 2\n2 pets. Lovely!\n" },
-    "14-prompt-full": { "sdk": "full", "transcript": "Type three words: red green blue\nYou typed 3 words: [\"red\", \"green\", \"blue\"]\n" }
+    "14-prompt-full": { "sdk": "full", "transcript": "Type three words: red green blue\nYou typed 3 words: [\"red\", \"green\", \"blue\"]\n" },
+    "15-overflow": { "sdk": "embedded", "trap": true, "noFatal": true }
   }
 }
