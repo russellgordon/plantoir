@@ -467,6 +467,35 @@ has the rule, what it deliberately costs, and where its cases live.
   `include_curriculum_coverage`; the build treats a missing key as ON, so
   courses created before this existed pick it up on their next build.
 
+**A folder added LATER, in Course Settings, starts the way a folder made
+here does** ([#506](https://github.com/russellgordon/plantoir/issues/506),
+both apps). Adding a name to the shared or per-section folder list makes the
+folder on disk, and since #506 puts the same two pages inside it that this
+step writes: its `index.md` (step 7's shape — per-section keys for a shared
+folder, `created`/`publish: true` for a per-section one — and the same
+sentence word for word), without which the site's sidebar never showed the
+folder although it was not hidden; and a `_DUPLICATE ME.md`, without which a
+teacher had nothing to copy. The template is the generic skeleton's
+(`support/skeletons/general/shared/Concepts/_DUPLICATE ME.md`; all 344
+skeleton templates are that one file, and a test pins it), with its date
+filled in, its keys split per section in a shared folder (held back in every
+one), and its "Curriculum connection" kept, pointed at the course's first
+specific expectation when it has no A1.1, or taken out when the course's
+primary curriculum folder holds no specific expectation. A per-section folder
+gets a template in every section too, though this step never writes one there.
+Pages go only into a folder the click has just made, never into one that was
+already there, and never over a file.
+
+Each app writes them itself, natively: a Settings click does not run this
+script (it would start the website builder, and no app runs Python on the
+host). That is why the texts are pinned as bytes in
+`contracts/course-management.json` → `foldersAddedLater`, computed with
+`setup_course.py`'s own functions. **Rejected:** copying a sibling folder's
+template (it may be a teacher's edited page with stale dates), and a special
+case giving a curriculum folder added later only an `index.md` — whether a
+folder is the curriculum is decided afterwards, by a separate tick, so it
+cannot be told at Add time.
+
 ### 6. Timetable sections
 
 The wizard asks how many sections the teacher has **and which timetable

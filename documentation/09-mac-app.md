@@ -2044,6 +2044,43 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+### A folder added later gets its index page and a page to duplicate (#506)
+
+`CourseSettingsView.noticeAfterFolderChange` → `createFoldersOnDisk` makes a
+folder the teacher adds to the shared or per-section list, then hands
+`FolderScaffold` the folders it has JUST made (a location already on disk is
+skipped and gets nothing). `FolderScaffold.pages` is pure — folder, scope,
+section numbers, the primary curriculum folder's top-level file names, the
+moment and the template in; paths and texts out — and `writePages` writes
+each page with `.withoutOverwriting`, only into a folder in that list. The
+template comes from the bundle through `SkeletonCatalog.duplicateMeTemplateURL()`
+(the generic family's `Concepts/_DUPLICATE ME.md`); the moment is
+`SectionAdder.timestamp()`; the primary curriculum folder is the first one
+`CurriculumFolderRule.resolvedFolders(for:)` gives (#128), read AFTER the new
+folder is made, so a "Curriculum" folder added to a course with none is
+empty and its own template's connection is taken out.
+
+What was MEASURED before choosing this: there is no shared writer — the
+course creator is `setup_course.py` inside the builder, and each app makes a
+folder added later on its own (mac `createFoldersOnDisk`, Windows
+`SpecialFolderRenamer.CreateFoldersOnDisk`), both EMPTY on purpose
+(`specialNames.addCreatesTheFolder.why`, now rewritten). All 344 skeleton
+`_DUPLICATE ME.md` files are one blob (`c539a22`); the example-content payloads carry
+309 templates in 54 different texts, so a payload course's folder added later gets
+the generic template, not its payload's. `process_frontmatter` resolves the
+shared index to `publish: true` and the split template to `publish: false`
+for every listed section. `SectionAdder` already mirrored setup's per-section
+folder page natively, and is the precedent for mirroring rather than calling.
+
+The trail's `folder created` line now ends ", with its index page and a page
+to duplicate" (", with its index page" if the template was missing from the
+bundle), from `CourseSettingsView.folderCreatedTrailLine`. Tests:
+`CourseManagementContractTests.testEveryFolderAddedLaterCase` (the contract's
+six cases, bytes), `FolderScaffoldTests` (the click itself through
+`noticeAfterFolderChange` — three of its five fail on the code before #506 —
+and every skeleton template, in the repository and the bundle, byte for byte
+the contract's `templateSource`).
+
 ### Curriculum folders: several maps, protection and the offer (#128)
 
 A course has one coverage map per declared curriculum folder that holds
