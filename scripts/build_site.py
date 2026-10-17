@@ -27,6 +27,7 @@ import how_i_teach
 import page_visibility
 import page_features
 import figures
+import swift_blocks
 import print_settings
 import reference_course
 import stop_preview
@@ -1728,6 +1729,40 @@ def _count_runner_pages(content_root: Path) -> dict:
         for engine in page_features.runner_engines_on_page(post.get("codeRunner"), post.content):
             counts[engine] = counts.get(engine, 0) + 1
     return counts
+
+
+def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Path) -> dict:
+    """
+    Runnable Swift (#493; scripts/swift_blocks.py): the programs the launcher
+    compiled before this build, copied into the site for every ```swift run
+    block on a page students can see that opts in, and every block without
+    one named - on a `plantoir: error:` line and as one folder problem. Never
+    compiles (the main container cannot start the Swift image) and never
+    stops a build: if this cannot run, the blocks stay plain code.
+    """
+    try:
+        def source_of(page):
+            source = _vault_sources.get(page)
+            return source[0] if source is not None else None
+
+        pages = []
+        for page in figures.pages_students_see(
+                content_root, _is_draft,
+                lambda page: _place_in_the_course(page, content_root),
+                source_of, skip=_is_media_name):
+            if "codeRunner" not in page["text"] or frontmatter is None:
+                continue
+            try:
+                post = frontmatter.loads(page["text"])
+            except Exception:
+                continue
+            pages.append({"place": page["place"], "codeRunner": post.get("codeRunner"),
+                          "body": post.content, "source": page["source"]})
+        cache_root = toolchain_paths.merged_output_root(course_dir) / swift_blocks.CACHE_FOLDER
+        return swift_blocks.prepare(pages, output_dir, cache_root)
+    except Exception as error:
+        print(f"⚠️ Could not prepare the Swift programs students run: {error}")
+        return {"problems": [], "blocks": 0, "ready": 0}
 
 
 LOCALES_SRC_CANDIDATES = [
@@ -7894,6 +7929,9 @@ def build_section_site(
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
     # Runnable code (#455), ALWAYS: which language engines this site carries.
     runner_pages_here = _count_runner_pages(content_root)
+    # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into
+    # the site, and each block without one said where every folder problem is.
+    swift_here = _prepare_runnable_swift(content_root, output_dir, course_dir)
 
     health_facts = {
         "coverage_wanted": coverage_wanted,
@@ -7930,6 +7968,8 @@ def build_section_site(
         "print_pdf_problems": print_pages_here["problems"],
         # Diagrams and graphs that could not be drawn (#485 E1).
         "figure_problems": figures.health_finding_facts(figures_here),
+        # Runnable Swift blocks with no program (#493).
+        "swift_problems": swift_blocks.health_finding_facts(swift_here),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)

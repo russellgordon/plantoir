@@ -267,6 +267,45 @@ def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
+def swift_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every runnable Swift block this build has no program
+    for (#493: codeRunnerBlocks.swift), never one per block. Each is named
+    through blockLine (its line in the teacher's file) or blockLineNoLine,
+    and the reason through codeRunnerBlocks.swift.reasons; every value is
+    filled in one pass.
+    """
+    entry = table["swiftCouldNotBePrepared"]
+    problems = facts.get("swift_problems") or []
+    swift = contracts.section(CONTRACT_FILE, "codeRunnerBlocks", "swift")
+    reasons = swift["reasons"]
+    gigabytes = swift["room"]["needGigabytes"]
+    named = []
+    for problem in problems[:MOST_PAGES_NAMED]:
+        reason = filled(reasons.get(problem.get("reason") or "", reasons["notCompiled"]),
+                        {"said": problem.get("said") or "", "gigabytes": gigabytes})
+        fill = {"page": problem.get("page", ""), "block": problem.get("block", 1), "reason": reason}
+        if problem.get("line") is not None:
+            fill["line"] = problem["line"]
+            piece = entry["blockLine"]
+        else:
+            piece = entry["blockLineNoLine"]
+        named.append(filled(piece, fill))
+    if len(problems) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": problems[0].get("page", "") if problems else "",
+        "count": len(problems),
+        # "; " rather than ", ": a compiler's message can hold a comma.
+        "blocks": "; ".join(named),
+    }
+    return finding(
+        "swiftCouldNotBePrepared", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(problems) == 1 else "sentenceForSeveral",
+    )
+
+
 def findings(facts: dict, course: str, section) -> list:
     """
     Every finding for one section's build.
@@ -302,6 +341,10 @@ def findings(facts: dict, course: str, section) -> list:
                                or None, "reason": figureFences.words.reasons
                                key, "name", "said"}], each a diagram or graph
                                that could not be drawn (#485 E1)
+    * `swift_problems`       — [{"page": place, "block": n, "line": n or None,
+                               "reason": codeRunnerBlocks.swift.reasons key,
+                               "said": the compiler's first error}], each a
+                               runnable Swift block with no program (#493)
     """
     table = _checks_by_name()
     found = []
@@ -364,6 +407,10 @@ def findings(facts: dict, course: str, section) -> list:
     # After everything above, so the existing examples keep their order (#485).
     if facts.get("figure_problems"):
         found.append(figures_finding(facts, course, section, table))
+
+    # After everything above, so the existing examples keep their order (#493).
+    if facts.get("swift_problems"):
+        found.append(swift_finding(facts, course, section, table))
 
     return found
 
