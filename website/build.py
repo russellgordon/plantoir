@@ -302,9 +302,10 @@ def awaiting_capture_notes(shots: dict) -> list[str]:
             issue = waiting_on_issue(shot)
             owner = f", waiting on {issue}" if issue else ""
             scene = shot.get("capture", {}).get("scene", identifier)
-            # The print set and the Code page's figures are taken by flags of
-            # their own (previews, not app scenes); every other scene by --only.
-            command = f"--{scene}" if scene in ("print-set", "code") else f"--only {scene}"
+            # The print set and the Code and Quizzes pages' figures are taken
+            # by flags of their own (previews, not app scenes); every other
+            # scene by --only.
+            command = f"--{scene}" if scene in ("print-set", "code", "quizzes") else f"--only {scene}"
             notes.append(f"'{identifier}' is not captured yet, so its page shows no picture there{owner} "
                          f"(capture.py {command})")
     return notes
