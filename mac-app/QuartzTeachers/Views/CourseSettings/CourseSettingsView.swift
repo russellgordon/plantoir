@@ -1130,11 +1130,13 @@ struct CourseSettingsView: View {
     func noticeAfterFolderChange(_ name: String, change: ListChange, scope: FolderScope) -> String? {
         switch change {
         case .added:
-            if createFoldersOnDisk(named: name, scope: scope) {
+            let outcome: FolderScaffold.Outcome = createFoldersOnDisk(named: name, scope: scope)
+            if outcome.foldersCreated > 0 {
                 ActivityTrail.note(
                     .folderCreated,
-                    "created the folder " + name + " in " + course.code
-                    + " (" + scope.configurationKey + ")"
+                    CourseSettingsView.folderCreatedTrailLine(
+                        name: name, courseCode: course.code, scope: scope, outcome: outcome
+                    )
                 )
                 return SpecialNames.addCreatesTheFolderMessage(name: name)
             }
@@ -1144,28 +1146,51 @@ struct CourseSettingsView: View {
         }
     }
 
+    /// The trail's line for a folder added in Course Settings: which folder,
+    /// which list, and — since #506 — the pages Plantoir put inside it, so a
+    /// teacher asking "where did this page come from?" has an answer. Only
+    /// what was actually written is named.
+    static func folderCreatedTrailLine(
+        name: String, courseCode: String, scope: FolderScope, outcome: FolderScaffold.Outcome
+    ) -> String {
+        var line: String = "created the folder " + name + " in " + courseCode
+            + " (" + scope.configurationKey + ")"
+        if outcome.indexPagesWritten > 0 && outcome.templatesWritten > 0 {
+            line += ", with its index page and a page to duplicate"
+        } else if outcome.indexPagesWritten > 0 {
+            line += ", with its index page"
+        }
+        return line
+    }
+
     /// Makes the folder the teacher just named, wherever its scope says it
-    /// lives, and reports whether anything was actually created.
+    /// lives, with the two pages a folder made with the course starts with,
+    /// and reports what was made.
     ///
     /// Adding a name used to write a configuration entry pointing at nothing,
     /// so the folder had to be made in Obsidian afterwards or the entry named
-    /// something that did not exist. Nothing is put INSIDE it: an empty folder
-    /// is the honest starting state, and inventing a page would put words in
-    /// the teacher's mouth.
-    func createFoldersOnDisk(named name: String, scope: FolderScope) -> Bool {
+    /// something that did not exist. Until #506 the folder was then left
+    /// EMPTY, on the reasoning that inventing a page would put words in the
+    /// teacher's mouth — but with no `index.md` the site's sidebar never
+    /// showed the folder, and with no template there was nothing to copy, so
+    /// a folder added later behaved unlike every folder made with the course.
+    /// The pages are the course creator's own (`FolderScaffold`), written only
+    /// into a folder this call has just made and never over a file.
+    func createFoldersOnDisk(named name: String, scope: FolderScope) -> FolderScaffold.Outcome {
+        let sectionNumbers: [Int] = course.configuration.sectionNumbers
         let locations: [URL] = SpecialFolderRenamer.folderLocations(
             named: name, scope: scope,
             courseDirectory: course.directoryURL,
-            sectionNumbers: course.configuration.sectionNumbers
+            sectionNumbers: sectionNumbers
         )
-        var created: Bool = false
+        var newFolders: [URL] = []
         for location in locations {
             if FileManager.default.fileExists(atPath: location.path) {
                 continue
             }
             do {
                 try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
-                created = true
+                newFolders.append(location)
             } catch {
                 // Re-adding a name whose folder is already there is the common
                 // case and is not worth a word; a genuine failure shows up as
@@ -1174,7 +1199,18 @@ struct CourseSettingsView: View {
                 continue
             }
         }
-        return created
+        if newFolders.isEmpty {
+            return FolderScaffold.Outcome()
+        }
+        let pages: [FolderScaffold.Page] = FolderScaffold.pages(
+            forFolderNamed: name,
+            scope: scope,
+            sectionNumbers: sectionNumbers,
+            curriculumPageNames: FolderScaffold.curriculumPageNames(for: course),
+            created: SectionAdder.timestamp(),
+            template: FolderScaffold.bundledTemplate()
+        )
+        return FolderScaffold.writePages(pages, intoNewFolders: newFolders, courseDirectory: course.directoryURL)
     }
 
     // MARK: - What a removal or an untick may do

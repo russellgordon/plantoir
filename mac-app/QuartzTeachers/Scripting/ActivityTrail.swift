@@ -528,7 +528,9 @@ nonisolated enum ActivityTrail {
         /// A folder was created on disk because a teacher added its name in
         /// Course Settings. Separate from the rename because it answers a
         /// different question: a folder appearing in a teacher's vault that
-        /// they did not make in Obsidian is otherwise unexplained.
+        /// they did not make in Obsidian is otherwise unexplained. Since #506
+        /// the line also says when its index page and a page to duplicate
+        /// were put inside it (`CourseSettingsView.folderCreatedTrailLine`).
         case folderCreated = "folder created"
         /// A course's word for a unit was renamed from inside Plantoir —
         /// every class page in every section, its title, and the links that

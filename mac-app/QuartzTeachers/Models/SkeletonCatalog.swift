@@ -249,6 +249,19 @@ enum SkeletonCatalog {
         return (hidden, expandable)
     }
 
+    /// The page to duplicate a folder added in Course Settings starts with
+    /// (#506): the generic family's `Concepts/_DUPLICATE ME.md`. Every
+    /// skeleton family carries this same file — 344 copies of one text, pinned
+    /// by `FolderScaffoldTests` against `contracts/course-management.json` →
+    /// `foldersAddedLater.templateSource` — so the generic copy is every
+    /// family's.
+    static func duplicateMeTemplateURL() -> URL? {
+        return Bundle.main.url(
+            forResource: "_DUPLICATE ME", withExtension: "md",
+            subdirectory: "support/skeletons/\(generalFamilyName)/shared/Concepts"
+        )
+    }
+
     /// True when a skeleton is OFFERED for this code: a family exists for
     /// its prefix AND the teacher is not taking the example content written
     /// for it.
