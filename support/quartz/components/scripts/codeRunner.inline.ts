@@ -36,6 +36,7 @@
 import settings from "../../plantoir_code_runner.json"
 import { FullSlug, getFullSlug, pathToRoot } from "../../util/path"
 import { filled, fnv1a, languageFor, RunnerLanguage } from "../../plugins/transformers/codeRunnerRule"
+import { colourLines, ColouredLine, lineHTML, reusePlan } from "./codeRunnerColour"
 
 type Words = Record<string, string>
 type Limits = {
@@ -472,6 +473,155 @@ function cutAnswer(text: string): string {
   return characters.slice(0, ANSWER_CHARACTERS).join("")
 }
 
+// ---- The editor's colour and line numbers (#585) -------------------------------
+
+// The editor's frame: a gutter of line numbers beside a cell in which a
+// coloured copy of the code sits under the textarea (codeRunner.scss says
+// why each metric is shared). Every line the student has not changed shows
+// the highlighted copy's own line - Shiki's spans, byte for byte - and every
+// line they have shows codeRunnerColour.ts's colours; only the lines whose
+// HTML changed are touched on a keystroke (codeRunnerBlocks.editor.colour).
+type Frame = {
+  frame: HTMLElement
+  // Re-colour now / on the next animation frame.
+  render: () => void
+  schedule: () => void
+  // Follow the textarea's scroll.
+  sync: () => void
+  // The current code's lines as HTML, for the print copy.
+  lines: () => string[]
+  theme: string
+}
+
+function buildFrame(wrapper: HTMLElement, editor: HTMLTextAreaElement, language: RunnerLanguage, original: string): Frame {
+  const frame = element("div", "plantoir-runner-frame")
+  const gutter = element("pre", "plantoir-runner-gutter")
+  gutter.setAttribute("aria-hidden", "true")
+  const numbers = element("span", "")
+  gutter.appendChild(numbers)
+  const cell = element("div", "plantoir-runner-cell")
+  const colour = element("pre", "plantoir-runner-colour")
+  colour.setAttribute("aria-hidden", "true")
+  const code = document.createElement("code")
+  const highlighted = wrapper.querySelector<HTMLElement>(".plantoir-runner-original pre > code")
+  const theme = highlighted?.getAttribute("data-theme") ?? "github-light github-dark"
+  code.setAttribute("data-theme", theme)
+  colour.appendChild(code)
+  cell.append(colour, editor)
+  frame.append(gutter, cell)
+
+  // The highlighted copy's lines, each kept only where its text is the
+  // teacher's line (a blank line holds a space there).
+  const originalTexts = original.split("\n")
+  const shikiLines: string[] = []
+  const originalLines: ColouredLine[] = []
+  const highlightedLines = highlighted === null ? [] : Array.from(highlighted.querySelectorAll<HTMLElement>(":scope > [data-line]"))
+  if (language.colour !== null && highlightedLines.length === originalTexts.length) {
+    const coloured = colourLines(language.colour, original) ?? []
+    for (let index = 0; index < originalTexts.length; index += 1) {
+      const line = highlightedLines[index]
+      const text = originalTexts[index]
+      const usable = line.textContent === text || (text.trim() === "" && (line.textContent ?? "").trim() === "")
+      shikiLines.push(usable ? line.innerHTML : "")
+      // A line that cannot be used gets a state no current line has.
+      originalLines.push({ text, state: usable ? (coloured[index]?.state ?? "") : "\u0000unusable", tokens: [] })
+    }
+  }
+  const sameColouring = (first: number, second: number) => shikiLines[first] === shikiLines[second]
+
+  let shown: string[] = []
+  let numbered = 0
+  const linesNow = (): string[] => {
+    const value = editor.value
+    const coloured = language.colour === null ? null : colourLines(language.colour, value)
+    const texts = value.split("\n")
+    const current: ColouredLine[] =
+      coloured ?? texts.map((text) => ({ text, state: "", tokens: [[text, ""]] as ColouredLine["tokens"] }))
+    const plan = originalLines.length > 0 ? reusePlan(originalLines, current, sameColouring) : []
+    const html: string[] = []
+    for (let index = 0; index < current.length; index += 1) {
+      const reused = plan[index]
+      if (current[index].text === "") {
+        html.push("")
+      } else if (reused !== null && reused !== undefined) {
+        html.push(shikiLines[reused])
+      } else {
+        html.push(lineHTML(current[index].tokens))
+      }
+    }
+    return html
+  }
+
+  // The copy is a scroll box of its own, scrolled to the textarea's place:
+  // a browser puts a scroll box's text on whole device pixels, so a copy
+  // moved by a transform instead sat a fraction of a pixel off the typed
+  // letters wherever the block itself did not start on a whole pixel
+  // (measured, documentation/06 I11). It stops where the textarea's scroll
+  // bars start, so the two have the same room to scroll and no letter shows
+  // through a bar.
+  const sync = () => {
+    colour.style.right = `${Math.max(0, editor.offsetWidth - editor.clientWidth)}px`
+    colour.style.bottom = `${Math.max(0, editor.offsetHeight - editor.clientHeight)}px`
+    colour.scrollLeft = editor.scrollLeft
+    colour.scrollTop = editor.scrollTop
+    numbers.style.transform = `translateY(${-editor.scrollTop}px)`
+  }
+
+  const render = () => {
+    const html = linesNow()
+    while (code.children.length < html.length) {
+      code.appendChild(element("span", "plantoir-runner-line"))
+    }
+    while (code.children.length > html.length) {
+      code.lastElementChild?.remove()
+    }
+    const next: string[] = []
+    for (let index = 0; index < html.length; index += 1) {
+      // Each line carries its own line break, so the copy's text is the
+      // textarea's, character for character.
+      const markup = index < html.length - 1 ? html[index] + "\n" : html[index]
+      next.push(markup)
+      if (shown[index] !== markup) {
+        code.children[index].innerHTML = markup
+      }
+    }
+    shown = next
+    if (html.length !== numbered) {
+      numbered = html.length
+      const all: string[] = []
+      for (let number = 1; number <= numbered; number += 1) {
+        all.push(String(number))
+      }
+      numbers.textContent = all.join("\n")
+      gutter.style.setProperty("--plantoir-digits", String(Math.max(2, String(numbered).length)))
+    }
+    sync()
+  }
+
+  let queued: number | null = null
+  const schedule = () => {
+    if (queued !== null) {
+      return
+    }
+    queued = window.requestAnimationFrame(() => {
+      queued = null
+      render()
+    })
+  }
+
+  editor.addEventListener("scroll", sync)
+  editor.addEventListener("compositionstart", () => wrapper.classList.add("plantoir-runner-composing"))
+  editor.addEventListener("compositionend", () => {
+    wrapper.classList.remove("plantoir-runner-composing")
+    render()
+  })
+  const resized = new ResizeObserver(() => sync())
+  resized.observe(editor)
+  window.addCleanup(() => resized.disconnect())
+
+  return { frame, render, schedule, sync, lines: linesNow, theme }
+}
+
 // ---- One block ----------------------------------------------------------------
 
 // The editor (#455): the student's copy of the code, or the teacher's when
@@ -536,14 +686,17 @@ function build(wrapper: HTMLElement, base: string, live: boolean): Block | null 
     wrapper.classList.add("plantoir-runner-readonly")
   }
 
-  // The editor, or nothing for readonly (its highlighted code stays).
+  // The editor in its frame (#585), or nothing for readonly (its
+  // highlighted code stays, with the numbers every code block has).
   let editor: HTMLTextAreaElement | null = null
+  let editorFrame: Frame | null = null
   let saidOnLoad = ""
   if (!readonly) {
     const made = buildEditor(language, original, key)
     editor = made.editor
     saidOnLoad = made.saidOnLoad
-    wrapper.appendChild(editor)
+    editorFrame = buildFrame(wrapper, editor, language, original)
+    wrapper.appendChild(editorFrame.frame)
   }
 
   // A language a student cannot edit (Swift) says so once, under its code.
@@ -614,8 +767,14 @@ function build(wrapper: HTMLElement, base: string, live: boolean): Block | null 
 
   // What prints when the student has edited the code: a textarea's typed
   // value is not part of a printed (or cloned) page (codeRunnerBlocks.print).
+  // Built as a static block is - pre > code > span[data-line] - so it prints
+  // coloured and numbered as one does (#585).
   const printCopy = element("pre", "plantoir-runner-print")
   printCopy.setAttribute("aria-hidden", "true")
+  const printCode = document.createElement("code")
+  printCode.setAttribute("data-theme", editorFrame?.theme ?? "github-light github-dark")
+  printCode.setAttribute("data-language", language.fence)
+  printCopy.appendChild(printCode)
   wrapper.appendChild(printCopy)
 
   const code = () => (editor !== null ? editor.value : original)
@@ -624,12 +783,31 @@ function build(wrapper: HTMLElement, base: string, live: boolean): Block | null 
   // input pattern in the current code)?
   const readsInput = () => flags.includes("stdin") || inputPattern.test(code())
 
-  const syncInputAndPrint = () => {
+  const syncInput = () => {
     const current = code()
     // A live page never shows the box: the program asks as it runs.
     inputBox.hidden = live || !readsInput()
-    printCopy.textContent = current
     wrapper.classList.toggle("plantoir-runner-edited", current !== original)
+  }
+
+  // The print copy, brought up to date only when the page may be printed or
+  // left (flush): rebuilding it on every keystroke cost a 500-line program
+  // 29 ms at a sixfold CPU slowdown (#585 plan review S2).
+  const syncPrint = () => {
+    if (editorFrame === null) {
+      return
+    }
+    const lines = editorFrame.lines()
+    printCode.textContent = ""
+    for (let index = 0; index < lines.length; index += 1) {
+      if (index > 0) {
+        printCode.appendChild(document.createTextNode("\n"))
+      }
+      const line = document.createElement("span")
+      line.setAttribute("data-line", "")
+      line.innerHTML = lines[index] === "" ? " " : lines[index]
+      printCode.appendChild(line)
+    }
   }
 
   const fit = () => {
@@ -640,6 +818,7 @@ function build(wrapper: HTMLElement, base: string, live: boolean): Block | null 
     if (editor.rows !== wanted) {
       editor.rows = wanted
       freeOpenCallouts(wrapper)
+      editorFrame?.sync()
     }
   }
 
@@ -664,7 +843,8 @@ function build(wrapper: HTMLElement, base: string, live: boolean): Block | null 
     if (saveTimer !== null) {
       save()
     }
-    syncInputAndPrint()
+    syncInput()
+    syncPrint()
   }
 
   // A live run's answer field (#583): ONE for the whole run, always the
@@ -1079,8 +1259,10 @@ function build(wrapper: HTMLElement, base: string, live: boolean): Block | null 
     storageRemove(key)
     clearOutput()
     status.textContent = ""
-    syncInputAndPrint()
+    syncInput()
+    syncPrint()
     fit()
+    editorFrame?.render()
   })
 
   wrapper.addEventListener("keydown", (event: KeyboardEvent) => {
@@ -1095,7 +1277,11 @@ function build(wrapper: HTMLElement, base: string, live: boolean): Block | null 
     let escapeArmed = false
     area.addEventListener("input", () => {
       fit()
-      syncInputAndPrint()
+      syncInput()
+      // An input method's text is drawn by the textarea until it is done.
+      if (!wrapper.classList.contains("plantoir-runner-composing")) {
+        editorFrame?.schedule()
+      }
       if (saveTimer !== null) {
         window.clearTimeout(saveTimer)
       }
@@ -1131,8 +1317,10 @@ function build(wrapper: HTMLElement, base: string, live: boolean): Block | null 
     })
   }
 
-  syncInputAndPrint()
+  syncInput()
+  syncPrint()
   fit()
+  editorFrame?.render()
   freeOpenCallouts(wrapper)
 
   if (flags.includes("autorun")) {

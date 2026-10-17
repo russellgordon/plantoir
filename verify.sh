@@ -470,6 +470,13 @@ else
   cat /tmp/verify_sidebar_page_marker_test.log
 fi
 
+if (cd scripts && python3 test_code_lines_style.py) >/tmp/verify_code_lines_style_test.log 2>&1; then
+  pass "every code block's line numbers: one gutter style with its hairline for static and runnable blocks, no ligatures in code, the editor's colour categories the contract's, and a handout's wrapped line hung under its code (scripts/test_code_lines_style.py, #585)"
+else
+  fail "every code block's line numbers or the editor's colours are not as the contract and each other say (scripts/test_code_lines_style.py, #585)"
+  cat /tmp/verify_code_lines_style_test.log
+fi
+
 if (cd scripts && python3 test_folder_spelling.py) >/tmp/verify_folder_spelling_test.log 2>&1; then
   pass "one working folder, one spelling: every spelling of a folder names one website builder and one builds folder (scripts/test_folder_spelling.py, #189)"
 else
@@ -1136,9 +1143,11 @@ echo ""
 echo "🔎 Checking the runnable-code rules against what the site and the build run…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/check_runner_rules_against_the_site.py" /opt/scripts/check_runner_rules_against_the_site.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/fixtures/runner-colour" /opt/scripts/fixtures/runner-colour),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/swift-gate" /opt/swift-gate),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/check_runner_rules_against_the_site.py \
   >/tmp/verify_runner_rules_site.log 2>&1; then
-  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
+  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, every codeRunner: line reads as the contract says, and the editor's colours agree with the image's own Shiki case for case, colour for colour and over the example content - $(grep '^codeRunnerColour.ts' /tmp/verify_runner_rules_site.log | sed 's/^codeRunnerColour.ts: //') (scripts/check_runner_rules_against_the_site.py, #455, #585)"
 else
   fail "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
   cat /tmp/verify_runner_rules_site.log

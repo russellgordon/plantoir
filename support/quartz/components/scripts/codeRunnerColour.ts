@@ -33,11 +33,11 @@
 
 // The categories, each a pair of Shiki's colours (codeRunnerBlocks.colour.
 // categories, codeRunner.scss's .plantoir-tok-<category>). "" is plain text.
-export type Category = "" | "k" | "s" | "c" | "f" | "m" | "p" | "g"
+export type Category = "" | "k" | "s" | "c" | "f" | "m" | "p" | "g" | "r"
 export type Token = [string, Category]
 export type ColouredLine = { text: string; state: string; tokens: Token[] }
 
-export const CATEGORIES: Category[] = ["k", "s", "c", "f", "m", "p", "g"]
+export const CATEGORIES: Category[] = ["k", "s", "c", "f", "m", "p", "g", "r"]
 
 // The languages this colours, by the language row's `colour` field.
 export function colourLines(colour: string, source: string): ColouredLine[] | null {
@@ -197,7 +197,8 @@ function wordList(words: string): Set<string> {
 // `__dunder__` names blue; the names a `def` or `class` defines, base
 // classes and decorators purple; a call's keyword-argument names orange;
 // comments grey with TODO and the other code tags red; raw strings (a
-// lowercase r) read as regular expressions, as Shiki reads them.
+// lowercase r) read as regular expressions, as Shiki reads them, their text
+// in the expression's own colour.
 
 const PY_KEYWORDS = wordList(`and as assert async await break class continue def del elif else except
   finally for from global if import in is lambda nonlocal not or pass raise return try while with yield`)
@@ -713,9 +714,11 @@ export function colourPython(source: string): ColouredLine[] {
     let at = start
     let from = at
     const groups: string[] = []
+    // A regular expression's own text is its own colour: a string's in
+    // light, a paler blue in dark (measured: #032F62 / #DBEDFF).
     const flush = (to: number) => {
       if (to > from) {
-        push(text.slice(from, to), "s")
+        push(text.slice(from, to), "r")
       }
     }
     const emit = (piece: string, category: Category) => {
