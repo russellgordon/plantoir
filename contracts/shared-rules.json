@@ -4642,7 +4642,13 @@
         "detail": "Students see the code with no working Run button until it is put right: {blocks}.",
         "blockLine": "“{page}”, Swift block {block}, line {line}: {reason}",
         "blockLineNoLine": "“{page}”, Swift block {block}: {reason}",
-        "oneReasonForSeveral": "{reason}, for {blocks} on {pages}",
+        "oneReasonForSeveral": "{blocks} on {pages}: {reason}",
+        "reasonsForSeveral": {
+          "notCompiled": "not made ready to run - preview the course again",
+          "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about 1.3 GB)",
+          "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run",
+          "notOnWindows": "Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable"
+        },
         "blockCount": { "one": "1 block", "several": "{count} blocks" },
         "pageCount": { "one": "1 page", "several": "{count} pages" },
         "groupingCases": [
@@ -4752,7 +4758,7 @@
                 "reason": "notCompiled"
               }
             ],
-            "detail": "Students see the code with no working Run button until it is put right: it was not made ready to run - preview the course again, for 17 blocks on 4 pages."
+            "detail": "Students see the code with no working Run button until it is put right: 17 blocks on 4 pages: not made ready to run - preview the course again."
           },
           {
             "name": "one compile error and two blocks with too little room",
@@ -4777,7 +4783,7 @@
                 "reason": "noRoom"
               }
             ],
-            "detail": "Students see the code with no working Run button until it is put right: “Unit 1”, Swift block 1, line 9: Swift found an error in it: cannot find 'nmae' in scope; this computer needs about 6 GB of free space before it can make Swift programs ready to run, for 2 blocks on 2 pages."
+            "detail": "Students see the code with no working Run button until it is put right: “Unit 1”, Swift block 1, line 9: Swift found an error in it: cannot find 'nmae' in scope; 2 blocks on 2 pages: this computer needs about 6 GB of free space before it can make Swift programs ready to run."
           },
           {
             "name": "one block on one page",
@@ -4789,12 +4795,12 @@
                 "reason": "notOnWindows"
               }
             ],
-            "detail": "Students see the code with no working Run button until it is put right: Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable, for 1 block on 1 page."
+            "detail": "Students see the code with no working Run button until it is put right: 1 block on 1 page: Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable."
           }
         ],
         "andMore": "and {count} more",
         "fixable": false,
-        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's runnable Swift blocks from 1; {line} is the line in the teacher's own file - the first error's line for compileError, the opening fence's otherwise - and when it cannot be found the block is named through blockLineNoLine; {reason} is codeRunnerBlocks.swift.reasons[reason] filled with {said} (the compiler's first error) and {gigabytes} (codeRunnerBlocks.swift.room.needGigabytes). `sentence` when ONE block has no program and `sentenceForSeveral` otherwise ({count} blocks). `detail` names each compileError block through blockLine or blockLineNoLine (each has its own message), and every OTHER reason ONCE, through oneReasonForSeveral with blockCount and pageCount (implementation review S4: a cause every block shares - offline, too little room, Windows - was said once per block, ten times and 'and 7 more'); compile errors first in page order, then the shared reasons in reasonCases' order; at most ten pieces, joined with \"; \" (a compiler's message can hold a comma), then `andMore` with the number of pieces left over. `groupingCases` pin it. Every value is filled in ONE pass. ONE finding per section build (#246).",
+        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's runnable Swift blocks from 1; {line} is the line in the teacher's own file - the first error's line for compileError, the opening fence's otherwise - and when it cannot be found the block is named through blockLineNoLine; {reason} is codeRunnerBlocks.swift.reasons[reason] filled with {said} (the compiler's first error) and {gigabytes} (codeRunnerBlocks.swift.room.needGigabytes). `sentence` when ONE block has no program and `sentenceForSeveral` otherwise ({count} blocks). `detail` names each compileError block through blockLine or blockLineNoLine (each has its own message), and every OTHER reason ONCE, through oneReasonForSeveral - the count first, then reasonsForSeveral[reason] (worded without a pronoun, so it reads after a count; the fixes review's nit 2) - with blockCount and pageCount (implementation review S4: a cause every block shares - offline, too little room, Windows - was said once per block, ten times and 'and 7 more'); compile errors first in page order, then the shared reasons in reasonCases' order; at most ten pieces, joined with \"; \" (a compiler's message can hold a comma), then `andMore` with the number of pieces left over. `groupingCases` pin it. Every value is filled in ONE pass. ONE finding per section build (#246).",
         "why": "#493 ruling Q1: a Swift block that does not compile used to be planned as a failed build (the issue's acceptance 11); a failed build would also stop the preview the teacher needs to fix it, the #485 E1 precedent. So the build carries on, the block shows its code with Run disabled and words.notReady, and the teacher - who previews in the app and never reads the build's console - is told where: page, block, line and the compiler's own first error. An assistant reads the same facts on `plantoir: error:` lines. The same finding says when a block could not be prepared at all (offline the first time, too little room, or on Windows), because to a teacher it is the same thing: students cannot run that program yet. Not repairable: only the teacher can correct the code, and getting Swift ready is the next preview's own job (review S8: in repair.neverOffered)."
       }
     ],
@@ -24200,7 +24206,7 @@
     ]
   },
   "codeRunnerBlocks": {
-    "note": "#455 (+#494), v1.8.0. A fenced block of code on a page that opts in becomes a small program a student can edit and RUN in the browser, with nothing installed and no account: ```python run on a page whose frontmatter says `codeRunner: true`. Two languages today, Python (#455) and Swift (#493, read-only and compiled ahead of time: `swift`); everything below reads the LANGUAGE TABLE (`languages`), so a second language is a row in that table, a runtime class in the page's code, a vendor layer and a pin - and nothing else (documentation/06-quartz-customizations.md -> 'I. Runnable code (#455)' -> 'Adding a language'). The page's half is support/quartz (codeRunnerRule.ts, codeRunner.ts, CodeRunner.tsx, codeRunner.inline.ts, codeRunner.scss); the engine's half is support/gated/<engine> laid over VENDOR_DIR/<engine> and copied into a site only when it needs it (siteCarriesEngine). No trail event: the app does nothing new a teacher sees.",
+    "note": "#455 (+#494), v1.8.0. A fenced block of code on a page that opts in becomes a small program a student can edit and RUN in the browser, with nothing installed and no account: ```python run on a page whose frontmatter says `codeRunner: true`. Two languages today, Python (#455) and Swift (#493, read-only and compiled ahead of time: `swift`); everything below reads the LANGUAGE TABLE (`languages`), so a language the browser runs as written is a row in that table, a runtime class in the page's code, a vendor layer and a pin; a language compiled ahead of time (Swift) also needs a compile layer, a folder problem and the two generic `prebuilt` rules (documentation/06-quartz-customizations.md -> 'I3' -> 'Adding a language', which lists exactly what Swift needed). The page's half is support/quartz (codeRunnerRule.ts, codeRunner.ts, CodeRunner.tsx, codeRunner.inline.ts, codeRunner.scss); the engine's half is support/gated/<engine> laid over VENDOR_DIR/<engine> and copied into a site only when it needs it (siteCarriesEngine). No trail event: the app does nothing new a teacher sees.",
     "rule": "A block runs only where THREE things hold: the page opts in (`codeRunner: true`, read as file-formats.json -> pageOptIns says), the fence's language is the FIRST word of its info string and is exactly a table row's `fence` (lowercase, Q1), and the rest of the info string, split on whitespace, holds the token `run` exactly. Any other block - on any page - is left exactly as it was, byte for byte. A runnable block keeps its highlighted code as the page shows it without the script, in a popover, and on paper; the page's script then replaces it with an editor (or keeps it, for `readonly`), an input box when the program reads input, Run / Stop / Reset, a status line and the output. ONE program runs on a page at a time (Q2): Run on a second block stops the first and says words.stoppedForAnother. Nothing is fetched until a student presses Run (or an `autorun` block scrolls into view): a page with runnable code costs a reader nothing until then.",
     "languages": [
       {
@@ -24962,7 +24968,7 @@
       "notes": {
         "rule": "Lines an assistant and a teacher read in the build's output that are NOT folder problems (implementation review S2 and N2): `fromBefore` when prepare served programs compiled by the PREVIOUS recipe because this recipe has not compiled them yet (an offline preview, or too little room, after Plantoir was updated) - the site keeps working, and the next preview that can compile replaces them; `large` for each block whose program is over `largeBytes` (a full-library program is about 3.4 MB; `import Foundation` with formatters or JSON measured 46,073,957 bytes), because every student downloads it on that block's first Run. Each is one line `plantoir: note: ` + the words; `large` names the block as `<page>.md: swift block <n>: `. `noteCases` pin both.",
         "fromBefore": "{count} Swift programs on this site are the ones made before Plantoir was updated; they work, and the next preview that can make them again replaces them",
-        "large": "its program is {megabytes} MB, which every student downloads the first time they run it - a print with several arguments, print(array) or import Foundation makes a program this big; \\(...) inside one string keeps it small",
+        "large": "its program is {megabytes} MB, which every student downloads the first time they run it - import Foundation is the usual cause (with formatters or JSON it measured 46 MB); plain Swift keeps a program under 5 MB",
         "largeBytes": 5000000
       },
       "noteCases": [

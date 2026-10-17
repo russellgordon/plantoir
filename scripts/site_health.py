@@ -314,8 +314,9 @@ def swift_finding(facts: dict, course: str, section, table: dict) -> Finding:
         for problem in sharing:
             if problem.get("page") not in pages:
                 pages.append(problem.get("page"))
+        several = entry["reasonsForSeveral"].get(reason)
         pieces.append(filled(entry["oneReasonForSeveral"], {
-            "reason": reason_text(sharing[0]),
+            "reason": filled(several, {"gigabytes": gigabytes}) if several else reason_text(sharing[0]),
             "blocks": counted(entry["blockCount"], len(sharing)),
             "pages": counted(entry["pageCount"], len(pages)),
         }))

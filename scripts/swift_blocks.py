@@ -435,6 +435,12 @@ def prepare(pages: list, output_dir, cache_root, swift_dir=None, windows=None, p
                     if isinstance(candidate, dict) and candidate.get("ok") and (folder / f"{key}.wasm").is_file():
                         served = (folder, candidate)
                         break
+                    if isinstance(candidate, dict) and candidate.get("ok") is False and is_cached(candidate):
+                        # The previous recipe's compile error for the same
+                        # code is still the code's fault: said as one, not as
+                        # lack of room or a download (the fixes review's nit 5).
+                        entry = candidate
+                        break
                 if served is not None:
                     folder, candidate = served
                     wanted[f"{key}.wasm"] = folder / f"{key}.wasm"
@@ -443,7 +449,7 @@ def prepare(pages: list, output_dir, cache_root, swift_dir=None, windows=None, p
                     _note_if_large(large, page, block, folder / f"{key}.wasm")
                     continue
             file_line = _file_line_of(block, key, page.get("source"))
-            if entry is not None and entry.get("ok") is False:
+            if entry is not None and entry.get("ok") is False and is_cached(entry):
                 block_line, said = first_error(entry.get("diagnostics") or "")
                 line = None
                 if file_line is not None:
