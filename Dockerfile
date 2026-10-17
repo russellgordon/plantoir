@@ -206,6 +206,10 @@ COPY scripts/print_settings.py /opt/scripts/print_settings.py
 # through support/figures/plantoir-figures.mjs, caches, and gates what the site
 # carries. Imported by build_site.py by bare name.
 COPY scripts/figures.py /opt/scripts/figures.py
+# Runnable Swift (#493): which blocks the launcher must compile (`plan`, run by
+# preview.sh through docker exec before the build) and what the build gives
+# the site (`prepare`). Imported by build_site.py by bare name.
+COPY scripts/swift_blocks.py /opt/scripts/swift_blocks.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).
