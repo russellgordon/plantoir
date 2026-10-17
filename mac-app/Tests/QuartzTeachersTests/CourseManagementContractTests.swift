@@ -333,6 +333,54 @@ final class CourseManagementContractTests: XCTestCase {
         }
     }
 
+    /// A section's front page names the course by the same rule (#575):
+    /// `foldersAddedLater.titleQuoting.frontPages`, which setup's wizard runs
+    /// too (`scripts/test_folder_titles.py`). Each case twice: added with no
+    /// sibling (the wizard's form), and added NEXT to a section whose front
+    /// page carries the case's own `titleLine` — the swap must read the quoted
+    /// sibling back, keep its wording, and quote the result.
+    func testEveryFrontPageTitleCase() throws {
+        let section: [String: Any] = try CourseManagementContractTests.section("foldersAddedLater")
+        let titleQuoting: [String: Any] = try XCTUnwrap(section["titleQuoting"] as? [String: Any])
+        let rule: [String: Any] = try XCTUnwrap(titleQuoting["frontPages"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6, "frontPages has shrunk")
+        for testCase in cases {
+            let code: String = try XCTUnwrap(testCase["courseCode"] as? String)
+            let name: String = try XCTUnwrap(testCase["courseName"] as? String)
+            let number: Int = try XCTUnwrap(testCase["section"] as? Int)
+            let showsGrade: Bool = try XCTUnwrap(testCase["showsGrade"] as? Bool)
+            let titleLine: String = try XCTUnwrap(testCase["titleLine"] as? String)
+            let nextLine: String = try XCTUnwrap(testCase["nextSectionTitleLine"] as? String)
+
+            // With no sibling: the wizard's form.
+            let (alone, aloneRoot) = try CourseManagementContractTests.frontPageCourse(
+                code: code, name: name, sections: [], showsGrade: [number: showsGrade]
+            )
+            defer { try? FileManager.default.removeItem(at: aloneRoot) }
+            try SectionAdder.addSection(number, to: alone)
+            XCTAssertEqual(
+                try CourseManagementContractTests.titleLine(of: alone, section: number), titleLine,
+                "\(name), section \(number), with no sibling"
+            )
+
+            // Next to a section whose front page is this case's line.
+            let (beside, besideRoot) = try CourseManagementContractTests.frontPageCourse(
+                code: code, name: name, sections: [number], showsGrade: [number: showsGrade]
+            )
+            defer { try? FileManager.default.removeItem(at: besideRoot) }
+            let siblingFolder: URL = beside.sectionDirectoryURL(forSection: number)
+            try FileManager.default.createDirectory(at: siblingFolder, withIntermediateDirectories: true)
+            try "---\n\(titleLine)\ncreated: 2026-09-01T08:00:00.000-0400\npublish: true\n---\n# Welcome\n"
+                .write(to: siblingFolder.appendingPathComponent("index.md"), atomically: true, encoding: .utf8)
+            try SectionAdder.addSection(number + 1, to: beside)
+            XCTAssertEqual(
+                try CourseManagementContractTests.titleLine(of: beside, section: number + 1), nextLine,
+                "\(name), section \(number + 1), beside a sibling titled \(titleLine)"
+            )
+        }
+    }
+
     // MARK: - What a course code says about the grade
 
     func testTheGradeLabelsAreWhatTheContractSays() throws {
@@ -793,6 +841,45 @@ final class CourseManagementContractTests: XCTestCase {
             contents: Data()
         )
         return coursesURL
+    }
+
+    /// A course on disk for the front-page cases: its code, name, listed
+    /// sections and per-section grade switches, and nothing else.
+    private static func frontPageCourse(
+        code: String, name: String, sections: [Int], showsGrade: [Int: Bool]
+    ) throws -> (course: Course, root: URL) {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("front-page-\(UUID().uuidString)")
+        let courseURL: URL = root.appendingPathComponent("courses/\(code)")
+        try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
+        var switches: [String: Bool] = [:]
+        for (number, shows) in showsGrade {
+            switches["section\(number)"] = shows
+        }
+        let configuration: [String: Any] = [
+            "course_code": code,
+            "course_name": name,
+            "section_numbers": sections,
+            "num_sections": sections.count,
+            "show_grade_in_title": ["sections": switches],
+        ]
+        let data: Data = try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
+        let configURL: URL = courseURL.appendingPathComponent("course_config.json")
+        try data.write(to: configURL)
+        let loaded: CourseConfiguration = try CourseConfiguration(contentsOf: configURL)
+        return (Course(code: code, directoryURL: courseURL, configuration: loaded), root)
+    }
+
+    /// The `title:` line of a section's front page.
+    private static func titleLine(of course: Course, section number: Int) throws -> String {
+        let page: URL = course.sectionDirectoryURL(forSection: number).appendingPathComponent("index.md")
+        for line in try String(contentsOf: page, encoding: .utf8).components(separatedBy: "\n") {
+            if line.hasPrefix("title:") {
+                return line
+            }
+        }
+        XCTFail("\(page.path) has no title line")
+        return ""
     }
 
     private static func section(_ name: String) throws -> [String: Any] {

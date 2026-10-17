@@ -508,6 +508,51 @@ re-run does not rewrite an index page that is already there, so a course made
 before this keeps any unreadable one until the teacher fixes it — the build's
 notice says which.
 
+**A section's front page names the COURSE by the same rule (#575).** Until
+1.8.1 the front page's title was written plain — `title: Grade 12 Physics:
+Mechanics, Section 1` — and a course name holding `: ` made it a page the build
+could not read. Measured on the #575 plan with the dev-test image: the build
+called `section1/index` unreadable (`pageSettingsUnreadable`, near line 2),
+removed the site and exited 1 with nothing to deploy; with that one line quoted
+by hand, the same course built with `<title>Grade 12 Physics: Mechanics, Section
+1</title>`. It is not a corner case: **161 of the catalogue's 2,047 course codes
+have a short name holding `: `** ("Entrepreneurship: The Venture", BDI3C, among
+them), so accepting the wizard's own suggested name was enough. But only a
+course started EMPTY was hit: setup writes the front page only when none is
+there, and every example-content and skeleton payload brings its own,
+`title: Section N`, which needs no quoting.
+
+Three writers put the course name into that title, and all three now quote by
+`frontmatter_title` / `FolderScaffold.frontmatterTitle`, applied to the WHOLE
+title (grade prefix, name, `, Section N`): setup, here; the mac's
+`SectionAdder` (the copied front page's swapped title, and the scaffold from a
+sibling's frontmatter — its fallback already quoted); and
+`SiteHealthRepair.restoreSectionIndex`, which writes the course name alone.
+`SectionAdder.sectionTitle` still returns PLAIN text, and reads a quoted
+sibling back first (a double-quoted value as a JSON string, a single-quoted one
+with `''` as `'`): without that, the trailing quote hides "Section 1" from the
+number swap and the form's wording silently replaces the teacher's. A value
+only YAML could decode (`\x41`, a comment after the closing quote) gives the
+form's wording, as an unreadable sibling always has. A name that needs no
+quoting writes the bytes it always did — measured by running the old and new
+wizard for ICS3U, MPM2D and SPH4U, empty and pre-populated: every file the
+same apart from its `created` lines. Cases: `titleQuoting.frontPages`, run by
+both apps' tests and by `scripts/test_folder_titles.py` through the real
+wizard.
+
+**Rejected:** refusing such a name in the wizard with a plain sentence (#575's
+other option) — a quoted title IS the title, so there is nothing to refuse,
+and refusing would turn away the catalogue's own name for 161 courses.
+**Left alone, for this release:** a course already made with a plain colon
+title. Its build names the front page as a folder problem near line 2; the
+hand fix is to put double quotes around the title on line 2 of
+`sectionN/index.md`, and the 1.8.1 release notes say so (a one-click repair
+is a v1.9.0 follow-on). A section added beside such a front page is written
+quoted, since the swap reads the broken line's words. Also left alone: other
+plain writers whose title comes from a word the teacher chose rather than the
+course name — `ClubStart`'s first page, the class page skeletons,
+`PageFrontmatter`'s renamed titles.
+
 Each app writes them itself, natively: a Settings click does not run this
 script (it would start the website builder, and no app runs Python on the
 host). That is why the texts are pinned as bytes in
