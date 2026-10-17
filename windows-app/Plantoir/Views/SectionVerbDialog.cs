@@ -79,8 +79,10 @@ internal sealed class SectionVerbDialog
             // Wide enough for the plan table's three columns, and the SAME
             // width at every stage: a dialog that widened at the plan would
             // jump (the mac rejected widening mid-flow for that, #524). Never
-            // wider than the window less a margin: at 175% and 200% the
-            // default window is 680 and 595 epx wide.
+            // wider than the window less a margin. The window opens at its
+            // 900 epx minimum at every scale since #542 (it was 680 and 595
+            // epx wide at 175% and 200% before), but that minimum is clamped
+            // to the work area, so a narrow display still gets a narrower root.
             if (root.Size.Width > 0)
                 _planWidth = Math.Min(PlanTableDialogWidth, root.Size.Width - 2 * PlanDialogMargin);
             _dialog.Resources["ContentDialogMinWidth"] = _planWidth;
