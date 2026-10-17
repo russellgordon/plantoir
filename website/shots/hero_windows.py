@@ -45,7 +45,7 @@ PARTS = SCRATCH / "parts-hero-windows"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from composite import diagonal_hero, FIGURE_WIDTH  # noqa: E402
-from images import prepare, WIDEST_WINDOW_PIXELS  # noqa: E402
+from images import prepare  # noqa: E402
 
 WORKSPACE = Path.home() / "Teaching"
 # Read from the one table both capture scripts share (folders.json, #445).
