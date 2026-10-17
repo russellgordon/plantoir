@@ -47,14 +47,11 @@ public class PanelHeightUnderSqueezeUiTests
 
         var window = app.Window;
         // Asked for 500, given the minimum, 900 epx (#542): the window never
-        // reaches 500, so wait for its width to settle rather than for a number
+        // reaches 500, so wait for its size to settle rather than for a number
         // (the wait used to be "width <= 520", which could never come true and
         // always ran its full five seconds).
         window.Patterns.Transform.Pattern.Resize(500, 800);
-        int last = -1;
-        Retry.WhileFalse(() => { int now = window.BoundingRectangle.Width; bool settled = now == last; last = now; return settled; },
-            TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(300));
-        Thread.Sleep(800);
+        WindowMinimumUiTests.Settle(window);
 
         var noticeBox = notice.BoundingRectangle;
         var windowBox = window.BoundingRectangle;
