@@ -198,10 +198,10 @@ class DownloadTests(unittest.TestCase):
         for entry in site["downloads"]:
             pins[entry["platform"]] = entry.get("pinned")
         self.assertIsNone(pins["macOS"])
-        # PlantoirSetup.exe joined v1.7.1 on 2026-10-16, Windows was pinned
-        # to 1.7.1 for the mac-first v1.7.2 cut, and its installer joined
-        # v1.7.2 later that day: both cards are unpinned since.
-        self.assertIsNone(pins["Windows"])
+        # PlantoirSetup.exe joined v1.7.2 on 2026-10-16; the mac-only v1.8.0
+        # cut (2026-10-17) pins Windows to 1.7.2 until its 1.8.0 installer
+        # joins that release, and that cut unpins it again.
+        self.assertEqual(pins["Windows"], "1.7.2")
 
 
 class ShortcutTests(unittest.TestCase):
