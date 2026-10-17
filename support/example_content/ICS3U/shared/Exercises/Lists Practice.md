@@ -1,6 +1,7 @@
 ---
 title: Lists Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -70,7 +71,7 @@ marks = [78, 91, 46, 63]
 > list changes, which it always does.
 
 > [!success]- Answer 5
-> ```python
+> ```python run
 > titles = ["Birdie", "Fifteen Dogs", "Indian Horse"]
 > target = "Fifteen Dogs"
 > position = -1
@@ -87,7 +88,7 @@ marks = [78, 91, 46, 63]
 > still meaningful when nothing matches.
 
 > [!success]- Answer 6
-> ```python
+> ```python run
 > weights = [6.5, 3.0, 11.2, 7.0]
 > above = 0
 > for weight in weights:

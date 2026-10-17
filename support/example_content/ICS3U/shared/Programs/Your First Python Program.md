@@ -1,6 +1,7 @@
 ---
 title: Your First Python Program
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -13,7 +14,7 @@ carrying a stack.
 
 ## The program
 
-```python
+```python run readonly
 # Chair setup for Mr. Diaz, who runs the winter concert.
 # Change the four numbers at the top; everything else follows.
 

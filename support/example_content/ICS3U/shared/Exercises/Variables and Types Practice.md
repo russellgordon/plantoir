@@ -1,6 +1,7 @@
 ---
 title: Variables and Types Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -16,13 +17,13 @@ one of those two sentences being ignored.
    number of chairs in a room; the mass of a recycling bin in
    kilograms; a book title; whether a permission form is in.
 2. **Predict the output.**
-   ```python
+   ```python run
    rows = 8
    rows = rows + 4
    print(rows)
    ```
 3. **Predict the output.** Explain the quotation marks.
-   ```python
+   ```python run
    print(type("14"))
    ```
 4. **Find the fault.** The club advisor types `6.5` and this crashes.
@@ -31,7 +32,7 @@ one of those two sentences being ignored.
    total = answer + 2.5
    ```
 5. **Predict the output.**
-   ```python
+   ```python run
    minutes = 185
    print(f"{minutes / 60:.1f}")
    ```
@@ -87,7 +88,9 @@ one of those two sentences being ignored.
 > `is_form` too.
 
 > [!success]- Answer 7
-> ```python
+> Type a name and a number of days on two lines of the input box,
+> then press Run.
+> ```python run
 > name = input("Name: ")
 > days = int(input("Days until the trip: "))
 > print(f"{name}, the trip is in {days} days.")
@@ -101,7 +104,7 @@ one of those two sentences being ignored.
 > moment anybody wants to subtract from it, text will not do.
 
 > [!success]- Answer 8
-> ```python
+> ```python run
 > total_minutes = 250
 > print(f"{total_minutes // 60} h {total_minutes % 60} min")
 > ```
