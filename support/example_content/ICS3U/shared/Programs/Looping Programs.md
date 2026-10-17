@@ -14,9 +14,8 @@ the four numbers she actually reports.
 
 ## The program
 
-To run it, press Run, and when it asks, type the number of days and
-then one weight each time — `4`, `6.5`, `3`, `11.2` and `7`, as in the
-run below.
+When it asks, type the number of days and then one weight at a time —
+`4`, `6.5`, `3`, `11.2` and `7`, as in the run below.
 
 ```python run readonly
 # Paper-recycling tally for Ms. Nakamura, who reports one number a

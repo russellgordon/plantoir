@@ -80,8 +80,8 @@ python3 hello.py
 ## First program checklist
 
 Type this — do not paste it — into a file called `hello.py`, then run
-it. To try it here first, press Run, and type your name and then your
-hours of sleep when it asks:
+it. To try it here first, type your name and then your hours
+of sleep when it asks:
 
 ```python run
 name = input("What is your name? ")

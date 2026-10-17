@@ -371,7 +371,7 @@ class CodePageTests(unittest.TestCase):
         place = "Programs/Talking to the User"
         source = SUPPORT / "example_content" / "ICS3U" / "shared" / (place + ".md")
         current = source.read_text(encoding="utf-8")
-        earlier = current.replace("press Run, and when it asks, type", "type, on two lines of the input box,")
+        earlier = current.replace("When it asks, type a name", "Type, on two lines of the input box, a name")
         self.assertNotEqual(earlier, current)
 
         def versions(path: Path) -> list:
@@ -387,7 +387,7 @@ class CodePageTests(unittest.TestCase):
             mf.apply_code_steps(folder, report, earlier_versions=versions)
             after = kept.read_text(encoding="utf-8")
         self.assertIn(f"made: ICS3U/{place}.md runnable", report.lines)
-        self.assertIn("press Run, and when it asks, type", after)
+        self.assertIn("When it asks, type a name", after)
         self.assertEqual(after.split("\n---", 1)[0], before.split("\n---", 1)[0], "the frontmatter is kept")
 
     def test_a_page_somebody_changed_is_left_as_they_changed_it(self):

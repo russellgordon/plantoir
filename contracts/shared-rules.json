@@ -25753,7 +25753,9 @@
       "Where a host sends the headers but the browser cannot isolate (a learning platform's frame, a plain-http address, Safari before 15.2), every link INTO a runner page is a full load (isolation.spa): it works and cannot loop, at the cost of one load from cache (review N3).",
       "Cloudflare reads at most 100 header rules per site (isolation.hosts.cloudflareCap): past that, pages keep the box and the publish says how many.",
       "Netlify page paths are written lower-cased (and as-is where that differs beyond ASCII): measured with é, Ü, ß, è as a combining accent and 日本語; a name whose lower case Netlify and Python spell differently (the Turkish dotted İ) was not measured.",
-      "The first ask of a program that a person did not start with Run - an autorun - raises no on-screen keyboard on an iPad until the student taps the field: iPadOS raises it only for a focus inside a tap (liveInput.focus)."
+      "The first ask of a program that a person did not start with Run - an autorun - raises no on-screen keyboard on an iPad until the student taps the field: iPadOS raises it only for a focus inside a tap (liveInput.focus).",
+      "The note line for a runner page that keeps the box (words.notLiveBecause) is printed by each publish and by the preview's server when the page is first opened in that preview - not by the build: in preview mode Quartz builds inside its own server, after build_site.py can read the built pages, and `preview.sh --build-only` prints nothing (review N2, accepted by the director).",
+      "The not-live rule's two readers differ in edge cases Quartz never emits or that were not measured to break (review N3): frame words inside a <textarea> read as a frame to the preview's rule and not to the publish's (the stricter one errs safe); a CSS `@import \"https://...\"` written without url() is seen by neither; and a cross-origin <audio><source> is named with the frame's words (notLiveFrame) rather than notLiveOther."
     ]
   },
   "quizCallouts": {

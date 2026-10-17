@@ -85,8 +85,8 @@ are inside.
 > are how you cover a table, a grid, or every day of every week.
 
 > [!success]- Answer 5
-> Press Run, type `four` when it asks, then `4` when it asks again:
-> the loop keeps asking until it gets digits.
+> When it asks, type `four`, then `4`: the loop keeps asking until it
+> gets digits.
 > ```python run
 > answer = ""
 >
@@ -126,8 +126,8 @@ are inside.
 > common off-by-one error in the language.
 
 > [!success]- Answer 8
-> Press Run, then type one weight each time it asks — `6`, `11`,
-> `7` — and `done` to finish.
+> When it asks, type one weight at a time — `6`, `11`, `7` — and
+> `done` to finish.
 > ```python run
 > highest = 0
 > entry = ""

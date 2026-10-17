@@ -2008,6 +2008,16 @@ document is made, so morphing would leave a runner page reached by a link
 un-isolated, or carry COEP into a plain page and block its frames (both
 pinned in `code_runner.mjs`; red against the unpatched router).
 
+**Known limits (implementation review).** The note line comes from each
+publish and from the preview's server when the page is first opened there,
+never from the build (N2, accepted: in preview mode Quartz builds inside its
+own server; `--build-only` prints nothing). The two readers of the not-live
+rule differ only where Quartz emits nothing or nothing was measured to break
+(N3): frame words inside a `<textarea>` count as a frame to the preview's
+reader only (it errs safe); `@import "https://…"` without `url()` is seen by
+neither; a cross-origin `<audio><source>` is named with the frame's words.
+Both are in `codeRunnerBlocks.knownLimits`.
+
 **Rejected.** `Cross-Origin-Embedder-Policy: credentialless` (Safari 26.6 does
 not isolate under it, and Chrome blocks the frames anyway); COEP site-wide
 (every page's frames break for a feature on a few); the interrupt buffer as

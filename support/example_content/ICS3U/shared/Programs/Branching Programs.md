@@ -15,8 +15,8 @@ end of a long week.
 
 ## The program
 
-To run it, press Run, and when it asks, type a title and then a number
-of days late — `Fifteen Dogs` and `12`, as in the run below.
+When it asks, type a title and then a number of days late —
+`Fifteen Dogs` and `12`, as in the run below.
 
 ```python run readonly
 # Return-desk helper for Mr. Whitfield, who wants the same book

@@ -88,8 +88,8 @@ stranger.
 ## Output is part of the code
 
 Everything above is for programmers. The person using your program
-reads something else entirely — your prompts and your messages. Press Run
-and answer with a number of hours, then run it again and answer
+reads something else entirely — your prompts and your messages. When it
+asks, answer with a number of hours; then run it again and answer
 `twelve`:
 
 ```python run
