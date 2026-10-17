@@ -6118,7 +6118,8 @@ long title shortens before the buttons are pushed out.
 
 **Measured 2026-10-15** (Intel i5-8365U, Windows 11 Pro 26200, one 1920 ×
 1080 screen at 150%, the sidebar at its only width, 230 epx; widths are the
-window's outer pixels): the window's minimum is **900 PIXELS, not 900 epx** —
+window's outer pixels; **the next two sentences were wrong — see the
+correction below the table**): the window's minimum is **900 PIXELS, not 900 epx** —
 `PreferredMinimumWidth` is in the AppWindow's physical units — so at 150% it
 is 600 epx, and dragging the edge stops there.
 
