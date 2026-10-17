@@ -37,6 +37,7 @@ the gate and the words read the table, never the word "python".
 
 import json
 import os
+import re
 import shutil
 import unicodedata
 from pathlib import Path
@@ -308,19 +309,31 @@ def _runner_row(fence: str):
     return dict(row, fence=fence)
 
 
+# The separators between the words of an info string, the SAME set as the
+# site's (codeRunnerRule.ts, INFO_SPACE): tab, space and Unicode's space
+# separators, NBSP among them (Option-Space on a Mac) - #455 review N2. Not
+# str.split(), which also splits on \x1c-\x1f and \x85, and not JavaScript's
+# \s, which adds U+FEFF: an explicit class is the only way both agree.
+INFO_SPACE = re.compile("[\t \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]+")
+
+
 def runner_for(lang, meta, opted_in):
     """
     Is a fence with this info string a runnable block (codeRunnerBlocks.fences)?
-    Answers {"fence", "flags", "row"} or None. The language is the info
-    string's first word, exactly; `run` must be a whitespace-separated token
-    of the rest; flags are the row's own, exact, each once, in the row's order.
+    Answers {"fence", "flags", "row"} or None. The info string (`lang`, then
+    `meta`) is split on INFO_SPACE; the language is its first word, exactly;
+    `run` must be one of the other words; flags are the row's own, exact,
+    each once, in the row's order.
     """
     if not opted_in:
         return None
-    row = _runner_row(lang or "")
+    words = [word for word in INFO_SPACE.split(f"{lang or ''} {meta or ''}") if word]
+    if not words:
+        return None
+    row = _runner_row(words[0])
     if row is None:
         return None
-    tokens = (meta or "").split()
+    tokens = words[1:]
     if "run" not in tokens:
         return None
     flags = [flag for flag in row["flags"] if flag in tokens]
@@ -340,7 +353,8 @@ def runner_fences(body: str, opted_in) -> list:
     for block in markdown_code.fenced_blocks(body):
         if block["nested"]:
             continue
-        runner = runner_for(block["lang"], block["meta"], True)
+        # The raw info string, split as the site splits it (INFO_SPACE).
+        runner = runner_for(block["info"], "", True)
         if runner is None:
             continue
         found.append({"fence": runner["fence"], "flags": runner["flags"],

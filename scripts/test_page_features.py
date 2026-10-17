@@ -327,7 +327,7 @@ class RunnerFenceTests(unittest.TestCase):
                     self.assertIsNone(found)
                     continue
                 self.assertIsNotNone(found)
-                self.assertEqual(found["fence"], case["lang"])
+                self.assertEqual(found["fence"], case.get("fence", case["lang"]))
                 self.assertEqual(found["flags"], case["flags"])
 
     def test_every_page_shape_has_as_many_runners_as_the_contract_says(self):

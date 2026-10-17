@@ -443,6 +443,9 @@ function build(wrapper: HTMLElement, base: string): Block | null {
   }
 
   let busy = false
+  // Set the first time this block really starts: an autorun that comes into
+  // view after a student already ran it by hand does not run it again.
+  let started = false
   const setBusy = (now: boolean) => {
     busy = now
     runButton.disabled = now
@@ -490,7 +493,14 @@ function build(wrapper: HTMLElement, base: string): Block | null {
       status.textContent = word("couldNotLoad", language)
       return
     }
+    // A queued autorun the student starts by hand runs once, not again when
+    // its turn comes (#455 review N1).
+    const queued = waitingAutoruns.indexOf(block)
+    if (queued >= 0) {
+      waitingAutoruns.splice(queued, 1)
+    }
     running = block
+    started = true
     flush()
     clearOutput()
     setBusy(true)
@@ -514,13 +524,21 @@ function build(wrapper: HTMLElement, base: string): Block | null {
             if (running !== block) {
               return
             }
-            printed += text.length
-            pending.push({ text, err })
-            if (printed > LIMITS.outputCharacters) {
+            // Only what is left of the allowance reaches the page: one big
+            // print would otherwise be painted whole, however large (#455
+            // review S1: print("x" * 50_000_000) painted 50 million).
+            const room = LIMITS.outputCharacters - printed
+            if (text.length > room) {
+              if (room > 0) {
+                pending.push({ text: text.slice(0, room), err })
+              }
+              printed = LIMITS.outputCharacters
               runtime.terminate()
               end(word("outputTooLong", language))
               return
             }
+            printed += text.length
+            pending.push({ text, err })
             if (frame === null) {
               frame = window.requestAnimationFrame(paint)
             }
@@ -625,7 +643,9 @@ function build(wrapper: HTMLElement, base: string): Block | null {
         for (const entry of entries) {
           if (entry.isIntersecting) {
             watcher.disconnect()
-            block.run(true)
+            if (!started) {
+              block.run(true)
+            }
             return
           }
         }

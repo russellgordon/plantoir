@@ -1439,8 +1439,13 @@ and ended by `addCleanup` when the page changes. **One program per page**
 starts a fresh one; an `autorun` block that comes into view while another
 program runs waits its turn (N4). **Stop** ends the thread — without
 cross-origin isolation (which a folder publish cannot send) there is no
-other way to interrupt Python — and the next Run starts a new one from the
-browser's cache.
+other way to interrupt Python — and the next Run starts a new one. Online
+that costs a few `304`s (Netlify's and Cloudflare's default `cache-control`
+is `max-age=0, must-revalidate`); OFFLINE it fails with `couldNotLoad`
+(measured by the implementation review: a warm Run offline finished; Stop,
+then Run, failed in 53 ms). So the page works without a connection only
+until a program is stopped, another block runs (that ends the thread too),
+the output cap is reached, or the page changes; the skill says so.
 
 The worker imports `./pyodide.mjs` and calls `loadPyodide` with `indexURL`,
 `lockFileURL`, `packageBaseUrl` and `cdnUrl` all its own folder; nothing is
@@ -1474,7 +1479,9 @@ output straight after its prompt (Q4: `Name? Ada`, not `Name? Hello Ada`),
 and past the last line `input()` raises `EOFError` (measured: `EOFError: EOF
 when reading a line`). Output is gathered once per animation frame; at
 100,000 characters the program is stopped and `words.outputTooLong` shown
-(Q5). The words are `codeRunnerBlocks.words` with `{language}` and
+(Q5), and only what was left of the allowance reaches the page — one
+`print("x" * 50_000_000)` used to be painted whole (implementation review
+S1, measured: 50 million characters in the `<pre>`); now at most 100,000. The words are `codeRunnerBlocks.words` with `{language}` and
 `{inputCall}` filled from the table row; none names the engine, WebAssembly,
 a worker or a thread (`test_page_features.py` sweeps them).
 
@@ -1515,8 +1522,28 @@ never shows "isn't on this site yet" for ever because of it. So:
 - and the SAFETY NET: the transformer leaves any runnable block whose
   engine the site does not carry as plain code and prints
   `plantoir: error: <page>.md: python block <n>: ` +
-  `words.blockNotPrepared` — never for a page students cannot see (the
-  transformer applies `patches/publish.ts`'s test).
+  `words.blockNotPrepared`, or `words.blockAfterUnclosedFence` when a fenced
+  block above it on the page was never closed (the likeliest cause, review
+  N3: the site closes such a fence at the end of its list item, the build's
+  reader carries on) — never for a page students cannot see (the
+  transformer applies `patches/publish.ts`'s test). The line is in the
+  build's output only: the transformer runs after the folder checks are
+  said, so it is not a folder problem in the app (a gap recorded on #455).
+- both sides split the info string on the SAME separators (`INFO_SPACE`:
+  tab, space and Unicode's space separators, NBSP — Option-Space — among
+  them; review N2: micromark leaves `python<NBSP>run` all in `lang`, and the
+  build used to call it a runner the site did not).
+
+**Fuzzed** (review N2's generator, 2026-10-17): 856 random pages over 28
+placements (428 with Unicode separators, 428 ASCII), each read by
+`findRunners` over Quartz's parser and by `runner_fences`. 38 disagree, all
+in known groups: the build alone counts a fence indented four spaces at the
+top of a page or inside an HTML block (the site carries the engine for
+nothing); the site alone decodes a character reference in the info string
+(`&#114;un`), keeps a fence inside `$$` as maths, rejects a backtick in a
+backtick fence's info string differently, and reads a few deeper
+quote-and-list nestings differently — each of those shows as plain code
+with the line above (`knownLimits`).
 
 `check_runner_rules_against_the_site.py` runs every `pageShapes` case
 through both readers, and the transformer itself with the engine carried,
@@ -1620,7 +1647,7 @@ is an ordinary Python block there — verified from Obsidian 1.12.7's and
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
-except the page marker H adds on top of them from `support/quartz` — with five asset exceptions, all in
+except the page marker H adds on top of them from `support/quartz` — with six asset exceptions, all in
 `quartz/static/` and all written every build: `og-image.png` is redrawn as the
 section's social sharing card (C2-13), and `favicon.ico`, `icon.svg`,
 `apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25); since

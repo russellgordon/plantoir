@@ -110,7 +110,9 @@ only**:
 - **Files** a program writes exist only for that one run (each Run starts
   in a fresh, empty folder). A program cannot read a file from the course.
 - One program runs on a page at a time; pressing Run on a second block stops
-  the first. Each Run starts from a fresh interpreter.
+  the first. Each Run starts with fresh variables; changes a program makes to
+  Python's own modules carry over until the program is stopped (Stop, then
+  Run, starts clean).
 - A program that prints more than 100,000 characters is stopped. Stop ends
   any program, including one stuck in a loop.
 
@@ -139,8 +141,10 @@ in the editor.
   school web server), in Safari and iPadOS 15 or later, Chrome 80 or later,
   Firefox 114 or later. The first Run on a page loads Python (about 13 MB,
   once; about a second on a Mac on a good connection, longer on an iPad on
-  school Wi-Fi); later Runs start at once. Once loaded it works offline for
-  the rest of the visit.
+  school Wi-Fi); later Runs start at once. Once loaded it keeps working
+  without a connection until a program is stopped, another block runs, or
+  the page changes - then it needs the connection again (a few small checks
+  with the site, not the whole download).
 - NOT from a site opened as files on a computer (a folder publish
   double-clicked): browsers run none of the page's scripts that way, so the
   blocks show as ordinary code with no Run button.
