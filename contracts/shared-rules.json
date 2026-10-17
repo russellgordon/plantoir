@@ -1364,6 +1364,89 @@
         }
       ]
     },
+    "overallBacklinks": {
+      "rule": "\"When did we do this?\" on an overall expectation's page (B1) lists every page that links that page OR any of its specific expectations (B1.1, B1.2, b1.3: overall_of, the coverage map's own rule) in the SAME curriculum folder. One list, unlabelled, each page once, in Quartz's order: ONE filter over the site's pages with targets = [the page's slug, ...its specific expectations' slugs]. Pages inside a curriculum folder and the coverage maps are still left out (structural). A specific expectation's own page is unchanged: direct links only. A code with no overall expectation (1.A, CRD-1.A) gathers nothing, and an overall page with no specific expectations lists only its direct links. Slugs are Quartz's: white space to -, & to -and-, % to -percent, ? and # dropped.",
+      "why": "Classes connect to SPECIFIC expectations, so the overall page was empty: measured on the MPM2D example course, the only page linking B1 was the Curriculum index (structural), while 8 pages link B1.3. The coverage map already counts a specific expectation's work towards its overall expectation (its overall chips). The build writes the map into support/Backlinks.tsx behind CQ4T-OVERALL-ANCHOR on every build (set_backlinks_overall_children). Only scripts/test_overall_backlinks.py runs these cases, against the build's map and the component's own rewritten lines; verify.sh 6k checks a real built page.",
+      "cases": [
+        {
+          "name": "a page that links B1 and B1.3 is listed once, in Quartz's order, and B1.3 keeps only its own",
+          "folders": ["Curriculum"],
+          "curriculumPages": ["Curriculum/B1. Using Linear Systems to Solve Problems", "Curriculum/B1.1", "Curriculum/B1.3", "Curriculum/B2. Solving Problems Involving Analytic Geometry", "Curriculum/B2.1", "Curriculum/index"],
+          "sitePages": [
+            {"slug": "Lessons/Day-4", "links": ["Curriculum/B1.3"]},
+            {"slug": "Lessons/Day-2", "links": ["Curriculum/B1.-Using-Linear-Systems-to-Solve-Problems", "Curriculum/B1.3"]},
+            {"slug": "Curriculum/index", "links": ["Curriculum/B1.-Using-Linear-Systems-to-Solve-Problems", "Curriculum/B1.1", "Curriculum/B1.3"]},
+            {"slug": "Curriculum-Coverage", "links": ["Curriculum/B1.-Using-Linear-Systems-to-Solve-Problems", "Curriculum/B1.1", "Curriculum/B1.3"]},
+            {"slug": "Lessons/Day-7", "links": ["Curriculum/B1.1"]},
+            {"slug": "Lessons/Day-9", "links": ["Curriculum/B2.1"]}
+          ],
+          "children": {
+            "Curriculum/B1.-Using-Linear-Systems-to-Solve-Problems": ["Curriculum/B1.1", "Curriculum/B1.3"],
+            "Curriculum/B2.-Solving-Problems-Involving-Analytic-Geometry": ["Curriculum/B2.1"]
+          },
+          "backlinks": {
+            "Curriculum/B1.-Using-Linear-Systems-to-Solve-Problems": ["Lessons/Day-4", "Lessons/Day-2", "Lessons/Day-7"],
+            "Curriculum/B1.3": ["Lessons/Day-4", "Lessons/Day-2"],
+            "Curriculum/B2.-Solving-Problems-Involving-Analytic-Geometry": ["Lessons/Day-9"]
+          },
+          "why": "Day-2 links both B1 and B1.3: two lists (direct, then through B1.3) would show it twice. Day-4 comes before Day-2 because that is Quartz's order, not direct-links-first. The Curriculum index and the coverage map link everything and stay out."
+        },
+        {
+          "name": "two curriculum folders each with a B1: each gathers only its own folder's B1.x",
+          "folders": ["Curriculum", "Old Curriculum"],
+          "curriculumPages": ["Curriculum/B1. Systems", "Curriculum/B1.1", "Old Curriculum/B1. Older Systems", "Old Curriculum/B1.2"],
+          "sitePages": [
+            {"slug": "Lessons/Day-1", "links": ["Old-Curriculum/B1.2"]},
+            {"slug": "Lessons/Day-3", "links": ["Curriculum/B1.1"]}
+          ],
+          "children": {
+            "Curriculum/B1.-Systems": ["Curriculum/B1.1"],
+            "Old-Curriculum/B1.-Older-Systems": ["Old-Curriculum/B1.2"]
+          },
+          "backlinks": {
+            "Curriculum/B1.-Systems": ["Lessons/Day-3"],
+            "Old-Curriculum/B1.-Older-Systems": ["Lessons/Day-1"]
+          },
+          "why": "A map keyed by code alone would give both B1 pages both lessons."
+        },
+        {
+          "name": "a lower-case code counts towards its overall expectation, a name with & is slugged as Quartz slugs it, an overall page with no specific expectations gathers nothing",
+          "folders": ["Curriculum"],
+          "curriculumPages": ["Curriculum/C1. Research & Inquiry Skills", "Curriculum/c1.2", "Curriculum/D1. Nothing Below", "Curriculum/Unit 2/C1.4"],
+          "sitePages": [
+            {"slug": "Lessons/Day-5", "links": ["Curriculum/c1.2"]},
+            {"slug": "Lessons/Day-6", "links": ["Curriculum/D1.-Nothing-Below"]},
+            {"slug": "Lessons/Day-8", "links": ["Curriculum/Unit-2/C1.4"]}
+          ],
+          "children": {
+            "Curriculum/C1.-Research--and--Inquiry-Skills": ["Curriculum/c1.2", "Curriculum/Unit-2/C1.4"]
+          },
+          "backlinks": {
+            "Curriculum/C1.-Research--and--Inquiry-Skills": ["Lessons/Day-5", "Lessons/Day-8"],
+            "Curriculum/D1.-Nothing-Below": ["Lessons/Day-6"]
+          },
+          "why": "c1.2 is C1's (overall_of upper-cases); a specific expectation in a unit subfolder still counts; Quartz writes & as -and-, which the coverage map's own slug helper does not."
+        },
+        {
+          "name": "College Board codes have no overall expectation and gather nothing",
+          "folders": ["AP Framework"],
+          "curriculumPages": ["AP Framework/1.A", "AP Framework/Unit 1/CRD-1.A"],
+          "sitePages": [
+            {"slug": "Lessons/Day-1", "links": ["AP-Framework/1.A"]}
+          ],
+          "children": {},
+          "backlinks": {
+            "AP-Framework/1.A": ["Lessons/Day-1"]
+          },
+          "why": "overall_of is None for a digit-first code or a learning objective; their pages keep their direct links."
+        }
+      ],
+      "rejected": [
+        {"option": "direct links only", "why": "Leaves the overall page empty in every shipped course: classes connect to specific expectations (MPM2D: no class page links B1; 8 link B1.3), and pages outside the curriculum folder linking an overall page directly number 44 across all example content, almost all a Learning Goals page. The panel would answer \"never\" for work the coverage map counts."},
+        {"option": "two lists, direct links first and then the specific expectations' pages, or a labelled second list", "why": "A page that links B1 and B1.3 appears twice, and a label (\"through B1.3\") adds a distinction the coverage map does not make. One filter over the site's pages de-duplicates for free and keeps Quartz's order."},
+        {"option": "children keyed by code across every curriculum folder", "why": "Two folders can each have a B1; each would collect the other's lessons."}
+      ]
+    },
     "note": "What counts as a curriculum expectation. Written after checking the code rather than from memory: an expectation is not a code found in a page's TEXT, it is a PAGE named by a code inside a curriculum folder. A first draft of this contract asserted text-scanning and was wrong before it was ever run."
   },
   "followingLinks": {

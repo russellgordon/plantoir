@@ -599,6 +599,14 @@ else
   sed 's/^/     /' /tmp/verify_coverage_maps_test.log | tail -40
 fi
 
+# Issue #505: an overall expectation's backlinks gather its specific expectations'.
+if (cd scripts && python3 test_overall_backlinks.py) >/tmp/verify_overall_backlinks_test.log 2>&1; then
+  pass "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
+else
+  fail "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
+  sed 's/^/     /' /tmp/verify_overall_backlinks_test.log | tail -40
+fi
+
 if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
   pass "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
 else

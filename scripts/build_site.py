@@ -7441,6 +7441,100 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
         print(f"✅ Backlinks panel will skip: {', '.join(names)}")
 
 
+
+def _quartz_page_slug(relative: Path) -> str:
+    """
+    The slug Quartz gives a page, as its backlinks index spells it.
+
+    Quartz v4.5.0's `sluggify`, segment by segment: white space becomes a
+    hyphen, `&` becomes `-and-`, `%` becomes `-percent`, and `?` and `#` are
+    dropped. `_quartz_slug` handles only the spaces, which is enough for the
+    coverage map's own links; the backlinks panel compares slugs exactly, so
+    a name with `&` in it would match nothing (#505 review, N8).
+    """
+    parts = list(relative.parts)
+    parts[-1] = relative.stem
+    slugged = []
+    for part in parts:
+        segment = re.sub(r"\s", "-", part)
+        segment = segment.replace("&", "-and-").replace("%", "-percent")
+        segment = segment.replace("?", "").replace("#", "")
+        slugged.append(segment)
+    return "/".join(slugged)
+
+
+def overall_backlink_children(content_root: Path, plan: list = None) -> dict:
+    """
+    {overall expectation page's slug: [its specific expectations' slugs]}.
+
+    "When did we do this?" on an overall expectation (B1) lists the pages
+    that link it AND the pages that link any of its specific expectations
+    (B1.1, B1.2, …), because classes connect to specific expectations and the
+    overall page was otherwise empty (#505). Read from the same pages the
+    coverage map reads (`_collect_expectations`, `overall_of`), folder by
+    folder: two curriculum folders can each have a B1, and each B1 gathers
+    only its own folder's B1.x. A digit-first or College Board code has no
+    overall expectation (`overall_of` is None), so it gathers nothing, and
+    an overall page with no specific expectations is left out.
+
+    `plan` is `plan_coverage_maps(...)`.
+    """
+    def say_nothing(_line):
+        # The coverage map already says when a code is met twice.
+        return None
+
+    children = {}
+    for folder, _title in plan or []:
+        specific, overall = _collect_expectations(folder, printer=say_nothing)
+        for overall_code, overall_page in overall.items():
+            specific_slugs = []
+            for code, page in specific.items():
+                if overall_of(code) == overall_code:
+                    specific_slugs.append(_quartz_page_slug(page.relative_to(content_root)))
+            if specific_slugs:
+                overall_slug = _quartz_page_slug(overall_page.relative_to(content_root))
+                children[overall_slug] = specific_slugs
+    return children
+
+
+def set_backlinks_overall_children(backlinks_tsx_path: Path, content_root: Path,
+                                   plan: list = None):
+    """
+    Write `overall_backlink_children` into Backlinks.tsx (CQ4T-OVERALL-ANCHOR),
+    the way `set_backlinks_structural_pages` writes its set — on every build,
+    map or no map, because the panel is on every page either way (#505).
+
+    One line, always: the pattern replaces the whole `const overallChildren`
+    line, so the nested brackets of the map never have to be matched.
+    """
+    if not backlinks_tsx_path.exists():
+        return
+    children = overall_backlink_children(content_root, plan)
+    entries = []
+    for overall_slug, specific_slugs in children.items():
+        entries.append(json.dumps([overall_slug, specific_slugs], ensure_ascii=False))
+    formatted = ", ".join(entries)
+    text = backlinks_tsx_path.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r'(?P<anchor>^[ \t]*//[ \t]*CQ4T-OVERALL-ANCHOR:[^\n]*\n)'
+        r'[ \t]*const[ \t]+overallChildren[ \t]*=[^\n]*',
+        re.MULTILINE)
+
+    def replace(match):
+        indent = "    "
+        return (f'{match.group("anchor")}{indent}'
+                f'const overallChildren = new Map<string, string[]>([{formatted}])')
+
+    updated, count = pattern.subn(replace, text)
+    if count:
+        backlinks_tsx_path.write_text(updated, encoding="utf-8")
+        total = 0
+        for specific_slugs in children.values():
+            total += len(specific_slugs)
+        print(f"✅ Backlinks panel: {len(children)} overall expectation page(s) also list "
+              f"the pages of their {total} specific expectation(s).")
+
+
 def link_coverage_from_key_links(content_root: Path, maps: list):
     """
     Put each coverage map in Key Links, directly under its folder's entry.
@@ -7968,6 +8062,9 @@ def build_section_site(
     else:
         print("ℹ️ Curriculum Coverage page is switched off for this course.")
     set_backlinks_structural_pages(
+        output_dir / "quartz" / "components" / "Backlinks.tsx", content_root,
+        coverage_plan)
+    set_backlinks_overall_children(
         output_dir / "quartz" / "components" / "Backlinks.tsx", content_root,
         coverage_plan)
     # ==========================================================================
