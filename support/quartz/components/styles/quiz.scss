@@ -60,6 +60,13 @@
     outline-offset: 2px;
   }
 
+  // The choice's words take the rest of the row, so a picture (Quartz's
+  // max-width: 100%) or a long formula in a choice has the room to fit.
+  & .plantoir-quiz-choice-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   & .plantoir-quiz-choice-text > p {
     margin: 0;
   }
