@@ -3473,9 +3473,58 @@ idle-slept", which on battery comes sooner. So:
   says to leave the computer on and awake. The `schedule-{light,dark}.png`
   shots still show the old bullet and are retaken at the v1.7.2 cut.
 
-**Windows** registers its task battery-allowed already
-(`DisallowStartIfOnBatteries=false`, `StopIfGoingOnBatteries=false`), so the
-same line there is untrue too; a `windows` issue carries its five strings.
+**Windows did the same on 2026-10-16 (#547).** Its task was already registered
+battery-allowed (`DisallowStartIfOnBatteries=false`,
+`StopIfGoingOnBatteries=false`, `TaskScheduling.cs`), so the line was untrue
+there too. It was in FIVE places, not the four the issue first named: the
+sidebar dialog's opening sentence (`ScheduledDeploy.DialogOpening`), the bullet
+in `ScheduledDeploy.Describe()` (what `plan_scheduled_deploy` returns), the
+in-app assistant's card (`AssistAgent`), the `schedule_deploy` answer
+(`PlantoirTools.ScheduleDeploy`) and the outside assistant's instructions
+(`McpInstructions.Text`). All five now drop it; the card and the answer say the
+mac's "on and awake then, with the lid open." through one constant,
+`ScheduledDeploy.AwakeThenWithTheLidOpen`.
+
+- **The battery line in Windows' own words.** The mac's sentence says "a Mac",
+  so Windows has its own: `ScheduledDeploy.OnBatterySleepsSooner`, "On battery,
+  a PC goes to sleep sooner, so be sure to keep it awake until then." (Russell,
+  2026-10-16; on battery a PC's power plan, and Modern Standby, sleep it
+  sooner, and a sleeping PC does not deploy.) It sits where the mac's does: on
+  its own line after the list in `Describe()`, and as the dialog's own text
+  block straight after the opening sentence. It is a separate block, never
+  glued into `DialogOpening`, because #400 and
+  `SharedRuleContractTests.EveryPlanOpeningNamesEveryDestinationInTheSavedOrder`
+  read that as "the first sentence". It is **not** on the card or in the
+  answer, matching the mac, where that was Russell's call.
+- **No contract entry.** No contract holds any of these sentences on either
+  platform, so there is no `specialNames.platformWording` entry either: that
+  rule covers sentences stored IN `contracts/` that name the computer. If this
+  one is ever lifted into a contract, it is written once as "On battery, a
+  {machine} goes to sleep sooner…", which "a PC" and "a Mac" fill with no
+  rewording.
+- **No routing re-measurement.** The issue said the `McpInstructions` edit owed
+  one. It does not: `McpInstructions.Text` is the MCP `instructions` field
+  (`Program.cs`), the local router never reads it, and nothing digests or pins
+  it. `scripts/test_tool_surface_digest.py` hashes the local tools'
+  descriptions, and `EveryDescriptionIsTheContractsOwn` compares tool
+  descriptions, not instructions.
+- **Pinned:** `ScheduledDeployTests.ItSaysWhatMustBeTrueOfTheComputer` (no
+  "plugged in"; the battery line present as a whole line),
+  `ScheduledDeployTests.TheDialogNeverAsksForACable`, and
+  `AssistantReadsSettingsAtTheCallTests.TheCardTheAnswerAndTheInstructionsNeverAskForACable`
+  (no cable in the card, the answer or the instructions; no battery line on the
+  card or in the answer). It is in that class, not `ScheduledDeployTests`,
+  because the answer needs the `FakeScheduler` of the `SharedActivityState`
+  collection. The opt-in `MenuBarUiTests` also checks that the dialog RENDERS
+  the battery line.
+- **Still to do:** `site/img/schedule-windows-{light,dark}.png` still show the
+  old sentence. A later piece of the v1.7.2 release retakes them. Windows' "If
+  it is asleep at that time, nothing happens and the site stays as it is." in
+  `Describe()` was left as it is. With `StartWhenAvailable=true` a missed
+  start may run when the PC wakes, inside the lateness window, so that sentence
+  may be untrue. It has to be MEASURED before it is reworded, and a `windows`
+  issue ([#554](https://github.com/russellgordon/plantoir/issues/554)) asks
+  for that.
 
 **REJECTED, again:** a wake timer (`pmset schedule wake` /
 `IOPMSchedulePowerEvent` — needs administrator rights and fails silently; the
@@ -3744,7 +3793,9 @@ mac has no share modes; nothing to mirror.
 #324): the scheduled run posts a toast in the section's own sentence, and a
 click opens that section (`ScheduledPublishToast`; trail `scheduled publish
 notification`). It is unproven on a real click (the desktop was locked), and
-nothing about it is ledgered — `NamedGapLedger` has been empty since bundle 9.
+nothing about it is ledgered — `NamedGapLedger` has been empty since bundle 9,
+but for a few hours on 2026-10-16 when mac #524's sixteen plan-table
+sentences were held against #548 until #548 landed them.
 
 ## Deploy and publish: the two words (v1.4.4, #443)
 

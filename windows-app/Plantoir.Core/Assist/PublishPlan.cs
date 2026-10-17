@@ -100,22 +100,56 @@ public sealed class PublishPlan
     /// read is not left out, because "already published" has to be something
     /// the app is sure of.
     /// </summary>
-    public string? LeftAloneSentence
+    public string? LeftAloneSentence => LeftAloneSentenceFor(ClassNoun.Class);
+
+    /// <summary>
+    /// <see cref="LeftAloneSentence"/> in the course's noun — the menu table's
+    /// note (#548). The card keeps the class form (a separate issue).
+    /// </summary>
+    internal string? LeftAloneSentenceFor(ClassNoun noun)
     {
-        get
+        var worth = LeftAlonePages.Select(page => page.DisplayTitle).ToList();
+        bool meeting = noun == ClassNoun.Meeting;
+        return worth.Count switch
         {
-            var worth = StoppedAtClasses
-                .Where(page => !(page.IsVisibleToStudents && page.VisibilityIsCertain))
-                .Select(page => page.DisplayTitle)
-                .ToList();
-            return worth.Count switch
-            {
-                0 => null,
-                1 => AssistWording.LinkedClassWasLeftAlone(worth),
-                _ => AssistWording.LinkedClassesWereLeftAlone(worth),
-            };
-        }
+            0 => null,
+            1 => meeting ? AssistWording.LinkedClassWasLeftAloneForAMeeting(worth) : AssistWording.LinkedClassWasLeftAlone(worth),
+            _ => meeting ? AssistWording.LinkedClassesWereLeftAloneForAMeeting(worth) : AssistWording.LinkedClassesWereLeftAlone(worth),
+        };
     }
+
+    /// <summary>
+    /// The linked classes a publish stopped at that students cannot CERTAINLY
+    /// see — the ones <see cref="LeftAloneSentence"/> names, and the ones the
+    /// menu's table lists as staying as they are (#548).
+    /// </summary>
+    public IReadOnlyList<PlannedPage> LeftAlonePages =>
+        StoppedAtClasses.Where(page => !(page.IsVisibleToStudents && page.VisibilityIsCertain)).ToList();
+
+    /// <summary>
+    /// The classes a changing page takes its date from, matched by PATH, in
+    /// the plan's order — the clause the card says beside the change and the
+    /// table says in its cell (#548).
+    /// </summary>
+    internal IReadOnlyList<string> ClassesWhoseDatesAreTakenBy(PlannedChange change) =>
+        DateMoves.Where(m => string.Equals(m.Page.RelativePath, change.Page.RelativePath, StringComparison.OrdinalIgnoreCase))
+                 .Select(m => m.TakenFrom)
+                 .ToList();
+
+    /// <summary>The date moves whose page is not one of the changes, said on their own lines.</summary>
+    internal IReadOnlyList<PlannedDateMove> OrphanedDateMoves()
+    {
+        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.RelativePath), StringComparer.OrdinalIgnoreCase);
+        return DateMoves.Where(m => !namedAlready.Contains(m.Page.RelativePath)).ToList();
+    }
+
+    /// <summary>A date move with no change of its own, as the card and the table's notes say it.</summary>
+    internal static string OrphanedDateMoveLine(PlannedDateMove move) =>
+        $"{move.Page.Named} will take the same date as “{move.TakenFrom}”.";
+
+    /// <summary>The names the teacher gave that fit no page of the section.</summary>
+    internal static string NoPageIsCalledLine(IReadOnlyList<string> unknownNames) =>
+        $"No page in this section is called {Listing(unknownNames)}.";
 
     public IEnumerable<PlannedPage> Named => NamedPages.Count > 0 ? NamedPages : Pages.Where(p => !p.ViaLink);
     public IEnumerable<PlannedPage> Linked => Pages.Where(p => p.ViaLink);
@@ -170,7 +204,7 @@ public sealed class PublishPlan
         }
         else if (Changes.Count == 0)
         {
-            lines.Add("No page's visibility would change.");
+            lines.Add(AssistWording.PlanNothingWouldChange);
         }
         else
         {
@@ -184,13 +218,7 @@ public sealed class PublishPlan
                     lines.Add($"…and {Changes.Count - listed} more.");
                     break;
                 }
-                string becoming = change.WillBeVisible ? "visible" : "hidden";
-                string line = $"{change.Page.Named} will become {becoming}";
-                foreach (var move in DateMoves.Where(m => string.Equals(m.Page.RelativePath, change.Page.RelativePath, StringComparison.OrdinalIgnoreCase)))
-                {
-                    line += $", with the same date as “{move.TakenFrom}”";
-                }
-                lines.Add(line + ".");
+                lines.Add($"{change.Page.Named} {AssistWording.PlanWillBecome(change.WillBeVisible, ClassesWhoseDatesAreTakenBy(change))}.");
                 listed++;
             }
         }
@@ -220,7 +248,7 @@ public sealed class PublishPlan
                     lines.Add($"…and {Kept.Count - listed} more.");
                     break;
                 }
-                lines.Add($"{staying.Page.Named} stays visible, because {staying.Reason}");
+                lines.Add($"{staying.Page.Named} {AssistWording.PlanStaysVisibleBecause(staying.Reason)}");
                 listed++;
             }
         }
@@ -231,24 +259,68 @@ public sealed class PublishPlan
             lines.Add(leftAlone);
         }
 
-        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.RelativePath), StringComparer.OrdinalIgnoreCase);
-        var orphaned = DateMoves.Where(m => !namedAlready.Contains(m.Page.RelativePath)).ToList();
+        var orphaned = OrphanedDateMoves();
         if (orphaned.Count > 0)
         {
             lines.Add("");
             foreach (var move in orphaned)
             {
-                lines.Add($"{move.Page.Named} will take the same date as “{move.TakenFrom}”.");
+                lines.Add(OrphanedDateMoveLine(move));
             }
         }
 
         if (UnknownNames.Count > 0)
         {
             lines.Add("");
-            lines.Add($"No page in this section is called {Listing(UnknownNames)}.");
+            lines.Add(NoPageIsCalledLine(UnknownNames));
         }
 
         return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// The plan as rows, for the Section menu's plan stage (#548, the mac's
+    /// <c>tabulated(noun:fromTheMenu:courseDirectoryURL:)</c>): the same stored
+    /// properties <see cref="Describe"/> reads, and the same
+    /// <see cref="AssistWording"/> pieces its lines are made of, so the table
+    /// and the card cannot say two different things. Rows in the contract's
+    /// order, none capped: the changes; the pages an unpublish keeps; the
+    /// classes a publish left as they are; the pages with no room for a key;
+    /// the pages already the way asked.
+    /// </summary>
+    /// <param name="folderOf">The Folder cell: the page's folder from the course folder, the course code at its root.</param>
+    /// <param name="noun">The course's noun. The table is the teacher's copy and never the model's, so a club's says "meeting" — in the kept reason, the left-alone cell and its note.</param>
+    public PlanTable Tabulate(Func<PlannedPage, string> folderOf, ClassNoun noun)
+    {
+        bool meeting = noun == ClassNoun.Meeting;
+        var rows = new List<PlanTable.Row>();
+        void Add(PlannedPage page, PlanTable.Change change, string whatChanges) =>
+            rows.Add(new PlanTable.Row(rows.Count, page.DisplayTitle, folderOf(page), change, whatChanges));
+
+        foreach (var change in Changes)
+            Add(change.Page, change.WillBeVisible ? PlanTable.Change.WillBecomeVisible : PlanTable.Change.WillBecomeHidden,
+                AssistWording.PlanWillBecome(change.WillBeVisible, ClassesWhoseDatesAreTakenBy(change)));
+        foreach (var staying in Kept)
+            Add(staying.Page, PlanTable.Change.StaysVisible, AssistWording.PlanStaysVisibleBecause(
+                meeting && staying.Reason == AssistWorkspace.ClassOfItsOwn ? AssistWorkspace.MeetingOfItsOwn : staying.Reason));
+        if (Publishes)
+            foreach (var page in LeftAlonePages)
+                Add(page, PlanTable.Change.StaysAsItIs,
+                    meeting ? AssistWording.MenuPlanStaysAsItIsForAMeeting : AssistWording.MenuPlanStaysAsItIs);
+        foreach (var page in CannotBeAddedTo)
+            Add(page, PlanTable.Change.StaysExactlyAsItIs, AssistWording.MenuPlanStaysExactlyAsItIs);
+        foreach (var page in AlreadyRight)
+            Add(page, Publishes ? PlanTable.Change.AlreadyVisible : PlanTable.Change.AlreadyHidden,
+                Publishes ? AssistWording.MenuPlanAlreadyVisible : AssistWording.MenuPlanAlreadyHidden);
+
+        // The card's other sentences, from the same functions it uses.
+        var notes = new List<string>();
+        if (CannotBeAddedToSentence is { } declined) notes.Add(declined);
+        if (Publishes && LeftAloneSentenceFor(noun) is { } leftAlone) notes.Add(leftAlone);
+        foreach (var move in OrphanedDateMoves()) notes.Add(OrphanedDateMoveLine(move));
+        if (UnknownNames.Count > 0) notes.Add(NoPageIsCalledLine(UnknownNames));
+
+        return new PlanTable(AssistWording.MenuPlanSummary(Changes.Count, AlreadyRight.Count, Publishes), rows, notes);
     }
 
     /// <summary>“a”, “a” and “b”, “a”, “b” and “c” — the way a sentence says a list.</summary>

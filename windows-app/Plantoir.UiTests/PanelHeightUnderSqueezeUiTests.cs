@@ -17,14 +17,15 @@ namespace Plantoir.UiTests;
 /// it too.</para>
 ///
 /// <para><b>The body is the longest the notice says</b>: a success naming
-/// two destinations, one of them a long folder path. The window is squeezed
-/// to 500 px wide (the sidebar column alone is at least 180) and the notice's
+/// two destinations, one of them a long folder path. The window is asked for
+/// 500 px wide and given its minimum, 900 epx (#542), and the notice's
 /// height read back. The mac's fault gave thousands of points; a few hundred
 /// pixels is fine. Reported in the test output and in
 /// <c>%TEMP%\plantoir-214-measurement.txt</c>, and asserted against the
 /// window's own height — a notice taller than its window is the bug.
-/// UNPROVEN as of 2026-10-01: written while no agent could drive the desktop;
-/// compiled, never run.</para>
+/// Written 2026-10-01 while no agent could drive the desktop; both methods
+/// have run since — 3 of 3 with CopyAPageDialogUiTests on 2026-10-16 (#542,
+/// i5-8365U, 1920 × 1080 at 150%), "window 900x737; notice 631x157".</para>
 /// </remarks>
 [Collection("drives the real app")]
 public class PanelHeightUnderSqueezeUiTests
@@ -46,9 +47,12 @@ public class PanelHeightUnderSqueezeUiTests
         var notice = app.Find("scheduledPublishNotice", "the scheduled-publish notice");
 
         var window = app.Window;
+        // Asked for 500, given the minimum, 900 epx (#542): the window never
+        // reaches 500, so wait for its size to settle rather than for a number
+        // (the wait used to be "width <= 520", which could never come true and
+        // always ran its full five seconds).
         window.Patterns.Transform.Pattern.Resize(500, 800);
-        Retry.WhileFalse(() => window.BoundingRectangle.Width <= 520, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200));
-        Thread.Sleep(800);
+        WindowMinimumUiTests.Settle(window);
 
         var noticeBox = notice.BoundingRectangle;
         var windowBox = window.BoundingRectangle;
@@ -64,7 +68,8 @@ public class PanelHeightUnderSqueezeUiTests
 
     /// <summary>
     /// #214's other half (bundle 11, V5/W3): a REAL publish to a folder, then
-    /// the window squeezed (it goes no narrower than 900), then the five parts
+    /// the window squeezed (it goes no narrower than its minimum, 900 epx:
+    /// 1350 px at 150%, #542), then the five parts
     /// of the folder publish's Done panel measured against the window — the
     /// phase, the folder sentence, Show in File Explorer, the render note and
     /// Show details. Each is an element WITH an automation peer (the panels

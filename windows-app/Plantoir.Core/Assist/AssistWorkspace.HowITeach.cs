@@ -126,7 +126,7 @@ public sealed partial class AssistWorkspace
             return AssistWording.HowITeachMissing(course.Code) + "\n\n" + AssistWording.HowITeachDraftingBrief;
         }
         if (HowITeachPage.TextOf(File.ReadAllBytes(path)) is not { } text)
-            throw new AssistRefusal($"â€œ{HowITeachPage.Title}â€ couldnâ€™t be read as text.");
+            throw new AssistRefusal(UnreadablePage(HowITeachPage.Title));
         if (!HowITeachPage.HasWords(text))
         {
             NoteHowITeachRead(course, HowITeachPage.TrailLineForARead(null, false, empty: true));
@@ -143,13 +143,30 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
+    /// A page that could not be read as text. Mirrors the mac's
+    /// <c>AssistToolRefusal.unreadablePage</c> word for word, adopted on purpose
+    /// with #540: until then this said "… couldn’t be read as text.", with
+    /// its quotation marks and apostrophe saved as the wrong characters, so a
+    /// teacher saw garbage around the title. No contract holds it on either
+    /// platform.
+    /// </summary>
+    private static string UnreadablePage(string title) => $"“{title}” could not be read, so nothing was changed.";
+
+    /// <summary>
     /// The refusals the plan and the write SHARE (<c>planAndWriteAgree</c>).
-    /// No reference-course gate: this app has no courses kept for reference
-    /// yet (#241); when it does, the plan must refuse one here.
+    /// A course kept for reference is refused HERE, first (#540, the mac's
+    /// <c>howITeachPlan</c>): <c>plan_write_how_i_teach</c> is ReadOnly, so
+    /// <c>ReferenceWriteGate</c> never sees it, and without this the plan
+    /// promised what the gate then refused the write. It says exactly what the
+    /// gate gives the write — <c>referenceCourses.wording.staysAsItIs</c> — so
+    /// the two cannot differ; the write meets the gate first anyway, and a
+    /// second identical refusal is harmless.
     /// </summary>
     private PlannedHowITeach PlanHowITeach(string courseCode, string text, string replacing)
     {
         var course = Course(courseCode);
+        if (ReferenceCourse.IsKeptForReference(course))
+            throw new AssistRefusal(ReferenceCourse.StaysAsItIs(ReferenceCourse.ShownCode(course)));
         text ??= "";
         if (text.Trim().Length == 0) throw new AssistRefusal(AssistWording.HowITeachNeedsWords);
         if (text.Length > HowITeachPage.MostCharacters) throw new AssistRefusal(AssistWording.HowITeachTooLong);
@@ -162,7 +179,7 @@ public sealed partial class AssistWorkspace
         {
             byte[] bytes = File.ReadAllBytes(path);
             existing = HowITeachPage.TextOf(bytes)
-                       ?? throw new AssistRefusal($"â€œ{HowITeachPage.Title}â€ couldnâ€™t be read as text.");
+                       ?? throw new AssistRefusal(UnreadablePage(HowITeachPage.Title));
             existingMark = HowITeachPage.MarkOf(bytes);
             if (mark.Length > 0 && mark != existingMark)
                 throw new AssistRefusal(AssistWording.HowITeachChangedSincePlanned(course.Code));
@@ -209,7 +226,7 @@ public sealed partial class AssistWorkspace
 
         // A backup wants a section; the page is the course's, so the lowest
         // stands in (the mac's choice; the zip holds the whole course). A copy
-        // that cannot be made does not stop the save â€” the trail says so, as
+        // that cannot be made does not stop the save — the trail says so, as
         // the mac's does.
         int standIn = planned.Course.SectionNumbers.DefaultIfEmpty(1).Min();
         string? backup = null;

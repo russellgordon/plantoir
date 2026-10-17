@@ -173,6 +173,69 @@ public class SectionMenuServerTests : IDisposable
         Assert.True(window.ServesTheLocalWindow);
     }
 
+    // ---- #548: the page plans carry their table, from the menu only ------------
+
+    private static PlanTable? TableOf(ModelContextProtocol.Protocol.CallToolResult result) =>
+        AssistToolAnswer.FromResult(result.Detail(), result.Meta).PlanTable;
+
+    [Fact]
+    public void ThePageAndDayPlansCarryATable_OnlyFromTheMenu()
+    {
+        File.WriteAllText(Path.Combine(_course, "Course Outline.md"), "---\npublishForSection1: false\n---\nOutline.\n");
+        Write(1, "All Classes", "Seen", "---\npublish: true\n---\nUp.\n");
+        string[] publishing = { "section1/All Classes/Unit 1, Day 2", "Course Outline" };
+        string[] hiding = { "section1/All Classes/Seen" };
+
+        var menu = new PlantoirTools(Menu());
+        var published = TableOf(menu.PlanPublishPages("ICS3U", 1, publishing));
+        var hidden = TableOf(menu.PlanUnpublishPages("ICS3U", 1, hiding));
+        var day = TableOf(menu.PlanPublishClassOn("ICS3U", 1, "2026-09-08"));
+
+        Assert.NotNull(published);
+        Assert.Equal(new[] { ("Unit 1, Day 2", "section1/All Classes"), ("Course Outline", "ICS3U") },
+                     published!.Rows.Select(row => (row.Title, row.Folder)));
+        Assert.All(published.Rows, row => Assert.Equal(AssistWording.PlanWillBecomeVisible, row.WhatChanges));
+        Assert.Equal(AssistWording.MenuPlanSummary(2, 0, publishing: true), published.Summary);
+        Assert.Equal(PlanTable.Change.WillBecomeHidden, Assert.Single(hidden!.Rows).Change);
+        Assert.Equal("Unit 1, Day 1", Assert.Single(day!.Rows).Title);
+
+        // Not from the assistant's window, nor from outside: their answers are as they were.
+        foreach (var surface in new[] { AssistSurface.LocalWindow, AssistSurface.Outside })
+        {
+            var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher(), undo: new UndoHistory()) { Surface = surface });
+            Assert.Null(TableOf(tools.PlanPublishPages("ICS3U", 1, publishing)));
+            Assert.Null(TableOf(tools.PlanUnpublishPages("ICS3U", 1, hiding)));
+            Assert.Null(TableOf(tools.PlanPublishClassOn("ICS3U", 1, "2026-09-08")));
+        }
+    }
+
+    [Fact]
+    public void APlanWithNothingToDoCarriesNoTable()
+    {
+        Write(1, "All Classes", "Seen", "---\npublish: true\n---\nUp.\n");
+        var menu = new PlantoirTools(Menu());
+        var answer = menu.PlanPublishPages("ICS3U", 1, new[] { "section1/All Classes/Seen" });
+        Assert.False(AssistToolAnswer.FromResult(answer.Detail(), answer.Meta).IsPlan);
+        Assert.Null(TableOf(answer));
+    }
+
+    /// <summary>
+    /// The model's bytes do not move: the text content of a page plan is the
+    /// same from the menu as from the assistant's window, table or no table.
+    /// (A plan with no menu-voice sentence in it — one with no declined pages.)
+    /// </summary>
+    [Fact]
+    public void TheTextContentIsTheSameWithOrWithoutTheTable()
+    {
+        string[] pages = { "section1/All Classes/Unit 1, Day 2" };
+        var fromTheMenu = new PlantoirTools(Menu()).PlanPublishPages("ICS3U", 1, pages);
+        var fromTheWindow = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher(), undo: new UndoHistory())
+            { Surface = AssistSurface.LocalWindow }).PlanPublishPages("ICS3U", 1, pages);
+
+        Assert.NotNull(TableOf(fromTheMenu));
+        Assert.Equal(fromTheWindow.Detail(), fromTheMenu.Detail());
+    }
+
     [Theory]
     [InlineData("menu", null, AssistSurface.Menu)]
     [InlineData("MENU", "1", AssistSurface.Menu)]
