@@ -166,7 +166,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    Since #204 it also signs the updater inside the app item by item and REFUSES
    a bundle whose updater is not on the app's own team, before notarization.
    Since #312 it also fetches and signs the website builder's helper programs
-   (Vendor/fetch-helpers.sh, release/sign-helpers.sh), and the DMG is about
+   (Vendor/fetch-helpers.sh, release/sign-helpers.sh); since #495 it fetches
+   Obsidian's add-ons for diagrams and graphs (Vendor/fetch-obsidian-addons.sh,
+   12.9 MB of JavaScript and CSS, nothing to sign, ~8 MB compressed), and the DMG is about
    **410 MB** (ULMO; 410,488,446 bytes at the #312 rehearsal) rather than 59 MB — the notarization upload takes
    correspondingly longer ("The update feed (macOS)" → "Deltas" for why
    updates stay small).
