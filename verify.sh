@@ -2365,7 +2365,7 @@ for info, code in fences:
 (course / "Runner Autorun.md").write_text(
     "---\ntitle: Runner Autorun\ncodeRunner: true\n---\nTwo blocks that run by themselves (plantoir-runner-autorun-7f3a).\n\n"
     "```python run autorun\nimport time\ntime.sleep(4)\nprint(\"first\")\n```\n\n"
-    "```python run autorun\nprint(\"second\")\n```\n", encoding="utf-8")
+    "```python run autorun\nimport time\ntime.sleep(3)\nprint(\"second\")\n```\n", encoding="utf-8")
 (course / "Runner Hidden.md").write_text(
     "---\ntitle: Runner Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-runner-hidden-7f3a).\n\n"
     "```python run\nprint(\"hidden\")\n```\n", encoding="utf-8")

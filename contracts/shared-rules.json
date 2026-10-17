@@ -24288,6 +24288,8 @@
             ],
             "why": "Before the reader opened the nested block, the build read its closing ``` as an opening one and missed this runner."
           },
+          {"name": "a list fence left open, then closed as the safety net's line says", "page": "- step one\n  ```python\n  print(1)\n  ```\n- step two\n\n```python run\nprint(2)\n```\n", "runners": 1, "siteBodies": ["print(2)"], "why": "Review N3 of the fixes: the closing ``` indented like the opening line closes it on both sides; at column 0 it does not."},
+          {"name": "a fence on a list marker's line, closed as the safety net's line says", "page": "- ```python\n  print(1)\n  ```\n\n```python run\nprint(2)\n```\n", "runners": 1, "siteBodies": ["print(2)"]},
           {
             "name": "a lazy line in a list item (S2)",
             "page": "1. item\n   ```python run\n   x = 8\n  print(x)\n   ```\n",
@@ -24427,7 +24429,7 @@
       "rule": "The input box shows when the block has the `stdin` flag or its CURRENT code matches the row's `inputPattern`; it sits between the code and the buttons (Q3) and is filled BEFORE Run, one line for each {inputCall}. It is never stored. Each line the program reads is echoed into the output straight after the prompt (Q4), so the transcript reads `Name? Ada` and not `Name? Hello Ada`; past the last line the program's {inputCall} raises EOFError, as at the end of a file. REJECTED: a prompt box per call driven by SharedArrayBuffer (the page would need cross-origin isolation headers, which a folder publish cannot send) and window.prompt (blocks the page, and iPadOS styles it as an alert)."
     },
     "output": {
-      "rule": "Output streams as the program prints it, gathered once per animation frame; stderr is set apart (span.plantoir-runner-err). At `maxCharacters` characters the program is stopped and words.outputTooLong shown (Q5): it protects an iPad's tab - a 200,000-line flood reached the page in 645 ms on a Mac, so the cap is protective rather than essential. Stop ends the program at once by ending its thread; the next Run starts a new one, from the browser's cache (about 1 s on a Mac, 1.7 s in the iPad simulator, measured 2026-10-09).",
+      "rule": "Output streams as the program prints it, gathered once per animation frame; stderr is set apart (span.plantoir-runner-err). At `maxCharacters` characters the program is stopped and words.outputTooLong shown (Q5): it protects an iPad's tab - a 200,000-line flood reached the page in 645 ms on a Mac, so the cap is protective rather than essential. Stop ends the program at once by ending its thread; the next Run starts a new one, which asks the site for its files again (a few small checks online - about 1 s on a Mac, 1.7 s in the iPad simulator, measured 2026-10-09 - and couldNotLoad offline).",
       "maxCharacters": 100000
     },
     "loading": {
@@ -24468,7 +24470,7 @@
       "couldNotLoad": "{language} couldn't start. Check the connection, then press Run again.",
       "teacherChangedIt": "Your teacher has changed this code, so it shows their new version.",
       "blockNotPrepared": "this block shows as plain code because the site was prepared without {language} - preview the site again, and if this line comes back, start the block's ``` on a line of its own",
-      "blockAfterUnclosedFence": "this block shows as plain code because a code block above it on this page is never closed - end that block with its own ``` line, then preview the site again"
+      "blockAfterUnclosedFence": "this block shows as plain code because a code block above it on this page is never closed - close that block with a line like the one that opened it (the same ``` or ~~~, indented the same, inside the same list item or callout), then preview the site again"
     },
     "agentGuidance": {
       "rule": "The skill `plantoir-runnable-code` sits beside `plantoir-printing` and `plantoir-math-graphs` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): the opt-in, the fence, the flags, input and EOFError, the measured list of what imports and what does not, files, `%%`, adding blocks after existing ones, offline and file:// behaviour, how it prints, and checking it in Preview. One skill for every language in the table: a language that joins it adds a section, not a second skill. The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
@@ -24480,7 +24482,7 @@
       "Ids are positional: a runnable block inserted ABOVE others gives every block below it a new id, which sets aside students' saved edits on those blocks. Add new blocks after the ones students already use.",
       "Each Run starts from a reset interpreter (harness), but a program can still leave residue in the same page visit: a standard-library module it changed stays changed, and `random`'s state carries on (S3). Stop, then Run, starts clean.",
       "The build's fence reader and the site's parser can still read a shape nobody has measured differently (pageShapes); the site then shows plain code and says so on a `plantoir: error:` line (siteDisagrees).",
-      "Measured by fuzzing (review N2, 2026-10-17): the build's reader also counts a fence indented four spaces at the top of a page (indented code to the site) and a fence inside an HTML block such as <div> - the site then carries the engine for nothing, which costs bytes and nothing else; the site, for its part, decodes a character reference in the info string (`&#114;un` reads as `run`), keeps a fence inside a `$$` maths block as maths, and reads a few deeper quote-and-list nestings differently - each of those shows as plain code with the safety net's line. Fuzz: 856 random pages, 38 disagreeing, every one in these groups.",
+      "Measured by fuzzing (review N2, 2026-10-17): the build's reader also counts a fence indented four spaces at the top of a page (indented code to the site) and a fence inside an HTML block such as <div> - the site then carries the engine for nothing, which costs bytes and nothing else; the site, for its part, decodes a character reference in the info string (`&#114;un` reads as `run`), keeps a fence inside a `$$` maths block as maths, and reads a few deeper quote-and-list nestings differently - each of those shows as plain code with the safety net's line; and a lazy line that leaves a list fence open makes the build's reader carry on and count a block the site shows as code text (bytes only). Fuzz: 856 random pages, 38 disagreeing, every one in these groups (a second fuzz by the review, 1,284 pages, found the last group 3 times).",
       "The page's code needs a browser that runs module workers: Safari and iPadOS 15 or later, Chrome 80 or later, Firefox 114 or later.",
       "A site opened as files on a computer, rather than from its web address, cannot run code: Safari 26.6 and Chrome for Testing 155 run none of a page's scripts from a file (measured 2026-10-17), so the blocks show as their highlighted code with no Run button; a browser that does run them is told words.needsWebAddress. KaTeX's faces DID load from a file in both (measured), so the maths keeps its look."
     ]

@@ -1543,7 +1543,13 @@ nothing); the site alone decodes a character reference in the info string
 (`&#114;un`), keeps a fence inside `$$` as maths, rejects a backtick in a
 backtick fence's info string differently, and reads a few deeper
 quote-and-list nestings differently — each of those shows as plain code
-with the line above (`knownLimits`).
+with the line above; and a lazy line that leaves a list fence open makes the
+build's reader carry on and count a block the site shows as code text (the
+fixes review's second fuzz, 1,284 pages, met it 3 times; bytes only)
+(`knownLimits`). `blockAfterUnclosedFence` tells a teacher to close the open
+block with a line like the one that opened it, indented the same: a closer at
+column 0 under a list item or callout closes nothing on the site (measured
+by the review; `pageShapes` pins the indented close).
 
 `check_runner_rules_against_the_site.py` runs every `pageShapes` case
 through both readers, and the transformer itself with the engine carried,
