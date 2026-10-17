@@ -15,12 +15,13 @@
 // codeRunnerRule.ts's, shared with the transformer.
 //
 // THE RUNTIME SEAM: a block's data-runner-runtime picks a class from
-// RUNTIMES. PyodideRuntime, the only one, starts static/<engine>/<worker> as
+// RUNTIMES. PyodideRuntime starts static/<engine>/<worker> as
 // a module worker (#455 review B1) on the first Run on a page and keeps it
 // warm for the rest of the visit; one program runs on a page at a time (Q2);
 // Stop ends the thread (the only way to stop Python mid-loop without
 // cross-origin isolation, which a folder publish cannot have). A language
-// that joins the table adds a class here.
+// that joins the table adds a class here: SwiftWasmRuntime (#493) runs each
+// Swift block's prebuilt program in a thread of its own the same way.
 
 import settings from "../../plantoir_code_runner.json"
 import { FullSlug, getFullSlug, pathToRoot } from "../../util/path"
@@ -48,13 +49,19 @@ type Refusal = "couldNotLoad" | "engineMissing" | "stopped"
 
 type RunHandlers = {
   out: (text: string, err: boolean) => void
-  done: (error: boolean) => void
+  // `said`, when given, is the status line's words (a Swift program that
+  // crashed or gave an exit code); otherwise finished / finishedWithError.
+  done: (error: boolean, said?: string) => void
+  // A prebuilt program has been fetched and is about to run (#493).
+  started?: () => void
 }
 
 interface CodeRuntime {
   readonly ready: boolean
   prepare(): Promise<void>
-  run(source: string, stdin: string[], handlers: RunHandlers): void
+  // `program` is a prebuilt block's compiled program's address (#493); a
+  // runtime that runs the source as written ignores it.
+  run(source: string, stdin: string[], handlers: RunHandlers, program?: string): void
   terminate(): void
 }
 
@@ -154,8 +161,142 @@ class PyodideRuntime implements CodeRuntime {
   }
 }
 
-const RUNTIMES: Record<string, (workerURL: string) => CodeRuntime> = {
+// Swift (#493), compiled ahead of time by the build: each block's program is
+// a small WebAssembly file (static/swift-wasm/<key>.wasm), run by
+// static/swift/plantoir-swift-worker.js under its hand-rolled WASI shim
+// (plantoir-wasi.mjs). The thread starts at once (there is no engine to
+// load); each Run sends the program's address, and the thread fetches it once
+// per visit and runs a fresh instance. Stop ends the thread, as for Python.
+class SwiftWasmRuntime implements CodeRuntime {
+  ready = false
+  private worker: Worker | null = null
+  private preparing: Promise<void> | null = null
+  private refuse: ((reason: Refusal) => void) | null = null
+  private handlers: RunHandlers | null = null
+  private fetching: number | null = null
+
+  constructor(
+    private readonly workerURL: string,
+    private readonly language: RunnerLanguage,
+  ) {}
+
+  prepare(): Promise<void> {
+    if (this.ready && this.worker !== null) {
+      return Promise.resolve()
+    }
+    if (this.preparing !== null) {
+      return this.preparing
+    }
+    this.preparing = new Promise<void>((resolve, reject) => {
+      let settled = false
+      const settle = (reason: Refusal | null) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        window.clearTimeout(watchdog)
+        this.refuse = null
+        this.preparing = null
+        if (reason === null) {
+          this.ready = true
+          resolve()
+        } else {
+          this.stopThread()
+          reject(reason)
+        }
+      }
+      this.refuse = (reason) => settle(reason)
+      const watchdog = window.setTimeout(() => settle("couldNotLoad"), LIMITS.loadSeconds * 1000)
+      let worker: Worker
+      try {
+        worker = new Worker(this.workerURL, { type: "module" })
+      } catch {
+        settle("couldNotLoad")
+        return
+      }
+      this.worker = worker
+      worker.onmessage = (event: MessageEvent) => {
+        const message = event.data ?? {}
+        if (message.type === "ready") {
+          settle(null)
+        } else if (message.type === "started") {
+          this.stopWatching()
+          this.handlers?.started?.()
+        } else if (message.type === "out") {
+          this.handlers?.out(String(message.text ?? ""), Boolean(message.err))
+        } else if (message.type === "fail") {
+          // The program could not be fetched (missing: the site has no such
+          // file) or compiled (a CSP that allows no wasm).
+          this.finish(true, word(message.reason === "missing" ? "notReady" : "couldNotLoad", this.language))
+        } else if (message.type === "done") {
+          let said: string | undefined = undefined
+          if (message.crashed) {
+            said = word("crashed", this.language)
+          } else if (typeof message.exitCode === "number" && message.exitCode !== 0) {
+            said = word("exitCode", this.language).split("{code}").join(String(message.exitCode))
+          }
+          this.finish(Boolean(message.error), said)
+        }
+      }
+      worker.onerror = (event: Event) => {
+        event.preventDefault()
+        if (settled) {
+          return
+        }
+        fetch(this.workerURL, { method: "HEAD", cache: "no-store" })
+          .then((response) => settle(response.status === 404 ? "engineMissing" : "couldNotLoad"))
+          .catch(() => settle("couldNotLoad"))
+      }
+    })
+    return this.preparing
+  }
+
+  private finish(error: boolean, said?: string) {
+    this.stopWatching()
+    const handlers = this.handlers
+    this.handlers = null
+    handlers?.done(error, said)
+  }
+
+  private stopWatching() {
+    if (this.fetching !== null) {
+      window.clearTimeout(this.fetching)
+      this.fetching = null
+    }
+  }
+
+  run(_source: string, stdin: string[], handlers: RunHandlers, program?: string) {
+    this.handlers = handlers
+    // Fetching and compiling the program is watched like loading an engine:
+    // a host that never answers ends in couldNotLoad, not "Loading..." for ever.
+    this.stopWatching()
+    this.fetching = window.setTimeout(() => {
+      this.fetching = null
+      this.stopThread()
+      this.finish(true, word("couldNotLoad", this.language))
+    }, LIMITS.loadSeconds * 1000)
+    this.worker?.postMessage({ type: "run", wasm: program ?? "", stdin })
+  }
+
+  private stopThread() {
+    this.worker?.terminate()
+    this.worker = null
+    this.ready = false
+  }
+
+  terminate() {
+    this.stopWatching()
+    this.handlers = null
+    if (this.refuse !== null) {
+      this.refuse("stopped")
+    }
+    this.stopThread()
+  }
+}
+
+const RUNTIMES: Record<string, (workerURL: string, language: RunnerLanguage) => CodeRuntime> = {
   pyodide: (workerURL) => new PyodideRuntime(workerURL),
+  "swift-wasm": (workerURL, language) => new SwiftWasmRuntime(workerURL, language),
 }
 
 // ---- One page visit ------------------------------------------------------------
@@ -192,7 +333,7 @@ function runtimeFor(language: RunnerLanguage): CodeRuntime | null {
     return null
   }
   const url = new URL(`${siteRoot()}/static/${language.engine}/${language.worker}`, location.href).href
-  const runtime = make(url)
+  const runtime = make(url, language)
   runtimes.set(language.engine, runtime)
   return runtime
 }
@@ -268,6 +409,11 @@ function build(wrapper: HTMLElement, base: string): Block | null {
   const id = wrapper.dataset.runnerId ?? ""
   const key = `plantoir:runner:${base}:${id}`
   const inputPattern = new RegExp(language.inputPattern)
+  // A prebuilt block's program (#493): its address from the site's root, or
+  // why the build has none (then Run stays off and words.notReady says so).
+  const programPath = wrapper.dataset.runnerWasm ?? ""
+  const unready = language.prebuilt && programPath === ""
+  const program = programPath === "" ? undefined : new URL(`${siteRoot()}/${programPath}`, location.href).href
 
   for (const child of Array.from(wrapper.children)) {
     child.classList.add("plantoir-runner-original")
@@ -311,6 +457,13 @@ function build(wrapper: HTMLElement, base: string): Block | null {
     wrapper.appendChild(editor)
   }
 
+  // A language a student cannot edit (Swift) says so once, under its code.
+  if (!language.editable) {
+    const note = element("p", "plantoir-runner-note")
+    note.textContent = word("cannotEdit", language)
+    wrapper.appendChild(note)
+  }
+
   const inputBox = element("div", "plantoir-runner-input")
   const inputLabel = element("label", "plantoir-runner-input-label")
   const input = element("textarea", "plantoir-runner-input-lines")
@@ -346,7 +499,7 @@ function build(wrapper: HTMLElement, base: string): Block | null {
   const status = element("p", "plantoir-runner-status")
   status.setAttribute("role", "status")
   status.setAttribute("aria-live", "polite")
-  status.textContent = saidOnLoad
+  status.textContent = unready ? word("notReady", language) : saidOnLoad
   wrapper.appendChild(status)
 
   const output = element("pre", "plantoir-runner-output")
@@ -448,9 +601,10 @@ function build(wrapper: HTMLElement, base: string): Block | null {
   let started = false
   const setBusy = (now: boolean) => {
     busy = now
-    runButton.disabled = now
+    runButton.disabled = now || unready
     stopButton.disabled = !now
   }
+  setBusy(false)
 
   const block: Block = {
     wrapper,
@@ -476,6 +630,10 @@ function build(wrapper: HTMLElement, base: string): Block | null {
     }
     if (location.protocol === "file:") {
       status.textContent = word("needsWebAddress", language)
+      return
+    }
+    if (unready) {
+      status.textContent = word("notReady", language)
       return
     }
     if (automatic && running !== null && running !== block) {
@@ -518,8 +676,16 @@ function build(wrapper: HTMLElement, base: string): Block | null {
         if (running !== block) {
           return
         }
-        status.textContent = word("running", language)
+        // A prebuilt program is still being fetched: "Loading" until it starts.
+        if (!language.prebuilt) {
+          status.textContent = word("running", language)
+        }
         runtime.run(code(), lines, {
+          started: () => {
+            if (running === block) {
+              status.textContent = word("running", language)
+            }
+          },
           out: (text, err) => {
             if (running !== block) {
               return
@@ -543,13 +709,13 @@ function build(wrapper: HTMLElement, base: string): Block | null {
               frame = window.requestAnimationFrame(paint)
             }
           },
-          done: (error) => {
+          done: (error, said) => {
             if (running !== block) {
               return
             }
-            end(error ? word("finishedWithError", language) : word("finished", language))
+            end(said ?? (error ? word("finishedWithError", language) : word("finished", language)))
           },
-        })
+        }, program)
       })
       .catch((reason: Refusal) => {
         if (running !== block || reason === "stopped") {

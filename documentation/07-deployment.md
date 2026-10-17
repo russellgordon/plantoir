@@ -584,6 +584,19 @@ Cloudflare did, once. Every publish re-uploads about 232 pages either way
 (the production rebuild changes every page's HTML — the explorer's random
 id — which predates this; see "Why determinism matters").
 
+**Runnable Swift (#493)** adds `static/swift/` (the thread
+`plantoir-swift-worker.js` and the shim `plantoir-wasi.mjs`, 10,925 bytes)
+and one program per Swift block in `static/swift-wasm/<key>.wasm`. A module
+worker and the module it imports must come back as a JavaScript type, as
+for Python; the programs are compiled from their BYTES (06 → I10), so a host
+that sends `.wasm` with the wrong type still runs them - the type is
+reported, not required. **Measured 2026-10-17** by `verify-deploy.sh`
+(the borrowed page carries one Swift block; `127 passed, 0 failed, 0
+skipped`): the preview, Netlify, Cloudflare Pages and both pairings send the
+thread and the shim as `application/javascript` and the page's program
+(45,843 bytes) as `application/wasm`; a folder publish carries the thread
+byte for byte as `support/gated/swift` holds it, and the program.
+
 **A school's own web server** (a folder publish served by IIS, nginx,
 Apache…) must map `.wasm` to `application/wasm` and `.mjs` to
 `text/javascript`; older default MIME tables miss both. Without them a
