@@ -42,7 +42,7 @@ search.
 
 This is the feature a programming course lives on — runnable examples
 with the spacing and quotation marks preserved, coloured by meaning.
-Press Run, and type your name when it asks:
+When it asks, type your name:
 
 ```python run
 name = input("What is your name? ")

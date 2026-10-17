@@ -92,8 +92,7 @@ branches.
 > inner one.
 
 > [!success]- Answer 5
-> Press Run, and when it asks, type a number of days — `0`, `7` or
-> `8`.
+> When it asks, type a number of days — `0`, `7` or `8`.
 > ```python run
 > answer = input("Days late: ")
 > days_late = int(answer)

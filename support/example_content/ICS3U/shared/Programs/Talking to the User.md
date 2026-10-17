@@ -14,8 +14,8 @@ all she wanted.
 
 ## The program
 
-To run it, press Run, and when it asks, type a name and then a number
-of minutes — `Priya` and `185`, as in the run below.
+When it asks, type a name and then a number of minutes — `Priya` and
+`185`, as in the run below.
 
 ```python run readonly
 # Weekly practice check-in for Ms. Roy, who coaches the senior team.

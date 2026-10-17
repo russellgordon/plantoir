@@ -27,8 +27,8 @@ teacher who runs the breakfast program. Ask them. Their words, not
 your guesses, define what this does.
 
 Here is a complete example of the right size, written for a teacher who
-orders milk based on how many students ate breakfast. Press Run, and when it
-asks, type a number of students:
+orders milk based on how many students ate breakfast. When it asks, type a
+number of students:
 
 ```python run
 students = int(input("How many students ate today? "))

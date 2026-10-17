@@ -15,8 +15,7 @@ programming life.
 
 ## A crash, in full
 
-The program, saved as `hours.py`. Press Run, and type `abc`
-when it asks:
+The program, saved as `hours.py`. When it asks, type `abc`:
 
 ```python run
 answer = input("How many hours did you work? ")
