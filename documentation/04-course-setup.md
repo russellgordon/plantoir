@@ -783,38 +783,52 @@ so the work is a judgement about every block, recorded where a later edit
 cannot quietly undo it:
 
 - **Measured scope**: 145 ```` ```python ```` blocks on 49 pages (the issue
-  guessed 79 on 40). **83 run on 41 pages** — 59 editable, 24
-  `readonly` (Concepts and Programs pages, the worked examples to read), 24
-  of them reading input — and **62 stay plain**, so 8 pages with Python get
-  no `codeRunner` at all. Plain means the block would fail or show nothing
-  alone: a fragment (names defined elsewhere on the page, or it does not
-  parse), definitions only, one `input()` line, a read of a file no run can
-  leave behind (each Run starts in a fresh empty folder), the multi-file
-  `from toolbox import …`, `breakpoint()`.
-- **The record is executable**: `.claude/skills/example-content/lint_runnable.py`
-  carries the table (every block: run / readonly / plain and why) and
-  `lint_payload.py` holds the payload to it exactly, plus rules every
-  payload keeps — a run block needs `codeRunner: true` and the reverse,
-  near-miss fences (```` ```Python run ````, `run,stdin`, a nested fence) and
-  unknown flags are refused, and a run block must parse, bind every name it
-  uses, import only the standard library the site runs, never call
-  `breakpoint()`, and write a file before reading it unless the read is
-  guarded by `except FileNotFoundError` (a module-level constant naming the
-  file counts — Programs/Reading and Writing Files does that).
+  guessed 79 on 40). **83 run on 41 pages** — 60 editable, 23 `readonly`
+  (the worked examples to read on Concepts and Programs pages; Concepts'
+  Repetition 3 and Testing and Debugging 1 are editable because their prose
+  asks students to change them), 24 of them reading input — and **62 stay
+  plain**, so 8 pages with Python get no `codeRunner` at all. Plain means
+  the block would fail or show nothing alone: a fragment (names defined
+  elsewhere on the page, or it does not parse), definitions only, one
+  `input()` line, a read of a file no run can leave behind (each Run starts
+  in a fresh empty folder), the multi-file `from toolbox import …`,
+  `breakpoint()`, or a find-the-fault question whose output gives the answer
+  away.
+- **Every input block is preceded by a sentence saying what to type in the
+  input box, one value per line** — the shipped skill's rule. The site reads
+  the whole box when Run is pressed, so an empty box is `EOFError` at the
+  first `input()` (measured), and prose describing a terminal's back-and-forth
+  ("type `abc` at the question", "it waits for you") was reworded.
+- **The record is executable, and run by hand**:
+  `.claude/skills/example-content/lint_runnable.py` carries the table
+  (every block: run / readonly / plain and why), and `lint_payload.py` —
+  which the example-content skill's Phase 7 runs, and nothing runs
+  automatically — holds the payload to it exactly, plus rules every payload
+  keeps: a run block needs `codeRunner: true` and the reverse; near-miss
+  fences (```` ```Python run ````, `run,stdin`, a nested fence) and unknown
+  flags are refused; a run block must parse, bind every name it uses, import
+  only the standard library the site runs, never call `breakpoint()`, use
+  `sys.stdin` only with the `stdin` flag, and write a file before reading it
+  (`open`, `open(file=…)`, `Path(…).read_text()`) unless the read is guarded
+  by `except FileNotFoundError` — a module-level constant naming the file
+  counts (Programs/Reading and Writing Files does that), as does the same
+  variable the write used. A run block in a language these rules do not
+  judge (`swift run`, #493) is left alone. Both scripts run under Python 3.9
+  (macOS's `/usr/bin/python3`) and later.
 - **Measured end to end** (2026-10-17, M4 Pro): ICS3U installed by the baked
-  wizard and built with the branch's image — 83 runners on 41 pages, 24
+  wizard and built with the branch's image — 83 runners on 41 pages, 23
   readonly, every runner's code identical to its block, `static/pyodide` in
   the site, no `plantoir: error:` line. All 82 finite blocks run in the
   image's own Pyodide 314.0.7 (Node, sample input lines, a fresh folder
-  each): 79 finish, and the 3 that end in an error do so ON PURPOSE —
-  two NameErrors that teach scope and the debugger tutorial's
-  ZeroDivisionError (`ENDS_IN_AN_ERROR`).
-- **What the browser showed**, Chrome for Testing 155 on the built site:
-  Repetition's endless loop (`while count > 0: print(count)`) reached the
-  100,000-character cap and stopped itself in under 1.5 s, before Stop
-  could be pressed, so its prose says so instead of "Ctrl + C in the
-  terminal"; an `input()` block with the box left empty ends in
-  `EOFError`, which is why a page that reads input shows a sample run.
+  each): 79 finish, and the 3 that end in an error do so ON PURPOSE — two
+  NameErrors that teach scope and the debugger tutorial's ZeroDivisionError
+  (`ENDS_IN_AN_ERROR`).
+- **What the browser showed**, Chrome for Testing 155 on the built site,
+  Python already loaded: Repetition's endless loop
+  (`while count > 0: print(count)`) reached the 100,000-character cap and
+  stopped itself within a second or two, before Stop could be pressed, so
+  its prose says so instead of "Ctrl + C in the terminal" (a first Run, or
+  an iPad, takes longer).
 - **Rejected**: making every complete program runnable regardless of page
   (a Concepts page's examples are to be read, not rewritten — `readonly`);
   a `stdin` flag on blocks that visibly call `input(` (the box appears by
@@ -822,13 +836,14 @@ cannot quietly undo it:
   (it changes the teaching, and no code body was changed); a lint rule that
   tracks which name is used before it is bound (the rule is "bound nowhere
   in the block", so a scope lesson's deliberate NameError passes — and so,
-  a known limit, does `count = count + 1` with no start).
-- **Known mismatches**, left as they are: a traceback on the site names
-  `main.py` where Reading an Error Message and The Bad Input Hunt show
+  a known limit, does `count = count + 1` with no start); counting a sample
+  transcript further down as telling students what to type.
+- **Known mismatches**: a traceback on the site names `main.py` where
+  Reading an Error Message and The Bad Input Hunt show
   `/home/student/hours.py` and `pay.py` (the prose is about a program on
-  the student's own computer); Programs/Reading and Writing Files shows a
-  "second run" transcript that the site cannot reproduce, because files
-  last one run.
+  the student's own computer). Programs/Reading and Writing Files shows a
+  "second run" transcript the site cannot produce, because files last one
+  run; a sentence under the block says so.
 
 **How the installer reads a link** ([#314](https://github.com/russellgordon/plantoir/issues/314),
 [#326](https://github.com/russellgordon/plantoir/issues/326)): the three

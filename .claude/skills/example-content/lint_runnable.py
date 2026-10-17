@@ -2,12 +2,20 @@
 
 Usage:  python3 .claude/skills/example-content/lint_runnable.py ICS3U
 
+Runs under Python 3.9 or later (macOS's own /usr/bin/python3 is 3.9). It is
+run BY HAND - alone, or through lint_payload.py in the example-content
+skill's Phase 7; no automated gate runs either script.
+
 Two jobs, both read the page the way the site does (the toolchain's own
 `scripts/markdown_code.fenced_blocks` and `scripts/page_features.runner_for`):
 
 1. RULES every payload must keep (`lint_payload.py` runs them on every page):
-   (1) a ```python run block on a page without `codeRunner: true`;
-   (2) `codeRunner: true` (or any other codeRunner value) with no run block;
+   (1) a runnable block (any language in page_features.RUNNER_LANGUAGES) on a
+       page without `codeRunner: true`;
+   (2) `codeRunner: true` (or any other codeRunner value) with no run block.
+       A ```<language> run block in a language these rules do not judge
+       (```swift run, before #493 adds its row) counts as a run block and is
+       otherwise left alone - never refused;
    (3) a block that LOOKS runnable but is not - ```Python run, ```py run,
        `run,stdin`, a run block nested after two list markers - or an unknown
        or repeated flag, or more than one `autorun` on a page;
@@ -16,13 +24,16 @@ Two jobs, both read the page the way the site does (the toolchain's own
        deliberate: a name bound inside a function and printed outside it -
        a lesson about scope - passes, and so, a known limit, does a name
        used before the line that first binds it;
-   (5) a run block that opens a file for reading which it never writes
-       earlier in the same block, unless the open sits in a `try` that
-       catches FileNotFoundError / OSError (each Run starts in a fresh,
-       empty folder). A file name may be a literal or a module-level
-       constant (`FILE_NAME = "reminders.txt"`);
+   (5) a run block that opens a file for reading - `open(...)`,
+       `open(file=...)`, `Path(...).read_text()` / `.read_bytes()` - which
+       it never writes earlier in the same block, unless the read sits in a
+       `try` that catches FileNotFoundError / OSError (each Run starts in a
+       fresh, empty folder). A file name may be a literal, a module-level
+       constant (`FILE_NAME = "reminders.txt"`) or the same variable the
+       write used (a name the user typed);
    plus: an import outside the standard library (or one the site cannot
-   run - turtle, tkinter ...), and `breakpoint()`.
+   run - turtle, tkinter ...), `breakpoint()`, and `sys.stdin` without the
+   `stdin` flag (the input box appears by itself only for `input(`).
 
 2. The JUDGEMENT TABLE for a payload that has one (ICS3U): every Python block
    on every page, top to bottom, is `run`, `readonly`, or plain with the
@@ -36,8 +47,10 @@ own self-check failed.
 
 import ast
 import builtins
+import importlib.util
 import re
 import sys
+import sysconfig
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -56,6 +69,32 @@ CATCHES_A_MISSING_FILE = {"FileNotFoundError", "OSError", "IOError",
 ALWAYS_BOUND = set(dir(builtins))
 
 PYTHON_WORDS = {"python", "py", "python3", "py3"}
+
+# Match statements arrived in Python 3.10; on 3.9 there are none to read.
+MATCH_CAPTURES = tuple(getattr(ast, name) for name in ("MatchAs", "MatchStar") if hasattr(ast, name))
+MATCH_MAPPING = getattr(ast, "MatchMapping", None)
+
+
+def is_standard_library(module: str) -> bool:
+    """Is `module` part of Python itself? sys.stdlib_module_names on 3.10+;
+    on 3.9, where the module is found: built in, or under the standard
+    library folder and not in site-packages."""
+    names = getattr(sys, "stdlib_module_names", None)
+    if names is not None:
+        return module in names
+    if module in sys.builtin_module_names:
+        return True
+    try:
+        spec = importlib.util.find_spec(module)
+    except (ImportError, ValueError):
+        return False
+    if spec is None:
+        return False
+    origin = spec.origin or ""
+    if origin in ("built-in", "frozen"):
+        return True
+    stdlib = sysconfig.get_paths()["stdlib"]
+    return origin.startswith(stdlib) and "site-packages" not in origin
 
 
 # ---------------------------------------------------------------------------
@@ -170,9 +209,9 @@ def bound_names(tree) -> set:
                 names.add(alias.asname or alias.name.split(".")[0])
         elif isinstance(node, ast.ExceptHandler) and node.name:
             names.add(node.name)
-        elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+        elif MATCH_CAPTURES and isinstance(node, MATCH_CAPTURES) and node.name:
             names.add(node.name)
-        elif isinstance(node, ast.MatchMapping) and node.rest:
+        elif MATCH_MAPPING is not None and isinstance(node, MATCH_MAPPING) and node.rest:
             names.add(node.rest)
     return names
 
@@ -197,11 +236,21 @@ def module_string_constants(tree) -> dict:
 
 
 def file_name_of(node, constants):
+    """What names the file: its text when it can be known, otherwise the
+    expression itself, so `open(name, "w")` then `open(name)` match."""
+    if node is None:
+        return None
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     if isinstance(node, ast.Name) and node.id in constants:
         return constants[node.id]
-    return None
+    return ("expression", ast.dump(node))
+
+
+def shown_name(name) -> str:
+    if isinstance(name, str):
+        return name
+    return "a file"
 
 
 def mode_of(call) -> str:
@@ -236,7 +285,43 @@ def guarded_against_a_missing_file(node, parents) -> bool:
     return False
 
 
-def program_problems(source: str) -> list:
+def file_accesses(tree, constants) -> list:
+    """Every file the block opens, in source order: (call, name, writes)."""
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        function = node.func
+        if isinstance(function, ast.Name) and function.id == "open":
+            target = node.args[0] if node.args else None
+            for keyword in node.keywords:
+                if keyword.arg == "file":
+                    target = keyword.value
+            if target is None:
+                continue
+            mode = mode_of(node)
+            found.append((node, file_name_of(target, constants), any(letter in mode for letter in "wax")))
+        elif isinstance(function, ast.Attribute) \
+                and function.attr in ("read_text", "read_bytes", "write_text", "write_bytes") \
+                and isinstance(function.value, ast.Call) \
+                and isinstance(function.value.func, (ast.Name, ast.Attribute)) \
+                and getattr(function.value.func, "id", getattr(function.value.func, "attr", "")) == "Path" \
+                and function.value.args:
+            found.append((node, file_name_of(function.value.args[0], constants),
+                          function.attr.startswith("write")))
+    found.sort(key=lambda access: (access[0].lineno, access[0].col_offset))
+    return found
+
+
+def reads_sys_stdin(tree) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr == "stdin" \
+                and isinstance(node.value, ast.Name) and node.value.id == "sys":
+            return True
+    return False
+
+
+def program_problems(source: str, flags=()) -> list:
     """What would go wrong the moment a student presses Run."""
     try:
         tree = ast.parse(source)
@@ -265,7 +350,7 @@ def program_problems(source: str) -> list:
         for module in modules:
             if module in CANNOT_IMPORT:
                 problems.append(f"imports {module}, which the site's Python cannot run")
-            elif module not in sys.stdlib_module_names:
+            elif not is_standard_library(module):
                 problems.append(f"imports {module}, which is not part of Python's standard "
                                 f"library (or is another file) - only the standard library runs on the site")
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "breakpoint":
@@ -277,26 +362,19 @@ def program_problems(source: str) -> list:
         for child in ast.iter_child_nodes(parent):
             parents[id(child)] = parent
     constants = module_string_constants(tree)
-    opens = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
-                and node.func.id == "open" and node.args:
-            opens.append(node)
-    opens.sort(key=lambda call: (call.lineno, call.col_offset))
     written = set()
-    for call in opens:
-        name = file_name_of(call.args[0], constants)
-        mode = mode_of(call)
-        writes = any(letter in mode for letter in "wax")
+    for call, name, writes in file_accesses(tree, constants):
         if writes:
-            if name is not None:
-                written.add(name)
+            written.add(name)
             continue
         if name in written or guarded_against_a_missing_file(call, parents):
             continue
-        shown = name if name is not None else "a file it cannot name"
-        problems.append(f"reads {shown} without writing it first - each Run starts in an "
+        problems.append(f"reads {shown_name(name)} without writing it first - each Run starts in an "
                         f"empty folder, so this is FileNotFoundError (catch it, or keep the block plain)")
+
+    if "stdin" not in flags and reads_sys_stdin(tree):
+        problems.append("reads sys.stdin without the `stdin` flag - the input box appears by "
+                        "itself only for input(); write ```python run stdin")
     return problems
 
 
@@ -315,6 +393,16 @@ def page_problems(rel: str, text: str) -> list:
     blocks = python_blocks(text)
     runnable = 0
     autoruns = 0
+    # Run blocks in a language these rules do not judge (```swift run): they
+    # count as run blocks for rule (2) and are otherwise left alone.
+    for block in markdown_code.fenced_blocks(text):
+        words = [word for word in page_features.INFO_SPACE.split(block["info"]) if word]
+        if words and words[0].lower() not in PYTHON_WORDS and "run" in words[1:]:
+            runnable += 1
+            if not opted_in and page_features.runner_for(block["info"], "", True) is not None \
+                    and not block["nested"]:
+                problems.append(f"{rel}:{block['line']}: a run block on a page without "
+                                f"`codeRunner: true` - it shows as ordinary code")
     for block in blocks:
         where = f"{rel}:{block['line']}"
         for problem in info_string_problems(block):
@@ -327,10 +415,10 @@ def page_problems(rel: str, text: str) -> list:
         if not opted_in:
             problems.append(f"{where}: a run block on a page without `codeRunner: true` - "
                             f"it shows as ordinary code")
-        for problem in program_problems(block["body"]):
+        for problem in program_problems(block["body"], block["runner"]["flags"]):
             problems.append(f"{where}: {problem}")
     if value is not None and runnable == 0:
-        problems.append(f"{rel}: codeRunner is set but no block says ```python run - "
+        problems.append(f"{rel}: codeRunner is set but no block says ```<language> run - "
                         f"take the line out")
     if autoruns > 1:
         problems.append(f"{rel}: {autoruns} autorun blocks - at most one per page")
@@ -350,6 +438,7 @@ DEFINITION = "plain: a definition only, shows nothing"
 MISSING_FILE = "plain: reads a file no earlier block can leave behind"
 ONE_INPUT = "plain: one input line, shows nothing"
 RHETORICAL = "plain: a one-line print shown for its wording"
+FIND_THE_FAULT = "plain: a find-the-fault question - running it gives the answer away"
 
 # ICS3U (#561): pages under shared/, every ```python block top to bottom.
 # Concepts and Programs are worked examples to read - readonly; everything
@@ -371,11 +460,13 @@ TABLES = {
                            "readonly", UNDEFINED],
         "Concepts/Making Decisions": [UNDEFINED, "readonly", UNDEFINED, UNDEFINED],
         "Concepts/Parameters, Returns, and Scope": [DEFINITION, UNDEFINED, "readonly", "readonly"],
-        # 3 is the loop that never ends: editable, so students can fix it, and
-        # the prose says press Stop.
+        # 3 is the loop that never ends: editable, so students can fix it; the
+        # prose says the page stops it for printing too much (measured).
         "Concepts/Repetition": ["readonly", "plain: an input loop that shows nothing",
                                 "run", "readonly", "readonly"],
-        "Concepts/Testing and Debugging": ["readonly"],
+        # Editable, although a Concepts page: the prose asks students to move a
+        # line and run it again.
+        "Concepts/Testing and Debugging": ["run"],
         "Concepts/Variables and Data Types": [NO_OUTPUT, NO_OUTPUT, NO_OUTPUT, NO_OUTPUT],
         "Concepts/Working with Text": ["readonly", "readonly",
                                        "plain: two lines whose TypeError the page prints beside them"],
@@ -390,8 +481,8 @@ TABLES = {
                                          "run", "run"],
         "Exercises/Lists Practice": [NO_OUTPUT, UNDEFINED, "run", "run", UNDEFINED, UNDEFINED],
         "Exercises/Loops Practice": ["run", "run", "run", "run", "run", "run", "run", "run", "run"],
-        "Exercises/Text Practice": ["plain: a find-the-fault question - running it gives the answer away", "run", "run", "run", "run", "run", "run"],
-        "Exercises/Variables and Types Practice": ["run", "run", ONE_INPUT, "run",
+        "Exercises/Text Practice": [FIND_THE_FAULT, "run", "run", "run", "run", "run", "run"],
+        "Exercises/Variables and Types Practice": ["run", "run", FIND_THE_FAULT, "run",
                                                    "plain: reads input, shows nothing", "run", "run"],
         "Explorations/The Bad Input Hunt": ["run"],
         "Explorations/The Data Pile": ["run"],
@@ -506,6 +597,13 @@ PAGE_MUST_BE_ACCEPTED = [
     "---\ncodeRunner: true\n---\n```python run readonly\nname = input('Name? ')\nprint(name)\n```\n",
     "---\ncodeRunner: true\n---\n> [!success]- Answer\n> ```python run\n> for n in range(3):\n>     print(n)\n> ```\n",
     "---\ncodeRunner: true\n---\n```python title=\"run me.py\" run\nimport math\nprint(math.pi)\n```\n",
+    # A language these rules do not judge is never refused (#493's Swift).
+    "---\ncodeRunner: true\n---\n```swift run\nprint(\"hi\")\n```\n",
+    # A file named by what the user typed, written then read back.
+    "---\ncodeRunner: true\n---\n```python run\nname = input('File? ')\nwith open(name, 'w') as f:\n"
+    "    f.write('x')\nwith open(name) as f:\n    print(f.read())\n```\n",
+    # sys.stdin with the stdin flag.
+    "---\ncodeRunner: true\n---\n```python run stdin\nimport sys\nprint(sys.stdin.readline())\n```\n",
     # Written before it is read, in one run.
     "---\ncodeRunner: true\n---\n```python run\nwith open('a.txt', 'w') as f:\n    f.write('x')\n"
     "with open('a.txt') as f:\n    print(f.read())\n```\n",
@@ -531,6 +629,10 @@ PAGE_MUST_BE_REFUSED = [
     "---\ncodeRunner: true\n---\n```python run\nimport turtle\nturtle.forward(9)\n```\n",
     "---\ncodeRunner: true\n---\n```python run\nfrom toolbox import read_lines\nprint(read_lines('a'))\n```\n",
     "---\ncodeRunner: true\n---\n```python run\nbreakpoint()\n```\n",
+    "---\ncodeRunner: true\n---\n```python run\nwith open(file='w.txt') as f:\n    print(f.read())\n```\n",
+    "---\ncodeRunner: true\n---\n```python run\nfrom pathlib import Path\nprint(Path('w.txt').read_text())\n```\n",
+    "---\ncodeRunner: true\n---\n```python run\nimport sys\nprint(sys.stdin.readline())\n```\n",
+    "---\npublish: true\n---\n```python run\nprint(1)\n```\n```swift run\nprint(2)\n```\n",
     "---\ncodeRunner: true\n---\n```python run autorun\nprint(1)\n```\n```python run autorun\nprint(2)\n```\n",
 ]
 

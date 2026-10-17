@@ -846,21 +846,29 @@ not memory. Judge EVERY block in context, top to bottom:
 - `codeRunner: true` goes on every page with at least one run block and on no
   other. Never `autorun`. No `stdin` flag where `input(` is visible — the
   input box appears by itself. Standard library only.
-- A block that reads input: the page should show a sample run or say what to
-  type — an empty input box is `EOFError` on the first `input()`.
+- **Whenever a block reads input, the page's text BEFORE it tells students
+  what to type in the input box, one value per line** — the shipped
+  `plantoir-runnable-code` skill's rule, and not optional: a sample run
+  further down is not enough. The site reads the whole box at once, so
+  never write "type it at the question" or "it waits for you"; an empty box
+  is `EOFError` at the first `input()`. ICS3U's 24 input blocks each carry
+  such a sentence ("Type a speed and a time on two lines of the input box,
+  then press Run").
 - A block that ends in an error ON PURPOSE (a scope lesson's NameError, the
   debugger tutorial's ZeroDivisionError) stays runnable; list it in
   `lint_runnable.py` → `ENDS_IN_AN_ERROR` so a check that presses Run on
   every block knows.
 - Prose that says "in the terminal" or "press Ctrl + C" beside a run block is
   wrong on the site: a loop that prints is stopped by the page at 100,000
-  characters (well under a second, measured), one that prints nothing by
-  **Stop**. Tracebacks name `main.py`, not the file the prose names.
+  characters (within a second or two, measured), one that prints nothing by
+  **Stop**. Tracebacks name `main.py`, not the file the prose names. A
+  program that keeps a file between runs cannot show that on the site
+  (files last one run): say so under the block.
 - On a page already in use, new run blocks go AFTER the existing ones (saved
   edits are kept by position).
 - Record the judgement in `lint_runnable.py` → `TABLES[<CODE>]`: one entry per
-  Python block, `run`, `readonly`, or `plain: <why>`. The linter holds the
-  payload to it exactly.
+  Python block, `run`, `readonly`, or `plain: <why>`. The linter, run by
+  hand in Phase 7, holds the payload to it exactly.
 
 **Required pages beyond the subject folders**: the Setup set (How <X> Class
 Works, the safety/trust agreement in subject-appropriate form, What to
@@ -1015,10 +1023,14 @@ the linter.
    `codeRunner: true` or the reverse, a near-miss fence (```` ```Python run ````,
    `run,stdin`, a fence nested after two list markers), an unknown flag, a run
    block that does not parse, uses a name it never binds, imports outside the
-   standard library, calls `breakpoint()` or reads a file it never writes
-   (unless guarded by `except FileNotFoundError`; a file name through a
-   module-level constant counts) — and the payload against its judgement
-   table, if it has one.
+   standard library, calls `breakpoint()`, reads `sys.stdin` without the
+   `stdin` flag, or reads a file it never writes (`open`, `open(file=…)`,
+   `Path(…).read_text()`; unless guarded by `except FileNotFoundError`; a
+   file name through a module-level constant, or the same variable the write
+   used, counts) — and the payload against its judgement table, if it has
+   one. A run block in a language it does not judge (```` ```swift run ````)
+   is left alone. Both scripts run under Python 3.9 or later. Nothing runs
+   them automatically — this step is the only place they are run.
 
    If you touched the Example Course (`support/example_course/`, EXC2O),
    also run `lint_skeletons.py` with no family named: EXC2O has no
@@ -1062,7 +1074,8 @@ the linter.
    per page against the judgement table (and its `data-runner-flags`
    readonly), check `static/pyodide` is in the site, that the build's
    `carried` line for Python (`page_features.ENGINE_WORDS`) names the number
-   of pages the table expects, and that no line starts `plantoir: error:`; and    `grep -rl katex-error <public dir>` finds NOTHING — a katex-error span
+   of pages the table expects, and that no line starts `plantoir: error:`; and
+   `grep -rl katex-error <public dir>` finds NOTHING — a katex-error span
    means an equation shattered at a markdown seam (see the math rules in
    Phase 5). For a payload with heavy notation, render every `$…$` span through
    the build's own KaTeX with `throwOnError: true`. **The module is not on
