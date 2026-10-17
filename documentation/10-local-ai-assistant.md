@@ -8165,7 +8165,9 @@ plan code, or every attempt is refused.
   terminal; the skip rule and the sheet's listing still hold then. The sheet
   sorts files by the undo's own verdict (`AssistUndoVerdict.of`, #555): a
   page already as it was before is in neither list, so the sheet's count and
-  the finished undo's agree.
+  the finished undo's agree. When EVERY page is already back (nothing to put
+  back, nothing left alone) the sheet and its result say
+  `startOfYear.wording.undoAllAlreadyBack` instead of "0 pages".
 - **The assistant window's** "undo that" (`AssistChangeHistory`) never holds
   this change and cannot take it back.
 

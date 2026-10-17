@@ -281,6 +281,7 @@ final class StartOfYearTests: XCTestCase {
             "undoTitle": StartOfYearWording.undoTitle(course: "{course}", section: "{section}"),
             "undoIntro": StartOfYearWording.undoIntro(pages: "{pages}"),
             "undoSkipped": StartOfYearWording.undoSkipped(pages: "{pages}"),
+            "undoAllAlreadyBack": StartOfYearWording.undoAllAlreadyBack,
             "undoButton": StartOfYearWording.undoButton,
             "undone": StartOfYearWording.undone(pages: "{pages}"),
             "undoLeftSome": StartOfYearWording.undoLeftSome(pages: "{pages}", backup: "{backup}"),
