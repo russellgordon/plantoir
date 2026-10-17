@@ -127,6 +127,11 @@ echo "📦 Checking Sparkle (the updater)..."
 # (release/sign-helpers.sh), which writes their MANIFEST again.
 echo "📦 Checking the website builder's helper programs..."
 ./Vendor/fetch-helpers.sh
+# Obsidian's add-ons for diagrams and graphs (#495): project.yml carries
+# Vendor/obsidian-addons as a resource folder, so it must be in place before
+# step 2 generates the project. JavaScript and CSS only — nothing to sign.
+echo "📦 Checking Obsidian's add-ons for diagrams and graphs..."
+./Vendor/fetch-obsidian-addons.sh
 
 # ---- 2. Generate Xcode Project -----------------------------------------------
 echo ""

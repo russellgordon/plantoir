@@ -370,6 +370,13 @@ else
   cat /tmp/verify_deploy_cloudflare_project_test.log
 fi
 
+if (cd scripts && python3 test_backup_leaves_plantoir_addons.py) >/tmp/verify_backup_addons_test.log 2>&1; then
+  pass "the setup wizard's backup leaves Plantoir's Obsidian add-ons out and keeps the teacher's own (scripts/test_backup_leaves_plantoir_addons.py, #495)"
+else
+  fail "the setup wizard's backup leaves Plantoir's Obsidian add-ons out and keeps the teacher's own (scripts/test_backup_leaves_plantoir_addons.py, #495)"
+  cat /tmp/verify_backup_addons_test.log
+fi
+
 if (cd scripts && python3 test_reference_course.py) >/tmp/verify_reference_course_test.log 2>&1; then
   pass "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
 else

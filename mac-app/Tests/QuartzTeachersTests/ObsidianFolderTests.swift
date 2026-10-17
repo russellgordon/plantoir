@@ -42,7 +42,9 @@ final class ObsidianFolderTests: XCTestCase {
                 callers.append(file.lastPathComponent + " x" + String(count))
             }
         }
-        XCTAssertEqual(callers, ["OpenInObsidianRoute.swift x2"], "Open in Obsidian goes through WorkspaceModel.openInObsidian from every route")
+        // ONE since #495: the route's own `ObsidianOpening.open`, which every
+        // open — the note's included — goes through, so a test can replace it.
+        XCTAssertEqual(callers, ["OpenInObsidianRoute.swift x1"], "Open in Obsidian goes through WorkspaceModel.openInObsidian from every route")
         let detail: String = try String(
             contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Section/SectionDetailView.swift"), encoding: .utf8
         )
