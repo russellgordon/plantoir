@@ -140,7 +140,6 @@
       "alt": "A Python program on a class website's Spot the Bug page, changed so its loop starts at the first name, with Run, Stop and Reset under it, its output — Ali, Bea and Cy, one to a line — and the word Finished.",
       "caption": "Students change the program, press Run, and read what it prints underneath.",
       "windows": false,
-      "awaiting_capture": true,
       "expectText": [
         "Try this one",
         "Run",
@@ -162,7 +161,6 @@
       "alt": "A Python program on the Reading an Error Message page with abc typed in the input box under it, and the traceback it ended in: line 2, then ValueError: invalid literal for int() with base 10: 'abc'.",
       "caption": "Input typed ahead, one line for each input(). An error names the line in the editor, in Python's own words.",
       "windows": false,
-      "awaiting_capture": true,
       "expectText": [
         "A crash, in full",
         "Traceback",
@@ -181,14 +179,14 @@
         "scene": "code",
         "prepare": "code-swift.js"
       },
-      "alt": "A Swift program on a class website, highlighted and not editable, with Priya and 14 typed on two lines of its input box, and its output: a greeting that counts the letters in her name, her age next year, and how long until she can learn to drive.",
+      "alt": "A Swift program on a class website, highlighted and not editable, with Priya and 14 typed on two lines of its input box, and its output: each question with the answer read for it, then Hello, Priya! Next year you will be 15.",
       "caption": "Swift runs with the input students type. The code stays as you wrote it.",
       "windows": false,
-      "awaiting_capture": true,
       "expectText": [
         "Ask, then answer",
         "Run",
-        "Hello, Priya!",
+        "Priya",
+        "Next year you will be 15",
         "Finished"
       ]
     },
@@ -205,7 +203,6 @@
       "alt": "A self-check question on a class website asking what a three-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it.",
       "caption": "A question students check for themselves, with your explanation once they have.",
       "windows": false,
-      "awaiting_capture": true,
       "expectText": [
         "What does this program print?",
         "Check",
