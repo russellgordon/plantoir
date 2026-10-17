@@ -137,7 +137,16 @@ uncloaked window; FindWindowEx by `Windows.UI.Core.CoreWindow` and UI
 Automation's desktop root showed no notification. A screen crop is what the
 rule forbids. Its Windows alt (`windowsAlt`) says what the picture shows and
 that Windows tells the teacher with a notification once the deploy has run;
-the shared caption is true of both pictures, so it is not swapped. The gate judges every
+the shared caption is true of both pictures, so it is not swapped. Retaken
+2026-10-16 (#544, after #547 changed the sheet's words) at 2538 × 1589 px
+in the 200% session — served at 1700 × 1064 by `prepare()`'s cap — and read
+back by `windowshot --ocr` in both themes: "On battery, a PC goes to sleep
+sooner, so be sure to keep it awake until then." is there, and neither
+"plugged" nor "laptop" is. The first pass of both themes had a keyboard
+focus ring round the date box (the 1.4.4 trap, commit 7a91dceba: the run
+before it had pressed Escape in Edge, so the last input Windows saw was the
+keyboard); real mouse movement through `SendInput` just before each
+`app_scenes_windows.py --retake schedule:<theme>` cleared it. The gate judges every
 `-windows` picture (`corners.images_the_pages_show(..., include_windows=True)`
 in `test_native_corners.py` and in `build.py`'s `native_corners_refusal`);
 the interim list of three retaken figures, `WINDOWS_FIGURES_RETAKEN`, is gone.
@@ -298,17 +307,29 @@ the handout's 10-pixel footer, "Page 1 of 1", was not read at all at 1x on a
 1080-pixel screen). The windows are the mac's sizes in DIPs, and on a screen
 too small for them at its own scale (1920 × 1080 at 150%, 2026-10-15) Edge
 is told to draw at a smaller one (`hero_windows.fitted_scale`, 1.15 there)
-so the page keeps the mac's framing with fewer pixels — 1427 × 961 for the
-page, 736 × 962 for the handout, shown whole (`view=Fit`). First taken on an
-unlocked desktop on 2026-10-15. That is why they are soft beside the mac's
-2× pictures (#544), and **the console cannot fix it by drawing a window
-bigger than the screen**: measured 2026-10-16, an Edge `--app` window at
-`--force-device-scale-factor=2` asked for 680 × 880 DIPs, then
-`SetWindowPos` 1360 × 1760, kept its width and was clamped to 1106 px tall
-(the screen's 1080 plus the frame — Windows' maximum tracking size). A 2×
-retake needs a 3840 × 2160 session at 200%, where `fitted_scale` is 2.0
-for both framings; `prepare()`'s 1700-px cap would then have to be lifted
-for these pictures. When all three are taken
+so the page keeps the mac's framing with fewer pixels — which made the first
+pictures (1427 × 961 for the page, 736 × 962 for the handout) soft beside the
+mac's 2× ones (#544). **They are taken at 2× now, and need a session that
+can hold a 2× window**: retaken 2026-10-16 in a Remote Desktop session of
+3840 × 2034 at 200% (work area 3840 × 1938), where `fitted_scale` is 2.0 for
+both framings with no code change — **2560 × 1720** for
+`print-page-windows-light/-dark.png` and **1360 × 1760** for
+`print-handout-windows.png`, each exactly twice its DIP window, with
+`expectText` read back by OCR. The console cannot
+do it by drawing a window bigger than the screen: measured 2026-10-16, an
+Edge `--app` window at `--force-device-scale-factor=2` asked for 680 × 880
+DIPs, then `SetWindowPos` 1360 × 1760, kept its width and was clamped to
+1106 px tall (the screen's 1080 plus the frame — Windows' maximum tracking
+size). Two harness changes went with the retake: `images.prepare(path, None)`
+never scales (the print set passes `None`; the 1700-px cap would have cut the
+page back to the old density), and `hero_windows.place_visible` sizes the
+VISIBLE frame — `DWMWA_EXTENDED_FRAME_BOUNDS`, which windowshot photographs —
+rather than the window rectangle with Windows 11's invisible border round it
+(at the fitted 1.127 scale a window asked for 766 × 992 photographed at
+736 × 962), placing again at most twice and stopping the run if the frame is
+still not the size asked for. `website/test_build_data.py` →
+`test_the_windows_print_pictures_are_twice_their_window` pins the sizes.
+When all three are taken
 the run marks both shots `windows: true`; take them off
 `WINDOWS_PICTURE_OWED` in `website/test_build_data.py` in the same commit.
 The preview is stopped with `preview.ps1 MPM2D 1 --stop`; the folder and its

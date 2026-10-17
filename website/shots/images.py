@@ -59,16 +59,19 @@ def serve_as_captured(path: Path) -> Path:
     return path
 
 
-def prepare(path: Path, widest: int = WIDEST_WINDOW_PIXELS) -> Path:
+def prepare(path: Path, widest: int | None = WIDEST_WINDOW_PIXELS) -> Path:
     """Scale a capture down if it is oversized, then write PNG and WebP.
 
     For the PHONE picture and the Windows pictures only. A Mac window capture
-    goes through `serve_as_captured`, which never scales (#434).
+    goes through `serve_as_captured`, which never scales (#434). `widest=None`
+    never scales either: the Windows print pictures (#544) are taken at 2x to
+    stand beside the mac's 2x pictures, and the 1700 cap would cut a
+    2560-pixel page picture back to a density the mac's does not have.
     """
     with Image.open(path) as opened:
         image = opened.convert("RGBA")
 
-    if image.width > widest:
+    if widest is not None and image.width > widest:
         height = round(image.height * widest / image.width)
         image = image.resize((widest, height), Image.LANCZOS)
 
