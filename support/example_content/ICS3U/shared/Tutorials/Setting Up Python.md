@@ -80,7 +80,8 @@ python3 hello.py
 ## First program checklist
 
 Type this — do not paste it — into a file called `hello.py`, then run
-it:
+it. To try it here first, type your name and your hours of sleep on two
+lines of the input box under it, then press Run:
 
 ```python run
 name = input("What is your name? ")
@@ -88,7 +89,7 @@ hours = float(input("How many hours did you sleep last night? "))
 print(f"Thanks, {name} — that is {hours * 60:.0f} minutes.")
 ```
 
-- [ ] It asks both questions, waits for you, and answers with a number
+- [ ] It asks both questions and answers with a number
 - [ ] Change the wording, run again, and see your change appear
 - [ ] Answer the second question with `eight` instead of `8`, and read
       the crash: Python reports
