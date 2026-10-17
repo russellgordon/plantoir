@@ -23,8 +23,9 @@ namespace Plantoir.UiTests;
 /// pixels is fine. Reported in the test output and in
 /// <c>%TEMP%\plantoir-214-measurement.txt</c>, and asserted against the
 /// window's own height — a notice taller than its window is the bug.
-/// UNPROVEN as of 2026-10-01: written while no agent could drive the desktop;
-/// compiled, never run.</para>
+/// Written 2026-10-01 while no agent could drive the desktop; both methods
+/// have run since — 3 of 3 with CopyAPageDialogUiTests on 2026-10-16 (#542,
+/// i5-8365U, 1920 × 1080 at 150%), "window 900x737; notice 631x157".</para>
 /// </remarks>
 [Collection("drives the real app")]
 public class PanelHeightUnderSqueezeUiTests
