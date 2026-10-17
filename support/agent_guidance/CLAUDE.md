@@ -16,3 +16,9 @@ matches the task before writing:
   "drawn": the `plantoir-math-graphs` skill
   (`.claude/skills/plantoir-math-graphs/SKILL.md`) - which fence to write,
   complete patterns to paste, and what cannot be done (no sliders).
+- **Code students run** - "make this example runnable", a Python program
+  students edit and run in the browser, a program that reads input, "try it
+  yourself": the `plantoir-runnable-code` skill
+  (`.claude/skills/plantoir-runnable-code/SKILL.md`) - how to opt the page
+  in, the ` ```python run ` block and its flags, input, and what the
+  standard library can and cannot do.
