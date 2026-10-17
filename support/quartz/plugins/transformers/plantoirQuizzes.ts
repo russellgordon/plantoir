@@ -63,7 +63,13 @@ import {
 } from "./quizRules"
 
 type QuizWords = { words: Record<string, string>; problems: Record<string, string> }
-type PageFindings = { quizzes: number; problems: number[]; nested: number; nestedProblems: number[] }
+type PageFindings = {
+  quizzes: number
+  problems: number[]
+  nested: number
+  nestedProblems: number[]
+  lines?: Array<number | null>
+}
 type QuizPages = { examined: string[]; pages: Record<string, PageFindings> }
 
 const WORDS_FILE = join("quartz", "plantoir_quiz.json")
@@ -543,18 +549,27 @@ export const PlantoirQuizzes: QuartzTransformerPlugin = () => ({
           }
           const said = known?.problems ?? {}
           const found = checked.pages[page] ?? { quizzes: 0, problems: [], nested: 0, nestedProblems: [] }
+          // Named by the question's place and, where the folder check knows
+          // it, its line in the teacher's file - never by a count.
+          const named = (place: number) => {
+            const line = found.lines?.[place - 1]
+            return typeof line === "number" ? `quiz ${place}, line ${line}` : `quiz ${place}`
+          }
           if (found.quizzes !== n || found.nested !== nested) {
-            sayDisagreement(page, `${n} quizzes`, said)
+            // No place can be trusted when the counts differ: name the first
+            // quiz either side found.
+            const line = found.lines?.find((value) => typeof value === "number")
+            sayDisagreement(page, typeof line === "number" ? `the quiz at line ${line}` : "quiz 1", said)
             return
           }
           for (const result of results) {
             const reported = found.problems.includes(result.n)
             if (reported !== (result.problem !== null)) {
-              sayDisagreement(page, `quiz ${result.n}`, said)
+              sayDisagreement(page, named(result.n), said)
             }
           }
           if (found.nestedProblems.length !== nested) {
-            sayDisagreement(page, `${nested} quizzes inside a list or callout`, said)
+            sayDisagreement(page, "a quiz inside a list or another callout", said)
           }
         }
       },
@@ -743,6 +758,10 @@ const MAX_DESCRIPTION_LENGTH = 300
 function withoutAnswers(node: any): any {
   if (node === null || typeof node !== "object") {
     return node
+  }
+  if (node.type === "element" && node.tagName === "input" && node.properties?.dataBlank !== undefined) {
+    // A blank reads as "…" ("Fill … and …."), not as nothing.
+    return { type: "text", value: "…" }
   }
   if (node.type === "element") {
     const classes = classesOf(node)

@@ -425,6 +425,19 @@ async function connect(chunk) {
       const hostSaved = await evaluate("JSON.parse(localStorage.getItem('plantoir:quiz:/:Quiz-Host') || '{}')")
       expect("a transcluded quiz is scored under its own page's name", hostSaved?.quizzes?.["Quiz-Source#1"]?.firstTry === true && !("Quiz-Host#1" in (hostSaved?.quizzes ?? {})), hostSaved)
 
+      // 7b. One quiz shown twice is one question: ids of its own, and counted
+      // once in the score (the implementation review's nit 1).
+      await open(base + "/Quiz-Twice.html")
+      await evaluate("localStorage.removeItem('plantoir:quiz:/:Quiz-Twice')")
+      await open(base + "/Quiz-Twice.html")
+      await evaluate("document.querySelectorAll('.plantoir-quiz')[0].querySelector('.plantoir-quiz-choice[data-choice=\"0\"] input').checked = true; document.querySelectorAll('.plantoir-quiz')[0].querySelector('.plantoir-quiz-check').click()")
+      const twice = await evaluate(`(() => {
+        const ids = Array.from(document.querySelectorAll("[id]")).map((element) => element.id)
+        return { copies: document.querySelectorAll(".plantoir-quiz").length, duplicateIds: ids.length - new Set(ids).size,
+                 score: document.querySelector(".plantoir-quiz-score-line")?.textContent }
+      })()`)
+      expect("a quiz shown twice has ids of its own and is counted once", twice.copies === 2 && twice.duplicateIds === 0 && twice.score === said("score", { right: 1, total: 1 }), twice)
+
       // 5b. Storage refused.
       await send("Page.addScriptToEvaluateOnNewDocument", {
         source: "Object.defineProperty(window, 'localStorage', { get() { throw new Error('refused') } })",

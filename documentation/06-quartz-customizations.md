@@ -1666,11 +1666,15 @@ Format and syntax are #511's (decided 2026-10-11, not reopened); the eight
 rulings of 2026-10-17 (Q1-Q8) and the plan review's ten should-fixes are in
 the closing comment of #563.
 
-**Compatibility.** A page with no `[!quiz]` outside fenced code comes out
-exactly as before: the text hook returns it untouched (checked in Node for
-every `untouched` case, the one that only SHOWS quiz syntax in a fence
-among them, review S2), and the two later stages act only on a page whose
-text holds `[!quiz`. `[!question]`, and `[!answer]` and `[!explain]`
+**Compatibility.** A page with no `[!quiz]` outside fenced or indented
+code comes out exactly as before: the text hook returns it untouched
+(checked in Node for every `untouched` case - quiz syntax shown in a fence
+(review S2) and in indented code at the page's level, inside a callout and
+under a list item (the implementation review's S1: a `>` four or more
+columns past its container's content opens nothing, in both readers) - and
+by verify 6k on a planted `Quiz Code Shown`, which is also named in no
+folder problem), and the two later stages act only on a page whose text
+holds `[!quiz`. `[!question]`, and `[!answer]` and `[!explain]`
 outside a quiz, are untouched and stay searchable. The script and styles are
 in every site's shared `postscript.js` and `index.css` (ruling Q2; every
 rule under a `plantoir-quiz` class, the script returns at once with no
@@ -1722,7 +1726,7 @@ other five, which differ between two builds of the same image).
   description, og:description, the RSS item and contentIndex.json). The
   summary is recomputed only when the page names no description of its
   own, with Description's own rules copied (150 / 300 characters, its link
-  rule).
+  rule); a blank reads as `…` in both ("Fill … and …." - pinned by 6k).
 
 ### J3. The markup, and what a screen reader hears
 
@@ -1776,7 +1780,9 @@ The score (ruling Q4, right on the FIRST Check): `localStorage`
 {"<source slug>#<n>": {hash, firstTry}}}`, keyed by the quiz's SOURCE page
 so a transcluded quiz keeps its own entry (review S5); a hash that no
 longer matches is ignored; every call in try/catch. Shown after the page's
-last quiz once one is answered, with Start again.
+last quiz once one is answered, with Start again; a quiz shown twice on a
+page (two transclusions) counts once, and each copy's ids are its own
+(measured on the planted `Quiz Twice`).
 
 **Transclusion (review S5), measured rather than limited:** Quartz copies
 the source page's finished HTML into the host, so a transcluded quiz keeps

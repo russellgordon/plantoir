@@ -1914,7 +1914,10 @@ runnable-code count (`_check_quizzes`):
    at any quote depth, then what `quizCallouts.rule` says a top-level quiz
    is. Inside one: the first list holding a task box is the choices (a box
    needs words after it on its line - measured: `- [ ]` alone is plain text
-   to the site's parser); a nested `> [!answer]` or `> [!explain]` at the
+   to the site's parser; a `>` four or more columns past its container's
+   content is indented code, and an HTML block swallows what follows it to
+   the next empty line, as the site reads both); a nested `> [!answer]` or
+   `> [!explain]` at the
    quiz's own level is that callout; the rest is the question, whose
    paragraphs (and title) are where blanks are counted. `verdict` - the
    mirror of quizRules.ts's, with the problems in `recognise.order` - says
@@ -1952,8 +1955,10 @@ runnable-code count (`_check_quizzes`):
 **The safety net** (`quizCallouts.safetyNet`, review S4). The site renders
 what IT read; for a page this check examined and that is published, it
 compares counts and, quiz by quiz, whether each side found a problem, and
-says `plantoir: error: <page>: quiz <n>: <readDifferently>` where they
-differ - quiet otherwise. It relies on `build --concurrency 1` (the line
+says `plantoir: error: <page>: quiz <n>, line <L>: <readDifferently>`
+where they differ (the line from the pages file's `lines`; when the counts
+differ, "the quiz at line L" of the first quiz the check found) - quiet
+otherwise. It relies on `build --concurrency 1` (the line
 reaches the build's output from the one parsing thread, review N1).
 Measured: a `- [ ] ` choice with nothing after the box was read as a box
 here and as text by the site, and the net said so on its first build; the
@@ -1967,7 +1972,7 @@ site's, the same rules), and its folder problem and any safety-net line
 come with the next Preview.
 
 **Measured** (2026-10-17, M4 Pro, macOS 26.6, the branch's image): the
-verify fixture's 34 quizzes (every recognise case on one page) were read
+verify fixture's 35 quizzes (every recognise case on one page) were read
 alike by both sides - every kind and every problem, with no safety-net
 line; EXC2O built with the pre-branch image and with this branch is 297 of
 302 pages and feeds identical once Quartz's random list ids and build
