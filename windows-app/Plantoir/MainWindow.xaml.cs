@@ -55,13 +55,15 @@ public sealed partial class MainWindow : Window
         // 1920 work area, 793 epx at 150%, under the 900 epx minimum: the
         // section title cut to "MP…" until the teacher touched the edge.
         //
-        // A remembered frame is MOVED first, so the scale and the work area are
-        // read from the display it reopens on, not from the primary one: a
-        // frame kept in pixels on a 150% screen is narrower in epx on a 225%
-        // one. A first run sizes for the primary work area and then centres.
+        // The window is MOVED first, so the scale and the work area are read
+        // from the display it will be sized for: a remembered frame to where it
+        // was (kept in pixels, a frame from a 150% screen is narrower in epx on
+        // a 225% one), a first run to the primary work area it is sized from
+        // (WinUI may have created the window on another monitor), and centred
+        // there after the Resize.
         bool remembered = frame is { X: > -10000, Y: > -10000 };
-        if (remembered)
-            AppWindow.Move(new PointInt32((int)frame!.X, (int)frame.Y));
+        AppWindow.Move(remembered ? new PointInt32((int)frame!.X, (int)frame.Y)
+                                  : new PointInt32(workArea.X, workArea.Y));
         var (minWidth, minHeight) = ApplyMinimumSize(ScaleOfDisplay());
         width = Math.Max(width, minWidth);
         height = Math.Max(height, minHeight);
@@ -571,11 +573,11 @@ public sealed partial class MainWindow : Window
 
     /// <summary>Re-applies the minimum for this scale and grows a window
     /// that is below it — unless it is maximised, where the display decides
-    /// the size.</summary>
+    /// the size, or minimised, where a Resize would act on an icon.</summary>
     private void EnforceMinimumSize(double scale)
     {
         var (minWidth, minHeight) = ApplyMinimumSize(scale);
-        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized }) return;
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized or OverlappedPresenterState.Minimized }) return;
         var size = AppWindow.Size;
         if (size.Width < minWidth || size.Height < minHeight)
             AppWindow.Resize(new SizeInt32(Math.Max(size.Width, minWidth), Math.Max(size.Height, minHeight)));

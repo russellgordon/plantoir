@@ -6483,12 +6483,14 @@ loads (from `XamlRoot.RasterizationScale`) and again on `XamlRoot.Changed`
 when the scale changes (a monitor move, a display-scale change),
 `EnforceMinimumSize` re-applies the minimum AND grows a window left below it,
 unless it is maximised — the minimum alone does not grow one. **What holds
-what:** the first-run clamp is held by the UiFact below, on this one display
+what:** the first-run clamp is held by `WindowMinimumUiTests` (named above), on this one display
 at one scale; the remembered-frame order, the re-apply and the grow on a
 scale change (the multi-monitor cases) are held by reading the code, since
-there is one screen here and no test changes the display scale. **At 225–250% the work-area clamp can still cut
+there is one screen here and no test changes the display scale. **On a 1920-wide screen at 225–250% the work-area clamp can still cut
 the toolbar**: the window there is narrower than 900 epx (1920 / 2.25 = 853
-epx), which is below the width the long title needs. After the change the
+epx), which is below the width the long title needs — and so is any screen
+whose work area is under 900 epx wide, a 1280 × 800 laptop at 150% (853 epx)
+among them. After the change the
 same UiFact read 1350 × 900 px (900 × 600 epx) at launch and at the
 narrowest; maximised (1295 × 687 epx) the buttons were Preview 185, Deploy 89
 and Browser 36 epx wide, and at the 900 epx minimum the same, Browser 15 epx
@@ -6498,8 +6500,9 @@ inside the right edge.
 filed — on the reading that the minimum was in pixels. The presenter already
 scales it, so that would have asked for 1350 epx (2025 px) at 150%. And #542's
 option 2, toolbar buttons that shrink to their glyphs: the mac does not have
-it; at 200% and below nothing needs it, and at 225% and above it is the
-remaining option, not taken. The UiFact's
+it; on a 1920-wide screen at 200% and below nothing needs it, and where the
+work area is under 900 epx (225% and above there, or a smaller screen) it is
+the remaining option, not taken. The UiFact's
 right-edge check is 8 px × scale inside UI Automation's window rectangle,
 because that rectangle includes Windows 11's invisible resize border (7 px a
 side at 150%: `GetWindowRect` 1350 against the visible frame's 1332).
