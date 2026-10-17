@@ -498,6 +498,18 @@ else
   cat /tmp/verify_page_features_test.log
 fi
 
+# Live input (#583): which built pages a publish isolates (a block that can
+# ask, and nothing from another website the headers would break), each
+# host's MEASURED spelling of a page's path, the marked _headers block -
+# replaced, never appended, beside the badge rule - Cloudflare's 100 rules,
+# and the note lines. Reads the contract; stdlib only.
+if (cd scripts && python3 test_isolation_headers.py) >/tmp/verify_isolation_headers_test.log 2>&1; then
+  pass "live input: which pages a publish lets ask for input as the program runs, each host's spelling of their paths, the _headers block replaced beside the badge rule, Cloudflare's 100 rules and the note lines (scripts/test_isolation_headers.py, #583)"
+else
+  fail "live input: which pages a publish lets ask for input as the program runs, each host's spelling of their paths, the _headers block replaced beside the badge rule, Cloudflare's 100 rules and the note lines (scripts/test_isolation_headers.py, #583)"
+  cat /tmp/verify_isolation_headers_test.log
+fi
+
 # Runnable Swift (#493): the key a block is cached by, the toolchain id, what
 # the launcher's plan writes and what the build's prepare gives the site and
 # says, and that the Swift image's recipe holds every pin and flag the
@@ -1499,6 +1511,9 @@ check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
 # Self-check quizzes (#563): the folder check. The site's transformer, script
 # and styles are in support/quartz (the loop below).
 check_baked scripts/quizzes.py            /opt/scripts/quizzes.py
+# Live input (#583): which pages a publish isolates. The preview's half is in
+# support/quartz (the loop below).
+check_baked scripts/isolation_headers.py  /opt/scripts/isolation_headers.py
 while IFS= read -r addition; do
   check_baked "$addition" "/opt/$addition"
 done < <(find support/quartz support/agent_guidance support/figures support/gated support/swift -type f ! -name '.*' | sort)
@@ -1804,6 +1819,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
         "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
+        "$HIT_COURSE/Live Plain Link.md" "$HIT_COURSE/Live Framed.md" "$HIT_COURSE/Live Autorun.md" "$HIT_COURSE/Live Box.md" \
         "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
         "$HIT_COURSE/Curriculum/Z1. Planted 100% Overall.md" "$HIT_COURSE/Curriculum/Z1.1.md" \
         "$HIT_COURSE/Quiz Fixture.md" "$HIT_COURSE/Quiz CRLF.md" "$HIT_COURSE/Quiz Lookalikes.md" \
@@ -2551,10 +2567,29 @@ playground += "```swift run\n#if canImport(WASILibc)\nimport WASILibc\n#endif\np
 playground += "Some words before the block that does not compile.\n\n"
 playground += "```swift run\nlet name = readLine() ?? \"\"\nprint(nmae)\n```\n\n"
 playground += "```swift run stdin\n" + (gate / "05-arrays.swift").read_text(encoding="utf-8") + "```\n"
+# #583: a prompt on the answer's line (terminator: ""), for live input.
+playground += "\n```swift run\n" + (gate / "13-prompt.swift").read_text(encoding="utf-8") + "```\n"
 (course / "Swift Playground.md").write_text(playground, encoding="utf-8")
 (course / "Swift Hidden.md").write_text(
     "---\ntitle: Swift Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-swift-hidden-7f3a).\n\n"
     "```swift run\nprint(\"hidden swift\")\n```\n", encoding="utf-8")
+# #583: live input. Live Plain Link: a plain page linking to the Runner
+# Playground (the site's own link across the isolation line, one way); Live
+# Autorun: two autoruns, the first asks, then a link to Live Framed (across
+# the line the other way), a plain page with a frame from this site, which
+# must load; Live Box: code that reads input beside a frame - never isolated,
+# so the box and the build's note line.
+(course / "Live Plain Link.md").write_text(
+    "---\ntitle: Live Plain Link\n---\nA plain page (plantoir-live-plain-7f3a) that links to [[Runner Playground]].\n", encoding="utf-8")
+(course / "Live Framed.md").write_text(
+    "---\ntitle: Live Framed\n---\nA plain page with a frame from this site (plantoir-live-framed-7f3a).\n\n"
+    "<iframe class=\"plantoir-live-frame\" src=\"Help-Sessions\" title=\"Help Sessions\"></iframe>\n", encoding="utf-8")
+(course / "Live Autorun.md").write_text(
+    "---\ntitle: Live Autorun\ncodeRunner: true\n---\nTwo blocks that run by themselves, and the first asks (plantoir-live-autorun-7f3a). Then [[Live Framed]].\n\n"
+    "```python run autorun\nname = input(\"Name? \")\nprint(\"Hi\", name)\n```\n\n```python run autorun\nprint(\"second\")\n```\n", encoding="utf-8")
+(course / "Live Box.md").write_text(
+    "---\ntitle: Live Box\ncodeRunner: true\n---\nCode that reads input beside a frame (plantoir-live-box-7f3a).\n\n"
+    "<iframe src=\"Help-Sessions\" title=\"Help Sessions\"></iframe>\n\n```python run\nprint(input(\"Name? \"))\n```\n", encoding="utf-8")
 RUNNERPLANTS
 
 # ---- #505: an overall expectation's backlinks, planted for the same build ----
@@ -3114,8 +3149,8 @@ if re.search(r"plantoir: error: [^\n]*Runner", said):
 # one more page for each engine.
 if not re.search(r"This site carries what runs Swift for 3 pages\.", said):
     problems.append("the build did not say the site carries Swift for the three pages students can see with Swift (Runner Fixture, Swift Playground, Quiz Playground)")
-if not re.search(r"This site carries what runs Python for 5 pages\.", said):
-    problems.append("the build did not say the site carries Python for the five pages students can see (not the hidden one; Quiz Playground is the fifth)")
+if not re.search(r"This site carries what runs Python for 7 pages\.", said):
+    problems.append("the build did not say the site carries Python for the seven pages students can see (not the hidden one; Quiz Playground is the fifth, #583's Live Autorun and Live Box the sixth and seventh)")
 engine = public / "static" / "pyodide"
 carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
 if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
@@ -3195,8 +3230,8 @@ def attribute(text, name):
     return html.unescape(found.group(1)) if found else None
 source = (course / "Swift Playground.md").read_text(encoding="utf-8")
 bodies = [block["body"] for block in swift_blocks.swift_fences(source, True)]
-if len(wrappers) != 6 or len(bodies) != 6:
-    problems.append(f"Swift Playground has {len(wrappers)} runnable blocks on the site and {len(bodies)} in the page, not 6")
+if len(wrappers) != 7 or len(bodies) != 7:
+    problems.append(f"Swift Playground has {len(wrappers)} runnable blocks on the site and {len(bodies)} in the page, not 7 (#583 added a prompt on the answer's line)")
 for index, (attributes, body) in enumerate(zip(wrappers, bodies), start=1):
     key = swift_blocks.key_of(body)
     if attribute(attributes, "data-runner-language") != "swift" or attribute(attributes, "data-runner-id") != f"Swift-Playground-swift-{index}":
@@ -3253,6 +3288,71 @@ then
   pass "runnable Swift: each block names its program (or compileError), static/swift-wasm holds exactly the programs visible pages use, static/swift is the overlay, and the block that does not compile is named at its line in the teacher's file with the compiler's first error, as a folder problem too (#493)"
 else
   fail "runnable Swift: one of the checks above failed (#493)"
+fi
+
+# ---- 6j, continued: live input (#583), as the build left it ----
+# Which built pages a host would isolate, read from the REAL built HTML (with
+# Quartz's own head) by both halves of the rule: the publish's
+# (isolation_headers.py) and the preview's (support/quartz/cli/
+# plantoirIsolation.mjs, the headers the preview's server would send). The
+# Live Box page (code that reads input beside a frame) keeps the box and is
+# named on a note line; the router's patch reached the site's script.
+if python3 - "$SITE_PUBLIC" <<'LIVEPY'
+import json, subprocess, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+sys.path.insert(0, "scripts")
+import contracts, toolchain_paths
+toolchain_paths.CONTRACTS_DIR = Path("contracts")
+contracts.reset_cache()
+import isolation_headers
+public = Path(sys.argv[1])
+problems = []
+verdicts = {item["file"]: item for item in isolation_headers.scan_site(public)}
+want = {"Runner-Playground.html": ("live", False), "Live-Autorun.html": ("live", True), "Swift-Playground.html": ("live", True),
+        "Discussions/Runner-Printable.html": ("live", False), "Live-Box.html": ("frame", True)}
+for name, (verdict, reads) in want.items():
+    got = verdicts.get(name)
+    if got is None or got["verdict"] != verdict or got["readsInput"] != reads:
+        problems.append(f"{name}: the publish's rule says {got}, not {verdict} (reads input: {reads})")
+for name in ("Help-Sessions.html", "Live-Framed.html", "Live-Plain-Link.html", "Runner-Not-Opted.html"):
+    if name in verdicts:
+        problems.append(f"{name} has no code that can ask, yet the publish's rule says {verdicts[name]}")
+outcome = {"live": [], "notLive": [verdicts["Live-Box.html"]] if "Live-Box.html" in verdicts else [], "capped": []}
+notes = isolation_headers.note_lines(public, outcome)
+if notes != [f"plantoir: note: Live Box.md: " + contracts.section("shared-rules", "codeRunnerBlocks", "words")["notLiveBecause"].replace("{what}", contracts.section("shared-rules", "codeRunnerBlocks", "words")["notLiveFrame"])]:
+    problems.append(f"the note line for Live Box is {notes}")
+script = """
+import { headersFor, PAGE_HEADERS, ENGINE_HEADERS } from "./support/quartz/cli/plantoirIsolation.mjs"
+const pub = process.argv[1]
+const cases = [["/Runner-Playground", PAGE_HEADERS], ["/Live-Autorun", PAGE_HEADERS], ["/Swift-Playground", PAGE_HEADERS],
+  ["/Live-Box", {}], ["/Live-Framed", {}], ["/Help-Sessions", {}], ["/", {}],
+  ["/static/pyodide/pyodide.mjs", ENGINE_HEADERS], ["/static/swift/plantoir-swift-worker.js", ENGINE_HEADERS], ["/index.css", {}]]
+const wrong = []
+for (const [address, want] of cases) {
+  const got = headersFor(pub, address)
+  if (JSON.stringify(got) !== JSON.stringify(want)) wrong.push(address + " " + JSON.stringify(got))
+}
+console.log(JSON.stringify(wrong))
+"""
+said = subprocess.run(["node", "--input-type=module", "-e", script, str(public)], capture_output=True, text=True)
+try:
+    wrong = json.loads(said.stdout.strip().splitlines()[-1])
+except Exception:
+    wrong = [f"the preview's rule did not run: {said.stderr.strip()[:300]}"]
+for item in wrong:
+    problems.append(f"the preview's headers: {item}")
+postscript = (public / "postscript.js").read_text(encoding="utf-8", errors="ignore") if (public / "postscript.js").is_file() else ""
+if "cross-origin-embedder-policy" not in postscript:
+    problems.append("the site's script does not carry the router's isolation check (PLANTOIR-ISOLATION-NAV)")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+LIVEPY
+then
+  pass "live input: the publish's rule and the preview's agree on the built pages - code that can ask is isolated (Python, Swift, a printable page), a page with a frame keeps the box and is named on a note line, plain pages get nothing, the engine folders get their own header - and the site's router carries the isolation check (#583)"
+else
+  fail "live input: the built pages are not isolated as codeRunnerBlocks.isolation says (#583)"
 fi
 
 # ---- 6k. Self-check quizzes (#563), as the build left them ----

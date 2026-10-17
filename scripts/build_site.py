@@ -1638,6 +1638,63 @@ def _wire_quizzes_transformer(config_ts: Path) -> None:
     config_ts.write_text(text, encoding="utf-8")
 
 
+# Live input (#583): the two edits to Quartz itself that cross-origin
+# isolation needs (contracts/shared-rules.json -> codeRunnerBlocks.isolation).
+ISOLATION_SERVE_MARKER = "PLANTOIR-ISOLATION-SERVE"
+ISOLATION_NAV_MARKER = "PLANTOIR-ISOLATION-NAV"
+
+_ISOLATION_SERVE_ANCHOR = "        const release = await buildMutex.acquire()\n"
+_ISOLATION_SERVE_LINE = (
+    "        /* " + ISOLATION_SERVE_MARKER + " (#583): the headers that isolate a page whose code asks for input "
+    "(quartz/cli/plantoirIsolation.mjs, fails open) */ try { const isolation = await import(\"./plantoirIsolation.mjs\"); "
+    "for (const [name, value] of Object.entries(isolation.headersFor(argv.output, req.url ?? \"/\"))) res.setHeader(name, value) } "
+    "catch (_plantoirIsolationError) {}\n"
+)
+
+
+def _wire_isolation_serve(handlers_js: Path) -> None:
+    """The preview's server sends the isolation headers (#583,
+    isolation.hosts.preview): one line in Quartz's serve(), after it takes
+    the build's lock, asks quartz/cli/plantoirIsolation.mjs which headers the
+    file gets - so a teacher previews what students get on a host. Fails
+    open: the import or the rule throwing serves the file as before."""
+    text = handlers_js.read_text(encoding="utf-8")
+    if ISOLATION_SERVE_MARKER in text:
+        return
+    if text.count(_ISOLATION_SERVE_ANCHOR) != 1:
+        print("⚠️ Could not let the preview ask for input as code runs: the preview's server has changed shape.")
+        return
+    at = text.index(_ISOLATION_SERVE_ANCHOR) + len(_ISOLATION_SERVE_ANCHOR)
+    handlers_js.write_text(text[:at] + _ISOLATION_SERVE_LINE + text[at:], encoding="utf-8")
+
+
+_ISOLATION_NAV_ANCHOR = "  const contents = await fetchCanonical(url)\n    .then((res) => {\n"
+_ISOLATION_NAV_LINES = (
+    "      // " + ISOLATION_NAV_MARKER + " (#583, codeRunnerBlocks.isolation.spa): a document's isolation is\n"
+    "      // fixed when it is made, so a page whose headers would isolate it, reached from one\n"
+    "      // that is not (or the other way round), is loaded whole rather than morphed in.\n"
+    "      const wantsIsolation = (res.headers.get(\"cross-origin-embedder-policy\") ?? \"\").toLowerCase().includes(\"require-corp\")\n"
+    "      if (wantsIsolation !== (self.crossOriginIsolated === true)) {\n"
+    "        window.location.assign(url)\n"
+    "        return\n"
+    "      }\n"
+)
+
+
+def _wire_isolation_nav(spa_ts: Path) -> None:
+    """Quartz's router loads a page whole when it crosses the isolation line
+    (#583, isolation.spa): checked on the page it fetched, before it morphs
+    the page in. Never fires where no host sends the headers."""
+    text = spa_ts.read_text(encoding="utf-8")
+    if ISOLATION_NAV_MARKER in text:
+        return
+    if text.count(_ISOLATION_NAV_ANCHOR) != 1:
+        print("⚠️ Could not let pages whose code asks for input open from the site's links: the page router has changed shape.")
+        return
+    at = text.index(_ISOLATION_NAV_ANCHOR) + len(_ISOLATION_NAV_ANCHOR)
+    spa_ts.write_text(text[:at] + _ISOLATION_NAV_LINES + text[at:], encoding="utf-8")
+
+
 def wire_quartz_additions(output_dir: Path) -> None:
     """The edits that connect support/quartz to Quartz: the Print button's two
     (#454), the figures transformer's two (#485 E1), the runnable code's
@@ -1645,7 +1702,10 @@ def wire_quartz_additions(output_dir: Path) -> None:
     in afterBody; its exports ride the two index edits), the self-check
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
-    button's component), and the folder pages' table of contents (#520).
+    button's component), the folder pages' table of contents (#520), and
+    live input's two (#583: the preview's server sends the isolation
+    headers, and Quartz's router loads a page whole across the isolation
+    line).
     Idempotent; an anchor that has moved warns and leaves the file alone.
 
     Deliberately NOT a third edit to mermaid.inline.ts (an event saying the
@@ -1661,6 +1721,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz.layout.ts", _wire_code_runner_component),
         (output_dir / "quartz.layout.ts", _wire_list_page_toc),
+        (output_dir / "quartz" / "cli" / "handlers.js", _wire_isolation_serve),
+        (output_dir / "quartz" / "components" / "scripts" / "spa.inline.ts", _wire_isolation_nav),
     ):
         try:
             wire(path)

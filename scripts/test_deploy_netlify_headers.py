@@ -320,6 +320,19 @@ class CloudflareIsNeverTouchedTests(unittest.TestCase):
             "must never execute this code at all."
         )
 
+    def test_the_live_input_block_is_written_after_any_rebuild_and_before_the_badge_rule(self):
+        # #583: the badge rule keeps the lines it did not write, so the live
+        # input block must already be in _headers when it runs; and a rebuild
+        # (ensure_base_url_and_rebuild) empties public/, so it must come after.
+        source = inspect.getsource(deploy.main)
+        rebuild_at = source.index("ensure_base_url_and_rebuild(section_dir")
+        live_at = source.index('isolation_headers.publish_headers(public_dir, "netlify")')
+        badge_call_at = source.index("write_netlify_headers_file(public_dir)")
+        manifest_at = source.index("create_delta_deploy(")
+        self.assertLess(rebuild_at, live_at)
+        self.assertLess(live_at, badge_call_at)
+        self.assertLess(badge_call_at, manifest_at)
+
     def test_publish_to_cloudflare_never_calls_the_headers_writer(self):
         # Belt and suspenders: the function Cloudflare's path actually calls
         # has no route to the badge-suppression code either.
