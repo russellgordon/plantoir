@@ -10,16 +10,16 @@ A few things to know before you read on:
 - **Plans change.** Something listed here may move to a later release, be
   reshaped, or be dropped after it is tried. Nothing on this page is a promise
   or a date.
-- **Your work is safe.** Every change below is designed so that a course you
-  have already built keeps working exactly as it does today. New features are
-  things you choose to use on a page; they do not change pages that don't
-  use them.
+- **Your work is safe.** A course you have already built keeps building and
+  publishing as it does today. Most new features are things you choose to use
+  on a page; a few improve every site (for example, checklists becoming
+  tickable), and those are named below.
 - **Mac first, Windows soon after.** New features usually arrive in the Mac
   app first and reach the Windows app in a following update. Where a feature
   is Mac-only for now, it says so below.
-- **Nothing about your students leaves their browser.** Features that track
-  progress (ticked checklists, quiz scores) keep it on the student's own
-  device. Plantoir is not, and will not become, a grade book.
+- **Student progress stays on the student's device.** Features that track
+  progress (ticked checklists, quiz scores) keep it in the student's own
+  browser and send it nowhere. Plantoir is not, and will not become, a grade book.
 
 Each item links to its GitHub issue, if you want the full detail. You don't
 need to read those to use Plantoir.
@@ -38,7 +38,8 @@ These are done and will arrive when 1.8 is released.
   ([#455](https://github.com/russellgordon/plantoir/issues/455),
   [#561](https://github.com/russellgordon/plantoir/issues/561))
 - **Swift programs too** (Mac only for now): read-only Swift programs that
-  students run with their own input.
+  students run with their own input. The first time you use one, the Mac
+  downloads a large one-time extra (about 1.3 GB).
   ([#493](https://github.com/russellgordon/plantoir/issues/493))
 - **Self-check quizzes.** Multiple choice, select all that apply, short
   answer and fill in the blank, written right in your notes. Students get
@@ -51,11 +52,14 @@ These are done and will arrive when 1.8 is released.
 - **Curriculum pages:** the overall expectations now show "When did we do
   this?" links, as the specific expectations already did.
   ([#505](https://github.com/russellgordon/plantoir/issues/505))
-- **Undo works properly after a partial undo.** Pressing Undo again now
-  finishes the job instead of getting stuck.
+- **Undoing a change Plantoir made for you works properly.** If only part
+  of a change could be undone, pressing Undo again now finishes the job
+  instead of getting stuck.
   ([#555](https://github.com/russellgordon/plantoir/issues/555))
 - **plantoir.app has a new Code page** showing runnable programs and quizzes.
   ([#562](https://github.com/russellgordon/plantoir/issues/562))
+- Behind the scenes: clearer records of when Plantoir opened and closed, to
+  help look into problems you report.
 
 ### Still to do for 1.8
 
@@ -78,8 +82,8 @@ These are done and will arrive when 1.8 is released.
 - **Windows fixes:**
   - a window can no longer reopen off screen after a monitor is unplugged
     ([#558](https://github.com/russellgordon/plantoir/issues/558));
-  - the first "Getting this folder ready" after an update should take seconds,
-    not two minutes
+  - why the first "Getting this folder ready" after an update can take about
+    two minutes is being looked into
     ([#559](https://github.com/russellgordon/plantoir/issues/559));
   - clubs see "meeting" rather than "class" when publishing
     ([#556](https://github.com/russellgordon/plantoir/issues/556));
@@ -93,14 +97,16 @@ These are done and will arrive when 1.8 is released.
 
 - **Open in Obsidian goes to the page you're looking at.** While previewing a
   page, Open in Obsidian will open the note that page came from, not just the
-  course. ([#518](https://github.com/russellgordon/plantoir/issues/518))
+  course — wherever it can tell which note that is. ([#518](https://github.com/russellgordon/plantoir/issues/518))
 - **Students can tick checklists.** A checklist on a class page becomes
   clickable, and each student's ticks are remembered in their own browser.
   Your notes are never changed.
   ([#519](https://github.com/russellgordon/plantoir/issues/519))
 - **A "My progress" page for each student**, built from those ticks: what
   they've checked off under each page's success criteria, grouped by class.
-  Only the student sees it.
+  It counts ticks under headings such as "Success criteria" (you can set
+  which headings in Course Settings). Only the student sees it, and this page
+  is added to every section automatically.
   ([#545](https://github.com/russellgordon/plantoir/issues/545))
 - **Reference courses, more flexible.** Add a ready-made course straight to
   your reference shelf — even for a course code you're already teaching —
@@ -139,17 +145,18 @@ These are done and will arrive when 1.8 is released.
     ([#517](https://github.com/russellgordon/plantoir/issues/517));
   - menu-bar commands such as Publish Pages… should always work the first
     time ([#523](https://github.com/russellgordon/plantoir/issues/523));
-  - the backups size in the sidebar no longer gets cut off
+  - the backups size in the sidebar should no longer get cut off
     ([#516](https://github.com/russellgordon/plantoir/issues/516)).
-- **Changing a scheduled publish time** without cancelling and scheduling
-  again — Windows already offers this; the Mac may get it too
+- **Changing a scheduled publish time — being decided.** Either both apps
+  let you change the time directly, as Windows does today, or both ask you to
+  cancel and schedule again
   ([#525](https://github.com/russellgordon/plantoir/issues/525)). On Windows,
   a course you keep for reference will stop publishing on a schedule, as it
   does on the Mac ([#527](https://github.com/russellgordon/plantoir/issues/527)).
 - **plantoir.app updates:** showing off the newer features
   ([#486](https://github.com/russellgordon/plantoir/issues/486)), and
-  correcting what it says about scheduled publishing: if your laptop is
-  closed at the scheduled time, the site is not published
+  correcting what it says about scheduled publishing when your computer is
+  closed or asleep at the scheduled time
   ([#509](https://github.com/russellgordon/plantoir/issues/509)).
 - **Being looked into: a completely opt-in usage count**, so we can learn
   roughly how many teachers use Plantoir and how. Nothing would be sent unless
@@ -167,8 +174,9 @@ These are done and will arrive when 1.8 is released.
   ([#507](https://github.com/russellgordon/plantoir/issues/507)), and add
   Google Gemini and Antigravity
   ([#508](https://github.com/russellgordon/plantoir/issues/508)).
-- **The rest of self-check quizzes**, building on what arrives in 1.8 — for
-  example, questions that use the GeoGebra and PhET interactives from 2.0.
+- **The rest of self-check quizzes**, building on what arrives in 1.8: an
+  answer key when you print, and questions that use the GeoGebra and PhET
+  interactives from 2.0.
   ([#511](https://github.com/russellgordon/plantoir/issues/511))
 
 ---
@@ -190,12 +198,15 @@ These are done and will arrive when 1.8 is released.
 
 - **When an issue closes**, move its line into "Already finished, waiting for
   the release" for that version, or delete it if a teacher would never notice.
-- **When a release is tagged**, delete its whole section — the release notes
-  now say what it brought — and update the "Last updated" line and the current
-  release number at the top. `RELEASING.md` and the `cut-release` skill carry
-  this as a step.
+- **When a release is tagged**, delete what it shipped — the release notes
+  now say what it brought — and update the current release number at the top.
+  On a Mac-only release, keep the Windows lines until the Windows download
+  joins that release. `RELEASING.md` and the `cut-release` skill carry this
+  as a step, including a check that every issue listed is still open on that
+  milestone (or closed and waiting for the release).
 - **When an issue moves milestone, or a new one is given a milestone**, move
   or add its line. The open issues and their milestones on GitHub are the
   source of truth; this page is the plain-words view of them.
+- **Change the "Last updated" date on every edit**, not only at a release.
 - Write for a teacher: what they will see or be able to do, never how it
   works inside. Internal-only work gets at most one "behind the scenes" line.
