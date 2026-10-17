@@ -303,9 +303,9 @@
         "why": "Afterwards a course whose pages say 'Module 2, Day 3' looks exactly like one that always did, and every link has been rewritten to match. 'When did these pages stop being Units?' — the first question when the next-class button or the curriculum map starts counting the wrong pages — has no other answer. The same event records a rename that stopped part way (how many pages had moved, and why it stopped) and one whose pages moved but whose settings could not be written, because those are the two states somebody will be asked to explain."
       },
       {
-        "carries": "the course code, the folder name, and which list it was added to",
+        "carries": "the course code, the folder name, which list it was added to, and — since #506 — whether its index page and a page to duplicate were put inside it (\", with its index page and a page to duplicate\"; \", with its index page\" or \", with a page to duplicate\" when only that one was written; nothing when neither was)",
         "event": "folder created",
-        "why": "Adding a name in Course Settings now creates the folder on disk, so a folder appears in the teacher's vault that they did not make in Obsidian. Separate from the rename because it answers a different question, and unexplained new folders are exactly what a teacher reports as 'Plantoir did something to my notes'."
+        "why": "Adding a name in Course Settings now creates the folder on disk, so a folder appears in the teacher's vault that they did not make in Obsidian. Separate from the rename because it answers a different question, and unexplained new folders are exactly what a teacher reports as 'Plantoir did something to my notes'. Since #506 the folder arrives with an index.md and a _DUPLICATE ME.md inside it, pages the teacher did not write; the line says so, because 'where did this page come from?' is the same report one level down."
       },
       {
         "carries": "the service's name and the folder path, redacted — recorded by a WINDOW only, never by the assistant's or the MCP server's own reading of a folder, since those show nothing",
@@ -11076,7 +11076,7 @@
     },
     "addCreatesTheFolder": {
       "message": "Plantoir made the folder “{name}” for you. Open it in Obsidian to put pages in it.",
-      "why": "Adding a name used to write a config entry pointing at nothing: the folder had to be created in Obsidian afterwards or the entry named a folder that did not exist. Creating it is what makes the list mean what it appears to mean. Nothing is put INSIDE it — an empty folder is the honest starting state, and inventing a page would put words in the teacher’s mouth."
+      "why": "Adding a name used to write a config entry pointing at nothing: the folder had to be created in Obsidian afterwards or the entry named a folder that did not exist. Creating it is what makes the list mean what it appears to mean. Since #506 it is not left EMPTY: it gets the two pages a folder made with the course gets — its index.md, without which the site’s sidebar never showed the folder although it was not hidden, and a _DUPLICATE ME.md, without which a teacher had nothing to copy. The old reason for an empty folder (inventing a page would put words in the teacher’s mouth) did not survive that: the words are the course creator’s own, the same ones every folder made with the course carries, and they go only into a folder the click has just made, never over a file. The pages, their texts and the cases are course-management.json → foldersAddedLater. The message is unchanged: it was true of an empty folder and is true of this one."
     },
     "removeLeavesTheFolderOnDisk": {
       "message": "“{name}” and everything in it stays on your Mac — this only takes it off your website. Add it back here to include it again.",

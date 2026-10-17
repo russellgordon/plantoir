@@ -307,6 +307,13 @@ else
   cat /tmp/verify_graded_new_course_test.log
 fi
 
+if (cd scripts && python3 test_folder_titles.py) >/tmp/verify_folder_titles_test.log 2>&1; then
+  pass "setup_course.py: a folder's index page names it in a title YAML reads back, by the titleQuoting rule (scripts/test_folder_titles.py, #506)"
+else
+  fail "setup_course.py: a folder's index page names it in a title YAML reads back, by the titleQuoting rule (scripts/test_folder_titles.py, #506)"
+  cat /tmp/verify_folder_titles_test.log
+fi
+
 if (cd scripts && python3 test_course_code_rule.py) >/tmp/verify_course_code_rule_test.log 2>&1; then
   pass "setup_course.py: a typed course code is asked the apps' rule, every courseCode case (scripts/test_course_code_rule.py, #402)"
 else
@@ -943,6 +950,22 @@ if docker run --rm \
 else
   fail "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
   cat /tmp/verify_class_folder_test.log
+fi
+
+# ---- folder titles read back through the build's own reader (#506) ----
+# The host run in step 0 has no frontmatter reader, so it checks the rule and
+# the wizard's pages only; here every titleQuoting case and a sweep of awkward
+# names are read back by the reader the build uses, and a missing reader fails.
+echo ""
+echo "🔎 Checking that every folder title reads back through the build's reader…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_folder_titles.py" /opt/scripts/test_folder_titles.py),readonly" \
+  -e PLANTOIR_REQUIRE_FRONTMATTER=1 \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_folder_titles.py >/tmp/verify_folder_titles_image_test.log 2>&1; then
+  pass "folder titles: every titleQuoting case and the sweep read back as their names in the build's reader (scripts/test_folder_titles.py in the image, #506)"
+else
+  fail "folder titles: every titleQuoting case and the sweep read back as their names in the build's reader (scripts/test_folder_titles.py in the image, #506)"
+  cat /tmp/verify_folder_titles_image_test.log
 fi
 
 # ---- build_site.py: pages take their class's date, in the teacher's files ----
