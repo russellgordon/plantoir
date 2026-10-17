@@ -2077,7 +2077,10 @@ would misread the name plain (`Unit: One`, `'Tis the Season`, `& Friends` were
 measured unreadable by the build), by the rule `contracts/course-management.json`
 → `foldersAddedLater.titleQuoting` pins and setup's `frontmatter_title` shares
 — doc 04 "5. Content structure" has it. `SectionAdder.scaffoldFrontmatter`'s
-fallback (no sibling page to copy) uses the same function.
+fallback (no sibling page to copy) uses the same function, and since #575 so
+does every front-page title `SectionAdder` swaps in and
+`SiteHealthRepair.restoreSectionIndex` writes (`titleQuoting.frontPages`;
+doc 04 has why).
 
 The trail's `folder created` line now ends ", with its index page and a page
 to duplicate", or names the one that was written (", with its index page" if

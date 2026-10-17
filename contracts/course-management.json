@@ -657,6 +657,64 @@
           "title": "Élan"
         }
       ],
+      "frontPages": {
+        "cases": [
+          {
+            "courseCode": "SPH4U",
+            "courseName": "Physics: Mechanics",
+            "nextSectionTitleLine": "title: \"Grade 12 Physics: Mechanics, Section 2\"",
+            "section": 1,
+            "showsGrade": true,
+            "titleLine": "title: \"Grade 12 Physics: Mechanics, Section 1\""
+          },
+          {
+            "courseCode": "BDI3C",
+            "courseName": "Entrepreneurship: The Venture",
+            "nextSectionTitleLine": "title: \"Grade 11 Entrepreneurship: The Venture, Section 3\"",
+            "section": 2,
+            "showsGrade": true,
+            "titleLine": "title: \"Grade 11 Entrepreneurship: The Venture, Section 2\"",
+            "why": "The catalogue's own short name for BDI3C: a teacher who accepted the wizard's suggested name, with no example content or skeleton, got a front page the build could not read."
+          },
+          {
+            "courseCode": "SPH4U",
+            "courseName": "Physics: Mechanics",
+            "nextSectionTitleLine": "title: \"Physics: Mechanics, Section 4\"",
+            "section": 3,
+            "showsGrade": false,
+            "titleLine": "title: \"Physics: Mechanics, Section 3\"",
+            "why": "The grade switch off for this section: the same rule on what is left."
+          },
+          {
+            "courseCode": "CODING",
+            "courseName": "Robotics: Year 2",
+            "nextSectionTitleLine": "title: \"Robotics: Year 2, Section 2\"",
+            "section": 1,
+            "showsGrade": true,
+            "titleLine": "title: \"Robotics: Year 2, Section 1\"",
+            "why": "No grade in the code, so no prefix, whatever the switch says."
+          },
+          {
+            "courseCode": "CODING",
+            "courseName": "'Tis the Season",
+            "nextSectionTitleLine": "title: \"'Tis the Season, Section 2\"",
+            "section": 1,
+            "showsGrade": true,
+            "titleLine": "title: \"'Tis the Season, Section 1\"",
+            "why": "Quoted for its first character, as a folder's title is."
+          },
+          {
+            "courseCode": "ICS3U",
+            "courseName": "Computer Science",
+            "nextSectionTitleLine": "title: Grade 11 Computer Science, Section 2",
+            "section": 1,
+            "showsGrade": true,
+            "titleLine": "title: Grade 11 Computer Science, Section 1",
+            "why": "Needs no quoting, so the line is the bytes it always was."
+          }
+        ],
+        "note": "A section's front page (sectionN/index.md) names the course by the same quoting rule as a folder's title, applied to the whole title: the grade prefix when the code has one and the section's switch is on, the course name, then \", Section N\". Written by setup_course.py when the course starts EMPTY (an example-content or skeleton payload brings its own front page, `title: Section N`, which needs no quoting), by the mac's SectionAdder (the copied front page's swapped title, and the scaffold from a sibling's frontmatter) and by SiteHealthRepair.restoreSectionIndex (the course name alone, by the same rule). `titleLine` is the line for `section`; `nextSectionTitleLine` is what adding the next section writes when this case's front page is the sibling it copies: the sibling's own wording, read back from its quoted form, with the number swapped and quoted again. Measured (#575): unquoted, `title: Grade 12 Physics: Mechanics, Section 1` made the build call the front page unreadable, remove the site and exit 1 with nothing to deploy; quoted, the same course built with that title. 161 of the catalogue's 2,047 course codes have a short name holding \": \". A sibling written in a form the reader does not take (single-quoted is unwrapped; double-quoted must be a JSON string, so YAML-only escapes such as \\x41, or a comment after the closing quote, are not) gives the wizard's form instead, as an unreadable sibling always has."
+      },
       "note": "What follows `title: ` on an index page Plantoir writes for a folder, here and at course creation (setup_course.py's frontmatter_title; the mac's FolderScaffold.frontmatterTitle, which SectionAdder's fallback pages use too). The name itself, or — when written plain YAML would not read it back as the name — the name double-quoted with JSON's escapes. Quoted when: empty; the first character is neither an ASCII letter nor beyond ASCII (every YAML indicator, a space, a digit); the last is a space, a tab or a colon; `: `, ` #` or a control character appears anywhere; or the name is one of YAML 1.1's plain words for true, false and null (true false yes no on off y n null ~), in any case. Generous on purpose: a quoted title is the same title. Measured on #506's review with the dev-test image: unquoted, `Unit: One`, `'Tis the Season` and `& Friends` each gave an index page the build could not read — the folder stayed out of the sidebar and the build's unreadable-settings notice named the page. scripts/test_folder_titles.py also reads every case back through the build's own frontmatter reader in the image. Known limits, measured on the fixes review and left as they are: three characters come out the same on both sides yet unreadable to PyYAML (the build's reader) — DEL (U+007F), quoted but written raw, which its reader rejects; and NEL (U+0085) and LINE SEPARATOR (U+2028), left plain, which it reads as line breaks. Quartz's own reader reads all three. No teacher is expected to name a folder with them, and escaping them would be a rule change both apps make together."
     }
   },

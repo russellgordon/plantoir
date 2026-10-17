@@ -11,7 +11,7 @@ course creator's writers, and each app's own writer for a folder added later
 `setup_course.title_needs_quoting` / `frontmatter_title`, pinned as
 `contracts/course-management.json` -> `foldersAddedLater.titleQuoting`.
 
-Three checks:
+Four checks:
 
 - every `titleQuoting` case through `setup_course.frontmatter_title`;
 - the REAL wizard (`setup_course.setup_course`, in-process, as
@@ -21,12 +21,15 @@ Three checks:
   index page is the contract's bytes (setup's moment put in its place). On
   Windows, where NTFS refuses ":" in a name, the folders are colon-free names
   that still need quoting and the colon page is compared in memory;
+- the real wizard making a course for each `titleQuoting.frontPages` case:
+  the section's front page names the COURSE by the same rule (#575 — a name
+  such as "Physics: Mechanics" gave a front page the build could not read);
 - every case, and a sweep of awkward names, read back through the build's own
   frontmatter reader — run inside the website builder's image, where that
   reader is installed. verify.sh runs this file both on the host (step 0) and
   in the image with PLANTOIR_REQUIRE_FRONTMATTER=1, which makes a missing
   reader a failure rather than a skip; Windows' PythonToolchainTests
-  discovers it and runs all three, its interpreter having that reader.
+  discovers it and runs them all, its interpreter having that reader.
 
 Run with:
 
@@ -84,18 +87,18 @@ class TheTitleRuleIsTheContracts(unittest.TestCase):
             self.assertEqual(setup_course.frontmatter_title(case["name"]), case["title"], case["name"])
 
 
-class TheWizardWritesTheContractsTitles(unittest.TestCase):
+class TheWizardsFolderPagesHelper(unittest.TestCase):
+    """Runs the real wizard in-process over a temporary working folder."""
 
-    COLON_CASE_FOLDER = "Unit 1: Kinematics"
-
-    def make_course(self, shared_folders: list, per_section_folders: list, sections: list) -> Path:
+    def make_course(self, shared_folders: list, per_section_folders: list, sections: list,
+                    code: str = "ZZZ3O", name: str = "Test Course", show_grade=None) -> Path:
         temporary = Path(tempfile.mkdtemp(prefix="plantoir-folder-titles-"))
         self.addCleanup(shutil.rmtree, temporary, True)
         courses = temporary / "courses"
-        course = courses / "ZZZ3O"
+        course = courses / code
         course.mkdir(parents=True)
         saved = {
-            "course_code": "ZZZ3O", "course_name": "Test Course",
+            "course_code": code, "course_name": name,
             "num_sections": len(sections), "section_numbers": sections,
             "shared_folders": shared_folders, "shared_files": [],
             "per_section_folders": per_section_folders, "per_section_files": [],
@@ -104,6 +107,8 @@ class TheWizardWritesTheContractsTitles(unittest.TestCase):
             "use_lcs_terminology": False, "include_curriculum_coverage": False,
             "include_curriculum_pages": False, "include_coverage_notes": False,
         }
+        if show_grade is not None:
+            saved["show_grade_in_title"] = show_grade
         (course / "course_config.json").write_text(json.dumps(saved), encoding="utf-8")
 
         original_courses = toolchain_paths.COURSES_DIR
@@ -118,7 +123,7 @@ class TheWizardWritesTheContractsTitles(unittest.TestCase):
                 raise RuntimeError("the wizard kept asking; it is looping")
             text = str(prompt).lower()
             if "enter the course code" in text:
-                return "ZZZ3O"
+                return code
             if "pre-populate" in text or "skeleton?" in text or "curriculum pages?" in text:
                 return "n"
             return ""
@@ -142,6 +147,11 @@ class TheWizardWritesTheContractsTitles(unittest.TestCase):
             if line.startswith("title:"):
                 return line
         raise AssertionError(f"{page} has no title line")
+
+
+class TheWizardWritesTheContractsTitles(TheWizardsFolderPagesHelper):
+
+    COLON_CASE_FOLDER = "Unit 1: Kinematics"
 
     # NTFS refuses ":" in a name, so on Windows the wizard makes folders whose
     # names still need quoting but carry no colon, and the colon case is
@@ -193,6 +203,42 @@ class TheWizardWritesTheContractsTitles(unittest.TestCase):
         self.assertIsNotNone(moment, written)
         expected = colon_case["files"][0]["text"].replace(section["created"], moment)
         self.assertEqual(written, expected)
+
+
+class TheWizardsFrontPageTitleIsTheContracts(TheWizardsFolderPagesHelper):
+    """
+    A course NAME holding ": " (#575): the wizard wrote the front page's title
+    plain, `title: Grade 12 Physics: Mechanics, Section 1`, and the build
+    called that front page unreadable and exited 1 with nothing to deploy.
+    The title is quoted by the same rule as a folder's, as
+    `titleQuoting.frontPages` has it. The course name is in no path, so every
+    case runs on NTFS too.
+    """
+
+    def test_every_front_page_case_through_the_real_wizard(self):
+        rule = folders_added_later()["titleQuoting"]["frontPages"]
+        cases = rule["cases"]
+        self.assertGreaterEqual(len(cases), 6, "frontPages has shrunk")
+        for case in cases:
+            section = case["section"]
+            course = self.make_course(
+                [], [], [section], code=case["courseCode"], name=case["courseName"],
+                show_grade={"sections": {f"section{section}": case["showsGrade"]}},
+            )
+            page = course / f"section{section}" / "index.md"
+            self.assertEqual(self.title_line(page), case["titleLine"], case["courseName"])
+
+    def test_every_front_page_case_reads_back_as_its_title(self):
+        reader = frontmatter_reader()
+        if reader is None:
+            self.skipTest("the build's frontmatter reader is not installed here; verify.sh runs this in the image")
+        for case in folders_added_later()["titleQuoting"]["frontPages"]["cases"]:
+            for key in ("titleLine", "nextSectionTitleLine"):
+                written = case[key][len("title: "):]
+                title = json.loads(written) if written.startswith('"') else written
+                read = reader.loads(f"---\n{case[key]}\n---\nbody\n").get("title")
+                self.assertEqual(read, title, case[key])
+                self.assertIn(case["courseName"], read, case[key])
 
 
 class EveryTitleReadsBackAsItsName(unittest.TestCase):
