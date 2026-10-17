@@ -126,6 +126,7 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-10-17 ([#575](https://github.com/russellgordon/plantoir/issues/575)) | A course whose name holds a colon followed by a space (for example "Physics: Mechanics") and that was started with no example content or ready-made pages may not build: the build says a section's front page cannot be read, near line 2. To fix it, open `sectionN/index.md` in Obsidian and put double quotes around the title on line 2, so it reads `title: "Grade 12 Physics: Mechanics, Section 1"`. Courses made from now on are written that way already. | 1.8.1 fixes the writers, not courses already made (the one-click repair is a v1.9.0 follow-on), and the site of such a course is not built at all until the line is quoted. |
 
 ## Trim the roadmap
 

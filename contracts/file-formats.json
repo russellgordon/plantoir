@@ -546,6 +546,11 @@
         "key": "codeRunner",
         "type": "boolean",
         "why": "#455 (v1.8.0). `codeRunner: true` turns a page's ```python run blocks into programs a student can edit and run in the browser (shared-rules.json -> codeRunnerBlocks). Per page, with no course switch and no setting in either app (Russell, 2026-10-05). Read exactly as `printable` is: python-frontmatter (PyYAML, YAML 1.1) loads the line and the build writes it back, so `yes` opts in and `\"true\"` and `false` do not; the site's transformer compares with `=== true`. A page that opts in with no runnable block is left exactly as it was and makes its site carry nothing; a page that does not opt in is untouched whatever its fences say. Its own reading cases are codeRunnerReadingCases, kept apart from readingCases because those are printable-shaped (#455 review N3)."
+      },
+      {
+        "key": "enableToc",
+        "type": "boolean",
+        "why": "Quartz's own key, and an opt-OUT rather than an opt-in: the table of contents is shown by default (Quartz's TableOfContents, showByDefault true), so `enableToc: false` hides it and `enableToc: true` only says what already holds. Either way it appears only when the page itself has two or more headings of depth 3 or less (minEntries 1, compared strictly). #520 (v1.8.1): folder pages honour it too. Quartz renders every folder's index.md, a curriculum folder's among them, with its folder-page layout, whose right column was empty in v4.5.0, so the key and its headings showed nothing there; the build now puts the table of contents in that column (build_site._wire_list_page_toc). Measured on the #520 plan: across support/, 49 of 1,009 folder index pages have two such headings and so show one (40 of them already said enableToc: true); tag pages and folder pages with no headings of their own are unchanged. Neither app reads it; both write `enableToc: false` into the class page skeletons they make, as setup does for a club's first page. What a built page shows is checked by verify.sh 6h, and scripts/test_folder_page_toc.py pins the wiring."
       }
     ],
     "readingCases": {
