@@ -53,16 +53,16 @@ _CALLOUT = re.compile(r"^\[!([A-Za-z0-9_-]+)\|?(.+?)?\]([+-]?)(.*)$")
 # One quote marker as CommonMark reads it: up to three spaces, `>`, then one
 # optional space or tab.
 _ONE_MARKER = re.compile(r"^ {0,3}>[ \t]?")
-# Every marker in front of a line, with the spaces between them.
-_ALL_MARKERS = re.compile(r"^(?:[ \t]*>)+[ \t]?")
 # A list item's marker: bullet or ordered, then a space or tab (or the end).
 _LIST_ITEM = re.compile(r"^( {0,3})([-*+]|[0-9]{1,9}[.)])([ \t]+|$)(.*)$")
 # A task box at the start of a list item's text (GFM): [ ], [x] or [X], then
 # a space or tab, then more on that line - a box with nothing after it is
 # plain text to the site's parser (measured: `- [ ]` and `- [ ] ` alone).
 _TASK_BOX = re.compile(r"^\[([ xX])\][ \t]+\S")
-# A fence opener on a line's body, after any list markers.
-_FENCE_OPEN = re.compile(r"^[ \t]*(?:(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)*(`{3,}|~{3,})(.*)$")
+# A fence opener on a line's body (after its indent), after any list markers.
+_FENCE_OPEN = re.compile(r"^(?:(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)*(`{3,}|~{3,})(.*)$")
+# A list marker that opens a container on a line (quizRules.containersOf).
+_LIST_OPENER = re.compile(r"^([-*+]|[0-9]{1,9}[.)])[ \t]+")
 # The lines that start a block of their own, so they are never a paragraph's
 # lazy continuation: a list item, a heading, a fence, a thematic break, a
 # table row, an HTML block.
@@ -72,10 +72,17 @@ _BLOCK_START = re.compile(
 # A line inside a quiz that is not paragraph text of the stem: a heading or a
 # table row.
 _NOT_STEM_TEXT = re.compile(r"^[ \t]{0,3}(?:#{1,6}(?:[ \t]|$)|\|)")
-# A callout start anywhere in a line's containers: list markers, quote
-# markers, then `[!quiz]` (for the quizzes that are not at the top level).
-_ANY_QUIZ_START = re.compile(
-    r"^[ \t]*(?:(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)*(?:>[ \t]*)+\[!quiz(?:\||\])", re.IGNORECASE)
+# An HTML block CommonMark opens with a block-level tag (its type 6): it runs
+# to the next empty line and swallows whatever Markdown is in it - a list of
+# choices included - as the site's parser does.
+_HTML_BLOCK = re.compile(
+    r"^ {0,3}</?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd"
+    r"|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head"
+    r"|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param"
+    r"|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:[ \t>]|/>|$)",
+    re.IGNORECASE)
+# A quiz callout's first line, once its containers are taken off.
+_QUIZ_CALLOUT = re.compile(r"^ {0,3}\[!quiz(?:\||\])", re.IGNORECASE)
 
 # ---- Numbers and answer lines (quizCallouts.answers) - quizRules.ts's mirror ----
 
@@ -272,11 +279,57 @@ def _readable_lines(text: str) -> list:
     return lines
 
 
-def _depth_and_body(line: str):
-    markers = _ALL_MARKERS.match(line)
-    if markers is None:
-        return 0, line
-    return markers.group(0).count(">"), line[markers.end():]
+def _leading(line: str, at: int):
+    """Columns of leading spaces and tabs from `at`, and where they end."""
+    columns = 0
+    index = at
+    while index < len(line) and line[index] in " \t":
+        columns += 4 - (columns % 4) if line[index] == "\t" else 1
+        index += 1
+    return columns, index
+
+
+def _containers(line: str, base: int = 0, lists: bool = False):
+    """quizRules.containersOf: each `>` (and, with `lists`, each list marker)
+    opens a container only at most three columns past where the container
+    around it starts its content (`base` for the page itself: the content
+    column of the list item the line belongs to). A `>` further in is the
+    text of indented code or of a paragraph (the implementation review's
+    S1). Answers (depth, body, whether a list marker was passed)."""
+    at = 0
+    depth = 0
+    allowed = base
+    listed = False
+    while True:
+        columns, index = _leading(line, at)
+        if columns - allowed > 3 or index >= len(line):
+            break
+        if line[index] == ">":
+            depth += 1
+            at = index + 1
+            if at < len(line) and line[at] in " \t":
+                at += 1
+            allowed = 0
+            continue
+        marker = _LIST_OPENER.match(line[index:]) if lists else None
+        if marker is not None:
+            listed = True
+            at = index + marker.end()
+            allowed = 0
+            continue
+        break
+    return depth, line[at:], listed
+
+
+def _depth_and_body(line: str, base: int = 0):
+    depth, body, _ = _containers(line, base)
+    return depth, body
+
+
+def _quiz_start_anywhere(line: str, base: int = 0) -> bool:
+    """A quiz callout's first line behind at least one `>`, wherever it is."""
+    depth, body, _ = _containers(line, base, lists=True)
+    return depth >= 1 and _QUIZ_CALLOUT.match(body) is not None
 
 
 def _is_blank(text: str) -> bool:
@@ -310,8 +363,11 @@ def _fence_closes(body: str, fence) -> bool:
     return run >= fence[1] and stripped[:run] == fence[0] * run and stripped[run:].strip(" \t") == ""
 
 
-def _fence_opens(body: str):
-    match = _FENCE_OPEN.match(body)
+def _fence_opens(body: str, base: int = 0):
+    columns, index = _leading(body, 0)
+    if columns - base > 3:
+        return None
+    match = _FENCE_OPEN.match(body[index:])
     if match is None:
         return None
     run = match.group(1)
@@ -382,7 +438,9 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
     index = 0
     while index < len(entries):
         inner, file_line, lazy = entries[index]
-        depth, body = _depth_and_body(inner)
+        indent = _indent(inner)
+        base = state["listContent"] if state["listKind"] is not None and indent >= state["listContent"] else 0
+        depth, body = _depth_and_body(inner, base)
         if fence is not None:
             if depth < fence[1]:
                 fence = None
@@ -393,7 +451,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
                 previous_blank = False
                 previous_paragraph = False
                 continue
-        if _ANY_QUIZ_START.match(inner):
+        if _quiz_start_anywhere(inner, base):
             nested_quizzes.append(file_line)
         if _is_blank(inner):
             close_stem()
@@ -401,8 +459,13 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             previous_paragraph = False
             index += 1
             continue
-        indent = _indent(inner)
         in_item = state["listKind"] is not None and indent >= state["listContent"]
+        if depth == 0 and not lazy and not previous_paragraph and _indent(body) - base >= 4:
+            # Indented code: never a choice, a callout, a fence or a blank.
+            close_stem()
+            previous_blank = False
+            index += 1
+            continue
 
         if depth >= 1 and not in_item and not lazy:
             # A blockquote inside the quiz, at the quiz's own level: when its
@@ -436,7 +499,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
                     lines_here.append((next_inner, next_line))
                 else:
                     break
-                if _ANY_QUIZ_START.match(next_inner):
+                if _quiz_start_anywhere(next_inner):
                     nested_quizzes.append(next_line)
                 index += 1
             if kind == "answer":
@@ -449,6 +512,16 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
                         kept_at.append(line_number)
                 answers.append(kept)
                 answer_lines_at.append(kept_at)
+            previous_blank = False
+            previous_paragraph = False
+            continue
+
+        if depth == 0 and not lazy and not in_item and _HTML_BLOCK.match(inner):
+            # An HTML block: everything to the next empty line is HTML.
+            close_stem()
+            close_list()
+            while index < len(entries) and not _is_blank(entries[index][0]):
+                index += 1
             previous_blank = False
             previous_paragraph = False
             continue
@@ -480,7 +553,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             index += 1
             continue
 
-        opened = _fence_opens(body) if depth == 0 and not lazy else None
+        opened = _fence_opens(body, base) if depth == 0 and not lazy else None
         if opened is not None:
             close_stem()
             if not in_item:
@@ -560,7 +633,9 @@ def quizzes_on_page(text: str) -> list:
     index = 0
     while index < len(lines):
         line, file_line = lines[index]
-        depth, body = _depth_and_body(line)
+        line_indent = _indent(line)
+        base = list_content if list_content is not None and line_indent >= list_content else 0
+        depth, body = _depth_and_body(line, base)
         if fence is not None:
             if depth < fence[1]:
                 fence = None
@@ -596,7 +671,14 @@ def quizzes_on_page(text: str) -> list:
             spaces = item.group(3)
             gap = len(spaces) if 1 <= len(spaces) <= 4 else 1
             list_content = len(item.group(1)) + len(item.group(2)) + gap
-        opened = _fence_opens(body)
+        if not previous_paragraph and _indent(body) - (base if depth == 0 else 0) >= 4:
+            # Indented code, at the page's level, in a quote or under a list
+            # item: never a quiz, a callout or a fence.
+            previous_blank = False
+            previous_quote = depth > 0
+            index += 1
+            continue
+        opened = _fence_opens(body, base if depth == 0 else 0)
         if opened is not None:
             fence = (opened, depth)
             previous_blank = False
@@ -657,7 +739,7 @@ def quizzes_on_page(text: str) -> list:
             previous_paragraph = False
             continue
 
-        if _ANY_QUIZ_START.match(line):
+        if _quiz_start_anywhere(line, base):
             add_nested(file_line)
         previous_blank = False
         previous_quote = depth > 0
@@ -757,9 +839,11 @@ def check_pages(pages: list, printer=print) -> dict:
         nested = 0
         reported_top = []
         reported_nested = []
+        lines = []
         for quiz in placed:
             if quiz["n"] is not None:
                 top += 1
+                lines.append(quiz["line"])
             else:
                 nested += 1
             if "problem" not in quiz:
@@ -777,7 +861,8 @@ def check_pages(pages: list, printer=print) -> dict:
                 "fill": quiz.get("fill") or {},
             })
         by_page[page["path"]] = {"quizzes": top, "problems": reported_top,
-                                 "nested": nested, "nestedProblems": reported_nested}
+                                 "nested": nested, "nestedProblems": reported_nested,
+                                 "lines": lines}
     return {"problems": problems, "examined": sorted(examined), "pages": by_page}
 
 

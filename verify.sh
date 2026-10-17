@@ -1678,6 +1678,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz Fixture.md" "$HIT_COURSE/Quiz CRLF.md" "$HIT_COURSE/Quiz Lookalikes.md" \
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
+        "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2447,6 +2448,18 @@ crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]
     "> [!quiz] Which is a factor of $x^2 - 9$?\n> - [x] $x - 3$\n> - [ ] $x + 9$\n>\n"
     "> > [!explain]- Why\n> > printable-explain-7f3a: a difference of squares.\n\n"
     "> [!quiz] Name the capital of Canada.\n> > [!answer]-\n> > printable-answer-7f3a | Ottawa\n", encoding="utf-8")
+(course / "Quiz Twice.md").write_text(
+    "---\ntitle: Quiz Twice\n---\nOne quiz shown twice (plantoir-quiz-twice-7f3a).\n\n![[Quiz Source]]\n\n![[Quiz Source]]\n",
+    encoding="utf-8")
+(course / "Quiz Code Shown.md").write_text(
+    "---\ntitle: Quiz Code Shown\n---\nQuiz syntax shown as indented code, never a quiz (quiz-code-sentinel-7f3a).\n\n"
+    "    > [!quiz] Shown as code.\n    > > [!answer]- Answer\n    > > a\n\n"
+    "> [!note] How to write one\n>\n>     > [!quiz] Shown as code in a callout.\n>     > > [!answer]- Answer\n>     > > a\n\n"
+    "- Step one: type this\n\n      > [!quiz] Shown as code under a list item.\n      > > [!answer]- Answer\n      > > a\n",
+    encoding="utf-8")
+(course / "Quiz Summary.md").write_text(
+    "---\ntitle: Quiz Summary\n---\n> [!quiz] Fill `____` and `____`.\n> > [!answer]-\n> > summary-answer-7f3a\n> > b\n",
+    encoding="utf-8")
 (course / "Quiz Hidden.md").write_text(
     "---\ntitle: Quiz Hidden\npublish: false\n---\nHidden (plantoir-quiz-hidden-7f3a).\n\n> [!quiz] Broken.\n> - [ ] a\n> - [ ] b\n",
     encoding="utf-8")
@@ -2952,6 +2965,17 @@ if len(markers) != 1 or f'"sentence": "{len(lines_said)} self-check questions' n
 crlf = quizzes_in(page("Quiz-CRLF.html"))
 if [(quiz["kind"], quiz["data"]) for quiz in crlf] != [("short", {"answers": ["$2^7$"]})]:
     problems.append(f"the page saved with CR LF read as {crlf}")
+shown = page("Quiz-Code-Shown.html")
+if not shown or "plantoir-quiz\"" in shown or "data-quiz" in shown:
+    problems.append("Quiz Code Shown is missing or was made a quiz")
+code = re.sub(r"<span[^>]*>|</span>", "", shown).replace("&gt;", ">")
+if len(re.findall(r"<code>> \[!quiz\] Shown as code[^\n]*\n> > \[!answer\]- Answer\n> > a\n</code>", code)) != 3:
+    problems.append("quiz syntax shown as indented code was changed (a line added to the code)")
+if "Quiz Code Shown" in "\n".join(line for line in said.splitlines() if "plantoir: error:" in line):
+    problems.append("quiz syntax shown as indented code was named as a folder problem")
+summary = re.findall(r'<meta name="description" content="([^"]*)"', page("Quiz-Summary.html"))
+if summary != ["Fill … and …."]:
+    problems.append(f"a summary that opens with blanks reads {summary}, expected 'Fill … and ….'")
 lookalikes = page("Quiz-Lookalikes.html")
 if not lookalikes or "plantoir-quiz" in lookalikes or "data-quiz" in lookalikes:
     problems.append("Quiz Lookalikes is missing or was made a quiz")
@@ -2984,8 +3008,8 @@ for path in public.rglob("*"):
     if not path.is_file() or path.suffix not in (".html", ".json", ".xml", ".txt"):
         continue
     text = path.read_text(encoding="utf-8", errors="replace")
-    for secret in ("playground-explain-7f3a", "printable-answer-7f3a", "printable-explain-7f3a"):
-        if secret in text and path.name not in ("Quiz-Playground.html", "Quiz-Printable.html"):
+    for secret in ("playground-explain-7f3a", "printable-answer-7f3a", "printable-explain-7f3a", "summary-answer-7f3a"):
+        if secret in text and path.name not in ("Quiz-Playground.html", "Quiz-Printable.html", "Quiz-Summary.html"):
             problems.append(f"{secret} is in {path.relative_to(public)}")
 playground = page("Quiz-Playground.html")
 for summary in re.findall(r'<meta (?:name="description"|property="og:description") content="([^"]*)"', playground):

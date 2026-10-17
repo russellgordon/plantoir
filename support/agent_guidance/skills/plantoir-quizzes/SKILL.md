@@ -138,9 +138,10 @@ whose choices refer to their position ("All of the above", "Both A and B",
 ## 4. Graphs, pictures and code inside a question
 
 Anything a page can hold works inside a question, a choice and an
-explanation. Indent it under its choice by the width of `- ` (two spaces
-after the `>`). How to write the graph itself is in the `plantoir-math-graphs`
-skill; how to write runnable code is in the `plantoir-runnable-code` skill
+explanation. Put it on the lines under its choice, lined up under the
+choice's `[`: after the `> ` that starts every line of the quiz, two more
+spaces (`>   ```functionplot`, as below). How to write the graph itself is
+in the `plantoir-math-graphs` skill; how to write runnable code is in the `plantoir-runnable-code` skill
 (a runnable block also needs `codeRunner: true` at the top of the page).
 
 A choice with a graph:

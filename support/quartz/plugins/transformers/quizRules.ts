@@ -320,36 +320,80 @@ export function filledWords(template: string, values: Record<string, string | nu
 // followed by `> > $2^7$` put the answer INTO the title (#563 plan M2).
 // Inside a quiz only (ruling Q1), after any nested callout's first line,
 // this adds one line holding just its `>` markers. Line endings are made LF
-// first (review S1), fenced code is skipped (S2), and a page with no quiz
-// outside fenced code comes back exactly as it came. Here rather than in
+// first (review S1), fenced and indented code are skipped (S2, and the
+// implementation review's S1), and a page with no quiz outside code comes
+// back exactly as it came. Here rather than in
 // the transformer so the check script can run it in Node with nothing else.
 
-const MARKERS = /^(?:[ \t]*>)+[ \t]?/
-const FENCE_OPEN = /^[ \t]*(?:(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)*(`{3,}|~{3,})(.*)$/
+const FENCE_OPEN = /^((?:[-*+]|[0-9]{1,9}[.)])[ \t]+)*(`{3,}|~{3,})(.*)$/
 const BLOCK_START =
   /^[ \t]{0,3}(?:[-*+](?:[ \t]|$)|[0-9]{1,9}[.)](?:[ \t]|$)|#{1,6}(?:[ \t]|$)|`{3,}|~{3,}|<|(?:-[ \t]*){3,}$|(?:\*[ \t]*){3,}$|(?:_[ \t]*){3,}$)/
-// A quiz callout's first line, behind any list markers and at least one `>`.
-const QUIZ_START = /^((?:[ \t]*(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)*(?:[ \t]*>[ \t]*)+)\[!quiz(?:\||\])/i
-// Any callout's first line, behind its `>` markers.
-const CALLOUT_LINE = /^((?:[ \t]*>[ \t]*)+)\[![\w-]+(?:\|.*?)?\][+-]?.*$/
+const LIST_ITEM = /^([-*+]|[0-9]{1,9}[.)])([ \t]+|$)/
+const CALLOUT_START = /^\[![\w-]+(?:\|.*?)?\][+-]?/
 
-function depthAndBody(line: string): [number, string] {
-  const markers = MARKERS.exec(line)
-  if (markers === null) {
-    return [0, line]
+// Columns of leading spaces and tabs from `at`, and where they end.
+function leading(line: string, at: number): [number, number] {
+  let columns = 0
+  let index = at
+  while (index < line.length && (line[index] === " " || line[index] === "\t")) {
+    columns += line[index] === "\t" ? 4 - (columns % 4) : 1
+    index += 1
   }
-  return [(markers[0].match(/>/g) ?? []).length, line.slice(markers[0].length)]
+  return [columns, index]
 }
 
-function fenceOpens(body: string): [string, number] | null {
-  const match = FENCE_OPEN.exec(body)
+// A line's containers as CommonMark opens them (review S1 of the
+// implementation): each `>` - and, when `lists` is true, each list marker -
+// opens a container only when it stands at most three columns past where
+// the container around it starts its content (`base` for the page itself:
+// the content column of a list item the line belongs to). A `>` four or more
+// columns in is the text of indented code, or of a paragraph, and opens
+// nothing. Answers the quote depth, the body after the last container, and
+// where that body starts in the line (after a `>`'s one optional space).
+export function containersOf(line: string, base = 0, lists = false): { depth: number; body: string; at: number; listed: boolean } {
+  let at = 0
+  let depth = 0
+  let allowed = base
+  let listed = false
+  for (;;) {
+    const [columns, index] = leading(line, at)
+    if (columns - allowed > 3 || index >= line.length) {
+      break
+    }
+    if (line[index] === ">") {
+      depth += 1
+      at = index + 1
+      if (line[at] === " " || line[at] === "\t") {
+        at += 1
+      }
+      allowed = 0
+      continue
+    }
+    const marker = lists ? LIST_ITEM.exec(line.slice(index)) : null
+    if (marker !== null && marker[2] !== "") {
+      listed = true
+      at = index + marker[0].length
+      allowed = 0
+      continue
+    }
+    break
+  }
+  return { depth, body: line.slice(at), at, listed }
+}
+
+function fenceOpens(body: string, base = 0): [string, number] | null {
+  const [columns, index] = leading(body, 0)
+  if (columns - base > 3) {
+    return null
+  }
+  const match = FENCE_OPEN.exec(body.slice(index))
   if (match === null) {
     return null
   }
-  if (match[1][0] === "`" && match[2].includes("`")) {
+  if (match[2][0] === "`" && match[3].includes("`")) {
     return null
   }
-  return [match[1][0], match[1].length]
+  return [match[2][0], match[2].length]
 }
 
 function fenceCloses(body: string, fence: [string, number]): boolean {
@@ -365,6 +409,12 @@ function isBlankLine(text: string): boolean {
   return /^[ \t]*$/.test(text)
 }
 
+// The start of a callout: at most three columns into its container's body.
+function calloutIn(body: string): boolean {
+  const [columns, index] = leading(body, 0)
+  return columns <= 3 && CALLOUT_START.test(body.slice(index))
+}
+
 export function nestedTitlesOwnTheirLine(source: string): string {
   if (!/\[!quiz/i.test(source)) {
     return source
@@ -375,9 +425,17 @@ export function nestedTitlesOwnTheirLine(source: string): string {
   let fence: { mark: [string, number]; depth: number } | null = null
   let quizDepth = 0
   let paragraph = false
+  let previousBlank = true
+  // The content column of the page-level list item the lines belong to.
+  let listContent = 0
   for (const line of lines) {
     out.push(line)
-    const [depth, body] = depthAndBody(line)
+    const [indent] = leading(line, 0)
+    if (listContent > 0 && indent < listContent && !isBlankLine(line) && (previousBlank || /^[ \t]*>/.test(line))) {
+      listContent = 0
+    }
+    const base = listContent > 0 && indent >= listContent ? listContent : 0
+    const { depth, body } = containersOf(line, base)
     if (fence !== null) {
       if (depth < fence.depth) {
         fence = null
@@ -385,40 +443,55 @@ export function nestedTitlesOwnTheirLine(source: string): string {
         if (fenceCloses(body, fence.mark)) {
           fence = null
         }
+        previousBlank = false
         continue
       }
     }
     if (isBlankLine(line)) {
       quizDepth = 0
       paragraph = false
+      previousBlank = true
       continue
     }
+    if (depth === 0) {
+      const item = /^( {0,3})([-*+]|[0-9]{1,9}[.)])([ \t]+)/.exec(line)
+      if (item !== null && (listContent === 0 || indent < listContent)) {
+        const gap = item[3].length >= 1 && item[3].length <= 4 ? item[3].length : 1
+        listContent = item[1].length + item[2].length + gap
+      }
+    }
+    previousBlank = false
     if (quizDepth > 0 && depth === 0 && (!paragraph || BLOCK_START.test(line))) {
       quizDepth = 0
     }
-    const opened = fenceOpens(body)
+    // Indented code (four columns past its container, not continuing a
+    // paragraph): never a quiz, a callout or a fence, and never changed.
+    const [bodyIndent] = leading(body, 0)
+    if (!paragraph && bodyIndent - (depth === 0 ? base : 0) >= 4) {
+      continue
+    }
+    const opened = fenceOpens(body, depth === 0 ? base : 0)
     if (opened !== null) {
       fence = { mark: opened, depth }
       paragraph = false
       continue
     }
     if (quizDepth > 0 && depth > quizDepth) {
-      const nested = CALLOUT_LINE.exec(line)
-      if (nested !== null && depthAndBody(nested[1])[0] > quizDepth) {
-        out.push(nested[1].replace(/[ \t]+$/, ""))
+      if (calloutIn(body)) {
+        out.push(line.slice(0, containersOf(line, base).at).replace(/[ \t]+$/, ""))
         paragraph = false
         continue
       }
     } else {
-      const start = QUIZ_START.exec(line)
-      if (start !== null) {
+      const containers = containersOf(line, base, true)
+      if (containers.depth >= 1 && calloutIn(containers.body) && /^[ \t]*\[!quiz(?:\||\])/i.test(containers.body)) {
         found = true
         quizDepth = depth
         // ObsidianFlavoredMarkdown already did this for a quiz at the left
         // edge (`^> *\[`); one indented, or inside a quote, gets it here.
         // One behind a list marker is left as it is.
-        if (!/^> *\[/.test(line) && !/[-*+0-9]/.test(start[1].replace(/[ \t>]/g, ""))) {
-          out.push(start[1].replace(/[ \t]+$/, ""))
+        if (!/^> *\[/.test(line) && !containers.listed) {
+          out.push(line.slice(0, containers.at).replace(/[ \t]+$/, ""))
         }
         paragraph = false
         continue

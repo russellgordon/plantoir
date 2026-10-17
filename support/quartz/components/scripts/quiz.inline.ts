@@ -164,23 +164,21 @@ function setUp(root: HTMLElement, record: (quiz: Quiz, right: boolean) => void, 
   }
 
   // Ids of this instance's own: a quiz shown twice (a transclusion) must not
-  // share its label with the other copy (review S5).
-  const title = root.querySelector(":scope > .callout-title .callout-title-inner") as HTMLElement | null
-  if (title !== null && title.id !== "") {
-    const others = document.querySelectorAll(`[id="${CSS.escape(title.id)}"]`)
-    if (others.length > 1) {
-      const renamed = `${title.id}-${instance}`
-      for (const labelled of root.querySelectorAll(`[aria-labelledby="${CSS.escape(title.id)}"]`)) {
-        labelled.setAttribute("aria-labelledby", renamed)
-      }
-      title.id = renamed
+  // share its label, its select-all line or a choice's description with the
+  // other copy (review S5) - every id in it that the page already holds is
+  // renamed, and what points at it inside this quiz follows.
+  for (const owner of Array.from(root.querySelectorAll<HTMLElement>("[id]"))) {
+    const id = owner.id
+    if (document.querySelectorAll(`[id="${CSS.escape(id)}"]`).length < 2) {
+      continue
     }
-  }
-  const hint = root.querySelector(".plantoir-quiz-hint") as HTMLElement | null
-  if (hint !== null && hint.id !== "" && document.querySelectorAll(`[id="${CSS.escape(hint.id)}"]`).length > 1) {
-    const renamed = `${hint.id}-${instance}`
-    root.querySelector(".plantoir-quiz-choices")?.setAttribute("aria-describedby", renamed)
-    hint.id = renamed
+    const renamed = `${id}-${instance}`
+    for (const attribute of ["aria-labelledby", "aria-describedby"]) {
+      for (const pointer of root.querySelectorAll(`[${attribute}="${CSS.escape(id)}"]`)) {
+        pointer.setAttribute(attribute, renamed)
+      }
+    }
+    owner.id = renamed
   }
 
   const fieldset = root.querySelector(".plantoir-quiz-choices") as HTMLFieldSetElement | null
@@ -468,9 +466,15 @@ document.addEventListener("nav", () => {
     if (scoreBox === null || scoreLine === null) {
       return
     }
+    // Each quiz once: one transcluded twice is one question (nit 1).
+    const seen = new Set<string>()
     let right = 0
     let answered = 0
     for (const quiz of quizzes) {
+      if (seen.has(quiz.id)) {
+        continue
+      }
+      seen.add(quiz.id)
       const entry = saved.quizzes[quiz.id]
       if (entry !== undefined && entry.hash === quiz.hash) {
         answered += 1
@@ -480,7 +484,7 @@ document.addEventListener("nav", () => {
       }
     }
     scoreBox.hidden = answered === 0
-    scoreLine.textContent = word("score", { right, total: quizzes.length })
+    scoreLine.textContent = word("score", { right, total: seen.size })
   }
 
   const record = (quiz: Quiz, right: boolean) => {
