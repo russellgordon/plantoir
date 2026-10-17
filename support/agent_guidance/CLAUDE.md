@@ -17,11 +17,12 @@ matches the task before writing:
   (`.claude/skills/plantoir-math-graphs/SKILL.md`) - which fence to write,
   complete patterns to paste, and what cannot be done (no sliders).
 - **Code students run** - "make this example runnable", a Python program
-  students edit and run in the browser, a program that reads input, "try it
-  yourself": the `plantoir-runnable-code` skill
+  students edit and run in the browser, a Swift program students run with
+  their own input, a program that reads input, "try it yourself": the
+  `plantoir-runnable-code` skill
   (`.claude/skills/plantoir-runnable-code/SKILL.md`) - how to opt the page
-  in, the ` ```python run ` block and its flags, input, and what the
-  standard library can and cannot do.
+  in, the ` ```python run ` block and its flags, the read-only
+  ` ```swift run ` block, input, and what each language can and cannot do.
 - **Questions students check themselves** - "add a 5-question check", a
   quiz, practice questions, a self-check, an exit ticket, multiple choice,
   fill in the blank: the `plantoir-quizzes` skill

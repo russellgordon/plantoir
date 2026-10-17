@@ -1,6 +1,7 @@
 ---
 title: The Bad Input Hunt
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - explorations
@@ -10,9 +11,10 @@ Your program works. You have run it perhaps thirty times, and every one
 of those thirty times you typed exactly what it was expecting, because
 you wrote it and you know what it wants.
 
-Your client does not know what it wants. Your client will type "seven".
+Your client does not know what it wants. Your client will type "seven". Type `seven` in the input box under the
+program and press Run to see what happens.
 
-```python
+```python run
 hours = int(input("How many hours did you work? "))
 print(f"You earned ${hours * 17.20:.2f}")
 ```

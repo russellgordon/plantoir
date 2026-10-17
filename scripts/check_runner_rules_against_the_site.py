@@ -23,7 +23,9 @@ Three halves:
    field; and the transformer itself (codeRunner.ts) is run over a page whose
    engine the site does and does not carry, to pin `siteDisagrees`: plain
    code and one `plantoir: error:` line, and no line for a page students
-   cannot see.
+   cannot see. Since #493 also every `swift.cacheKey` case (the site's
+   normalising and key), and Swift blocks whose program the build has, could
+   not make, or never saw.
 2. Every `pageShapes` case is read by the BUILD's side too
    (page_features.runner_fences), so the two readers are seen to agree where
    the contract says they do (review S2).
@@ -57,8 +59,9 @@ import { join } from "path"
 import { unified } from "unified"
 import remarkParse from "remark-parse"
 import remarkGfm from "remark-gfm"
-import { LANGUAGES, runnerFor, findRunners, filled } from "RULE_TS"
-import { CodeRunnerFences } from "TRANSFORMER_TS"
+import { createHash } from "crypto"
+import { LANGUAGES, runnerFor, findRunners, filled, normaliseProgram } from "RULE_TS"
+import { CodeRunnerFences, programKey } from "TRANSFORMER_TS"
 
 const rules = JSON.parse(readFileSync(process.argv[2], "utf-8"))
 const failures = []
@@ -96,6 +99,16 @@ for (const c of rules.ids.cases) {
   const ids = findRunners(parse(c.page), true, c.slug).map((runner) => runner.id)
   if (JSON.stringify(ids) !== JSON.stringify(c.ids)) failures.push(`ids ${c.slug}: ${JSON.stringify(ids)}`)
 }
+// The Swift cache key (#493, codeRunnerBlocks.swift.cacheKey): the site's
+// normalising, and its key as the transformer computes it.
+for (const c of rules.swift.cacheKey.cases) {
+  count += 1
+  const got = normaliseProgram(c.body)
+  const key = createHash("sha256").update(got.text, "utf8").digest("hex")
+  if (got.text !== c.normalised || got.droppedAtTop !== c.droppedAtTop || key !== c.key || programKey(c.body) !== c.key) {
+    failures.push(`swift.cacheKey ${c.name}: ${JSON.stringify(got)} ${key}`)
+  }
+}
 // The transformer itself (siteDisagrees): a runnable block whose engine the
 // site does not carry stays plain code and is named on a plantoir: error:
 // line - unless students cannot see the page.
@@ -112,12 +125,28 @@ const transformerCases = [
   { name: "the engine is not carried, on a page students cannot see", carried: [], publish: false, wrapped: false, line: null },
   { name: "the engine is not carried, after an unclosed fence", carried: [], publish: undefined, wrapped: false, line: afterUnclosed, page: unclosedPage },
 ]
+// Swift's blocks (#493): the key looked up in quartz/plantoir-runners/swift.json.
+const swiftRow = LANGUAGES.find((language) => language.fence === "swift")
+const swiftPage = "```swift run\nprint(1)\n```\n"
+const swiftKey = programKey("print(1)")
+const swiftNotCompiled = "plantoir: error: Units/Loops.md: swift block 1: " + filled(words.blockNotCompiled, swiftRow)
+const swiftNotPrepared = "plantoir: error: Units/Loops.md: swift block 1: " + filled(words.blockNotPrepared, swiftRow)
+transformerCases.push(
+  { name: "a Swift block whose program the build has", carried: ["swift"], programs: { [swiftKey]: { ok: true, file: swiftKey + ".wasm", sdk: "embedded" } }, wrapped: true, line: null, page: swiftPage, wasm: `static/swift-wasm/${swiftKey}.wasm` },
+  { name: "a Swift block the build could not compile", carried: ["swift"], programs: { [swiftKey]: { ok: false, reason: "compileError" } }, wrapped: true, line: null, page: swiftPage, unready: "compileError" },
+  { name: "a Swift block whose key the build never saw", carried: ["swift"], programs: {}, wrapped: false, line: swiftNotCompiled, page: swiftPage },
+  { name: "a Swift block on a site that does not carry Swift", carried: [], programs: {}, wrapped: false, line: swiftNotPrepared, page: swiftPage },
+)
 const home = process.cwd()
 for (const c of transformerCases) {
   count += 1
   const site = mkdtempSync(join(tmpdir(), "plantoir-runner-site-"))
   mkdirSync(join(site, "quartz"))
   writeFileSync(join(site, "quartz", "plantoir_code_runner.json"), JSON.stringify({ words, carried: c.carried, limits: {} }))
+  if (c.programs !== undefined) {
+    mkdirSync(join(site, "quartz", "plantoir-runners"))
+    writeFileSync(join(site, "quartz", "plantoir-runners", "swift.json"), JSON.stringify(c.programs))
+  }
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25)
   process.chdir(site)
   const said = []
@@ -128,10 +157,13 @@ for (const c of transformerCases) {
   transform(tree, { value: text, data: { frontmatter: { codeRunner: true, publish: c.publish }, slug: "Units/Loops", relativePath: "Units/Loops.md" } })
   console.log = log
   process.chdir(home)
-  const wrapped = JSON.stringify(tree).includes('"plantoirRunner"')
+  const text2 = JSON.stringify(tree)
+  const wrapped = text2.includes('"plantoirRunner"')
   const lined = c.line === null ? said.length === 0 : said.length === 1 && said[0] === c.line
-  if (wrapped !== c.wrapped || !lined) {
-    failures.push(`transformer, ${c.name}: wrapped ${wrapped}, said ${JSON.stringify(said)}`)
+  const wasmRight = c.wasm === undefined ? !text2.includes("dataRunnerWasm") : text2.includes(`"dataRunnerWasm":"${c.wasm}"`)
+  const unreadyRight = c.unready === undefined ? !text2.includes("dataRunnerUnready") : text2.includes(`"dataRunnerUnready":"${c.unready}"`)
+  if (wrapped !== c.wrapped || !lined || !wasmRight || !unreadyRight) {
+    failures.push(`transformer, ${c.name}: wrapped ${wrapped}, said ${JSON.stringify(said)}, program ${wasmRight}, unready ${unreadyRight}`)
   }
 }
 console.log(JSON.stringify({ count, failures }))

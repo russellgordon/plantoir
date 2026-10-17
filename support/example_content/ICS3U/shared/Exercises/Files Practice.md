@@ -1,6 +1,7 @@
 ---
 title: Files Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -55,7 +56,7 @@ and one of them is about destroying one.
 > back gives `'firstsecond'`.
 
 > [!success]- Answer 3
-> ```python
+> ```python run
 > with open("notes.txt", "w") as file:
 >     file.write("first\n")
 >     file.write("second\n")
@@ -79,7 +80,7 @@ and one of them is about destroying one.
 > certainty to design for, not an edge case.
 
 > [!success]- Answer 5
-> ```python
+> ```python run
 > try:
 >     with open("weights.txt", "r") as file:
 >         lines = file.readlines()

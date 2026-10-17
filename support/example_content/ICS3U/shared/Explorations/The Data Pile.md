@@ -1,6 +1,7 @@
 ---
 title: The Data Pile
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - explorations
@@ -33,7 +34,7 @@ Round two is where the exploration actually starts.
 
 Most people begin like this, because it is the only tool they have:
 
-```python
+```python run
 value1 = 12
 value2 = 7
 value3 = 19

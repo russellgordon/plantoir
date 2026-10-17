@@ -1847,7 +1847,8 @@ programs students edit and run in their browser; the site's half is
    extra and copied again on every build. The vendor folder IS the engine: an
    overlay alone installs nothing and says so ("…this copy of Plantoir is
    missing what runs it, so students will see the code without a Run
-   button."). The carried line: "▶️ This site carries what runs Python for 3
+   button.") - except for a `prebuilt` language (Swift, #493), whose overlay
+   is all its engine is (`page_features.OVERLAY_IS_THE_ENGINE`; below). The carried line: "▶️ This site carries what runs Python for 3
    pages." No engine with no runnable block: verify.sh 6c checks
    `static/pyodide` leaves with the last one.
 3. **The words file** (`page_features.write_runner_words`, straight after the
@@ -1892,6 +1893,133 @@ key alone deciding (above); downloading Pyodide when a site is built (a build
 would need the network); copying the worker into `/opt/vendor` (it would
 need its own line in both runtimes) or into every site's `static/` (a site
 without runnable code would carry it).
+
+## Runnable Swift: what the launcher and the build do (#493, v1.8.0)
+
+A ` ```swift run ` block on a page that opts in runs as a small WebAssembly
+program compiled AHEAD of time (Swift has no interpreter a browser can
+carry), read-only: a student changes the input, not the code. The site's half
+is [06 → I10](06-quartz-customizations.md#i10-swift-493); the rules are
+`contracts/shared-rules.json` → `codeRunnerBlocks.swift`; the image that
+compiles is [02 → The Swift image](02-docker-image.md#the-swift-image-493-v180).
+Three steps, in three places, because **the build cannot compile**: it runs
+inside the website builder, which has no way to start another container (a
+Docker socket inside it was rejected - a container that can start
+containers can do anything on the Mac).
+
+1. **Plan** - `preview.sh`'s `prepare_runnable_swift`, just before the
+   build (03 → preview.sh), runs `python3 /opt/scripts/swift_blocks.py plan
+   --course=C --format=lines` inside the website builder. It reads EVERY page
+   of the course as the teacher keeps it (each `.md` outside dot-folders and
+   Media - not the build's merged copy, which does not exist yet), keeps the
+   pages whose settings look like they opt in (generously: a quoted `"true"`
+   is compiled though it does not opt in), finds their Swift blocks with the
+   build's own fence reader, and writes each block the cache does not hold
+   into `<builds>/<CODE>/.swift-cache/jobs/<run>/<key>.swift` - a folder of
+   this run's own (review S3: two builds of one course must never share a
+   job folder, or one deletes the other's job and caches a failure for a
+   valid block). It prints `root=`, `cache=`, `jobs=`, `count=` lines (a
+   teacher's Mac has no JSON reader the launcher can count on). It reads
+   hidden pages and other sections too: that costs a compile, never a wrong
+   answer.
+2. **Compile** - only when there are jobs, in the Swift image (built the first
+   time, after a free-space check), one `docker run --rm --network none` with
+   the cache folder mounted at its own path: `compile.py` compiles the jobs in
+   parallel and writes `<key>.wasm` and `<key>.json` beside the others.
+3. **Prepare** - `build_site.py`'s `_prepare_runnable_swift`, ALWAYS, straight
+   after the runner count: for every Swift block on a page students can see
+   that opts in (the gate's own visibility rule and python-frontmatter, as the
+   count), it copies the block's program into `quartz/static/swift-wasm/`
+   (synced: a program no page uses any more is removed - the garbage
+   collection), writes `quartz/plantoir-runners/swift.json` ({key: ok and
+   file, or not ok and the reason}), and names every block without a program
+   on a `plantoir: error:` line and as ONE folder problem,
+   `siteHealth` → `swiftCouldNotBePrepared` (in the facts as `swift_problems`).
+   It says "🦅 8 of 9 Swift programs on this site ready to run."
+
+**The key** is the SHA-256 of the block's normalised code (trailing spaces
+off, the shared indentation off, blank lines at either end dropped) - exactly
+the text compiled, so a diagnostic's line maps back: the opening fence's line
+in the teacher's file, plus the blank lines dropped from the top, plus the
+error's line in the program. The site's transformer computes the same key
+from what Quartz's parser read (`codeRunnerRule.normaliseProgram`; both
+sides run `swift.cacheKey.cases`). The key never depends on the compiled
+program (review S4).
+
+**The cache** is `<builds>/<CODE>/.swift-cache/<toolchain id>/`, beside the
+figure cache and like it outside the teacher's folder, shared by the course's
+sections. The **toolchain id** is 16 hex of SHA-256 over the Swift image's
+recipe files (`Dockerfile`, `compile.py`, `ReadLineShim.swift`,
+`FlushBeforeRead.c`), which state every pin, flag and the PATH - so a moved
+pin or flag compiles every block again (#493 acceptance 12, pinned by
+`test_swift_blocks.py`) and nothing else does. A compile error is cached too
+(an unchanged broken block is not compiled again); a compile that took longer
+than 180 s is not, nor one whose wasm-opt step or readLine flush failed, nor one killed by a
+signal or that failed with no diagnostics (review S3, and the implementation
+review's S3, measured: under `--memory 50m` a valid block used to be cached as
+a compileError with empty diagnostics, for ever; an entry an earlier
+compile.py wrote that way is now a miss, so it heals). A failure that is not
+the compiler's is never remembered. **Pruning** happens in prepare, and ONLY when this toolchain's
+folder holds every block the site needs (review N5): an offline preview
+after a recipe change would otherwise throw away the only programs that
+work - and until this toolchain compiles a block, prepare SERVES the newest
+older toolchain's program for the same code (the key names the code), with
+one `plantoir: note:` line (`swift.notes.fromBefore`; implementation review
+N2: before, the kept folder only helped a revert, and every block was "not
+ready"). Then every other toolchain's folder goes, and this one's entries
+unused for 90 days. `--full-rebuild` (the launcher passes it to plan) clears
+cached FAILURES, so a block that did not compile is compiled again; it keeps
+programs, because a key names its code and its toolchain, so a program is
+never stale (`swift.cacheCases`). Building twice compiles nothing
+the second time (acceptance 10; verify.sh checks the page comes out the same).
+
+**When a block has no program**, the reason is said on a `plantoir: error:`
+line per block, and in the folder problem ONCE per cause: each compile error
+by its block and line, every other reason once, count first ("17 blocks on 4
+pages: not made ready to run - …"; implementation review S4: a cause every
+block shares was said ten times and "and 7 more";
+`swiftCouldNotBePrepared.groupingCases`). The reasons
+(`swift.reasons`, pinned by `swift.reasonCases`):
+
+| Reason | When |
+|---|---|
+| `compileError` | Swift found an error; the line is the first error's, in the teacher's file, and the words carry the compiler's own message. The block shows its code with Run off ("This program isn't ready to run yet."). |
+| `noRoom` | the launcher found less than 6 GB free for the Swift image (`state.json` beside the cache says so; plan removes it at the start of every run). |
+| `notDownloaded` | the launcher could not build the Swift image, which downloads about 1.3 GB the first time (`state.json`: `{state: notDownloaded}`); the sentence names the download and the internet. |
+| `notCompiled` | nothing recorded, and the sentence says only "preview the course again" (implementation review N1: it used to blame the internet for causes that have nothing to do with it): a compile that did not finish (killed, too slow, wasm-opt failed - none is cached, so the next preview tries again), a wait for another launcher's download that gave up, or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
+| `notOnWindows` | the build ran on Windows, which has no container and compiles nothing in v1.8 (#493 option (b)). Chosen in the shared Python (review N2), so Windows teachers read a sentence about Windows the day they take these scripts. |
+
+**Notes, not problems.** A block whose program is over 5 MB is named on a
+`plantoir: note:` line (`swift.notes.large`, implementation review S2): a
+multi-argument print or `print(array)` costs about 3.4 MB, and `import
+Foundation` with formatters and JSON measured 46 MB, which every student
+downloads on that block's first Run. So is the count of programs served from
+the previous recipe (`notes.fromBefore`). Neither is a folder problem.
+
+The build is never stopped by any of them (#493 ruling Q1, the #485 E1
+precedent): a failed build would also stop the preview the teacher needs to
+fix the block. The issue's acceptance 11 ("fails the build") was ruled out
+for that reason.
+
+**Scheduled publishes** run the same launcher (`preview.sh --build-only`), so
+they compile too, and build the Swift image if a preview never did (ruling
+Q4). In practice a preview has already filled the cache.
+
+**Known limit.** The build's fence reader and Quartz's parser read a lazy line
+in a list item differently (`fences.pageShapes`): the build compiles the body
+IT read and the site looks for the key of a shorter body, finds none, and
+shows the block as plain code with a `plantoir: error:` line
+(`words.blockNotCompiled`). The fence reader was deliberately NOT changed to
+follow lazy lines (the brief keeps the fence rule as #455 left it; the safety
+net names the block). A Swift block the build's reader cannot see at all is
+never compiled, and is named the same way.
+
+**Rejected:** compiling in the build (it cannot start the Swift image); a
+Docker socket in the main container; the toolchain in the main image (every
+teacher would download 1.3 GB for a language most never use); failing the
+build on a compile error (ruling Q1); clearing the cache on `--full-rebuild`;
+a hand-bumped toolchain version in the key; caching a failure that was not
+the compiler's; one job folder per course.
 
 ## Self-check quizzes: what the build does (#563, v1.8.0)
 

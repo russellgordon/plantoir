@@ -206,6 +206,10 @@ COPY scripts/print_settings.py /opt/scripts/print_settings.py
 # through support/figures/plantoir-figures.mjs, caches, and gates what the site
 # carries. Imported by build_site.py by bare name.
 COPY scripts/figures.py /opt/scripts/figures.py
+# Runnable Swift (#493): which blocks the launcher must compile (`plan`, run by
+# preview.sh through docker exec before the build) and what the build gives
+# the site (`prepare`). Imported by build_site.py by bare name.
+COPY scripts/swift_blocks.py /opt/scripts/swift_blocks.py
 # Self-check quizzes (#563): the folder check that reads every `> [!quiz]` by
 # the site's own rules and writes the words the site's quizzes use. Imported
 # by build_site.py by bare name (test_baked_modules.py).
