@@ -1508,6 +1508,37 @@ def _wire_content_layout(layout_ts: Path) -> None:
     layout_ts.write_text(text[:start] + block + text[end:], encoding="utf-8")
 
 
+def _wire_list_page_toc(layout_ts: Path) -> None:
+    """Give folder pages the table of contents every other page has (#520).
+
+    Quartz renders every `folder/index.md` — a curriculum folder's index
+    among them — with `defaultListPageLayout`, whose right column is `[]` in
+    v4.5.0: the table of contents is computed for the page and then placed
+    nowhere, so `enableToc: true` and five headings showed nothing. This puts
+    the content layout's own `Component.DesktopOnly(Component.TableOfContents())`
+    there, in the list layout ONLY. Quartz's own rule then decides, as on any
+    page: shown by default, hidden by `enableToc: false`, and only with two or
+    more headings of depth 3 or less on the page itself — so a tag page or a
+    folder page with no headings of its own is unchanged. Idempotent; a
+    layout that has changed shape warns and is left alone."""
+    text = layout_ts.read_text(encoding="utf-8")
+    start = text.find("export const defaultListPageLayout")
+    if start < 0:
+        print("⚠️ Could not add the table of contents to folder pages: the page layout has changed shape.")
+        return
+    end = text.find("export const", start + 1)
+    if end < 0:
+        end = len(text)
+    block = text[start:end]
+    if "Component.TableOfContents(" in block:
+        return
+    if block.count("right: []") != 1:
+        print("⚠️ Could not add the table of contents to folder pages: the page layout has changed shape.")
+        return
+    block = block.replace("right: []", "right: [Component.DesktopOnly(Component.TableOfContents())]", 1)
+    layout_ts.write_text(text[:start] + block + text[end:], encoding="utf-8")
+
+
 def _wire_transformers_index(index_ts: Path) -> None:
     """Export the figures transformer (#485 E1), the runnable code's (#455)
     and the self-check quizzes' (#563) beside Quartz's own."""
@@ -1611,11 +1642,11 @@ def wire_quartz_additions(output_dir: Path) -> None:
     """The edits that connect support/quartz to Quartz: the Print button's two
     (#454), the figures transformer's two (#485 E1), the runnable code's
     two more (#455: its transformer before SyntaxHighlighting, its component
-    in afterBody; its exports ride the two index edits), and the self-check
+    in afterBody; its exports ride the two index edits), the self-check
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
-    button's component). Idempotent; an
-    anchor that has moved warns and leaves the file alone.
+    button's component), and the folder pages' table of contents (#520).
+    Idempotent; an anchor that has moved warns and leaves the file alone.
 
     Deliberately NOT a third edit to mermaid.inline.ts (an event saying the
     diagrams are drawn), which an earlier draft made: that script is inlined
@@ -1629,6 +1660,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz.layout.ts", _wire_code_runner_component),
+        (output_dir / "quartz.layout.ts", _wire_list_page_toc),
     ):
         try:
             wire(path)
