@@ -300,7 +300,15 @@ too small for them at its own scale (1920 × 1080 at 150%, 2026-10-15) Edge
 is told to draw at a smaller one (`hero_windows.fitted_scale`, 1.15 there)
 so the page keeps the mac's framing with fewer pixels — 1427 × 961 for the
 page, 736 × 962 for the handout, shown whole (`view=Fit`). First taken on an
-unlocked desktop on 2026-10-15. When all three are taken
+unlocked desktop on 2026-10-15. That is why they are soft beside the mac's
+2× pictures (#544), and **the console cannot fix it by drawing a window
+bigger than the screen**: measured 2026-10-16, an Edge `--app` window at
+`--force-device-scale-factor=2` asked for 680 × 880 DIPs, then
+`SetWindowPos` 1360 × 1760, kept its width and was clamped to 1106 px tall
+(the screen's 1080 plus the frame — Windows' maximum tracking size). A 2×
+retake needs a 3840 × 2160 session at 200%, where `fitted_scale` is 2.0
+for both framings; `prepare()`'s 1700-px cap would then have to be lifted
+for these pictures. When all three are taken
 the run marks both shots `windows: true`; take them off
 `WINDOWS_PICTURE_OWED` in `website/test_build_data.py` in the same commit.
 The preview is stopped with `preview.ps1 MPM2D 1 --stop`; the folder and its

@@ -657,6 +657,65 @@ than implying every line came off a run. **Nothing here has ever been seen to
 crash its host**; this exists so that if one ever does, it is read correctly
 the first time.
 
+### A red that is a clock: the pool starved early in a full run (#543, #427)
+
+Three tests with a real socket or a real process went red one run in N in a
+full `dotnet test` and green alone straight after: `PreviewPageStatusTests.
+EachStatusIsReadAsTheServerAnsweredIt` ("Expected: 200, Actual: null", 7 s,
+11.6 s into the 1.7.1 cut's run), its sibling `AStoppedPreviewEndsTheAsking
+RatherThanReadingItAsSilence` ("No exception was thrown", 7 s, 26.8 s into a
+run), and `ConPtyRedirectedParentTests.AChildStartedFromARedirectedParent
+StillWritesToItsPseudoConsole` (11 s the second time; the first's duration and both messages were not kept).
+Seven seconds is the product's 5 s per-try clock (`previewStartPage.
+secondsPerAttempt`) plus about two; eleven is the test's 10 s wait plus one.
+
+**What was reproduced** (2026-10-16, Intel i5-8365U, 8 logical CPUs, 16 GB,
+Windows 11 Pro 26200), with a scratch harness that was NOT committed: before
+each repetition it blocks every pool thread on a `ManualResetEventSlim`
+(4 × cores + the pool's current thread count work items, released from a
+DEDICATED thread, since a pool timer could not fire), then runs a verbatim
+copy of the old and the new test body, ten times each:
+
+| Body | Old | New |
+|---|---|---|
+| ConPTY, pool held 12 s | **8 of 10 red**, each `exited: True` and an EMPTY transcript, 11.8 s | 10 of 10 green |
+| `EachStatus…`, pool held 8 s | 1 of 10 red ("Expected 200, Actual null", 7.8 s) — the first repetition in the process | 10 of 10 green |
+| the same, threads handed back one per 60 ms | 1 of 10 red (7.0 s), again the first | 10 of 10 green |
+| `AStoppedPreview…`, both release shapes | 0 of 20 red | 20 of 20 green |
+
+The ConPTY shape is the useful one: an EMPTY transcript is starvation (the
+pool reader never ran), which is not #155's shape — mode sequences and no
+`PTY-OK` — so a red there should be read by its transcript. The harness
+proves the tests were VULNERABLE to a starved pool; it does not prove that
+is what happened in the recorded runs, whose messages were lost (#427) or
+whose sibling was not reproduced (`AStoppedPreview…`, a timer race that
+needs the 5 s per-try timer to be serviced before the 200 ms one).
+CPU load alone does NOT starve the pool, and the loops say so: each class
+run alone 50 times with the NEW bodies gave 50 of 50 green for both
+classes, and 50 of 50 again for both while eight busy-loop jobs held every
+core (200 runs in all, `dotnet test --no-build`, judged by the totals line).
+
+**What changed** (test code only): `EachStatus…` passes a 30 s per-try clock
+on the five answered paths and keeps 300 ms on `/stalls`, the one assert
+whose subject is the clock. `AStoppedPreview…` no longer races two timers:
+`ServeAsync` completes a `heard` `TaskCompletionSource`
+(`RunContinuationsAsynchronously`) when the request arrives, the test then
+cancels the preview itself with a one-minute per-try clock, and waits on the
+asking with `WaitAsync(30 s)`, so a product that ignored the stop would fail
+with a `TimeoutException` rather than pass when its own clock ran out. The
+ConPTY test reads on a dedicated `Thread`, as the product's `ScriptRunner`
+does, and both of its waits are 30 s. A pass still takes milliseconds.
+
+**Rejected:** `ThreadPool.SetMinThreads` in the test host — it would hide a
+starvation a product path could meet, and the tests would then be passing in
+a process unlike the app's. Waiting for the listener to accept once before
+the first assert (#543's other option) — `listener.Start()` already accepts
+at the TCP level (the kernel completes the handshake into the backlog
+before `ServeAsync` returns); what starves is the user-mode work on both
+sides, the accept loop, the reads and writes, HttpClient's continuations
+and the timers, so it would change nothing. A dedicated server thread
+instead of `Task.Run` — the client side starves too, so it cures half.
+
 ### And when the failure IS real: a red contract test is a handover
 
 Everything above is about telling a genuine failure from a crash or an empty
@@ -1152,6 +1211,10 @@ the whole process) and the per-instance `_ptyGate` (it would not serialise two
 Starts). The cost: while the lock is held, another thread writing to
 `Console` loses that output — the GUI app writes none. Launching harnesses
 with ShellExecute is still the better habit, and `DrivenApp` keeps doing it.
+Since #427 (2026-10-16) the test reads on a dedicated thread with 30 s
+waits: a pool reader starved at the start of a full run gave `exited: True`
+and an EMPTY transcript — a different shape from the one above — in a
+harness that starved the pool ("A red that is a clock", above).
 
 The app also says so now: when it starts with stdout, stderr or stdin
 redirected to a pipe or a file, `startup.log` gets one line
@@ -1574,6 +1637,78 @@ line and a path-free notice, the skills, Not Now, the hook),
 `PreviewBrowserHandoffTests` (modes and papers against the contract, the
 message, the trail words, a link's destination never on the trail, the
 shim's shape against `print.inline.ts`).
+
+## The sidebar's page dot on Windows (#515, #546)
+
+The dot before each page row inside an open folder of "Navigate this site"
+is one stylesheet in `support/quartz` (`06-quartz-customizations.md` → "H.
+The sidebar's page marker"); Windows inherits it with the toolchain, no C#
+and no contract key. What #546 owed is that it was confirmed on a native
+build, in the app's own pane, and under a REAL contrast theme, which the mac
+can only emulate.
+
+**Measured 2026-10-16** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one
+1920 × 1080 screen at 150%, Edge and WebView2 Runtime 155.0.4283.60, the
+runtime's Node 20.18.1):
+
+- **The mac's check, unchanged, on a native build.** A scratch working folder
+  (`print_set_windows.mirror_toolchain` from this tree, verify.sh's own EXC2O
+  copied from `support/example_course`), with verify.sh's four planted files
+  written byte for byte (`Discussions/Marker Fixture Long.md`, `Marker
+  Fixture Word.md`, `Discussions/Tasks/index.md` and `Marker Fixture Inner
+  Page.md`) **plus its `Plain Long Page.md`**: the check needs one page at the
+  TOP level of the sidebar ("no page at the top level … the check would prove
+  nothing"), EXC2O's own top-level pages are not in the explorer, and in
+  verify.sh that page comes from the #501 fixture. `preview.ps1 EXC2O 1
+  --build-only --non-interactive` with `PLANTOIR_RUNTIME` set; the built
+  `index.css` carries the forced-colours rule (`CanvasText`, one match);
+  `public\` served by `python -m http.server` on 127.0.0.1; then
+  `node --experimental-websocket browser-checks/sidebar_page_marker.mjs
+  "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+  http://127.0.0.1:<port>/Discussions/Marker-Fixture-Long.html
+  http://127.0.0.1:<port>/Discussions/index.html Discussions Tasks "Marker
+  Fixture Page With A Title Long Enough To Wrap Onto A Second Line"`, verbatim:
+  **`OK: light 5.63:1, dark 9.45:1, forced colours 10.41:1`** — the mac's
+  forest-moss figures to the hundredth (7 pages marked, 11 folders bare, the
+  long title on 3 lines with every line at 12.8 px, the dot at 0).
+- **The app's own preview pane.** The x64 Debug build with `--state-dir` on
+  that folder, Preview pressed on EXC2O Section 1, the pane read over
+  WebView2's debugging port (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=
+  --remote-debugging-port=…`) and photographed. Dark (the system's mode) and
+  then light: a dot on every page row of the open Discussions folder and of
+  Tasks inside it, none on a folder row; the three-line long title and the
+  too-wide "Electroencephalographically…" title both hang, every line
+  starting under the first letter; the current page in Quartz's highlight
+  colour (rgb(184, 196, 128) light, rgb(210, 221, 158) dark) and, hovered
+  (by Chromium input over the debugging port), "Energy Source Debate" took
+  the hover colour while its dot kept `--dark`. Two things about the pane at
+  this screen size, neither the dot's: at the 900-epx window the pane is
+  Quartz's narrow layout (the sidebar behind the menu button), and on a
+  maximised window the explorer had been left collapsed, and its folders
+  closed, by the earlier narrow visit, so "Navigate this site" had to be
+  opened by hand. The photographs were taken with the pane zoomed to 75%
+  (Ctrl+−), to fit the folder on a 1080-px screen.
+- **High Contrast, the real theme.** Before: `SPI_GETHIGHCONTRAST` flags 126
+  (off), `CurrentTheme` `…\Themes\Custom.theme`, AppsUseLightTheme 0,
+  SystemUsesLightTheme 0. `SPI_SETHIGHCONTRAST` with `HCF_HIGHCONTRASTON`
+  (not elevated) turned on **High Contrast Black** (`hcblack.theme`; it also
+  set AppsUseLightTheme to 1). In the still-running app's pane and in a
+  headed Edge window on the served build, `matchMedia('(forced-colors:
+  active)')` was **true** in both; every page dot (7 of 7 in Edge, the
+  nested Tasks page included) computed to **rgb(255, 255, 255)**, CanvasText,
+  at the stylesheet's .75 opacity, on Canvas **rgb(32, 32, 32)**: (199, 199,
+  199) on (32, 32, 32), **9.64:1**. Seen: a light grey dot on every page row,
+  none on folder rows, the long titles hanging, in both. (Edge's window
+  photographs blank under the theme, so its picture was taken by Chromium's
+  own `Page.captureScreenshot`; the pane photographs normally.) Turned off
+  with flags 126: flags, `CurrentTheme`, AppsUseLightTheme and
+  SystemUsesLightTheme all read back as before. One residue: Windows now
+  remembers "High Contrast Black" as the scheme the NEXT time contrast is
+  turned on (`lpszDefaultScheme` read "" before).
+
+The emulated figure (10.41:1, black on white) and the real one (9.64:1, the
+dot's .75 opacity over Black's dark Canvas) differ because the emulation's
+Canvas is white; both clear 3:1 by a wide margin.
 
 ## What this page does not cover
 
@@ -4439,7 +4574,9 @@ not apply here: there is no splitter to drag (the sidebar is a fixed 230 px)
 and WinUI does not measure a TextBlock at a proposed near-zero width; with a
 900 px minimum window the detail column cannot get narrower than about
 670 px. Height was not squeezed (737 of a 600 px minimum), and the lowest
-part sits at 328 px.
+part sits at 328 px. (Read since #542: these UI Automation numbers are epx,
+not pixels. The test host is not DPI-aware, so it is handed rectangles
+virtualised to 96 dpi; "900" was the 900 epx minimum, 1350 px at 150%.)
 
 **Measured, 2026-10-01 13:51 (bundle 11, run 1, same PC), verbatim:**
 "window 900x737; notice 631x157 (top 135 below the window's top)". The
@@ -4449,6 +4586,8 @@ notice is 157 px of a 737 px window, inside it. The test's own wait for the
 width to reach 520 times out silently; it should say so if the window's
 minimum ever drops (left as it is: the assertion that matters — the notice
 stays inside the window — holds at the narrowest width a teacher can reach).
+(Since #542 the wait is for the width to SETTLE, which it does at the 900 epx
+minimum, rather than for a number it can never reach.)
 
 
 ## The pictures on plantoir.app: real windows, staged by the app (#380, #370)
@@ -6287,7 +6426,8 @@ long title shortens before the buttons are pushed out.
 
 **Measured 2026-10-15** (Intel i5-8365U, Windows 11 Pro 26200, one 1920 ×
 1080 screen at 150%, the sidebar at its only width, 230 epx; widths are the
-window's outer pixels): the window's minimum is **900 PIXELS, not 900 epx** —
+window's outer pixels; **the next sentence, and the table's last row label, were wrong — see the
+correction below the table**): the window's minimum is **900 PIXELS, not 900 epx** —
 `PreferredMinimumWidth` is in the AppWindow's physical units — so at 150% it
 is 600 epx, and dragging the edge stops there.
 
@@ -6300,11 +6440,72 @@ is 600 epx, and dragging the edge stops there.
 | 900 px (600 epx, the minimum) | title gone, Deploy cut, Browser off | the Preview button cut, Deploy and Browser off |
 
 So at 900 epx nothing clips; the ellipsis does its job down to about 800
-epx with the long title; below that the buttons leave the window, and the
-minimum allows it at any scale above 100%. Not changed here (it is
-behaviour, and the mac's minimum is a separate question): making the
-minimum 900 epx (`900 × scale`), or letting the toolbar's buttons shrink to
-their glyphs, is the director's call.
+epx with the long title; below that the buttons leave the window.
+
+**Corrected 2026-10-16 (#542): the minimum was already 900 epx; the window
+OPENED below it.** Measured on the same PC at 150% by
+`WindowMinimumUiTests.AtItsNarrowestTheWindowStillShowsPreviewDeployAndBrowser`,
+reading the frame both through UI Automation and through `GetWindowRect` on a
+thread made per-monitor DPI-aware, against an x64 Debug build of dev
+99295805c, "Preview at Last Viewed" seeded:
+
+- **At launch** (first run, no remembered frame): 1190 × 725 px, which UI
+  Automation reports as 793 × 483, i.e. **793 × 483 epx** — the first-run size
+  is 62% × 72% of the work area (1920 × 1008), set by `AppWindow.Resize` in
+  pixels BEFORE the minimum was set, and setting a minimum does not grow a
+  window that is already narrower. Every button was whole (Browser's right
+  edge 15 epx inside the window), the section title shortened — the "800 epx"
+  row above.
+- **At its narrowest** (UI Automation asked for 400 × 400): **1350 × 900 px =
+  900 × 600 epx**. `PreferredMinimumWidth`/`Height` behave as epx: the
+  presenter scales them. Nothing drags below that.
+
+So the table's first sentence ("900 PIXELS, not 900 epx … dragging the edge
+stops there") was wrong, and the rows below 900 epx were not reachable by a
+drag. Those widths were reached some other way that was not recorded; the
+rows still describe what the toolbar does at those widths (they agree with
+the launch measurement at 793 epx). In a teacher's hands the app reached
+them in two ways: the first-run window above, and a remembered frame — it is
+kept in PIXELS, so a 1350 px window remembered on a 150% display and
+reopened on a 225% one is 600 epx there.
+
+**What changed.** `MainWindow.ApplyMinimumSize(scale)` sets the minimum
+BEFORE the first `Resize` and the launch size (first-run or remembered) is
+clamped up to it, so the window opens at no less than 900 × 600 epx (1350 ×
+900 px at 150%). A remembered frame is MOVED first, and the scale
+(`GetDpiForMonitor` of the monitor it now sits on) and the work area are read
+after the move, so a frame reopened on another display is clamped for THAT
+display. The minimum is clamped to the work area of the display the
+window is on (`DisplayArea.GetFromWindowId(…, Nearest)`), divided by the
+scale, because 900 epx is 2025 px at 225% — wider than a 1920 work area, and
+a minimum wider than the screen would trap the window. Once the content
+loads (from `XamlRoot.RasterizationScale`) and again on `XamlRoot.Changed`
+when the scale changes (a monitor move, a display-scale change),
+`EnforceMinimumSize` re-applies the minimum AND grows a window left below it,
+unless it is maximised or minimised — the minimum alone does not grow one. **What holds
+what:** the first-run clamp is held by `WindowMinimumUiTests` (named above), on this one display
+at one scale; the remembered-frame order, the re-apply and the grow on a
+scale change (the multi-monitor cases) are held by reading the code, since
+there is one screen here and no test changes the display scale. **On a 1920-wide screen at 225–250% the work-area clamp can still cut
+the toolbar**: the window there is narrower than 900 epx (1920 / 2.25 = 853
+epx), which is below the width the long title needs — and so is any screen
+whose work area is under 900 epx wide, a 1280 × 800 laptop at 150% (853 epx)
+among them. After the change the
+same UiFact read 1350 × 900 px (900 × 600 epx) at launch and at the
+narrowest; maximised (1295 × 687 epx) the buttons were Preview 185, Deploy 89
+and Browser 36 epx wide, and at the 900 epx minimum the same, Browser 15 epx
+inside the right edge.
+
+**REJECTED:** a minimum of `900 × RasterizationScale`, #542's option 1 as
+filed — on the reading that the minimum was in pixels. The presenter already
+scales it, so that would have asked for 1350 epx (2025 px) at 150%. And #542's
+option 2, toolbar buttons that shrink to their glyphs: the mac does not have
+it; on a 1920-wide screen at 200% and below nothing needs it, and where the
+work area is under 900 epx (225% and above there, or a smaller screen) it is
+the remaining option, not taken. The UiFact's
+right-edge check is 8 px × scale inside UI Automation's window rectangle,
+because that rectangle includes Windows 11's invisible resize border (7 px a
+side at 150%: `GetWindowRect` 1350 against the visible frame's 1332).
 
 ### Known limits
 
