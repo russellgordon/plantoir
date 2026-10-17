@@ -569,6 +569,39 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
                        "written under a hidden Obsidian")
     }
 
+    /// Fixes review N1: while Obsidian runs, a registry that cannot be read
+    /// (caught mid-write) counts as open — no write.
+    func testAnUnreadableRegistryWhileRunningCountsAsOpen() async throws {
+        XCTAssertTrue(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: true, registryData: Data("{\"vaults\": {\"a".utf8)))
+        XCTAssertTrue(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: true, registryData: nil))
+        XCTAssertFalse(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: false, registryData: nil))
+        XCTAssertFalse(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: true, registryData: try ObsidianFigureAddOnsTests.registry(vaults: ["/w/ICS3U"], open: true)))
+        let made: Driven = try drive(answer: .yes)
+        made.log.running = true
+        made.log.registry = Data("{\"vaults\": {\"a".utf8)
+        made.workspace.addObsidianAddOnsAfterAPreview(course: made.course)
+        await made.workspace.obsidianAddOnsWork?.value
+        XCTAssertFalse(FileManager.default.fileExists(atPath: made.course.directoryURL.appendingPathComponent(".obsidian/plugins").path),
+                       "written while the registry could not be read")
+    }
+
+    /// Fixes review N2: the course opened in Obsidian WHILE the offer was up —
+    /// Add Them asks again and goes the reopen way, never writing under it.
+    func testAddThemChecksAgainWhenAnswered() async throws {
+        let made: Driven = try drive(answer: .notAsked)
+        made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
+        await made.workspace.obsidianAddOnsWork?.value
+        let request: ObsidianAddOnsRequest = try XCTUnwrap(made.workspace.obsidianAddOnsOfferRequest)
+        XCTAssertFalse(request.courseIsOpen)
+        made.log.running = true
+        made.log.openVaults = [made.course.directoryURL.path]
+        made.log.quitCloses = false
+        await made.workspace.answerObsidianAddOnsOffer(request, .addThem)
+        XCTAssertEqual(made.log.quits, 1, "the reopen way")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: made.course.directoryURL.appendingPathComponent(".obsidian/plugins").path),
+                       "written under an Obsidian opened while the offer was up")
+    }
+
     /// Later: opened as it is, nothing written, not asked again this run.
     func testLaterWritesNothingAndIsNotAskedAgain() async throws {
         let made: Driven = try drive(answer: .yes)

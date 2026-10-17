@@ -26739,7 +26739,7 @@
       ]
     },
     "offerCases": {
-      "note": "Open in Obsidian's decision (sequence), as data. `courseOpenInObsidian` means Obsidian is RUNNING and its registry marks the course open - however many of its windows are on screen: a hidden, minimised, full-screen or other-Space Obsidian still holds the course's add-on list in memory (implementation review B1, measured on a hidden Obsidian with 16 vault windows and none on screen). Over-reporting is the safe direction. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
+      "note": "Open in Obsidian's decision (sequence), as data. `courseOpenInObsidian` means Obsidian is RUNNING and its registry marks the course open (or cannot be read while it runs - it is rewritten in place) - however many of its windows are on screen: a hidden, minimised, full-screen or other-Space Obsidian still holds the course's add-on list in memory (implementation review B1, measured on a hidden Obsidian with 16 vault windows and none on screen). Over-reporting is the safe direction. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
       "cases": [
         {
           "name": "a reference course is never scanned",

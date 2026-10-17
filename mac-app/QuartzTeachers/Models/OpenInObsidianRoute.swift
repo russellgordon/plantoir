@@ -177,7 +177,9 @@ extension WorkspaceModel {
         switch answered {
         case .addThem:
             settings.obsidianFigureAddOns = .yes
-            if request.courseIsOpen {
+            // Asked again NOW: the teacher may have opened the course in
+            // Obsidian while the question was up (fixes review N2).
+            if request.courseIsOpen || courseIsOpenInObsidian(request.course.directoryURL.path) {
                 await reopenObsidianWithAddOns(request)
                 return
             }
@@ -232,7 +234,7 @@ extension WorkspaceModel {
                 vaultIsTheCourse: ObsidianFigureAddOnsOffer.vaultIsTheCourse(
                     targetPath: coursePath, coursePath: coursePath, registryData: self.obsidianOpening.registryData()
                 ),
-                courseOpenInObsidian: self.vaultsOpenInObsidian().contains(coursePath)
+                courseOpenInObsidian: self.courseIsOpenInObsidian(coursePath)
             )
             if decision == .install {
                 await self.addObsidianAddOns(toCourse: course, scanned.needed, trigger: .afterAPreview)
@@ -256,7 +258,7 @@ extension WorkspaceModel {
             vaultIsTheCourse: ObsidianFigureAddOnsOffer.vaultIsTheCourse(
                 targetPath: target.path, coursePath: coursePath, registryData: obsidianOpening.registryData()
             ),
-            courseOpenInObsidian: vaultsOpenInObsidian().contains(coursePath),
+            courseOpenInObsidian: courseIsOpenInObsidian(coursePath),
             reopenDeclinedThisRun: ObsidianFigureAddOnsThisRun.reopenDeclined.contains(coursePath)
         )
         switch ObsidianFigureAddOnsOffer.decision(situation) {
@@ -310,6 +312,16 @@ extension WorkspaceModel {
     /// Open in Obsidian asks to reopen.
     private func vaultsOpenInObsidian() -> [String] {
         return ObsidianFigureAddOnsOffer.vaultsOpen(
+            obsidianRunning: obsidianOpening.isRunning(),
+            registryData: obsidianOpening.registryData()
+        )
+    }
+
+    /// Whether this course counts as open in Obsidian right now
+    /// (`ObsidianFigureAddOnsOffer.courseIsOpen`).
+    private func courseIsOpenInObsidian(_ coursePath: String) -> Bool {
+        return ObsidianFigureAddOnsOffer.courseIsOpen(
+            coursePath: coursePath,
             obsidianRunning: obsidianOpening.isRunning(),
             registryData: obsidianOpening.registryData()
         )
