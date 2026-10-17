@@ -5842,8 +5842,10 @@ stretches to it.
 12 rows.** ContentDialog's content `ScrollViewer` has its vertical scrolling
 DISABLED in the template: content taller than the dialog is clipped from
 OUTSIDE, where no scroll bar can reach it. A Windows window is often short:
-the default window on this PC (Windows 11, 1920 × 1080 at 150%) is 793 × 483
-epx, a XAML root 446 epx tall. So everything on the plan stage has to fit,
+the default window on this PC (Windows 11, 1920 × 1080 at 150%) was 793 × 483
+epx when this was written, a XAML root 446 epx tall — since #542 it opens at
+its 900 × 600 epx minimum, a root of about 563, and 446 is kept here as
+a shorter root the layout is still written to survive. So everything on the plan stage has to fit,
 and `PlanTableLayout.For` (Core, unit-tested) decides how much of each part
 shows. The NOTES give way first, to keep four rows (`PreferredRows`): their
 cap is clamp(min(H, 756) − 230 − 2 − 8 − 4 × 32, 40, 120) epx, and it is the
@@ -5883,11 +5885,19 @@ at 900 × 600 (XAML root 563), and the table grew from 161 to 290 epx (5 to 9
 rows), with everything inside. Whether that minimum is applied in epx or
 pixels, and why the default window opens below it, is settled under #542, not
 here; these are the numbers this piece saw. The 31-row fixture whose note
-names thirty linked classes (112 epx laid out): 4 rows, the notes given 78
-epx and their viewport showing 70% of them, scrolled to 100%, and the notes
-area inside the window (UI Automation clips a note's rectangle to the
-viewport, so the note's own rectangle cannot show more than that); Publish 35
-epx above the window's bottom. Earlier the same day, over a 200% remote session (window 937 × 625
+named thirty linked classes (112 epx laid out), AT THAT 793 × 483 WINDOW: 4
+rows, the notes given 78 epx and their viewport showing 70% of them, scrolled
+to 100%, and the notes area inside the window (UI Automation clips a note's
+rectangle to the viewport, so the note's own rectangle cannot show more than
+that); Publish 35 epx above the window's bottom. **Since #542 the window opens
+at its 900 × 600 minimum (XAML root about 563)**, and there a 112-epx note fits
+whole beside 5 rows — correct behaviour, and it left
+`LongNotesScrollToTheirEndInsideTheWindow` failing on "the notes do not
+scroll" in the full UI run of 2026-10-16 on `dev` b0af8d3fd (window 900x600;
+notes area 112; note 112 tall). The product was right and the FIXTURE too
+short, so it now links seventy classes: a note well past the notes' 120-epx
+cap, which scrolls at ANY window height rather than only at the one it was
+first measured at. Earlier the same day, over a 200% remote session (window 937 × 625
 epx), 10 rows.
 
 **Return and Escape with the table focused — measured, and one key needed

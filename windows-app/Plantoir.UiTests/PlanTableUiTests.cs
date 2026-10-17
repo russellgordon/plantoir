@@ -48,11 +48,15 @@ public class PlanTableUiTests
     }
 
     /// <summary>
-    /// A class linking thirty hidden classes: each is left as it is, so the
-    /// note under the table names all thirty and runs to several lines —
-    /// longer than the notes are given at the default window.
+    /// A class linking seventy hidden classes: each is left as it is, so the
+    /// note under the table names all seventy and runs to about ten lines —
+    /// well past the 120 epx the notes are EVER given (PlanTableLayout's cap),
+    /// so they scroll at any window height. Thirty were enough at the 793 × 483
+    /// window this was first measured at (a 112-epx note, given 78); since #542
+    /// the window opens at its 900 × 600 minimum, where 112 epx fits whole
+    /// beside five rows — correct, and no test of scrolling at all.
     /// </summary>
-    private const int LinkedClasses = 30;
+    private const int LinkedClasses = 70;
 
     private static void WriteCourseWithLongNotes(string courses)
     {
@@ -332,7 +336,8 @@ public class PlanTableUiTests
 
     /// <summary>
     /// The review's finding 1: at the default window, notes longer than they
-    /// can be given scroll inside their own area, to 100%, with that area
+    /// can be given (the fixture's are taller than the notes' 120-epx cap, so
+    /// this holds at any window the app opens at) scroll inside their own area, to 100%, with that area
     /// inside the window — never cut off below the dialog — and the table,
     /// Cancel and Publish stay inside the window.
     /// </summary>
