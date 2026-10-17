@@ -244,6 +244,59 @@ public class HowITeachTests : IDisposable
         Assert.False(new AssistToolAnswerProbe(tools.PlanWriteHowITeach("ICS3U", "")).IsPlan);
     }
 
+    // ---- A course kept for reference (#540) ---------------------------------
+
+    /// <summary>Marks the fixture's course as kept for reference, the key #241 reads.</summary>
+    private void KeepForReference() =>
+        File.WriteAllText(Path.Combine(CourseDirectory, "course_config.json"),
+            """
+            { "course_code": "ICS3U", "course_name": "Computer Science", "deploy_target": "netlify",
+              "num_sections": 1, "per_section_folders": ["All Classes"], "section_numbers": [1],
+              "kept_for_reference": true, "reference_school_year": 2025 }
+            """);
+
+    /// <summary>
+    /// #540: <c>plan_write_how_i_teach</c> is ReadOnly, so the gate every write
+    /// shares never saw it, and the plan promised what the write was then
+    /// refused. It refuses itself now, and is not a plan.
+    /// </summary>
+    [Fact]
+    public void ThePlanRefusesACourseKeptForReference()
+    {
+        KeepForReference();
+        var workspace = Open();
+        string shown = ReferenceCourse.ShownCode(workspace.Course("ICS3U"));
+
+        var result = new PlantoirTools(workspace).PlanWriteHowITeach("ICS3U", "Words.");
+
+        Assert.False(new AssistToolAnswerProbe(result).IsPlan);
+        Assert.Equal(ReferenceCourse.StaysAsItIs(shown), result.Summary());
+        Assert.False(File.Exists(PagePath));
+    }
+
+    /// <summary>
+    /// <c>howITeachPage.tools.planAndWriteAgree</c>: the plan refuses exactly
+    /// what the write is refused, in the same words — pinned against the gate
+    /// itself, not against a copy of its sentence. Reading still works
+    /// (<c>readOnAReferenceCourse</c>).
+    /// </summary>
+    [Fact]
+    public void ThePlanAndTheWriteRefuseAReferenceCourseInTheSameWords()
+    {
+        KeepForReference();
+        var workspace = Open();
+        var tools = new PlantoirTools(workspace);
+
+        string? gate = ReferenceWriteGate.Refusal("write_how_i_teach",
+            System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, System.Text.Json.JsonElement>>(
+                """{"course":"ICS3U","text":"Words."}""")!, workspace);
+
+        Assert.NotNull(gate);
+        Assert.Equal(gate, tools.PlanWriteHowITeach("ICS3U", "Words.").Summary());
+        Assert.Equal(gate, Assert.Throws<AssistRefusal>(() => workspace.WriteHowITeach("ICS3U", "Words.", "")).Message);
+        Assert.Contains(AssistWording.HowITeachMissing("ICS3U"), tools.ReadHowITeach("ICS3U").Summary());
+    }
+
     private sealed record AssistToolAnswerProbe(CallToolResult Result)
     {
         public bool IsPlan => Result.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>() == true;

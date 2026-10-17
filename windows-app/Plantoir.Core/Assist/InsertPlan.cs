@@ -44,6 +44,13 @@ public sealed class InsertPlan
 
     public bool ChangesNothing => Added.Count == 0 && Renames.Count == 0 && Moves.Count == 0;
 
+    /// <summary>
+    /// Other classes are renamed or moved, so the make-room records no undo
+    /// entry and every plan of it says so before Go (the mac's
+    /// <c>movesAnythingElse</c>; #530, #489).
+    /// </summary>
+    public bool MovesOtherClasses => Renames.Count > 0 || Moves.Count > 0;
+
     /// <summary>The plan in the class form — what the MODEL reads, in every course.</summary>
     public string Describe() => Describe(ClassNoun.Class);
 

@@ -525,8 +525,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                              $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}." +
                              (replaced is { } was ? " " + AssistWording.ScheduleReplaces($"{was:dddd d MMMM, h:mm tt}") : "");
             return Answering(summary, summary + "\n\n" +
-                             "Remember this computer has to be on and awake then — plugged in if it is a laptop, " +
-                             "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it.");
+                             "Remember this computer has to be " + ScheduledDeploy.AwakeThenWithTheLidOpen + " " +
+                             "Plantoir cannot wake it up. Say the word and I'll cancel it.");
         });
 
     [McpServerTool(Name = "cancel_scheduled_deploy", Title = "Call off a scheduled deploy",
@@ -679,15 +679,25 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             var noun = workspace.NounForCourse(course);
             if (plan.ChangesNothing) return Answering(plan.Describe());
+            string forTheModel = plan.Describe();
             string card = plan.Describe(noun);
-            // The menu's card says, before Make Room is pressed, that Undo
-            // Last Change will not take this back once other classes move
-            // (#489, the mac's makeRoomPlan(fromTheMenu:)).
-            if (workspace.SpeaksFromTheMenu && (plan.Renames.Count > 0 || plan.Moves.Count > 0))
-                card += "\n\n" + (noun == ClassNoun.Meeting
-                    ? AssistWording.MakingRoomCannotBeUndoneFromTheMenuForAMeeting
-                    : AssistWording.MakingRoomCannotBeUndoneFromTheMenu);
-            return Proposing(plan.Describe(), card);
+            // Once other classes move, Undo Last Change will not take this
+            // back, and the plan is where the teacher can still say no — so it
+            // says so before Go, the mac's makeRoomPlan. The model's copy in
+            // the CLASS form (it reads the class form in every course, #274);
+            // the card in the course's noun on the assistant's card (#530),
+            // or the FromTheMenu twin on the Section menu's card (#489) —
+            // exactly one of the two, never both.
+            if (plan.MovesOtherClasses)
+            {
+                forTheModel += "\n\n" + AssistWording.MakingRoomCannotBeUndone;
+                card += "\n\n" + (workspace.SpeaksFromTheMenu
+                    ? ClassPageSchemes.Say(noun, AssistWording.MakingRoomCannotBeUndoneFromTheMenu,
+                                           AssistWording.MakingRoomCannotBeUndoneFromTheMenuForAMeeting)
+                    : ClassPageSchemes.Say(noun, AssistWording.MakingRoomCannotBeUndone,
+                                           AssistWording.MakingRoomCannotBeUndoneForAMeeting));
+            }
+            return Proposing(forTheModel, card);
         });
 
     [McpServerTool(Name = "make_room_for_classes", Title = "Make room for classes",
@@ -1783,6 +1793,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // Nothing went back, because every file has been edited since. This
         // must not read like a success, and a count of files put back reads
         // exactly like one when the count is zero.
+        // Some files went back and the rest were kept, so the entry STAYS on
+        // the list: a write with no new undo entry, which the menu's trail
+        // reads as "took part of the last change back" (#550, the mac's #531).
+        if (result.Restored.Count > 0 && result.Skipped.Count > 0) workspace.NoteAChangeWithNoUndoEntry();
+
         if (result.Restored.Count == 0)
         {
             string refusal = (menu ? AssistWording.CouldNotUndoFromTheMenu(result.Description, result.Skipped.Count)
@@ -2142,17 +2157,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             if (unitWord is not null) unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
         }
         string what = unit is { } number ? $"{unitWord} {number}" : "the pages you named";
-        string reason = error is UnauthorizedAccessException
-            ? "Plantoir doesn’t have permission to change one of them."
-            : error.Message;
-        string said = AssistWording.PublishStoppedPartWay(what, reason);
-        // The menu has no Restore banner; its way back is the copy it made
-        // just before this change, in the course's Backups (#489).
-        if (workspace.SpeaksFromTheMenu && workspace.ConversationBackupPath is not null)
-            said += " " + AssistWording.RestoreFromBackupPutsItBack;
-        else if (workspace.ServesTheLocalWindow && workspace.ConversationBackupPath is not null)
-            said += " " + AssistWording.RestoreSectionPutsItBack(section.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        return said;
+        // One composition for every change that stopped part way, the re-date
+        // included since #550 (the way back per surface is decided there).
+        return workspace.StoppedPartWay(what, error, section);
     }
 
     private async Task<CallToolResult?> WholeUnitRequested(
@@ -2284,13 +2291,22 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// so a teacher who read "Show this to the teacher and ask before going
     /// ahead" was being addressed as though they were the model, about
     /// machinery, directly above the asking it described.
+    ///
+    /// <para>From the Section menu's server only, a plan also carries its
+    /// table in <c>_meta</c> (#548, <see cref="AssistToolAnswer.PlanTableKey"/>)
+    /// — beside the card, never instead of it, and never in the text content,
+    /// so the model's bytes do not move. The two answers above are not plans
+    /// and carry none.</para>
     /// </summary>
-    private CallToolResult Proposing(PublishPlan plan) =>
-        plan.NothingToDoSentence is { } already
-            ? Answering(already)
-            : (plan.ChangesNothing && plan.UnknownNames.Count > 0)
-                ? Answering(plan.Describe())
-                : Proposing(plan.Describe());
+    private CallToolResult Proposing(PublishPlan plan)
+    {
+        if (plan.NothingToDoSentence is { } already) return Answering(already);
+        if (plan.ChangesNothing && plan.UnknownNames.Count > 0) return Answering(plan.Describe());
+        var proposal = Proposing(plan.Describe());
+        if (workspace.SpeaksFromTheMenu)
+            proposal.Meta![AssistToolAnswer.PlanTableKey] = workspace.Tabulate(plan).ToJson();
+        return proposal;
+    }
 
 
     /// <summary>

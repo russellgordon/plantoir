@@ -131,7 +131,6 @@ internal static class NamedGapLedger
     // parity with mac v1.4.0", and the ledger was its burn-down list.)
     private const string V150 = "v1.5.0";
     private const string V171 = "v1.7.1";
-    private const string V172 = "v1.7.2";
 
     /// <summary>
     /// One thing the contract names and this app does not have yet.
@@ -152,14 +151,10 @@ internal static class NamedGapLedger
         keys.Select(key => new Entry(area, key, issue, milestone, reason));
 
     // Reasons, one per owning issue, as `private const string` beside the
-    // milestones above. (Empty from 2026-10-15, when the catch-up to mac 1.7.1,
-    // #481, closed its last two entries, until mac 1.7.2's plan table below.)
-
-    private const string PlanTable548 =
-        "mac #524 (v1.7.2) shows the three page plans — Publish Pages…, Hide Pages… and Publish Class " +
-        "for a Date… — as a table (page, folder, change) with a summary line above it, and builds the " +
-        "card's per-page lines from the same plan* pieces (documentation/09-mac-app.md → \"The plan as a " +
-        "table (#524)\"); Windows has neither the table nor these members yet, and #548 brings both";
+    // milestones above. EMPTY since 2026-10-16: #548 closed the sixteen
+    // plan-table sentences (mac #524) that #551's piece held open that
+    // morning, when the plan table landed. (Empty before that from
+    // 2026-10-15, when the catch-up to mac 1.7.1, #481, closed its last two.)
 
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
@@ -182,18 +177,10 @@ internal static class NamedGapLedger
 
         // ---- app-rules.json → modelTiers.requirements
 
-        // ---- assist-wording.json → wording. (The Section menu's sentences
-        // landed with #489's 2B, and the Deploy question's seventeen, mac
-        // #475, with 2C.) Held open since 2026-10-16: the sixteen sentences of
-        // mac #524's plan table, owed by #548 — the plan's one-page pieces
-        // (plan*) and the table's own summary, columns and cells (menuPlan*).
-        Owed(AssistWordingKeys, 548, V172, PlanTable548,
-            "planWillBecomeVisible", "planWillBecomeHidden", "planNothingWouldChange",
-            "planWillBecomeVisibleWithTheDateOf", "planStaysVisibleBecause",
-            "menuPlanPageColumn", "menuPlanFolderColumn", "menuPlanChangeColumn",
-            "menuPlanAlreadyVisible", "menuPlanAlreadyHidden", "menuPlanStaysExactlyAsItIs",
-            "menuPlanStaysAsItIs", "menuPlanStaysAsItIsForAMeeting",
-            "menuPlanSummary", "menuPlanSummaryHiding", "menuPlanSummaryOnePage"),
+        // ---- assist-wording.json → wording: none held open. The Section
+        // menu's sentences landed with #489's 2B, the Deploy question's
+        // seventeen (mac #475) with 2C, and mac #524's sixteen plan-table
+        // sentences (plan*, menuPlan*) with #548's plan table.
 
         // ---- assist-cases.json → scenarios.cases: none held open. #475's
         // three landed with #489's 2C.
