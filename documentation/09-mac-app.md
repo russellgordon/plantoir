@@ -3821,25 +3821,37 @@ reference copy already leaves `plugins/` behind (#255, below);
 sheet does not tell a teacher "your add-ons were left behind" about add-ons
 they never chose, and the trail still names them.
 
-**The live check (L1–L8) was NOT run by an agent** (director ruling B1 on the
-plan review): an isolated Obsidian started from the Bash sandbox can reach
-Russell's real one through `~/.obsidian-cli.sock` (1.13.7 unlinks and
-re-listens on it at every start, at `os.homedir()`), and System Events
-keystrokes go to whichever Obsidian is in front. A prepared script, with a
-`HOME` preflight, PID-set checks and no keystrokes, is for Russell to run.
-Until it has run, three things are ASSUMED from Obsidian 1.13.7's code rather
-than measured: the trust question appears with no directory step when the
-files are on disk before the first load (L1); functionplot 1.2.1 still draws
-on 1.13.x (L2 — if it does not, ship TikZJax only, ruling Q7); and a vault
-already trusted loads an add-on added later with no new question (L6).
+**The live check (L1–L8) was run on 2026-10-17**, by a prepared script on
+an isolated Obsidian 1.13.7 (installer 1.12.7) — not by an agent driving the
+interface (director ruling B1 on the plan review): an isolated Obsidian started
+from the Bash sandbox can reach Russell's real one through
+`~/.obsidian-cli.sock` (1.13.7 unlinks and re-listens on it at every start, at
+`os.homedir()`), and System Events keystrokes go to whichever Obsidian is in
+front, so the script had a short isolated `HOME` (a Unix socket path is at
+most 104 bytes on macOS), `--use-mock-keychain`, PID-set checks and no
+keystrokes. Results, in [#495's comment](https://github.com/russellgordon/plantoir/issues/495#issuecomment-6238148700):
+the trust question appears with no directory step when the files are on disk
+before the first load, with its focus on "Browse vault in Restricted Mode"
+(L1); functionplot 1.2.1 draws on 1.13.7, and a note already open redraws
+after Trust without being reopened (L2); files written while the course is
+open bring no question and draw nothing until a relaunch, which asks (L3,
+L4); a vault already trusted loads an add-on added later with no new question,
+and TikZ draws (L6); and Russell's own Obsidian, its registry and its socket
+were untouched (L8). Until that run, L1, L2 and L6 were ASSUMED from
+Obsidian's code; they are measured now.
 
 **Teacher words** (`wording`, rule 1 with Obsidian's own quoted labels taken
 out first, `testTheWordsNeverNameTheMachinery`): Obsidian's English labels
 from 1.13.7's `i18n.js` — "Trust author and enable plugins", "Browse vault in
 Restricted Mode", "Community plugins", "Exit Restricted mode". The trust
 question puts its focus on "Browse vault in Restricted Mode", so the offer
-says Return chooses the other button; after Trust, Obsidian opens Settings ▸
-Community plugins by itself, so the offer says that too (review S9). The
+says Return chooses the other button. After Trust, Obsidian switches the
+add-ons on and goes straight on: it does NOT open Settings ▸ Community plugins
+(the live check counted `.modal.mod-settings` at 0, with the open note
+redrawing at once). The offer used to say it did — review S9 had read that
+from Obsidian's code — and told the teacher to close the settings; #582 took
+that sentence out of `offerMessage` (both platforms) and corrected
+`wording.note`. The
 key is per vault, so six courses with figures mean six trust clicks.
 
 **The trail** — four events (`activityTrail.mustRecord`): "obsidian add-ons
