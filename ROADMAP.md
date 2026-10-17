@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 17 October 2026. The current release is **1.7.2**.*
+*Last updated: 17 October 2026. The current release is **1.8.0** on the Mac and **1.7.2** on Windows.*
 
 A few things to know before you read on:
 
@@ -26,59 +26,22 @@ need to read those to use Plantoir.
 
 ---
 
-## Next: version 1.8
+## Next: Windows catches up to 1.8
 
-### Already finished, waiting for the release
+Plantoir 1.8 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
+download joins the release, with:
 
-These are done and will arrive when 1.8 is released.
-
-- **Programs students can run on the page.** Put Python code on a page and
-  students can edit it and press Run in their browser, with nothing to
-  install. The ready-made ICS3U course uses these throughout.
-  ([#455](https://github.com/russellgordon/plantoir/issues/455),
-  [#561](https://github.com/russellgordon/plantoir/issues/561))
-- **Swift programs too** (Mac only for now): read-only Swift programs that
-  students run with their own input. The first time you use one, the Mac
-  downloads a large one-time extra (about 1.3 GB).
-  ([#493](https://github.com/russellgordon/plantoir/issues/493))
-- **Self-check quizzes.** Multiple choice, select all that apply, short
-  answer and fill in the blank, written right in your notes. Students get
-  instant feedback; answers can include maths, graphs, diagrams and runnable
-  code. ([#563](https://github.com/russellgordon/plantoir/issues/563))
-- **Maths shows up even without an outside service.** The maths on your
-  pages is now served by your own class site rather than borrowed from
-  another website.
-  ([#494](https://github.com/russellgordon/plantoir/issues/494))
-- **Curriculum pages:** the overall expectations now show "When did we do
-  this?" links, as the specific expectations already did.
-  ([#505](https://github.com/russellgordon/plantoir/issues/505))
-- **Undoing a change Plantoir made for you works properly.** If only part
-  of a change could be undone, pressing Undo again now finishes the job
-  instead of getting stuck.
-  ([#555](https://github.com/russellgordon/plantoir/issues/555))
-- **plantoir.app has a new Code page** showing runnable programs and quizzes.
-  ([#562](https://github.com/russellgordon/plantoir/issues/562))
-- Behind the scenes: clearer records of when Plantoir opened and closed, to
-  help look into problems you report.
-
-### Still to do for 1.8
-
-- **Obsidian add-ons installed for you.** Some features look best in
-  Obsidian with an add-on (for example, to see a diagram while you write).
-  Plantoir will offer to install it into your course with one yes, rather
-  than asking you to do it by hand.
-  ([#495](https://github.com/russellgordon/plantoir/issues/495))
-- **A shared folder added later appears on the site.** Today, a folder you
-  add to an existing course in Course Settings doesn't show in the sidebar
-  and has no page to copy. It will behave like a folder made with the course.
-  ([#506](https://github.com/russellgordon/plantoir/issues/506))
-- **Windows catches up** on runnable Python, self-check quizzes and the
-  Undo fix above
+- **Runnable Python, self-check quizzes, maths served by your own site and
+  the Undo fix**
   ([#568](https://github.com/russellgordon/plantoir/issues/568),
   [#571](https://github.com/russellgordon/plantoir/issues/571),
   [#564](https://github.com/russellgordon/plantoir/issues/564)), and a
   decision on how Swift programs will ever work on Windows
   ([#570](https://github.com/russellgordon/plantoir/issues/570)).
+- **Obsidian add-ons installed for you, and a shared folder added later
+  appearing on the site**, as on the Mac
+  ([#581](https://github.com/russellgordon/plantoir/issues/581),
+  [#580](https://github.com/russellgordon/plantoir/issues/580)).
 - **Windows fixes:**
   - a window can no longer reopen off screen after a monitor is unplugged
     ([#558](https://github.com/russellgordon/plantoir/issues/558));
