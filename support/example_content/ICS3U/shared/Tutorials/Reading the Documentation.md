@@ -1,6 +1,7 @@
 ---
 title: Reading the Documentation
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tutorials
@@ -36,7 +37,7 @@ Take `str.split(sep=None, maxsplit=-1)`. Four questions, in order:
 Then try it on one line of your own data, in isolation, before putting
 it inside your program:
 
-```python
+```python run
 line = "Priya,  17, Kingston"
 print(line.split(","))       # ['Priya', '  17', ' Kingston']
 ```

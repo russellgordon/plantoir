@@ -1,6 +1,7 @@
 ---
 title: Repetition
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -14,7 +15,7 @@ one idea, a hundred times. A loop is how you say that.
 
 ## Counting laps in advance
 
-```python
+```python run readonly
 for day in range(1, 8):
     print(f"Day {day}: warm-up, drills, scrimmage")
 ```
@@ -57,21 +58,22 @@ sensible number of days.
 > A `while` loop whose condition can never become `False` will run
 > until you stop it. The usual cause is forgetting to change the
 > variable the condition depends on:
-> ```python
+> ```python run
 > count = 3
 > while count > 0:
 >     print(count)
 > ```
-> `count` is never reduced, so this prints `3` forever. Press
-> `Ctrl` + `C` in the terminal to interrupt it — then look for what the
-> loop was supposed to be changing.
+> `count` is never reduced, so this prints `3` forever. Run it: within
+> a second or two the page stops it for printing too much. A stuck loop that
+> prints nothing runs until you press **Stop**. Either way, look for
+> what the loop was supposed to be changing, fix it, and run it again.
 
 ## The accumulator pattern
 
 Most useful loops are not printing; they are building up an answer in a
 variable that lives *outside* the loop.
 
-```python
+```python run readonly
 minutes = [45, 0, 60, 30, 0, 90, 25]
 
 total = 0
@@ -97,7 +99,7 @@ something a person can act on.
 Once you have met [[Lists]], loops start containing loops — one pass
 per week on the outside, one pass per day on the inside:
 
-```python
+```python run readonly
 weeks = []
 weeks.append([45, 0, 60, 30, 0, 90, 25])
 weeks.append([30, 30, 60, 0, 45, 60, 0])

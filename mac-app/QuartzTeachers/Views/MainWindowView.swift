@@ -78,6 +78,11 @@ struct MainWindowView: View {
         // sidebar: the section window's toolbar button is reachable with the
         // sidebar collapsed (#457, the HIG sweep).
         .modifier(LockedPagesNoteAlert())
+        // Obsidian's add-ons for diagrams and graphs (#495): asked by the
+        // same route, before Obsidian opens, and on the window for the same
+        // reason.
+        .modifier(ObsidianAddOnsOfferDialog())
+        .modifier(ObsidianReopenAlert())
         .fileImporter(
             isPresented: $workspace.isChoosingWorkspace,
             allowedContentTypes: [.folder]
@@ -376,6 +381,113 @@ private struct LockedPagesNoteAlert: ViewModifier {
             set: { showing in
                 if !showing {
                     workspace.lockedPagesNoteRequest = nil
+                }
+            }
+        )
+    }
+}
+
+/// "Show diagrams and graphs in Obsidian too?" (#495) — asked at Open in
+/// Obsidian, BEFORE Obsidian opens, when a course has figure fences and the
+/// teacher has not answered yet. Three answers: Add Them; Not Now (asked
+/// again next time Plantoir starts); Not Now with "Don't ask again" ticked.
+/// Settings ▸ Obsidian is the way back from the last. Obsidian opens after
+/// any of them.
+///
+/// The message says, before it happens, what Obsidian will ask and which
+/// button to click — a security question Plantoir caused, arriving unannounced,
+/// would read as a warning about Plantoir (exploration, "Teacher-facing
+/// words").
+private struct ObsidianAddOnsOfferDialog: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Environment(WorkspaceModel.self) var workspace
+
+    /// The "Don't ask again" box, unticked each time the question comes up.
+    @State var dontAskAgain: Bool = false
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog(
+            ObsidianFigureAddOnsWording.offerTitle,
+            isPresented: isPresented,
+            titleVisibility: .visible,
+            presenting: workspace.obsidianAddOnsOfferRequest
+        ) { shown in
+            Button(ObsidianFigureAddOnsWording.offerAdd) {
+                Task { @MainActor in
+                    await workspace.answerObsidianAddOnsOffer(shown, .addThem)
+                }
+            }
+            Button(ObsidianFigureAddOnsWording.offerNotNow, role: .cancel) {
+                let answered: ObsidianFigureAddOnsTrail.Answered = dontAskAgain ? .notNowDontAskAgain : .notNow
+                Task { @MainActor in
+                    await workspace.answerObsidianAddOnsOffer(shown, answered)
+                }
+            }
+        } message: { shown in
+            Text(ObsidianFigureAddOnsWording.offerText(course: shown.course.code, courseIsOpen: shown.courseIsOpen))
+        }
+        .dialogSuppressionToggle(ObsidianFigureAddOnsWording.dontAskAgain, isSuppressed: $dontAskAgain)
+        .onChange(of: workspace.obsidianAddOnsOfferRequest?.id) { _, _ in
+            dontAskAgain = false
+        }
+    }
+
+    private var isPresented: Binding<Bool> {
+        return Binding(
+            get: { return workspace.obsidianAddOnsOfferRequest != nil },
+            set: { showing in
+                if !showing {
+                    workspace.obsidianAddOnsOfferRequest = nil
+                }
+            }
+        )
+    }
+}
+
+/// "Reopen Obsidian to show diagrams and graphs?" (#495) — asked when the
+/// answer is yes, the course needs add-ons it lacks, and the course is open
+/// in Obsidian. Nothing is written into an open course (plan review S3):
+/// Obsidian keeps its list of add-ons in memory and writes it back whole, so
+/// an add-on written under it would be dropped. Reopen closes Obsidian first.
+private struct ObsidianReopenAlert: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Environment(WorkspaceModel.self) var workspace
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content.alert(
+            ObsidianFigureAddOnsWording.reopenTitle,
+            isPresented: isPresented,
+            presenting: workspace.obsidianReopenRequest
+        ) { shown in
+            Button(ObsidianFigureAddOnsWording.reopen) {
+                Task { @MainActor in
+                    await workspace.answerObsidianReopen(shown, reopen: true)
+                }
+            }
+            Button(ObsidianFigureAddOnsWording.later, role: .cancel) {
+                Task { @MainActor in
+                    await workspace.answerObsidianReopen(shown, reopen: false)
+                }
+            }
+        } message: { shown in
+            Text(ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.reopenMessage, course: shown.course.code))
+        }
+    }
+
+    private var isPresented: Binding<Bool> {
+        return Binding(
+            get: { return workspace.obsidianReopenRequest != nil },
+            set: { showing in
+                if !showing {
+                    workspace.obsidianReopenRequest = nil
                 }
             }
         )

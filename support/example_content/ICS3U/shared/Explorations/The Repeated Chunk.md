@@ -1,6 +1,7 @@
 ---
 title: The Repeated Chunk
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - explorations
@@ -14,7 +15,7 @@ works. You are inheriting it this morning.
 Open the file. Here is the part that turns term one's mark into a
 letter:
 
-```python
+```python run
 term1 = 78
 
 if term1 >= 80:

@@ -173,6 +173,13 @@ function stampRoles(settings: Settings) {
   const callouts = document.querySelectorAll(".center article blockquote.callout")
   for (const callout of callouts) {
     const element = callout as HTMLElement
+    // A self-check quiz's own [!answer] and [!explain] (#563) are neither an
+    // answer for the key nor something to unfold: on paper a quiz is its
+    // question only (ruling Q8), and quiz.scss and the handout's copy hide
+    // what it holds back.
+    if (element.parentElement?.closest(".plantoir-quiz")) {
+      continue
+    }
     element.dataset.plantoirRole = role(
       element.getAttribute("data-callout") ?? "",
       element.classList.contains("is-collapsed"),
@@ -432,6 +439,44 @@ function paragraphOf(text: string): HTMLElement {
   return paragraph
 }
 
+// A quiz in the handout's copy: its answer, explanation, buttons, feedback
+// and marks removed, its choices back in Markdown order, and every box and
+// blank drawn empty (a copy keeps what a student ticked or typed).
+function questionsOnlyQuizzes(article: HTMLElement) {
+  for (const held of article.querySelectorAll(
+    ".plantoir-quiz-answer, .plantoir-quiz-explain, .plantoir-quiz-actions, .plantoir-quiz-feedback, " +
+      ".plantoir-quiz-mark, .plantoir-quiz-badge, .plantoir-quiz-not-ready, .plantoir-quiz-hint, .plantoir-quiz-score",
+  )) {
+    held.remove()
+  }
+  for (const quiz of Array.from(article.querySelectorAll<HTMLElement>(".plantoir-quiz"))) {
+    const multiple = quiz.dataset.quizKind === "multiple"
+    for (const fieldset of quiz.querySelectorAll(".plantoir-quiz-choices")) {
+      const choices = Array.from(fieldset.querySelectorAll<HTMLElement>(":scope > .plantoir-quiz-choice"))
+      choices.sort((a, b) => Number(a.dataset.choice ?? 0) - Number(b.dataset.choice ?? 0))
+      for (const choice of choices) {
+        fieldset.appendChild(choice)
+      }
+    }
+    for (const input of Array.from(quiz.querySelectorAll<HTMLInputElement>("input"))) {
+      const drawn = document.createElement("span")
+      if (input.classList.contains("plantoir-quiz-blank")) {
+        drawn.className = "plantoir-quiz-paper-blank"
+        drawn.style.cssText = "display:inline-block;min-width:6em;border-bottom:1px solid currentColor"
+        drawn.textContent = "\u00a0"
+      } else {
+        drawn.className = "plantoir-quiz-paper-box"
+        drawn.textContent = multiple ? "□ " : "○ "
+      }
+      input.replaceWith(drawn)
+    }
+    for (const callout of quiz.querySelectorAll<HTMLElement>(".callout")) {
+      unfold(callout)
+    }
+    unfold(quiz)
+  }
+}
+
 // The handout, built from a copy of the article. Nothing on the page itself
 // is changed.
 function buildHandout(mode: Mode, settings: Settings): HTMLElement {
@@ -457,6 +502,10 @@ function buildHandout(mode: Mode, settings: Settings): HTMLElement {
   for (const element of article.querySelectorAll(`[${CURRICULUM}]`)) {
     element.remove()
   }
+  // Self-check quizzes (#563): the question only, in Markdown order, with
+  // empty boxes - nothing the quiz holds back and nothing a student chose
+  // (ruling Q8; the answer key is #511's).
+  questionsOnlyQuizzes(article)
 
   // The questions, in page order (questionItems): headings that are question
   // labels, and question callouts that are not inside an answer or a list.
@@ -492,6 +541,11 @@ function buildHandout(mode: Mode, settings: Settings): HTMLElement {
   for (const node of Array.from(article.querySelectorAll("blockquote.callout"))) {
     const callout = node as HTMLElement
     unfold(callout)
+    // A quiz prints as it stands after questionsOnlyQuizzes: its title keeps
+    // its formulas and blanks, which setTitle would flatten to text (#563).
+    if (callout.closest(".plantoir-quiz")) {
+      continue
+    }
     const titleText = titleOf(callout)
     if (!article.contains(callout)) {
       // Inside an answer already lifted: it travels with that answer.
@@ -787,9 +841,26 @@ function loadScript(doc: Document, source: string): Promise<void> {
   })
 }
 
+// Where a stylesheet link was REALLY fetched from. A link Quartz keeps
+// across its page changes (spa-preserve: index.css, and since #494 KaTeX's
+// own stylesheet) has a relative href, which after a change of page resolves
+// against the NEW page's address - one folder off, a 404 in the print frame
+// (#455 review S1, measured). The sheet remembers the address it came from.
+function fetchedFrom(link: HTMLLinkElement): string {
+  try {
+    const sheet = link.sheet as CSSStyleSheet | null
+    if (sheet && sheet.href) {
+      return sheet.href
+    }
+  } catch {
+    // A sheet from another origin may refuse to be read; its href is absolute.
+  }
+  return link.href
+}
+
 function indexStylesheet(): string | null {
   for (const link of document.head.querySelectorAll('link[rel="stylesheet"]')) {
-    const href = (link as HTMLLinkElement).href
+    const href = fetchedFrom(link as HTMLLinkElement)
     if (/\/index\.css(\?|$)/.test(href)) {
       return href
     }
@@ -826,10 +897,21 @@ function makeFrame(paper: Paper): HTMLIFrameElement {
 // The handout's own faces go in the same way, by full address.
 function copyPageStylesheets(doc: Document, indexCss: string | null, root: string) {
   for (const element of document.head.querySelectorAll('link[rel="stylesheet"], style')) {
-    if (element instanceof HTMLLinkElement && element.href === indexCss) {
-      continue
+    let copy: HTMLElement
+    if (element instanceof HTMLLinkElement) {
+      const href = fetchedFrom(element)
+      if (href === indexCss) {
+        continue
+      }
+      // A fresh link to the address the sheet came from, never a copy of a
+      // relative href (see fetchedFrom).
+      const link = doc.createElement("link")
+      link.rel = "stylesheet"
+      link.href = href
+      copy = link
+    } else {
+      copy = doc.importNode(element, true) as HTMLElement
     }
-    const copy = doc.importNode(element, true) as HTMLElement
     copy.setAttribute("data-pagedjs-ignore", "")
     doc.head.appendChild(copy)
   }

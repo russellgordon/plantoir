@@ -259,6 +259,80 @@ final class CourseManagementContractTests: XCTestCase {
         }
     }
 
+    // MARK: - A folder added later (#506)
+
+    /// Every `foldersAddedLater` case, through `FolderScaffold` — the paths
+    /// and the texts a folder added in Course Settings starts with, compared
+    /// as BYTES against what `setup_course.py`'s own functions produced.
+    ///
+    /// The template is read from the bundle, the way the app reads it, so a
+    /// bundle that carried a different template than the contract names
+    /// would fail here as well as in `FolderScaffoldTests`.
+    func testEveryFolderAddedLaterCase() throws {
+        let section: [String: Any] = try CourseManagementContractTests.section("foldersAddedLater")
+        let created: String = try XCTUnwrap(section["created"] as? String)
+        let template: String = try XCTUnwrap(FolderScaffold.bundledTemplate(), "the bundle carries no template")
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 7, "foldersAddedLater has shrunk")
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let folder: String = try XCTUnwrap(testCase["folder"] as? String)
+            let scopeName: String = try XCTUnwrap(testCase["scope"] as? String)
+            let sections: [Int] = try XCTUnwrap(testCase["sections"] as? [Int])
+            let curriculumPages: [String]? = testCase["curriculumPages"] as? [String]
+            let scope: FolderScope = scopeName == "shared" ? .shared : .perSection
+            XCTAssertTrue(scopeName == "shared" || scopeName == "perSection", "\(name): scope \(scopeName)")
+
+            let pages: [FolderScaffold.Page] = FolderScaffold.pages(
+                forFolderNamed: folder,
+                scope: scope,
+                sectionNumbers: sections,
+                curriculumPageNames: curriculumPages,
+                created: created,
+                template: template
+            )
+
+            let expected: [[String: Any]] = try XCTUnwrap(testCase["files"] as? [[String: Any]])
+            var expectedPaths: [String] = []
+            for file in expected {
+                expectedPaths.append(try XCTUnwrap(file["path"] as? String))
+            }
+            var writtenPaths: [String] = []
+            for page in pages {
+                writtenPaths.append(page.relativePath)
+            }
+            XCTAssertEqual(writtenPaths, expectedPaths, "\(name): the pages and their order")
+            for file in expected {
+                let path: String = try XCTUnwrap(file["path"] as? String)
+                let text: String = try XCTUnwrap(file["text"] as? String)
+                var written: String? = nil
+                for page in pages where page.relativePath == path {
+                    written = page.text
+                }
+                XCTAssertEqual(
+                    Data((written ?? "").utf8), Data(text.utf8),
+                    "\(name): \(path) wrote \((written ?? "nothing").debugDescription)"
+                )
+            }
+        }
+    }
+
+    /// The title rule every index page Plantoir writes for a folder follows —
+    /// `FolderScaffold.frontmatterTitle`, which `SectionAdder`'s fallback
+    /// pages use too, against `foldersAddedLater.titleQuoting`; setup's
+    /// `frontmatter_title` runs the same list (`scripts/test_folder_titles.py`).
+    func testEveryTitleQuotingCase() throws {
+        let section: [String: Any] = try CourseManagementContractTests.section("foldersAddedLater")
+        let rule: [String: Any] = try XCTUnwrap(section["titleQuoting"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 15, "titleQuoting has shrunk")
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let title: String = try XCTUnwrap(testCase["title"] as? String)
+            XCTAssertEqual(FolderScaffold.frontmatterTitle(name), title, name)
+        }
+    }
+
     // MARK: - What a course code says about the grade
 
     func testTheGradeLabelsAreWhatTheContractSays() throws {

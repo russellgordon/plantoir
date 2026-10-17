@@ -61,6 +61,14 @@ RUN git clone --depth 1 --branch v4.5.0 https://github.com/jackyzha0/quartz.git 
 # Pre-install dependencies inside the image so npm install does not run over slow 9P mounts
 RUN cd /opt/quartz && npm install --no-audit && npm cache clean --force
 
+# KaTeX 0.16.21 is what Quartz's lockfile installs and renders every formula
+# with; since #494 every site also carries ITS stylesheet, copy-tex and woff2
+# faces (build_site.install_katex_assets copies them from here), instead of
+# linking 0.16.11's from cdn.jsdelivr.net. This fails the image build if the
+# lockfile ever resolves another version (measured: npm ls katex@0.16.22
+# exits 1), so the pin in contracts/toolchain.json cannot drift unnoticed.
+RUN cd /opt/quartz && npm ls katex@0.16.21
+
 # Paged.js, the print layout for pages whose settings say `printable: true`
 # (#454). Into /opt/vendor, NOT into the Quartz scaffold's static/: a site
 # carries it only when one of its pages asks for it (build_site.py copies it
@@ -115,6 +123,27 @@ RUN curl -fsSL -o /tmp/function-plot.tgz https://registry.npmjs.org/function-plo
  && tar -xzf /tmp/function-plot.tgz -C /tmp/function-plot package/dist/function-plot.js package/LICENSE \
  && cp /tmp/function-plot/package/dist/function-plot.js /tmp/function-plot/package/LICENSE /opt/vendor/function-plot/ \
  && rm -rf /tmp/function-plot /tmp/function-plot.tgz
+
+# Python that runs in the student's browser, for a page's ```python run
+# blocks (#455): Pyodide 314.0.7, CPython 3.14.2 compiled to WebAssembly.
+# Into /opt/vendor beside the other engines, under the same gate: a section's
+# site carries it (static/pyodide, with support/gated/pyodide/plantoir-worker.js
+# laid over it) only while a page students can see opts in with a runnable
+# block, so a course without one ships none of its 13,531,207 bytes. The core
+# tarball is fetched by exact version and checked against its SHA-256; five of
+# its files are kept - pyodide.mjs (the module a module worker imports: #455
+# review B1), pyodide.asm.mjs, pyodide.asm.wasm, python_stdlib.zip and
+# pyodide-lock.json - with a README naming the licence, MPL-2.0 (the tarball
+# carries no LICENSE file). `python3 -m tarfile`, because the slim base has no
+# bzip2. Before the tikz-engine COPY, so editing a script never downloads it
+# again; contracts/toolchain.json -> pins carries the why.
+RUN curl -fsSL -o /tmp/pyc.tar.bz2 https://github.com/pyodide/pyodide/releases/download/314.0.7/pyodide-core-314.0.7.tar.bz2 \
+ && echo "2abdcc2e35208af406e07724cffa85bc582ced97e9028383ecf5462541393f95  /tmp/pyc.tar.bz2" | sha256sum -c - \
+ && python3 -m tarfile -e /tmp/pyc.tar.bz2 /tmp/pyx && mkdir -p /opt/vendor/pyodide \
+ && cd /tmp/pyx/pyodide \
+ && cp pyodide.mjs pyodide.asm.mjs pyodide.asm.wasm python_stdlib.zip pyodide-lock.json /opt/vendor/pyodide/ \
+ && printf 'Pyodide 314.0.7 (MPL-2.0). Source: https://github.com/pyodide/pyodide/tree/314.0.7\n' > /opt/vendor/pyodide/README.txt \
+ && rm -rf /tmp/pyx /tmp/pyc.tar.bz2
 
 # TikZ diagrams drawn at BUILD time from a page's ```tikz fence (#485 E1):
 # node-tikzjax 1.0.5, whose TeX engine (tex.wasm, core.dump and all 212 TeX
@@ -177,6 +206,14 @@ COPY scripts/print_settings.py /opt/scripts/print_settings.py
 # through support/figures/plantoir-figures.mjs, caches, and gates what the site
 # carries. Imported by build_site.py by bare name.
 COPY scripts/figures.py /opt/scripts/figures.py
+# Runnable Swift (#493): which blocks the launcher must compile (`plan`, run by
+# preview.sh through docker exec before the build) and what the build gives
+# the site (`prepare`). Imported by build_site.py by bare name.
+COPY scripts/swift_blocks.py /opt/scripts/swift_blocks.py
+# Self-check quizzes (#563): the folder check that reads every `> [!quiz]` by
+# the site's own rules and writes the words the site's quizzes use. Imported
+# by build_site.py by bare name (test_baked_modules.py).
+COPY scripts/quizzes.py /opt/scripts/quizzes.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).

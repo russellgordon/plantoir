@@ -265,11 +265,18 @@ remembered, so it is quick.
 
 ## 9. In Obsidian
 
-- **TikZ**: the teacher sees the picture in Obsidian only with the
-  community plugin **TikZJax** installed and enabled (Settings ->
-  Community plugins -> Browse -> "TikZJax"); Plantoir does not install it
-  for them yet. Without it the fence shows as text; the website draws it
-  either way, with the same engine, so the picture is the same.
-- **functionplot**: the Obsidian plugin that drew these is no longer in
-  Obsidian's plugin directory, so in Obsidian the fence shows as plain text.
-  The website draws it. Do not tell the teacher to install a plugin for it.
+- Obsidian draws a fence only when the add-on for it is installed and
+  switched on in that course: **TikZJax** for `tikz`, **Functionplot** for
+  `functionplot`. Without it the fence shows as text in Obsidian; the website
+  draws it either way, with the same engine for TikZ, so the picture is the
+  same.
+- **Never install, download or edit anything under `.obsidian` yourself** —
+  not an add-on, not `community-plugins.json`, not a setting. Adding
+  add-ons is the teacher's choice, not yours.
+- The functionplot add-on is no longer in Obsidian's own Browse list, so do
+  not tell the teacher to search for it there.
+- If the teacher says Obsidian shows a fence as text: the add-on is missing
+  from that course or switched off. The first time a course opens with
+  add-ons, Obsidian asks whether they trust its author; the answer that turns
+  them on is "Trust author and enable plugins". Settings > Community plugins
+  in Obsidian shows which add-ons the course has and whether they are on.

@@ -1,6 +1,7 @@
 ---
 title: Talking to the User
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -13,7 +14,10 @@ all she wanted.
 
 ## The program
 
-```python
+To run it, type a name and a number of minutes on two lines of the
+input box — `Priya` and `185`, as in the run below — then press Run.
+
+```python run readonly
 # Weekly practice check-in for Ms. Roy, who coaches the senior team.
 # She wanted players to see their own week without her doing
 # arithmetic on the bus home.
@@ -66,8 +70,9 @@ accurate and unusable. `{per_day:.0f}` shows none at all, because
 "about 26 minutes a day" is the honest precision for this number.
 
 > [!bug]- What the program does without the try block
-> Delete the `try`/`except` and keep only `minutes = int(answer)`, then
-> type `seven` at the prompt:
+> The block above is read-only, so try this in your own copy: delete the
+> `try`/`except`, keep only `minutes = int(answer)`, run it and answer
+> `seven`:
 > ```
 > Traceback (most recent call last):
 >   File "/home/student/practice.py", line 3, in <module>

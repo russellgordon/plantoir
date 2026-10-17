@@ -1,6 +1,7 @@
 ---
 title: Reading an Error Message
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tutorials
@@ -14,15 +15,16 @@ programming life.
 
 ## A crash, in full
 
-The program, saved as `hours.py`:
+The program, saved as `hours.py`. Type `abc` in the input box under it,
+then press Run:
 
-```python
+```python run
 answer = input("How many hours did you work? ")
 count = int(answer)
 print(f"That is {count * 60} minutes.")
 ```
 
-Run it and type `abc` at the question. Python prints this:
+With `abc` as the answer, Python prints this:
 
 ```
 Traceback (most recent call last):

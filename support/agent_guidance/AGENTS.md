@@ -18,3 +18,16 @@ that matches the task before writing:
   cannot be done (no sliders) are in
   `.agents/skills/plantoir-math-graphs/SKILL.md` (the same file is at
   `.claude/skills/plantoir-math-graphs/SKILL.md`).
+- **Code students run** - "make this example runnable", a Python program
+  students edit and run in the browser, a Swift program students run with
+  their own input, a program that reads input, "try it yourself": how to
+  opt the page in, the ` ```python run ` block and its flags, the
+  read-only ` ```swift run ` block, input, and what each language can and
+  cannot do are in `.agents/skills/plantoir-runnable-code/SKILL.md` (the
+  same file is at `.claude/skills/plantoir-runnable-code/SKILL.md`).
+- **Questions students check themselves** - "add a 5-question check", a
+  quiz, practice questions, a self-check, an exit ticket, multiple choice,
+  fill in the blank: the ` > [!quiz] ` callout for every kind, how answers
+  are checked, shuffling, and graphs and code inside questions are in
+  `.agents/skills/plantoir-quizzes/SKILL.md` (the same file is at
+  `.claude/skills/plantoir-quizzes/SKILL.md`).

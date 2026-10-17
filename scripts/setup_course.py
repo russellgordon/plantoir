@@ -160,6 +160,59 @@ DEFAULT_PER_SECTION_FILES = [
 # are never published, and stay that way unless the teacher flips them.
 UNPUBLISHED_PER_SECTION_FILES = {"Private Notes.md", "Scratch Page.md"}
 
+
+# The words YAML 1.1 reads as something other than text when written plain
+# (`title: Yes` is a boolean), compared in lower case.
+YAML_PLAIN_NON_TEXT_WORDS = {"true", "false", "yes", "no", "on", "off", "y", "n", "null", "~"}
+
+
+def title_needs_quoting(name: str) -> bool:
+    """
+    Whether a folder's (or file's) name, written plain after `title: `, would
+    read back as something other than that name — or not read at all (#506).
+
+    Measured: a folder called `Unit: One`, `'Tis the Season` or `& Friends`
+    gave an index page the build could not read, so the folder stayed out of
+    the sidebar and the teacher was told to fix a page Plantoir had written.
+    The rule is deliberately generous, because a quoted title is still the
+    same title, and simple enough to mirror exactly in each app
+    (`FolderScaffold.titleNeedsQuoting` on the mac):
+
+    * empty;
+    * a first character that is not an ASCII letter and not beyond ASCII —
+      every YAML indicator (`' " & * ! | > % @ [ { # - ? , :` and the
+      backtick), a space, and a digit (a number, a date, `1:20`) is caught here;
+    * a last character that is a space, a tab or a colon;
+    * `: `, ` #`, a tab, or any control character anywhere;
+    * one of YAML 1.1's plain words for true, false and null, in any case.
+
+    `contracts/course-management.json` -> `foldersAddedLater.titleQuoting`.
+    """
+    if name == "":
+        return True
+    first = name[0]
+    if not (("A" <= first <= "Z") or ("a" <= first <= "z") or ord(first) > 127):
+        return True
+    if name[-1] in (" ", "\t", ":"):
+        return True
+    if ": " in name or " #" in name:
+        return True
+    for character in name:
+        if ord(character) < 0x20 or ord(character) == 0x7F:
+            return True
+    return name.lower() in YAML_PLAIN_NON_TEXT_WORDS
+
+
+def frontmatter_title(name: str) -> str:
+    """
+    What follows `title: ` for a name: the name itself, or — when written plain
+    it would not read back as the name — the name double-quoted with JSON's
+    escapes, which YAML reads as the same text (`title_needs_quoting`).
+    """
+    if title_needs_quoting(name):
+        return json.dumps(name, ensure_ascii=False)
+    return name
+
 # Two jurisdictions, both resolved through toolchain_paths rather than by
 # hard-coded prefix: a native Windows run has no /opt, and SUPPORT_DIR is
 # what already knows where the bundled support/ tree landed. Order matters
@@ -194,11 +247,31 @@ def _iter_nonempty(p: Path) -> bool:
     except StopIteration:
         return False
 
+# Plantoir's own Obsidian add-ons for diagrams and graphs (#495) carry this
+# marker in their folder under .obsidian/plugins. They are left out of a backup
+# by MARKER, never by name - the teacher's own add-ons are theirs and are kept -
+# as the mac's CourseArchiver does (shared-rules.json ->
+# obsidianAddOnsForFigures.backups). The app puts them back at its next pass.
+PLANTOIR_ADDON_MARKER = ".plantoir"
+
+
+def _plantoir_addon_folders(plugins_dir: str, names: list) -> set:
+    """The names among `names` (folders in .obsidian/plugins) that carry
+    Plantoir's marker, as a regular file."""
+    found = set()
+    for name in names:
+        marker = os.path.join(plugins_dir, name, PLANTOIR_ADDON_MARKER)
+        if os.path.isfile(marker) and not os.path.islink(marker):
+            found.add(name)
+    return found
+
+
 def backup_existing_course_dir(course_dir: Path, backup_root: Path, excludes: set[str] | None = None) -> Path | None:
     """
     If course_dir exists and is non-empty, create a zip backup at:
       backup_root / course_dir.name / YYYY-MM-DD_HHMMSS.zip
-    Skips folders/files listed in `excludes` (merged_output, caches, etc.).
+    Skips folders/files listed in `excludes` (merged_output, caches, etc.),
+    and Plantoir's own Obsidian add-ons (#495, `_plantoir_addon_folders`).
     Returns the created zip path, or None if nothing was backed up.
     """
     excludes = (excludes or set()) | BACKUP_DEFAULT_EXCLUDES
@@ -222,6 +295,9 @@ def backup_existing_course_dir(course_dir: Path, backup_root: Path, excludes: se
             rel_root = os.path.relpath(root, course_dir)
             if rel_root == ".":
                 rel_root = ""
+            if Path(rel_root).parts == (".obsidian", "plugins"):
+                plantoirs = _plantoir_addon_folders(root, dirs)
+                dirs[:] = [d for d in dirs if d not in plantoirs]
             for name in files:
                 if name in excludes:
                     continue
@@ -3412,7 +3488,7 @@ def setup_course(no_backup: bool = False):
         if not index_md_path.exists():
             with open(index_md_path, "w", encoding="utf-8") as f:
                 f.write("---\n")
-                f.write(f"title: {folder}\n")
+                f.write(f"title: {frontmatter_title(folder)}\n")
                 for sec in section_numbers:
                     f.write(f"createdSection{sec}: {now_str}\n")
                     f.write(f"publishForSection{sec}: true\n")
@@ -3424,7 +3500,7 @@ def setup_course(no_backup: bool = False):
         if not file_path.exists():
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write("---\n")
-                f.write(f"title: {file.replace('.md', '')}\n")
+                f.write(f"title: {frontmatter_title(file.replace('.md', ''))}\n")
                 for sec in section_numbers:
                     f.write(f"createdSection{sec}: {now_str}\n")
                     f.write(f"publishForSection{sec}: true\n")
@@ -3495,7 +3571,7 @@ def setup_course(no_backup: bool = False):
             if not index_md.exists():
                 with open(index_md, "w", encoding="utf-8") as f:
                     f.write("---\n")
-                    f.write(f"title: {folder}\n")
+                    f.write(f"title: {frontmatter_title(folder)}\n")
                     f.write(f"created: {now_str}\n")
                     f.write("publish: true\n")
                     f.write("---\n")
@@ -3507,7 +3583,7 @@ def setup_course(no_backup: bool = False):
                 is_unpublished = file in UNPUBLISHED_PER_SECTION_FILES
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write("---\n")
-                    f.write(f"title: {file.replace('.md', '')}\n")
+                    f.write(f"title: {frontmatter_title(file.replace('.md', ''))}\n")
                     f.write(f"created: {now_str}\n")
                     f.write(f"publish: {'false' if is_unpublished else 'true'}\n")
                     f.write("---\n")

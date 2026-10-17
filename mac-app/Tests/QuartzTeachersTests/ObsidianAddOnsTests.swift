@@ -79,7 +79,7 @@ final class ObsidianAddOnsTests: XCTestCase {
     /// links' targets included, is exactly as it was.
     func runEveryCase(throughKeepACopy: Bool) async throws {
         let cases: [[String: Any]] = try XCTUnwrap(try ObsidianAddOnsTests.rules()["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 9, "The contract’s cases did not load.")
+        XCTAssertGreaterThanOrEqual(cases.count, 10, "The contract’s cases did not load.")
         let route: String = throughKeepACopy ? "Keep a Copy" : "import"
 
         for testCase in cases {
@@ -96,6 +96,8 @@ final class ObsidianAddOnsTests: XCTestCase {
             XCTAssertEqual(found.addOnsFolderIsALink, expected["addOnsFolderIsALink"] as? Bool, "\(name)")
             XCTAssertEqual(found.settingsFolderIsALink, expected["settingsFolderIsALink"] as? Bool, "\(name)")
             XCTAssertEqual(found.publishSiteIsSet, expected["publishSiteIsSet"] as? Bool, "\(name)")
+            // #495: Plantoir's own add-ons, told apart by their marker.
+            XCTAssertEqual(found.plantoirAddOnNames, (expected["plantoirAddOnNames"] as? [String]) ?? [], "\(name): Plantoir's add-ons found")
             let expectSaid: Bool = try XCTUnwrap(testCase["expectSaid"] as? Bool)
 
             let madeURL: URL
@@ -186,7 +188,7 @@ final class ObsidianAddOnsTests: XCTestCase {
 
             // The trail names what was left behind, and only when anything was.
             let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
-            if found.isEmpty {
+            if found.isEmpty && found.plantoirAddOnNames.isEmpty {
                 XCTAssertFalse(trail.contains("Obsidian"), "\(name) (\(route)): \(trail)")
             } else {
                 XCTAssertTrue(

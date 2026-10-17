@@ -1,6 +1,7 @@
 ---
 title: Predict the Output
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - warm-ups
@@ -20,7 +21,7 @@ did is the only place today's learning can happen.
 4. Run it. Surprised? The line that fooled you is today's lesson.
 
 > [!example]- Two lines, three defensible readings
-> ```python
+> ```python run
 > mark = "84"
 > print(mark * 2)
 > ```

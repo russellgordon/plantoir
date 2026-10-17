@@ -530,7 +530,7 @@
   },
   "note": "The two files both apps WRITE, and the Python then reads. Everything else in these contracts describes behaviour; this describes a format, and a format that drifts corrupts a teacher's course quietly. Both spellings below have already caused a real bug: `SectionAdder` was found writing the OLD frontmatter key on both platforms, so a section added through the app was born in a schema everything else had moved off, and the TEST agreed with the code.",
   "pageOptIns": {
-    "note": "#454 (v1.6.0). Frontmatter keys a page uses to ask for something extra on the built site, as opposed to `publish:`, which decides whether it is there at all. Both apps leave these alone - only the build and the site read them - so the cases below are run by the shared Python (scripts/test_page_features.py) and, down the real chain inside the image, by scripts/check_print_rules_against_the_site.py from verify.sh. A key that pulls in a large engine is GATED PER SITE: the engine is copied into a section's site only when at least one page students can see opts in, so a course that never prints carries none of it (Paged.js, 502,617 bytes). #455 adds `codeRunner` here.",
+    "note": "#454 (v1.6.0). Frontmatter keys a page uses to ask for something extra on the built site, as opposed to `publish:`, which decides whether it is there at all. Both apps leave these alone - only the build and the site read them - so the cases below are run by the shared Python (scripts/test_page_features.py) and, down the real chain inside the image, by scripts/check_print_rules_against_the_site.py from verify.sh. A key that pulls in a large engine is GATED PER SITE: the engine is copied into a section's site only when at least one page students can see opts in, so a course that never prints carries none of it (Paged.js, 502,617 bytes). `codeRunner` (#455) is gated by its language's engine instead: shared-rules.json -> codeRunnerBlocks.siteCarriesEngine.",
     "keys": [
       {
         "key": "printable",
@@ -541,6 +541,11 @@
         "key": "printPdf",
         "type": "string: a file name in the course's Media folder",
         "why": "Decisions 14 and 14a (Russell, 2026-10-09). A PDF the teacher already has, handed out instead of the generated handout: the Print button becomes a plain link that opens the PDF, with no menu and no script, so it works offline and without JavaScript. The value is a FILE NAME only - the PDF is assumed to be in the course's Media folder, where Obsidian puts attachments - written plainly (`printPdf: Worksheet 3.pdf`) or as the link Obsidian writes for a link property (`printPdf: \"[[Worksheet 3.pdf]]\"`, `|alias` dropped); the unquoted `[[Worksheet 3.pdf]]`, which YAML reads as a list inside a list, is accepted too, because Obsidian users type exactly that. A slash or backslash is a path and is refused. It WINS over `printable` when both are set. A value the build cannot use is taken off the build's own copy of the page (never the teacher's), so the page falls back to the generated handout when it says `printable: true` and to no button otherwise, and the teacher is told by the siteHealth check printPdfNotFound. The PDF reaches the site the way every Media file already does (Quartz copies every non-page file in content/ to the site), so the build only resolves and checks the name; it copies nothing."
+      },
+      {
+        "key": "codeRunner",
+        "type": "boolean",
+        "why": "#455 (v1.8.0). `codeRunner: true` turns a page's ```python run blocks into programs a student can edit and run in the browser (shared-rules.json -> codeRunnerBlocks). Per page, with no course switch and no setting in either app (Russell, 2026-10-05). Read exactly as `printable` is: python-frontmatter (PyYAML, YAML 1.1) loads the line and the build writes it back, so `yes` opts in and `\"true\"` and `false` do not; the site's transformer compares with `=== true`. A page that opts in with no runnable block is left exactly as it was and makes its site carry nothing; a page that does not opt in is untouched whatever its fences say. Its own reading cases are codeRunnerReadingCases, kept apart from readingCases because those are printable-shaped (#455 review N3)."
       }
     ],
     "readingCases": {
@@ -559,6 +564,19 @@
         { "lines": ["printable: true", "publish: false"], "printable": true, "optsIn": true, "carriesThePrintLayout": false, "why": "Students cannot see the page, so it does not make the site carry the engine." },
         { "lines": ["printable: true", "printPdf: Worksheet 3.pdf"], "printable": true, "optsIn": true, "carriesThePrintLayout": false, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "why": "Its own PDF wins, so the generated handout is never made from it." },
         { "lines": ["printable: true", "printPdf: missing-7f3a.pdf"], "printable": true, "optsIn": true, "carriesThePrintLayout": true, "mediaFiles": [], "why": "A printPdf that does not resolve falls back to the generated handout, which needs the engine." }
+      ]
+    },
+    "codeRunnerReadingCases": {
+      "rule": "`codeRunner:` as typed (`lines`), what python-frontmatter makes of it (`codeRunner`, null for absent or empty: what the build writes back and the site reads), and whether that opts the page in (`optsIn`, only the boolean true). scripts/test_page_features.py runs `codeRunner` -> `optsIn`; check_runner_rules_against_the_site.py puts `lines` through the build's own reader in the image.",
+      "cases": [
+        { "lines": ["codeRunner: true"], "codeRunner": true, "optsIn": true, "why": "The plain case." },
+        { "lines": ["codeRunner: yes"], "codeRunner": true, "optsIn": true, "why": "YAML 1.1: PyYAML reads yes as true and writes back `true`, which is what the site reads." },
+        { "lines": ["codeRunner: True"], "codeRunner": true, "optsIn": true },
+        { "lines": ["codeRunner: \"true\""], "codeRunner": "true", "optsIn": false, "why": "A quoted string, not the boolean." },
+        { "lines": ["codeRunner: false"], "codeRunner": false, "optsIn": false },
+        { "lines": ["codeRunner: 1"], "codeRunner": 1, "optsIn": false, "why": "A number, not the boolean." },
+        { "lines": ["codeRunner:"], "codeRunner": null, "optsIn": false },
+        { "lines": ["title: No setting"], "codeRunner": null, "optsIn": false }
       ]
     },
     "printPdfCases": {

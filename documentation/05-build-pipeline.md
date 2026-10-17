@@ -1543,6 +1543,10 @@ expectations and chips; a map with none leaves out the chip sentence, the
 notes, and an empty chips `div` is never written. The old sort key read
 `int(code.split(".")[0][1:])`, which is `int("")` for `1.A`: widening the rule
 without replacing it would have stopped every such build with a traceback.
+The same `overall_of` decides what an overall expectation's page lists under
+"When did we do this?": every page that links it or any of its specific
+expectations in the same folder (#505, `documentation/06-quartz-customizations.md`
+→ D1).
 
 **Nested pages and repeats.** Pages are collected RECURSIVELY, shallowest
 first then by path — a plain path sort puts `(old)/A1.1` and `2019 version/A1.1`
@@ -1765,6 +1769,8 @@ cases: `contracts/shared-rules.json` → `figureFences`.
    `plantoir: error: Units/Similar Triangles.md: tikz block 2, line 14: …`;
    a drawing with no `% alt:` and a graph setting nobody reads are
    `plantoir: note:` lines only (ruling E1-3).
+   (`quizzesNotReady`, #563, is reported the same way: see "Self-check
+   quizzes: what the build does".)
 
 **Measured** (M4 Pro, Colima at 6 CPUs, the dev-test image, Node 20.20.2):
 the verify fixture's first build drew its 7 distinct diagrams and checked 5
@@ -1799,7 +1805,10 @@ so a few shapes the site's parser reads differently still slip past it
 whose content is less indented than the marker's text (lazy lines), a
 numbered fence straight after a paragraph line, a closing fence at column 0
 under a bullet. Each shows students "couldn't be drawn" (or turns the next
-figure into plain code), and Obsidian shows the same shapes broken too. Not
+figure into plain code), and Obsidian shows the same shapes broken too.
+(Since #455 the fence reader OPENS the nested-marker block as the site does,
+marked `nested`, so the fences after it are read alike; figures still leave
+the nested one itself undrawn, as before — runnable code's review S2.) Not
 raised as a finding because the only place that knows is Quartz's own
 parse, after the folder checks have been said; a post-build scan for a
 failed figure with no manifest failure would do it and is the way to add it
@@ -1813,6 +1822,301 @@ rewrites raw text, and the drawing's single glyphs flooded the page's
 description); SVGs as `<img>` (no page fonts and no theme colours); a cache
 in the teacher's vault; a `math_engines.json` switch (the fence is the
 opt-in); stopping the build on a figure (`--strict`).
+
+## Runnable code: what the build does (#455, v1.8.0)
+
+A page that says `codeRunner: true` turns its ` ```python run ` blocks into
+programs students edit and run in their browser; the site's half is
+[06 → I](06-quartz-customizations.md#i-runnable-code-455-v180), the rules
+`contracts/shared-rules.json` → `codeRunnerBlocks`. The build's share is the
+#454 gate again, plus one file, all in the ALWAYS section:
+
+1. **Counting** (`_count_runner_pages`, straight after `_prepare_figures`):
+   the same pages figures read (`figures.pages_students_see` — the gate's own
+   visibility rule, outside Media), each read with python-frontmatter after
+   `process_frontmatter` has written it back (so `codeRunner: yes` is
+   `true`), and `page_features.runner_engines_on_page` asks two things: does
+   the page opt in, and does it hold a runnable block of a language in the
+   table (`page_features.runner_fences`, over `markdown_code.fenced_blocks`,
+   the #313 fence rule)? A page that opts in with no runnable block counts for
+   nothing (#455 Q1, 2026-10-17: with two languages the key alone cannot say
+   which engine to carry; the price is the known limit below). page_features
+   never imports frontmatter, so its test still runs on Windows.
+2. **The gate.** The counts join print's and graphs' in
+   `page_features.install_gated_assets`, which since #455 takes a LIST of
+   sources per engine, later winning file by file: `VENDOR_DIR/<engine>` (the
+   five pinned Pyodide files and the README, see 02) and
+   `SUPPORT_DIR/gated/<engine>` (`plantoir-worker.js`, the page's thread). One
+   sync, not a copy after it: a copy after the sync would be deleted as an
+   extra and copied again on every build. The vendor folder IS the engine: an
+   overlay alone installs nothing and says so ("…this copy of Plantoir is
+   missing what runs it, so students will see the code without a Run
+   button.") - except for a `prebuilt` language (Swift, #493), whose overlay
+   is all its engine is (`page_features.OVERLAY_IS_THE_ENGINE`; below). The carried line: "▶️ This site carries what runs Python for 3
+   pages." No engine with no runnable block: verify.sh 6c checks
+   `static/pyodide` leaves with the last one.
+3. **The words file** (`page_features.write_runner_words`, straight after the
+   gate): `quartz/plantoir_code_runner.json` holds the words and limits from
+   the contract and **the engines the gate actually installed**. The page's
+   script bundles it (esbuild); the transformer reads it with `fs` at build
+   time, and leaves any runnable block whose engine is NOT carried as the
+   plain code it was, with one line an assistant reads:
+   `plantoir: error: Units/Loops.md: python block 2: ` +
+   `codeRunnerBlocks.words.blockNotPrepared` (siteDisagrees, review S2). So a
+   block the build did not count can never become a Run button that says
+   "isn't on this site yet" to students for ever. No line for a page students
+   cannot see: Quartz parses those too and drops them later (the transformer
+   applies `patches/publish.ts`'s own test).
+4. **The KaTeX copy** (#494, `install_katex_assets`, beside the gate, EVERY
+   site): Quartz's own `node_modules/katex` — `dist/katex.min.css`,
+   `dist/contrib/copy-tex.min.js`, the 20 woff2 faces and `LICENSE` — into
+   `quartz/static/katex`, same-bytes skip, extras removed, a missing package
+   one line. Its patch to latex.ts (`patch_katex_local`, beside
+   `patch_katex_mhchem`) is 06 → C2-26.
+
+**The live-preview edge.** The preview's own rebuilds (a page edited while
+it serves) do not run the gate or rewrite the words file. A page that gains
+`codeRunner: true` or its first runnable block while a preview is ALREADY
+running therefore shows its blocks as plain code, with the `plantoir: error:`
+line in the preview's output, until the next Preview — never a Run button
+that cannot work. A page that already had runnable code keeps working.
+
+**Known limit.** The build counts runnable blocks with the toolchain's fence
+rule, not Quartz's parser. Every shape the reviews measured is now read alike
+(`codeRunnerBlocks.fences.pageShapes`, checked through both readers in the
+image by `check_runner_rules_against_the_site.py`); a fence opened after a
+second container on a list marker's line (`- - ```python run`) is runnable on
+NEITHER side; a lazy line in a list item gives both sides one runner but
+different bodies (the site's is the one that runs). A shape nobody has
+measured that the two read differently shows as plain code with the
+`plantoir: error:` line above — the safety net, rather than a folder problem,
+because only Quartz's parse knows, after the folder checks have been said.
+
+**Rejected:** a course-level switch (Russell, 2026-10-05: per page only); the
+key alone deciding (above); downloading Pyodide when a site is built (a build
+would need the network); copying the worker into `/opt/vendor` (it would
+need its own line in both runtimes) or into every site's `static/` (a site
+without runnable code would carry it).
+
+## Runnable Swift: what the launcher and the build do (#493, v1.8.0)
+
+A ` ```swift run ` block on a page that opts in runs as a small WebAssembly
+program compiled AHEAD of time (Swift has no interpreter a browser can
+carry), read-only: a student changes the input, not the code. The site's half
+is [06 → I10](06-quartz-customizations.md#i10-swift-493); the rules are
+`contracts/shared-rules.json` → `codeRunnerBlocks.swift`; the image that
+compiles is [02 → The Swift image](02-docker-image.md#the-swift-image-493-v180).
+Three steps, in three places, because **the build cannot compile**: it runs
+inside the website builder, which has no way to start another container (a
+Docker socket inside it was rejected - a container that can start
+containers can do anything on the Mac).
+
+1. **Plan** - `preview.sh`'s `prepare_runnable_swift`, just before the
+   build (03 → preview.sh), runs `python3 /opt/scripts/swift_blocks.py plan
+   --course=C --format=lines` inside the website builder. It reads EVERY page
+   of the course as the teacher keeps it (each `.md` outside dot-folders and
+   Media - not the build's merged copy, which does not exist yet), keeps the
+   pages whose settings look like they opt in (generously: a quoted `"true"`
+   is compiled though it does not opt in), finds their Swift blocks with the
+   build's own fence reader, and writes each block the cache does not hold
+   into `<builds>/<CODE>/.swift-cache/jobs/<run>/<key>.swift` - a folder of
+   this run's own (review S3: two builds of one course must never share a
+   job folder, or one deletes the other's job and caches a failure for a
+   valid block). It prints `root=`, `cache=`, `jobs=`, `count=` lines (a
+   teacher's Mac has no JSON reader the launcher can count on). It reads
+   hidden pages and other sections too: that costs a compile, never a wrong
+   answer.
+2. **Compile** - only when there are jobs, in the Swift image (built the first
+   time, after a free-space check), one `docker run --rm --network none` with
+   the cache folder mounted at its own path: `compile.py` compiles the jobs in
+   parallel and writes `<key>.wasm` and `<key>.json` beside the others.
+3. **Prepare** - `build_site.py`'s `_prepare_runnable_swift`, ALWAYS, straight
+   after the runner count: for every Swift block on a page students can see
+   that opts in (the gate's own visibility rule and python-frontmatter, as the
+   count), it copies the block's program into `quartz/static/swift-wasm/`
+   (synced: a program no page uses any more is removed - the garbage
+   collection), writes `quartz/plantoir-runners/swift.json` ({key: ok and
+   file, or not ok and the reason}), and names every block without a program
+   on a `plantoir: error:` line and as ONE folder problem,
+   `siteHealth` → `swiftCouldNotBePrepared` (in the facts as `swift_problems`).
+   It says "🦅 8 of 9 Swift programs on this site ready to run."
+
+**The key** is the SHA-256 of the block's normalised code (trailing spaces
+off, the shared indentation off, blank lines at either end dropped) - exactly
+the text compiled, so a diagnostic's line maps back: the opening fence's line
+in the teacher's file, plus the blank lines dropped from the top, plus the
+error's line in the program. The site's transformer computes the same key
+from what Quartz's parser read (`codeRunnerRule.normaliseProgram`; both
+sides run `swift.cacheKey.cases`). The key never depends on the compiled
+program (review S4).
+
+**The cache** is `<builds>/<CODE>/.swift-cache/<toolchain id>/`, beside the
+figure cache and like it outside the teacher's folder, shared by the course's
+sections. The **toolchain id** is 16 hex of SHA-256 over the Swift image's
+recipe files (`Dockerfile`, `compile.py`, `ReadLineShim.swift`,
+`FlushBeforeRead.c`), which state every pin, flag and the PATH - so a moved
+pin or flag compiles every block again (#493 acceptance 12, pinned by
+`test_swift_blocks.py`) and nothing else does. A compile error is cached too
+(an unchanged broken block is not compiled again); a compile that took longer
+than 180 s is not, nor one whose wasm-opt step or readLine flush failed, nor one killed by a
+signal or that failed with no diagnostics (review S3, and the implementation
+review's S3, measured: under `--memory 50m` a valid block used to be cached as
+a compileError with empty diagnostics, for ever; an entry an earlier
+compile.py wrote that way is now a miss, so it heals). A failure that is not
+the compiler's is never remembered. **Pruning** happens in prepare, and ONLY when this toolchain's
+folder holds every block the site needs (review N5): an offline preview
+after a recipe change would otherwise throw away the only programs that
+work - and until this toolchain compiles a block, prepare SERVES the newest
+older toolchain's program for the same code (the key names the code), with
+one `plantoir: note:` line (`swift.notes.fromBefore`; implementation review
+N2: before, the kept folder only helped a revert, and every block was "not
+ready"). Then every other toolchain's folder goes, and this one's entries
+unused for 90 days. `--full-rebuild` (the launcher passes it to plan) clears
+cached FAILURES, so a block that did not compile is compiled again; it keeps
+programs, because a key names its code and its toolchain, so a program is
+never stale (`swift.cacheCases`). Building twice compiles nothing
+the second time (acceptance 10; verify.sh checks the page comes out the same).
+
+**When a block has no program**, the reason is said on a `plantoir: error:`
+line per block, and in the folder problem ONCE per cause: each compile error
+by its block and line, every other reason once, count first ("17 blocks on 4
+pages: not made ready to run - …"; implementation review S4: a cause every
+block shares was said ten times and "and 7 more";
+`swiftCouldNotBePrepared.groupingCases`). The reasons
+(`swift.reasons`, pinned by `swift.reasonCases`):
+
+| Reason | When |
+|---|---|
+| `compileError` | Swift found an error; the line is the first error's, in the teacher's file, and the words carry the compiler's own message. The block shows its code with Run off ("This program isn't ready to run yet."). |
+| `noRoom` | the launcher found less than 6 GB free for the Swift image (`state.json` beside the cache says so; plan removes it at the start of every run). |
+| `notDownloaded` | the launcher could not build the Swift image, which downloads about 1.3 GB the first time (`state.json`: `{state: notDownloaded}`); the sentence names the download and the internet. |
+| `notCompiled` | nothing recorded, and the sentence says only "preview the course again" (implementation review N1: it used to blame the internet for causes that have nothing to do with it): a compile that did not finish (killed, too slow, wasm-opt failed - none is cached, so the next preview tries again), a wait for another launcher's download that gave up, or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
+| `notOnWindows` | the build ran on Windows, which has no container and compiles nothing in v1.8 (#493 option (b)). Chosen in the shared Python (review N2), so Windows teachers read a sentence about Windows the day they take these scripts. |
+
+**Notes, not problems.** A block whose program is over 5 MB is named on a
+`plantoir: note:` line (`swift.notes.large`, implementation review S2): a
+multi-argument print or `print(array)` costs about 3.4 MB, and `import
+Foundation` with formatters and JSON measured 46 MB, which every student
+downloads on that block's first Run. So is the count of programs served from
+the previous recipe (`notes.fromBefore`). Neither is a folder problem.
+
+The build is never stopped by any of them (#493 ruling Q1, the #485 E1
+precedent): a failed build would also stop the preview the teacher needs to
+fix the block. The issue's acceptance 11 ("fails the build") was ruled out
+for that reason.
+
+**Scheduled publishes** run the same launcher (`preview.sh --build-only`), so
+they compile too, and build the Swift image if a preview never did (ruling
+Q4). In practice a preview has already filled the cache.
+
+**Known limit.** The build's fence reader and Quartz's parser read a lazy line
+in a list item differently (`fences.pageShapes`): the build compiles the body
+IT read and the site looks for the key of a shorter body, finds none, and
+shows the block as plain code with a `plantoir: error:` line
+(`words.blockNotCompiled`). The fence reader was deliberately NOT changed to
+follow lazy lines (the brief keeps the fence rule as #455 left it; the safety
+net names the block). A Swift block the build's reader cannot see at all is
+never compiled, and is named the same way.
+
+**Rejected:** compiling in the build (it cannot start the Swift image); a
+Docker socket in the main container; the toolchain in the main image (every
+teacher would download 1.3 GB for a language most never use); failing the
+build on a compile error (ruling Q1); clearing the cache on `--full-rebuild`;
+a hand-bumped toolchain version in the key; caching a failure that was not
+the compiler's; one job folder per course.
+
+## Self-check quizzes: what the build does (#563, v1.8.0)
+
+A `> [!quiz]` callout at the left edge of a page becomes a question students
+answer and check in their browser; the site's half is
+[06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), the rules
+`contracts/shared-rules.json` → `quizCallouts`. There is no frontmatter key
+and no engine to gate: the callout opts the page in, and the script and
+styles ride every site's shared `postscript.js` and `index.css` (ruling Q2).
+The build's share is a folder check and two files, ALWAYS, beside the
+runnable-code count (`_check_quizzes`):
+
+1. **Reading.** `figures.pages_students_see(..., must_contain="[!")` - the
+   gate's own visibility rule, outside Media, only pages that could hold a
+   callout - then `quizzes.quizzes_on_page` on each build copy's raw text.
+   The reader is line by line, not a Markdown parser (the reason
+   `markdown_code` gives): line endings made LF (CR LF and a lone CR, review
+   S1), `%%` comments taken out first as ObsidianFlavoredMarkdown takes them
+   (S10, keeping a map back to the page's own lines), fenced code skipped
+   at any quote depth, then what `quizCallouts.rule` says a top-level quiz
+   is. Inside one: the first list holding a task box is the choices (a box
+   needs words after it on its line - measured: `- [ ]` alone is plain text
+   to the site's parser; a `>` four or more columns past its container's
+   content is indented code, and an HTML block - a block-level tag, or a
+   line holding only one tag - swallows what follows it to the next empty
+   line, as the site reads both: quiz syntax in one at the page's level is
+   no quiz, and a list of choices in one makes the quiz `choicesInHtml`, on
+   both sides); a nested `> [!answer]` or
+   `> [!explain]` at the
+   quiz's own level is that callout; the rest is the question, whose
+   paragraphs (and title) are where blanks are counted. `verdict` - the
+   mirror of quizRules.ts's, with the problems in `recognise.order` - says
+   what the quiz is. The mirror PARSES answer lines (`parse_answer_line`)
+   and never checks what a student typed: that is quizRules.ts's alone.
+2. **Lines in the teacher's file.** A build copy can carry lines the
+   teacher's page does not (rewritten frontmatter, a removed region), so
+   each quiz is matched to the one in the teacher's page with the same
+   title, counting equal titles in order (review N8), and a problem keeps
+   its distance from the quiz's first line - the answer line for an answer
+   problem, otherwise the quiz's first line. One that cannot be matched
+   loses its line (`quizLineNoLine`).
+3. **What the teacher and an assistant are told.** One line per quiz that
+   cannot be checked:
+   `plantoir: error: Units/Practice.md: quiz 3, line 41: <quizCallouts.words.problems[reason]>`
+   (`line 41` alone for a quiz inside a list or callout, which has no
+   place), and ONE folder problem per section build, `quizzesNotReady`
+   (at most ten named, after every other finding), surfaced by both apps
+   and recorded on the trail as the existing "found a problem with this
+   course's folders" - no new trail event. It never stops a build (the
+   ruling for #493): one question must not keep a site from being built,
+   and refusing would break the preview the teacher is fixing it in. Not
+   repairable (`siteHealth.repair.neverOffered`).
+4. **The two files** (`quizzes.write_quiz_files`, every build, the same
+   bytes for the same input): `quartz/plantoir_quiz.json` carries only the
+   words (`words.site`, `words.problems`), because the page's script
+   bundles it and must change only when the words do; and
+   `quartz/plantoir_quiz_pages.json` carries `examined` (every page read,
+   by its path in the site's content) and, for each page with a quiz, how
+   many top-level and nested quizzes it found and which it reported. The
+   transformer reads both with `fs` (mtime-cached). An unreadable contract
+   writes empty words, and the site then renders every quiz as not ready -
+   never with its answers on show.
+
+**The safety net** (`quizCallouts.safetyNet`, review S4). The site renders
+what IT read; for a page this check examined and that is published, it
+compares counts and, quiz by quiz, whether each side found a problem, and
+says `plantoir: error: <page>: quiz <n>, line <L>: <readDifferently>`
+where they differ (the line from the pages file's `lines`; when the
+top-level counts differ, "the quiz at line L" of the first quiz the check
+found; when only the quizzes in a list or callout differ, "a quiz inside a
+list or another callout at line L" from `nestedLines`) - quiet otherwise. It relies on `build --concurrency 1` (the line
+reaches the build's output from the one parsing thread, review N1).
+Measured: a `- [ ] ` choice with nothing after the box was read as a box
+here and as text by the site, and the net said so on its first build; the
+rule was then corrected on both sides and pinned (`aBoxNeedsWordsAfterIt`).
+A page students cannot see is parsed by Quartz too and never named.
+
+**The live-preview edge.** As for runnable code: the preview's own rebuilds
+do not re-run the check or rewrite the files, so a quiz added while a
+preview serves is rendered by the site's own reading (its verdict is the
+site's, the same rules), and its folder problem and any safety-net line
+come with the next Preview.
+
+**Measured** (2026-10-17, M4 Pro, macOS 26.6, the branch's image): the
+verify fixture's 35 quizzes (every recognise case on one page) were read
+alike by both sides - every kind and every problem, with no safety-net
+line; EXC2O built with the pre-branch image and with this branch is 297 of
+302 pages and feeds identical once Quartz's random list ids and build
+times are set aside, the other five being folder and tag listings ordered
+by build time, which differ between two builds of the SAME image too
+(measured: six differ there); MPM2D's `Similar Triangles Practice` (eight
+top-level `[!answer]-` callouts), a page of look-alikes and its CR LF twin
+are identical.
 
 ## Stage 4: Configuration patching
 

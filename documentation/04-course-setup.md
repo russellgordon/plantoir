@@ -467,6 +467,57 @@ has the rule, what it deliberately costs, and where its cases live.
   `include_curriculum_coverage`; the build treats a missing key as ON, so
   courses created before this existed pick it up on their next build.
 
+**A folder added LATER, in Course Settings, starts the way a folder made
+here does** ([#506](https://github.com/russellgordon/plantoir/issues/506),
+mac; Windows owes it — #580). Adding a name to the shared or per-section folder list makes the
+folder on disk, and since #506 puts the same two pages inside it that this
+step writes: its `index.md` (step 7's shape — per-section keys for a shared
+folder, `created`/`publish: true` for a per-section one — and the same
+sentence word for word), without which the site's sidebar never showed the
+folder although it was not hidden; and a `_DUPLICATE ME.md`, without which a
+teacher had nothing to copy. The template is the generic skeleton's
+(`support/skeletons/general/shared/Concepts/_DUPLICATE ME.md`; all 344
+skeleton templates are that one file, and a test pins it), with its date
+filled in, its keys split per section in a shared folder (held back in every
+one), and its "Curriculum connection" kept, pointed at the course's first
+specific expectation when it has no A1.1, or taken out when the course's
+primary curriculum folder holds no specific expectation. A per-section folder
+gets a template in every section too, though this step never writes one there.
+Pages go only into a folder the click has just made, never into one that was
+already there, and never over a file.
+
+**A folder's name goes into `title:` quoted whenever YAML would misread it
+plain** — here, at creation, as much as for a folder added later
+(`setup_course.title_needs_quoting` / `frontmatter_title`; the mac's
+`FolderScaffold.frontmatterTitle`, which `SectionAdder`'s fallback pages use
+too). Measured on #506's review with the dev-test image: written plain,
+`Unit: One`, `'Tis the Season` and `& Friends` each gave an index page the
+build could not read, so the folder stayed out of the sidebar and the build's
+unreadable-settings notice named a page Plantoir had written; quoted, all three
+— made at creation and added later — are in the sidebar with no notice. The
+rule is generous on purpose (a quoted title is the same title) and simple
+enough to mirror exactly: quoted when empty, when the first character is
+neither an ASCII letter nor beyond ASCII (every YAML indicator, a space, a
+digit), when the last is a space, a tab or a colon, when `: `, ` #` or a
+control character appears, or when the name is one of YAML 1.1's words for
+true, false or null; the quoting is JSON's. Cases:
+`contracts/course-management.json` → `foldersAddedLater.titleQuoting`, run by
+both apps and by `scripts/test_folder_titles.py`, which verify.sh also runs in
+the image to read every case back through the build's own reader. A setup
+re-run does not rewrite an index page that is already there, so a course made
+before this keeps any unreadable one until the teacher fixes it — the build's
+notice says which.
+
+Each app writes them itself, natively: a Settings click does not run this
+script (it would start the website builder, and no app runs Python on the
+host). That is why the texts are pinned as bytes in
+`contracts/course-management.json` → `foldersAddedLater`, computed with
+`setup_course.py`'s own functions. **Rejected:** copying a sibling folder's
+template (it may be a teacher's edited page with stale dates), and a special
+case giving a curriculum folder added later only an `index.md` — whether a
+folder is the curriculum is decided afterwards, by a separate tick, so it
+cannot be told at Add time.
+
 ### 6. Timetable sections
 
 The wizard asks how many sections the teacher has **and which timetable
@@ -773,6 +824,77 @@ skill `.claude/skills/example-content/` and checked by its
 `lint_payload.py` — no app code changes on either platform. The same skill
 holds the skeleton generator and `lint_skeletons.py`; the skeletons are
 generated output, so never hand-edit `support/skeletons/`.
+
+**Runnable Python in the ready-made pages** ([#561](https://github.com/russellgordon/plantoir/issues/561),
+v1.8.0). ICS3U is the first payload whose code students RUN on the class
+website (the runner itself: [06 → I](06-quartz-customizations.md#i-runnable-code-455-v180)).
+The installer needs nothing new — `codeRunner: true` is an ordinary
+frontmatter line it copies through, beside the per-section keys it writes —
+so the work is a judgement about every block, recorded where a later edit
+cannot quietly undo it:
+
+- **Measured scope**: 145 ```` ```python ```` blocks on 49 pages (the issue
+  guessed 79 on 40). **83 run on 41 pages** — 60 editable, 23 `readonly`
+  (the worked examples to read on Concepts and Programs pages; Concepts'
+  Repetition 3 and Testing and Debugging 1 are editable because their prose
+  asks students to change them), 24 of them reading input — and **62 stay
+  plain**, so 8 pages with Python get no `codeRunner` at all. Plain means
+  the block would fail or show nothing alone: a fragment (names defined
+  elsewhere on the page, or it does not parse), definitions only, one
+  `input()` line, a read of a file no run can leave behind (each Run starts
+  in a fresh empty folder), the multi-file `from toolbox import …`,
+  `breakpoint()`, or a find-the-fault question whose output gives the answer
+  away.
+- **Every input block is preceded by a sentence saying what to type in the
+  input box, one value per line** — the shipped skill's rule. The site reads
+  the whole box when Run is pressed, so an empty box is `EOFError` at the
+  first `input()` (measured), and prose describing a terminal's back-and-forth
+  ("type `abc` at the question", "it waits for you") was reworded.
+- **The record is executable, and run by hand**:
+  `.claude/skills/example-content/lint_runnable.py` carries the table
+  (every block: run / readonly / plain and why), and `lint_payload.py` —
+  which the example-content skill's Phase 7 runs, and nothing runs
+  automatically — holds the payload to it exactly, plus rules every payload
+  keeps: a run block needs `codeRunner: true` and the reverse; near-miss
+  fences (```` ```Python run ````, `run,stdin`, a nested fence) and unknown
+  flags are refused; a run block must parse, bind every name it uses, import
+  only the standard library the site runs, never call `breakpoint()`, use
+  `sys.stdin` only with the `stdin` flag, and write a file before reading it
+  (`open`, `open(file=…)`, `Path(…).read_text()`) unless the read is guarded
+  by `except FileNotFoundError` — a module-level constant naming the file
+  counts (Programs/Reading and Writing Files does that), as does the same
+  variable the write used. A run block in a language these rules do not
+  judge (`swift run`, #493) is left alone. Both scripts run under Python 3.9
+  (macOS's `/usr/bin/python3`) and later.
+- **Measured end to end** (2026-10-17, M4 Pro): ICS3U installed by the baked
+  wizard and built with the branch's image — 83 runners on 41 pages, 23
+  readonly, every runner's code identical to its block, `static/pyodide` in
+  the site, no `plantoir: error:` line. All 82 finite blocks run in the
+  image's own Pyodide 314.0.7 (Node, sample input lines, a fresh folder
+  each): 79 finish, and the 3 that end in an error do so ON PURPOSE — two
+  NameErrors that teach scope and the debugger tutorial's ZeroDivisionError
+  (`ENDS_IN_AN_ERROR`).
+- **What the browser showed**, Chrome for Testing 155 on the built site,
+  Python already loaded: Repetition's endless loop
+  (`while count > 0: print(count)`) reached the 100,000-character cap and
+  stopped itself within a second or two, before Stop could be pressed, so
+  its prose says so instead of "Ctrl + C in the terminal" (a first Run, or
+  an iPad, takes longer).
+- **Rejected**: making every complete program runnable regardless of page
+  (a Concepts page's examples are to be read, not rewritten — `readonly`);
+  a `stdin` flag on blocks that visibly call `input(` (the box appears by
+  itself); `autorun` anywhere; rewriting fragments into complete programs
+  (it changes the teaching, and no code body was changed); a lint rule that
+  tracks which name is used before it is bound (the rule is "bound nowhere
+  in the block", so a scope lesson's deliberate NameError passes — and so,
+  a known limit, does `count = count + 1` with no start); counting a sample
+  transcript further down as telling students what to type.
+- **Known mismatches**: a traceback on the site names `main.py` where
+  Reading an Error Message and The Bad Input Hunt show
+  `/home/student/hours.py` and `pay.py` (the prose is about a program on
+  the student's own computer). Programs/Reading and Writing Files shows a
+  "second run" transcript the site cannot produce, because files last one
+  run; a sentence under the block says so.
 
 **How the installer reads a link** ([#314](https://github.com/russellgordon/plantoir/issues/314),
 [#326](https://github.com/russellgordon/plantoir/issues/326)): the three
