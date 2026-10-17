@@ -17,11 +17,12 @@ namespace Plantoir.UiTests;
 /// <para>Two moments are checked. At LAUNCH the window must already be at
 /// least 900 × 600 epx: on 2026-10-16 it opened at 1190 × 725 px, 793 × 483
 /// epx at 150%, because the first-run size was set before the minimum (the
-/// defect #542 turned out to be). Then the window is asked for 400 × 400 px
-/// and given its minimum; each
-/// button's width is compared with the width it had in the wide window it
-/// opened at, so a button squeezed narrower fails as surely as one pushed
-/// off the edge. The right edge is held 8 px × scale inside the window's,
+/// defect #542 turned out to be). Then the window is MAXIMISED and each
+/// button's width read there, restored, asked for 400 × 400 px and given its
+/// minimum; each button's width is compared with its width in the maximised
+/// window, so a button squeezed narrower fails as surely as one pushed off
+/// the edge. (Not with the launch window: since the fix that IS the minimum
+/// here, and the comparison would be with itself.) The right edge is held 8 px × scale inside the window's,
 /// because UI Automation's window rectangle includes Windows 11's invisible
 /// resize border (about 7 px a side at 150%), so a button flush against the
 /// rectangle's edge is already under the border and clipped.</para>
@@ -45,6 +46,7 @@ public class WindowMinimumUiTests
     public WindowMinimumUiTests(ITestOutputHelper output) => _output = output;
 
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hwnd, int command);
     [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
@@ -78,6 +80,24 @@ public class WindowMinimumUiTests
 
     private static string Describe(Rect r) => $"{r.Right - r.Left}x{r.Bottom - r.Top} at ({r.Left},{r.Top})";
 
+    /// <summary>Waits until the window's size stops changing, rather than for
+    /// a number (the number is what is under test): THREE equal reads in a
+    /// row, 300 ms apart, since two can both land before an asynchronous
+    /// resize does. Then a moment for the toolbar to lay out.</summary>
+    internal static void Settle(FlaUI.Core.AutomationElements.Window window)
+    {
+        var last = System.Drawing.Rectangle.Empty;
+        int same = 0;
+        Retry.WhileFalse(() =>
+        {
+            var now = window.BoundingRectangle;
+            same = now == last ? same + 1 : 0;
+            last = now;
+            return same >= 2;
+        }, TimeSpan.FromSeconds(6), TimeSpan.FromMilliseconds(300));
+        Thread.Sleep(800);
+    }
+
     [UiFact]
     public void AtItsNarrowestTheWindowStillShowsPreviewDeployAndBrowser()
     {
@@ -96,7 +116,6 @@ public class WindowMinimumUiTests
         var browser = app.Find("openInBrowserButton", "Open in Browser");
         Assert.Equal(PreviewStartPage.PreviewAtLastViewed, preview.Name);
         var buttons = new[] { ("Preview", preview), ("Deploy", deploy), ("Browser", browser) };
-        var wide = buttons.ToDictionary(b => b.Item1, b => b.Item2.BoundingRectangle.Width);
 
         var window = app.Window;
         IntPtr hwnd = window.Properties.NativeWindowHandle.Value;
@@ -108,18 +127,24 @@ public class WindowMinimumUiTests
                           $"GetWindowRect {Describe(before.window)}, visible {Describe(before.visible)}, right edges inside " +
                           string.Join("/", buttons.Select(b => $"{b.Item1} {launchEdges[b.Item1]}"));
 
+        // The buttons' WIDE widths are read in a MAXIMISED window: after #542
+        // the launch window IS the minimum here, so comparing against it would
+        // compare a layout with itself.
+        // ShowWindow, not UI Automation's WindowPattern: measured 2026-10-16,
+        // SetWindowVisualState(Maximized) left this window at 900 × 600 epx.
+        ShowWindow(hwnd, 3 /* SW_MAXIMIZE */);
+        Settle(window);
+        var maximisedBox = window.BoundingRectangle;
+        var wide = buttons.ToDictionary(b => b.Item1, b => b.Item2.BoundingRectangle.Width);
+        wideLine += $"; maximised: UIA {maximisedBox.Width}x{maximisedBox.Height}, buttons " +
+                    string.Join("/", buttons.Select(b => $"{b.Item1} {wide[b.Item1]}"));
+        Assert.True(maximisedBox.Width > launchBox.Width,
+            $"the window did not grow when maximised, so the wide widths would be the narrow ones: {wideLine}");
+        ShowWindow(hwnd, 9 /* SW_RESTORE */);
+        Settle(window);
+
         window.Patterns.Transform.Pattern.Resize(400, 400);
-        // Wait until the width stops changing, rather than for a number: the
-        // number is what is under test.
-        int last = -1;
-        Retry.WhileFalse(() =>
-        {
-            int now = window.BoundingRectangle.Width;
-            bool settled = now == last;
-            last = now;
-            return settled;
-        }, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(300));
-        Thread.Sleep(800);   // the toolbar lays out after the frame changes
+        Settle(window);
 
         var box = window.BoundingRectangle;
         var after = Physical(hwnd);

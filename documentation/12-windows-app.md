@@ -6466,32 +6466,40 @@ drag. Those widths were reached some other way that was not recorded; the
 rows still describe what the toolbar does at those widths (they agree with
 the launch measurement at 793 epx). In a teacher's hands the app reached
 them in two ways: the first-run window above, and a remembered frame — it is
-kept in PIXELS, so a 1350 px window remembered at 150% reopens at 600 epx on
-a 225% display.
+kept in PIXELS, so a 1350 px window remembered on a 150% display and
+reopened on a 225% one is 600 epx there.
 
 **What changed.** `MainWindow.ApplyMinimumSize(scale)` sets the minimum
 BEFORE the first `Resize` and the launch size (first-run or remembered) is
 clamped up to it, so the window opens at no less than 900 × 600 epx (1350 ×
-900 px at 150%). The minimum is clamped to the work area of the display the
+900 px at 150%). A remembered frame is MOVED first, and the scale
+(`GetDpiForMonitor` of the monitor it now sits on) and the work area are read
+after the move, so a frame reopened on another display is clamped for THAT
+display. The minimum is clamped to the work area of the display the
 window is on (`DisplayArea.GetFromWindowId(…, Nearest)`), divided by the
 scale, because 900 epx is 2025 px at 225% — wider than a 1920 work area, and
-a minimum wider than the screen would trap the window. It is re-applied once
-from `XamlRoot.RasterizationScale` when the content loads and again on
-`XamlRoot.Changed` when the scale changes (a monitor move, a display-scale
-change): the clamp is the part a scale changes. **That re-apply is held by
-reading the code, not by a test** — there is one screen here and no test
-changes the display scale. **At 225–250% the work-area clamp can still cut
+a minimum wider than the screen would trap the window. Once the content
+loads (from `XamlRoot.RasterizationScale`) and again on `XamlRoot.Changed`
+when the scale changes (a monitor move, a display-scale change),
+`EnforceMinimumSize` re-applies the minimum AND grows a window left below it,
+unless it is maximised — the minimum alone does not grow one. **What holds
+what:** the first-run clamp is held by the UiFact below, on this one display
+at one scale; the remembered-frame order, the re-apply and the grow on a
+scale change (the multi-monitor cases) are held by reading the code, since
+there is one screen here and no test changes the display scale. **At 225–250% the work-area clamp can still cut
 the toolbar**: the window there is narrower than 900 epx (1920 / 2.25 = 853
 epx), which is below the width the long title needs. After the change the
-same UiFact read 1350 × 900 px at launch and at the narrowest, every button
-at its full width (Preview 185, Deploy 89, Browser 36 epx), Browser 15 epx
+same UiFact read 1350 × 900 px (900 × 600 epx) at launch and at the
+narrowest; maximised (1295 × 687 epx) the buttons were Preview 185, Deploy 89
+and Browser 36 epx wide, and at the 900 epx minimum the same, Browser 15 epx
 inside the right edge.
 
 **REJECTED:** a minimum of `900 × RasterizationScale`, #542's option 1 as
 filed — on the reading that the minimum was in pixels. The presenter already
 scales it, so that would have asked for 1350 epx (2025 px) at 150%. And #542's
 option 2, toolbar buttons that shrink to their glyphs: the mac does not have
-it, and with the launch clamp nothing needs it above 200%. The UiFact's
+it; at 200% and below nothing needs it, and at 225% and above it is the
+remaining option, not taken. The UiFact's
 right-edge check is 8 px × scale inside UI Automation's window rectangle,
 because that rectangle includes Windows 11's invisible resize border (7 px a
 side at 150%: `GetWindowRect` 1350 against the visible frame's 1332).

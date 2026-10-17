@@ -54,33 +54,40 @@ public sealed partial class MainWindow : Window
         // already narrower, so the old order opened a first run at 1190 px on a
         // 1920 work area, 793 epx at 150%, under the 900 epx minimum: the
         // section title cut to "MP…" until the teacher touched the edge.
-        double scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0;
-        var (minWidth, minHeight) = ApplyMinimumSize(scale);
+        //
+        // A remembered frame is MOVED first, so the scale and the work area are
+        // read from the display it reopens on, not from the primary one: a
+        // frame kept in pixels on a 150% screen is narrower in epx on a 225%
+        // one. A first run sizes for the primary work area and then centres.
+        bool remembered = frame is { X: > -10000, Y: > -10000 };
+        if (remembered)
+            AppWindow.Move(new PointInt32((int)frame!.X, (int)frame.Y));
+        var (minWidth, minHeight) = ApplyMinimumSize(ScaleOfDisplay());
         width = Math.Max(width, minWidth);
         height = Math.Max(height, minHeight);
         AppWindow.Resize(new SizeInt32(width, height));
-        if (frame is { } f && f.X > -10000 && f.Y > -10000)
-            AppWindow.Move(new PointInt32((int)f.X, (int)f.Y));
-        else   // First run: sit centred on the work area rather than at (0,0).
+        if (!remembered)   // First run: sit centred on the work area rather than at (0,0).
             AppWindow.Move(new PointInt32(
                 workArea.X + (workArea.Width - width) / 2,
                 workArea.Y + (workArea.Height - height) / 2));
-        // A frame remembered on a monitor at another scale, or the window
-        // dragged to one, changes what the work area allows: re-applied once
-        // the content has a XamlRoot, and whenever its scale changes.
+        // Once the content has a XamlRoot, and whenever its scale changes (a
+        // monitor move, a display-scale change), the minimum is re-applied AND
+        // a window left below it is grown to it, since the minimum alone does
+        // not grow one. This path, and the multi-monitor case above, are held
+        // by reading the code: the UiFact runs on one display at one scale.
         bool watchingScale = false;
         if (Content is FrameworkElement rootElement)
             rootElement.Loaded += (_, _) =>
             {
                 if (watchingScale || Content?.XamlRoot is not { } xamlRoot) return;
                 watchingScale = true;
-                ApplyMinimumSize(xamlRoot.RasterizationScale);
+                EnforceMinimumSize(xamlRoot.RasterizationScale);
                 double applied = xamlRoot.RasterizationScale;
                 xamlRoot.Changed += (root, _) =>
                 {
                     if (root.RasterizationScale == applied) return;
                     applied = root.RasterizationScale;
-                    ApplyMinimumSize(applied);
+                    EnforceMinimumSize(applied);
                 };
             };
 
@@ -548,7 +555,31 @@ public sealed partial class MainWindow : Window
     public bool IsClosed { get; private set; }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern uint GetDpiForWindow(IntPtr hwnd);
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int dpiType, out uint dpiX, out uint dpiY);
+
+    /// <summary>The scale of the display the window is on NOW, read from the
+    /// monitor rather than the window: before the window is shown, a Move to
+    /// another monitor need not have changed the window's own DPI yet.</summary>
+    private double ScaleOfDisplay()
+    {
+        IntPtr monitor = MonitorFromWindow(WinRT.Interop.WindowNative.GetWindowHandle(this), 2 /* nearest */);
+        return GetDpiForMonitor(monitor, 0 /* effective */, out uint dpi, out _) == 0 && dpi > 0 ? dpi / 96.0 : 1.0;
+    }
+
+    /// <summary>Re-applies the minimum for this scale and grows a window
+    /// that is below it — unless it is maximised, where the display decides
+    /// the size.</summary>
+    private void EnforceMinimumSize(double scale)
+    {
+        var (minWidth, minHeight) = ApplyMinimumSize(scale);
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized }) return;
+        var size = AppWindow.Size;
+        if (size.Width < minWidth || size.Height < minHeight)
+            AppWindow.Resize(new SizeInt32(Math.Max(size.Width, minWidth), Math.Max(size.Height, minHeight)));
+    }
 
     /// <summary>
     /// The window's minimum, 900 × 600 epx (the mac's 900 × 600 points,
@@ -565,7 +596,8 @@ public sealed partial class MainWindow : Window
     ///
     /// <para>The clamp is the one thing a scale changes: 900 epx is 2025 px at
     /// 225%, wider than a 1920 work area, and a minimum wider than the screen
-    /// would trap the window. So it is re-applied when the XamlRoot's scale
+    /// would trap the window. So it is re-applied, and a window below it is
+    /// grown (<see cref="EnforceMinimumSize"/>), when the XamlRoot's scale
     /// changes (a monitor move or a display-scale change). That path is held
     /// by reading the code, not by a test: there is one screen here, and the
     /// display scale is not changed by a test. At 225% and above the clamped
@@ -574,8 +606,9 @@ public sealed partial class MainWindow : Window
     ///
     /// <para>REJECTED: <c>900 × scale</c> as the minimum, which #542 proposed.
     /// The presenter scales it already, so that would ask for 1350 epx (2025 px)
-    /// at 150%. REJECTED: buttons that shrink to their glyphs, which the mac
-    /// does not have.</para>
+    /// at 150%. NOT TAKEN: buttons that shrink to their glyphs, which the mac
+    /// does not have; at 200% and below nothing needs them, and at 225% and
+    /// above they are the remaining option.</para>
     /// </remarks>
     private (int width, int height) ApplyMinimumSize(double scale)
     {
