@@ -1,6 +1,7 @@
 ---
 title: The Hundred-Line Problem
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - explorations
@@ -13,7 +14,7 @@ like a printed schedule she can pin to the wall.
 
 Here is the program she has. It handles two weeks.
 
-```python
+```python run
 week = 1
 balance = 25.00
 print(f"Week {week}: ${balance:.2f}")

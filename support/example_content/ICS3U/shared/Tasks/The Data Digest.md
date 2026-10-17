@@ -1,6 +1,7 @@
 ---
 title: The Data Digest
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tasks
@@ -26,7 +27,7 @@ somebody actually collected about something that actually happens.
 
 Here is a program that computes correctly and helps nobody:
 
-```python
+```python run
 items = [3, 11, 4, 9, 12, 2, 10, 5]
 total = 0
 highest = items[0]

@@ -1,6 +1,7 @@
 ---
 title: What This Site Can Do
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - reference
@@ -42,7 +43,7 @@ search.
 This is the feature a programming course lives on — runnable examples
 with the spacing and quotation marks preserved, coloured by meaning:
 
-```python
+```python run
 name = input("What is your name? ")
 if len(name) > 0:
     print(f"Hello, {name}!")

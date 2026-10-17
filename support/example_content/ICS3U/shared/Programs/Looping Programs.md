@@ -1,6 +1,7 @@
 ---
 title: Looping Programs
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -13,7 +14,7 @@ the four numbers she actually reports.
 
 ## The program
 
-```python
+```python run readonly
 # Paper-recycling tally for Ms. Nakamura, who reports one number a
 # month and was adding kilograms on a whiteboard.
 

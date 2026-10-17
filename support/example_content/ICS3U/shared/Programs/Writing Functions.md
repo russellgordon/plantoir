@@ -1,6 +1,7 @@
 ---
 title: Writing Functions
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -14,7 +15,7 @@ times. This one has it written once.
 
 ## The program
 
-```python
+```python run readonly
 # Practice-week summary for Ms. Roy, who plans next week from last
 # week's minutes. Three small functions, each with one job.
 

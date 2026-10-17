@@ -1,6 +1,7 @@
 ---
 title: Formula Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -18,7 +19,7 @@ Ask for a speed in kilometres per hour and a time in hours, print the
 distance to one decimal place.
 
 > [!success]- Answer 1
-> ```python
+> ```python run
 > speed = float(input("Speed, in km/h: "))
 > time_taken = float(input("Time, in hours: "))
 >
@@ -38,7 +39,7 @@ Ask for a radius, print the area to two decimals. Use `math.pi`, not
 3.14.
 
 > [!success]- Answer 2
-> ```python
+> ```python run
 > import math
 >
 > radius = float(input("Radius, in cm: "))
@@ -55,7 +56,7 @@ Ask for a radius, print the area to two decimals. Use `math.pi`, not
 $$F = \frac{9}{5}C + 32$$
 
 > [!success]- Answer 3
-> ```python
+> ```python run
 > celsius = float(input("Temperature, in Celsius: "))
 >
 > fahrenheit = 9 / 5 * celsius + 32
@@ -74,7 +75,7 @@ Ask for watts, hours per day, and the price per kilowatt-hour. Print
 the daily cost and the cost over a 194-day school year.
 
 > [!success]- Answer 4
-> ```python
+> ```python run
 > watts = float(input("Power, in watts: "))
 > hours = float(input("Hours per day: "))
 > rate = float(input("Price per kWh, in dollars: "))
@@ -98,7 +99,7 @@ then prints the mean — and does not crash when the user types `done`
 immediately.
 
 > [!success]- Answer 5
-> ```python
+> ```python run
 > readings = []
 >
 > while True:

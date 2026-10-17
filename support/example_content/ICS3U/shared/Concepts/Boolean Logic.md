@@ -1,6 +1,7 @@
 ---
 title: Boolean Logic
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -40,7 +41,7 @@ where you meant `and` lets everybody through, and looks fine doing it.
 `True` and `False` are values with a type — `bool` — and comparisons
 *produce* them. You can store one:
 
-```python
+```python run readonly
 days_late = 4
 is_overdue = days_late > 0
 print(is_overdue)
@@ -66,7 +67,7 @@ Two more things worth knowing:
 
 ## The trap that reads perfectly
 
-```python
+```python run readonly
 day = "Mon"
 
 if day == "Sat" or "Sun":

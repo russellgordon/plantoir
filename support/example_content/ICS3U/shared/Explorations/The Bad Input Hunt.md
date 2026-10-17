@@ -1,6 +1,7 @@
 ---
 title: The Bad Input Hunt
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - explorations
@@ -12,7 +13,7 @@ you wrote it and you know what it wants.
 
 Your client does not know what it wants. Your client will type "seven".
 
-```python
+```python run
 hours = int(input("How many hours did you work? "))
 print(f"You earned ${hours * 17.20:.2f}")
 ```

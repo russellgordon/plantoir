@@ -1,6 +1,7 @@
 ---
 title: Parameters, Returns, and Scope
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -64,7 +65,7 @@ simple case first and let the rest of the body assume it is past.
 
 ## Where a variable lives
 
-```python
+```python run readonly
 def total_minutes(sessions):
     total = 0
     for value in sessions:
@@ -91,7 +92,7 @@ Anything the caller needs, the function `return`s.[^1]
 Once a function returns a value, other functions can use it — and that
 is where a program starts to feel designed rather than typed:
 
-```python
+```python run readonly
 def as_hours_and_minutes(minutes):
     hours = minutes // 60
     rest = minutes % 60

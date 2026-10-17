@@ -1,6 +1,7 @@
 ---
 title: Setting Up Python
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tutorials
@@ -81,7 +82,7 @@ python3 hello.py
 Type this — do not paste it — into a file called `hello.py`, then run
 it:
 
-```python
+```python run
 name = input("What is your name? ")
 hours = float(input("How many hours did you sleep last night? "))
 print(f"Thanks, {name} — that is {hours * 60:.0f} minutes.")

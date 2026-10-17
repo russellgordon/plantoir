@@ -1,6 +1,7 @@
 ---
 title: Reading and Writing Files
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -12,7 +13,7 @@ still there tomorrow, next week, and after the computer is restarted.
 
 ## The program
 
-```python
+```python run readonly
 # Shelf-reminder list for Mr. Whitfield. The file holds TITLES and a
 # number of days — never who borrowed what. That is a decision, taken
 # with him, and it is written here so nobody "improves" it by adding
