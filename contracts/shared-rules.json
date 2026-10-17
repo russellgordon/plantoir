@@ -26318,7 +26318,8 @@
       "A self-check, never a grade: the page's source shows the answers to anyone who looks.",
       "A quiz shown by transclusion (![[Other page#Quiz]]) is checked and scored as its own page's quiz, under the host page's score.",
       "A popover preview of a page shows its quizzes without Check (the page's script runs on the page itself, not in a popover); their answers stay hidden.",
-      "The folder check reads a page line by line, not with the site's parser (documentation/05): pages written the way the skill shows agree, and where an unusual nesting is read differently the site's safety net says so on a `plantoir: error:` line."
+      "The folder check reads a page line by line, not with the site's parser (documentation/05): pages written the way the skill shows agree, and where an unusual nesting is read differently the site's safety net says so on a `plantoir: error:` line.",
+        "Two HTML shapes are still read differently by the site and the folder check (#563 final review, 2026-10-17): a tag whose quoted attribute holds a `>` (`<img alt=\"x>y\">`) and an open `<pre>`, `<script>`, `<style>` or `<textarea>` before the choices. The safety net catches both and the page says so on its `plantoir: error:` line; neither is a shape the skill shows."
     ]
   }
 }
