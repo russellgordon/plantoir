@@ -287,6 +287,30 @@ final class AppUpdatesDelegateTests: XCTestCase {
         XCTAssertEqual(updates.decideAtQuit(), .installsAsItQuits, "The answer has gone; the quit cannot stop it")
     }
 
+    /// #560: the teacher's Install marks the quit that follows as the
+    /// installer's — until the installer's last look postpones the relaunch
+    /// for work under way. A ⌘Q during that wait installs as Plantoir quits
+    /// and is the teacher's own, like Install on Quit, so the mark comes off.
+    func testTheInstallMarkComesOffWhenTheRelaunchIsPostponed() {
+        let updates: AppUpdates = AppUpdatesDelegateTests.updatesReadingOnlyThisApp()
+        let windows: StandInWindows = StandInWindows()
+        let driver: HoldingUserDriver = HoldingUserDriver(standard: windows, owner: updates)
+        updates.adopt(driver)
+        XCTAssertFalse(updates.isQuittingToInstall)
+        driver.showReady { _ in }
+        windows.pressInstallAndRelaunch()
+        XCTAssertTrue(updates.isQuittingToInstall, "the teacher's Install should mark the quit as the installer's")
+
+        CourseActivity.beginPreviewBuild(folderPath: "/pretend", courseCode: "ENG2D", sectionNumber: 1)
+        let updater: SPUUpdater = AppUpdatesDelegateTests.unstartedUpdater()
+        XCTAssertTrue(updates.updater(updater, shouldPostponeRelaunchForUpdate: SUAppcastItem.empty()) {})
+        XCTAssertFalse(updates.isQuittingToInstall, "a quit while the relaunch waits is the teacher's")
+        XCTAssertEqual(
+            QuitConfirmation.closingReason(quitReasonCode: nil, installingAnUpdate: updates.isQuittingToInstall),
+            .quitByTheTeacher
+        )
+    }
+
     // MARK: - The trail
 
     /// The updater says nothing when an administrator's password was asked

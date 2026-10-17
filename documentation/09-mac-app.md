@@ -1716,7 +1716,11 @@ up. The reasons are `QuitConfirmation.ClosingReason`:
   install**: `installNow` (the teacher's Install, straight away or after held
   work) and `heldWorkIsDone`'s postponed-install branch set
   `isQuittingToInstall`; `didAbortWithError` (4007, a password not given,
-  among others) and any update cycle that ends in an error clear it. NOT
+  among others), any update cycle that ends in an error, and the installer's
+  last look POSTPONING the relaunch for work under way
+  (`shouldPostponeRelaunchForUpdate`) clear it — a ⌘Q during that wait
+  installs as Plantoir quits and is the teacher's, like Install on Quit
+  (implementation review). NOT
   from `noteInstalling`/`willInstallUpdate`: that callback also runs when the
   teacher quits with an update ready ("installs as Plantoir quits"), and that
   quit is the teacher's — its "update installing … as Plantoir quits" line
@@ -1749,11 +1753,12 @@ update lines. Windows printed 1.7.2 as "1.7 (2)"; the mac's guard
 (`ActivityTrailWiringTests.testTheOpenedLineCarriesTheThreePartVersionThenTheBuild`)
 passed before #560 too and exists so the Windows fault cannot arrive here.
 
-**Rejected:** a fourth reason, "asked to quit by another program". The Dock's
-Quit, Activity Monitor's Quit and an AppleScript `quit` all arrive as the same
-`kAEQuitApplication` request ⌘Q makes, with no quit reason; only a log out,
-restart or shut down carries one, so a fourth reason would be a guess dressed
-as a measurement. A `Force Quit` writes nothing, by construction — that is the
+**Rejected:** a fourth reason, "asked to quit by another program". ⌘Q is
+handled inside the app and sends no Apple event at all; the Dock's Quit,
+Activity Monitor's Quit and an AppleScript `quit` send a quit Apple event with
+no quit reason. Either way nothing tells them apart from the teacher's own
+quit — only a log out, restart or shut down carries a reason — so a fourth
+reason would be a guess dressed as a measurement. A `Force Quit` writes nothing, by construction — that is the
 "crash" the line exists to tell apart.
 
 ## A preview that never appears: bounding the QUIET, not the run
