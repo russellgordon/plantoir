@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Get a screenshot ready to be served.
 
-A capture comes off the screen at the display's own resolution, which is about
-twice what the page ever needs and several times the file size a visitor
-should be asked to download. Every saved shot is therefore scaled down to
-twice its largest drawn size and written twice: a PNG, and a WebP the page
-offers first.
+Every saved shot is written twice: a PNG, and a WebP the page offers first.
+A WINDOW capture -- the Mac's (#434) and, since #557, Windows' -- is served
+at its own pixel size, never scaled: the page draws it beside its other-
+platform twin at the same CSS size, and a 2x Windows capture cut back to
+1700 px looked soft beside the mac's 2784. Only the phone picture is scaled
+down (WIDEST_PHONE_PIXELS), being a simulator screen far larger than the
+page ever draws it.
 """
 
 from __future__ import annotations
@@ -14,9 +16,9 @@ from pathlib import Path
 
 from PIL import Image
 
-# Twice the widest the page ever draws each kind of shot, so a Retina screen
-# still gets a pixel per pixel and nobody downloads more than that.
-WIDEST_WINDOW_PIXELS = 1700
+# Twice the widest the page ever draws the phone, so a Retina screen still
+# gets a pixel per pixel. (WIDEST_WINDOW_PIXELS = 1700 capped every Windows
+# window picture until #557, 2026-10-16; removed so nothing reaches for it.)
 WIDEST_PHONE_PIXELS = 720
 
 
@@ -59,16 +61,18 @@ def serve_as_captured(path: Path) -> Path:
     return path
 
 
-def prepare(path: Path, widest: int = WIDEST_WINDOW_PIXELS) -> Path:
-    """Scale a capture down if it is oversized, then write PNG and WebP.
+def prepare(path: Path, widest: int | None = None) -> Path:
+    """Write PNG and WebP, scaling down only when `widest` is given.
 
-    For the PHONE picture and the Windows pictures only. A Mac window capture
-    goes through `serve_as_captured`, which never scales (#434).
+    For the PHONE picture (`widest=WIDEST_PHONE_PIXELS`) and the Windows
+    pictures. A Windows window capture passes nothing and is never scaled
+    (#557, following the print pictures of #544): it stands beside the mac's
+    capture, which `serve_as_captured` never scales (#434).
     """
     with Image.open(path) as opened:
         image = opened.convert("RGBA")
 
-    if image.width > widest:
+    if widest is not None and image.width > widest:
         height = round(image.height * widest / image.width)
         image = image.resize((widest, height), Image.LANCZOS)
 
