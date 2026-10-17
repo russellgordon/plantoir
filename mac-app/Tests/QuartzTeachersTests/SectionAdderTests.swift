@@ -953,6 +953,7 @@ final class SectionAdderTests: XCTestCase {
             ("title: \"Grade 11 Physics: Mechanics, Section 1\"", "title: \"Grade 11 Physics: Mechanics, Section 2\""),
             ("title: 'Grade 11 Rock ''n'' Roll: Live, Section 1'", "title: \"Grade 11 Rock 'n' Roll: Live, Section 2\""),
             ("title: Grade 11 Physics: Mechanics, Section 1", "title: \"Grade 11 Physics: Mechanics, Section 2\""),
+            ("title: 'Tis the Season, Section 1", "title: \"'Tis the Season, Section 2\""),
             ("title: \"Grade 11 \\\"Real\\\" World, Section 1\"", "title: Grade 11 \"Real\" World, Section 2"),
         ]
         for sibling in siblings {
@@ -988,9 +989,9 @@ final class SectionAdderTests: XCTestCase {
             XCTAssertEqual(SectionAdder.sectionTitle(for: course, sectionNumber: 2),
                            "Grade 11 Introduction to Computer Science, Section 2", written)
         }
-        XCTAssertNil(SectionAdder.plainTitle(fromValue: "\"unterminated"))
-        XCTAssertNil(SectionAdder.plainTitle(fromValue: "'unterminated"))
         XCTAssertEqual(SectionAdder.plainTitle(fromValue: "Labs"), "Labs")
+        XCTAssertEqual(SectionAdder.plainTitle(fromValue: "'Tis open"), "'Tis open",
+                       "a quote that never closes is taken as written")
     }
 
     /// The scaffold taken from a sibling's frontmatter quotes the swapped
