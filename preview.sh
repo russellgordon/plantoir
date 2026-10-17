@@ -3529,6 +3529,163 @@ announce_the_preview_address() {
 
 announce_the_preview_address || exit 1
 
+# -------------------- Runnable Swift (#493) --------------------
+# A ```swift run block runs in the student's browser as a small program
+# compiled AHEAD of time, and the build cannot compile it: build_site.py runs
+# inside the website builder, which has no way to start another. So the
+# launcher does it here, on this Mac, just before the build:
+#
+#   1. ask the website builder which blocks the course's cache does not hold
+#      yet (scripts/swift_blocks.py plan; it writes them into a job folder of
+#      this run's own, beside the course's built sites);
+#   2. none: nothing more - a course with no Swift never gets the Swift
+#      builder at all;
+#   3. otherwise make sure the Swift builder exists, building it the first
+#      time from support/swift (about 1.3 GB downloaded, a few minutes; kept
+#      after that), after checking there is room for it (review S9: a full
+#      disk would take the whole preview down, not only Swift);
+#   4. compile the jobs in it, with no network.
+#
+# Nothing here ever stops the preview: whatever could not be compiled is said
+# by the build, block by block, as one folder problem (codeRunnerBlocks.swift
+# in contracts/shared-rules.json). Its tag hashes support/swift ONLY
+# (contracts/toolchain.json -> swiftImage), so editing anything else never
+# rebuilds it. Windows has no such step (#493 option (b)).
+SWIFT_TAG_PREFIX="teaching-quartz-swift:src-"
+SWIFT_ROOM_GB=6
+
+# The Swift builder's own twin of prune_superseded_images: the same rules,
+# for its own prefix only (never a blanket prune).
+prune_superseded_swift_images() {
+  local keep_tag="$1"
+  local tag
+  local age_text
+  [[ "$keep_tag" == "$SWIFT_TAG_PREFIX"* ]] || return 0
+  while read -r tag age_text; do
+    [[ -z "$tag" ]] && continue
+    [[ "$tag" == "$SWIFT_TAG_PREFIX"* ]] || continue
+    [[ "$tag" == "$keep_tag" ]] && continue
+    if [[ -n "$(docker ps -aq --filter "ancestor=$tag" 2>/dev/null || true)" ]]; then
+      continue
+    fi
+    case "$age_text" in
+      *day*|*week*|*month*|*year*) ;;
+      *) continue ;;
+    esac
+    docker rmi "$tag" >/dev/null 2>&1 || true
+  done < <(docker images --filter "reference=${SWIFT_TAG_PREFIX}*" \
+             --format '{{.Repository}}:{{.Tag}} {{.CreatedSince}}' 2>/dev/null || true)
+}
+
+# One Swift builder is built at a time on this Mac (review S3): a second
+# launcher waits for the first rather than downloading 1.3 GB beside it. A
+# lock left by a launcher that is gone is taken over.
+take_the_swift_build_lock() {
+  # /tmp, not $TMPDIR: the app and a terminal carry different TMPDIRs.
+  local lock="/tmp/plantoir-swift-build-$(id -u).lock"
+  local waited=0
+  local holder
+  while ! mkdir "$lock" 2>/dev/null; do
+    holder="$(cat "$lock/pid" 2>/dev/null || true)"
+    if [[ -n "$holder" ]] && ! kill -0 "$holder" 2>/dev/null; then
+      rm -rf "$lock"
+      continue
+    fi
+    if [ "$waited" -ge 1200 ]; then
+      return 1
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  echo "$$" > "$lock/pid"
+  SWIFT_BUILD_LOCK="$lock"
+  return 0
+}
+
+give_back_the_swift_build_lock() {
+  if [[ -n "${SWIFT_BUILD_LOCK:-}" ]]; then
+    rm -rf "$SWIFT_BUILD_LOCK"
+    SWIFT_BUILD_LOCK=""
+  fi
+}
+
+# How many whole gigabytes the website builder's disk has free, or nothing.
+free_gigabytes_for_builders() {
+  docker exec "$CONTAINER_NAME" df -Pk / 2>/dev/null | awk 'NR == 2 { print int($4 / 1048576) }'
+}
+
+prepare_runnable_swift() {
+  local planned root="" cache="" jobs="" count=0 key value
+  planned="$(docker exec "$CONTAINER_NAME" python3 /opt/scripts/swift_blocks.py plan --course="$COURSE" --format=lines 2>/dev/null)" || return 0
+  while IFS='=' read -r key value; do
+    case "$key" in
+      root) root="$value" ;;
+      cache) cache="$value" ;;
+      jobs) jobs="$value" ;;
+      count) count="$value" ;;
+    esac
+  done <<< "$planned"
+  if [[ -z "$jobs" || -z "$root" || "$count" == "0" ]]; then
+    return 0
+  fi
+
+  local context
+  context="$(resolve_build_context 2>/dev/null)/support/swift"
+  if [[ ! -f "$context/Dockerfile" ]]; then
+    echo "⚠️  This copy of Plantoir cannot get Swift ready, so the Swift programs on this site will not run yet."
+    return 0
+  fi
+  local swift_image="${SWIFT_TAG_PREFIX}$(toolchain_hash "$context")"
+
+  if ! docker image inspect "$swift_image" >/dev/null 2>&1; then
+    local free
+    free="$(free_gigabytes_for_builders)"
+    if [[ -n "$free" && "$free" -lt "$SWIFT_ROOM_GB" ]]; then
+      printf '{"state": "noRoom", "freeGigabytes": %s}\n' "$free" > "$root/state.json" 2>/dev/null || true
+      echo "⚠️  Not enough free space to get Swift ready (about ${SWIFT_ROOM_GB} GB is needed, ${free} GB is free), so the Swift programs on this site will not run yet."
+      rm -rf "$jobs"
+      return 0
+    fi
+    if ! take_the_swift_build_lock; then
+      echo "⚠️  Swift is still being got ready for another course; preview again in a few minutes to make these programs runnable."
+      rm -rf "$jobs"
+      return 0
+    fi
+    if ! docker image inspect "$swift_image" >/dev/null 2>&1; then
+      echo "🧱 Getting Swift ready for this course's runnable code — the first time downloads about 1.3 GB and takes a few minutes…"
+      local build_cmd=(docker buildx build --load)
+      if ! docker buildx version >/dev/null 2>&1; then
+        build_cmd=(env DOCKER_BUILDKIT=1 docker build)
+      fi
+      if "${build_cmd[@]}" --progress=plain -t "$swift_image" "$context" >"$root/last-swift-build.log" 2>&1; then
+        echo "✅ Swift is ready."
+        prune_superseded_swift_images "$swift_image"
+      else
+        give_back_the_swift_build_lock
+        echo "⚠️  Could not get Swift ready — the first time needs an internet connection. The rest of the site builds as usual; preview again once online to make its Swift programs runnable."
+        rm -rf "$jobs"
+        return 0
+      fi
+    fi
+    give_back_the_swift_build_lock
+  fi
+
+  local noun="programs"
+  [[ "$count" == "1" ]] && noun="program"
+  echo "🦅 Making ${count} Swift ${noun} ready to run…"
+  if docker run --rm --network none \
+      --mount "$(bind_mount_argument "$root" "$root")" \
+      "$swift_image" python3 /opt/plantoir-swift/compile.py "$jobs" "$cache" >"$root/last-compile.log" 2>&1; then
+    :
+  else
+    echo "⚠️  Could not make the Swift programs ready to run this time; the build will say which ones."
+  fi
+  rm -rf "$jobs"
+  return 0
+}
+
+prepare_runnable_swift
+
 # A terminal is what makes the container's prompts and live progress work, so
 # ask for one when there IS one. But `docker exec -t` refuses to start at all
 # when stdin is not a terminal — from a script or from CI — and it fails here,
