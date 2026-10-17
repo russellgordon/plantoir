@@ -2349,7 +2349,9 @@ nested = '- - ```python run\n    print("nested shape")\n    ```\n\n```python run
 import re
 twin = "Runnable code planted by verify.sh (plantoir-runner-sentinel-7f3a).\n\n"
 for info, code in fences:
-    words = [w for w in re.findall(r'\S*"[^"]*"\S*|\S+', info) if w not in ("run", "readonly", "stdin", "autorun")]
+    # Words as the site's parser splits them: on space and tab only, so a
+    # no-break space stays inside its word (codeRunnerBlocks.fences, N2).
+    words = [w for w in re.findall(r'[^ \t"]*"[^"]*"[^ \t]*|[^ \t]+', info) if w not in ("run", "readonly", "stdin", "autorun")]
     twin += f"```{' '.join(words)}\n{code}\n```\n\n"
 (course / "Runner Plain Twin.md").write_text("---\ntitle: Runner Plain Twin\n---\n" + twin, encoding="utf-8")
 (course / "Runner Playground.md").write_text(
