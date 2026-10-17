@@ -4471,7 +4471,7 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "quizzesNotReady"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
         "reversed": {
           "check": "linksIntoHiddenPages",
@@ -4634,6 +4634,174 @@
         "fixable": false,
         "fill": "{page} is the page's place in the course folder without .md; {kind} is kinds[engine]; {block} counts that engine's fences on the page from 1; {line} is the line in the teacher's own file, and when it cannot be found {blockLine} is the line within the fence (figureLineInBlock), or neither is known (figureLineNoLine); {reason} is figureFences.words.reasons[reason] filled with the figure's {name}, {said} and {seconds}. `sentence` when ONE figure could not be drawn and `sentenceForSeveral` otherwise ({count} figures). `detail` names at most ten figures, joined with \"; \" (a reason can hold a comma), then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per section build (#246).",
         "why": "#485 E1 (plan, Python prepares and Quartz places): a diagram or graph that cannot be drawn shows students a short sentence in its place (ruling E1-7), and the teacher, who previews in the app and never reads the build's console, has to be told where - page, fence and line - or the sentence stays on the site. An assistant reads the same facts on `plantoir: error:` lines. It never stops a build: one figure must not keep a whole site from being built or deployed. Not repairable: only the teacher knows what the figure was meant to say. A figure with no description (`% alt:`) is NOT a finding (ruling E1-3): it is drawn, and only a `plantoir: note:` line says so."
+      },
+      {
+        "name": "swiftCouldNotBePrepared",
+        "sentence": "A Swift program on “{page}” in {course} Section {section} is not ready to run.",
+        "sentenceForSeveral": "{count} Swift programs in {course} Section {section} are not ready to run.",
+        "detail": "Students see the code with no working Run button until it is put right: {blocks}.",
+        "blockLine": "“{page}”, Swift block {block}, line {line}: {reason}",
+        "blockLineNoLine": "“{page}”, Swift block {block}: {reason}",
+        "oneReasonForSeveral": "{blocks} on {pages}: {reason}",
+        "reasonsForSeveral": {
+          "notCompiled": "not made ready to run - preview the course again",
+          "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about 1.3 GB)",
+          "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run",
+          "notOnWindows": "Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable"
+        },
+        "blockCount": { "one": "1 block", "several": "{count} blocks" },
+        "pageCount": { "one": "1 page", "several": "{count} pages" },
+        "groupingCases": [
+          {
+            "name": "seventeen blocks on four pages, all offline, are one piece",
+            "problems": [
+              {
+                "page": "Unit 1",
+                "block": 1,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 2",
+                "block": 1,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 3",
+                "block": 1,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 4",
+                "block": 1,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 1",
+                "block": 2,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 2",
+                "block": 2,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 3",
+                "block": 2,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 4",
+                "block": 2,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 1",
+                "block": 3,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 2",
+                "block": 3,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 3",
+                "block": 3,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 4",
+                "block": 3,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 1",
+                "block": 4,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 2",
+                "block": 4,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 3",
+                "block": 4,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 4",
+                "block": 4,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 1",
+                "block": 5,
+                "line": 3,
+                "reason": "notCompiled"
+              }
+            ],
+            "detail": "Students see the code with no working Run button until it is put right: 17 blocks on 4 pages: not made ready to run - preview the course again."
+          },
+          {
+            "name": "one compile error and two blocks with too little room",
+            "problems": [
+              {
+                "page": "Unit 1",
+                "block": 1,
+                "line": 9,
+                "reason": "compileError",
+                "said": "cannot find 'nmae' in scope"
+              },
+              {
+                "page": "Unit 1",
+                "block": 2,
+                "line": 20,
+                "reason": "noRoom"
+              },
+              {
+                "page": "Unit 2",
+                "block": 1,
+                "line": 4,
+                "reason": "noRoom"
+              }
+            ],
+            "detail": "Students see the code with no working Run button until it is put right: “Unit 1”, Swift block 1, line 9: Swift found an error in it: cannot find 'nmae' in scope; 2 blocks on 2 pages: this computer needs about 6 GB of free space before it can make Swift programs ready to run."
+          },
+          {
+            "name": "one block on one page",
+            "problems": [
+              {
+                "page": "Unit 1",
+                "block": 1,
+                "line": null,
+                "reason": "notOnWindows"
+              }
+            ],
+            "detail": "Students see the code with no working Run button until it is put right: 1 block on 1 page: Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable."
+          }
+        ],
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's runnable Swift blocks from 1; {line} is the line in the teacher's own file - the first error's line for compileError, the opening fence's otherwise - and when it cannot be found the block is named through blockLineNoLine; {reason} is codeRunnerBlocks.swift.reasons[reason] filled with {said} (the compiler's first error) and {gigabytes} (codeRunnerBlocks.swift.room.needGigabytes). `sentence` when ONE block has no program and `sentenceForSeveral` otherwise ({count} blocks). `detail` names each compileError block through blockLine or blockLineNoLine (each has its own message), and every OTHER reason ONCE, through oneReasonForSeveral - the count first, then reasonsForSeveral[reason] (worded without a pronoun, so it reads after a count; the fixes review's nit 2) - with blockCount and pageCount (implementation review S4: a cause every block shares - offline, too little room, Windows - was said once per block, ten times and 'and 7 more'); compile errors first in page order, then the shared reasons in reasonCases' order; at most ten pieces, joined with \"; \" (a compiler's message can hold a comma), then `andMore` with the number of pieces left over. `groupingCases` pin it. Every value is filled in ONE pass. ONE finding per section build (#246).",
+        "why": "#493 ruling Q1: a Swift block that does not compile used to be planned as a failed build (the issue's acceptance 11); a failed build would also stop the preview the teacher needs to fix it, the #485 E1 precedent. So the build carries on, the block shows its code with Run disabled and words.notReady, and the teacher - who previews in the app and never reads the build's console - is told where: page, block, line and the compiler's own first error. An assistant reads the same facts on `plantoir: error:` lines. The same finding says when a block could not be prepared at all (offline the first time, too little room, or on Windows), because to a teacher it is the same thing: students cannot run that program yet. Not repairable: only the teacher can correct the code, and getting Swift ready is the next preview's own job (review S8: in repair.neverOffered)."
       },
       {
         "name": "quizzesNotReady",
@@ -24052,7 +24220,7 @@
     ]
   },
   "codeRunnerBlocks": {
-    "note": "#455 (+#494), v1.8.0. A fenced block of code on a page that opts in becomes a small program a student can edit and RUN in the browser, with nothing installed and no account: ```python run on a page whose frontmatter says `codeRunner: true`. Python is the only language today; everything below reads the LANGUAGE TABLE (`languages`), so a second language is a row in that table, a runtime class in the page's code, a vendor layer and a pin - and nothing else (documentation/06-quartz-customizations.md -> 'I. Runnable code (#455)' -> 'Adding a language'). The page's half is support/quartz (codeRunnerRule.ts, codeRunner.ts, CodeRunner.tsx, codeRunner.inline.ts, codeRunner.scss); the engine's half is support/gated/<engine> laid over VENDOR_DIR/<engine> and copied into a site only when it needs it (siteCarriesEngine). No trail event: the app does nothing new a teacher sees.",
+    "note": "#455 (+#494), v1.8.0. A fenced block of code on a page that opts in becomes a small program a student can edit and RUN in the browser, with nothing installed and no account: ```python run on a page whose frontmatter says `codeRunner: true`. Two languages today, Python (#455) and Swift (#493, read-only and compiled ahead of time: `swift`); everything below reads the LANGUAGE TABLE (`languages`), so a language the browser runs as written is a row in that table, a runtime class in the page's code, a vendor layer and a pin; a language compiled ahead of time (Swift) also needs a compile layer, a folder problem and the two generic `prebuilt` rules (documentation/06-quartz-customizations.md -> 'I3' -> 'Adding a language', which lists exactly what Swift needed). The page's half is support/quartz (codeRunnerRule.ts, codeRunner.ts, CodeRunner.tsx, codeRunner.inline.ts, codeRunner.scss); the engine's half is support/gated/<engine> laid over VENDOR_DIR/<engine> and copied into a site only when it needs it (siteCarriesEngine). No trail event: the app does nothing new a teacher sees.",
     "rule": "A block runs only where THREE things hold: the page opts in (`codeRunner: true`, read as file-formats.json -> pageOptIns says), the fence's language is the FIRST word of its info string and is exactly a table row's `fence` (lowercase, Q1), and the rest of the info string, split on whitespace, holds the token `run` exactly. Any other block - on any page - is left exactly as it was, byte for byte. A runnable block keeps its highlighted code as the page shows it without the script, in a popover, and on paper; the page's script then replaces it with an editor (or keeps it, for `readonly`), an input box when the program reads input, Run / Stop / Reset, a status line and the output. ONE program runs on a page at a time (Q2): Run on a second block stops the first and says words.stoppedForAnother. Nothing is fetched until a student presses Run (or an `autorun` block scrolls into view): a page with runnable code costs a reader nothing until then.",
     "languages": [
       {
@@ -24071,9 +24239,25 @@
         "inputCall": "input()",
         "inputPattern": "\\binput\\s*\\(",
         "prebuilt": false
+      },
+      {
+        "fence": "swift",
+        "idPrefix": "swift",
+        "displayName": "Swift",
+        "runtime": "swift-wasm",
+        "engine": "swift",
+        "worker": "plantoir-swift-worker.js",
+        "editable": false,
+        "flags": [
+          "stdin",
+          "autorun"
+        ],
+        "inputCall": "readLine()",
+        "inputPattern": "\\breadLine\\s*\\(",
+        "prebuilt": true
       }
     ],
-    "languagesRule": "The ONE table everything reads. `fence` is the info string's first word, exact; `idPrefix` names the block's id (ids); `displayName` fills {language} in the words; `runtime` picks the class in codeRunner.inline.ts that runs it; `engine` is the folder under VENDOR_DIR, under support/gated and under the site's static/ (the #454 convention: one name in all three); `worker` is the file inside it the page starts; `editable` false would make every block read-only; `flags` are the tokens after `run` the language accepts; `inputCall` fills {inputCall}; `inputPattern` is a JavaScript and Python regular expression that shows the input box without the `stdin` flag; `prebuilt` false means the browser runs the source as written (true is #493's: the build compiles it first). Two literal mirrors exist because the site's code must bundle without the contract and page_features.py must run without the image: `LANGUAGES` in support/quartz/plugins/transformers/codeRunnerRule.ts and `RUNNER_LANGUAGES` in scripts/page_features.py. scripts/test_page_features.py pins the Python mirror field for field and scripts/check_runner_rules_against_the_site.py the TypeScript one. REJECTED: the word `python` anywhere in the fence rule, the ids, the gate, the words or the print rule (Russell, 2026-10-09: a new language is a drop-in, not a rewrite).",
+    "languagesRule": "The ONE table everything reads. `fence` is the info string's first word, exact; `idPrefix` names the block's id (ids); `displayName` fills {language} in the words; `runtime` picks the class in codeRunner.inline.ts that runs it; `engine` is the folder under VENDOR_DIR, under support/gated and under the site's static/ (the #454 convention: one name in all three); `worker` is the file inside it the page starts; `editable` false makes every block of the language read-only (Swift: a student changes the input, never the code, and the page says words.cannotEdit once under it); `flags` are the tokens after `run` the language accepts; `inputCall` fills {inputCall}; `inputPattern` is a JavaScript and Python regular expression that shows the input box without the `stdin` flag; `prebuilt` false means the browser runs the source as written; true means the build compiles each block ahead of time and the page runs the result (Swift: `swift`), and the language's engine is its overlay alone - support/gated/<engine> - because what really runs is made per course (siteCarriesEngine). Two literal mirrors exist because the site's code must bundle without the contract and page_features.py must run without the image: `LANGUAGES` in support/quartz/plugins/transformers/codeRunnerRule.ts and `RUNNER_LANGUAGES` in scripts/page_features.py. scripts/test_page_features.py pins the Python mirror field for field and scripts/check_runner_rules_against_the_site.py the TypeScript one. REJECTED: the word `python` anywhere in the fence rule, the ids, the gate, the words or the print rule (Russell, 2026-10-09: a new language is a drop-in, not a rewrite).",
     "fences": {
       "rule": "`lang` is the info string's first word as written and `meta` the rest (mdast's `lang` and `meta`; markdown_code.fenced_blocks's `lang` and `meta`). A runner when `optedIn`, `lang` equals a table row's `fence` exactly, and `meta` split on runs of whitespace holds `run` exactly. `flags` are the tokens that equal one of the row's flags exactly, each once, in the row's order; anything else is ignored. A whitespace split means a title that contains ` run ` makes a runner and `run.py` does not (S5): chosen, not discovered.",
       "cases": [
@@ -24242,10 +24426,59 @@
             "readonly",
             "autorun"
           ]
+        },
+        {
+          "name": "swift run is a Swift runner",
+          "lang": "swift",
+          "meta": "run",
+          "optedIn": true,
+          "runner": true,
+          "flags": []
+        },
+        {
+          "name": "Swift in capitals is not a runner",
+          "lang": "Swift",
+          "meta": "run",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "a Swift block with no run token",
+          "lang": "swift",
+          "meta": "",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "Swift's two flags",
+          "lang": "swift",
+          "meta": "run autorun stdin",
+          "optedIn": true,
+          "runner": true,
+          "flags": [
+            "stdin",
+            "autorun"
+          ]
+        },
+        {
+          "name": "readonly is not a Swift flag: every Swift block is read-only already",
+          "lang": "swift",
+          "meta": "run readonly",
+          "optedIn": true,
+          "runner": true,
+          "flags": [],
+          "why": "The row's editable is false; a `readonly` token is ignored like any word the row does not list."
+        },
+        {
+          "name": "a Swift page that does not opt in is untouched",
+          "lang": "swift",
+          "meta": "run",
+          "optedIn": false,
+          "runner": false
         }
       ],
       "pageShapes": {
-        "rule": "Where a fence can SIT, on a page that opts in, read by both sides: the site's transformer (codeRunnerRule.findRunners over Quartz's own parse) and the build's count (page_features.runner_fences over markdown_code.fenced_blocks, the #313 fence rule). `runners` is how many runnable blocks BOTH sides find; `siteBodies` is the code each runnable block holds on the site. A fence opened on a line that opens a list item holding another container on that same line (`- - ```python run`, `1. > ```python run`) is a code block to the site's parser and was nothing to the build's reader, which then misread every fence after it (review S2, measured with remark). The build's reader now opens it too, marked `nested` (markdown_code.fenced_blocks), so the fences after it are read alike; and it is NOT a runner on either side (the transformer skips such a block), so it stays the plain highlighted block it always was. A lazy line (indented less than its list item's content) ends the block on the site and not in the build's reader: both find ONE runner and agree on whether the site carries the engine, which is all #455 asks of the build; the site's body is the one that runs (#493, which compiles the body, makes the build agree). Where the two still disagree in a shape nobody has measured, siteDisagrees is the safety net.",
+        "rule": "Where a fence can SIT, on a page that opts in, read by both sides: the site's transformer (codeRunnerRule.findRunners over Quartz's own parse) and the build's count (page_features.runner_fences over markdown_code.fenced_blocks, the #313 fence rule). `runners` is how many runnable blocks BOTH sides find; `siteBodies` is the code each runnable block holds on the site. A fence opened on a line that opens a list item holding another container on that same line (`- - ```python run`, `1. > ```python run`) is a code block to the site's parser and was nothing to the build's reader, which then misread every fence after it (review S2, measured with remark). The build's reader now opens it too, marked `nested` (markdown_code.fenced_blocks), so the fences after it are read alike; and it is NOT a runner on either side (the transformer skips such a block), so it stays the plain highlighted block it always was. A lazy line (indented less than its list item's content) ends the block on the site and not in the build's reader: both find ONE runner and agree on whether the site carries the engine, which is all #455 asks of the build; the site's body is the one that runs. For Swift (#493) the build compiles the body IT read, so the two keys differ and the site shows that block as plain code with a `plantoir: error:` line (siteDisagrees, words.blockNotCompiled) - the reader was NOT changed to follow lazy lines (#493: the brief keeps the fence rule as it is; the safety net names the block, and the lazy line is a mistake a teacher can see and fix). Where the two still disagree in a shape nobody has measured, siteDisagrees is the safety net.",
         "cases": [
           {
             "name": "at the top level",
@@ -24319,6 +24552,15 @@
               "x = 8"
             ],
             "why": "The two-space line ends the list item, and with it the block, on the site; the build's reader keeps it. One runner either way."
+          },
+          {
+            "name": "a lazy line in a Swift block in a list item",
+            "page": "1. item\n   ```swift run\n   let x = 8\n  print(x)\n   ```\n",
+            "runners": 1,
+            "siteBodies": [
+              "let x = 8"
+            ],
+            "why": "As the Python case above: one runner on both sides, but the build compiles `let x = 8\\nprint(x)` and the site looks for the key of `let x = 8`, finds none, and shows plain code with a plantoir: error: line (siteDisagrees)."
           }
         ]
       }
@@ -24340,11 +24582,21 @@
           "ids": [
             "index-py-1"
           ]
+        },
+        {
+          "slug": "Units/Strings",
+          "page": "```python run\nprint(1)\n```\n\n```swift run\nprint(2)\n```\n\n```python run\nprint(3)\n```\n\n```swift run readonly\nprint(4)\n```\n",
+          "ids": [
+            "Units/Strings-py-1",
+            "Units/Strings-swift-1",
+            "Units/Strings-py-2",
+            "Units/Strings-swift-2"
+          ]
         }
       ]
     },
     "siteCarriesEngine": {
-      "rule": "The #454 gate, per site, per language: `static/<engine>/` (the table row's engine: VENDOR_DIR/<engine> with support/gated/<engine> laid over it, later winning - for Python the five pinned Pyodide files, its README and plantoir-worker.js) only when at least one page students can see opts in AND holds at least one runnable block of that language. A page that opts in with no runnable block carries nothing (#455 plan Q1, Russell 2026-10-17: with two languages the key alone cannot say which engine to carry). A missing engine (VENDOR_DIR/<engine> absent - the overlay alone is not an engine) is one plain line and no Run button, never a stopped build. Each case's pages give `codeRunner` as the build hands it over (parsed), `printable` likewise, the page's `body` and whether students can see it.",
+      "rule": "The #454 gate, per site, per language: `static/<engine>/` (the table row's engine: VENDOR_DIR/<engine> with support/gated/<engine> laid over it, later winning - for Python the five pinned Pyodide files, its README and plantoir-worker.js) only when at least one page students can see opts in AND holds at least one runnable block of that language. A page that opts in with no runnable block carries nothing (#455 plan Q1, Russell 2026-10-17: with two languages the key alone cannot say which engine to carry). A missing engine (VENDOR_DIR/<engine> absent - the overlay alone is not an engine) is one plain line and no Run button, never a stopped build. The one exception is a `prebuilt` language (Swift): its overlay IS its engine (plantoir-swift-worker.js and plantoir-wasi.mjs), because each block's program is compiled per course into static/swift-wasm/ (swift.site), so there is no VENDOR_DIR/swift and none is needed. Each case's pages give `codeRunner` as the build hands it over (parsed), `printable` likewise, the page's `body` and whether students can see it.",
       "cases": [
         {
           "name": "no page opts in",
@@ -24435,11 +24687,43 @@
             "pyodide": false,
             "pagedjs": false
           }
+        },
+        {
+          "name": "a page students can see with a Swift block carries Swift's engine and not Python's",
+          "pages": [
+            {
+              "codeRunner": true,
+              "printable": null,
+              "body": "```swift run\nprint(1)\n```\n",
+              "visible": true
+            }
+          ],
+          "engines": {
+            "swift": true,
+            "pyodide": false,
+            "pagedjs": false
+          }
+        },
+        {
+          "name": "a page with one block of each language carries both engines",
+          "pages": [
+            {
+              "codeRunner": true,
+              "printable": null,
+              "body": "```python run\nprint(1)\n```\n\n```swift run\nprint(2)\n```\n",
+              "visible": true
+            }
+          ],
+          "engines": {
+            "swift": true,
+            "pyodide": true,
+            "pagedjs": false
+          }
         }
       ]
     },
     "siteDisagrees": {
-      "rule": "Review S2's safety net. The build writes the engines the site carries into quartz/plantoir_code_runner.json (`carried`) before the site is made. When the site's transformer finds a runnable block whose language's engine is NOT carried - the build's reader missed the block, the engine is missing from this copy of Plantoir, or the page was changed while a preview was running - it leaves the block as the plain highlighted code it was (a student never sees words.engineMissing for ever) and prints one line an assistant can read: `plantoir: error: <page>.md: <fence> block <n>: ` + words.blockNotPrepared - or words.blockAfterUnclosedFence when a fenced code block above it on the page was never closed, the likeliest cause (review N3: the site closes such a fence at the end of its list item, the build's reader carries on through the block below). The line stays in the build's output; it is not a folder problem in the app (the transformer runs after the folder checks are said) - a gap recorded on #455. The live preview's own rebuild cannot run the gate again (documentation/05-build-pipeline.md -> 'The live-preview edge'), so a block added while a preview runs shows as plain code until the next preview.",
+      "rule": "Review S2's safety net. The build writes the engines the site carries into quartz/plantoir_code_runner.json (`carried`) before the site is made. When the site's transformer finds a runnable block whose language's engine is NOT carried - the build's reader missed the block, the engine is missing from this copy of Plantoir, or the page was changed while a preview was running - it leaves the block as the plain highlighted code it was (a student never sees words.engineMissing for ever) and prints one line an assistant can read: `plantoir: error: <page>.md: <fence> block <n>: ` + words.blockNotPrepared - or words.blockAfterUnclosedFence when a fenced code block above it on the page was never closed, the likeliest cause (review N3: the site closes such a fence at the end of its list item, the build's reader carries on through the block below). The line stays in the build's output; it is not a folder problem in the app (the transformer runs after the folder checks are said) - a gap recorded on #455. The live preview's own rebuild cannot run the gate again (documentation/05-build-pipeline.md -> 'The live-preview edge'), so a block added while a preview runs shows as plain code until the next preview. For a `prebuilt` language (Swift, #493) the transformer ALSO looks the block's key (swift.cacheKey, from the code its own parser read) up in quartz/plantoir-runners/<engine>.json: a key that is not there - the two readers read the block differently, or the code changed while a preview was running - is the same case, plain code and one line with words.blockNotCompiled (or words.blockAfterUnclosedFence). A key that IS there but has no program (compileError, notCompiled, noRoom, notOnWindows) is not this case: the build has already said it on its own line and as a folder problem, and the block is wrapped with no program (swift.site).",
       "example": "plantoir: error: Units/Loops.md: python block 2: words.blockNotPrepared"
     },
     "harness": {
@@ -24470,7 +24754,7 @@
       "rule": "DECISION 8. On paper a runnable block prints as code and nothing else - no buttons, input box, status or output: an UNEDITED block prints its highlighted code as every other block does; an EDITED one prints the student's current code, from a copy kept in step with the editor (pre.plantoir-runner-print, wrapper class plantoir-runner-edited), because a textarea's typed value is not part of what a printed or copied page holds. The same rules serve ⌘P and the Print button (Paged.js promotes @media print), and the Print button waits for the copy to be brought up to date (window.plantoirPrint.prepare). Every rule is scoped under .plantoir-runner, so a page with no runnable block prints exactly as before (B2)."
     },
     "words": {
-      "note": "English, as data, on a page students read. {language} is the table row's displayName and {inputCall} its inputCall. No word names the machinery (CLAUDE.md rule 1): never the engine's name, WebAssembly, a worker or a thread. blockNotPrepared and blockAfterUnclosedFence are reasons on a `plantoir: error:` line (siteDisagrees), which an assistant and a teacher read.",
+      "note": "English, as data, on a page students read. {language} is the table row's displayName and {inputCall} its inputCall. No word names the machinery (CLAUDE.md rule 1): never the engine's name, WebAssembly, a worker or a thread. blockNotPrepared, blockAfterUnclosedFence and blockNotCompiled are reasons on a `plantoir: error:` line (siteDisagrees), which an assistant and a teacher read. cannotEdit, notReady, crashed and exitCode ({code}: the number the program gave exit()) are #493's: the note under a block whose language is not editable, the status of a block with no program, a program that trapped (its `Fatal error:` line, when it printed one, is already in the output), and a program that ended with a non-zero exit code.",
       "run": "Run",
       "stop": "Stop",
       "reset": "Reset",
@@ -24491,10 +24775,293 @@
       "couldNotLoad": "{language} couldn't start. Check the connection, then press Run again.",
       "teacherChangedIt": "Your teacher has changed this code, so it shows their new version.",
       "blockNotPrepared": "this block shows as plain code because the site was prepared without {language} - preview the site again, and if this line comes back, start the block's ``` on a line of its own",
-      "blockAfterUnclosedFence": "this block shows as plain code because a code block above it on this page is never closed - close that block with a line like the one that opened it (the same ``` or ~~~, indented the same, inside the same list item or callout), then preview the site again"
+      "blockAfterUnclosedFence": "this block shows as plain code because a code block above it on this page is never closed - close that block with a line like the one that opened it (the same ``` or ~~~, indented the same, inside the same list item or callout), then preview the site again",
+      "cannotEdit": "You can change the input and run it again. The code itself can't be edited here.",
+      "notReady": "This program isn't ready to run yet.",
+      "crashed": "The program stopped because of an error.",
+      "exitCode": "The program ended with exit code {code}.",
+      "blockNotCompiled": "this block shows as plain code because it was not made ready to run when the site was prepared - preview the site again, and if this line comes back, start the block's ``` on a line of its own and indent every line of the block alike"
+    },
+    "swift": {
+      "rule": "#493, v1.8.0. A ```swift run block is compiled AHEAD OF TIME to a small WebAssembly program, and the student runs that program: Swift has no interpreter a browser can carry, so the code is read-only and the input box is what a student changes (Path A of the Phase 0 report on #493: Embedded Swift per block, with an automatic fall back to the full standard library). Three steps, in three places. PLAN, by the launcher through the main container, before the build: scripts/swift_blocks.py reads every page of the course that opts in (generously: hidden pages and other sections too) and writes each block the cache does not hold into a job folder of this run's own. COMPILE, only when there are jobs, in a SECOND image the launcher builds the first time it is needed (contracts/toolchain.json -> swiftImage; `teaching-quartz-swift:src-<hash of support/swift>`), one container per preview with no network (support/swift/compile.py). PREPARE, in the build, every build: each block's program is copied into the site and every block without one is said (siteHealth -> swiftCouldNotBePrepared, and a `plantoir: error:` line). The build never compiles (it runs in the main container, which cannot start another) and is never stopped by a block that does not compile (#493 ruling Q1: the preview must open so the teacher can fix it). Scheduled publishes run the same launcher, so they compile too (ruling Q4); deploy.py's own rebuild for a different web address (rebuild_for_production) runs inside the container and uses the cache only - a block it finds no program for ships not ready, said the same way.",
+      "compile": {
+        "rule": "Per block, in this order (Phase 0 §7, the spike's corrections G1-G5): 1. Embedded Swift - `embedded` flags, the readLine shim (support/swift/ReadLineShim.swift: Embedded Swift on wasm has no readLine() without it) compiled beside the block, the Unicode tables linked. 2. If that does not compile, OR the optimised program contains `placeholder` (Embedded Swift compiled a `print` of a value it cannot print, and would print that sentence instead of the value: an array, an optional, a struct, an error in a string - measured on 05 and 09), the full standard library - `full` flags. 3. If neither compiles, the block is a compileError with the FULL compiler's diagnostics, the ones that describe ordinary Swift. Every compile is TWO steps, `-c` to `/tmp/plantoir-swift/<key>/main.o` then a link (spike G4: the one-call driver puts a random temporary path into the program, so the same code gave different bytes every time; with a path fixed per key, the same code gives the same bytes in every run of one image). PATH is pinned to the toolchain's folder and /usr/bin:/bin and wasm-opt is called by its absolute path: clang runs any wasm-opt it finds on PATH by itself, which changes the output (Phase 0 trap 1). `-swift-version 5` is pinned (Swift 6 mode changes an Embedded verdict: Phase 0 trap 2). `-assert-config Debug` makes a trap print its `Fatal error:` line. The link caps memory at 256 MB (review S5). readLine() flushes stdout before it reads - ReadLineShim.swift for Embedded Swift, and support/swift/FlushBeforeRead.c linked with `--wrap=swift_stdlib_readLine_stdin` for the full library - so a prompt printed with `terminator: \"\"` comes BEFORE the input line the page echoes (measured 2026-10-17: without it the echoed line came first; swift-gate 13 and 14 pin both libraries). Jobs run in parallel, one per CPU. `mustContain` lists strings compile.py must hold, checked by scripts/test_swift_blocks.py.",
+        "placeholder": "cannot print value in embedded Swift",
+        "embedded": "-target wasm32-unknown-wasip1 -sdk <sdk>/WASI.sdk -static-stdlib -resource-dir <sdk>/swift.xctoolchain/usr/lib/swift -enable-experimental-feature Embedded -wmo -Osize -assert-config Debug -swift-version 5; link: -Xlinker -lc++ -Xlinker -lswift_Concurrency -lswiftUnicodeDataTables -Xlinker --max-memory=268435456; both: -Xclang-linker -resource-dir -Xclang-linker <sdk>/swift.xctoolchain/usr/lib/swift_static/clang",
+        "full": "-target wasm32-unknown-wasip1 -sdk <sdk>/WASI.sdk -static-stdlib -resource-dir <sdk>/swift.xctoolchain/usr/lib/swift_static -O -assert-config Debug -swift-version 5; link: -Xlinker --max-memory=268435456; both: -Xclang-linker -resource-dir -Xclang-linker <sdk>/swift.xctoolchain/usr/lib/swift_static/clang",
+        "wasmOpt": "/opt/binaryen/bin/wasm-opt -Os --strip-debug --strip-producers",
+        "maxMemoryBytes": 268435456,
+        "jobSeconds": 180,
+        "mustContain": [
+          "\"-Osize\"",
+          "\"-O\"",
+          "\"-assert-config\", \"Debug\"",
+          "\"-swift-version\", \"5\"",
+          "\"-enable-experimental-feature\", \"Embedded\"",
+          "\"-wmo\"",
+          "\"-lswiftUnicodeDataTables\"",
+          "\"-Xclang-linker\", \"-resource-dir\", \"-Xclang-linker\"",
+          "MAX_MEMORY = 268435456",
+          "\"--max-memory=",
+          "\"-c\"",
+          "\"-Os\", \"--strip-debug\", \"--strip-producers\"",
+          "/opt/binaryen/bin/wasm-opt",
+          "PLACEHOLDER = b\"cannot print value in embedded Swift\"",
+          "/usr/bin:/bin",
+          "\"--wrap=swift_stdlib_readLine_stdin\"",
+          "FlushBeforeRead.c"
+        ]
+      },
+      "cacheKey": {
+        "rule": "A block's key is the SHA-256, as lowercase hex, of its NORMALISED code in UTF-8: split on \"\\n\"; take spaces, tabs, carriage returns, form feeds and vertical tabs off the end of each line; take off the indentation every non-blank line shares (the longest common run of leading spaces and tabs, compared character by character); drop blank lines at the start and the end. The normalised code is exactly what is compiled, so a diagnostic's line maps back to the teacher's file by the opening fence's line plus `droppedAtTop`. Both sides compute it: scripts/swift_blocks.py (normalise, key_of) from the build's fence reader, and the site's transformer (codeRunnerRule.ts, normaliseProgram, with node's crypto) from what Quartz's parser read - the cases are run by scripts/test_swift_blocks.py and scripts/check_runner_rules_against_the_site.py. The key NEVER depends on the compiled program (review S4).",
+        "cases": [
+          {
+            "name": "a plain program",
+            "body": "print(\"Hello\")",
+            "normalised": "print(\"Hello\")",
+            "key": "093656492e3a7ab60f75f0575a89b9d9c8e7ff1d03b5419927792394407b7a7c",
+            "droppedAtTop": 0
+          },
+          {
+            "name": "trailing spaces and tabs come off each line",
+            "body": "let x = 1   \nprint(x)\t",
+            "normalised": "let x = 1\nprint(x)",
+            "key": "70bf17dcd6a14319a56e5831483d6205b4e9690c0a1e7cb14f90fb9bf91d49c2",
+            "droppedAtTop": 0
+          },
+          {
+            "name": "shared indentation comes off",
+            "body": "    let x = 1\n    if x > 0 {\n        print(x)\n    }",
+            "normalised": "let x = 1\nif x > 0 {\n    print(x)\n}",
+            "key": "049fccce1238e3a891792ef32911c187625af6f4b691e25e9897ece5bd3627e3",
+            "droppedAtTop": 0
+          },
+          {
+            "name": "blank lines at either end are dropped, inner ones kept",
+            "body": "\n\nlet x = 1\n\nprint(x)\n\n",
+            "normalised": "let x = 1\n\nprint(x)",
+            "key": "256064b1544057363104c3eeb0d6cc558855fc5a90ed14ae45ff8423754c8da1",
+            "droppedAtTop": 2
+          },
+          {
+            "name": "a blank line does not count towards the shared indentation",
+            "body": "  let x = 1\n\n  print(x)",
+            "normalised": "let x = 1\n\nprint(x)",
+            "key": "256064b1544057363104c3eeb0d6cc558855fc5a90ed14ae45ff8423754c8da1",
+            "droppedAtTop": 0
+          },
+          {
+            "name": "tabs and spaces share only what is the same",
+            "body": "\t let a = 1\n\t  let b = 2",
+            "normalised": "let a = 1\n let b = 2",
+            "key": "9bb3c8357891bf30cd65700a3c3e8c9a86b5bc0ea72ddaedb16cb5a26049b3a9",
+            "droppedAtTop": 0
+          },
+          {
+            "name": "accented letters are kept as written",
+            "body": "print(\"Zoë\")",
+            "normalised": "print(\"Zoë\")",
+            "key": "26bd144be009c6f15eedeef801d46b78379be46bedb5b818de3a5e82dd36123d",
+            "droppedAtTop": 0
+          },
+          {
+            "name": "a carriage return at the end of a line comes off",
+            "body": "let x = 1\r\nprint(x)\r",
+            "normalised": "let x = 1\nprint(x)",
+            "key": "70bf17dcd6a14319a56e5831483d6205b4e9690c0a1e7cb14f90fb9bf91d49c2",
+            "droppedAtTop": 0
+          }
+        ]
+      },
+      "cache": {
+        "rule": "<builds>/<CODE>/.swift-cache/<toolchain id>/<key>.wasm and <key>.json, shared by the course's sections and outside the teacher's folder (the figures cache's place, #485). <key>.json is {ok: true, sdk: embedded | full, bytes, swift, wasmOpt} or {ok: false, reason: compileError, diagnostics, swift, wasmOpt}; each file is written by a temporary name and a rename, and an entry that is not there, or not whole, is a miss. The TOOLCHAIN ID is the first 16 hex of SHA-256 over `toolchainIdFrom`, each file's name, a NUL, its bytes and a NUL: those files state every pin, flag and the PATH, so changing any compiles every block again (#493 acceptance 12) and nothing else does (#485's engine_id pattern; a hand-bumped version string was rejected there for missing a move). A compile that took longer than compile.jobSeconds is NOT cached, nor one whose wasm-opt step or readLine flush failed after Swift accepted the code, nor one killed by a signal or that failed with no diagnostics (review S3 and the implementation review's S3, measured: under `--memory 50m` a valid block was cached as a compileError with empty diagnostics; test_swift_blocks.CompileStepTests, with stand-in tools). plan treats an `ok: false` entry with no diagnostics as a miss, so an entry an earlier compile.py wrote that way heals on the next preview (`cacheCases`). Jobs: <builds>/<CODE>/.swift-cache/jobs/<run>/<key>.swift, a folder per run (review S3: two builds of a course never share one), removed by compile.py when it finishes and, if a run was killed, by a later plan after `orphanJobSeconds`. PRUNING happens in prepare and ONLY when this toolchain's folder holds every block the site needs (review N5: an offline preview after a recipe change must not throw away the only programs that work): then every other toolchain's folder goes, and this one's entries unused for `pruneDays` (prepare touches each one it uses). `--full-rebuild` (passed to plan by the launcher) clears cached FAILURES, so every block that did not compile is compiled again; it keeps programs: a key already names its code and its toolchain, so a program is never stale (`cacheCases`). Until this toolchain compiles a block, prepare SERVES the newest older toolchain's program for the same code (`notes.fromBefore`, implementation review N2). `state.json` beside the folders says why the launcher compiled nothing ({state: noRoom} or {state: notDownloaded}); plan removes it at the start of every run. The launcher's own logs are `logs/swift-build-<pid>.log` and `logs/compile-<pid>.log`, one per run, removed by plan after a day (implementation review N3: two launchers once wrote into one file).",
+        "toolchainIdFrom": [
+          "support/swift/Dockerfile",
+          "support/swift/compile.py",
+          "support/swift/ReadLineShim.swift",
+          "support/swift/FlushBeforeRead.c"
+        ],
+        "pruneDays": 90,
+        "orphanJobSeconds": 86400
+      },
+      "room": {
+        "rule": "Before building the Swift image the launcher asks the website builder how much room its disk has (review S9). Below `needGigabytes` it builds nothing, writes {state: noRoom} into the cache's state.json, and the build says each block is not ready with reasons.noRoom: a full disk would otherwise take the whole preview down, not only Swift. Measured 2026-10-17 (Colima on an M4 Pro): the trimmed image is 2.24 GB on disk (504 MB compressed); building it holds the 1.1 GB download and the 3.7 GB unpacked toolchain at once before the trim, so 6 GB leaves room for that and for the site.",
+        "needGigabytes": 6
+      },
+      "site": {
+        "rule": "What the build gives the site: quartz/static/swift-wasm/<key>.wasm for every block on a page students can see whose program exists (and nothing else: the folder is synced every build, so a program no page uses any more is removed - the garbage collection), and quartz/plantoir-runners/swift.json, {<key>: {ok: true, file, sdk} | {ok: false, reason}}. The transformer wraps a Swift block as any runnable block, plus data-runner-wasm=\"static/swift-wasm/<key>.wasm\" (joined to the page's path to the site root by the page's script) when its key is ok, or data-runner-unready=\"<reason>\" when it is not: then the block shows its code with Run disabled and words.notReady. The engine folder static/swift/ holds the overlay only: plantoir-swift-worker.js and plantoir-wasi.mjs."
+      },
+      "workerTalks": "page -> worker: {type: \"run\", wasm: the program's address, stdin: [lines]}. worker -> page: {type: \"ready\"} once started; then per run {type: \"started\"} when the program is fetched, compiled and about to run, {type: \"out\", text, err}, and {type: \"done\", error, crashed?, exitCode?}; or {type: \"fail\", reason: missing | couldNotLoad} when the program could not be fetched (missing: the site has no such file - words.notReady) or compiled (a CSP without wasm - words.couldNotLoad). The program is fetched once per page visit and compiled from its BYTES (WebAssembly.compile, never compileStreaming, so a host that sends .wasm with the wrong type still works: review N4); every run is a FRESH instance (a Swift program runs once). Stop ends the thread, as for Python.",
+      "wasi": {
+        "rule": "The hand-rolled wasi_snapshot_preview1 (support/gated/swift/plantoir-wasi.mjs), the same file in the page's thread and in verify.sh's gate (browser-checks/wasi_run.mjs). fds 0-2 are a CHARACTER DEVICE whose rights do NOT include FD_SEEK (0x4) or FD_TELL (0x20): wasi-libc's isatty() needs both, and without them stdout is fully buffered - output arrives all at once at the end, and Embedded Swift's `Fatal error:` line, which goes to stdout, is LOST on a trap (spike G5, corrected Phase 0; the gate's must-fail). stdin hands over ONE line per fd_read and echoes it into the output as it is taken, straight after the prompt (review S6: the transcript reads as Python's does); past the last line fd_read answers 0 bytes, the end of input, and readLine() is nil. stdout and stderr are decoded per stream, holding a character split across two writes until it is whole (review N4). argv is [\"main\"], the environment empty, random_get is crypto.getRandomValues in pieces of 65,536 bytes, no folder is given (fd_prestat_get answers EBADF, path_open ENOTCAPABLE), fd_seek on fds 0-2 ESPIPE, proc_exit throws the exit code, and any other import of the module answers ENOSYS, so a toolchain that imports one more call never fails to link.",
+        "imports": {
+          "embedded": [
+            "args_get",
+            "args_sizes_get",
+            "fd_fdstat_get",
+            "fd_read",
+            "fd_seek",
+            "fd_write",
+            "proc_exit",
+            "random_get"
+          ],
+          "full": [
+            "args_get",
+            "args_sizes_get",
+            "environ_get",
+            "environ_sizes_get",
+            "fd_close",
+            "fd_fdstat_get",
+            "fd_prestat_dir_name",
+            "fd_prestat_get",
+            "fd_read",
+            "fd_seek",
+            "fd_write",
+            "path_open",
+            "proc_exit",
+            "random_get"
+          ]
+        },
+        "errno": {
+          "SUCCESS": 0,
+          "BADF": 8,
+          "INVAL": 28,
+          "NOSYS": 52,
+          "SPIPE": 70,
+          "NOTCAPABLE": 76
+        },
+        "terminalRights": "0xffffffff without 0x4 (FD_SEEK) and 0x20 (FD_TELL)"
+      },
+      "traps": "A program that traps (an index out of range, a force-unwrapped nil, the 256 MB memory cap) ends with WebAssembly.RuntimeError; one that recursed past the browser's own stack ends with RangeError (review S5: `instanceof WebAssembly.RuntimeError` is false for it, in Chrome 155 and Safari 26.6). Both end the run with words.crashed. The `Fatal error: ...` line, when the program printed one, is already in the output - on stdout under Embedded Swift and stderr under the full library - and is shown as written; a stack overflow prints none. exit(n) with n != 0 ends with words.exitCode; returning, or exit(0), with words.finished.",
+      "reasons": {
+        "compileError": "Swift found an error in it: {said}",
+        "notCompiled": "it was not made ready to run - preview the course again",
+        "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about 1.3 GB)",
+        "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run",
+        "notOnWindows": "Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable"
+      },
+      "reasonsRule": "Why a block has no program, said on its `plantoir: error:` line and in siteHealth -> swiftCouldNotBePrepared (each reason filled in ONE pass): compileError - the cache holds the compiler's diagnostics, and {said} is the message of its first `error:` (the line it names is mapped to the teacher's file); notCompiled - no program and no reason recorded (a compile that did not finish - killed, too slow, wasm-opt failed - which the next preview tries again, a wait for another launcher's download that gave up, or no launcher ran, as in deploy.py's own rebuild); notDownloaded - the launcher could not build the Swift image, which downloads about 1.3 GB the first time (`state.json` says so: {state: notDownloaded}); noRoom - the launcher found less than room.needGigabytes free ({gigabytes}); notOnWindows - the build ran on Windows, which has no container and cannot compile Swift in v1.8 (#493 option (b); the windows issue owns the decision). `reasonCases` pin which one applies.",
+      "reasonCases": [
+        {
+          "name": "no program and nothing recorded, on a Mac",
+          "state": null,
+          "appliesOn": "mac",
+          "reason": "notCompiled"
+        },
+        {
+          "name": "the launcher found too little room, on a Mac",
+          "state": {
+            "state": "noRoom"
+          },
+          "appliesOn": "mac",
+          "reason": "noRoom"
+        },
+        {
+          "name": "the Swift builder could not be downloaded, on a Mac",
+          "state": {
+            "state": "notDownloaded"
+          },
+          "appliesOn": "mac",
+          "reason": "notDownloaded"
+        },
+        {
+          "name": "no program, on Windows",
+          "state": null,
+          "appliesOn": "windows",
+          "reason": "notOnWindows"
+        },
+        {
+          "name": "Windows says Windows even with a state left by a Mac",
+          "state": {
+            "state": "noRoom"
+          },
+          "appliesOn": "windows",
+          "reason": "notOnWindows"
+        }
+      ],
+      "notes": {
+        "rule": "Lines an assistant and a teacher read in the build's output that are NOT folder problems (implementation review S2 and N2): `fromBefore` when prepare served programs compiled by the PREVIOUS recipe because this recipe has not compiled them yet (an offline preview, or too little room, after Plantoir was updated) - the site keeps working, and the next preview that can compile replaces them; `large` for each block whose program is over `largeBytes` (a full-library program is about 3.4 MB; `import Foundation` with formatters or JSON measured 46,073,957 bytes), because every student downloads it on that block's first Run. Each is one line `plantoir: note: ` + the words; `large` names the block as `<page>.md: swift block <n>: `. `noteCases` pin both.",
+        "fromBefore": "{count} Swift programs on this site are the ones made before Plantoir was updated; they work, and the next preview that can make them again replaces them",
+        "large": "its program is {megabytes} MB, which every student downloads the first time they run it - import Foundation is the usual cause (with formatters or JSON it measured 46 MB); plain Swift keeps a program under 5 MB",
+        "largeBytes": 5000000
+      },
+      "noteCases": [
+        {
+          "name": "a program over the limit is named",
+          "bytes": 6200000,
+          "note": true,
+          "megabytes": "6.2"
+        },
+        {
+          "name": "a full-library program under the limit is not",
+          "bytes": 3453463,
+          "note": false
+        },
+        {
+          "name": "the previous recipe's program is served and said once",
+          "fromBefore": 2,
+          "served": true
+        }
+      ],
+      "cacheCases": [
+        {
+          "name": "a program is a hit",
+          "entry": {
+            "ok": true,
+            "sdk": "embedded"
+          },
+          "fullRebuild": false,
+          "compiledAgain": false
+        },
+        {
+          "name": "a compile error with the compiler's words is a hit",
+          "entry": {
+            "ok": false,
+            "reason": "compileError",
+            "diagnostics": "main.swift:2:7: error: cannot find 'nmae' in scope"
+          },
+          "fullRebuild": false,
+          "compiledAgain": false
+        },
+        {
+          "name": "a failure with no words is compiled again (a killed compiler, review S3)",
+          "entry": {
+            "ok": false,
+            "reason": "compileError",
+            "diagnostics": ""
+          },
+          "fullRebuild": false,
+          "compiledAgain": true
+        },
+        {
+          "name": "--full-rebuild compiles every cached failure again",
+          "entry": {
+            "ok": false,
+            "reason": "compileError",
+            "diagnostics": "main.swift:2:7: error: cannot find 'nmae' in scope"
+          },
+          "fullRebuild": true,
+          "compiledAgain": true
+        },
+        {
+          "name": "--full-rebuild keeps programs",
+          "entry": {
+            "ok": true,
+            "sdk": "full"
+          },
+          "fullRebuild": true,
+          "compiledAgain": false
+        },
+        {
+          "name": "no entry is compiled",
+          "entry": null,
+          "fullRebuild": false,
+          "compiledAgain": true
+        }
+      ]
     },
     "agentGuidance": {
-      "rule": "The skill `plantoir-runnable-code` sits beside `plantoir-printing` and `plantoir-math-graphs` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): the opt-in, the fence, the flags, input and EOFError, the measured list of what imports and what does not, files, `%%`, adding blocks after existing ones, offline and file:// behaviour, how it prints, and checking it in Preview. One skill for every language in the table: a language that joins it adds a section, not a second skill. The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
+      "rule": "The skill `plantoir-runnable-code` sits beside `plantoir-printing` and `plantoir-math-graphs` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): the opt-in, the fence, the flags, input and EOFError, the measured list of what imports and what does not, files, `%%`, adding blocks after existing ones, offline and file:// behaviour, how it prints, and checking it in Preview - and, since #493, a Swift section: the fence, read-only, readLine() and the input box, what Embedded Swift costs and why some blocks are bigger, crashes and their Fatal error lines, and the first preview that gets Swift ready. One skill for every language in the table: a language that joins it adds a section, not a second skill. The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
       "skill": "plantoir-runnable-code"
     },
     "knownLimits": [
@@ -24505,7 +25072,15 @@
       "The build's fence reader and the site's parser can still read a shape nobody has measured differently (pageShapes); the site then shows plain code and says so on a `plantoir: error:` line (siteDisagrees).",
       "Measured by fuzzing (review N2, 2026-10-17): the build's reader also counts a fence indented four spaces at the top of a page (indented code to the site) and a fence inside an HTML block such as <div> - the site then carries the engine for nothing, which costs bytes and nothing else; the site, for its part, decodes a character reference in the info string (`&#114;un` reads as `run`), keeps a fence inside a `$$` maths block as maths, and reads a few deeper quote-and-list nestings differently - each of those shows as plain code with the safety net's line; and a lazy line that leaves a list fence open makes the build's reader carry on and count a block the site shows as code text (bytes only). Fuzz: 856 random pages, 38 disagreeing, every one in these groups (a second fuzz by the review, 1,284 pages, found the last group 3 times).",
       "The page's code needs a browser that runs module workers: Safari and iPadOS 15 or later, Chrome 80 or later, Firefox 114 or later.",
-      "A site opened as files on a computer, rather than from its web address, cannot run code: Safari 26.6 and Chrome for Testing 155 run none of a page's scripts from a file (measured 2026-10-17), so the blocks show as their highlighted code with no Run button; a browser that does run them is told words.needsWebAddress. KaTeX's faces DID load from a file in both (measured), so the maths keeps its look."
+      "A site opened as files on a computer, rather than from its web address, cannot run code: Safari 26.6 and Chrome for Testing 155 run none of a page's scripts from a file (measured 2026-10-17), so the blocks show as their highlighted code with no Run button; a browser that does run them is told words.needsWebAddress. KaTeX's faces DID load from a file in both (measured), so the maths keeps its look.",
+      "Swift blocks are read-only (#493 Path A): a student changes the input and runs it again, never the code. Editing would need a compiler somewhere other than the student's browser - the compile service of #493 §7, specified and deliberately not built.",
+      "A Swift block that Embedded Swift cannot compile or print is compiled with the full standard library instead: it runs the same, and costs about 3.4 MB (0.9 MB brotli) to fetch on its first Run instead of about 12-110 KB. The commonest trigger is a `print` with more than one argument (`print(\"Total:\", total)` - Embedded Swift's print takes one; measured by the implementation review), then `print(array)`, String.contains(String), and an optional, a struct or an error inside a string; `print(\"Total: \\(total)\")` stays small. Measured on swift-gate/: 4 of 15 fragments fall back. `import Foundation` works too (Date, formatters, JSON, String(format:) - measured) but costs 3.4 MB for Date and up to 46 MB with formatters and JSON; the build names any program over 5 MB on a `plantoir: note:` line (swift.notes.large).",
+      "Swift programs are capped at 256 MB of memory (review S5): a list that grows for ever traps in about a tenth of a second instead of filling the tab - and Embedded Swift says so with a misleading `Fatal error: Unexpectedly found nil while unwrapping an Optional value` (measured), not 'out of memory'.",
+      "A Swift program that recurses deeply hits the BROWSER's stack before its own: about 5,000 calls in Chrome 155 and only about 2,000 in Safari 26.6 and the iPadOS 26.5 simulator (fine at 2,000, crashing at 3,000, both libraries - implementation review), and it ends with words.crashed and no `Fatal error:` line (review S5). Write recursive examples that stay well under 1,000 calls deep.",
+      "`Int` is 32 bits here (wasm32): it holds up to 2,147,483,647, so `13!`, Fibonacci(47) or a large running total overflows - and an overflow stops the program with words.crashed and NO `Fatal error:` line, in both libraries (measured 2026-10-17: `-assert-config Debug` keeps preconditions' messages, but an arithmetic overflow check compiles to a bare trap - even with `-Onone` (7.4 MB unoptimised, the full library), which is therefore no cheap way to a message; swift-gate 15 pins the silent trap). On a Mac or an iPad the same program runs, because Int is 64 bits there. Use `Int64` (or `Double`) for factorials and large totals, or check the range.",
+      "A Swift block whose code the build's fence reader and the site's parser read differently (a lazy line in a list item: pageShapes) has two different keys; the site shows it as plain code with a `plantoir: error:` line naming it (siteDisagrees, words.blockNotCompiled). A Swift fence the build's reader cannot see is never compiled, for the same reason.",
+      "Swift is compiled by the launcher on a Mac. Windows has no container and compiles nothing in v1.8 (swift.reasons.notOnWindows); deploy.py's own rebuild for a different web address uses only what a preview already compiled.",
+      "The first preview with a Swift block downloads about 1.3 GB and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once."
     ]
   },
   "quizCallouts": {

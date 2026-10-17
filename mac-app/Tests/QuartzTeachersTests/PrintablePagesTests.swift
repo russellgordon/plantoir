@@ -519,7 +519,8 @@ final class PrintablePagesTests: XCTestCase {
 
     /// #455: the runnable-code skill travels the same way, and both root
     /// files name it - so an assistant asked to "make this example
-    /// runnable" is pointed at `codeRunner: true` and ```python run.
+    /// runnable" is pointed at `codeRunner: true` and ```python run, and
+    /// (#493) at the Swift section's ```swift run.
     func testTheRunnableCodeSkillIsWrittenAndBothRootFilesNameIt() throws {
         let codeRunnerBlocks: [String: Any] = try SharedRulesContractTests.section("codeRunnerBlocks")
         let guidance: [String: Any] = try XCTUnwrap(codeRunnerBlocks["agentGuidance"] as? [String: Any])
@@ -533,6 +534,11 @@ final class PrintablePagesTests: XCTestCase {
             XCTAssertTrue(skill.contains("name: \(skillName)"), home)
             XCTAssertTrue(skill.contains("codeRunner: true"), home)
             XCTAssertTrue(skill.contains("```python run"), home)
+            // #493: ONE skill for every language - Swift is a section of
+            // it, not a second skill (codeRunnerBlocks.agentGuidance).
+            XCTAssertTrue(skill.contains("## Swift"), home)
+            XCTAssertTrue(skill.contains("```swift run"), home)
+            XCTAssertTrue(skill.contains("readLine()"), home)
         }
         for name in AgentGuidance.rootFiles {
             let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)

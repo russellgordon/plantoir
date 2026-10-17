@@ -33,6 +33,10 @@ engine is VENDOR_DIR/<engine> with SUPPORT_DIR/gated/<engine> laid over it
 (the page's own half, plantoir-worker.js), so the worker reaches the image and
 the Windows runtime through support/ without a line of its own. The fence rule,
 the gate and the words read the table, never the word "python".
+
+#493 adds the second row, Swift: read-only, compiled ahead of time
+(`prebuilt`), its engine the overlay alone (OVERLAY_IS_THE_ENGINE), and its
+programs prepared by scripts/swift_blocks.py.
 """
 
 import json
@@ -58,7 +62,19 @@ RUNNER_LANGUAGES = {
     "python": {"idPrefix": "py", "displayName": "Python", "runtime": "pyodide", "engine": "pyodide",
                "worker": "plantoir-worker.js", "editable": True, "flags": ("readonly", "stdin", "autorun"),
                "inputCall": "input()", "inputPattern": r"\binput\s*\(", "prebuilt": False},
+    "swift": {"idPrefix": "swift", "displayName": "Swift", "runtime": "swift-wasm", "engine": "swift",
+              "worker": "plantoir-swift-worker.js", "editable": False, "flags": ("stdin", "autorun"),
+              "inputCall": "readLine()", "inputPattern": r"\breadLine\s*\(", "prebuilt": True},
 }
+
+# Engines whose overlay in SUPPORT_DIR/gated/<engine> IS the engine (#493): a
+# `prebuilt` language's programs are compiled per course (scripts/
+# swift_blocks.py puts them in static/swift-wasm/), so there is nothing to
+# vendor - the page's thread and its WASI shim are all a site needs.
+OVERLAY_IS_THE_ENGINE = set()
+for _row in RUNNER_LANGUAGES.values():
+    if _row["prebuilt"]:
+        OVERLAY_IS_THE_ENGINE.add(_row["engine"])
 
 # The file the site's code reads: the words, the limits and the engines this
 # site carries (codeRunnerBlocks.siteDisagrees), written on every build.
@@ -264,7 +280,9 @@ def install_gated_assets(output_dir, counts: dict, vendor_dir=None, printer=prin
 
     An engine with an overlay in SUPPORT_DIR/gated/<engine> (#455's worker)
     gets it laid over the vendor copy. The vendor folder IS the engine: an
-    overlay alone installs nothing and is said as missing.
+    overlay alone installs nothing and is said as missing - except for a
+    `prebuilt` language's engine (#493, OVERLAY_IS_THE_ENGINE), whose overlay
+    is all there is.
     """
     vendor = Path(vendor_dir) if vendor_dir is not None else toolchain_paths.VENDOR_DIR
     support = Path(support_dir) if support_dir is not None else toolchain_paths.SUPPORT_DIR
@@ -281,14 +299,16 @@ def install_gated_assets(output_dir, counts: dict, vendor_dir=None, printer=prin
                 continue
             said = ENGINE_WORDS[engine]
             source = vendor / engine
+            overlay = support / "gated" / engine
+            if engine in OVERLAY_IS_THE_ENGINE:
+                source = overlay
             if not source.is_dir():
                 if target.exists():
                     shutil.rmtree(target, ignore_errors=True)
                 printer(said["missing"].format(pages=pages))
                 continue
             sources = [source]
-            overlay = support / "gated" / engine
-            if overlay.is_dir():
+            if overlay.is_dir() and overlay != source:
                 sources.append(overlay)
             outcome[engine]["copied"] = _sync_folder(sources, target)
             outcome[engine]["installed"] = True

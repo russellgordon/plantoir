@@ -1,15 +1,17 @@
 ---
 title: Spot the Bug
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - warm-ups
 ---
 One short program on the board and a promise: it contains exactly one
-bug. Your job is to find it by *reading* — no running, no changing
-things at random to see what happens. Programs fail in a small number
-of predictable ways, and learning to see those ways cold is what turns
-a panicky hour into the calm routine of [[Getting Unstuck]].
+bug. Your job is to find it by *reading* first — before you run
+anything, and without changing things at random to see what happens.
+Programs fail in a small number of predictable ways, and learning to
+see those ways cold is what turns a panicky hour into the calm routine
+of [[Getting Unstuck]].
 
 ## How to run it
 
@@ -28,7 +30,7 @@ a panicky hour into the calm routine of [[Getting Unstuck]].
 
 ## Try this one
 
-```python
+```python run
 names = ["Ali", "Bea", "Cy"]
 for index in range(1, len(names)):
     print(names[index])
@@ -39,6 +41,9 @@ because `range(1, 3)` starts counting at 1 while [[Lists|list]]
 positions start at 0. Nobody would notice on a list of three. On a
 class list of thirty, one person is simply missing — the kind of
 failure [[Who Is This For]] takes personally.
+
+Fix it in the program above and press **Run**: all three names should
+appear. **Reset** brings the bug back.
 
 ## One variation
 

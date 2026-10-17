@@ -1470,7 +1470,22 @@ tests pin both field for field), a runtime class in `RUNTIMES`, a vendor
 layer in the Dockerfile (and `fetch-runtime.ps1`), and a pin in
 `toolchain.json`. Nothing else: the fence rule, the ids, the gate, the words
 and the print rules read the table, never the word "python" (Russell,
-2026-10-09).
+2026-10-09). **Swift (#493) tested that sentence.** For a language the
+browser runs as written, it holds as stated. A language compiled ahead of
+time needed more, and the honest list is: a table row (`prebuilt: true`,
+`editable: false`); a runtime class (`SwiftWasmRuntime`), which widened the
+`CodeRuntime` interface (`run(…, program)`, an optional `started`, and
+`done(error, said)` for its crash and exit-code words); a compile layer in
+place of a vendor folder (`support/swift/` and `scripts/swift_blocks.py`:
+the launcher's plan-and-compile step in `preview.sh`, and a `build_site`
+call that prepares the programs); a folder problem of its own
+(`swiftCouldNotBePrepared`); a pin (`toolchain.json` → `swiftImage`); and
+two generic `prebuilt` rules - the gate takes the overlay as the whole engine
+(`page_features.OVERLAY_IS_THE_ENGINE`), and the transformer looks a
+prebuilt block's key up in `quartz/plantoir-runners/<engine>.json` (I10).
+The fence rule, the ids, the gate's count and Python's gate were not
+touched (implementation review N4 asked for this list instead of "that is
+all").
 
 ### I4. Input, output and the words
 
@@ -1649,6 +1664,148 @@ Enter (it fights the iPadOS keyboard and IME); a `# plantoir: run` first
 line (Obsidian takes only the info string's first word, so ` ```python run `
 is an ordinary Python block there — verified from Obsidian 1.12.7's and
 1.13.7's own code, 2026-10-08).
+
+### I10. Swift (#493)
+
+A ` ```swift run ` block on a page that opts in runs as a WebAssembly program
+compiled ahead of time by the build's launcher ([05 → Runnable
+Swift](05-build-pipeline.md#runnable-swift-what-the-launcher-and-the-build-do-493-v180),
+[02 → The Swift image](02-docker-image.md#the-swift-image-493-v180)) -
+Swift has no interpreter a browser can carry. Path A of the Phase 0 report on
+#493: Embedded Swift per block (about 12-110 KB), and the full standard
+library (about 3.4 MB, 0.9 MB brotli) for a block Embedded Swift cannot
+compile or would print `(cannot print value in embedded Swift)` for.
+Rules: `codeRunnerBlocks.swift`.
+
+**Read-only, and why.** The student changes the input box, never the code:
+editing would need a compiler somewhere other than the student's browser -
+the compile service of #493 §7 (SwiftFiddle's runner), specified and
+deliberately not built, so a service outage can never block a lesson. The
+row's `editable: false` makes every Swift block keep its highlighted code
+with Run and Stop only (no Reset, nothing stored), and `words.cannotEdit`
+says so once, quietly, under the code (`.plantoir-runner-note`, hidden in
+print). `readonly` is therefore not a Swift flag; `stdin` and `autorun` are.
+
+**On the page.** The transformer wraps a Swift block like any runnable block
+and, because the row is `prebuilt`, computes the block's key from the code
+Quartz's parser read (`programKey`: SHA-256 of `normaliseProgram`, node's
+crypto - not in `codeRunnerRule.ts`, which the page's script bundles too)
+and looks it up in `quartz/plantoir-runners/swift.json`, which the build
+wrote: `data-runner-wasm="static/swift-wasm/<key>.wasm"` when the program
+exists, `data-runner-unready="<reason>"` when the build said why not (then
+Run is off and `words.notReady` shows), and when the key is not listed at
+all - the build's reader and Quartz's read the block differently, or the
+page changed under a running preview - plain code and a `plantoir: error:`
+line with `words.blockNotCompiled` (review S2's safety net, extended).
+
+**The thread** is `static/swift/plantoir-swift-worker.js`, a module worker
+like Python's, with the hand-rolled WASI shim beside it
+(`plantoir-wasi.mjs`, the same file verify.sh's gate runs in Node). It
+starts at once - there is no engine to load - and each Run sends the
+program's address and the input lines. The program is fetched once per
+visit and compiled from its BYTES (`WebAssembly.compile`, not
+`compileStreaming`, which refuses a `.wasm` sent with the wrong type -
+review N4: a self-hosted folder often sends `application/octet-stream`), and
+every Run is a FRESH instance (a Swift program runs once; its globals cannot
+be reset). Fetching is watched like an engine's loading: past 45 s,
+`words.couldNotLoad`. Stop ends the thread, as for Python; the next Run
+starts another, and the program comes from the browser's cache.
+
+**The shim** answers what the compiled programs import - eight calls for
+Embedded Swift, fourteen for the full library (Phase 0 and the spike
+measured the same lists; any other import answers ENOSYS, so a toolchain
+that adds one never fails to link). Three rules in it were each measured
+into place:
+
+- **fds 0-2 are a terminal**: `fd_fdstat_get` says CHARACTER_DEVICE AND
+  leaves FD_SEEK and FD_TELL out of the rights. wasi-libc's `isatty()` needs
+  both; with only the file type, stdout went fully buffered after its first
+  line (the spike counted 2 writes for 01 instead of 5), and Embedded
+  Swift's `Fatal error:` line - which goes to stdout - was LOST on a trap
+  (spike G5, correcting Phase 0). verify.sh runs the must-fail: with every
+  right set, fragment 10's line is lost; with the shim's, it is kept.
+- **One stdin line per read, echoed as it is taken** (review S6), so the
+  transcript reads `What is your name?` / `Ada` / `Hello, Ada!` as Python's
+  does; past the last line, 0 bytes, and `readLine()` is `nil`. A prompt
+  printed with `terminator: ""` would still sit in stdout's buffer when the
+  program reads, and the echoed line came FIRST (measured 2026-10-17); so
+  readLine() flushes stdout before reading - `ReadLineShim.swift` for
+  Embedded Swift, `FlushBeforeRead.c` linked with
+  `--wrap=swift_stdlib_readLine_stdin` for the full library (swift-gate 13
+  and 14 pin both).
+- **stdout and stderr decoded per stream**, holding a character split
+  across two writes until it is whole (review N4).
+
+**Int is 32 bits** (wasm32): `Int.max` is 2,147,483,647 here and
+9,223,372,036,854,775,807 natively, so `13!` overflows and the program
+traps with `words.crashed` and NO `Fatal error:` line, in both libraries -
+even `-Onone` (7.4 MB) prints none, because an overflow check compiles to a
+bare trap (measured 2026-10-17; implementation review S1; swift-gate 15
+pins it). The skill and `knownLimits` tell teachers to use `Int64` for
+factorials and large totals.
+
+**Traps.** An index out of range, a `nil` unwrapped with `!`, or the 256 MB
+memory cap ends in `WebAssembly.RuntimeError`; a recursion past the
+browser's own stack ends in `RangeError`, which is NOT a RuntimeError
+(review S5, Chrome 155 and Safari 26.6) - both are `words.crashed`. The
+`Fatal error: ...` line is already in the output when the program printed
+one (stdout under Embedded Swift, stderr under the full library); a stack
+overflow prints none. `exit(n)` with n ≠ 0 is `words.exitCode`. The memory
+cap is a link flag (`--max-memory=268435456`): without it a list that grows
+for ever reached 2 GB in a tab before trapping (review S5); with it, 0.06 s
+in Node. Embedded Swift then says `Fatal error: Unexpectedly found nil while
+unwrapping an Optional value` - misleading, measured, in `knownLimits`.
+
+**The S4 finding, and why reproducibility does not matter.** A one-call
+`swiftc` puts a random temporary path into a 16-byte module-hash segment, so
+the same code compiled twice gave different bytes (spike G4); compiling to a
+fixed object path per key (`/tmp/plantoir-swift/<key>/main.o`) makes one
+image give the same bytes every time (verify.sh checks two fragments), but
+the macOS and Linux toolchains still differ in that segment, and parallel
+compiles in different folders would too (review S4, measured with three
+folder names). None of it matters, because NOTHING keys on the program: the
+cache key is the code's hash plus the recipe's (the toolchain id), and a
+program is only ever produced from that pair and served by that key. The
+reproducible-bytes requirement the spike's correction implied was dropped
+(review S4 ruling); the fixed path stays because it costs nothing.
+
+**Measured** (2026-10-17, M4 Pro, macOS 26.6), on verify's planted Swift
+Playground (a greeting reading two lines, a loop that never ends, an index
+out of range, `exit(3)`, a block that does not compile, and swift-gate 05,
+which needs the full library), served from the Mac with no compression.
+"First Run" is the press of Run to the status saying it ended, the thread
+and the program's fetch included; nothing of Swift was fetched on page load
+in any of them.
+
+| Browser | Embedded, first Run | Embedded, again | Full library, first Run | Full, again | Stop | Everything else |
+|---|---:|---:|---:|---:|---:|---|
+| Chrome for Testing 155 (headless, verify.sh's `swift_runner.mjs`) | 57 ms | — | 54 ms | — | 2 ms | the whole check: read-only with the note, input echoed after each prompt, changed input changes the output, Run after Stop, the trap's `Fatal error: Index out of range` line and `words.crashed`, `words.exitCode` with 3, `words.notReady` with Run off |
+| Safari 26.6 (AppleScript, the page's own script) | 25 ms | 11 ms | 21 ms | 15 ms | 0 ms | the same, all as expected |
+| iPad (A16) simulator, iPadOS 18.6, Safari | 35 ms | 12 ms | 32 ms | 12 ms | 0 ms | the same, all as expected (driven by a measuring script the page loads and posts back - safaridriver's remote automation was off on this Mac) |
+
+**What a student downloads on the first Run of a block**: its program -
+the Embedded greeting 62,347 bytes (28,144 gzip, 23,951 brotli), the
+full-library block 3,453,463 bytes (1,238,667 gzip, 927,100 brotli) - plus
+the thread and the shim once per visit (10,925 bytes). Later Runs of the
+same block come from the thread's own compiled copy; after Stop, from the
+browser's cache. A real iPad on school Wi-Fi is Russell's smoke test, and
+so is a real iPad's recursion depth (review S5 measured Safari 26.6 on the
+Mac at about 2,000 calls).
+
+**What every site's bundles cost** for the Swift runtime (EXC2O, against
+#455's numbers in I8): `postscript.js` 121,277 → 125,230 bytes (+3,953),
+`index.css` 60,812 → 60,949 (+137).
+
+**Rejected:** Path B (one module per course, every block an entry point:
+the full library is 0.9 MB brotli per block, not the 17 MB once feared, and
+Path B would rewrite top-level code into functions, changing what
+`main.swift` means); editing (the compile service, §7); `@bjorn3/browser_wasi_shim`
+(the hand-rolled shim is about 220 lines and does exactly what the programs
+import); `compileStreaming` (N4); one long-lived instance (a Swift program
+runs once); mapping only RuntimeError to the crash words (S5); a dedicated
+"called itself too many times" word (considered; one crash sentence, and the
+known limit tells teachers how deep is safe); stopping the build on a compile
+error (ruling Q1).
 
 ## J. Self-check quizzes (#563, v1.8.0)
 

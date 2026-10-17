@@ -249,6 +249,34 @@ check_engine() {  # check_engine <label> <site base url ending in />
   else
     no "$1's page of runnable code answered HTTP $code or carries no runnable block"
   fi
+  # Runnable Swift (#493): the page's thread and its WASI shim as JavaScript
+  # (a module worker refuses anything else), and the block's program. The
+  # program is compiled from its bytes, so its type does not decide whether
+  # it runs; it is said, not required (review N4).
+  for name in plantoir-swift-worker.js plantoir-wasi.mjs; do
+    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/swift/$name" 2>/dev/null | tr -d '\r')
+    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
+    if [ "$code" = "200" ] && printf '%s' "$type" | grep -q javascript; then
+      ok "$1 sends static/swift/$name (HTTP 200, $type)"
+    else
+      no "$1 answered HTTP $code, '$type' for static/swift/$name (a module worker needs JavaScript)"
+    fi
+  done
+  local program
+  program=$(grep -aoE 'data-runner-wasm="static/swift-wasm/[0-9a-f]{64}\.wasm"' "$WORK/runner-page.html" | head -1 | sed 's/^data-runner-wasm="//; s/"$//')
+  if [ -z "$program" ]; then
+    no "$1's page of runnable code carries no Swift program"
+  else
+    headers=$(curl -s -D - -o "$WORK/program.wasm" --max-time 30 "${base}$program" 2>/dev/null | tr -d '\r')
+    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
+    if [ "$code" = "200" ] && [ "$(head -c 4 "$WORK/program.wasm" | od -An -tx1 | tr -d ' \n')" = "0061736d" ]; then
+      ok "$1 sends the page's Swift program (HTTP 200, ${type:-no type}, $(wc -c < "$WORK/program.wasm" | tr -d ' ') bytes)"
+    else
+      no "$1 answered HTTP $code for $program, or not a WebAssembly program"
+    fi
+  fi
   headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/katex/katex.min.css" 2>/dev/null | tr -d '\r')
   if printf '%s\n' "$headers" | head -1 | grep -q " 200" && printf '%s\n' "$headers" | grep -iq "^content-type: text/css"; then
     ok "$1 serves KaTeX's stylesheet itself (text/css)"
@@ -283,10 +311,20 @@ for name, digest in pins["katex"]["files"].items():
         problems.append(f"static/katex/{name.replace('dist/', '', 1)}")
 if not (site / "static" / "pyodide" / "plantoir-worker.js").is_file():
     problems.append("static/pyodide/plantoir-worker.js")
+# Runnable Swift (#493): the overlay as it is in support/gated/swift, and the
+# page's compiled program.
+overlay = Path(sys.argv[2]).parent.parent / "support" / "gated" / "swift"
+for item in sorted(overlay.iterdir()):
+    copy = site / "static" / "swift" / item.name
+    if not copy.is_file() or copy.read_bytes() != item.read_bytes():
+        problems.append(f"static/swift/{item.name}")
+programs = sorted((site / "static" / "swift-wasm").glob("*.wasm")) if (site / "static" / "swift-wasm").is_dir() else []
+if not programs or any(path.read_bytes()[:4] != b"\0asm" for path in programs):
+    problems.append("static/swift-wasm")
 print(", ".join(problems))
 PY
 )
-  [ -z "$problems" ] && ok "$1 carries the pinned Python engine and KaTeX, byte for byte" \
+  [ -z "$problems" ] && ok "$1 carries the pinned Python engine, KaTeX and Swift's thread, byte for byte, and the page's Swift program" \
                      || no "$1 lacks or changed: $problems"
 }
 
@@ -319,6 +357,12 @@ A page of runnable code borrowed by verify-deploy.sh (plantoir-runner-deploy-7f3
 ```python run stdin
 name = input("Name? ")
 print("Hello,", name)
+```
+
+```swift run
+print("What is your name?")
+let name = readLine() ?? ""
+print("Hello, \(name)!")
 ```
 RUNNERPAGE
 ok "a page of runnable code borrowed into section $SECTION (removed on any exit)"

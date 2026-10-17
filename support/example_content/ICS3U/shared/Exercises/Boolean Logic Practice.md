@@ -1,6 +1,7 @@
 ---
 title: Boolean Logic Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -28,7 +29,7 @@ whole point is to make your prediction match the machine.
 ## Using it
 
 5. **Find the fault.** It is Monday, and this prints `Weekend!`
-   ```python
+   ```python run
    day = "Mon"
    if day == "Sat" or "Sun":
        print("Weekend!")
@@ -66,7 +67,7 @@ whole point is to make your prediction match the machine.
 
 > [!success]- Answer 4
 > Yes — identical in all four combinations. Try it:
-> ```python
+> ```python run
 > print(not (True and False))
 > print((not True) or (not False))
 > ```

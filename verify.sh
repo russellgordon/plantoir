@@ -484,6 +484,17 @@ else
   cat /tmp/verify_page_features_test.log
 fi
 
+# Runnable Swift (#493): the key a block is cached by, the toolchain id, what
+# the launcher's plan writes and what the build's prepare gives the site and
+# says, and that the Swift image's recipe holds every pin and flag the
+# contract names. Stdlib only; the compiler itself is the Swift gate below.
+if (cd scripts && python3 test_swift_blocks.py) >/tmp/verify_swift_blocks_test.log 2>&1; then
+  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+else
+  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+  cat /tmp/verify_swift_blocks_test.log
+fi
+
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
 # and the latex.ts patch that links it; and (#455) the edits that wire
 # Plantoir's additions into a section's Quartz copy. Stdlib only.
@@ -1435,12 +1446,15 @@ check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
 # Diagrams and graphs (#485 E1): the build's pass, and (in the loop) the
 # helper, its lockfile and the site's transformer, script and styles.
 check_baked scripts/figures.py            /opt/scripts/figures.py
+# Runnable Swift (#493): plan and prepare; and (in the loop) the Swift image's
+# recipe, which the build hashes for its toolchain id, and the page's thread.
+check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
 # Self-check quizzes (#563): the folder check. The site's transformer, script
 # and styles are in support/quartz (the loop below).
 check_baked scripts/quizzes.py            /opt/scripts/quizzes.py
 while IFS= read -r addition; do
   check_baked "$addition" "/opt/$addition"
-done < <(find support/quartz support/agent_guidance support/figures support/gated -type f ! -name '.*' | sort)
+done < <(find support/quartz support/agent_guidance support/figures support/gated support/swift -type f ! -name '.*' | sort)
 # The print engine itself, by the hash the pin carries (contracts/toolchain.json).
 PAGEDJS_PIN="$(python3 -c 'import json; print([p["fileSha256"] for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "pagedjs"][0])')"
 PAGEDJS_BAKED="$(docker run --rm "$DEV_TEST_IMAGE" sha256sum /opt/vendor/pagedjs/paged.min.js 2>/dev/null | cut -d' ' -f1)"
@@ -1625,6 +1639,73 @@ else
   fail "Quartz carries ${QUARTZ_COMMITS} commits of history; the clone should be depth 1 (#334)"
 fi
 
+# -------------------- 4c. The Swift gate (#493) --------------------
+# The Swift image is built from support/swift under the tag the launcher
+# itself computes (preview.sh's toolchain_hash over that folder ONLY), so the
+# build in section 5 finds it and compiles its planted blocks without
+# building it again. Reused when it is already on this Mac, as the launcher
+# would; --no-cache rebuilds it. Then every swift-gate/ fragment is compiled
+# in it and run through the site's own WASI shim in Node
+# (browser-checks/wasi_run.mjs): the library each compiled with, its output,
+# its trap and Fatal-error line, the stdin echo, and the must-fail that the
+# Fatal-error line is LOST without the shim's rights (spike G5, review S10).
+# Skipped, saying why, when the image cannot be built (offline the first time).
+eval "$(sed -n '/^toolchain_hash() {/,/^}/p' preview.sh)"
+SWIFT_GATE_TAG="teaching-quartz-swift:src-$(toolchain_hash support/swift)"
+SWIFT_GATE_DIR="$HOME/.plantoir-verify-swift-gate"
+SWIFT_GATE_READY="false"
+echo ""
+echo "🦅 The Swift gate: ${SWIFT_GATE_TAG}…"
+SWIFT_BUILD_STARTED=$(date +%s)
+if [[ -z "$NO_CACHE" ]] && docker image inspect "$SWIFT_GATE_TAG" >/dev/null 2>&1; then
+  SWIFT_GATE_READY="true"
+  SWIFT_BUILT_HOW="already on this Mac"
+elif docker buildx build --load $NO_CACHE --progress=plain -t "$SWIFT_GATE_TAG" support/swift >/tmp/verify_swift_image.log 2>&1; then
+  SWIFT_GATE_READY="true"
+  SWIFT_BUILT_HOW="built in $(( $(date +%s) - SWIFT_BUILD_STARTED )) s"
+fi
+if [[ "$SWIFT_GATE_READY" == "true" ]]; then
+  SWIFT_IMAGE_SIZE="$(docker images --format '{{.Size}}' "$SWIFT_GATE_TAG" 2>/dev/null | head -1)"
+  pass "the Swift image exists from support/swift ($SWIFT_BUILT_HOW, ${SWIFT_IMAGE_SIZE:-size unknown}) (#493)"
+  # The trim (ruling Q2) and the off-PATH wasm-opt (Phase 0 trap 1), as built.
+  if docker run --rm "$SWIFT_GATE_TAG" sh -c 'test ! -e /opt/swift/usr/bin/lldb && test ! -e /opt/swift/usr/bin/sourcekit-lsp && test ! -e /opt/swift/usr/lib/swift_static && ! command -v wasm-opt >/dev/null && test -x /opt/binaryen/bin/wasm-opt && test -d /opt/swift-sdks/swift-6.4.0-RELEASE_wasm.artifactbundle' >/dev/null 2>&1; then
+    pass "the Swift image is trimmed (no lldb, sourcekit or host libraries), its SDK is installed, and wasm-opt is off PATH (#493)"
+  else
+    fail "the Swift image is not trimmed as its recipe says, lacks its SDK, or has wasm-opt on PATH (#493)"
+  fi
+  rm -rf "$SWIFT_GATE_DIR"
+  mkdir -p "$SWIFT_GATE_DIR/jobs" "$SWIFT_GATE_DIR/out" "$SWIFT_GATE_DIR/again/jobs" "$SWIFT_GATE_DIR/again/out"
+  cp swift-gate/*.swift "$SWIFT_GATE_DIR/jobs/"
+  cp swift-gate/01-greeting.swift swift-gate/05-arrays.swift "$SWIFT_GATE_DIR/again/jobs/"
+  SWIFT_COMPILE_STARTED=$(date +%s)
+  docker run --rm --network none --mount "$(bind_mount_argument "$SWIFT_GATE_DIR" "$SWIFT_GATE_DIR")" \
+    "$SWIFT_GATE_TAG" python3 /opt/plantoir-swift/compile.py "$SWIFT_GATE_DIR/jobs" "$SWIFT_GATE_DIR/out" \
+    >/tmp/verify_swift_compile.log 2>&1
+  SWIFT_COMPILE_SECONDS=$(( $(date +%s) - SWIFT_COMPILE_STARTED ))
+  if node browser-checks/wasi_run.mjs swift-gate "$SWIFT_GATE_DIR/out" >/tmp/verify_swift_gate.log 2>&1; then
+    pass "the Swift gate: all $(ls swift-gate/*.swift | wc -l | tr -d ' ') fragments compiled in ${SWIFT_COMPILE_SECONDS} s with the library swift-gate/expected.json names, ran through the site's WASI shim as expected, traps kept their Fatal error line, input echoed after its prompt, and the G5 must-fail failed (browser-checks/wasi_run.mjs, #493)"
+  else
+    fail "the Swift gate: a fragment did not compile, chose the wrong library, printed the wrong thing or lost its Fatal error line (browser-checks/wasi_run.mjs, #493)"
+    cat /tmp/verify_swift_compile.log /tmp/verify_swift_gate.log
+  fi
+  sed -n '/^| fragment/,/^| G5/p' /tmp/verify_swift_gate.log
+  # The same code compiles to the same bytes in a second container (spike G4:
+  # the object file's path is fixed per key).
+  docker run --rm --network none --mount "$(bind_mount_argument "$SWIFT_GATE_DIR" "$SWIFT_GATE_DIR")" \
+    "$SWIFT_GATE_TAG" python3 /opt/plantoir-swift/compile.py "$SWIFT_GATE_DIR/again/jobs" "$SWIFT_GATE_DIR/again/out" \
+    >/tmp/verify_swift_again.log 2>&1
+  if cmp -s "$SWIFT_GATE_DIR/out/01-greeting.wasm" "$SWIFT_GATE_DIR/again/out/01-greeting.wasm" \
+     && cmp -s "$SWIFT_GATE_DIR/out/05-arrays.wasm" "$SWIFT_GATE_DIR/again/out/05-arrays.wasm"; then
+    pass "the Swift image compiles the same code to the same bytes in a second run (spike G4, #493)"
+  else
+    fail "the Swift image compiled the same code to different bytes in a second run (spike G4, #493)"
+  fi
+  rm -rf "$SWIFT_GATE_DIR"
+else
+  RESULTS+=("⏭️  SKIPPED  the Swift gate (#493): the Swift image could not be built - the first build needs the internet (/tmp/verify_swift_image.log)")
+  echo "⏭️  SKIPPED  the Swift gate: the Swift image could not be built (see /tmp/verify_swift_image.log)"
+fi
+
 # -------------------- 5. Drive the real launcher against the image --------------------
 echo ""
 echo "🧹 Removing existing '$CONTAINER_NAME' container so the launcher recreates it"
@@ -1675,6 +1756,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
+        "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
         "$HIT_COURSE/Quiz Fixture.md" "$HIT_COURSE/Quiz CRLF.md" "$HIT_COURSE/Quiz Lookalikes.md" \
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
@@ -2406,6 +2488,24 @@ for info, code in fences:
 (course / "Runner Hidden.md").write_text(
     "---\ntitle: Runner Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-runner-hidden-7f3a).\n\n"
     "```python run\nprint(\"hidden\")\n```\n", encoding="utf-8")
+# #493: Swift Playground - the blocks the Swift browser check runs (a
+# greeting that reads input, a loop that never ends, an index out of range,
+# exit(3), a block that does not compile, and one that needs the full
+# library), and Swift Hidden, a page students cannot see, whose block is
+# compiled (the plan is generous) but never reaches the site.
+gate = Path("swift-gate")
+playground = "---\ntitle: Swift Playground\ncodeRunner: yes\n---\nSwift to run (plantoir-swift-playground-7f3a).\n\n"
+playground += "```swift run\n" + (gate / "01-greeting.swift").read_text(encoding="utf-8") + "```\n\n"
+playground += "```swift run\nprint(\"spinning\")\nvar n = 0\nwhile true { n &+= 1 }\n```\n\n"
+playground += "```swift run\n" + (gate / "10-out-of-range.swift").read_text(encoding="utf-8") + "```\n\n"
+playground += "```swift run\n#if canImport(WASILibc)\nimport WASILibc\n#endif\nprint(\"leaving with 3\")\nexit(3)\n```\n\n"
+playground += "Some words before the block that does not compile.\n\n"
+playground += "```swift run\nlet name = readLine() ?? \"\"\nprint(nmae)\n```\n\n"
+playground += "```swift run stdin\n" + (gate / "05-arrays.swift").read_text(encoding="utf-8") + "```\n"
+(course / "Swift Playground.md").write_text(playground, encoding="utf-8")
+(course / "Swift Hidden.md").write_text(
+    "---\ntitle: Swift Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-swift-hidden-7f3a).\n\n"
+    "```swift run\nprint(\"hidden swift\")\n```\n", encoding="utf-8")
 RUNNERPLANTS
 
 # ---- #563: self-check quizzes, planted for the same build ----
@@ -2821,12 +2921,15 @@ if not fixture:
     problems.append("Runner-Fixture.html was not built")
 found = re.findall(r'<div class="plantoir-runner" data-runner-id="([^"]*)" data-runner-flags(?:="([^"]*)")? data-runner-language="([^"]*)" data-runner-runtime="([^"]*)" data-runner-engine="([^"]*)" data-original="([^"]*)"', fixture)
 expected = []
-counter = 0
+rows = {row["fence"]: row for row in rules["languages"]}
+counters = {}
 for number, case in enumerate(rules["fences"]["cases"], start=1):
     if case["optedIn"] and case["runner"]:
-        counter += 1
-        expected.append((f"Runner-Fixture-py-{counter}", " ".join(case["flags"]), "python", "pyodide", "pyodide", f'print("case {number}")'))
-expected.append((f"Runner-Fixture-py-{counter + 1}", "", "python", "pyodide", "pyodide", 'print("after the nested shape")'))
+        fence = case.get("fence", case["lang"])
+        row = rows[fence]
+        counters[fence] = counters.get(fence, 0) + 1
+        expected.append((f"Runner-Fixture-{row['idPrefix']}-{counters[fence]}", " ".join(case["flags"]), fence, row["runtime"], row["engine"], f'print("case {number}")'))
+expected.append((f"Runner-Fixture-py-{counters['python'] + 1}", "", "python", "pyodide", "pyodide", 'print("after the nested shape")'))
 got = [(rid, flags or "", language, runtime, engine, html.unescape(original)) for rid, flags, language, runtime, engine, original in found]
 if got != expected:
     problems.append(f"the fixture's runnable blocks are {got}, not the contract's {expected}")
@@ -2843,6 +2946,8 @@ if (public / "Runner-Hidden.html").exists():
 said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
 if re.search(r"plantoir: error: [^\n]*Runner", said):
     problems.append("the build named a runner page on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*Runner[^\n]*", said).group(0))
+if not re.search(r"This site carries what runs Swift for 2 pages\.", said):
+    problems.append("the build did not say the site carries Swift for the two pages students can see with Swift (Runner Fixture, Swift Playground)")
 if not re.search(r"This site carries what runs Python for 4 pages\.", said):
     problems.append("the build did not say the site carries Python for the four pages students can see (not the hidden one)")
 engine = public / "static" / "pyodide"
@@ -2892,9 +2997,90 @@ for problem in problems:
 sys.exit(1 if problems else 0)
 RUNNERPY
 then
-  pass "runnable code: every block the contract says runs is wrapped with its id, flags and the teacher's code, the nested shape stays plain, a page that does not opt in is untouched, the hidden page counts for nothing, the site carries the pinned Python with its worker and its script carries every word; maths styled from the site's own KaTeX, and nothing on the site names a CDN but the one string the worker pins out (#455, #494)"
+  pass "runnable code: every block the contract says runs (Python and Swift) is wrapped with its id, flags and the teacher's code, the nested shape stays plain, a page that does not opt in is untouched, the hidden page counts for nothing, the site carries the pinned Python with its worker and its script carries every word; maths styled from the site's own KaTeX, and nothing on the site names a CDN but the one string the worker pins out (#455, #494)"
 else
   fail "runnable code or the site's own KaTeX: one of the checks above failed (#455, #494)"
+fi
+
+# ---- 6j, continued: runnable Swift (#493), as the build left it ----
+# The planted Swift Playground's blocks each carry their program's address
+# (the key of the code the site read) or, for the one that does not compile,
+# data-runner-unready; static/swift-wasm holds exactly the programs pages
+# students can see use (not Swift Hidden's, though the plan compiled it);
+# static/swift is the overlay alone; the build named the broken block at its
+# line in the teacher's file with the compiler's first error, and said it as
+# the swiftCouldNotBePrepared folder problem.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE" <<'SWIFTPY'
+import html, json, re, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+sys.path.insert(0, "scripts")
+import swift_blocks
+public, log, course = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+problems = []
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["codeRunnerBlocks"]
+page = (public / "Swift-Playground.html").read_text(encoding="utf-8") if (public / "Swift-Playground.html").is_file() else ""
+if not page:
+    problems.append("Swift-Playground.html was not built")
+# Attribute by attribute: a value may hold ">" (data-original is the code).
+wrappers = re.findall(r'<div class="plantoir-runner"((?:\s+[\w-]+(?:="[^"]*")?)*)\s*>', page)
+def attribute(text, name):
+    found = re.search(name + r'="([^"]*)"', text)
+    return html.unescape(found.group(1)) if found else None
+source = (course / "Swift Playground.md").read_text(encoding="utf-8")
+bodies = [block["body"] for block in swift_blocks.swift_fences(source, True)]
+if len(wrappers) != 6 or len(bodies) != 6:
+    problems.append(f"Swift Playground has {len(wrappers)} runnable blocks on the site and {len(bodies)} in the page, not 6")
+for index, (attributes, body) in enumerate(zip(wrappers, bodies), start=1):
+    key = swift_blocks.key_of(body)
+    if attribute(attributes, "data-runner-language") != "swift" or attribute(attributes, "data-runner-id") != f"Swift-Playground-swift-{index}":
+        problems.append(f"Swift block {index} is not wrapped as Swift with its id: {attributes[:160]}")
+    if index == 5:
+        if attribute(attributes, "data-runner-unready") != "compileError" or attribute(attributes, "data-runner-wasm") is not None:
+            problems.append(f"the block that does not compile is not marked compileError: {attributes[:200]}")
+    elif attribute(attributes, "data-runner-wasm") != f"static/swift-wasm/{key}.wasm":
+        problems.append(f"Swift block {index} does not name its program static/swift-wasm/{key}.wasm: {attribute(attributes, 'data-runner-wasm')}")
+wanted = set()
+for body in bodies[:4] + bodies[5:]:
+    wanted.add(swift_blocks.key_of(body) + ".wasm")
+for number, case in enumerate(rules["fences"]["cases"], start=1):
+    if case["optedIn"] and case["runner"] and case.get("fence", case["lang"]) == "swift":
+        wanted.add(swift_blocks.key_of(f'print("case {number}")') + ".wasm")
+carried = public / "static" / "swift-wasm"
+got = set(path.name for path in carried.iterdir()) if carried.is_dir() else set()
+if got != wanted:
+    problems.append(f"static/swift-wasm holds {sorted(got)}, not exactly {sorted(wanted)}")
+if (carried / (swift_blocks.key_of('print("hidden swift")') + ".wasm")).exists():
+    problems.append("the hidden page's Swift program reached the site")
+for path in sorted(carried.glob("*.wasm")) if carried.is_dir() else []:
+    if path.read_bytes()[:4] != b"\0asm":
+        problems.append(f"{path.name} is not a WebAssembly program")
+engine = public / "static" / "swift"
+overlay = Path("support/gated/swift")
+if not engine.is_dir() or sorted(p.name for p in engine.iterdir()) != sorted(p.name for p in overlay.iterdir()):
+    problems.append(f"static/swift holds {sorted(p.name for p in engine.iterdir()) if engine.is_dir() else 'nothing'}")
+else:
+    for item in overlay.iterdir():
+        if (engine / item.name).read_bytes() != item.read_bytes():
+            problems.append(f"static/swift/{item.name} is not support/gated/swift/{item.name}")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+broken_line = source.splitlines().index("print(nmae)") + 1
+reason = rules["swift"]["reasons"]["compileError"].replace("{said}", "cannot find 'nmae' in scope")
+line = f"plantoir: error: Swift Playground.md: swift block 5, line {broken_line}: {reason}"
+if line not in said:
+    problems.append(f"the build did not say: {line}")
+if not re.search(r'"name": "swiftCouldNotBePrepared"[^\n]*Swift Playground', said):
+    problems.append("the build did not report the broken Swift block as the swiftCouldNotBePrepared folder problem")
+if re.search(r"plantoir: error: [^\n]*swift block", said.replace(line, "")):
+    problems.append("the build named another Swift block on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*swift block[^\n]*", said.replace(line, "")).group(0))
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+SWIFTPY
+then
+  pass "runnable Swift: each block names its program (or compileError), static/swift-wasm holds exactly the programs visible pages use, static/swift is the overlay, and the block that does not compile is named at its line in the teacher's file with the compiler's first error, as a folder problem too (#493)"
+else
+  fail "runnable Swift: one of the checks above failed (#493)"
 fi
 
 # ---- 6k. Self-check quizzes (#563), as the build left them ----
@@ -3152,6 +3338,13 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "runnable code did not run in a browser as the contract says (browser-checks/code_runner.mjs, #455)"
     cat /tmp/verify_code_runner.log
   fi
+  if node browser-checks/swift_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Swift-Playground.html \
+       >/tmp/verify_swift_runner.log 2>&1; then
+    pass "runnable Swift in a browser: nothing fetched on load; read-only with its note; Run with input echoes it after each prompt, changed input changes the output, Stop ends a loop and Run works again, an index out of range shows its Fatal error line and the crash words, exit(3) its exit code, a block that did not compile says it is not ready - $(head -1 /tmp/verify_swift_runner.log | sed 's/^OK: //') (#493, browser-checks/swift_runner.mjs)"
+  else
+    fail "runnable Swift did not run in a browser as the contract says (browser-checks/swift_runner.mjs, #493)"
+    cat /tmp/verify_swift_runner.log
+  fi
   # #563: the self-check quizzes as a student answers them, against a server
   # the check starts itself.
   if node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
@@ -3188,6 +3381,7 @@ SAMEPY
 # found from before, the drawing engine is never started, and the page comes
 # out byte for byte the same.
 cp "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html 2>/dev/null || true
+cp "$SITE_PUBLIC/Swift-Playground.html" /tmp/verify_swift_first.html 2>/dev/null || true
 if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_figures_second.log 2>&1 \
    && grep -Eq "Drew 0 diagrams \([1-9][0-9]* from before\)" /tmp/verify_figures_second.log \
    && same_page_but_for_quartz_ids "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html; then
@@ -3195,6 +3389,16 @@ if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_figu
 else
   fail "diagrams and graphs: a second build drew again or changed the page (#485)"
   grep -n "Drew\|plantoir:" /tmp/verify_figures_second.log | head -5
+fi
+# Runnable Swift (#493 acceptance 10): the same build compiled nothing - the
+# launcher found every block in the cache - and the Swift page came out the same.
+if ! grep -q "Swift program.* ready to run…" /tmp/verify_figures_second.log \
+   && grep -Eq "8 of 9 Swift programs on this site ready to run" /tmp/verify_figures_second.log \
+   && same_page_but_for_quartz_ids "$SITE_PUBLIC/Swift-Playground.html" /tmp/verify_swift_first.html; then
+  pass "runnable Swift: a second build compiles nothing and the Swift page is byte-identical (#493)"
+else
+  fail "runnable Swift: a second build compiled again or changed the Swift page (#493)"
+  grep -n "Swift" /tmp/verify_figures_second.log | head -5
 fi
 restore_hit_fixture
 trap release_verify_lock EXIT

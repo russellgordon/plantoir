@@ -1,6 +1,7 @@
 ---
 title: Looping Programs
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -13,7 +14,11 @@ the four numbers she actually reports.
 
 ## The program
 
-```python
+To run it, type the number of days on the first line of the input box
+and one weight on each line after it — `4`, `6.5`, `3`, `11.2` and `7`,
+as in the run below — then press Run.
+
+```python run readonly
 # Paper-recycling tally for Ms. Nakamura, who reports one number a
 # month and was adding kilograms on a whiteboard.
 

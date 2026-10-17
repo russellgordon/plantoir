@@ -1,6 +1,7 @@
 ---
 title: Input and Output
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -31,7 +32,7 @@ one-line version hides which half broke when it breaks.
 
 ## Showing the answer
 
-```python
+```python run readonly
 name = "Priya"
 minutes = 185
 hours = minutes / 60
@@ -80,9 +81,10 @@ People type `seven`. People type nothing at all and press return.
 ValueError: invalid literal for int() with base 10: 'seven'
 ```
 
-You can catch that instead of crashing:
+You can catch that instead of crashing. Type `seven` in the input box,
+then press Run:
 
-```python
+```python run readonly
 answer = input("Minutes practised: ")
 
 try:
@@ -101,7 +103,9 @@ error handling — which is what [[The Bad Input Hunt]] is for.
 
 > [!question]- Self-check: what does this print if the user types 3.5?
 > (click to expand)
-> ```python
+>
+> Type `3.5` in the input box, then press Run to check.
+> ```python run readonly
 > count = int(input("How many? "))
 > print(count)
 > ```

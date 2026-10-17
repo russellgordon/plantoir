@@ -2,6 +2,9 @@
 
 Usage:  python3 .claude/skills/example-content/lint_payload.py ADA1O
 
+Runs under Python 3.9 or later (macOS's own /usr/bin/python3 is 3.9), and is
+run by hand - the example-content skill's Phase 7; no automated gate runs it.
+
 Checks every rule the installer and the site build depend on. Exit code 0
 means clean; 1 means problems were printed; 2 means the linter's own
 self-check failed. The Example Course (`support/example_course/`, EXC2O) is
@@ -20,6 +23,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 # reads links exactly as the build does. A link inside code is an example.
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import markdown_code  # noqa: E402
+
+# Runnable Python (#455, #561): the rules every page keeps, and the judgement
+# table of a payload that has one. Its own file, so it can be run alone.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lint_runnable  # noqa: E402
 
 
 def fence_lines_that_fall_out(text: str) -> list:
@@ -104,6 +112,7 @@ def check_the_checks() -> list:
     for sentence in HEADING_MARK_MUST_BE_REFUSED:
         if not heading_marks_missing(sentence):
             failures.append(f"accepted a sentence it must refuse: {sentence!r}")
+    failures.extend(lint_runnable.check_the_checks())
     return failures
 
 
@@ -229,6 +238,7 @@ def lint(course_code: str) -> int:
         is_curriculum = curriculum_folder and rel.startswith(f"shared/{curriculum_folder}/")
 
         problems.extend(heading_mark_problem(rel, text))
+        problems.extend(lint_runnable.page_problems(rel, text))
 
         # A filename Windows cannot create is a course Windows teachers
         # cannot have. Git for Windows refuses to check such a path out at
@@ -753,6 +763,8 @@ def lint(course_code: str) -> int:
                 "no final evaluation — the last thing in the course is a page in Tasks "
                 "tagged `final-evaluation`, carrying the exam or culminating task"
             )
+
+    problems.extend(lint_runnable.table_problems(course_code, root))
 
     print(f"{len(pages)} pages checked; {len(class_ordinals)} class pages")
     if curriculum_folder and specific:

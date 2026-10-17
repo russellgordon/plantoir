@@ -349,6 +349,9 @@ class RunnerFenceTests(unittest.TestCase):
         self.assertEqual(page_features.runner_engines_on_page(None, body), set())
         self.assertEqual(page_features.runner_engines_on_page("true", body), set())
         self.assertEqual(page_features.runner_engines_on_page(True, "```python\nprint(1)\n```\n"), set())
+        self.assertEqual(page_features.runner_engines_on_page(True, "```swift run\nprint(1)\n```\n"), {"swift"})
+        both = "```python run\nprint(1)\n```\n\n```swift run\nprint(2)\n```\n"
+        self.assertEqual(page_features.runner_engines_on_page(True, both), {"pyodide", "swift"})
 
 
 class CodeRunnerReadingCaseTests(unittest.TestCase):
@@ -388,6 +391,9 @@ class RunnerEngineWorkspace:
         self.support = self.folder / "support"
         (self.support / "gated" / "pyodide").mkdir(parents=True)
         (self.support / "gated" / "pyodide" / "plantoir-worker.js").write_text("/* worker */\n", encoding="utf-8")
+        (self.support / "gated" / "swift").mkdir(parents=True)
+        for name in ("plantoir-swift-worker.js", "plantoir-wasi.mjs"):
+            (self.support / "gated" / "swift" / name).write_text(f"/* {name} */\n", encoding="utf-8")
         self.output = self.folder / "section1"
         (self.output / "quartz" / "static").mkdir(parents=True)
         self.said = []
@@ -475,6 +481,31 @@ class RunnerGateTests(unittest.TestCase):
         self.assertIn("Python", said)
         for word in ("pyodide", "webassembly", "wasm", "worker", "docker", "container", "toolchain", "{"):
             self.assertNotIn(word, said.lower())
+
+    def test_a_prebuilt_languages_overlay_is_its_engine(self):
+        """#493: Swift's programs are compiled per course, so its overlay -
+        the page's thread and its WASI shim - is all the engine there is,
+        with no VENDOR_DIR/swift."""
+        self.assertFalse((self.space.vendor / "swift").exists())
+        outcome = self.space.gate({"swift": 1})
+        self.assertTrue(outcome["swift"]["installed"])
+        self.assertEqual(sorted(path.name for path in self.space.static("swift").iterdir()),
+                         ["plantoir-swift-worker.js", "plantoir-wasi.mjs"])
+        self.assertTrue(any("Swift" in line and "1 page" in line for line in self.space.said), self.space.said)
+        self.space.gate({"swift": 0})
+        self.assertFalse(self.space.static("swift").exists())
+
+    def test_a_prebuilt_language_with_no_overlay_warns(self):
+        shutil.rmtree(self.space.support / "gated" / "swift")
+        outcome = self.space.gate({"swift": 2})
+        self.assertFalse(outcome["swift"]["installed"])
+        self.assertFalse(self.space.static("swift").exists())
+        self.assertTrue(any("Swift" in line for line in self.space.said), self.space.said)
+
+    def test_only_prebuilt_languages_have_an_overlay_for_an_engine(self):
+        for fence, row in page_features.RUNNER_LANGUAGES.items():
+            with self.subTest(fence=fence):
+                self.assertEqual(row["engine"] in page_features.OVERLAY_IS_THE_ENGINE, row["prebuilt"])
 
     def test_engines_with_no_overlay_are_unchanged(self):
         outcome = self.space.gate({"pagedjs": 1})

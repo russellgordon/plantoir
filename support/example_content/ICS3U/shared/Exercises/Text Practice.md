@@ -1,6 +1,7 @@
 ---
 title: Text Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -43,7 +44,7 @@ version of a bug that has genuinely broken somebody's program.
 > [!success]- Answer 2
 > The spaces are characters, so the two strings are genuinely
 > different values. `.strip()` removes whitespace from both ends:
-> ```python
+> ```python run
 > typed = "  Priya  "
 > print(typed.strip() == "Priya")
 > ```
@@ -62,7 +63,7 @@ version of a bug that has genuinely broken somebody's program.
 > TypeError: 'str' object does not support item assignment
 > ```
 > Build a new string instead:
-> ```python
+> ```python run
 > name = "priya"
 > name = name[0].upper() + name[1:]
 > print(name)
@@ -71,7 +72,7 @@ version of a bug that has genuinely broken somebody's program.
 > original is never edited.
 
 > [!success]- Answer 5
-> ```python
+> ```python run
 > line = "Fifteen Dogs|14"
 > fields = line.split("|")
 > title = fields[0]
@@ -86,7 +87,9 @@ version of a bug that has genuinely broken somebody's program.
 > back from a file becomes usable data.
 
 > [!success]- Answer 6
-> ```python
+> Type a name in the input box — two spaces, then PRIYA, then a space,
+> works — then press Run.
+> ```python run
 > typed = input("Name: ")
 > name = typed.strip().lower()
 >
@@ -99,7 +102,7 @@ version of a bug that has genuinely broken somebody's program.
 > that up is a fifteen-minute bug.
 
 > [!success]- Answer 7
-> ```python
+> ```python run
 > full = "Priya Nair"
 > parts = full.split(" ")
 > initials = parts[0][0] + parts[1][0]
@@ -114,7 +117,7 @@ version of a bug that has genuinely broken somebody's program.
 > section of [[Computers and Society]].
 
 > [!success]- Answer 8
-> ```python
+> ```python run
 > count = 0
 > for letter in "Fifteen Dogs".lower():
 >     if letter in "aeiou":
