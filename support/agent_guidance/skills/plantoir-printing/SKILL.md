@@ -158,6 +158,12 @@ print as code and nothing else - no buttons, input box or output: the
 teacher's code, or the student's own if they changed it before pressing
 Print. How to write them is in the `plantoir-runnable-code` skill.
 
+Self-check quizzes (` > [!quiz] ` callouts) print as their questions only -
+empty circles or boxes for the choices, a line for each blank - and their
+answers and explanations are in neither the questions nor the answer key
+yet. Write the answers a handout's key needs as the answer callouts above;
+how to write quizzes is in the `plantoir-quizzes` skill.
+
 ## 6. The Curriculum connection never prints
 
 Many pages end with a section headed `## Curriculum connection` that

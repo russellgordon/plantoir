@@ -336,6 +336,54 @@ def swift_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
+def quizzes_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every self-check question this build found it cannot
+    check (#563), never one per question. Each is named through quizLine
+    (its place and its line in the teacher's file), quizLineNoLine (the line
+    could not be found), quizLineNotNumbered (a quiz inside a list or another
+    callout, which has no place among the page's quizzes) or quizPageOnly,
+    and the reason through quizCallouts.words.problems; every value is filled
+    in one pass.
+    """
+    entry = table["quizzesNotReady"]
+    problems = facts.get("quiz_problems") or []
+    reasons = contracts.section(CONTRACT_FILE, "quizCallouts", "words", "problems")
+    named = []
+    for problem in problems[:MOST_PAGES_NAMED]:
+        reason_text = reasons.get(problem.get("reason") or "", reasons["nothingToCheck"])
+        reason = filled(reason_text, {key: value for key, value in (problem.get("fill") or {}).items()})
+        fill = {"page": problem.get("page", ""), "reason": reason}
+        numbered = problem.get("n") is not None
+        has_line = problem.get("line") is not None
+        if numbered:
+            fill["n"] = problem["n"]
+        if has_line:
+            fill["line"] = problem["line"]
+        if numbered and has_line:
+            piece = entry["quizLine"]
+        elif numbered:
+            piece = entry["quizLineNoLine"]
+        elif has_line:
+            piece = entry["quizLineNotNumbered"]
+        else:
+            piece = entry["quizPageOnly"]
+        named.append(filled(piece, fill))
+    if len(problems) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": problems[0].get("page", "") if problems else "",
+        "count": len(problems),
+        # "; " rather than ", ": a reason can hold a comma.
+        "quizzes": "; ".join(named),
+    }
+    return finding(
+        "quizzesNotReady", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(problems) == 1 else "sentenceForSeveral",
+    )
+
+
 def findings(facts: dict, course: str, section) -> list:
     """
     Every finding for one section's build.
@@ -375,6 +423,11 @@ def findings(facts: dict, course: str, section) -> list:
                                "reason": codeRunnerBlocks.swift.reasons key,
                                "said": the compiler's first error}], each a
                                runnable Swift block with no program (#493)
+    * `quiz_problems`        — [{"page": place, "n": the quiz's place among
+                               the page's top-level quizzes or None, "line":
+                               n or None, "reason": quizCallouts.words.problems
+                               key, "fill": its values}], each a self-check
+                               question that cannot be checked (#563)
     """
     table = _checks_by_name()
     found = []
@@ -441,6 +494,9 @@ def findings(facts: dict, course: str, section) -> list:
     # After everything above, so the existing examples keep their order (#493).
     if facts.get("swift_problems"):
         found.append(swift_finding(facts, course, section, table))
+    # After everything above, so the existing examples keep their order (#563).
+    if facts.get("quiz_problems"):
+        found.append(quizzes_finding(facts, course, section, table))
 
     return found
 

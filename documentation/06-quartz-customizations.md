@@ -1860,6 +1860,207 @@ runs once); mapping only RuntimeError to the crash words (S5); a dedicated
 known limit tells teachers how deep is safe); stopping the build on a compile
 error (ruling Q1).
 
+## J. Self-check quizzes (#563, v1.8.0)
+
+The first half of #511. A `> [!quiz]` callout at the left edge of a page
+becomes a question a student answers and checks in the browser: multiple
+choice (one box ticked), select all that apply (two or more), short answer
+and fill in the blank (an `[!answer]` inside the quiz, one line per blank),
+each with an optional `[!explain]` revealed after the first Check or Show
+answer, and `[!quiz|shuffle]` to shuffle the choices. Self-check only: no
+accounts, no network, nothing reaches the teacher. The rules are data in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`quizCallouts`; the build's half is
+[05 → Self-check quizzes](05-build-pipeline.md#self-check-quizzes-what-the-build-does-563-v180).
+Format and syntax are #511's (decided 2026-10-11, not reopened); the eight
+rulings of 2026-10-17 (Q1-Q8) and the plan review's ten should-fixes are in
+the closing comment of #563.
+
+**Compatibility.** A page with no `[!quiz]` outside fenced or indented
+code comes out exactly as before: the text hook returns it untouched
+(checked in Node for every `untouched` case - quiz syntax shown in a fence
+(review S2) and in indented code at the page's level, inside a callout and
+under a list item (the implementation review's S1: a `>` four or more
+columns past its container's content opens nothing, in both readers) - and
+by verify 6k on a planted `Quiz Code Shown`, which is also named in no
+folder problem), and the two later stages act only on a page whose text
+holds `[!quiz`. `[!question]`, and `[!answer]` and `[!explain]`
+outside a quiz, are untouched and stay searchable. The script and styles are
+in every site's shared `postscript.js` and `index.css` (ruling Q2; every
+rule under a `plantoir-quiz` class, the script returns at once with no
+quiz). Measured on EXC2O (no quiz): `postscript.js` 122,138 → 136,068 bytes
+(+13,930; gzip 40,867 → 45,378, +4,511), `index.css` 60,812 → 65,787
+(+4,975; gzip +700), and 297 of 302 pages and feeds identical (05 has the
+other five, which differ between two builds of the same image).
+
+### J1. The files (all in `support/quartz/`, installed every build)
+
+| File | What it does |
+|---|---|
+| `plugins/transformers/quizRules.ts` | The ONE implementation of the rules, pure (no DOM, no imports): `parseAnswerLine`, `splitAlternatives`, `parseNumber`, `normalise`, `accepts`, `shuffledOrder`, `verdict`, `isBlank`, and the text hook `nestedTitlesOwnTheirLine`. The transformer decides what each quiz is with it; the page's script checks answers with it. `scripts/check_quiz_rules_against_the_site.py` bundles it and runs every parse, check and shuffle case in Node (110 on 2026-10-17). The Python mirror, `scripts/quizzes.py`, parses and decides but never checks an answer. |
+| `plugins/transformers/plantoirQuizzes.ts` | `PlantoirQuizzes`, wired straight after `Plugin.PlantoirFigures(),` (so after Description; anchored on the figures line so a fresh site and an old one stand in the same order, review N7). Three hooks, below. |
+| `components/scripts/quiz.inline.ts` | Check, Show answer, feedback, the shuffle, keyboard folds, the score (J4). Imports `quartz/plantoir_quiz.json` (the words only). Works out the page's slug and root itself: importing `util/path` put a second copy of that module into `postscript.js` (3,266 bytes, measured). |
+| `components/styles/quiz.scss` | Every rule under `.plantoir-quiz` (or `.plantoir-quiz-score`); 16 px boxes (no zoom on focus), 44 px targets, the theme's colours with dark-mode marks, `@media print` (J5). |
+| `components/PlantoirMetaLine.tsx` | Carries the script and styles, as it carries the figures' (no new component or layout edit). |
+
+### J2. Three stages, and why
+
+* **Text** (before parsing). ObsidianFlavoredMarkdown gives a callout's
+  title line a paragraph of its own only at the page's left edge (its
+  `calloutLineRegex` is `^> *\[!…`), so in `> > [!answer]-` then `> > $2^7$`
+  the answer went INTO the title (measured, plan M2: the title read "Answer
+  2^7", the body empty; an explanation's first line likewise). Inside a quiz
+  only (ruling Q1 - the general fix would change existing sites and the
+  printing skill's empty-`>` advice; a separate issue), after any nested
+  callout's first line, the hook adds one line holding just its `>` markers.
+  Line endings are made LF first (review S1: Windows writes every build copy
+  in text mode, CR LF, and the hook did nothing there), fences are skipped
+  at every depth (S2), and a page with no quiz outside fenced code comes
+  back as it came - CR LF included.
+* **Markdown** (after GitHubFlavoredMarkdown; a task item's `checked` is set
+  at parse time, M1). Every quiz that is a CHILD OF THE PAGE becomes the
+  markup below; one inside a list or callout (ruling Q3) is rendered not
+  ready with `notAtTopLevel`. Answer lines are read from the page's own
+  text by the `[!answer]` blockquote's lines (two `>` markers off, trimmed),
+  never from the parsed tree, which has already turned "quotes" curly and
+  `\|` into `|` (M3). Every task box's tick is taken off the page (M7: a
+  task list renders `<input checked disabled>`, the answer key on screen).
+  A `$...$` answer is shown through the page's own parser (`this.parse`):
+  only a parsed formula node carries what rehype-katex renders (review S9;
+  measured, the revealed answer holds `.katex`).
+* **HTML** (after Description, before Latex). The question's id, the
+  choices' `aria-labelledby` and `aria-describedby`, blanks
+  (`<code>____</code>`, M4) made into boxes, and the page's search text and
+  summary made again WITHOUT the quizzes' answers and explanations
+  (ruling Q5; review S3: Description had put "Answer 42" into the meta
+  description, og:description, the RSS item and contentIndex.json). The
+  summary is recomputed only when the page names no description of its
+  own, with Description's own rules copied (150 / 300 characters, its link
+  rule); a blank reads as `…` in both ("Fill … and …." - pinned by 6k).
+
+### J3. The markup, and what a screen reader hears
+
+Quartz's callout stays (colours, title, fold) and gains `plantoir-quiz`,
+`data-quiz-n` (place among the page's top-level quizzes), `data-quiz-source`
+(the slug of the page it was written on), `data-quiz-kind`,
+`data-quiz-shuffle`, `data-quiz-hash` (FNV-1a 32 of its source) and
+`data-quiz` (the correct places, or the answer lines - a self-check, so the
+page's source showing answers is accepted, knownLimits). Not ready:
+`data-quiz-kind="notReady"` and `data-quiz-problem`, the question and its
+choices with every box empty, and `words.site.notReady` (ruling Q6).
+
+* Choices are a `<fieldset>` labelled by the question; each is a real radio
+  button or checkbox inside a `<label>` with the choice's first line.
+  Anything after it - a graph, an image, code to run - sits OUTSIDE the
+  label (pressing Run never ticks it; measured) and describes the box
+  (`aria-describedby`, review S7), so "Graph A" is read with the graph's
+  description. A box needs words after it on its line to be a box at all
+  (measured), so a choice with no words of its own is named
+  `choiceNumber` and the figure's description when it happens.
+* No `name` is set when the site is built: the script gives each quiz on
+  the page its own, and renames an id a transclusion has duplicated.
+* Blanks are text boxes labelled "Blank n of count"; a short answer's box
+  `answerLabel`. Autocomplete, autocapitalize, autocorrect and spellcheck
+  off.
+* Feedback is a polite live region; a blank is marked in words and a sign
+  (✓ Right / ✗ Not right) and `aria-invalid`, never colour alone.
+* Folds (review S6): Quartz's fold titles listen for clicks only, and a
+  folded callout's content stays focusable. Inside a quiz, each fold title
+  is `role=button tabindex=0 aria-expanded` and opens with Enter or Space;
+  folded content is `inert` until opened; a revealed explanation is opened
+  (its height recomputed - Quartz measured it while hidden, M9).
+
+### J4. Checking, the shuffle, and the score
+
+`accepts` (contract `answers`): alternatives on ` | ` with a space or tab on
+both sides; numbers by value (decimals with or without a leading digit,
+integer fractions, `+ - −`; not `1e3`, `0x10`, `Infinity`, a comma, `½`,
+ruling Q7); `A ± T` only as a number ± a number not negative, so `±3` and
+`x = ±3` are answers and `+-` typed matches `±` (review S8); `$...$`
+compared inside; NFKC then `toLowerCase()` with no locale (STRASSE is not
+straße - pinned), curly quotes made straight (iOS Smart Punctuation).
+
+The shuffle moves the choices (reading and Tab order follow what is seen;
+CSS `order` was rejected, WCAG 1.3.2) with `shuffledOrder(n, Math.random)`
+on every load; `beforeprint` puts Markdown order back for ⌘P and
+`afterprint` the shuffle; the handout sorts its own copy by `data-choice`.
+
+The score (ruling Q4, right on the FIRST Check): `localStorage`
+`plantoir:quiz:<site root path>:<page slug>` = `{v: 1, quizzes:
+{"<source slug>#<n>": {hash, firstTry}}}`, keyed by the quiz's SOURCE page
+so a transcluded quiz keeps its own entry (review S5); a hash that no
+longer matches is ignored; every call in try/catch. Shown after the page's
+last quiz once one is answered, with Start again; a quiz shown twice on a
+page (two transclusions) counts once, and each copy's ids are its own
+(measured on the planted `Quiz Twice`).
+
+**Transclusion (review S5), measured rather than limited:** Quartz copies
+the source page's finished HTML into the host, so a transcluded quiz keeps
+its own `data-quiz-source`, ids and answers; on `Quiz Host` (its own quiz 1
+and `![[Quiz Source]]`'s quiz 1) the two have distinct ids, labels and
+radio groups, and the transcluded one is scored as `Quiz-Source#1`. So it is
+interactive, not the not-ready fallback the ruling allowed.
+
+### J5. On paper (ruling Q8)
+
+A quiz prints as its question: buttons, feedback, score, answer, explanation,
+marks and the not-ready line hidden; native boxes hidden and an empty ○ (one
+answer) or □ (select all) drawn; a blank an empty line. `print.inline.ts`
+gives callouts INSIDE a quiz no role (a folded `[!answer]` there would have
+been lifted into the handout's key, M10), and its handout copy removes what a
+quiz holds back, sorts the choices back and draws the boxes (a copy keeps
+what a student ticked or typed). Measured: `Quiz Printable`'s handout holds
+both quizzes' questions, the page's own folded answer in its key, and
+neither quiz's answer nor its explanation. The answer key for quizzes is
+#511's.
+
+### J6. Measured (2026-10-17, M4 Pro, macOS 26.6, Chrome for Testing 155)
+
+`browser-checks/quiz_check.mjs` on the verify fixture's `Quiz Playground`
+(eight quizzes: every kind, a shuffle, a folded quiz of graphs, code to run
+and a picture in choices, graphs and code in explanations), `Quiz Host` and
+`Quiz Printable`: every kind wrong then right in the contract's words; an
+empty answer never checked; the explanation's TEXT visible after a Check and
+its graph drawn; Show answer's badge, and its formula set by KaTeX; Enter in
+a box checks it; a folded quiz's title opens with Enter and its content was
+inert; Run in a choice does not tick it; Swift (#493) runs in a choice and in a revealed explanation, printing `6` from each (measured after merging #493, the compile through preview.sh's Swift image); answering asks no website and the
+site for nothing; the shuffle in 19 orders over 20 loads; print media hides
+every held-back part and draws ○ and □; the score kept across a reload and
+cleared by Start again, and every quiz still checks with `localStorage`
+throwing; five page changes leave one listener set per quiz and one for
+printing; the transclusion above; the handout. Light and dark screenshots
+read cleanly (marks and badges have dark-mode colours). NOT measured here:
+Safari, iPadOS, VoiceOver, the mac preview pane, Netlify (#563's closing
+comment lists them as owed).
+
+### J7. Teacher note: "Writing a self-check question"
+
+Start a callout at the left edge with `> [!quiz]` and the question; tick the
+right choice with `- [x]` (two or more for select all), or put the answer
+inside on its own line under `> > [!answer]-` (one line per `` `____` ``
+blank); add `> > [!explain]- Why` for the reason. Separate accepted answers
+with ` | `; `3.14 ± 0.01` for a range. Preview and answer each question; one
+that cannot be checked is named in the folder problems with its line. The
+skill `plantoir-quizzes` (support/agent_guidance) carries the whole of this,
+with patterns, for an assistant.
+
+**Rejected** (with the reasons above and in the plan): a ```` ```quiz ````
+fence (#511: no maths or graphs inside, and Obsidian shows a code block);
+CSS `order` for the shuffle; a frontmatter key (a second switch that can
+disagree with the page); a per-page `<script>` (Quartz's SPA head patch, and
+a second loading mechanism); patching ObsidianFlavoredMarkdown for every
+nested callout (Q1); Python checking answers (one implementation only);
+`<label>` around a choice's blocks (Run would tick it); a radio `name` at
+build time (a transclusion would join the page's group); one words-and-pages
+JSON (the page's script bundles the words, so a file that changes with every
+quiz problem would change `postscript.js` too).
+
+**Departures from #563's wording**, recorded so they are not mistaken for
+omissions: assets ride every site's shared bundle rather than "only on pages
+that use a quiz" (ruling Q2, measured above), and a malformed quiz is a
+folder problem with page and line rather than "build fails" (the ruling for
+#493: a build is never stopped by one page).
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
