@@ -211,7 +211,10 @@ final class PageWindow: NSObject, WKNavigationDelegate {
                 contentWorld: .page
             )
         } catch {
-            fail("the prepare script failed: \(error.localizedDescription)")
+            // WebKit puts the script's own words (the exception's message, or
+            // that its promise was dropped unsettled) in the error's details.
+            let details: String = ((error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String) ?? ""
+            fail("the prepare script failed: \(error.localizedDescription) \(details)")
             return false
         }
         let said: String = (answer as? String) ?? "it returned \(String(describing: answer))"

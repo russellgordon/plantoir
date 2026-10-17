@@ -24,8 +24,10 @@ if (feedback() !== RIGHT) return "the feedback reads \"" + feedback() + "\", not
 const explain = quiz.querySelector(".plantoir-quiz-explain")
 if (!explain || explain.hidden) return "the explanation is not shown"
 document.activeElement && document.activeElement.blur && document.activeElement.blur()
-let heading = quiz.previousElementSibling
-while (heading && !/^H[23]$/.test(heading.tagName)) heading = heading.previousElementSibling
-if (heading) heading.scrollIntoView({ block: "start" })
-if (quiz.getBoundingClientRect().bottom > window.innerHeight - 24) quiz.scrollIntoView({ block: "end" })
+// Framing: the page stays where the scroll to its top left it unless the
+// block's bottom (its output included) would be cut off; then the block's
+// bottom is brought to a little above the window's edge, so the text above
+// it, which says what it is for, stays in the picture.
+const overhang = quiz.getBoundingClientRect().bottom - (window.innerHeight - 56)
+if (overhang > 0) window.scrollBy(0, overhang)
 return "ready"

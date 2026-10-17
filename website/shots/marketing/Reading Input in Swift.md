@@ -17,32 +17,18 @@ program, then press **Run**.
 ```swift run
 print("What is your name?")
 let name = readLine() ?? ""
-
-if name.isEmpty {
-    print("You didn't type a name, so I'll call you Friend.")
-} else {
-    print("Hello, \(name)! Your name has \(name.count) letters.")
-}
-
 print("How old are you?")
 let ageText = readLine() ?? ""
 
 if let age = Int(ageText) {
-    let nextYear = age + 1
-    print("Next year you will be \(nextYear).")
-    if age >= 16 {
-        print("You are old enough to drive in Ontario.")
-    } else {
-        let yearsToWait = 16 - age
-        print("You can learn to drive in \(yearsToWait) years.")
-    }
+    print("Hello, \(name)! Next year you will be \(age + 1).")
 } else {
-    print("\"\(ageText)\" is not a whole number.")
+    print("Hello, \(name)! \"\(ageText)\" is not a whole number.")
 }
 ```
 
-Then try it with no name, and with an age written as a word. Which line
-of the program decides what happens each time?
+Then try it with an age written as a word. Which line of the program
+decides what happens?
 
 ## What to notice
 
