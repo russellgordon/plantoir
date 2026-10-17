@@ -1,0 +1,304 @@
+// Self-check quizzes (#563). EVERY rule here is under a .plantoir-quiz class
+// (.plantoir-quiz itself, or .plantoir-quiz-score, the page's score line,
+// which the page's script puts after the last quiz): this stylesheet goes
+// into the site's one index.css, which every page links, so a page with no
+// quiz must look and print exactly as it did. No @page, no element selectors
+// on their own, no classes on <html>. Colours are the theme's variables, so
+// light and dark both follow the site; right and wrong are said in words and
+// a sign as well as colour.
+
+.plantoir-quiz {
+  & [hidden] {
+    display: none !important;
+  }
+
+  & .plantoir-quiz-choices {
+    margin: 0.25rem 0 0.5rem;
+    padding: 0;
+    border: none;
+    min-width: 0;
+  }
+
+  & .plantoir-quiz-hint {
+    margin: 0 0 0.4rem;
+    font-size: 0.9em;
+    color: var(--darkgray);
+  }
+
+  & .plantoir-quiz-choice {
+    margin: 0.3rem 0;
+  }
+
+  & .plantoir-quiz-choice-label {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    min-height: 44px;
+    padding: 0.35rem 0.6rem;
+    box-sizing: border-box;
+    border: 1px solid var(--lightgray);
+    border-radius: 5px;
+    background: var(--light);
+    cursor: pointer;
+  }
+
+  & .plantoir-quiz-choice-label:hover {
+    border-color: var(--secondary);
+  }
+
+  & .plantoir-quiz-input {
+    flex: none;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+    accent-color: var(--secondary);
+    transform: translateY(0.15rem);
+  }
+
+  & .plantoir-quiz-input:focus-visible {
+    outline: 2px solid var(--tertiary);
+    outline-offset: 2px;
+  }
+
+  & .plantoir-quiz-choice-text > p {
+    margin: 0;
+  }
+
+  & .plantoir-quiz-choice-more {
+    margin: 0.3rem 0 0 2.3rem;
+  }
+
+  & .plantoir-quiz-blank {
+    // iPadOS zooms the page when a field under 16 px takes the focus.
+    font: inherit;
+    font-size: max(16px, 1em);
+    min-width: 6rem;
+    max-width: 100%;
+    padding: 0.2rem 0.5rem;
+    color: var(--dark);
+    background: var(--light);
+    border: 1px solid var(--gray);
+    border-radius: 5px;
+    box-sizing: border-box;
+  }
+
+  & .plantoir-quiz-blank:focus-visible {
+    outline: 2px solid var(--tertiary);
+    outline-offset: 1px;
+  }
+
+  & .plantoir-quiz-response .plantoir-quiz-blank {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  & .plantoir-quiz-blank[aria-invalid="true"] {
+    border-color: #c62828;
+  }
+
+  & .plantoir-quiz-blank[aria-invalid="false"] {
+    border-color: #2e7d32;
+  }
+
+  & .plantoir-quiz-mark {
+    margin: 0 0.4rem 0 0.3rem;
+    font-size: 0.85em;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  & .plantoir-quiz-mark.is-right {
+    color: #2e7d32;
+  }
+
+  & .plantoir-quiz-mark.is-wrong {
+    color: #c62828;
+  }
+
+  & .plantoir-quiz-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.6rem 0 0.2rem;
+  }
+
+  & .plantoir-quiz-actions > button {
+    min-height: 44px;
+    padding: 0.3rem 1rem;
+    font: inherit;
+    font-size: 0.95em;
+    color: var(--dark);
+    background: var(--light);
+    border: 1px solid var(--lightgray);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  & .plantoir-quiz-actions > button.plantoir-quiz-check {
+    color: var(--light);
+    background: var(--secondary);
+    border-color: var(--secondary);
+  }
+
+  & .plantoir-quiz-actions > button:focus-visible {
+    outline: 2px solid var(--tertiary);
+    outline-offset: 2px;
+  }
+
+  & .plantoir-quiz-feedback {
+    margin: 0.3rem 0 0.5rem;
+    font-weight: 600;
+  }
+
+  & .plantoir-quiz-feedback:empty {
+    margin: 0;
+  }
+
+  & .plantoir-quiz-badge {
+    margin-left: auto;
+    padding: 0 0.5rem;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--light);
+    background: #2e7d32;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  & .plantoir-quiz-answer {
+    margin: 0.4rem 0;
+    padding: 0.4rem 0.75rem;
+    border-left: 3px solid var(--secondary);
+    background: var(--highlight);
+    border-radius: 0 5px 5px 0;
+  }
+
+  & .plantoir-quiz-answer > p {
+    margin: 0.2rem 0;
+  }
+
+  & .plantoir-quiz-explain {
+    margin-top: 0.5rem;
+  }
+
+  & .plantoir-quiz-not-ready {
+    font-size: 0.9em;
+    font-style: italic;
+    color: var(--darkgray);
+  }
+
+  // A fold title that is a button (review S6) shows the keyboard where it is.
+  & .callout-title[role="button"]:focus-visible {
+    outline: 2px solid var(--tertiary);
+    outline-offset: 2px;
+  }
+}
+
+:root[saved-theme="dark"] .plantoir-quiz {
+  & .plantoir-quiz-blank[aria-invalid="true"] {
+    border-color: #ef9a9a;
+  }
+
+  & .plantoir-quiz-blank[aria-invalid="false"] {
+    border-color: #a5d6a7;
+  }
+
+  & .plantoir-quiz-mark.is-right {
+    color: #a5d6a7;
+  }
+
+  & .plantoir-quiz-mark.is-wrong {
+    color: #ef9a9a;
+  }
+
+  & .plantoir-quiz-badge {
+    color: #161618;
+    background: #a5d6a7;
+  }
+}
+
+.plantoir-quiz-score {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+
+  &[hidden] {
+    display: none !important;
+  }
+
+  & > .plantoir-quiz-score-line {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  & > button {
+    min-height: 44px;
+    padding: 0.3rem 1rem;
+    font: inherit;
+    font-size: 0.95em;
+    color: var(--dark);
+    background: var(--light);
+    border: 1px solid var(--lightgray);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  & > button:focus-visible {
+    outline: 2px solid var(--tertiary);
+    outline-offset: 2px;
+  }
+}
+
+// On paper (ruling Q8): the question only. Nothing a student did, and no
+// answer, reaches the paper; choices are drawn as empty boxes.
+@media print {
+  .plantoir-quiz {
+    & .plantoir-quiz-actions,
+    & .plantoir-quiz-feedback,
+    & .plantoir-quiz-answer,
+    & .plantoir-quiz-explain,
+    & .plantoir-quiz-mark,
+    & .plantoir-quiz-badge,
+    & .plantoir-quiz-not-ready,
+    & .plantoir-quiz-hint {
+      display: none !important;
+    }
+
+    & .plantoir-quiz-input {
+      display: none !important;
+    }
+
+    & .plantoir-quiz-choice-label {
+      min-height: 0;
+      padding: 0.1rem 0;
+      border: none;
+      background: none;
+    }
+
+    &[data-quiz-kind="single"] .plantoir-quiz-choice-label::before {
+      content: "○";
+      flex: none;
+    }
+
+    &[data-quiz-kind="multiple"] .plantoir-quiz-choice-label::before {
+      content: "□";
+      flex: none;
+    }
+
+    & .plantoir-quiz-blank {
+      min-height: 0;
+      border: none;
+      border-bottom: 1px solid currentColor;
+      border-radius: 0;
+      background: none;
+      color: transparent !important;
+      -webkit-text-fill-color: transparent;
+    }
+  }
+
+  .plantoir-quiz-score {
+    display: none !important;
+  }
+}
