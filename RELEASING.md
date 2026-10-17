@@ -127,6 +127,20 @@ commit that moves the version line.
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
 
+## Trim the roadmap
+
+[`ROADMAP.md`](ROADMAP.md) is the plain-words view of the open milestones,
+written for teachers. **When the tag goes up, delete the released version's
+section** — or, on a cut that carries one platform only, delete what shipped
+and keep the other platform's lines until its download joins the release —
+and update its "Last updated" line and current release number, in the same
+commit that moves the version line. Then compare the issue numbers it lists
+(`grep -o 'issues/[0-9]*' ROADMAP.md`) with the open milestones on GitHub, and
+move or remove any line whose issue has moved or closed. A roadmap that still lists a
+shipped release as "next" is the same failure as a "Landed since" table that
+survives its own release. Its last section says how it is kept between
+releases.
+
 ## The short version
 
 For future-you, mid-school-year, who remembers nothing. The whys are below.

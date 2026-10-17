@@ -22,6 +22,10 @@ this skill automates its steps 5–6 and the note-writing.
    summarise them away: a caution lives in a commit BODY, and a body is what
    gets compressed. Clear the list in the same commit that moves the version
    line, exactly as the "Landed since" table is cleared.
+2b. **`ROADMAP.md`.** In that same commit, delete the released version's
+   section (only what shipped, on a one-platform cut), update the "Last
+   updated" line and current release number, and check its issue numbers
+   against the open milestones (`RELEASING.md` → "Trim the roadmap").
 3. The bundle(s) to attach:
    - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `mac-app/publish.sh -Sign`)
    - `windows-app/dist/PlantoirSetup.exe` (freshly built & signed by `publish.ps1 -Sign`)
