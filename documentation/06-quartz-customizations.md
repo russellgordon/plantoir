@@ -1970,7 +1970,7 @@ and a picture in choices, graphs and code in explanations), `Quiz Host` and
 empty answer never checked; the explanation's TEXT visible after a Check and
 its graph drawn; Show answer's badge, and its formula set by KaTeX; Enter in
 a box checks it; a folded quiz's title opens with Enter and its content was
-inert; Run in a choice does not tick it; answering asks no website and the
+inert; Run in a choice does not tick it; Swift (#493) runs in a choice and in a revealed explanation, printing `6` from each (measured after merging #493, the compile through preview.sh's Swift image); answering asks no website and the
 site for nothing; the shuffle in 19 orders over 20 loads; print media hides
 every held-back part and draws ○ and □; the score kept across a reload and
 cleared by Start again, and every quiz still checks with `localStorage`

@@ -2591,7 +2591,11 @@ def png(width, height):
     "> - [x] Graph B\n>   " + F + "functionplot\n>   y = -x^2\n>   " + F + "\n\n"
     "> [!quiz] What does this print?\n> - [x] 5\n>   " + F + "python run\n>   print(2 + 3)\n>   " + F + "\n> - [ ] 6\n> - [ ] A picture\n>   ![a blue box](Media/plantoir-quiz-choice.png)\n>\n"
     "> > [!explain]- Why\n> > Run it yourself:\n> > " + F + "python run\n> > print(2 + 3)\n> > " + F + "\n\n"
-    "> [!quiz] Solve $x^2 = 9$.\n> > [!answer]-\n> > ±3 | x = ±3\n", encoding="utf-8")
+    "> [!quiz] Solve $x^2 = 9$.\n> > [!answer]-\n> > ±3 | x = ±3\n\n"
+    # Swift to run (#493) in a choice and in an explanation (#563 review S2).
+    "> [!quiz] What does this Swift program print?\n> - [x] 6\n>   " + F + "swift run\n>   print(2 * 3)\n>   " + F + "\n"
+    "> - [ ] 23\n>\n> > [!explain]- Why\n> > `*` multiplies. Run it:\n> > " + F + "swift run\n> > let n = 2\n> > print(n * 3)\n> > " + F + "\n",
+    encoding="utf-8")
 QUIZPLANTS
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
@@ -3043,6 +3047,12 @@ for index, (attributes, body) in enumerate(zip(wrappers, bodies), start=1):
 wanted = set()
 for body in bodies[:4] + bodies[5:]:
     wanted.add(swift_blocks.key_of(body) + ".wasm")
+# The self-check quizzes' playground runs Swift in a choice and in an
+# explanation (#563), so its programs are on the site too.
+quiz_playground = course / "Quiz Playground.md"
+if quiz_playground.is_file():
+    for block in swift_blocks.swift_fences(quiz_playground.read_text(encoding="utf-8"), True):
+        wanted.add(swift_blocks.key_of(block["body"]) + ".wasm")
 for number, case in enumerate(rules["fences"]["cases"], start=1):
     if case["optedIn"] and case["runner"] and case.get("fence", case["lang"]) == "swift":
         wanted.add(swift_blocks.key_of(f'print("case {number}")') + ".wasm")

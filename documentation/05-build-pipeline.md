@@ -2043,8 +2043,11 @@ runnable-code count (`_check_quizzes`):
    is. Inside one: the first list holding a task box is the choices (a box
    needs words after it on its line - measured: `- [ ]` alone is plain text
    to the site's parser; a `>` four or more columns past its container's
-   content is indented code, and an HTML block swallows what follows it to
-   the next empty line, as the site reads both); a nested `> [!answer]` or
+   content is indented code, and an HTML block - a block-level tag, or a
+   line holding only one tag - swallows what follows it to the next empty
+   line, as the site reads both: quiz syntax in one at the page's level is
+   no quiz, and a list of choices in one makes the quiz `choicesInHtml`, on
+   both sides); a nested `> [!answer]` or
    `> [!explain]` at the
    quiz's own level is that callout; the rest is the question, whose
    paragraphs (and title) are where blanks are counted. `verdict` - the
@@ -2084,9 +2087,10 @@ runnable-code count (`_check_quizzes`):
 what IT read; for a page this check examined and that is published, it
 compares counts and, quiz by quiz, whether each side found a problem, and
 says `plantoir: error: <page>: quiz <n>, line <L>: <readDifferently>`
-where they differ (the line from the pages file's `lines`; when the counts
-differ, "the quiz at line L" of the first quiz the check found) - quiet
-otherwise. It relies on `build --concurrency 1` (the line
+where they differ (the line from the pages file's `lines`; when the
+top-level counts differ, "the quiz at line L" of the first quiz the check
+found; when only the quizzes in a list or callout differ, "a quiz inside a
+list or another callout at line L" from `nestedLines`) - quiet otherwise. It relies on `build --concurrency 1` (the line
 reaches the build's output from the one parsing thread, review N1).
 Measured: a `- [ ] ` choice with nothing after the box was read as a box
 here and as text by the site, and the net said so on its first build; the

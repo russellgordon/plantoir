@@ -81,6 +81,22 @@ _HTML_BLOCK = re.compile(
     r"|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param"
     r"|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:[ \t>]|/>|$)",
     re.IGNORECASE)
+# CommonMark's HTML block type 7: a line holding only one whole tag (open or
+# closing, any name but the raw-text ones), which cannot interrupt a
+# paragraph but otherwise runs to the next empty line like type 6.
+_HTML_TAG_LINE = re.compile(
+    r"^ {0,3}(?:<(?!(?:script|style|pre|textarea)\b)[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>]*)?/?>"
+    r"|</[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$", re.IGNORECASE)
+# A task item, as it would read if it were not inside HTML.
+_TASK_ITEM_TEXT = re.compile(r"^ {0,3}(?:[-*+]|[0-9]{1,9}[.)])[ \t]+\[[ xX]\][ \t]+\S")
+
+
+def _html_block_starts(text: str, after_paragraph: bool) -> bool:
+    """Does an HTML block start here (type 6 always; type 7 only where it
+    does not continue a paragraph)?"""
+    return _HTML_BLOCK.match(text) is not None or (not after_paragraph and _HTML_TAG_LINE.match(text) is not None)
+
+
 # A quiz callout's first line, once its containers are taken off.
 _QUIZ_CALLOUT = re.compile(r"^ {0,3}\[!quiz(?:\||\])", re.IGNORECASE)
 
@@ -247,6 +263,8 @@ def verdict(model: dict) -> dict:
         if model["blanks"] != len(lines):
             return problem("blanksAndLines", {"blanks": model["blanks"], "lines": len(lines)})
         return {"kind": "fill", "shuffle": shuffle, "correct": [], "answers": list(lines)}
+    if model.get("htmlChoices"):
+        return problem("choicesInHtml")
     return problem("nothingToCheck")
 
 
@@ -516,11 +534,14 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             previous_paragraph = False
             continue
 
-        if depth == 0 and not lazy and not in_item and _HTML_BLOCK.match(inner):
-            # An HTML block: everything to the next empty line is HTML.
+        if depth == 0 and not lazy and not in_item and _html_block_starts(inner, previous_paragraph):
+            # An HTML block: everything to the next empty line is HTML - a
+            # list of choices in it included, which the quiz then says.
             close_stem()
             close_list()
             while index < len(entries) and not _is_blank(entries[index][0]):
+                if _TASK_ITEM_TEXT.match(entries[index][0]):
+                    state["htmlChoices"] = True
                 index += 1
             previous_blank = False
             previous_paragraph = False
@@ -591,6 +612,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             "choices": state["choices"],
             "answers": answers,
             "blanks": state["blanks"],
+            "htmlChoices": state.get("htmlChoices", False),
         },
         "answerLinesAt": answer_lines_at,
         "nestedQuizzes": nested_quizzes,
@@ -671,6 +693,15 @@ def quizzes_on_page(text: str) -> list:
             spaces = item.group(3)
             gap = len(spaces) if 1 <= len(spaces) <= 4 else 1
             list_content = len(item.group(1)) + len(item.group(2)) + gap
+        if depth == 0 and list_content is None and _html_block_starts(line, previous_paragraph):
+            # An HTML block at the page's level: to the next empty line,
+            # whatever it holds - quiz syntax included - is HTML.
+            while index < len(lines) and not _is_blank(lines[index][0]):
+                index += 1
+            previous_blank = False
+            previous_quote = False
+            previous_paragraph = False
+            continue
         if not previous_paragraph and _indent(body) - (base if depth == 0 else 0) >= 4:
             # Indented code, at the page's level, in a quote or under a list
             # item: never a quiz, a callout or a fence.
@@ -840,12 +871,14 @@ def check_pages(pages: list, printer=print) -> dict:
         reported_top = []
         reported_nested = []
         lines = []
+        nested_lines = []
         for quiz in placed:
             if quiz["n"] is not None:
                 top += 1
                 lines.append(quiz["line"])
             else:
                 nested += 1
+                nested_lines.append(quiz["line"])
             if "problem" not in quiz:
                 continue
             if quiz["n"] is not None:
@@ -862,7 +895,7 @@ def check_pages(pages: list, printer=print) -> dict:
             })
         by_page[page["path"]] = {"quizzes": top, "problems": reported_top,
                                  "nested": nested, "nestedProblems": reported_nested,
-                                 "lines": lines}
+                                 "lines": lines, "nestedLines": nested_lines}
     return {"problems": problems, "examined": sorted(examined), "pages": by_page}
 
 

@@ -141,8 +141,14 @@ Anything a page can hold works inside a question, a choice and an
 explanation. Put it on the lines under its choice, lined up under the
 choice's `[`: after the `> ` that starts every line of the quiz, two more
 spaces (`>   ```functionplot`, as below). How to write the graph itself is
-in the `plantoir-math-graphs` skill; how to write runnable code is in the `plantoir-runnable-code` skill
-(a runnable block also needs `codeRunner: true` at the top of the page).
+in the `plantoir-math-graphs` skill; how to write runnable code - Python (` ```python run `) or Swift
+(` ```swift run `) - is in the `plantoir-runnable-code` skill (a runnable
+block also needs `codeRunner: true` at the top of the page).
+
+Keep HTML out of the lines between a question and its choices: a line such
+as `<img …>` or `<div>` straight before the list makes the website read the
+choices as HTML (the quiz then cannot be checked). Leave an empty `>` line
+after any HTML, or use a Markdown image instead.
 
 A choice with a graph:
 

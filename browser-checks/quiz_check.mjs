@@ -54,7 +54,10 @@ if (!chromePath || !siteFolder) {
   process.exit(2)
 }
 
-const RULES = JSON.parse(readFileSync(new URL("../contracts/shared-rules.json", import.meta.url), "utf-8")).quizCallouts
+const ALL_RULES = JSON.parse(readFileSync(new URL("../contracts/shared-rules.json", import.meta.url), "utf-8"))
+const RULES = ALL_RULES.quizCallouts
+// A runner's status words (codeRunnerBlocks.words), for Swift run in a quiz.
+const RUNNER_WORDS = ALL_RULES.codeRunnerBlocks.words
 const said = (key, values = {}) =>
   RULES.words.site[key].replace(/\{([A-Za-z]+)\}/g, (whole, name) => (name in values ? String(values[name]) : whole))
 
@@ -217,6 +220,7 @@ async function connect(chunk) {
   }
   const problems = []
   const notes = []
+  let swiftRuns = []
   const expect = (what, ok, detail) => {
     if (!ok) problems.push(`${what}${detail === undefined ? "" : ": " + JSON.stringify(detail).slice(0, 300)}`)
   }
@@ -240,9 +244,9 @@ async function connect(chunk) {
       // 1. Every kind, wrong then right.
       if (!(await open(playground))) return finish(1, "FAIL: the playground did not load")
       const counted = await evaluate("document.querySelectorAll('.plantoir-quiz[data-built]').length")
-      expect("every quiz on the page was set up", counted === 8, counted)
+      expect("every quiz on the page was set up", counted === 9, counted)
       const rows = await evaluate("Array.from(document.querySelectorAll('.plantoir-quiz')).map((quiz) => quiz.querySelectorAll('.plantoir-quiz-actions').length)")
-      expect("each interactive quiz has one row of buttons", JSON.stringify(rows) === JSON.stringify([1, 1, 1, 1, 1, 1, 1, 1]), rows)
+      expect("each interactive quiz has one row of buttons", JSON.stringify(rows) === JSON.stringify([1, 1, 1, 1, 1, 1, 1, 1, 1]), rows)
       const loadedRequests = siteServer.requests.length
       // The fixture's own site settings ask Google Fonts and an analytics
       // script for themselves on load; answering must ask nobody anything.
@@ -334,9 +338,37 @@ async function connect(chunk) {
       const runInChoice = await evaluate("(() => { const choice = window.__quiz.quiz(7).querySelector('.plantoir-quiz-choice[data-choice=\"0\"]'); const run = choice.querySelector('.plantoir-runner-run'); if (!run) return 'no Run button'; run.click(); return choice.querySelector('input.plantoir-quiz-input').checked })()")
       expect("pressing Run on code in a choice does not tick it", runInChoice === false, runInChoice)
 
+      // 4b. Swift to run (#493) in a choice and in an explanation (#563
+      // review S2): Run in the choice prints and does not tick it, and the
+      // explanation's program runs once the explanation is revealed.
+      const runSwift = async (selector) => evaluate(`(async () => {
+        const block = ${selector}
+        if (!block) return { error: "no block" }
+        const run = block.querySelector(".plantoir-runner-run")
+        if (!run) return { error: "no Run button", html: block.outerHTML.slice(0, 300) }
+        run.click()
+        const ended = ${JSON.stringify(["finished", "finishedWithError", "stopped", "couldNotLoad", "engineMissing", "notReady"].map((key) => (RUNNER_WORDS[key] ?? "").split("{language}").join("Swift")))}
+        const until = Date.now() + 90000
+        while (Date.now() < until) {
+          const status = block.querySelector(".plantoir-runner-status")?.textContent ?? ""
+          if (ended.includes(status)) break
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        }
+        return { status: block.querySelector(".plantoir-runner-status")?.textContent, output: block.querySelector(".plantoir-runner-output")?.textContent }
+      })()`)
+      const swiftChoice = await runSwift("window.__quiz.quiz(9).querySelector('.plantoir-quiz-choice[data-choice=\"0\"] .plantoir-runner')")
+      expect("Swift run in a choice prints its output", swiftChoice.output === "6\n", swiftChoice)
+      expect("and does not tick the choice", (await evaluate("window.__quiz.quiz(9).querySelector('.plantoir-quiz-choice[data-choice=\"0\"] input').checked")) === false)
+      await evaluate("window.__quiz.choose(9, [0]); window.__quiz.press(9, 'check')")
+      expect("the Swift quiz checks", (await evaluate("window.__quiz.feedback(9)")) === said("right"))
+      await evaluate("window.__quiz.quiz(9).querySelector('.plantoir-quiz-explain').scrollIntoView()")
+      const swiftExplain = await runSwift("window.__quiz.quiz(9).querySelector('.plantoir-quiz-explain .plantoir-runner')")
+      expect("Swift run in the revealed explanation prints its output", swiftExplain.output === "6\n", swiftExplain)
+      swiftRuns = [swiftChoice, swiftExplain]
+
       // 2. Nothing from another website; answering asked the site for
       // nothing but the graph engine (and the code's, for the Run above).
-      const asked = siteServer.requests.slice(loadedRequests).filter((path) => !path.includes("/static/function-plot/") && !path.includes("/static/pyodide/"))
+      const asked = siteServer.requests.slice(loadedRequests).filter((path) => !path.includes("/static/function-plot/") && !path.includes("/static/pyodide/") && !path.includes("/static/swift"))
       expect("answering asked the site for nothing", asked.length === 0, asked)
       expect("answering asked no other website for anything", offSite.length === loadedOffSite, offSite.slice(loadedOffSite))
 
@@ -381,10 +413,10 @@ async function connect(chunk) {
       await evaluate("window.__quiz.choose(3, [0, 2]); window.__quiz.press(3, 'check')")
       await evaluate("window.__quiz.press(4, 'show')")
       const scored = await evaluate("document.querySelector('.plantoir-quiz-score-line').textContent")
-      expect("the score counts right on the first try only", scored === said("score", { right: 1, total: 8 }), scored)
+      expect("the score counts right on the first try only", scored === said("score", { right: 1, total: 9 }), scored)
       await open(playground)
       const kept = await evaluate("({ hidden: document.querySelector('.plantoir-quiz-score').hidden, line: document.querySelector('.plantoir-quiz-score-line').textContent })")
-      expect("the score is kept across a reload", !kept.hidden && kept.line === said("score", { right: 1, total: 8 }), kept)
+      expect("the score is kept across a reload", !kept.hidden && kept.line === said("score", { right: 1, total: 9 }), kept)
       const stored = await evaluate("Object.keys(localStorage).filter((key) => key.startsWith('plantoir:quiz:'))")
       expect("the score is kept under plantoir:quiz:<root>:<slug>", JSON.stringify(stored) === '["plantoir:quiz:/:Quiz-Playground"]', stored)
       await evaluate("document.querySelector('.plantoir-quiz-start-again').click()")
@@ -406,7 +438,7 @@ async function connect(chunk) {
       const root = await listenersOn("window.__quiz.quiz(2)")
       expect("each quiz has one set of listeners after five page changes", root.click === 1 && root.keydown === 1 && root.input === 1, root)
       const rowsAfter = await evaluate("Array.from(document.querySelectorAll('.plantoir-quiz')).map((quiz) => quiz.querySelectorAll('.plantoir-quiz-actions').length).join(',')")
-      expect("and one row of buttons each", rowsAfter === "1,1,1,1,1,1,1,1", rowsAfter)
+      expect("and one row of buttons each", rowsAfter === "1,1,1,1,1,1,1,1,1", rowsAfter)
       await evaluate("window.__quiz.choose(2, [1]); window.__quiz.press(2, 'check')")
       expect("a quiz still checks after the page changes", (await evaluate("window.__quiz.feedback(2)")) === said("right"))
 
@@ -457,7 +489,7 @@ async function connect(chunk) {
       if (problems.length > 0) {
         return finish(1, "FAIL: " + problems.join("; "))
       }
-      finish(0, `OK: 8 quizzes, every kind wrong then right, the shuffle in ${orders.size} orders over 20 loads, the score kept and cleared, five page changes clean, a transcluded quiz on its own, paper and the handout questions only`)
+      finish(0, `OK: 9 quizzes, every kind wrong then right, the shuffle in ${orders.size} orders over 20 loads, the score kept and cleared, five page changes clean, a transcluded quiz on its own, Swift in a choice and an explanation (${swiftRuns.map((run) => JSON.stringify(run.output)).join(", ")}), paper and the handout questions only`)
     } catch (error) {
       finish(1, "FAIL: " + (error?.stack ?? error))
     }
