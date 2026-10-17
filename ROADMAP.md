@@ -124,17 +124,29 @@ These are done and will arrive when 1.8 is released.
 - **Problems with runnable code are shown in the app**, alongside the other
   things Plantoir tells you about a folder, rather than only on the page.
   ([#567](https://github.com/russellgordon/plantoir/issues/567))
+- **GeoGebra on your pages.** Interactive maths with sliders, draggable
+  points and constructions, written as a few lines in a note. Students tap
+  to load it; nothing loads until then. (Graphs students can move, and TikZ
+  diagrams, are already here.)
+  ([#578](https://github.com/russellgordon/plantoir/issues/578))
+- **Printing fixes:** Print should always open the print window, even on a
+  long page with many code blocks (today it can stop silently in Safari)
+  ([#576](https://github.com/russellgordon/plantoir/issues/576)), and a
+  handout printed on Windows should look the same as one printed on a Mac
+  ([#577](https://github.com/russellgordon/plantoir/issues/577)).
+- **A course name with a colon works.** Naming a course "Physics: Mechanics"
+  no longer stops its front page from being built.
+  ([#575](https://github.com/russellgordon/plantoir/issues/575))
 - **Diagrams and fonts served by your own site**, as maths already is in 1.8,
   so pages look right without reaching other websites.
   ([#566](https://github.com/russellgordon/plantoir/issues/566))
 
 ---
 
-## Version 2.0 — interactive science and maths
+## Version 2.0 — interactive science
 
-- **GeoGebra and PhET on your pages.** Interactive maths with sliders and
-  draggable points (GeoGebra), and science simulations from the University of
-  Colorado's PhET collection — projectile motion, gas laws, circuits, natural
+- **PhET science simulations on your pages**, from the University of
+  Colorado's collection — projectile motion, gas laws, circuits, natural
   selection and more. Students tap to open them; nothing loads until then.
   ([#485](https://github.com/russellgordon/plantoir/issues/485))
 - **A live circuit simulator** with real schematic symbols, for physics and
@@ -175,8 +187,8 @@ These are done and will arrive when 1.8 is released.
   Google Gemini and Antigravity
   ([#508](https://github.com/russellgordon/plantoir/issues/508)).
 - **The rest of self-check quizzes**, building on what arrives in 1.8: an
-  answer key when you print, and questions that use the GeoGebra and PhET
-  interactives from 2.0.
+  answer key when you print, and questions that use GeoGebra (1.9) and PhET
+  (2.0).
   ([#511](https://github.com/russellgordon/plantoir/issues/511))
 
 ---
