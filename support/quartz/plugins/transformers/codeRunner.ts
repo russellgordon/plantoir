@@ -77,10 +77,14 @@ export const CodeRunnerFences: QuartzTransformerPlugin = () => ({
         const known = runnerFile()
         const carried = known?.carried ?? []
         const page = String(file.data.relativePath ?? slug + ".md")
+        // A page students cannot see is parsed here too and dropped later
+        // (patches/publish.ts, the same test): no line about it.
+        const flag = file.data.frontmatter?.publish
+        const published = !(flag === false || flag === "false")
         for (const runner of runners) {
           const code = runner.node as unknown as Code
           if (!carried.includes(runner.language.engine) || !known?.words?.blockNotPrepared) {
-            if (known?.words?.blockNotPrepared) {
+            if (known?.words?.blockNotPrepared && published) {
               console.log(
                 `plantoir: error: ${page}: ${runner.language.fence} block ${runner.n}: ` +
                   filled(known.words.blockNotPrepared, runner.language),
