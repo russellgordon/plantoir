@@ -643,6 +643,15 @@ else
   sed 's/^/     /' /tmp/verify_overall_backlinks_test.log | tail -40
 fi
 
+# Issue #520: folder pages (a curriculum folder's index among them) get the
+# table of contents, wired through wire_quartz_additions.
+if (cd scripts && python3 test_folder_page_toc.py) >/tmp/verify_folder_page_toc_test.log 2>&1; then
+  pass "build_site.py: folder pages get the table of contents, once, and the page layout keeps its own (scripts/test_folder_page_toc.py)"
+else
+  fail "build_site.py: folder pages get the table of contents, once, and the page layout keeps its own (scripts/test_folder_page_toc.py)"
+  sed 's/^/     /' /tmp/verify_folder_page_toc_test.log | tail -40
+fi
+
 if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
   pass "setup_course.py: curriculum_folders written for a new course, and a re-run keeps a recorded folder (scripts/test_setup_curriculum_folders.py)"
 else
@@ -2834,6 +2843,34 @@ if [[ -f "$SITE_PUBLIC/Curriculum-Coverage.html" ]] \
   pass "A % in an expectation's file name builds, and the coverage map links the page Quartz serves (#569)"
 else
   fail "The coverage map's link to a page named with % is wrong, or the page is missing (#569): $SITE_PUBLIC/Curriculum-Coverage.html, $SITE_PUBLIC/Curriculum/Z1.-Planted-100-percent-Overall.html"
+fi
+
+# ---- 6h, continued: a folder page's table of contents (#520) ----
+# EXC2O's own Curriculum/index.md says enableToc: true and has headings of its
+# own; Quartz renders a folder's index with the folder-page layout, whose
+# right column was empty, so it showed no table of contents. Counted inside
+# the table of contents only: two entries or more.
+if python3 - "$SITE_PUBLIC/Curriculum/index.html" <<'TOCCHECK'
+import re, sys
+try:
+    html = open(sys.argv[1], encoding="utf-8").read()
+except OSError as error:
+    print(f"   no built page: {error}")
+    sys.exit(1)
+start = html.find('class="toc')
+if start < 0:
+    print(f"   no table of contents on {sys.argv[1]}")
+    sys.exit(1)
+end = html.find("</ul>", start)
+# One <li class="depth-N"> per heading; Quartz adds an empty "overflow-end" item.
+entries = len(re.findall(r'<li class="depth-', html[start:end if end > start else len(html)]))
+print(f"   table of contents entries: {entries}")
+sys.exit(0 if entries >= 2 else 1)
+TOCCHECK
+then
+  pass "A curriculum folder's index page shows its table of contents (#520)"
+else
+  fail "A curriculum folder's index page shows no table of contents, or one with fewer than two entries (#520) - see the line above"
 fi
 
 # ---- 6h, continued: printable pages (#454) ----
