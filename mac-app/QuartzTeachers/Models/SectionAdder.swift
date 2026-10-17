@@ -675,7 +675,9 @@ enum SectionAdder {
         }
         let title: String = newTitle ?? fallbackTitle ?? ""
         let publish: String = fallbackIsDraft ? "false" : "true"
-        return "title: \(title)\ncreated: \(created)\npublish: \(publish)"
+        // Quoted when written plain it would not read back as the title
+        // (#506's review: `Unit: One` gave a page the build could not read).
+        return "title: \(FolderScaffold.frontmatterTitle(title))\ncreated: \(created)\npublish: \(publish)"
     }
 
     /// The lines between a file's opening and closing fences, or nil when the
