@@ -24,8 +24,10 @@ const output = block.querySelector(".plantoir-runner-output")
 while (Date.now() < until && status.textContent !== FINISHED_WITH_AN_ERROR) await pause(100)
 if (status.textContent !== FINISHED_WITH_AN_ERROR) return "the status line reads \"" + status.textContent + "\", not \"" + FINISHED_WITH_AN_ERROR + "\""
 if (!/line 2[\s\S]*ValueError: invalid literal for int\(\) with base 10: 'abc'/.test(output.textContent)) return "the output is " + JSON.stringify(output.textContent)
-let heading = block.previousElementSibling
-while (heading && !/^H[23]$/.test(heading.tagName)) heading = heading.previousElementSibling
-if (heading) heading.scrollIntoView({ block: "start" })
-if (block.getBoundingClientRect().bottom > window.innerHeight - 24) block.scrollIntoView({ block: "end" })
+// Framing: the page stays where the scroll to its top left it unless the
+// block's bottom (its output included) would be cut off; then the block's
+// bottom is brought to a little above the window's edge, so the text above
+// it, which says what it is for, stays in the picture.
+const overhang = block.getBoundingClientRect().bottom - (window.innerHeight - 56)
+if (overhang > 0) window.scrollBy(0, overhang)
 return "ready"

@@ -386,6 +386,7 @@ python3 website/shots/capture.py --sites       # the class sites, search, phone 
 python3 website/shots/capture.py --colour-figures   # only the two colour figures, from the three home pages
 python3 website/shots/capture.py --browser-shots <id,id>   # only these class-site shots
 python3 website/shots/capture.py --print-set   # what printing does (v1.7.0): see below
+python3 website/shots/capture.py --code        # the Code page (v1.8.0, #562): see below
 python3 website/build.py && python3 website/build.py --check
 ```
 
@@ -406,6 +407,36 @@ A payload page changed since the folder was made is not in it: delete the
 folder and run again. Windows takes the same two shots with
 `capture_windows.py --print-set` (`print_set_windows.py`; the course is
 `print_set.py`'s, shared by both): `SCREENSHOTS.md` → "Windows Capture".
+
+**The Code page (v1.8.0, #562, `--code`).** `code-python`, `code-python-error`,
+`code-swift` and `code-quiz` (light and dark, Mac only: `windows: false`, owed
+by name in `test_build_data.py`'s `WINDOWS_PICTURE_OWED`) are taken from
+PREVIEWS of the kept marketing folder (`~/Plantoir Marketing`, not moved: no
+path shows in them) — ICS3U for the Python and the quiz, ICS4U for the Swift.
+First the run gives the folder what they need (`marketing_folder.apply_code_steps`,
+also part of `--provision`): ICS3U's pages that the ready-made course made
+runnable after the folder was made (#561) are brought up to date, but only a
+page that is still exactly what an earlier payload made of it (its committed
+versions read from git; the installer's per-section dates and the College
+Board embeds set aside and put back), so a page somebody changed is left and
+named; and two pages of our own are planted, `shots/marketing/Reading Input
+in Swift.md` in ICS4U's Programs (no payload has Swift) and `Check Your
+Loops.md` in ICS3U's Exercises (no payload has a quiz). The previews are built
+from THIS tree's recipe, copied from the repository rather than an app bundle
+(the app plays no part in a class-site picture), so the first run builds the
+website builder and, for ICS4U, gets Swift ready. Each page is photographed
+in `webwindow.swift` with `--prepare shots/prepare/<id>.js`: after the settle
+and the scroll to the top, the script presses Run (typing the input first) or
+answers the first quiz and presses Check, waits for the contract's words —
+the status line's "Finished." or "Finished with an error.", the quiz's
+"Right!" and its explanation shown — checks the output, scrolls only as far
+as it takes to bring the block's bottom (its output included) inside the
+window, and only then is the window photographed; it fails the
+run with its reason, or when `--prepare-timeout` (120 s here) runs out.
+Vision must read each shot's `expectText`. The print set (both platforms)
+takes only scene `print-set`, so these never reach MPM2D's preview.
+
+**Before starting:** the screen unlocked and left alone for about an hour,
 
 **Before starting:** the screen unlocked and left alone for about an hour,
 Focus off, Plantoir's notifications allowed, the Safari profile `⎚` present,

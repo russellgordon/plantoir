@@ -224,6 +224,7 @@ python3 website/shots/capture.py            # captures app + deployed sites
 python3 website/shots/capture.py --app      # app windows only
 python3 website/shots/capture.py --sites    # class websites only
 python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir Marketing
+python3 website/shots/capture.py --code     # the Code page's figures (v1.8.0, #562)
 ```
 
 - **App Windows**: Driven by `MarketingScreenshotTests.swift` in
@@ -257,6 +258,21 @@ python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir M
   figures are the exception: their parts are the course home pages in a plain
   window with no browser round it (`webwindow.swift`), because their subject
   is the sites, and three toolbars read as three browsers.
+- **The Code page's figures** (#562: `code-python`, `code-python-error`,
+  `code-swift`, `code-quiz`) are pages of a local PREVIEW of the marketing
+  folder in a `webwindow.swift` window, put into the state each promises by a
+  prepare script (`website/shots/prepare/`, `--prepare`): it presses Run or
+  Check, waits for the contract's words ("Finished.", "Finished with an
+  error.", "Right!") and checks the output before the picture. The script runs
+  after the settle and the scroll to the top, and is bounded by
+  `--prepare-timeout`; the page's own minute to load stops counting once it has
+  loaded (until #562 that minute ran from launch and was never cancelled, so a
+  page photographed after 60 s was reported as "had not finished loading" —
+  measured: a settle of 62 s failed that way, and passes now). Mac only by
+  design for now: Windows carries no Python and compiles no Swift for a class
+  site in v1.8, and `capture_windows.py` makes no marketing preview, so the
+  four are `windows: false` and owed by name; its print set takes only scene
+  `print-set`. `website/README.md` → "The Code page" has the run.
 - **Mobile View**: Photographed in the iOS Simulator using RocketSim to render
   the authentic device bezel.
 - **Appearance Switching**: Machine appearance is toggled between Light and
@@ -488,3 +504,14 @@ Windows `--stage-scene` names `map-ontario`, `map-college-board` and
 | `both-curricula` | A lesson's curriculum connection quoting both | `both-curricula` |
 | `how-i-teach` | Obsidian on ICS3U's How I Teach page | `how-i-teach` |
 | `club` | The New Course panel making a club | `club` |
+
+Added for v1.8.0 (#562, macOS only — `windows: false`, owed by name in
+`WINDOWS_PICTURE_OWED`; taken by `capture.py --code` from previews of the
+marketing folder, prepare scripts in `website/shots/prepare/`):
+
+| ID | Subject | Page |
+|---|---|---|
+| `code-python` | Spot the Bug's Python, fixed in the editor, run, its output and "Finished." | ICS3U `/Warm-Ups/Spot-the-Bug` |
+| `code-python-error` | Reading an Error Message's Python, `abc` in the input box, the traceback naming line 2 | ICS3U `/Tutorials/Reading-an-Error-Message` |
+| `code-swift` | A read-only Swift program with a name and an age in its input box, run | ICS4U `/Programs/Reading-Input-in-Swift` (planted) |
+| `code-quiz` | A multiple-choice quiz answered right and checked, its explanation open | ICS3U `/Exercises/Check-Your-Loops` (planted) |
