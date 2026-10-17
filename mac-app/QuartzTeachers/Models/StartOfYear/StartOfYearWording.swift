@@ -229,6 +229,11 @@ nonisolated enum StartOfYearWording {
         return "The backup “\(backup)” holds the course as it was before."
     }
 
+    /// The undo sheet, and its result, when every page is already as it was
+    /// before the change and none was changed since (#555): nothing to put
+    /// back and nothing left alone, so "0 pages" would read as a fault.
+    static let undoAllAlreadyBack: String = "Everything is already as it was before this change."
+
     static let undoEndsWhenYouQuit: String =
         "This undo is kept only while Plantoir is open. Quitting ends it."
 }

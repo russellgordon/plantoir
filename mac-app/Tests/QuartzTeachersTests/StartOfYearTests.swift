@@ -281,6 +281,7 @@ final class StartOfYearTests: XCTestCase {
             "undoTitle": StartOfYearWording.undoTitle(course: "{course}", section: "{section}"),
             "undoIntro": StartOfYearWording.undoIntro(pages: "{pages}"),
             "undoSkipped": StartOfYearWording.undoSkipped(pages: "{pages}"),
+            "undoAllAlreadyBack": StartOfYearWording.undoAllAlreadyBack,
             "undoButton": StartOfYearWording.undoButton,
             "undone": StartOfYearWording.undone(pages: "{pages}"),
             "undoLeftSome": StartOfYearWording.undoLeftSome(pages: "{pages}", backup: "{backup}"),
@@ -762,6 +763,42 @@ final class StartOfYearTests: XCTestCase {
         XCTAssertNil(StartOfYearUndoRegistry.shared.entry(
             folderPath: "/tmp/somewhere", courseCode: "ICS3U", sectionNumber: 1, now: Date(timeIntervalSince1970: 1_001)
         ))
+    }
+
+    /// #555 plan review S3: the undo sheet sorts files by the undo's own
+    /// rule, so a page already as it was before the change is neither "to be
+    /// put back" nor "left alone" — and a created page still on disk as a
+    /// folder is left alone, never already back. MUST FAIL on the code before
+    /// #555, which listed the already-back page and the gone page as left alone.
+    func testTheUndoSheetSortsFilesByTheUndosOwnRule() throws {
+        let folder: URL = FileManager.default.temporaryDirectory.appendingPathComponent("SheetSort-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let untouched: URL = folder.appendingPathComponent("untouched.md")
+        let back: URL = folder.appendingPathComponent("back.md")
+        let edited: URL = folder.appendingPathComponent("edited.md")
+        let gone: URL = folder.appendingPathComponent("gone.md")
+        let folderNow: URL = folder.appendingPathComponent("folder.md")
+        try "after".write(to: untouched, atomically: true, encoding: .utf8)
+        try "before".write(to: back, atomically: true, encoding: .utf8)
+        try "after, edited".write(to: edited, atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: folderNow, withIntermediateDirectories: true)
+        let files: [AssistSavedFile] = [
+            AssistSavedFile(fileURL: untouched, before: "before", after: "after"),
+            AssistSavedFile(fileURL: back, before: "before", after: "after"),
+            AssistSavedFile(fileURL: edited, before: "before", after: "after"),
+            AssistSavedFile(fileURL: gone, before: nil, after: "after"),
+            AssistSavedFile(fileURL: folderNow, before: nil, after: "after"),
+        ]
+        let change: AssistChange = AssistChange(
+            whatHappened: "x", courseCode: "ICS3U", sectionNumber: 1, rebuildsThePreview: true, files: files
+        )
+        let entry: StartOfYearUndoRegistry.Entry = StartOfYearUndoRegistry.Entry(
+            change: change, backupFileName: "b.zip", visibilityAfter: "", scheduledDeploy: nil
+        )
+        let sorted: (putBack: [URL], skipped: [URL]) = StartOfYearPreparation.whatAnUndoWouldDo(entry)
+        XCTAssertEqual(sorted.putBack, [untouched])
+        XCTAssertEqual(sorted.skipped, [edited, folderNow])
     }
 
     // MARK: - Fixtures
