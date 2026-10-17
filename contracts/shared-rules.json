@@ -25442,7 +25442,7 @@
       "waitingForInput": "Waiting for your answer…",
       "endInput": "No more input",
       "notLiveBecause": "students type this page's input in a box before Run, because the page also shows {what} - put that on a page of its own to let students answer as the program asks",
-      "notLiveFrame": "a video or page from another website",
+      "notLiveFrame": "a video, a PDF or another web page in a frame",
       "notLivePicture": "a picture from another website",
       "notLiveOther": "something from another website",
       "notLiveCapped": "{count} page(s) with code students run take their input in a box before Run on this Cloudflare website, which can be set up for only so many pages - publishing to Netlify lets every page ask as the program runs"
