@@ -787,9 +787,26 @@ function loadScript(doc: Document, source: string): Promise<void> {
   })
 }
 
+// Where a stylesheet link was REALLY fetched from. A link Quartz keeps
+// across its page changes (spa-preserve: index.css, and since #494 KaTeX's
+// own stylesheet) has a relative href, which after a change of page resolves
+// against the NEW page's address - one folder off, a 404 in the print frame
+// (#455 review S1, measured). The sheet remembers the address it came from.
+function fetchedFrom(link: HTMLLinkElement): string {
+  try {
+    const sheet = link.sheet as CSSStyleSheet | null
+    if (sheet && sheet.href) {
+      return sheet.href
+    }
+  } catch {
+    // A sheet from another origin may refuse to be read; its href is absolute.
+  }
+  return link.href
+}
+
 function indexStylesheet(): string | null {
   for (const link of document.head.querySelectorAll('link[rel="stylesheet"]')) {
-    const href = (link as HTMLLinkElement).href
+    const href = fetchedFrom(link as HTMLLinkElement)
     if (/\/index\.css(\?|$)/.test(href)) {
       return href
     }
@@ -826,10 +843,21 @@ function makeFrame(paper: Paper): HTMLIFrameElement {
 // The handout's own faces go in the same way, by full address.
 function copyPageStylesheets(doc: Document, indexCss: string | null, root: string) {
   for (const element of document.head.querySelectorAll('link[rel="stylesheet"], style')) {
-    if (element instanceof HTMLLinkElement && element.href === indexCss) {
-      continue
+    let copy: HTMLElement
+    if (element instanceof HTMLLinkElement) {
+      const href = fetchedFrom(element)
+      if (href === indexCss) {
+        continue
+      }
+      // A fresh link to the address the sheet came from, never a copy of a
+      // relative href (see fetchedFrom).
+      const link = doc.createElement("link")
+      link.rel = "stylesheet"
+      link.href = href
+      copy = link
+    } else {
+      copy = doc.importNode(element, true) as HTMLElement
     }
-    const copy = doc.importNode(element, true) as HTMLElement
     copy.setAttribute("data-pagedjs-ignore", "")
     doc.head.appendChild(copy)
   }
