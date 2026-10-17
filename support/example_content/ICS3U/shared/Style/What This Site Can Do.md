@@ -1,6 +1,7 @@
 ---
 title: What This Site Can Do
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - reference
@@ -40,9 +41,10 @@ search.
 ## Code, coloured and exact
 
 This is the feature a programming course lives on — runnable examples
-with the spacing and quotation marks preserved, coloured by meaning:
+with the spacing and quotation marks preserved, coloured by meaning.
+Type your name in the input box under it, then press Run:
 
-```python
+```python run
 name = input("What is your name? ")
 if len(name) > 0:
     print(f"Hello, {name}!")
@@ -61,8 +63,11 @@ Traceback (most recent call last):
 ValueError: invalid literal for int() with base 10: 'abc'
 ```
 
-**How that was made:** three backticks and the language name, the
-code, then three backticks to close. Every page in
+**How that was made:** three backticks, the language name and the word
+`run` (` ```python run `), the code, then three backticks to close — and
+`codeRunner: true` in the settings block at the top of the page, which
+is what gives students the Run button. Without `run`, the same block is
+ordinary coloured code, like the traceback above. Every page in
 [[Programs/index|Programs]] is built on this.
 
 ---

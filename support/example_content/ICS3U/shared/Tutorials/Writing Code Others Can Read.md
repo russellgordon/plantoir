@@ -1,6 +1,7 @@
 ---
 title: Writing Code Others Can Read
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tutorials
@@ -87,9 +88,11 @@ stranger.
 ## Output is part of the code
 
 Everything above is for programmers. The person using your program
-reads something else entirely — your prompts and your messages:
+reads something else entirely — your prompts and your messages. Type a
+number of hours in the input box, then try `twelve`, pressing Run each
+time:
 
-```python
+```python run
 hours = input("How many hours did you work? ")
 if hours.isdigit():
     pay = int(hours) * 17.20

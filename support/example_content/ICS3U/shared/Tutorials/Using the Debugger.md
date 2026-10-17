@@ -1,6 +1,7 @@
 ---
 title: Using the Debugger
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tutorials
@@ -19,7 +20,7 @@ professionals still use it daily. It costs nothing and it works
 everywhere. Here is a program that runs perfectly and gives the wrong
 answer:
 
-```python
+```python run
 total = 0
 for score in [8, 9, 10]:
     total = score
@@ -86,7 +87,7 @@ you would remove leftover prints.
 You have already seen a call stack, in every traceback you have read.
 This program:
 
-```python
+```python run
 def total_minutes(sessions):
     total = 0
     for minutes in sessions:

@@ -1,6 +1,7 @@
 ---
 title: Starting from a Skeleton
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tutorials
@@ -11,7 +12,7 @@ thinking left for you to do.
 
 ## What a skeleton looks like
 
-```python
+```python run
 """Ticket pricing — Unit 1.
 
 Reads the customer's age, decides the price, prints it.

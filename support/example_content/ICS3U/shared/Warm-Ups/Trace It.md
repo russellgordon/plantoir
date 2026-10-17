@@ -1,6 +1,7 @@
 ---
 title: Trace It
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - warm-ups
@@ -13,7 +14,7 @@ reliable way to find out what a loop is actually doing.
 
 ## The program
 
-```python
+```python run
 total = 0
 for number in range(1, 6):
     if number % 2 == 0:

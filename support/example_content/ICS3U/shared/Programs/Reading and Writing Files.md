@@ -1,6 +1,7 @@
 ---
 title: Reading and Writing Files
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -12,7 +13,10 @@ still there tomorrow, next week, and after the computer is restarted.
 
 ## The program
 
-```python
+To run it, type a title and a number of days on two lines of the input
+box — `Fifteen Dogs` and `14`, say — then press Run.
+
+```python run readonly
 # Shelf-reminder list for Mr. Whitfield. The file holds TITLES and a
 # number of days — never who borrowed what. That is a decision, taken
 # with him, and it is written here so nobody "improves" it by adding
@@ -47,6 +51,10 @@ days = input("Back in how many days? ")
 add_reminder(title, days)
 show_reminders()
 ```
+
+Here each Run starts with no saved file, so the site always shows the
+first run. On your own computer, run it twice and the list is still
+there.
 
 The second time it is run, with one reminder already saved:
 
