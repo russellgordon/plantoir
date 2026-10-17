@@ -421,6 +421,141 @@ class CodePageTests(unittest.TestCase):
         self.assertIn("> > [!explain]", first.split("\n\n")[0])
 
 
+def fake_course(folder: Path, code: str) -> Path:
+    """A course the way the guards read one: a course_config.json is enough."""
+    course_dir = folder / "courses" / code
+    course_dir.mkdir(parents=True, exist_ok=True)
+    (course_dir / "course_config.json").write_text(json.dumps({"course_code": code}) + "\n", encoding="utf-8")
+    return course_dir
+
+
+class PlantedPageTests(unittest.TestCase):
+    """Our own planted pages kept up to date (#587): Check Your Loops gained
+    a fifth question, and the kept marketing folder holds the four-question
+    page it was planted with, which write-if-absent would never replace."""
+
+    LOOPS = mf.HERE / "marketing" / "Check Your Loops.md"
+
+    def test_a_kept_page_that_is_an_earlier_version_is_brought_up_to_date(self):
+        earlier = "---\ntitle: Check Your Loops\n---\nFour quick questions.\n"
+
+        def versions(path: Path) -> list:
+            return [self.LOOPS.read_text(encoding="utf-8"), earlier] if path == self.LOOPS else []
+
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            kept = fake_course(folder, "ICS3U") / "Exercises" / "Check Your Loops.md"
+            kept.parent.mkdir(parents=True)
+            kept.write_text(earlier, encoding="utf-8")
+            fake_course(folder, "ICS4U")
+            report = mf.Report()
+            mf.add_code_pages(folder, report, earlier_versions=versions)
+            self.assertEqual(kept.read_text(encoding="utf-8"), self.LOOPS.read_text(encoding="utf-8"))
+            self.assertIn("made: ICS3U/Exercises/Check Your Loops.md (brought up to date)", report.lines)
+            again = mf.Report()
+            mf.add_code_pages(folder, again, earlier_versions=versions)
+        self.assertIn("already there: ICS3U/Exercises/Check Your Loops.md", again.lines)
+        self.assertEqual(again.made, 0, again.lines)
+
+    def test_a_kept_page_somebody_changed_is_left_alone_and_named(self):
+        earlier = "---\ntitle: Check Your Loops\n---\nFour quick questions.\n"
+        changed = earlier + "Russell's own fifth question.\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            kept = fake_course(folder, "ICS3U") / "Exercises" / "Check Your Loops.md"
+            kept.parent.mkdir(parents=True)
+            kept.write_text(changed, encoding="utf-8")
+            fake_course(folder, "ICS4U")
+            report = mf.Report()
+            mf.add_code_pages(folder, report, earlier_versions=lambda path: [earlier])
+            self.assertEqual(kept.read_text(encoding="utf-8"), changed)
+        self.assertIn("left as you changed it: ICS3U/Exercises/Check Your Loops.md", report.lines)
+
+    @unittest.skipIf(not (REPO / ".git").exists(), "needs the repository's history")
+    def test_git_holds_the_four_question_page_the_kept_folder_was_given(self):
+        versions = mf.git_versions(self.LOOPS)
+        self.assertTrue(any("Four quick questions" in version for version in versions),
+                        "the page as #562 planted it is in the history, so a kept copy of it is refreshed")
+
+    def test_the_demo_quiz_pages_are_written_when_absent_and_never_over_a_changed_page(self):
+        pages = mf.demo_folders.planted_pages()
+        self.assertEqual([(page["course"], page["place"]) for page in pages], [
+            ("MCV4U", "Exercises/Check Your Curve Sketching.md"),
+            ("SCH3U", "Exercises/Check Your Stoichiometry.md"),
+            ("ENG2D", "Exercises/Check Your Reading.md"),
+        ])
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            fake_course(folder, "MCV4U")
+            sch3u = fake_course(folder, "SCH3U")
+            changed = sch3u / "Exercises" / "Check Your Stoichiometry.md"
+            changed.parent.mkdir(parents=True)
+            changed.write_text("somebody's own page\n", encoding="utf-8")
+            report = mf.Report()
+            mf.demo_folders.apply_planted_pages(folder, report, earlier_versions=lambda path: [])
+            curve = folder / "courses" / "MCV4U" / "Exercises" / "Check Your Curve Sketching.md"
+            self.assertEqual(curve.read_text(encoding="utf-8"),
+                             (mf.HERE / "demo" / "Check Your Curve Sketching.md").read_text(encoding="utf-8"))
+            self.assertEqual(changed.read_text(encoding="utf-8"), "somebody's own page\n")
+            self.assertFalse((folder / "courses" / "ENG2D").exists(), "a course not made yet is passed over")
+            self.assertEqual(mf.demo_folders.planted_page_problems(folder), [])
+        self.assertIn("made: MCV4U/Exercises/Check Your Curve Sketching.md", report.lines)
+        self.assertIn("left as you changed it: SCH3U/Exercises/Check Your Stoichiometry.md", report.lines)
+
+
+class QuizPageTests(unittest.TestCase):
+    """Every planted quiz page is one the site can check (#587): the folder
+    check finds every quiz and no problem in any of them, so a figure is
+    never of a quiz that says it cannot be checked."""
+
+    PAGES = {
+        "demo/Check Your Curve Sketching.md": 3,
+        "demo/Check Your Stoichiometry.md": 3,
+        "demo/Check Your Reading.md": 3,
+        "marketing/Check Your Loops.md": 5,
+    }
+
+    @staticmethod
+    def check(texts: dict) -> dict:
+        import contracts
+        import quizzes
+        import toolchain_paths
+        before = toolchain_paths.CONTRACTS_DIR
+        toolchain_paths.CONTRACTS_DIR = str(REPO / "contracts")
+        contracts.reset_cache()
+        try:
+            pages: list[dict] = []
+            for place, text in texts.items():
+                pages.append({"place": place, "path": place, "text": text, "source": text})
+            return quizzes.check_pages(pages, printer=lambda line: None)
+        finally:
+            toolchain_paths.CONTRACTS_DIR = before
+            contracts.reset_cache()
+
+    def test_every_planted_quiz_page_checks_out(self):
+        texts: dict = {}
+        for place in self.PAGES:
+            path = mf.HERE / place
+            self.assertTrue(path.is_file(), f"{place} is missing")
+            texts[place] = path.read_text(encoding="utf-8")
+        result = self.check(texts)
+        self.assertEqual(result["problems"], [])
+        for place, count in self.PAGES.items():
+            with self.subTest(page=place):
+                self.assertEqual(result["pages"][place]["quizzes"], count)
+        loops = texts["marketing/Check Your Loops.md"]
+        fifth = loops[loops.rindex("> [!quiz]"):]
+        self.assertIn("> ```python run\n", fifth, "the last question carries a program students run")
+        self.assertIn("\ncodeRunner: true\n", loops.split("\n---", 1)[0] + "\n")
+
+    def test_a_broken_quiz_is_found(self):
+        place = "demo/Check Your Curve Sketching.md"
+        text = (mf.HERE / place).read_text(encoding="utf-8")
+        broken = text.replace("> > [!answer]-\n> > 9\n", "", 1)
+        self.assertNotEqual(broken, text)
+        self.assertEqual(len(self.check({place: broken})["problems"]), 1)
+
+
 def cached_ced() -> Path | None:
     candidates = []
     if os.environ.get("PLANTOIR_CED_PDF"):
