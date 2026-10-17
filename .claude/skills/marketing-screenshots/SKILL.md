@@ -210,12 +210,17 @@ python3 website/shots/capture.py --app      # the hero and the older app windows
 python3 website/shots/capture.py --sites    # the class sites and the phone
 python3 website/shots/capture.py --print-set   # what printing does: a preview of MPM2D (~/Plantoir Print)
 python3 website/shots/capture.py --code        # the Code page: previews of ICS3U and ICS4U (~/Plantoir Marketing)
+python3 website/shots/capture.py --quizzes     # the Quizzes page: previews of MCV4U, SCH3U, ENG2D (~/Desktop/Teaching) and ICS3U
 ```
 
 `--code` judges itself like `--print-set`: a prepare script presses Run or
 Check and must see "Finished." (or the quiz's "Right!") before the picture,
 and Vision must read `expectText`. Still look: the block, its output and the
 heading above it should all be in the window, with no focus ring.
+`--quizzes` judges itself the same way and also refuses a quiz too tall for
+the window; still look: the question's top, the graph or passage, the marks
+beside each blank and the open explanation should all be in frame, and the
+demo folder must be the demo folder (it refuses one that is not).
 
 The scenes re-take one at a time too: `capture.py --only reference,two-maps`
 (names in `website/shots/scenes.py`). **Unlike `--app`, a scenes run judges

@@ -270,7 +270,7 @@ class RedirectTests(unittest.TestCase):
         # points at /printing/, so an old link still lands somewhere useful.
         site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
         self.assertIn({"from": "interactive", "to": "visualizations"}, build.moved_pages(site))
-        self.assertEqual(site["nav"], ["index", "features", "visualizations", "printing", "code",
+        self.assertEqual(site["nav"], ["index", "features", "visualizations", "printing", "quizzes", "code",
                                        "day-to-day", "deploying", "support"])
         self.assertFalse((build.WEBSITE / "pages" / "interactive.html").exists())
         visualizations = (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8")
@@ -433,6 +433,12 @@ WINDOWS_PICTURE_OWED: dict = {
     "code-python-error": "Windows carries no Python for runnable blocks yet (#568)",
     "code-swift": "Windows makes no Swift block runnable yet (#570)",
     "code-quiz": "no Windows capture of the marketing folder's previews yet",
+    # The Quizzes page (#587): previews of the demo and marketing folders'
+    # planted quiz pages. Owed by the windows issue that follows #587.
+    "quiz-math": "no Windows quizzes until #571; no Windows capture of the previews",
+    "quiz-chemistry": "no Windows quizzes until #571; no Windows capture of the previews",
+    "quiz-english": "no Windows quizzes until #571; no Windows capture of the previews",
+    "quiz-code-run": "no Windows quizzes until #571; no Windows capture of the previews",
 }
 
 
@@ -459,6 +465,46 @@ class CodePagePictureTests(unittest.TestCase):
                         self.assertTrue(picture.is_file(), f"{picture.name} is missing")
 
 
+class QuizzesPagePictureTests(unittest.TestCase):
+
+    def test_every_picture_on_the_quizzes_page_is_there_in_both_appearances(self):
+        # #587: one figure per subject, each a planted quiz page just checked,
+        # photographed in light AND dark (capture.py --quizzes), and the Code
+        # page's code-quiz again for code highlighted in a question's stem.
+        import re
+        page = (build.WEBSITE / "pages" / "quizzes.html").read_text(encoding="utf-8")
+        identifiers = re.findall(r"\{\{shot:([a-z0-9-]+)\}\}", page)
+        self.assertEqual(identifiers, ["quiz-math", "quiz-chemistry", "quiz-english", "code-quiz", "quiz-code-run"])
+        manifest = json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))
+        shots = {shot["id"]: shot for shot in manifest["shots"]}
+        for identifier in identifiers:
+            with self.subTest(shot=identifier):
+                expected_scene = "code" if identifier == "code-quiz" else "quizzes"
+                self.assertEqual(shots[identifier]["capture"]["scene"], expected_scene)
+                self.assertNotIn("awaiting_capture", shots[identifier])
+                for suffix in ("light", "dark"):
+                    for extension in ("png", "webp"):
+                        picture = build.IMAGE_DIR / f"{identifier}-{suffix}.{extension}"
+                        self.assertTrue(picture.is_file(), f"{picture.name} is missing")
+
+
+class FrontPageQuizTests(unittest.TestCase):
+
+    def test_the_front_page_shows_a_quiz_and_links_the_quizzes_page(self):
+        index = (build.WEBSITE / "pages" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("{{shot:quiz-chemistry}}", index)
+        self.assertIn('href="{{up}}quizzes/"', index)
+
+    def test_how_to_write_a_quiz_is_the_quizzes_page(self):
+        features = (build.WEBSITE / "pages" / "features.html").read_text(encoding="utf-8")
+        self.assertIn('href="{{up}}quizzes/"', features)
+        self.assertIn('href="{{up}}quizzes/"', (build.WEBSITE / "pages" / "code.html").read_text(encoding="utf-8"))
+        self.assertIn('href="{{up}}quizzes/"', (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8"))
+        for page in sorted((build.WEBSITE / "pages").glob("*.html")):
+            with self.subTest(page=page.name):
+                self.assertNotIn("code/#quizzes", page.read_text(encoding="utf-8"))
+
+
 class PreviewPageSceneTests(unittest.TestCase):
     """A `preview-page` shot is a page of ONE local preview, named by its
     scene. The print set (both platforms) previews MPM2D only, so it must
@@ -473,7 +519,7 @@ class PreviewPageSceneTests(unittest.TestCase):
         for shot in self.manifest_shots():
             if shot["capture"].get("kind") in ("preview-page", "handout"):
                 with self.subTest(shot=shot["id"]):
-                    self.assertIn(shot["capture"].get("scene"), ("print-set", "code"))
+                    self.assertIn(shot["capture"].get("scene"), ("print-set", "code", "quizzes"))
 
     def test_the_windows_print_set_takes_only_its_own(self):
         sys.path.insert(0, str(build.WEBSITE / "shots"))
@@ -491,6 +537,20 @@ class PreviewPageSceneTests(unittest.TestCase):
         for shot in capture.shots_of_kind("preview-page", scene="code"):
             with self.subTest(shot=shot["id"]):
                 self.assertTrue((capture.PREPARE_DIR / shot["capture"]["prepare"]).is_file())
+
+    @unittest.skipUnless(sys.platform == "darwin", "capture.py is the Mac's")
+    def test_the_quiz_set_takes_one_figure_per_subject_from_its_folder(self):
+        sys.path.insert(0, str(build.WEBSITE / "shots"))
+        import capture
+        shots = capture.shots_of_kind("preview-page", scene="quizzes")
+        found: list = []
+        for shot in shots:
+            found.append((shot["id"], shot["capture"]["workspace"], shot["capture"]["course"]))
+            with self.subTest(shot=shot["id"]):
+                self.assertTrue((capture.PREPARE_DIR / shot["capture"]["prepare"]).is_file())
+                self.assertIs(shot.get("windows"), False)
+        self.assertEqual(found, [("quiz-math", "demo", "MCV4U"), ("quiz-chemistry", "demo", "SCH3U"),
+                                 ("quiz-english", "demo", "ENG2D"), ("quiz-code-run", "marketing", "ICS3U")])
 
 
 class WindowsSwapTests(unittest.TestCase):
