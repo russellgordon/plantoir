@@ -3616,7 +3616,8 @@ free_gigabytes_for_builders() {
 
 prepare_runnable_swift() {
   local planned root="" cache="" jobs="" count=0 key value
-  planned="$(docker exec "$CONTAINER_NAME" python3 /opt/scripts/swift_blocks.py plan --course="$COURSE" --format=lines 2>/dev/null)" || return 0
+  # --full-rebuild also compiles every block that failed before (programs stay).
+  planned="$(docker exec "$CONTAINER_NAME" python3 /opt/scripts/swift_blocks.py plan --course="$COURSE" --format=lines $FULL_REBUILD 2>/dev/null)" || return 0
   while IFS='=' read -r key value; do
     case "$key" in
       root) root="$value" ;;
@@ -3636,6 +3637,10 @@ prepare_runnable_swift() {
     return 0
   fi
   local swift_image="${SWIFT_TAG_PREFIX}$(toolchain_hash "$context")"
+  # One log per run (implementation review N3: two launchers once wrote into
+  # one file at once); swift_blocks.py's plan removes them after a day.
+  local logs="$root/logs"
+  mkdir -p "$logs" 2>/dev/null || true
 
   if ! docker image inspect "$swift_image" >/dev/null 2>&1; then
     local free
@@ -3657,11 +3662,12 @@ prepare_runnable_swift() {
       if ! docker buildx version >/dev/null 2>&1; then
         build_cmd=(env DOCKER_BUILDKIT=1 docker build)
       fi
-      if "${build_cmd[@]}" --progress=plain -t "$swift_image" "$context" >"$root/last-swift-build.log" 2>&1; then
+      if "${build_cmd[@]}" --progress=plain -t "$swift_image" "$context" >"$logs/swift-build-$$.log" 2>&1; then
         echo "✅ Swift is ready."
         prune_superseded_swift_images "$swift_image"
       else
         give_back_the_swift_build_lock
+        printf '{"state": "notDownloaded"}\n' > "$root/state.json" 2>/dev/null || true
         echo "⚠️  Could not get Swift ready — the first time needs an internet connection. The rest of the site builds as usual; preview again once online to make its Swift programs runnable."
         rm -rf "$jobs"
         return 0
@@ -3675,7 +3681,7 @@ prepare_runnable_swift() {
   echo "🦅 Making ${count} Swift ${noun} ready to run…"
   if docker run --rm --network none \
       --mount "$(bind_mount_argument "$root" "$root")" \
-      "$swift_image" python3 /opt/plantoir-swift/compile.py "$jobs" "$cache" >"$root/last-compile.log" 2>&1; then
+      "$swift_image" python3 /opt/plantoir-swift/compile.py "$jobs" "$cache" >"$logs/compile-$$.log" 2>&1; then
     :
   else
     echo "⚠️  Could not make the Swift programs ready to run this time; the build will say which ones."

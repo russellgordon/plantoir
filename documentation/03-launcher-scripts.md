@@ -1796,14 +1796,18 @@ round passed it).
   runnable code — the first time downloads about 1.3 GB and takes a few
   minutes…") after asking the website builder for its free space (`df` of its
   root; under 6 GB it builds nothing, writes `{state: noRoom}` into the
-  cache's `state.json` and says so - review S9), under a lock in
+  cache's `state.json` and says so - review S9; the check runs before ANY
+  missing-image build, even one that would reuse cached layers; a build that
+  fails writes `{state: notDownloaded}`), under a lock in
   `/tmp/plantoir-swift-build-<uid>.lock` so two launchers never download it
   side by side (review S3; a lock whose holder has gone is taken over, and a
   wait longer than 20 minutes gives up with a line) - then compiles with one
   `docker run --rm --network none` mounting the course's `.swift-cache` at
   its own path (the builds-root rule; it is under `$HOME`, so Colima can see
-  it). Its own output goes to `last-swift-build.log` and `last-compile.log`
-  beside the cache, not to the console: the console says "🦅 Making N Swift
+  it). Its own output goes to `logs/swift-build-<pid>.log` and
+  `logs/compile-<pid>.log` beside the cache - one per run, so two launchers
+  never write into one file (implementation review N3); plan removes them
+  after a day - not to the console: the console says "🦅 Making N Swift
   programs ready to run…" and, if anything went wrong, one plain line.
   **Nothing here ever stops the preview**: an image that could not be built
   (offline), too little room, or a compile that failed all leave the build to

@@ -372,6 +372,84 @@ class PrepareTests(unittest.TestCase):
                       contracts.section("shared-rules", "siteHealth", "repair", "neverOffered", "checks"))
 
 
+class GroupingNotesAndCacheCaseTests(unittest.TestCase):
+    """The finding says a shared cause once (groupingCases, implementation
+    review S4); the note lines (noteCases, S2 and N2); what plan compiles
+    again (cacheCases, S3)."""
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contract()
+
+    def setUp(self):
+        self.space = Course()
+
+    def tearDown(self):
+        self.space.remove()
+
+    def test_every_grouping_case_holds(self):
+        import site_health
+        check = [entry for entry in contracts.section("shared-rules", "siteHealth", "checks")
+                 if entry["name"] == "swiftCouldNotBePrepared"][0]
+        self.assertGreaterEqual(len(check["groupingCases"]), 3)
+        for case in check["groupingCases"]:
+            with self.subTest(case=case["name"]):
+                found = site_health.swift_finding({"swift_problems": case["problems"]}, "ICS4U", 1,
+                                                  site_health._checks_by_name())
+                self.assertEqual(found.detail, case["detail"])
+
+    def test_every_cache_case_holds(self):
+        for case in swift_rules("cacheCases"):
+            with self.subTest(case=case["name"]):
+                shutil.rmtree(self.space.cache_root, ignore_errors=True)
+                self.space.page("Strings.md", OPTED + f"```swift run\n{BLOCK_ONE}\n```\n")
+                key = swift_blocks.key_of(BLOCK_ONE)
+                if case["entry"] is not None:
+                    self.space.cache().mkdir(parents=True, exist_ok=True)
+                    (self.space.cache() / f"{key}.json").write_text(json.dumps(case["entry"]))
+                planned = swift_blocks.plan(self.space.course, self.space.cache_root,
+                                            full_rebuild=case["fullRebuild"])
+                self.assertEqual(planned["count"] == 1, case["compiledAgain"])
+
+    def test_a_large_program_is_named_on_a_note_line(self):
+        notes = swift_rules("notes")
+        for case in swift_rules("noteCases"):
+            if "bytes" not in case:
+                continue
+            with self.subTest(case=case["name"]):
+                self.space.said.clear()
+                shutil.rmtree(self.space.cache_root, ignore_errors=True)
+                self.space.compiled(BLOCK_ONE, sdk="full", data=b"\0asm" + b"x" * (case["bytes"] - 4))
+                outcome = self.space.prepare([PrepareTests.page(f"```swift run\n{BLOCK_ONE}\n```\n")])
+                lines = [line for line in self.space.said if line.startswith("plantoir: note:")]
+                if case["note"]:
+                    want = "plantoir: note: Units/Strings.md: swift block 1: " + notes["large"].replace("{megabytes}", case["megabytes"])
+                    self.assertEqual(lines, [want])
+                else:
+                    self.assertEqual(lines, [])
+                self.assertEqual(outcome["problems"], [], "a note is not a folder problem")
+
+    def test_the_previous_recipes_program_is_served_until_this_one_compiles(self):
+        case = [case for case in swift_rules("noteCases") if case.get("served")][0]
+        old = self.space.cache_root / "0123456789abcdef"
+        old.mkdir(parents=True)
+        bodies = [BLOCK_ONE, BLOCK_TWO][:case["fromBefore"]]
+        for body in bodies:
+            key = swift_blocks.key_of(body)
+            (old / f"{key}.wasm").write_bytes(b"\0asm old")
+            (old / f"{key}.json").write_text(json.dumps({"ok": True, "sdk": "embedded"}))
+        page = "".join(f"```swift run\n{body}\n```\n" for body in bodies)
+        outcome = self.space.prepare([PrepareTests.page(page)])
+        self.assertEqual(outcome["problems"], [])
+        self.assertEqual(outcome["fromBefore"], case["fromBefore"])
+        self.assertEqual(sorted(path.read_bytes() for path in self.space.static().iterdir()),
+                         [b"\0asm old"] * case["fromBefore"])
+        notes = [line for line in self.space.said if line.startswith("plantoir: note:")]
+        self.assertEqual(notes, ["plantoir: note: " + swift_rules("notes", "fromBefore").replace(
+            "{count}", str(case["fromBefore"]))])
+        self.assertTrue(old.exists(), "the old folder is kept while it is still being served")
+
+
 class RecipeTests(unittest.TestCase):
     """The Swift image's recipe holds every pin and flag the contract names."""
 
@@ -449,6 +527,11 @@ embedded = "Embedded" in args
 if "-c" in args:
     sources = [a for a in args if a.endswith(".swift")]
     text = "".join(Path(s).read_text() for s in sources)
+    if "KILLED" in text:
+        import os, signal
+        os.kill(os.getpid(), signal.SIGKILL)
+    if "SILENT_FAIL" in text:
+        sys.exit(1)
     if "BOTH_FAIL" in text or ("EMBEDDED_FAILS" in text and embedded):
         print("main.swift:2:7: error: cannot find 'nmae' in scope", file=sys.stderr)
         sys.exit(1)
@@ -542,9 +625,14 @@ class CompileStepTests(unittest.TestCase):
 
     def test_a_failure_that_is_not_the_compilers_is_never_cached(self):
         self.job("e" * 64, 'print("x") // OPT_FAILS')
+        self.job("f" * 64, 'print("x") // KILLED')
+        self.job("0" * 64, 'print("x") // SILENT_FAIL')
         self.compile.main(["compile.py", str(self.jobs), str(self.out)])
         self.assertIsNone(self.entry("e" * 64), "a wasm-opt failure was cached as the code's fault")
         self.assertFalse((self.out / ("e" * 64 + ".wasm")).exists())
+        self.assertIsNone(self.entry("f" * 64), "a compiler killed by a signal was cached as the code's fault")
+        self.assertIsNone(self.entry("0" * 64), "a failure with no diagnostics was cached as the code's fault")
+        self.assertEqual(list(self.out.glob(".*.tmp")), [], "a temporary file was left behind")
 
 
 if __name__ == "__main__":

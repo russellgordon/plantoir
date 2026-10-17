@@ -87,6 +87,9 @@ for (const [name, wants] of Object.entries(expected)) {
     if (!result.crashed) {
       failures.push(`${name}: expected a trap, got exit ${result.exit}`)
       verdict = "NO TRAP"
+    } else if (wants.noFatal && (stdout + stderr).includes("Fatal error")) {
+      failures.push(`${name}: trapped WITH a Fatal error line - the known limit about silent overflow is out of date`)
+      verdict = "TRAP, FATAL LINE"
     } else if (wants.fatal && !(stdout + stderr).includes(wants.fatal)) {
       failures.push(`${name}: trapped without "${wants.fatal}" in its output`)
       verdict = "TRAP, NO FATAL LINE"

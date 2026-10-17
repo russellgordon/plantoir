@@ -11,8 +11,9 @@
 //   Embedded binaries import 8: args_get, args_sizes_get, fd_fdstat_get,
 //   fd_read, fd_seek, fd_write, proc_exit, random_get. Full-library binaries
 //   import 6 more: environ_get, environ_sizes_get, fd_close, fd_prestat_get,
-//   fd_prestat_dir_name, path_open. Neither imports clock_time_get today; it
-//   is here so a toolchain that does never fails to link. Any OTHER
+//   fd_prestat_dir_name, path_open. A program that imports Foundation also
+//   imports clock_time_get (15 imports; measured by the implementation
+//   review), which is implemented below. Any OTHER
 //   wasi_snapshot_preview1 import answers ENOSYS, filled in from the module's
 //   own import list.
 //

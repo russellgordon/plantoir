@@ -70,6 +70,8 @@ import toolchain_paths  # noqa: E402
 FENCE = "swift"
 CACHE_FOLDER = ".swift-cache"
 JOBS_FOLDER = "jobs"
+# The launcher's logs, one per run (implementation review N3).
+LOGS_FOLDER = "logs"
 STATE_FILE = "state.json"
 STATIC_FOLDER = "swift-wasm"
 MANIFEST = Path("plantoir-runners") / "swift.json"
@@ -198,7 +200,38 @@ def blocks_to_compile(texts) -> list:
     return programs
 
 
-def plan(course_dir, cache_root, swift_dir=None, now=None) -> dict:
+def is_cached(entry) -> bool:
+    """Does a cache entry name its block's outcome? A program, or the
+    compiler's verdict WITH its words. An entry with no diagnostics (written
+    by an earlier compile.py when the compiler was killed) is a miss
+    (implementation review S3)."""
+    if not isinstance(entry, dict):
+        return False
+    if entry.get("ok"):
+        return True
+    return bool(str(entry.get("diagnostics") or "").strip())
+
+
+def clear_failures(cache: Path) -> int:
+    """--full-rebuild: every cached FAILURE goes, so each is compiled again;
+    programs stay, because a key names its code and its recipe."""
+    cleared = 0
+    try:
+        entries = sorted(cache.glob("*.json"))
+    except OSError:
+        return 0
+    for path in entries:
+        entry = _read_json(path)
+        if isinstance(entry, dict) and entry.get("ok") is False:
+            try:
+                path.unlink()
+                cleared += 1
+            except OSError:
+                pass
+    return cleared
+
+
+def plan(course_dir, cache_root, swift_dir=None, now=None, full_rebuild=False) -> dict:
     """
     Write a job for every Swift block the cache does not hold, into a job
     folder of this run's own. Answers {"root", "cache", "jobs", "count"}:
@@ -209,6 +242,8 @@ def plan(course_dir, cache_root, swift_dir=None, now=None) -> dict:
     now = time.time() if now is None else now
     root = Path(cache_root)
     cache = root / toolchain_id(swift_dir)
+    if full_rebuild:
+        clear_failures(cache)
     texts = []
     for page in course_pages(course_dir):
         try:
@@ -217,7 +252,7 @@ def plan(course_dir, cache_root, swift_dir=None, now=None) -> dict:
             continue
     waiting = []
     for key, program in blocks_to_compile(texts):
-        if (cache / f"{key}.json").is_file():
+        if is_cached(_read_json(cache / f"{key}.json")):
             continue
         waiting.append((key, program))
     # A new run: whatever the last one could not do is said again only if it
@@ -238,17 +273,21 @@ def plan(course_dir, cache_root, swift_dir=None, now=None) -> dict:
 
 
 def _remove_orphan_jobs(root: Path, now: float) -> None:
-    folder = root / JOBS_FOLDER
-    try:
-        runs = list(folder.iterdir())
-    except OSError:
-        return
-    for run in runs:
+    """A killed run's job folder, and launcher logs, after a day."""
+    for folder in (root / JOBS_FOLDER, root / LOGS_FOLDER):
         try:
-            if now - run.stat().st_mtime > ORPHAN_JOB_SECONDS:
-                shutil.rmtree(run, ignore_errors=True)
+            runs = list(folder.iterdir())
         except OSError:
-            pass
+            continue
+        for run in runs:
+            try:
+                if now - run.stat().st_mtime > ORPHAN_JOB_SECONDS:
+                    if run.is_dir():
+                        shutil.rmtree(run, ignore_errors=True)
+                    else:
+                        run.unlink()
+            except OSError:
+                pass
 
 
 # ---- prepare: the build's half -----------------------------------------------------
@@ -261,12 +300,15 @@ def _reasons() -> dict:
 def missing_reason(state, windows: bool) -> str:
     """Why a block has no binary (codeRunnerBlocks.swift.reasonCases): Windows
     cannot compile Swift yet (option (b), #493); the launcher found too little
-    free space; or it could not compile at all (the Swift builder could not be
-    made - offline - or no launcher ran, as in deploy.py's own rebuild)."""
+    free space; the Swift builder could not be downloaded; or no program and
+    nothing recorded (a compile that did not finish, or no launcher ran, as
+    in deploy.py's own rebuild)."""
     if windows:
         return "notOnWindows"
     if isinstance(state, dict) and state.get("state") == "noRoom":
         return "noRoom"
+    if isinstance(state, dict) and state.get("state") == "notDownloaded":
+        return "notDownloaded"
     return "notCompiled"
 
 
@@ -352,10 +394,15 @@ def prepare(pages: list, output_dir, cache_root, swift_dir=None, windows=None, p
     except Exception:
         gigabytes = ""
     static = Path(output_dir) / "quartz" / "static" / STATIC_FOLDER
+    notes = _notes()
+    older = _older_caches(root, cache)
     manifest = {}
     wanted = {}
     problems = []
     blocks = 0
+    from_before = 0
+    not_in_this_cache = 0
+    large = []
     for page in pages:
         for block in swift_fences(page.get("body") or "", page_features.opts_in(page.get("codeRunner"))):
             blocks += 1
@@ -374,7 +421,27 @@ def prepare(pages: list, output_dir, cache_root, swift_dir=None, windows=None, p
                     os.utime(cache / f"{key}.wasm", None)
                 except OSError:
                     pass
+                _note_if_large(large, page, block, cache / f"{key}.wasm")
                 continue
+            if not is_cached(entry):
+                not_in_this_cache += 1
+                # The previous recipe's program for the same code is SERVED
+                # until this recipe compiles it (implementation review N2):
+                # the site keeps working through an offline preview or a
+                # full disk after Plantoir was updated.
+                served = None
+                for folder in older:
+                    candidate = _read_json(folder / f"{key}.json")
+                    if isinstance(candidate, dict) and candidate.get("ok") and (folder / f"{key}.wasm").is_file():
+                        served = (folder, candidate)
+                        break
+                if served is not None:
+                    folder, candidate = served
+                    wanted[f"{key}.wasm"] = folder / f"{key}.wasm"
+                    manifest[key] = {"ok": True, "file": f"{key}.wasm", "sdk": candidate.get("sdk")}
+                    from_before += 1
+                    _note_if_large(large, page, block, folder / f"{key}.wasm")
+                    continue
             file_line = _file_line_of(block, key, page.get("source"))
             if entry is not None and entry.get("ok") is False:
                 block_line, said = first_error(entry.get("diagnostics") or "")
@@ -406,13 +473,55 @@ def prepare(pages: list, output_dir, cache_root, swift_dir=None, windows=None, p
                 + (f" ({copied} copied in)." if copied else "."))
     for problem in problems:
         printer(error_line(problem, gigabytes))
+    if from_before and notes:
+        printer("plantoir: note: " + notes["fromBefore"].replace("{count}", str(from_before)))
+    for item in large:
+        printer(large_note(item, notes))
     # Old toolchains' folders go only once this one holds every block the
     # site needs (review N5): an offline preview after a recipe change must
-    # not throw away the only binaries that work.
-    missing = any(problem["reason"] != "compileError" for problem in problems)
-    if cache is not None and not missing:
+    # not throw away the only binaries that work - which it now serves.
+    if cache is not None and not not_in_this_cache:
         prune(root, cache.name, now)
-    return {"problems": problems, "blocks": blocks, "ready": ready}
+    return {"problems": problems, "blocks": blocks, "ready": ready, "fromBefore": from_before,
+            "large": large}
+
+
+def _notes() -> dict:
+    try:
+        import contracts
+        return contracts.section("shared-rules", "codeRunnerBlocks", "swift", "notes")
+    except Exception:
+        return {}
+
+
+def _older_caches(root: Path, cache) -> list:
+    """Every other toolchain's folder, newest first."""
+    try:
+        folders = [folder for folder in root.iterdir() if folder.is_dir()
+                   and folder.name not in (JOBS_FOLDER, LOGS_FOLDER) and (cache is None or folder != cache)]
+    except OSError:
+        return []
+    return sorted(folders, key=lambda folder: folder.stat().st_mtime, reverse=True)
+
+
+def _note_if_large(large: list, page: dict, block: dict, path: Path) -> None:
+    """A program over notes.largeBytes is named on a `plantoir: note:` line
+    (implementation review S2): a 46 MB program per block is a cost a
+    teacher should hear about, not a fault."""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return
+    limit = _notes().get("largeBytes")
+    if isinstance(limit, int) and size > limit:
+        large.append({"page": page["place"], "block": block["n"], "bytes": size})
+
+
+def large_note(item: dict, notes: dict) -> str:
+    """`plantoir: note: Units/Dates.md: swift block 2: ...`."""
+    megabytes = f"{item['bytes'] / 1_000_000:.1f}"
+    text = (notes.get("large") or "").replace("{megabytes}", megabytes)
+    return f"plantoir: note: {item['page']}.md: swift block {item['block']}: {text}"
 
 
 def _sync_files(wanted: dict, target: Path) -> int:
@@ -497,7 +606,7 @@ def main(argv: list) -> int:
         cache_root = cache_root.resolve()
     except OSError:
         pass
-    planned = plan(course_dir, cache_root)
+    planned = plan(course_dir, cache_root, full_rebuild="--full-rebuild" in argv)
     if _argument(argv, "format") == "lines":
         # For the launcher, which has no JSON reader on a teacher's Mac: one
         # KEY=value line each, the value everything after the first "=".

@@ -4642,9 +4642,159 @@
         "detail": "Students see the code with no working Run button until it is put right: {blocks}.",
         "blockLine": "“{page}”, Swift block {block}, line {line}: {reason}",
         "blockLineNoLine": "“{page}”, Swift block {block}: {reason}",
+        "oneReasonForSeveral": "{reason}, for {blocks} on {pages}",
+        "blockCount": { "one": "1 block", "several": "{count} blocks" },
+        "pageCount": { "one": "1 page", "several": "{count} pages" },
+        "groupingCases": [
+          {
+            "name": "seventeen blocks on four pages, all offline, are one piece",
+            "problems": [
+              {
+                "page": "Unit 1",
+                "block": 1,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 2",
+                "block": 1,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 3",
+                "block": 1,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 4",
+                "block": 1,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 1",
+                "block": 2,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 2",
+                "block": 2,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 3",
+                "block": 2,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 4",
+                "block": 2,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 1",
+                "block": 3,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 2",
+                "block": 3,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 3",
+                "block": 3,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 4",
+                "block": 3,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 1",
+                "block": 4,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 2",
+                "block": 4,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 3",
+                "block": 4,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 4",
+                "block": 4,
+                "line": 3,
+                "reason": "notCompiled"
+              },
+              {
+                "page": "Unit 1",
+                "block": 5,
+                "line": 3,
+                "reason": "notCompiled"
+              }
+            ],
+            "detail": "Students see the code with no working Run button until it is put right: it was not made ready to run - preview the course again, for 17 blocks on 4 pages."
+          },
+          {
+            "name": "one compile error and two blocks with too little room",
+            "problems": [
+              {
+                "page": "Unit 1",
+                "block": 1,
+                "line": 9,
+                "reason": "compileError",
+                "said": "cannot find 'nmae' in scope"
+              },
+              {
+                "page": "Unit 1",
+                "block": 2,
+                "line": 20,
+                "reason": "noRoom"
+              },
+              {
+                "page": "Unit 2",
+                "block": 1,
+                "line": 4,
+                "reason": "noRoom"
+              }
+            ],
+            "detail": "Students see the code with no working Run button until it is put right: “Unit 1”, Swift block 1, line 9: Swift found an error in it: cannot find 'nmae' in scope; this computer needs about 6 GB of free space before it can make Swift programs ready to run, for 2 blocks on 2 pages."
+          },
+          {
+            "name": "one block on one page",
+            "problems": [
+              {
+                "page": "Unit 1",
+                "block": 1,
+                "line": null,
+                "reason": "notOnWindows"
+              }
+            ],
+            "detail": "Students see the code with no working Run button until it is put right: Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable, for 1 block on 1 page."
+          }
+        ],
         "andMore": "and {count} more",
         "fixable": false,
-        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's runnable Swift blocks from 1; {line} is the line in the teacher's own file - the first error's line for compileError, the opening fence's otherwise - and when it cannot be found the block is named through blockLineNoLine; {reason} is codeRunnerBlocks.swift.reasons[reason] filled with {said} (the compiler's first error) and {gigabytes} (codeRunnerBlocks.swift.room.needGigabytes). `sentence` when ONE block has no program and `sentenceForSeveral` otherwise ({count} blocks). `detail` names at most ten blocks, joined with \"; \" (a compiler's message can hold a comma), then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per section build (#246).",
+        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's runnable Swift blocks from 1; {line} is the line in the teacher's own file - the first error's line for compileError, the opening fence's otherwise - and when it cannot be found the block is named through blockLineNoLine; {reason} is codeRunnerBlocks.swift.reasons[reason] filled with {said} (the compiler's first error) and {gigabytes} (codeRunnerBlocks.swift.room.needGigabytes). `sentence` when ONE block has no program and `sentenceForSeveral` otherwise ({count} blocks). `detail` names each compileError block through blockLine or blockLineNoLine (each has its own message), and every OTHER reason ONCE, through oneReasonForSeveral with blockCount and pageCount (implementation review S4: a cause every block shares - offline, too little room, Windows - was said once per block, ten times and 'and 7 more'); compile errors first in page order, then the shared reasons in reasonCases' order; at most ten pieces, joined with \"; \" (a compiler's message can hold a comma), then `andMore` with the number of pieces left over. `groupingCases` pin it. Every value is filled in ONE pass. ONE finding per section build (#246).",
         "why": "#493 ruling Q1: a Swift block that does not compile used to be planned as a failed build (the issue's acceptance 11); a failed build would also stop the preview the teacher needs to fix it, the #485 E1 precedent. So the build carries on, the block shows its code with Run disabled and words.notReady, and the teacher - who previews in the app and never reads the build's console - is told where: page, block, line and the compiler's own first error. An assistant reads the same facts on `plantoir: error:` lines. The same finding says when a block could not be prepared at all (offline the first time, too little room, or on Windows), because to a teacher it is the same thing: students cannot run that program yet. Not repairable: only the teacher can correct the code, and getting Swift ready is the next preview's own job (review S8: in repair.neverOffered)."
       }
     ],
@@ -24704,7 +24854,7 @@
         ]
       },
       "cache": {
-        "rule": "<builds>/<CODE>/.swift-cache/<toolchain id>/<key>.wasm and <key>.json, shared by the course's sections and outside the teacher's folder (the figures cache's place, #485). <key>.json is {ok: true, sdk: embedded | full, bytes, swift, wasmOpt} or {ok: false, reason: compileError, diagnostics, swift, wasmOpt}; each file is written by a temporary name and a rename, and an entry that is not there, or not whole, is a miss. The TOOLCHAIN ID is the first 16 hex of SHA-256 over `toolchainIdFrom`, each file's name, a NUL, its bytes and a NUL: those files state every pin, flag and the PATH, so changing any compiles every block again (#493 acceptance 12) and nothing else does (#485's engine_id pattern; a hand-bumped version string was rejected there for missing a move). A compile that took longer than compile.jobSeconds is NOT cached, nor one whose wasm-opt step or readLine flush failed after Swift accepted the code (review S3: a failure that is not the compiler's is never remembered; test_swift_blocks.CompileStepTests, with stand-in tools). Jobs: <builds>/<CODE>/.swift-cache/jobs/<run>/<key>.swift, a folder per run (review S3: two builds of a course never share one), removed by compile.py when it finishes and, if a run was killed, by a later plan after `orphanJobSeconds`. PRUNING happens in prepare and ONLY when this toolchain's folder holds every block the site needs (review N5: an offline preview after a recipe change must not throw away the only programs that work): then every other toolchain's folder goes, and this one's entries unused for `pruneDays` (prepare touches each one it uses). `--full-rebuild` does NOT clear it: a key already names its code and its toolchain, so a full rebuild has nothing stale to clear, and clearing would undo what the launcher compiled a moment before the build. `state.json` beside the folders says why the launcher compiled nothing ({state: noRoom}); plan removes it at the start of every run.",
+        "rule": "<builds>/<CODE>/.swift-cache/<toolchain id>/<key>.wasm and <key>.json, shared by the course's sections and outside the teacher's folder (the figures cache's place, #485). <key>.json is {ok: true, sdk: embedded | full, bytes, swift, wasmOpt} or {ok: false, reason: compileError, diagnostics, swift, wasmOpt}; each file is written by a temporary name and a rename, and an entry that is not there, or not whole, is a miss. The TOOLCHAIN ID is the first 16 hex of SHA-256 over `toolchainIdFrom`, each file's name, a NUL, its bytes and a NUL: those files state every pin, flag and the PATH, so changing any compiles every block again (#493 acceptance 12) and nothing else does (#485's engine_id pattern; a hand-bumped version string was rejected there for missing a move). A compile that took longer than compile.jobSeconds is NOT cached, nor one whose wasm-opt step or readLine flush failed after Swift accepted the code, nor one killed by a signal or that failed with no diagnostics (review S3 and the implementation review's S3, measured: under `--memory 50m` a valid block was cached as a compileError with empty diagnostics; test_swift_blocks.CompileStepTests, with stand-in tools). plan treats an `ok: false` entry with no diagnostics as a miss, so an entry an earlier compile.py wrote that way heals on the next preview (`cacheCases`). Jobs: <builds>/<CODE>/.swift-cache/jobs/<run>/<key>.swift, a folder per run (review S3: two builds of a course never share one), removed by compile.py when it finishes and, if a run was killed, by a later plan after `orphanJobSeconds`. PRUNING happens in prepare and ONLY when this toolchain's folder holds every block the site needs (review N5: an offline preview after a recipe change must not throw away the only programs that work): then every other toolchain's folder goes, and this one's entries unused for `pruneDays` (prepare touches each one it uses). `--full-rebuild` (passed to plan by the launcher) clears cached FAILURES, so every block that did not compile is compiled again; it keeps programs: a key already names its code and its toolchain, so a program is never stale (`cacheCases`). Until this toolchain compiles a block, prepare SERVES the newest older toolchain's program for the same code (`notes.fromBefore`, implementation review N2). `state.json` beside the folders says why the launcher compiled nothing ({state: noRoom} or {state: notDownloaded}); plan removes it at the start of every run. The launcher's own logs are `logs/swift-build-<pid>.log` and `logs/compile-<pid>.log`, one per run, removed by plan after a day (implementation review N3: two launchers once wrote into one file).",
         "toolchainIdFrom": [
           "support/swift/Dockerfile",
           "support/swift/compile.py",
@@ -24765,11 +24915,12 @@
       "traps": "A program that traps (an index out of range, a force-unwrapped nil, the 256 MB memory cap) ends with WebAssembly.RuntimeError; one that recursed past the browser's own stack ends with RangeError (review S5: `instanceof WebAssembly.RuntimeError` is false for it, in Chrome 155 and Safari 26.6). Both end the run with words.crashed. The `Fatal error: ...` line, when the program printed one, is already in the output - on stdout under Embedded Swift and stderr under the full library - and is shown as written; a stack overflow prints none. exit(n) with n != 0 ends with words.exitCode; returning, or exit(0), with words.finished.",
       "reasons": {
         "compileError": "Swift found an error in it: {said}",
-        "notCompiled": "it was not made ready to run - preview the course again while this computer is connected to the internet",
+        "notCompiled": "it was not made ready to run - preview the course again",
+        "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about 1.3 GB)",
         "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run",
         "notOnWindows": "Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable"
       },
-      "reasonsRule": "Why a block has no program, said on its `plantoir: error:` line and in siteHealth -> swiftCouldNotBePrepared (each reason filled in ONE pass): compileError - the cache holds the compiler's diagnostics, and {said} is the message of its first `error:` (the line it names is mapped to the teacher's file); notCompiled - no program and no reason recorded (the image could not be built, which needs the internet the first time, or no launcher ran, as in deploy.py's own rebuild); noRoom - the launcher found less than room.needGigabytes free ({gigabytes}); notOnWindows - the build ran on Windows, which has no container and cannot compile Swift in v1.8 (#493 option (b); the windows issue owns the decision). `reasonCases` pin which one applies.",
+      "reasonsRule": "Why a block has no program, said on its `plantoir: error:` line and in siteHealth -> swiftCouldNotBePrepared (each reason filled in ONE pass): compileError - the cache holds the compiler's diagnostics, and {said} is the message of its first `error:` (the line it names is mapped to the teacher's file); notCompiled - no program and no reason recorded (a compile that did not finish - killed, too slow, wasm-opt failed - which the next preview tries again, a wait for another launcher's download that gave up, or no launcher ran, as in deploy.py's own rebuild); notDownloaded - the launcher could not build the Swift image, which downloads about 1.3 GB the first time (`state.json` says so: {state: notDownloaded}); noRoom - the launcher found less than room.needGigabytes free ({gigabytes}); notOnWindows - the build ran on Windows, which has no container and cannot compile Swift in v1.8 (#493 option (b); the windows issue owns the decision). `reasonCases` pin which one applies.",
       "reasonCases": [
         {
           "name": "no program and nothing recorded, on a Mac",
@@ -24786,6 +24937,14 @@
           "reason": "noRoom"
         },
         {
+          "name": "the Swift builder could not be downloaded, on a Mac",
+          "state": {
+            "state": "notDownloaded"
+          },
+          "appliesOn": "mac",
+          "reason": "notDownloaded"
+        },
+        {
           "name": "no program, on Windows",
           "state": null,
           "appliesOn": "windows",
@@ -24798,6 +24957,86 @@
           },
           "appliesOn": "windows",
           "reason": "notOnWindows"
+        }
+      ],
+      "notes": {
+        "rule": "Lines an assistant and a teacher read in the build's output that are NOT folder problems (implementation review S2 and N2): `fromBefore` when prepare served programs compiled by the PREVIOUS recipe because this recipe has not compiled them yet (an offline preview, or too little room, after Plantoir was updated) - the site keeps working, and the next preview that can compile replaces them; `large` for each block whose program is over `largeBytes` (a full-library program is about 3.4 MB; `import Foundation` with formatters or JSON measured 46,073,957 bytes), because every student downloads it on that block's first Run. Each is one line `plantoir: note: ` + the words; `large` names the block as `<page>.md: swift block <n>: `. `noteCases` pin both.",
+        "fromBefore": "{count} Swift programs on this site are the ones made before Plantoir was updated; they work, and the next preview that can make them again replaces them",
+        "large": "its program is {megabytes} MB, which every student downloads the first time they run it - a print with several arguments, print(array) or import Foundation makes a program this big; \\(...) inside one string keeps it small",
+        "largeBytes": 5000000
+      },
+      "noteCases": [
+        {
+          "name": "a program over the limit is named",
+          "bytes": 6200000,
+          "note": true,
+          "megabytes": "6.2"
+        },
+        {
+          "name": "a full-library program under the limit is not",
+          "bytes": 3453463,
+          "note": false
+        },
+        {
+          "name": "the previous recipe's program is served and said once",
+          "fromBefore": 2,
+          "served": true
+        }
+      ],
+      "cacheCases": [
+        {
+          "name": "a program is a hit",
+          "entry": {
+            "ok": true,
+            "sdk": "embedded"
+          },
+          "fullRebuild": false,
+          "compiledAgain": false
+        },
+        {
+          "name": "a compile error with the compiler's words is a hit",
+          "entry": {
+            "ok": false,
+            "reason": "compileError",
+            "diagnostics": "main.swift:2:7: error: cannot find 'nmae' in scope"
+          },
+          "fullRebuild": false,
+          "compiledAgain": false
+        },
+        {
+          "name": "a failure with no words is compiled again (a killed compiler, review S3)",
+          "entry": {
+            "ok": false,
+            "reason": "compileError",
+            "diagnostics": ""
+          },
+          "fullRebuild": false,
+          "compiledAgain": true
+        },
+        {
+          "name": "--full-rebuild compiles every cached failure again",
+          "entry": {
+            "ok": false,
+            "reason": "compileError",
+            "diagnostics": "main.swift:2:7: error: cannot find 'nmae' in scope"
+          },
+          "fullRebuild": true,
+          "compiledAgain": true
+        },
+        {
+          "name": "--full-rebuild keeps programs",
+          "entry": {
+            "ok": true,
+            "sdk": "full"
+          },
+          "fullRebuild": true,
+          "compiledAgain": false
+        },
+        {
+          "name": "no entry is compiled",
+          "entry": null,
+          "fullRebuild": false,
+          "compiledAgain": true
         }
       ]
     },
@@ -24815,9 +25054,10 @@
       "The page's code needs a browser that runs module workers: Safari and iPadOS 15 or later, Chrome 80 or later, Firefox 114 or later.",
       "A site opened as files on a computer, rather than from its web address, cannot run code: Safari 26.6 and Chrome for Testing 155 run none of a page's scripts from a file (measured 2026-10-17), so the blocks show as their highlighted code with no Run button; a browser that does run them is told words.needsWebAddress. KaTeX's faces DID load from a file in both (measured), so the maths keeps its look.",
       "Swift blocks are read-only (#493 Path A): a student changes the input and runs it again, never the code. Editing would need a compiler somewhere other than the student's browser - the compile service of #493 §7, specified and deliberately not built.",
-      "A Swift block that Embedded Swift cannot compile or print (String.contains(String), `print(array)`, an optional, a struct or an error inside a string) is compiled with the full standard library instead: it runs the same, and costs about 3.4 MB (0.9 MB brotli) to fetch on its first Run instead of about 50-110 KB. Measured on swift-gate/: 4 of 14 fragments fall back.",
+      "A Swift block that Embedded Swift cannot compile or print is compiled with the full standard library instead: it runs the same, and costs about 3.4 MB (0.9 MB brotli) to fetch on its first Run instead of about 12-110 KB. The commonest trigger is a `print` with more than one argument (`print(\"Total:\", total)` - Embedded Swift's print takes one; measured by the implementation review), then `print(array)`, String.contains(String), and an optional, a struct or an error inside a string; `print(\"Total: \\(total)\")` stays small. Measured on swift-gate/: 4 of 15 fragments fall back. `import Foundation` works too (Date, formatters, JSON, String(format:) - measured) but costs 3.4 MB for Date and up to 46 MB with formatters and JSON; the build names any program over 5 MB on a `plantoir: note:` line (swift.notes.large).",
       "Swift programs are capped at 256 MB of memory (review S5): a list that grows for ever traps in about a tenth of a second instead of filling the tab - and Embedded Swift says so with a misleading `Fatal error: Unexpectedly found nil while unwrapping an Optional value` (measured), not 'out of memory'.",
-      "A Swift program that recurses deeply hits the BROWSER's stack before its own: about 5,000 calls in Chrome 155 and only about 2,000 in Safari 26.6 (iPadOS's limit is unmeasured), and it ends with words.crashed and no `Fatal error:` line (review S5). Write recursive examples that stay well under 2,000 calls deep.",
+      "A Swift program that recurses deeply hits the BROWSER's stack before its own: about 5,000 calls in Chrome 155 and only about 2,000 in Safari 26.6 and the iPadOS 26.5 simulator (fine at 2,000, crashing at 3,000, both libraries - implementation review), and it ends with words.crashed and no `Fatal error:` line (review S5). Write recursive examples that stay well under 1,000 calls deep.",
+      "`Int` is 32 bits here (wasm32): it holds up to 2,147,483,647, so `13!`, Fibonacci(47) or a large running total overflows - and an overflow stops the program with words.crashed and NO `Fatal error:` line, in both libraries (measured 2026-10-17: `-assert-config Debug` keeps preconditions' messages, but an arithmetic overflow check compiles to a bare trap - even with `-Onone` (7.4 MB unoptimised, the full library), which is therefore no cheap way to a message; swift-gate 15 pins the silent trap). On a Mac or an iPad the same program runs, because Int is 64 bits there. Use `Int64` (or `Double`) for factorials and large totals, or check the range.",
       "A Swift block whose code the build's fence reader and the site's parser read differently (a lazy line in a list item: pageShapes) has two different keys; the site shows it as plain code with a `plantoir: error:` line naming it (siteDisagrees, words.blockNotCompiled). A Swift fence the build's reader cannot see is never compiled, for the same reason.",
       "Swift is compiled by the launcher on a Mac. Windows has no container and compiles nothing in v1.8 (swift.reasons.notOnWindows); deploy.py's own rebuild for a different web address uses only what a preview already compiled.",
       "The first preview with a Swift block downloads about 1.3 GB and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once."

@@ -1952,25 +1952,46 @@ recipe files (`Dockerfile`, `compile.py`, `ReadLineShim.swift`,
 pin or flag compiles every block again (#493 acceptance 12, pinned by
 `test_swift_blocks.py`) and nothing else does. A compile error is cached too
 (an unchanged broken block is not compiled again); a compile that took longer
-than 180 s is not, nor one whose wasm-opt step or readLine flush failed (review S3: a failure that is not the compiler's is never
-remembered). **Pruning** happens in prepare, and ONLY when this toolchain's
+than 180 s is not, nor one whose wasm-opt step or readLine flush failed, nor one killed by a
+signal or that failed with no diagnostics (review S3, and the implementation
+review's S3, measured: under `--memory 50m` a valid block used to be cached as
+a compileError with empty diagnostics, for ever; an entry an earlier
+compile.py wrote that way is now a miss, so it heals). A failure that is not
+the compiler's is never remembered. **Pruning** happens in prepare, and ONLY when this toolchain's
 folder holds every block the site needs (review N5): an offline preview
 after a recipe change would otherwise throw away the only programs that
-work. Then every other toolchain's folder goes, and this one's entries unused
-for 90 days. `--full-rebuild` does NOT clear it: a key names its code and
-its toolchain, so there is nothing stale, and clearing would undo what the
-launcher compiled a moment before the build. Building twice compiles nothing
+work - and until this toolchain compiles a block, prepare SERVES the newest
+older toolchain's program for the same code (the key names the code), with
+one `plantoir: note:` line (`swift.notes.fromBefore`; implementation review
+N2: before, the kept folder only helped a revert, and every block was "not
+ready"). Then every other toolchain's folder goes, and this one's entries
+unused for 90 days. `--full-rebuild` (the launcher passes it to plan) clears
+cached FAILURES, so a block that did not compile is compiled again; it keeps
+programs, because a key names its code and its toolchain, so a program is
+never stale (`swift.cacheCases`). Building twice compiles nothing
 the second time (acceptance 10; verify.sh checks the page comes out the same).
 
-**When a block has no program**, the reason is said, block by block
+**When a block has no program**, the reason is said on a `plantoir: error:`
+line per block, and in the folder problem ONCE per cause: each compile error
+by its block and line, every other reason once, "…, for 17 blocks on 4
+pages" (implementation review S4: a cause every block shares was said ten
+times and "and 7 more"; `swiftCouldNotBePrepared.groupingCases`). The reasons
 (`swift.reasons`, pinned by `swift.reasonCases`):
 
 | Reason | When |
 |---|---|
 | `compileError` | Swift found an error; the line is the first error's, in the teacher's file, and the words carry the compiler's own message. The block shows its code with Run off ("This program isn't ready to run yet."). |
 | `noRoom` | the launcher found less than 6 GB free for the Swift image (`state.json` beside the cache says so; plan removes it at the start of every run). |
-| `notCompiled` | nothing recorded: the Swift image could not be built (offline the first time), or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
+| `notDownloaded` | the launcher could not build the Swift image, which downloads about 1.3 GB the first time (`state.json`: `{state: notDownloaded}`); the sentence names the download and the internet. |
+| `notCompiled` | nothing recorded, and the sentence says only "preview the course again" (implementation review N1: it used to blame the internet for causes that have nothing to do with it): a compile that did not finish (killed, too slow, wasm-opt failed - none is cached, so the next preview tries again), a wait for another launcher's download that gave up, or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
 | `notOnWindows` | the build ran on Windows, which has no container and compiles nothing in v1.8 (#493 option (b)). Chosen in the shared Python (review N2), so Windows teachers read a sentence about Windows the day they take these scripts. |
+
+**Notes, not problems.** A block whose program is over 5 MB is named on a
+`plantoir: note:` line (`swift.notes.large`, implementation review S2): a
+multi-argument print or `print(array)` costs about 3.4 MB, and `import
+Foundation` with formatters and JSON measured 46 MB, which every student
+downloads on that block's first Run. So is the count of programs served from
+the previous recipe (`notes.fromBefore`). Neither is a folder problem.
 
 The build is never stopped by any of them (#493 ruling Q1, the #485 E1
 precedent): a failed build would also stop the preview the teacher needs to

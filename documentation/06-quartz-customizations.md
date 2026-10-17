@@ -1470,16 +1470,22 @@ tests pin both field for field), a runtime class in `RUNTIMES`, a vendor
 layer in the Dockerfile (and `fetch-runtime.ps1`), and a pin in
 `toolchain.json`. Nothing else: the fence rule, the ids, the gate, the words
 and the print rules read the table, never the word "python" (Russell,
-2026-10-09). **Swift (#493) was the test of that sentence, and it held**: a
-row (`prebuilt: true`, `editable: false`), a runtime class
-(`SwiftWasmRuntime`), a vendor layer that for a compiled language is the
-COMPILE step (`support/swift/` and `scripts/swift_blocks.py` instead of a
-folder under `/opt/vendor`), and a pin (`toolchain.json` → `swiftImage`) -
-that is all. The fence rule, the ids, the gate's count and Python's gate
-were not touched; the two things `prebuilt` adds are generic, not Swift's:
-the gate accepts an overlay as the whole engine when the row is prebuilt
+2026-10-09). **Swift (#493) tested that sentence.** For a language the
+browser runs as written, it holds as stated. A language compiled ahead of
+time needed more, and the honest list is: a table row (`prebuilt: true`,
+`editable: false`); a runtime class (`SwiftWasmRuntime`), which widened the
+`CodeRuntime` interface (`run(…, program)`, an optional `started`, and
+`done(error, said)` for its crash and exit-code words); a compile layer in
+place of a vendor folder (`support/swift/` and `scripts/swift_blocks.py`:
+the launcher's plan-and-compile step in `preview.sh`, and a `build_site`
+call that prepares the programs); a folder problem of its own
+(`swiftCouldNotBePrepared`); a pin (`toolchain.json` → `swiftImage`); and
+two generic `prebuilt` rules - the gate takes the overlay as the whole engine
 (`page_features.OVERLAY_IS_THE_ENGINE`), and the transformer looks a
 prebuilt block's key up in `quartz/plantoir-runners/<engine>.json` (I10).
+The fence rule, the ids, the gate's count and Python's gate were not
+touched (implementation review N4 asked for this list instead of "that is
+all").
 
 ### I4. Input, output and the words
 
@@ -1666,7 +1672,7 @@ compiled ahead of time by the build's launcher ([05 → Runnable
 Swift](05-build-pipeline.md#runnable-swift-what-the-launcher-and-the-build-do-493-v180),
 [02 → The Swift image](02-docker-image.md#the-swift-image-493-v180)) -
 Swift has no interpreter a browser can carry. Path A of the Phase 0 report on
-#493: Embedded Swift per block (about 50-110 KB), and the full standard
+#493: Embedded Swift per block (about 12-110 KB), and the full standard
 library (about 3.4 MB, 0.9 MB brotli) for a block Embedded Swift cannot
 compile or would print `(cannot print value in embedded Swift)` for.
 Rules: `codeRunnerBlocks.swift`.
@@ -1729,6 +1735,14 @@ into place:
   and 14 pin both).
 - **stdout and stderr decoded per stream**, holding a character split
   across two writes until it is whole (review N4).
+
+**Int is 32 bits** (wasm32): `Int.max` is 2,147,483,647 here and
+9,223,372,036,854,775,807 natively, so `13!` overflows and the program
+traps with `words.crashed` and NO `Fatal error:` line, in both libraries -
+even `-Onone` (7.4 MB) prints none, because an overflow check compiles to a
+bare trap (measured 2026-10-17; implementation review S1; swift-gate 15
+pins it). The skill and `knownLimits` tell teachers to use `Int64` for
+factorials and large totals.
 
 **Traps.** An index out of range, a `nil` unwrapped with `!`, or the 256 MB
 memory cap ends in `WebAssembly.RuntimeError`; a recursion past the
