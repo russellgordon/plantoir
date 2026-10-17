@@ -1,6 +1,7 @@
 ---
 title: Lists
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -54,7 +55,7 @@ minutes[1] = 20        # replace the element at position 1
 minutes.append(15)     # add a new element to the end
 ```
 
-```python
+```python run readonly
 sorted_marks = [46, 63, 78, 91]
 sorted_marks.insert(2, 70)   # put 70 at position 2, shifting the rest
 sorted_marks.remove(63)      # delete the first 63 found
@@ -88,7 +89,7 @@ Use the first when you only care about the values. Use the second when
 you need to know *where* you are — which is exactly what a search
 needs:
 
-```python
+```python run readonly
 marks = [78, 91, 46, 63]
 target = 46
 position = -1

@@ -1,6 +1,7 @@
 ---
 title: The Helper Script
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tasks
@@ -28,7 +29,7 @@ your guesses, define what this does.
 Here is a complete example of the right size, written for a teacher who
 orders milk based on how many students ate breakfast:
 
-```python
+```python run
 students = int(input("How many students ate today? "))
 cartons = students * 2
 if cartons > 48:

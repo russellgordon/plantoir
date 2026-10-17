@@ -1,6 +1,7 @@
 ---
 title: Branching Programs
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -14,7 +15,7 @@ end of a long week.
 
 ## The program
 
-```python
+```python run readonly
 # Return-desk helper for Mr. Whitfield, who wants the same book
 # treated the same way every time, whoever is at the desk.
 

@@ -1,6 +1,7 @@
 ---
 title: Loops Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -13,13 +14,13 @@ are inside.
 ## Reading
 
 1. How many lines does this print, and what is the last one?
-   ```python
+   ```python run
    for day in range(1, 8):
        print(f"Day {day}")
    ```
 2. **Trace it.** Give the value of `total` after each pass, then say
    what prints.
-   ```python
+   ```python run
    weights = [6, 11, 7]
    total = 0
    for weight in weights:
@@ -27,7 +28,7 @@ are inside.
    print(total)
    ```
 3. **Find the fault.** This prints `7` when it should print `24`.
-   ```python
+   ```python run
    weights = [6, 11, 7]
    for weight in weights:
        total = 0
@@ -35,7 +36,7 @@ are inside.
    print(total)
    ```
 4. How many lines does this print in total?
-   ```python
+   ```python run
    for week in range(2):
        for day in range(3):
            print(f"Week {week}, day {day}")
@@ -69,7 +70,7 @@ are inside.
 > `total = 0` is inside the loop, so every pass throws away the running
 > total and starts again — the printed value is only the last weight.
 > Move that line above the `for`:
-> ```python
+> ```python run
 > weights = [6, 11, 7]
 > total = 0
 > for weight in weights:
@@ -84,7 +85,7 @@ are inside.
 > are how you cover a table, a grid, or every day of every week.
 
 > [!success]- Answer 5
-> ```python
+> ```python run
 > answer = ""
 >
 > while not answer.isdigit():
@@ -98,13 +99,13 @@ are inside.
 > question gets asked at least once.
 
 > [!success]- Answer 6
-> ```python
+> ```python run
 > total = 0
 > for number in range(2, 21, 2):
 >     total = total + number
 > print(total)
 > ```
-> ```python
+> ```python run
 > total = 0
 > for number in range(1, 21):
 >     if number % 2 == 0:
@@ -123,7 +124,7 @@ are inside.
 > common off-by-one error in the language.
 
 > [!success]- Answer 8
-> ```python
+> ```python run
 > highest = 0
 > entry = ""
 >

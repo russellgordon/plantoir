@@ -1,6 +1,7 @@
 ---
 title: Working with Text
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -19,7 +20,7 @@ is a normal, expected part of the job.
 
 A string is characters in order, indexed exactly like a list:
 
-```python
+```python run readonly
 name = "Priya"
 print(len(name))    # 5
 print(name[0])      # P
@@ -58,7 +59,7 @@ right.
 
 Two of them fix the corridor bug in one line:
 
-```python
+```python run readonly
 typed = input("Name: ")
 name = typed.strip()
 

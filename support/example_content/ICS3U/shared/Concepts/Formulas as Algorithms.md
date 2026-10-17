@@ -1,6 +1,7 @@
 ---
 title: Formulas as Algorithms
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -19,7 +20,7 @@ The formula says nothing about where the numbers come from, in what
 order to do the arithmetic, or what to do when somebody types "eight"
 instead of `8`. The algorithm has to.
 
-```python
+```python run readonly
 watts = float(input("Appliance power, in watts: "))
 hours = float(input("Hours used per day: "))
 rate = float(input("Price per kilowatt-hour, in dollars: "))

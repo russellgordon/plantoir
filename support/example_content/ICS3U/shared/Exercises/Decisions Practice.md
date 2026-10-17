@@ -1,6 +1,7 @@
 ---
 title: Decisions Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -25,7 +26,7 @@ branches.
        print("Not yet")
    ```
 2. What does this print when `temperature` is exactly `30`?
-   ```python
+   ```python run
    temperature = 30
    if temperature > 30:
        print("Open the windows.")
@@ -91,7 +92,7 @@ branches.
 > inner one.
 
 > [!success]- Answer 5
-> ```python
+> ```python run
 > answer = input("Days late: ")
 > days_late = int(answer)
 >

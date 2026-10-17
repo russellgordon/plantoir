@@ -1,6 +1,7 @@
 ---
 title: Reading an Error Message
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - tutorials
@@ -16,7 +17,7 @@ programming life.
 
 The program, saved as `hours.py`:
 
-```python
+```python run
 answer = input("How many hours did you work? ")
 count = int(answer)
 print(f"That is {count * 60} minutes.")

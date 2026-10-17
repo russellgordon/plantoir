@@ -1,6 +1,7 @@
 ---
 title: Talking to the User
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -13,7 +14,7 @@ all she wanted.
 
 ## The program
 
-```python
+```python run readonly
 # Weekly practice check-in for Ms. Roy, who coaches the senior team.
 # She wanted players to see their own week without her doing
 # arithmetic on the bus home.

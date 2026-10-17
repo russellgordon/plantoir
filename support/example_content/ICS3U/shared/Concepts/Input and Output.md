@@ -1,6 +1,7 @@
 ---
 title: Input and Output
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -31,7 +32,7 @@ one-line version hides which half broke when it breaks.
 
 ## Showing the answer
 
-```python
+```python run readonly
 name = "Priya"
 minutes = 185
 hours = minutes / 60
@@ -82,7 +83,7 @@ ValueError: invalid literal for int() with base 10: 'seven'
 
 You can catch that instead of crashing:
 
-```python
+```python run readonly
 answer = input("Minutes practised: ")
 
 try:
@@ -101,7 +102,7 @@ error handling — which is what [[The Bad Input Hunt]] is for.
 
 > [!question]- Self-check: what does this print if the user types 3.5?
 > (click to expand)
-> ```python
+> ```python run readonly
 > count = int(input("How many? "))
 > print(count)
 > ```
