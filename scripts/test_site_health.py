@@ -69,6 +69,8 @@ class SiteHealthTests(unittest.TestCase):
                                      "problem": "missing"}]},
             {"figure_problems": [{"page": "Unit 2/Similar Triangles", "engine": "tikz", "block": 1,
                                   "line": 12, "reason": "undefinedCommand", "name": "\\foo"}]},
+            {"quiz_problems": [{"page": "Unit 2/Practice", "n": 3, "line": 41,
+                                "reason": "noCorrectChoice", "fill": {}}]},
         ):
             broken = dict(HEALTHY)
             broken.update(facts)
