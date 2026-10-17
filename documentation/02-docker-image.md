@@ -354,6 +354,91 @@ built (a build would need the network); the scaffold's `static/` (every site
 would carry 13.5 MB); Skulpt (a Python-2-era subset students would outgrow);
 JupyterLite or Custom Frames (a whole notebook per page).
 
+### The Swift image (#493, v1.8.0)
+
+Runnable Swift blocks ([05 → Runnable Swift](05-build-pipeline.md#runnable-swift-what-the-launcher-and-the-build-do-493-v180))
+are compiled in a **second image**, `teaching-quartz-swift:src-<hash>`,
+whose recipe is `support/swift/` (`Dockerfile`, `compile.py`,
+`ReadLineShim.swift`, `FlushBeforeRead.c`). It is NOT part of the website
+builder: the launcher builds it the first time a preview has a Swift block
+to compile, so a teacher who never writes Swift never downloads it. Its tag
+hashes `support/swift/` ONLY (the launchers' `toolchain_hash` over that
+folder), so a script edit elsewhere never rebuilds it; an edit inside it
+changes this tag AND the website builder's (support/ is in that recipe),
+which costs a small rebuild of the builder. `prune_superseded_swift_images`
+in preview.sh is `prune_superseded_images`' twin for its own prefix, by the
+same rules (never a blanket prune, nothing a container uses, nothing built in
+the last day). Pins: `contracts/toolchain.json` → `swiftImage`, a top-level
+key deliberately NOT under `pins` - both apps' pin tests read every pin as a
+line the ROOT Dockerfile must contain; `scripts/test_swift_blocks.py` checks
+these against `support/swift/Dockerfile` instead (Python, so Windows runs it).
+
+**What it holds** (spike, 2026-10-16, and its corrections):
+
+| Layer | What | Pinned by |
+|---|---|---|
+| base | `python:3.11-slim@sha256:90744cff…` - the builder's own Debian 13 base, so the first layer is shared | digest |
+| apt | runtime libraries the Linux toolchain links against (no -dev, no gcc: it only cross-compiles) | Debian |
+| toolchain + SDK, one layer | Swift **6.4.0-RELEASE** for Debian 13, chosen by `TARGETARCH` (aarch64 1,102,526,016 B, x86_64 1,122,646,127 B - review S7), and the **one** platform-neutral wasm SDK bundle (92,760,992 B), installed into `/opt/swift-sdks` | SHA-256 each; GPG signatures verified against the Swift 6.x Release Signing Key `52BB7E3D…B47A981F` |
+| binaryen | `wasm-opt` version_133 only (static; 17 MB kept), chosen by `TARGETARCH`, at `/opt/binaryen/bin` - **off PATH** | SHA-256 each (= GitHub's asset digests) |
+| recipe | `compile.py`, the readLine shim, the flush - `/opt/plantoir-swift/` | the tag |
+
+**Measured** (2026-10-17, Colima on an Apple M4 Pro, 6 CPUs, arm64): **80 s**
+to build with its downloads (about **1.30 GB**: the toolchain, the SDK and
+binaryen); **2.24 GB on disk, 504 MB compressed**. Untrimmed it was 5.61 GB
+on disk (the spike's image, 3.74 GB of it toolchain). x86_64 is pinned but
+its compiles are not measured.
+
+**The trim** (#493 ruling Q2: applied now, not deferred) happens in the SAME
+`RUN` that unpacks the toolchain, so nothing the compiler does not use is ever
+stored in a layer: lldb, sourcekit-lsp, clangd, docc, swift-format, the
+package manager (`swift-build`, `swift-package`, `swift-sdk` and friends),
+`llvm-cov`/`llvm-profdata`, libclang/libLTO, the docs, and the Linux host's
+OWN standard libraries (`lib/swift_static`, `lib/swift/embedded`,
+`lib/swift/pm`) - the wasm ones come from the SDK. Kept: `swiftc` and the
+driver, `swift-frontend`, clang, `wasm-ld`, `lib/swift/host/compiler` and
+`lib/swift/linux`, which the frontend links against. The SDK is installed
+BEFORE the trim (review S10), because the trim removes the program that
+installs it. verify.sh's Swift gate checks the trim as built.
+
+**Four corrections from the spike, each now a gate** (review S10):
+
+1. **G1** - `swift sdk install <url> --checksum` CRASHES on Linux 6.4.0 after
+   its download (FoundationNetworking: `_MultiHandle deallocated with
+   non-zero retain count`, SIGABRT). The SDK is fetched with curl, checked
+   with `sha256sum -c` and installed from the local file
+   (`test_swift_blocks.py` pins the line).
+2. **G2** - on Linux every link needs the SDK's clang resource folder
+   (`-Xclang-linker -resource-dir -Xclang-linker
+   <sdk>/swift.xctoolchain/usr/lib/swift_static/clang`): the Linux toolchain
+   ships only `clang/21/lib/linux`, and the wasm builtins live in the SDK
+   (`compile.mustContain`; the gate compiles).
+3. **G4** - a one-call `swiftc` is NOT reproducible: it puts a random
+   temporary object path into a 16-byte `.swift_modhash` data segment.
+   compile.py compiles `-c` to `/tmp/plantoir-swift/<key>/main.o` and links
+   from there, so the same code gives the same bytes in every run of one
+   image (verify.sh compiles two fragments twice and compares). Across hosts
+   the bytes still differ in exactly that segment (macOS and Linux name
+   different paths), and **that does not matter**: the cache key is the
+   code's hash plus the recipe's, never the program's (review S4, 06 → I10).
+4. **G5** - the shim's character-device rule needs its RIGHTS too (06 → I10;
+   the gate's must-fail).
+
+**Disk** (review S9): building it holds the 1.1 GB download and the 3.7 GB
+unpacked toolchain at once before the trim. The launcher asks the website
+builder how much its disk has free first and builds nothing below **6 GB**
+(`codeRunnerBlocks.swift.room.needGigabytes`); the build then says each block
+is not ready because there is not enough free space. A full disk would
+otherwise take the whole preview down, not only Swift.
+
+**Rejected:** the toolchain in the builder's image (1.3 GB for every
+teacher); the untrimmed image (5.61 GB) with the trim deferred to a
+follow-up (ruling Q2); `swift sdk install <url>` (G1); wasm-opt on PATH
+(Phase 0 trap 1: clang runs it by itself, changing the output); SwiftPM per
+block (about 1 s more each, Phase 0); Ubuntu's toolchain build (Debian 13 is
+the base's own); Swift 6.4.1 (released 2026-10-12 after Phase 0 measured
+6.4.0: a toolchain move re-runs the swift-gate first, swift-gate/README.md).
+
 ### What the first build downloads (measured for #334)
 
 Per container (`/sys/class/net/eth0/statistics/rx_bytes` inside each

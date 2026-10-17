@@ -1,0 +1,5 @@
+How wide is the rectangle?
+How tall is it?
+Original: 3.0 by 4.5, area 13.5, perimeter 15.0
+Copy: 6.0 by 9.0, area 54.0, perimeter 30.0
+After changing the original, the copy is still 6.0 wide.

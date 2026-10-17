@@ -1,0 +1,6 @@
+Type the age of each person buying a ticket:
+Ticket bought: seat 101.
+Sorry, 9 is too young for this film.
+Something went wrong: notANumber(text: "twelve")
+Ticket bought: seat 100.
+Sorry, the film is sold out.

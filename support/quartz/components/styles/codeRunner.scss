@@ -104,6 +104,13 @@
     margin: 0;
   }
 
+  // A language students cannot edit (Swift, #493) says so once, quietly.
+  & .plantoir-runner-note {
+    margin: 0.3rem 0 0.4rem;
+    font-size: 0.85em;
+    color: var(--darkgray);
+  }
+
   & .plantoir-runner-output {
     margin: 0.4rem 0 0;
     padding: 0.5rem 0.75rem;
@@ -143,6 +150,7 @@
     & .plantoir-runner-input,
     & .plantoir-runner-controls,
     & .plantoir-runner-status,
+    & .plantoir-runner-note,
     & .plantoir-runner-output {
       display: none !important;
     }
