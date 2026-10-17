@@ -18,13 +18,15 @@ Three checks:
   test_graded_folders_new_course.py drives it) making a course whose folders
   are three of those names and the contract's colon-and-space case: each
   index page's title line is the contract's, and the colon case's whole
-  index page is the contract's bytes (setup's moment put in its place);
+  index page is the contract's bytes (setup's moment put in its place). On
+  Windows, where NTFS refuses ":" in a name, the folders are colon-free names
+  that still need quoting and the colon page is compared in memory;
 - every case, and a sweep of awkward names, read back through the build's own
   frontmatter reader — run inside the website builder's image, where that
   reader is installed. verify.sh runs this file both on the host (step 0) and
   in the image with PLANTOIR_REQUIRE_FRONTMATTER=1, which makes a missing
   reader a failure rather than a skip; Windows' PythonToolchainTests
-  discovers it and runs the first two.
+  discovers it and runs all three, its interpreter having that reader.
 
 Run with:
 
@@ -141,20 +143,33 @@ class TheWizardWritesTheContractsTitles(unittest.TestCase):
                 return line
         raise AssertionError(f"{page} has no title line")
 
+    # NTFS refuses ":" in a name, so on Windows the wizard makes folders whose
+    # names still need quoting but carry no colon, and the colon case is
+    # compared IN MEMORY: the page written for STAND_IN, with the colon name
+    # put where the stand-in's stands. Everywhere else both go on disk.
+    ON_WINDOWS = os.name == "nt"
+    STAND_IN = "Notes #1"
+
     def test_the_wizards_folder_pages_carry_the_contracts_titles(self):
         section = folders_added_later()
         titles = {}
         for case in section["titleQuoting"]["cases"]:
             titles[case["name"]] = case["title"]
-        shared = ["Unit: One", "'Tis the Season", "Labs", self.COLON_CASE_FOLDER]
-        per_section = ["& Friends"]
-        course = self.make_course(shared, per_section, [1, 2])
+        if self.ON_WINDOWS:
+            checked = ["2024 Projects", "'Tis the Season", "Labs"]
+            shared = checked + [self.STAND_IN]
+            per_section_name = "-Dash"
+        else:
+            checked = ["Unit: One", "'Tis the Season", "Labs"]
+            shared = checked + [self.COLON_CASE_FOLDER]
+            per_section_name = "& Friends"
+        course = self.make_course(shared, [per_section_name], [1, 2])
 
-        for folder in ["Unit: One", "'Tis the Season", "Labs"]:
+        for folder in checked:
             self.assertEqual(self.title_line(course / folder / "index.md"), "title: " + titles[folder], folder)
         for number in (1, 2):
-            page = course / f"section{number}" / "& Friends" / "index.md"
-            self.assertEqual(self.title_line(page), "title: " + titles["& Friends"])
+            page = course / f"section{number}" / per_section_name / "index.md"
+            self.assertEqual(self.title_line(page), "title: " + titles[per_section_name])
 
         # The colon case's whole page, as the contract has it, with setup's
         # own moment put where the contract's stands.
@@ -163,7 +178,14 @@ class TheWizardWritesTheContractsTitles(unittest.TestCase):
             if case["folder"] == self.COLON_CASE_FOLDER:
                 colon_case = case
         self.assertIsNotNone(colon_case, "the contract's colon-and-space case is gone")
-        written = (course / self.COLON_CASE_FOLDER / "index.md").read_text(encoding="utf-8")
+        if self.ON_WINDOWS:
+            stand_in_page = (course / self.STAND_IN / "index.md").read_text(encoding="utf-8")
+            written = stand_in_page.replace(
+                "title: " + setup_course.frontmatter_title(self.STAND_IN),
+                "title: " + setup_course.frontmatter_title(self.COLON_CASE_FOLDER),
+            ).replace("**" + self.STAND_IN + "**", "**" + self.COLON_CASE_FOLDER + "**")
+        else:
+            written = (course / self.COLON_CASE_FOLDER / "index.md").read_text(encoding="utf-8")
         moment = None
         for line in written.split("\n"):
             if line.startswith("createdSection1: "):
