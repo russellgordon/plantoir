@@ -20,8 +20,8 @@ The formula says nothing about where the numbers come from, in what
 order to do the arithmetic, or what to do when somebody types "eight"
 instead of `8`. The algorithm has to.
 
-To run it, type the watts, the hours and the price on three lines of
-the input box — `1500`, `2` and `0.13`, say — then press Run.
+To run it, press Run, and type the watts, the hours and the price as
+it asks for each — `1500`, `2` and `0.13`, say.
 
 ```python run readonly
 watts = float(input("Appliance power, in watts: "))

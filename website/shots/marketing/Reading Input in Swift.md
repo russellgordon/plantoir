@@ -11,8 +11,8 @@ back nothing at all, so Swift makes you say what to do then.
 
 ## Ask, then answer
 
-Type your name and your age on two lines of the input box under the
-program, then press **Run**.
+Press **Run**, then type your name and your age when the program asks
+for them.
 
 ```swift run
 print("What is your name?")

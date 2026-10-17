@@ -430,7 +430,9 @@ WINDOWS_PICTURE_OWED: dict = {
     # Owed by the windows issue that follows #562 (its draft:
     # 562-windows-issue.md); code-swift stays owed until Windows compiles Swift.
     "code-python": "Windows carries no Python for runnable blocks yet (#568)",
+    "code-python-live": "Windows carries no Python for runnable blocks yet (#568), nor live input's headers (#583)",
     "code-python-error": "Windows carries no Python for runnable blocks yet (#568)",
+    "code-swift-live": "Windows makes no Swift block runnable yet (#570), nor live input's headers (#583)",
     "code-swift": "Windows makes no Swift block runnable yet (#570)",
     "code-quiz": "no Windows capture of the marketing folder's previews yet",
 }
@@ -446,7 +448,7 @@ class CodePagePictureTests(unittest.TestCase):
         import re
         page = (build.WEBSITE / "pages" / "code.html").read_text(encoding="utf-8")
         identifiers = re.findall(r"\{\{shot:([a-z0-9-]+)\}\}", page)
-        self.assertEqual(identifiers, ["code-python", "code-python-error", "code-swift", "code-quiz"])
+        self.assertEqual(identifiers, ["code-python", "code-python-live", "code-python-error", "code-swift-live", "code-swift", "code-quiz"])
         manifest = json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))
         shots = {shot["id"]: shot for shot in manifest["shots"]}
         for identifier in identifiers:
@@ -487,7 +489,7 @@ class PreviewPageSceneTests(unittest.TestCase):
         import capture
         self.assertEqual([shot["id"] for shot in capture.shots_of_kind("preview-page", scene="print-set")], ["print-page"])
         self.assertEqual([shot["id"] for shot in capture.shots_of_kind("preview-page", scene="code")],
-                         ["code-python", "code-python-error", "code-swift", "code-quiz"])
+                         ["code-python", "code-python-live", "code-python-error", "code-swift-live", "code-swift", "code-quiz"])
         for shot in capture.shots_of_kind("preview-page", scene="code"):
             with self.subTest(shot=shot["id"]):
                 self.assertTrue((capture.PREPARE_DIR / shot["capture"]["prepare"]).is_file())
