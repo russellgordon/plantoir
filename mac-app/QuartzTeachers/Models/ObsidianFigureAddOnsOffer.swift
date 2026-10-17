@@ -45,7 +45,7 @@ nonisolated enum ObsidianFigureAddOnsWording {
 
     /// The offer, asked at Open in Obsidian before Obsidian opens.
     static let offerTitle: String = "Show diagrams and graphs in Obsidian too?"
-    static let offerMessage: String = "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Return chooses the other button. Obsidian then opens its settings to show the add-ons switched on; close them to go on writing."
+    static let offerMessage: String = "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Return chooses the other button."
 
     /// Added under the offer when the course is open in Obsidian now.
     static let offerWhileOpen: String = "{course} is open in Obsidian now, so Obsidian closes and opens it again to show them. What you've written is kept."
