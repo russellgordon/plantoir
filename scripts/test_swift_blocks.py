@@ -429,6 +429,20 @@ class GroupingNotesAndCacheCaseTests(unittest.TestCase):
                     self.assertEqual(lines, [])
                 self.assertEqual(outcome["problems"], [], "a note is not a folder problem")
 
+    def test_the_previous_recipes_compile_error_is_still_a_compile_error(self):
+        """The fixes review's nit 5: after a recipe change with too little
+        room, a block the previous recipe could not compile is said as a
+        compile error, not as lack of room."""
+        old = self.space.cache_root / "0123456789abcdef"
+        old.mkdir(parents=True)
+        key = swift_blocks.key_of(BLOCK_ONE)
+        (old / f"{key}.json").write_text(json.dumps({"ok": False, "reason": "compileError",
+                                                     "diagnostics": "main.swift:1:7: error: cannot find 'nmae' in scope"}))
+        (self.space.cache_root / swift_blocks.STATE_FILE).write_text('{"state": "noRoom"}')
+        outcome = self.space.prepare([PrepareTests.page(f"```swift run\n{BLOCK_ONE}\n```\n")])
+        self.assertEqual([problem["reason"] for problem in outcome["problems"]], ["compileError"])
+        self.assertEqual(outcome["problems"][0]["said"], "cannot find 'nmae' in scope")
+
     def test_the_previous_recipes_program_is_served_until_this_one_compiles(self):
         case = [case for case in swift_rules("noteCases") if case.get("served")][0]
         old = self.space.cache_root / "0123456789abcdef"
@@ -532,6 +546,12 @@ if "-c" in args:
         os.kill(os.getpid(), signal.SIGKILL)
     if "SILENT_FAIL" in text:
         sys.exit(1)
+    if "ECHO_ERROR" in text:
+        # As swiftc does: the error, with the code around it echoed.
+        print("main.swift:1:7: error: cannot find 'killedCount' in scope\n" + text, file=sys.stderr)
+        sys.exit(1)
+    if "ECHO_WARNING" in text:
+        print("main.swift:1:5: warning: variable was never mutated\n" + text, file=sys.stderr)
     if "BOTH_FAIL" in text or ("EMBEDDED_FAILS" in text and embedded):
         print("main.swift:2:7: error: cannot find 'nmae' in scope", file=sys.stderr)
         sys.exit(1)
@@ -633,6 +653,20 @@ class CompileStepTests(unittest.TestCase):
         self.assertIsNone(self.entry("f" * 64), "a compiler killed by a signal was cached as the code's fault")
         self.assertIsNone(self.entry("0" * 64), "a failure with no diagnostics was cached as the code's fault")
         self.assertEqual(list(self.out.glob(".*.tmp")), [], "a temporary file was left behind")
+
+    def test_code_that_says_killed_is_not_a_killed_compiler(self):
+        """The fixes review's F1: the compiler echoes the student's code, so
+        'killed' or 'terminated due to signal' in a variable, a string or a
+        comment must not read as a compiler that was killed."""
+        warned = "1" * 64
+        failed = "2" * 64
+        self.job(warned, 'var enemiesKilled = 0 // the game was terminated due to signal 9 // ECHO_WARNING\nprint("Killed: \\(enemiesKilled)")')
+        self.job(failed, 'print(killedCount) // Killed, terminated due to signal // ECHO_ERROR')
+        self.compile.main(["compile.py", str(self.jobs), str(self.out)])
+        self.assertEqual(self.entry(warned)["sdk"], "embedded", "a warning that echoes 'killed' code was taken for a kill")
+        broken = self.entry(failed)
+        self.assertIsNotNone(broken, "an error naming killedCount was taken for a kill and not cached")
+        self.assertIn("cannot find 'killedCount' in scope", broken["diagnostics"])
 
 
 if __name__ == "__main__":

@@ -51,12 +51,12 @@ against a Mac's own toolchain while developing; the image never sets them.
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -88,9 +88,6 @@ JOB_SECONDS = 180
 MOST_DIAGNOSTIC_CHARACTERS = 4000
 
 OBJECT_ROOT = Path("/tmp/plantoir-swift")
-
-# The driver's own words when a step it started was killed.
-KILLED = re.compile(r"(failed|terminated) due to signal|Killed", re.I)
 
 COMMON = ["-target", "wasm32-unknown-wasip1", "-sdk", f"{SDK}/WASI.sdk", "-static-stdlib",
           # spike G2: the wasm builtins live in the SDK, not the Linux toolchain.
@@ -144,8 +141,11 @@ def run(arguments: list) -> tuple:
         raise TookTooLong(str(error)) from error
     said = (done.stdout or "") + (done.stderr or "")
     # Killed (out of memory, a signal): not the code's fault (review S3 of
-    # the implementation review, measured under --memory 50m).
-    if done.returncode < 0 or KILLED.search(said):
+    # the implementation review, measured under --memory 50m: every kill
+    # came back as a negative status). Decided by the status ALONE, never by
+    # reading the words - the compiler echoes the student's code, which may
+    # well say "killed" (the fixes review's F1).
+    if done.returncode < 0:
         raise NotTheCompilers(said or f"stopped by signal {-done.returncode}")
     return done.returncode, said
 
@@ -184,8 +184,10 @@ def tidy(said: str, work: Path) -> str:
 
 def write_atomically(path: Path, data: bytes) -> None:
     """By a temporary name that is this process's and thread's own, so two
-    launchers compiling the same key never take each other's (review N3)."""
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    launchers compiling the same key never take each other's (review N3,
+    and the fixes review's nit 3)."""
+    # os.getpid() is 1 in every container, so a random suffix makes it certain.
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp")
     temporary.write_bytes(data)
     try:
         os.replace(temporary, path)

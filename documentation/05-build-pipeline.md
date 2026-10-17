@@ -1973,9 +1973,10 @@ the second time (acceptance 10; verify.sh checks the page comes out the same).
 
 **When a block has no program**, the reason is said on a `plantoir: error:`
 line per block, and in the folder problem ONCE per cause: each compile error
-by its block and line, every other reason once, "…, for 17 blocks on 4
-pages" (implementation review S4: a cause every block shares was said ten
-times and "and 7 more"; `swiftCouldNotBePrepared.groupingCases`). The reasons
+by its block and line, every other reason once, count first ("17 blocks on 4
+pages: not made ready to run - …"; implementation review S4: a cause every
+block shares was said ten times and "and 7 more";
+`swiftCouldNotBePrepared.groupingCases`). The reasons
 (`swift.reasons`, pinned by `swift.reasonCases`):
 
 | Reason | When |

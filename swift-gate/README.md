@@ -42,15 +42,15 @@ overflows, and the trap prints NO `Fatal error:` line in either library
 
 Each fragment is `NN-name.swift` with `NN-name.stdin` (the input box's lines)
 and `NN-name.expected` (what it prints, without the echoed input). For the
-three that trap, `.expected` is what it prints before the trap. Every
+four that trap, `.expected` is what it prints before the trap. Every
 `.expected` for 01–09 was checked against a native macOS build (Swift 6.4.0,
 `swiftc -O -swift-version 5`) on 2026-10-17.
 
 ## Measured (2026-10-17, the Swift image on Colima, Apple M4 Pro)
 
 Compiled by `support/swift/compile.py` in `teaching-quartz-swift`, all
-fourteen in parallel in 11 s (15 measured with the macOS toolchain, same
-sizes as ever), then run by `wasi_run.mjs` in Node 22:
+fifteen in parallel in 13 s (verify.sh at 50bbb079e), then run by
+`wasi_run.mjs` in Node 22:
 
 | # | Library | Bytes | Imports | Result |
 |---|---|---|---|---|
