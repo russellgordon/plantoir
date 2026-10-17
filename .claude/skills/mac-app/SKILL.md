@@ -491,7 +491,9 @@ and code comments should too. The rule is about what appears on screen.
   fails. Run `mac-app/Vendor/fetch-sparkle.sh` once per clone or worktree. A
   Debug build has no update feed, so it never checks for or installs anything.
 - **`Vendor/helpers` is not committed either** (#312), and without it
-  `xcodegen generate` fails too. `mac-app/Vendor/fetch-helpers.sh` once per
+  `xcodegen generate` fails too. `mac-app/Vendor/fetch-obsidian-addons.sh`
+  (#495, 12.9 MB, pins read from the contract) is the fourth: once per clone
+  or worktree, or generating fails. `mac-app/Vendor/fetch-helpers.sh` once per
   clone or worktree: ~470 MB the first time on a Mac, seconds after that
   (the cache is outside the repository).
 - **The assistant's model is not bundled** — it downloads to Application

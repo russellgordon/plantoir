@@ -6592,6 +6592,14 @@ Three properties matter more than the mechanism:
   A teacher's own file of either name is added to only after they say yes in
   a sheet. See
   [09 → Printing](09-mac-app.md#guidance-for-an-assistant-written-into-the-working-folder).
+- **An assistant never writes under `.obsidian`** (#495). Obsidian's add-ons
+  for diagrams and graphs are Plantoir's to add, on the teacher's own yes at
+  Open in Obsidian (09 → "Obsidian's add-ons for diagrams and graphs (#495)");
+  the `plantoir-math-graphs` skill tells an assistant never to install,
+  download or edit anything there, and what to tell a teacher whose Obsidian
+  shows a fence as text. No tool, schema or prompt byte moved: none of the
+  assistants — Plantoir's own or an outside one — can add an add-on, and the
+  offer is never made through them (`obsidianAddOnsForFigures.rejected`).
 - **The item is hidden when the tool is not installed**, and hidden
   independently per door. Not greyed out: a menu that teaches teachers to stop
   reading it is worse than a shorter menu.

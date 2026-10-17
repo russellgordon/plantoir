@@ -556,6 +556,7 @@ cd mac-app
 ./Vendor/fetch-llama.sh     # REQUIRED before generating — see below
 ./Vendor/fetch-sparkle.sh   # REQUIRED too, since #204 — see below
 ./Vendor/fetch-helpers.sh   # REQUIRED too, since #312 — ~470 MB, see below
+./Vendor/fetch-obsidian-addons.sh   # REQUIRED too, since #495 — 12.9 MB, see below
 xcodegen generate
 open Plantoir.xcodeproj
 ```
@@ -589,6 +590,18 @@ from `setup.sh` and keeps its downloads in a cache OUTSIDE the repository
 second clone or worktree costs a few seconds and no disk; the first costs the
 download. Run `xcodegen generate` again after it replaces the folder (Trap 1).
 `documentation/09-mac-app.md` → "What the app carries for the website builder".
+
+`fetch-obsidian-addons.sh` fetches the two Obsidian add-ons the app offers to
+add to a course with diagrams and graphs (TikZJax 0.5.2 and Functionplot
+1.2.1, 12.9 MB with their licences, #495). Also **not optional**:
+`project.yml` names `Vendor/obsidian-addons` as a resource folder. It reads
+every version, size and SHA-256 from `contracts/shared-rules.json` →
+`obsidianAddOnsForFigures.addOns` (a test fails if a hash is written into
+the script), refuses a mismatch, and caches outside the repository
+(`${PLANTOIR_ADDONS_CACHE:-~/Library/Caches/Plantoir-dev/obsidian-addons}`).
+Run it once per clone or worktree, and `xcodegen generate` again after it
+replaces the folder (Trap 1). `documentation/09-mac-app.md` → "Obsidian's
+add-ons for diagrams and graphs (#495)".
 
 Debug builds are signed with a real "Apple Development" identity
 (`DEVELOPMENT_TEAM` in `project.yml`) rather than ad-hoc — an ad-hoc signature
