@@ -24456,7 +24456,8 @@
         ],
         "inputCall": "input()",
         "inputPattern": "\\binput\\s*\\(",
-        "prebuilt": false
+        "prebuilt": false,
+        "colour": "python"
       },
       {
         "fence": "swift",
@@ -24472,10 +24473,11 @@
         ],
         "inputCall": "readLine()",
         "inputPattern": "\\breadLine\\s*\\(",
-        "prebuilt": true
+        "prebuilt": true,
+        "colour": "swift"
       }
     ],
-    "languagesRule": "The ONE table everything reads. `fence` is the info string's first word, exact; `idPrefix` names the block's id (ids); `displayName` fills {language} in the words; `runtime` picks the class in codeRunner.inline.ts that runs it; `engine` is the folder under VENDOR_DIR, under support/gated and under the site's static/ (the #454 convention: one name in all three); `worker` is the file inside it the page starts; `editable` false makes every block of the language read-only (Swift: a student changes the input, never the code, and the page says words.cannotEdit once under it); `flags` are the tokens after `run` the language accepts; `inputCall` fills {inputCall}; `inputPattern` is a JavaScript and Python regular expression that shows the input box without the `stdin` flag; `prebuilt` false means the browser runs the source as written; true means the build compiles each block ahead of time and the page runs the result (Swift: `swift`), and the language's engine is its overlay alone - support/gated/<engine> - because what really runs is made per course (siteCarriesEngine). Two literal mirrors exist because the site's code must bundle without the contract and page_features.py must run without the image: `LANGUAGES` in support/quartz/plugins/transformers/codeRunnerRule.ts and `RUNNER_LANGUAGES` in scripts/page_features.py. scripts/test_page_features.py pins the Python mirror field for field and scripts/check_runner_rules_against_the_site.py the TypeScript one. REJECTED: the word `python` anywhere in the fence rule, the ids, the gate, the words or the print rule (Russell, 2026-10-09: a new language is a drop-in, not a rewrite).",
+    "languagesRule": "The ONE table everything reads. `fence` is the info string's first word, exact; `idPrefix` names the block's id (ids); `displayName` fills {language} in the words; `runtime` picks the class in codeRunner.inline.ts that runs it; `engine` is the folder under VENDOR_DIR, under support/gated and under the site's static/ (the #454 convention: one name in all three); `worker` is the file inside it the page starts; `editable` false makes every block of the language read-only (Swift: a student changes the input, never the code, and the page says words.cannotEdit once under it); `flags` are the tokens after `run` the language accepts; `inputCall` fills {inputCall}; `inputPattern` is a JavaScript and Python regular expression that shows the input box without the `stdin` flag; `prebuilt` false means the browser runs the source as written; true means the build compiles each block ahead of time and the page runs the result (Swift: `swift`), and the language's engine is its overlay alone - support/gated/<engine> - because what really runs is made per course (siteCarriesEngine); `colour` (#585) names the tokenizer in support/quartz/components/scripts/codeRunnerColour.ts that colours the language's editor (editor.colour), or null for none. Two literal mirrors exist because the site's code must bundle without the contract and page_features.py must run without the image: `LANGUAGES` in support/quartz/plugins/transformers/codeRunnerRule.ts and `RUNNER_LANGUAGES` in scripts/page_features.py. scripts/test_page_features.py pins the Python mirror field for field and scripts/check_runner_rules_against_the_site.py the TypeScript one. REJECTED: the word `python` anywhere in the fence rule, the ids, the gate, the words or the print rule (Russell, 2026-10-09: a new language is a drop-in, not a rewrite).",
     "fences": {
       "rule": "`lang` is the info string's first word as written and `meta` the rest (mdast's `lang` and `meta`; markdown_code.fenced_blocks's `lang` and `meta`). A runner when `optedIn`, `lang` equals a table row's `fence` exactly, and `meta` split on runs of whitespace holds `run` exactly. `flags` are the tokens that equal one of the row's flags exactly, each once, in the row's order; anything else is ignored. A whitespace split means a title that contains ` run ` makes a runner and `run.py` does not (S5): chosen, not discovered.",
       "cases": [
