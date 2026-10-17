@@ -24036,5 +24036,462 @@
       { "choice": "frontPage", "trail": "Settings ▸ Preview — Preview now opens at the front page" },
       { "choice": "lastViewed", "trail": "Settings ▸ Preview — Preview now opens at the page last viewed" }
     ]
+  },
+  "codeRunnerBlocks": {
+    "note": "#455 (+#494), v1.8.0. A fenced block of code on a page that opts in becomes a small program a student can edit and RUN in the browser, with nothing installed and no account: ```python run on a page whose frontmatter says `codeRunner: true`. Python is the only language today; everything below reads the LANGUAGE TABLE (`languages`), so a second language is a row in that table, a runtime class in the page's code, a vendor layer and a pin - and nothing else (documentation/06-quartz-customizations.md -> 'I. Runnable code (#455)' -> 'Adding a language'). The page's half is support/quartz (codeRunnerRule.ts, codeRunner.ts, CodeRunner.tsx, codeRunner.inline.ts, codeRunner.scss); the engine's half is support/gated/<engine> laid over VENDOR_DIR/<engine> and copied into a site only when it needs it (siteCarriesEngine). No trail event: the app does nothing new a teacher sees.",
+    "rule": "A block runs only where THREE things hold: the page opts in (`codeRunner: true`, read as file-formats.json -> pageOptIns says), the fence's language is the FIRST word of its info string and is exactly a table row's `fence` (lowercase, Q1), and the rest of the info string, split on whitespace, holds the token `run` exactly. Any other block - on any page - is left exactly as it was, byte for byte. A runnable block keeps its highlighted code as the page shows it without the script, in a popover, and on paper; the page's script then replaces it with an editor (or keeps it, for `readonly`), an input box when the program reads input, Run / Stop / Reset, a status line and the output. ONE program runs on a page at a time (Q2): Run on a second block stops the first and says words.stoppedForAnother. Nothing is fetched until a student presses Run (or an `autorun` block scrolls into view): a page with runnable code costs a reader nothing until then.",
+    "languages": [
+      {
+        "fence": "python",
+        "idPrefix": "py",
+        "displayName": "Python",
+        "runtime": "pyodide",
+        "engine": "pyodide",
+        "worker": "plantoir-worker.js",
+        "editable": true,
+        "flags": [
+          "readonly",
+          "stdin",
+          "autorun"
+        ],
+        "inputCall": "input()",
+        "inputPattern": "\\binput\\s*\\(",
+        "prebuilt": false
+      }
+    ],
+    "languagesRule": "The ONE table everything reads. `fence` is the info string's first word, exact; `idPrefix` names the block's id (ids); `displayName` fills {language} in the words; `runtime` picks the class in codeRunner.inline.ts that runs it; `engine` is the folder under VENDOR_DIR, under support/gated and under the site's static/ (the #454 convention: one name in all three); `worker` is the file inside it the page starts; `editable` false would make every block read-only; `flags` are the tokens after `run` the language accepts; `inputCall` fills {inputCall}; `inputPattern` is a JavaScript and Python regular expression that shows the input box without the `stdin` flag; `prebuilt` false means the browser runs the source as written (true is #493's: the build compiles it first). Two literal mirrors exist because the site's code must bundle without the contract and page_features.py must run without the image: `LANGUAGES` in support/quartz/plugins/transformers/codeRunnerRule.ts and `RUNNER_LANGUAGES` in scripts/page_features.py. scripts/test_page_features.py pins the Python mirror field for field and scripts/check_runner_rules_against_the_site.py the TypeScript one. REJECTED: the word `python` anywhere in the fence rule, the ids, the gate, the words or the print rule (Russell, 2026-10-09: a new language is a drop-in, not a rewrite).",
+    "fences": {
+      "rule": "`lang` is the info string's first word as written and `meta` the rest (mdast's `lang` and `meta`; markdown_code.fenced_blocks's `lang` and `meta`). A runner when `optedIn`, `lang` equals a table row's `fence` exactly, and `meta` split on runs of whitespace holds `run` exactly. `flags` are the tokens that equal one of the row's flags exactly, each once, in the row's order; anything else is ignored. A whitespace split means a title that contains ` run ` makes a runner and `run.py` does not (S5): chosen, not discovered.",
+      "cases": [
+        {
+          "name": "the plain case",
+          "lang": "python",
+          "meta": "run",
+          "optedIn": true,
+          "runner": true,
+          "flags": []
+        },
+        {
+          "name": "a page that does not opt in is untouched",
+          "lang": "python",
+          "meta": "run",
+          "optedIn": false,
+          "runner": false
+        },
+        {
+          "name": "no run token",
+          "lang": "python",
+          "meta": "",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "runn is not run",
+          "lang": "python",
+          "meta": "runn",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "Python in capitals is not a runner (Q1)",
+          "lang": "Python",
+          "meta": "run",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "py is not a fence in the table",
+          "lang": "py",
+          "meta": "run",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "all three flags",
+          "lang": "python",
+          "meta": "run readonly stdin autorun",
+          "optedIn": true,
+          "runner": true,
+          "flags": [
+            "readonly",
+            "stdin",
+            "autorun"
+          ]
+        },
+        {
+          "name": "an unknown token is ignored",
+          "lang": "python",
+          "meta": "run foo",
+          "optedIn": true,
+          "runner": true,
+          "flags": []
+        },
+        {
+          "name": "flags are exact lowercase",
+          "lang": "python",
+          "meta": "run READONLY",
+          "optedIn": true,
+          "runner": true,
+          "flags": []
+        },
+        {
+          "name": "two spaces before run",
+          "lang": "python",
+          "meta": "  run",
+          "optedIn": true,
+          "runner": true,
+          "flags": []
+        },
+        {
+          "name": "a flag before run",
+          "lang": "python",
+          "meta": "readonly run",
+          "optedIn": true,
+          "runner": true,
+          "flags": [
+            "readonly"
+          ]
+        },
+        {
+          "name": "a comma is not whitespace",
+          "lang": "python",
+          "meta": "run,stdin",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "line highlighting before run",
+          "lang": "python",
+          "meta": "{1,3} run",
+          "optedIn": true,
+          "runner": true,
+          "flags": []
+        },
+        {
+          "name": "a title with a bare run inside it",
+          "lang": "python",
+          "meta": "title=\"a run b\"",
+          "optedIn": true,
+          "runner": true,
+          "flags": [],
+          "why": "Whitespace split (S5): the title's middle word is the token."
+        },
+        {
+          "name": "a title naming run.py",
+          "lang": "python",
+          "meta": "title=\"run.py\"",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "a language not in the table is untouched",
+          "lang": "ruby",
+          "meta": "run",
+          "optedIn": true,
+          "runner": false
+        },
+        {
+          "name": "a title before run",
+          "lang": "python",
+          "meta": "title=\"loop.py\" run",
+          "optedIn": true,
+          "runner": true,
+          "flags": []
+        },
+        {
+          "name": "a flag written twice counts once",
+          "lang": "python",
+          "meta": "run stdin stdin",
+          "optedIn": true,
+          "runner": true,
+          "flags": [
+            "stdin"
+          ]
+        },
+        {
+          "name": "a no-break space between the words (Option-Space)",
+          "lang": "python\u00a0run",
+          "meta": "",
+          "optedIn": true,
+          "runner": true,
+          "flags": [],
+          "fence": "python",
+          "why": "Review N2: micromark leaves all of it in `lang`; both sides split the info string on the same set of spaces (INFO_SPACE), NBSP among them."
+        },
+        {
+          "name": "flags come in the table's order",
+          "lang": "python",
+          "meta": "run autorun readonly",
+          "optedIn": true,
+          "runner": true,
+          "flags": [
+            "readonly",
+            "autorun"
+          ]
+        }
+      ],
+      "pageShapes": {
+        "rule": "Where a fence can SIT, on a page that opts in, read by both sides: the site's transformer (codeRunnerRule.findRunners over Quartz's own parse) and the build's count (page_features.runner_fences over markdown_code.fenced_blocks, the #313 fence rule). `runners` is how many runnable blocks BOTH sides find; `siteBodies` is the code each runnable block holds on the site. A fence opened on a line that opens a list item holding another container on that same line (`- - ```python run`, `1. > ```python run`) is a code block to the site's parser and was nothing to the build's reader, which then misread every fence after it (review S2, measured with remark). The build's reader now opens it too, marked `nested` (markdown_code.fenced_blocks), so the fences after it are read alike; and it is NOT a runner on either side (the transformer skips such a block), so it stays the plain highlighted block it always was. A lazy line (indented less than its list item's content) ends the block on the site and not in the build's reader: both find ONE runner and agree on whether the site carries the engine, which is all #455 asks of the build; the site's body is the one that runs (#493, which compiles the body, makes the build agree). Where the two still disagree in a shape nobody has measured, siteDisagrees is the safety net.",
+        "cases": [
+          {
+            "name": "at the top level",
+            "page": "```python run\nprint(1)\n```\n",
+            "runners": 1,
+            "siteBodies": [
+              "print(1)"
+            ]
+          },
+          {
+            "name": "in a folded callout",
+            "page": "> [!example]- Try it\n> ```python run\n> print(2)\n> ```\n",
+            "runners": 1,
+            "siteBodies": [
+              "print(2)"
+            ]
+          },
+          {
+            "name": "in a list item indented with a tab",
+            "page": "- step one\n\t```python run\n\tprint(3)\n\t```\n",
+            "runners": 1,
+            "siteBodies": [
+              "print(3)"
+            ]
+          },
+          {
+            "name": "on a list marker's own line",
+            "page": "- ```python run\n  print(4)\n  ```\n",
+            "runners": 1,
+            "siteBodies": [
+              "print(4)"
+            ]
+          },
+          {
+            "name": "on a quote's and a list marker's own line",
+            "page": "> - ```python run\n>   print(5)\n>   ```\n",
+            "runners": 1,
+            "siteBodies": [
+              "print(5)"
+            ]
+          },
+          {
+            "name": "on two list markers' own line (S2)",
+            "page": "- - ```python run\n    print(6)\n    ```\n",
+            "runners": 0,
+            "siteBodies": [],
+            "why": "The site's parser sees a block, the build's reader does not; neither makes it a runner."
+          },
+          {
+            "name": "on a list marker and a quote's own line",
+            "page": "1. > ```python run\n   > print(7)\n   > ```\n",
+            "runners": 0,
+            "siteBodies": []
+          },
+          {
+            "name": "a runner after a fence on two list markers' line",
+            "page": "- - ```python run\n    print(6)\n    ```\n\n```python run\nprint(9)\n```\n",
+            "runners": 1,
+            "siteBodies": [
+              "print(9)"
+            ],
+            "why": "Before the reader opened the nested block, the build read its closing ``` as an opening one and missed this runner."
+          },
+          {"name": "a list fence left open, then closed as the safety net's line says", "page": "- step one\n  ```python\n  print(1)\n  ```\n- step two\n\n```python run\nprint(2)\n```\n", "runners": 1, "siteBodies": ["print(2)"], "why": "Review N3 of the fixes: the closing ``` indented like the opening line closes it on both sides; at column 0 it does not."},
+          {"name": "a fence on a list marker's line, closed as the safety net's line says", "page": "- ```python\n  print(1)\n  ```\n\n```python run\nprint(2)\n```\n", "runners": 1, "siteBodies": ["print(2)"]},
+          {
+            "name": "a lazy line in a list item (S2)",
+            "page": "1. item\n   ```python run\n   x = 8\n  print(x)\n   ```\n",
+            "runners": 1,
+            "siteBodies": [
+              "x = 8"
+            ],
+            "why": "The two-space line ends the list item, and with it the block, on the site; the build's reader keeps it. One runner either way."
+          }
+        ]
+      }
+    },
+    "ids": {
+      "rule": "Every runnable block has an id, `<slug>-<idPrefix>-<n>`, n counting THAT language's runnable blocks on the page from 1 in document order; blocks that are not runnable are not counted. The id names the block's saved edits (storage), so it is positional: a runner inserted ABOVE others gives every one below a new id (knownLimits).",
+      "cases": [
+        {
+          "slug": "Units/Loops",
+          "page": "```python run\nprint(1)\n```\n\n```python\nprint(2)\n```\n\n```python run readonly\nprint(3)\n```\n",
+          "ids": [
+            "Units/Loops-py-1",
+            "Units/Loops-py-2"
+          ]
+        },
+        {
+          "slug": "index",
+          "page": "- - ```python run\n    print(0)\n    ```\n\n```python run\nprint(1)\n```\n",
+          "ids": [
+            "index-py-1"
+          ]
+        }
+      ]
+    },
+    "siteCarriesEngine": {
+      "rule": "The #454 gate, per site, per language: `static/<engine>/` (the table row's engine: VENDOR_DIR/<engine> with support/gated/<engine> laid over it, later winning - for Python the five pinned Pyodide files, its README and plantoir-worker.js) only when at least one page students can see opts in AND holds at least one runnable block of that language. A page that opts in with no runnable block carries nothing (#455 plan Q1, Russell 2026-10-17: with two languages the key alone cannot say which engine to carry). A missing engine (VENDOR_DIR/<engine> absent - the overlay alone is not an engine) is one plain line and no Run button, never a stopped build. Each case's pages give `codeRunner` as the build hands it over (parsed), `printable` likewise, the page's `body` and whether students can see it.",
+      "cases": [
+        {
+          "name": "no page opts in",
+          "pages": [
+            {
+              "codeRunner": null,
+              "printable": null,
+              "body": "```python run\nprint(1)\n```\n",
+              "visible": true
+            }
+          ],
+          "engines": {
+            "pyodide": false,
+            "pagedjs": false
+          }
+        },
+        {
+          "name": "one page students can see opts in with a runnable block",
+          "pages": [
+            {
+              "codeRunner": true,
+              "printable": null,
+              "body": "```python run\nprint(1)\n```\n",
+              "visible": true
+            }
+          ],
+          "engines": {
+            "pyodide": true,
+            "pagedjs": false
+          }
+        },
+        {
+          "name": "only a page students cannot see",
+          "pages": [
+            {
+              "codeRunner": true,
+              "printable": null,
+              "body": "```python run\nprint(1)\n```\n",
+              "visible": false
+            }
+          ],
+          "engines": {
+            "pyodide": false,
+            "pagedjs": false
+          }
+        },
+        {
+          "name": "opted in with no runnable block",
+          "pages": [
+            {
+              "codeRunner": true,
+              "printable": null,
+              "body": "```python\nprint(1)\n```\n",
+              "visible": true
+            }
+          ],
+          "engines": {
+            "pyodide": false,
+            "pagedjs": false
+          }
+        },
+        {
+          "name": "printable only",
+          "pages": [
+            {
+              "codeRunner": null,
+              "printable": true,
+              "body": "Questions.\n",
+              "visible": true
+            }
+          ],
+          "engines": {
+            "pyodide": false,
+            "pagedjs": true
+          }
+        },
+        {
+          "name": "the string true does not opt in",
+          "pages": [
+            {
+              "codeRunner": "true",
+              "printable": null,
+              "body": "```python run\nprint(1)\n```\n",
+              "visible": true
+            }
+          ],
+          "engines": {
+            "pyodide": false,
+            "pagedjs": false
+          }
+        }
+      ]
+    },
+    "siteDisagrees": {
+      "rule": "Review S2's safety net. The build writes the engines the site carries into quartz/plantoir_code_runner.json (`carried`) before the site is made. When the site's transformer finds a runnable block whose language's engine is NOT carried - the build's reader missed the block, the engine is missing from this copy of Plantoir, or the page was changed while a preview was running - it leaves the block as the plain highlighted code it was (a student never sees words.engineMissing for ever) and prints one line an assistant can read: `plantoir: error: <page>.md: <fence> block <n>: ` + words.blockNotPrepared - or words.blockAfterUnclosedFence when a fenced code block above it on the page was never closed, the likeliest cause (review N3: the site closes such a fence at the end of its list item, the build's reader carries on through the block below). The line stays in the build's output; it is not a folder problem in the app (the transformer runs after the folder checks are said) - a gap recorded on #455. The live preview's own rebuild cannot run the gate again (documentation/05-build-pipeline.md -> 'The live-preview edge'), so a block added while a preview runs shows as plain code until the next preview.",
+      "example": "plantoir: error: Units/Loops.md: python block 2: words.blockNotPrepared"
+    },
+    "harness": {
+      "rule": "What a Run does, in the engine's own thread (a module worker, plantoir-worker.js: B1 measured that Pyodide 314 refuses a classic worker wherever the page's CSP allows data: scripts). The program is compiled as `main.py` and run with fresh globals; its traceback is trimmed to start at the first `main.py` frame, so a line number in the output is the line in the editor (CPython's own wording); a SyntaxError prints without the `Traceback` header, as CPython prints one; SystemExit is silent. BEFORE EVERY RUN (S3, measured: one block's `builtins.print = ...` silenced the next block on the page): builtins are restored from a copy taken at load, sys.stdout / stderr / stdin and the recursion limit are reset, and the program starts in a fresh empty folder. Files a program writes exist for that run only. Nothing is ever fetched for an `import`: packages outside the standard library are not there (no pip, numpy or matplotlib), and turtle, tkinter, curses, readline, venv, ensurepip and pip fail; sqlite3, decimal, zoneinfo, hashlib, ssl, lzma, csv, json, asyncio and threading work (measured, review 2026-10-09).",
+      "workerTalks": "page -> worker: {type: \"run\", source, stdin: [lines]}. worker -> page: {type: \"ready\", ms}, {type: \"out\", text, err: boolean}, {type: \"done\", error: boolean}, {type: \"fail\", message}."
+    },
+    "stdin": {
+      "rule": "The input box shows when the block has the `stdin` flag or its CURRENT code matches the row's `inputPattern`; it sits between the code and the buttons (Q3) and is filled BEFORE Run, one line for each {inputCall}. It is never stored. Each line the program reads is echoed into the output straight after the prompt (Q4), so the transcript reads `Name? Ada` and not `Name? Hello Ada`; past the last line the program's {inputCall} raises EOFError, as at the end of a file. REJECTED: a prompt box per call driven by SharedArrayBuffer (the page would need cross-origin isolation headers, which a folder publish cannot send) and window.prompt (blocks the page, and iPadOS styles it as an alert)."
+    },
+    "output": {
+      "rule": "Output streams as the program prints it, gathered once per animation frame; stderr is set apart (span.plantoir-runner-err). At `maxCharacters` characters the program is stopped and words.outputTooLong shown (Q5): it protects an iPad's tab - a 200,000-line flood reached the page in 645 ms on a Mac, so the cap is protective rather than essential. Stop ends the program at once by ending its thread; the next Run starts a new one, which asks the site for its files again (a few small checks online - about 1 s on a Mac, 1.7 s in the iPad simulator, measured 2026-10-09 - and couldNotLoad offline).",
+      "maxCharacters": 100000
+    },
+    "loading": {
+      "rule": "The engine is fetched on the first Run on a page (or an `autorun` block's first view) - never on page load - and kept warm for the rest of that page's visit; leaving the page ends it. If it has not said ready `watchdogSeconds` after starting, it is stopped and words.couldNotLoad shown (S1: a server that sends `.wasm` as the wrong type, or a CSP with no wasm permission, otherwise leaves a spinner for ever). If the thread fails to start at all, ONE request for the worker file decides the words: 404 -> words.engineMissing, anything else -> words.couldNotLoad. A page opened as a file (file://) starts nothing and says words.needsWebAddress. Hosts must send `.wasm` as application/wasm and `.mjs` as a JavaScript type; a CSP must allow 'unsafe-eval' or 'wasm-unsafe-eval' (documentation/07-deployment.md).",
+      "watchdogSeconds": 45
+    },
+    "storage": {
+      "rule": "A student's edits are kept in the browser (localStorage), per site and block: key `plantoir:runner:<base>:<id>`, <base> being the site root's path as this page resolves it (N5: previews on one port and folder publishes under one host share an origin), holding {originalHash, code}; originalHash is FNV-1a 32 of the teacher's code (not crypto.subtle, which a preview reached over a school network's plain http does not have). Written `debounceMilliseconds` after the last keystroke and at once when the page is left (addCleanup, pagehide). Code equal to the teacher's removes the key. When the teacher's code has CHANGED since the edits were saved (the hash differs), the saved value is moved to `<key>:set-aside` (replacing any earlier one), the live key is removed, the teacher's new code is shown, and words.teacherChangedIt is said - once, because the live key is gone. Set-aside work is NOT offered back (S4, Russell 2026-10-17). Reset puts the teacher's code back, removes the key and clears the output. `readonly` blocks store nothing. Every storage call is guarded: a browser that refuses storage simply forgets.",
+      "debounceMilliseconds": 400
+    },
+    "editor": {
+      "rule": "A plain textarea in the site's code font, at least 16 px (iPadOS zooms the page on focus below 16 px), spellcheck, autocapitalise, autocorrect and autocomplete off, no wrapping. It grows with its code up to `maxLines` lines, then scrolls; growing inside an open callout lifts the callout's fixed height so nothing is clipped. Tab inserts four spaces (or indents every selected line), Shift-Tab takes up to four off; Escape then Tab leaves the editor (the keyboard trap rule); nothing happens while an input method is composing; Enter is never intercepted (no auto-indent: it fights the iPadOS keyboard). Cmd/Ctrl-Enter runs. `readonly` keeps the highlighted code and shows only Run and Stop. REJECTED: CodeMirror (a 400 KB editor per page for indentation), auto-indent.",
+      "maxLines": 24,
+      "indent": "    "
+    },
+    "print": {
+      "rule": "DECISION 8. On paper a runnable block prints as code and nothing else - no buttons, input box, status or output: an UNEDITED block prints its highlighted code as every other block does; an EDITED one prints the student's current code, from a copy kept in step with the editor (pre.plantoir-runner-print, wrapper class plantoir-runner-edited), because a textarea's typed value is not part of what a printed or copied page holds. The same rules serve ⌘P and the Print button (Paged.js promotes @media print), and the Print button waits for the copy to be brought up to date (window.plantoirPrint.prepare). Every rule is scoped under .plantoir-runner, so a page with no runnable block prints exactly as before (B2)."
+    },
+    "words": {
+      "note": "English, as data, on a page students read. {language} is the table row's displayName and {inputCall} its inputCall. No word names the machinery (CLAUDE.md rule 1): never the engine's name, WebAssembly, a worker or a thread. blockNotPrepared and blockAfterUnclosedFence are reasons on a `plantoir: error:` line (siteDisagrees), which an assistant and a teacher read.",
+      "run": "Run",
+      "stop": "Stop",
+      "reset": "Reset",
+      "editorLabel": "{language} code you can edit",
+      "readonlyLabel": "{language} code",
+      "inputLabel": "Input: one line for each {inputCall}",
+      "outputLabel": "Output",
+      "loading": "Loading {language}…",
+      "running": "Running…",
+      "ready": "Ready",
+      "finished": "Finished.",
+      "finishedWithError": "Finished with an error.",
+      "stopped": "Stopped.",
+      "stoppedForAnother": "Stopped so another program on this page could run.",
+      "outputTooLong": "Stopped: the program printed too much.",
+      "needsWebAddress": "{language} runs only when this page is opened from its web address.",
+      "engineMissing": "{language} isn't on this site yet. Preview the site again to add it.",
+      "couldNotLoad": "{language} couldn't start. Check the connection, then press Run again.",
+      "teacherChangedIt": "Your teacher has changed this code, so it shows their new version.",
+      "blockNotPrepared": "this block shows as plain code because the site was prepared without {language} - preview the site again, and if this line comes back, start the block's ``` on a line of its own",
+      "blockAfterUnclosedFence": "this block shows as plain code because a code block above it on this page is never closed - close that block with a line like the one that opened it (the same ``` or ~~~, indented the same, inside the same list item or callout), then preview the site again"
+    },
+    "agentGuidance": {
+      "rule": "The skill `plantoir-runnable-code` sits beside `plantoir-printing` and `plantoir-math-graphs` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): the opt-in, the fence, the flags, input and EOFError, the measured list of what imports and what does not, files, `%%`, adding blocks after existing ones, offline and file:// behaviour, how it prints, and checking it in Preview. One skill for every language in the table: a language that joins it adds a section, not a second skill. The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
+      "skill": "plantoir-runnable-code"
+    },
+    "knownLimits": [
+      "Quartz removes every `%%` pair from a page before it reads anything, inside fences too, so `print(\"100%%\")` is altered on the site and not in Obsidian.",
+      "A block shown on another page by an embed (![[Loops]]) keeps its own page's id, so two copies of one block share their saved edits (N1).",
+      "Ids are positional: a runnable block inserted ABOVE others gives every block below it a new id, which sets aside students' saved edits on those blocks. Add new blocks after the ones students already use.",
+      "Each Run starts from a reset interpreter (harness), but a program can still leave residue in the same page visit: a standard-library module it changed stays changed, and `random`'s state carries on (S3). Stop, then Run, starts clean.",
+      "The build's fence reader and the site's parser can still read a shape nobody has measured differently (pageShapes); the site then shows plain code and says so on a `plantoir: error:` line (siteDisagrees).",
+      "Measured by fuzzing (review N2, 2026-10-17): the build's reader also counts a fence indented four spaces at the top of a page (indented code to the site) and a fence inside an HTML block such as <div> - the site then carries the engine for nothing, which costs bytes and nothing else; the site, for its part, decodes a character reference in the info string (`&#114;un` reads as `run`), keeps a fence inside a `$$` maths block as maths, and reads a few deeper quote-and-list nestings differently - each of those shows as plain code with the safety net's line; and a lazy line that leaves a list fence open makes the build's reader carry on and count a block the site shows as code text (bytes only). Fuzz: 856 random pages, 38 disagreeing, every one in these groups (a second fuzz by the review, 1,284 pages, found the last group 3 times).",
+      "The page's code needs a browser that runs module workers: Safari and iPadOS 15 or later, Chrome 80 or later, Firefox 114 or later.",
+      "A site opened as files on a computer, rather than from its web address, cannot run code: Safari 26.6 and Chrome for Testing 155 run none of a page's scripts from a file (measured 2026-10-17), so the blocks show as their highlighted code with no Run button; a browser that does run them is told words.needsWebAddress. KaTeX's faces DID load from a file in both (measured), so the maths keeps its look."
+    ]
   }
 }
