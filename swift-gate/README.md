@@ -1,9 +1,9 @@
 # swift-gate: the fragments every Swift toolchain must pass (#493)
 
-Twelve small Swift programs, written the way a Grade 11 or 12 student writes
+Fourteen small Swift programs, written the way a Grade 11 or 12 student writes
 them, that the Swift image (`support/swift/`) must compile and the site's own
 WASI shim (`support/gated/swift/plantoir-wasi.mjs`) must run correctly. They
-are the gate for runnable Swift blocks: `verify.sh` compiles all twelve in the
+are the gate for runnable Swift blocks: `verify.sh` compiles all fourteen in the
 image it builds and runs them through `browser-checks/wasi_run.mjs`, which
 checks each against `expected.json`.
 
@@ -14,7 +14,10 @@ fragment changes neither the website builder's image nor the app bundle.
 Fragments 01–10 are the ten #493's Phase 0 measured, re-authored to its table
 on 2026-10-17 (the originals were in a scratchpad that was lost); 01 and 05
 are the spike's. 11 and 12 were added by the plan review (S5): a recursion
-that never stops and a list that grows for ever.
+that never stops and a list that grows for ever. 13 and 14 were added while
+implementing: a prompt printed with `terminator: ""` before `readLine()`,
+whose echoed answer came BEFORE the prompt until readLine() was made to
+flush stdout - 13 in Embedded Swift, 14 in the full library.
 
 | # | Fragment | What it exercises |
 |---|---|---|
@@ -30,6 +33,8 @@ that never stops and a list that grows for ever.
 | 10 | out-of-range | an array index past the end: a trap, with its `Fatal error:` line |
 | 11 | recursion | a function that calls itself for ever: a crash, not a hang |
 | 12 | growth | a list that grows for ever: a trap at the 256 MB memory cap |
+| 13 | prompt | `print(..., terminator: "")` then `readLine()`: the prompt before the echoed answer (Embedded) |
+| 14 | prompt-full | the same in a program that prints an array (the full library) |
 
 Each fragment is `NN-name.swift` with `NN-name.stdin` (the input box's lines)
 and `NN-name.expected` (what it prints, without the echoed input). For the
@@ -39,37 +44,43 @@ three that trap, `.expected` is what it prints before the trap. Every
 
 ## Measured (2026-10-17, the Swift image on Colima, Apple M4 Pro)
 
-Compiled by `support/swift/compile.py` in `teaching-quartz-swift`, all twelve
-in parallel in 10.4 s, then run by `wasi_run.mjs` in Node 22:
+Compiled by `support/swift/compile.py` in `teaching-quartz-swift`, all
+fourteen in parallel in 11 s, then run by `wasi_run.mjs` in Node 22:
 
 | # | Library | Bytes | Imports | Result |
 |---|---|---|---|---|
-| 01-greeting | embedded | 62,042 | 8 | MATCH |
-| 02-average | embedded | 70,601 | 8 | MATCH |
-| 03-palindrome | full | 4,260,684 | 14 | MATCH |
-| 04-optionals | embedded | 100,352 | 8 | MATCH |
-| 05-arrays | full | 3,453,452 | 14 | MATCH |
-| 06-struct | embedded | 69,473 | 8 | MATCH |
-| 07-inheritance | embedded | 70,263 | 8 | MATCH |
-| 08-enum | embedded | 109,134 | 8 | MATCH |
-| 09-errors | full | 3,446,038 | 14 | MATCH |
-| 10-out-of-range | embedded | 48,944 | 8 | trap (RuntimeError) with `Fatal error: Index out of range` |
+| 01-greeting | embedded | 62,347 | 8 | MATCH |
+| 02-average | embedded | 70,906 | 8 | MATCH |
+| 03-palindrome | full | 4,260,695 | 14 | MATCH |
+| 04-optionals | embedded | 100,660 | 8 | MATCH |
+| 05-arrays | full | 3,453,463 | 14 | MATCH |
+| 06-struct | embedded | 69,784 | 8 | MATCH |
+| 07-inheritance | embedded | 70,570 | 8 | MATCH |
+| 08-enum | embedded | 109,442 | 8 | MATCH |
+| 09-errors | full | 3,446,053 | 14 | MATCH |
+| 10-out-of-range | embedded | 49,243 | 8 | trap (RuntimeError) with `Fatal error: Index out of range` |
 | 11-recursion | embedded | 12,697 | 8 | crash (RangeError) |
-| 12-growth | embedded | 15,168 | 7 | trap (RuntimeError) in 0.07 s at the cap |
+| 12-growth | embedded | 15,168 | 7 | trap (RuntimeError) in 0.07 s at the cap, with Embedded Swift's misleading `Fatal error: Unexpectedly found nil while unwrapping an Optional value` |
+| 13-prompt | embedded | 49,252 | 8 | MATCH, and the transcript with the prompt before the answer |
+| 14-prompt-full | full | 3,442,011 | 14 | MATCH, and the transcript too |
 
-The verdicts are Phase 0's: Embedded Swift compiles nine, refuses 03 at
-compile (`String.contains(String)` is not in its library), and compiles 05
-and 09 into programs that would print `(cannot print value in embedded
-Swift)` - so compile.py falls back to the full standard library for those
-three, and they run correctly. The same fragments compiled with the macOS
-6.4.0 toolchain give programs of exactly these sizes (the bytes differ only
-in the 16-byte module hash, which names the host: spike G4), and one image
+The verdicts for 01-10 are Phase 0's: Embedded Swift runs seven of them
+correctly, refuses 03 at compile (`String.contains(String)` is not in its
+library), and compiles 05 and 09 into programs that would print `(cannot
+print value in embedded Swift)` - so compile.py falls back to the full
+standard library for those three, and they run correctly; 14 falls back for
+the same reason as 05. The same fragments compiled with the macOS 6.4.0
+toolchain give programs of exactly these sizes (the bytes differ only in the
+16-byte module hash, which names the host: spike G4), and one image
 compiles the same code to the same bytes every time.
 
 The shim's own checks, in the same run: each input line is echoed straight
 after its prompt; and the **must-fail** - with every right on fds 0-2, seek
 and tell included, fragment 10's `Fatal error:` line is lost, and with the
-shim's rights it is kept (spike G5).
+shim's rights it is kept (spike G5). Without readLine()'s flush, 13 and 14
+printed the answer first (`Ada`, then `What is your name? Nice to meet you,
+Ada.`) in both libraries - the must-fail for the flush, measured by taking it
+out and putting it back.
 
 ## When the toolchain moves
 
