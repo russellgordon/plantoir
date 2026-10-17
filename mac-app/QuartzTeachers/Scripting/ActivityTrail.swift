@@ -33,6 +33,12 @@ nonisolated enum ActivityTrail {
     /// an event is not.
     enum Event: String, CaseIterable, Sendable {
         case appOpened = "app opened"
+        /// Plantoir closed (#560): why — quit by the teacher, to install a
+        /// new version, or because the Mac is logging out, restarting or
+        /// shutting down — and the process id, so it pairs with its own
+        /// `appOpened` line. Without it a trail that stops cannot tell a
+        /// crash from a quit.
+        case appClosed = "app closed"
         case machine = "machine described"
         case helpers = "helpers described"
         case workingFolderOpened = "working folder opened"
@@ -522,7 +528,9 @@ nonisolated enum ActivityTrail {
         /// A folder was created on disk because a teacher added its name in
         /// Course Settings. Separate from the rename because it answers a
         /// different question: a folder appearing in a teacher's vault that
-        /// they did not make in Obsidian is otherwise unexplained.
+        /// they did not make in Obsidian is otherwise unexplained. Since #506
+        /// the line also says when its index page and a page to duplicate
+        /// were put inside it (`CourseSettingsView.folderCreatedTrailLine`).
         case folderCreated = "folder created"
         /// A course's word for a unit was renamed from inside Plantoir —
         /// every class page in every section, its title, and the links that
@@ -1216,6 +1224,24 @@ nonisolated enum ActivityTrail {
         case previewStartedAtLastViewed = "preview started at the page last viewed"
         /// Settings ▸ Preview changed where Preview opens (#504): which.
         case previewStartPageChosenInSettings = "preview start page chosen in Settings"
+        /// Open in Obsidian asked about Obsidian's add-ons for diagrams and
+        /// graphs (#495): the course and the answer — Add Them, Not Now, or
+        /// Not Now with "don't ask again" — or why nothing was asked
+        /// although the course needs them: Obsidian opens it as part of a
+        /// larger vault.
+        case obsidianAddOnsOffered = "obsidian add-ons offered"
+        /// A pass over a course's Obsidian add-ons for diagrams and graphs
+        /// (#495): the course, what started it, and for each add-on by name
+        /// and version whether it was added, already there, switched off
+        /// and left off, or left alone and why — or why nothing was added.
+        /// Written when something was added, and otherwise once per course
+        /// per run; never a page's words.
+        case obsidianAddOnsAdded = "obsidian add-ons added"
+        /// The reopen question was answered (#495): Obsidian was closed and
+        /// opened again to show the add-ons, or Later.
+        case obsidianReopenedForAddOns = "obsidian reopened for add-ons"
+        /// Settings ▸ Obsidian turned the add-ons on or off (#495).
+        case obsidianAddOnsSettingChanged = "obsidian add-ons setting changed"
     }
 
     // MARK: - Stored properties
@@ -1381,6 +1407,17 @@ nonisolated enum ActivityTrail {
     static func noteLaunch() {
         ActivityTrail.note(.appOpened, "Plantoir opened — " + ProblemReportEnvironment.appDescription)
         ActivityTrail.note(.machine, "running on " + ProblemReportEnvironment.systemDescription)
+    }
+
+    /// The line that closes a session (#560): "Plantoir closed — quit by
+    /// the teacher · pid 4711". The pid is the same one the session's
+    /// "Plantoir opened" line carries, so two copies running at once still
+    /// pair up.
+    static func closedLine(
+        reason: QuitConfirmation.ClosingReason,
+        processIdentifier: Int32 = ProcessInfo.processInfo.processIdentifier
+    ) -> String {
+        return "Plantoir closed — \(reason.words) · pid \(processIdentifier)"
     }
 
     /// The helper programs this launch found, as measured.

@@ -255,7 +255,12 @@ struct StartOfYearSheet: View {
             Text(StartOfYearWording.undoEndsWhenYouQuit)
                 .foregroundStyle(.secondary)
         case .undoReady(_, let putBack, let skipped):
-            Text(StartOfYearWording.undoIntro(pages: StartOfYearWording.pages(putBack.count)))
+            if putBack.isEmpty && skipped.isEmpty {
+                // Every page is already back (#555): neither list has anything.
+                Text(StartOfYearWording.undoAllAlreadyBack)
+            } else {
+                Text(StartOfYearWording.undoIntro(pages: StartOfYearWording.pages(putBack.count)))
+            }
             fileList(putBack)
             if !skipped.isEmpty {
                 Text(StartOfYearWording.undoSkipped(pages: StartOfYearWording.pages(skipped.count)))
@@ -265,7 +270,9 @@ struct StartOfYearSheet: View {
             Text(StartOfYearWording.undoEndsWhenYouQuit)
                 .foregroundStyle(.secondary)
         case .undone(let undone, let backup):
-            if undone.skipped.isEmpty {
+            if undone.skipped.isEmpty && undone.putBack == 0 {
+                Text(StartOfYearWording.undoAllAlreadyBack)
+            } else if undone.skipped.isEmpty {
                 Text(StartOfYearWording.undone(pages: StartOfYearWording.pages(undone.putBack)))
             } else {
                 Text(StartOfYearWording.undone(pages: StartOfYearWording.pages(undone.putBack)))

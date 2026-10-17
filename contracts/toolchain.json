@@ -135,6 +135,32 @@
         "tex/tex_files.tar.gz": "492271c589ab2d7b64c22a09f927ea09cd5ee3fc696a46067ddea2da4693c86f"
       },
       "why": "#485 E1: draws a page's ```tikz diagrams at BUILD time, so students download no engine (the Obsidian plugin's browser engine is 7.0 MB of script plus 4.8 MB of fonts). Its TeX engine - tex.wasm, core.dump and all 212 TeX files - is byte-identical to the one obsidian-tikzjax 0.5.2 embeds (measured by SHA-256 of each decompressed file, 213 distinct contents on each side, none on one side only), so a fence draws the same picture in Obsidian and on the site; the JavaScript AROUND the engine differs (@prinsss/dvi2html 0.0.1 and svgo 3.3.5 against the plugin's own dvi2html and svgo 2), so 'same picture' also rests on four diagrams compared by viewBox and text runs. Installed with `npm ci --omit=dev` from support/figures/package-lock.json, which pins all 133 packages under it - load-bearing, because node-tikzjax floats jsdom ^23, svgo ^3 and memfs ^4 and svgo shapes every drawing; the lockfile is also part of the figure cache's engine id (figureFences.cache), so a moved package draws every diagram afresh. 39 MB of files, 5,445 of them, 14.4 MB compressed; carried at /opt/vendor/tikz-engine (Windows: runtime\\vendor\\tikz-engine) and NEVER copied into a site - a site carries only the Computer Modern faces its diagrams use (static/tikz). LPPL-1.3c (node-tikzjax, TikZJax); the 212 TeX files carry their own LPPL and GPL terms; the BaKoMa faces their own licence - THIRD_PARTY_LICENSES.md. `sha256` is the npm tarball's, for the record (the lockfile's integrity line is what npm checks); `files` are the engine's own three, which verify.sh checks in the image. REJECTED: TikZJax in the browser (4.94 MB gzipped per student, 1.8 s for four diagrams); installing into Quartz's node_modules; bundling it with esbuild (it reads tex/ beside itself); a fork without jsdom."
+    },
+    {
+      "pin": "pyodide",
+      "value": "314.0.7",
+      "dockerfileContains": "pyodide-core-314.0.7.tar.bz2",
+      "windowsRuntimeContains": "pyodide-core-314.0.7.tar.bz2",
+      "sha256": "2abdcc2e35208af406e07724cffa85bc582ced97e9028383ecf5462541393f95",
+      "files": {
+        "pyodide.mjs": "6f1d60f7bf529beb300f0f47983c921d3982363640ba20af0e38efdddbc66109",
+        "pyodide.asm.mjs": "f7cdc8ece80678ceb712f8e65ebe6d3a83203a180c399865f49612a051693635",
+        "pyodide.asm.wasm": "cc36e3cab04fdfc9a63ff13eb52eae2b911bf46c025cc7b281f394bd3de1d5e6",
+        "python_stdlib.zip": "fa1957e5777068fc4f7437f96d860ae2fbe9c19732ba06c84e004ec16dd7dd7a",
+        "pyodide-lock.json": "5dc2fc119108bc148c7457dc86e7675b5c87e1cafd420b9c34c1eaef7b36c010"
+      },
+      "why": "#455: runs a page's ```python run blocks in the student's browser (shared-rules.json -> codeRunnerBlocks). Pyodide 314.0.7 (2026-09-14) is CPython 3.14.2 compiled to WebAssembly. CARRIED, not fetched when a site is built (Russell, 2026-10-05): the core tarball (6,757,104 bytes, `sha256`) is downloaded once into the image and checked; five of its files are kept, 13,531,207 bytes (pyodide.mjs 17,931; pyodide.asm.mjs 1,250,344; pyodide.asm.wasm 9,598,218; python_stdlib.zip 2,545,637; pyodide-lock.json 119,077), at /opt/vendor/pyodide (Windows: runtime\\vendor\\pyodide) with a README naming MPL-2.0 (the tarball carries no LICENSE file). A site carries them, with support/gated/pyodide/plantoir-worker.js, only when a page students can see has a runnable block (codeRunnerBlocks.siteCarriesEngine). pyodide.mjs, not pyodide.js (#455 review B1: Pyodide 314 refuses a classic worker wherever data: scripts are allowed), and pyodide.asm.mjs, not .asm.js. pyodide.mjs names one other address, a jsdelivr fallback for packages; the worker pins indexURL, packageBaseUrl and cdnUrl to the site's own folder, so it is never used, and verify.sh allows exactly that one string. Extracted with `python3 -m tarfile` because the slim base has no bzip2. `files` are checked in the image by verify.sh and in a site that carries them. REJECTED: the CDN (a third party and a network for every Run), a download at build time (a build would need the network), Skulpt (Python 2-era subset), JupyterLite (a whole notebook)."
+    },
+    {
+      "pin": "katex",
+      "value": "0.16.21",
+      "dockerfileContains": "npm ls katex@0.16.21",
+      "files": {
+        "dist/katex.min.css": "f787891b550d554c214aa8902f39ac46df2dbd48fdec500a2040a5dce1e8ab58",
+        "dist/contrib/copy-tex.min.js": "07770af90943a1de1a1010794bc78c6a7346d46d48fb63e35cc76ba76b827604",
+        "LICENSE": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+      },
+      "why": "#494: the KaTeX a site's maths is styled and copied with, served by the site itself (static/katex/) instead of cdn.jsdelivr.net. Quartz v4.5.0's lockfile installs katex 0.16.21 (rehype-katex 7.0.1 renders every formula with it at build time), but its latex.ts linked 0.16.11's stylesheet and copy-tex from the CDN on every page - so sites rendered with one version and styled with another. Copied from Quartz's own node_modules on every build (build_site.install_katex_assets): katex.min.css (23,352 bytes), contrib/copy-tex.min.js (1,673), the 20 woff2 faces (259,792) and the LICENSE (MIT) - 284,817 bytes plus the licence on EVERY site, because Python cannot tell maths the way remark-math does and a wrong guess breaks every formula silently. woff2 only: every browser that can run a site's code (module workers: Safari 15+) takes woff2 first and never asks for woff or ttf. `npm ls katex@0.16.21` after Quartz's npm install fails the image build if the lockfile ever resolves another version (measured: 0.16.22 exits 1). No windowsRuntimeContains: Windows' runtime takes the same lockfile; documentation/12-windows-app.md records the version it measures. REJECTED: gating per site on maths; all three font formats (1.10 MB); inlining the CSS into index.css; absolute /static/katex/ links (break a folder published under a subpath)."
     }
   ],
   "rules": [
@@ -162,5 +188,66 @@
     ],
     "note": "The recipe's FOLDERS, as data, because there were four hand-maintained copies of this list and they drifted the moment a fifth folder was added: the mac's WorkspaceModel.refreshToolchain, Windows' ToolchainMirror.RecipeFolders, the marketing screenshot harness (website/shots/capture.py), and the Dockerfile. Six carriers are pinned against this list in total, the other two being mac-app/project.yml and windows-app/Plantoir/Plantoir.csproj, which bundle and ship the folders; the Dockerfile is pinned in BOTH directions, since a COPY the contract does not list reproduces the original failure exactly. capture.py's own docstring said 'keep them in step' and it was the one that did not — which broke the demo workspace outright rather than subtly, because it copies the Dockerfile that expects the folder it did not copy.",
     "why": "A .toolchain/ holding the new Dockerfile without the new folder is not stale, it is UNBUILDABLE: `docker buildx build` fails on the missing COPY, and preview.sh's friendly 'missing the build recipe' message cannot fire because the Dockerfile is present."
+  },
+  "swiftImage": {
+    "note": "#493: the SECOND image, which compiles a course's ```swift run blocks to WebAssembly (shared-rules.json -> codeRunnerBlocks.swift). A top-level key of its own, deliberately NOT under `pins`: both apps' pin tests read every pin as a line the ROOT Dockerfile must contain, and these are lines of support/swift/Dockerfile, which is not the website builder's recipe. scripts/test_swift_blocks.py checks every `recipeContains` against support/swift/Dockerfile (Python, so Windows runs it too). Built by the launcher on the host - never by the build, which runs in the main container and cannot start another - the first time a preview has a block to compile; a teacher who never writes Swift never downloads it.",
+    "tagPrefix": "teaching-quartz-swift:src-",
+    "recipe": "support/swift",
+    "tag": "teaching-quartz-swift:src-<first 8 hex of the launchers' toolchain_hash over support/swift ONLY>: a script edit elsewhere never rebuilds a 2 GB image, and an edit here changes this tag AND the website builder's (support/ is in its recipe), which costs a small rebuild of that one. prune_superseded_images has a twin for this prefix, by the same rules (never a blanket prune; nothing a container uses; nothing built in the last day).",
+    "measured": "2026-10-17, Colima on an Apple M4 Pro (arm64, 6 CPUs): 80 s to build with the downloads (about 1.30 GB: the toolchain 1,102,526,016 B, the SDK 92,760,992 B, binaryen 105,577,739 B); 2.24 GB on disk, 504 MB compressed, against 5.61 GB untrimmed (spike). The trim removes lldb, sourcekit, the package manager, the docs and the Linux host's own standard libraries in the same step that unpacks the toolchain. Every swift-gate/ fragment compiles to programs of exactly the sizes the untrimmed macOS toolchain makes (they differ only in the 16-byte module hash, which names the host: spike G4), and the same code compiles to the same bytes in every run of one image (verify.sh checks it); the table is in documentation/02-docker-image.md. x86_64 is pinned (downloaded once to take its SHA-256 and check its signature: toolchain 1,122,646,127 B, binaryen 111,200,018 B) but its compiles are not measured.",
+    "pins": [
+      {
+        "pin": "swiftBaseImage",
+        "value": "python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff",
+        "recipeContains": "FROM python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff",
+        "why": "The website builder's own base (Debian 13), so the first layer is shared and the Debian 13 toolchain's libraries are the system's."
+      },
+      {
+        "pin": "swiftToolchainArm64",
+        "value": "6.4.0-RELEASE debian13-aarch64",
+        "url": "https://download.swift.org/swift-6.4.0-release/debian13-aarch64/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13-aarch64.tar.gz",
+        "sha256": "c501354c2690c93676cb08243c6e3e4e5f2b2dc46e557bf9538427d51788f132",
+        "bytes": 1102526016,
+        "recipeContains": "c501354c2690c93676cb08243c6e3e4e5f2b2dc46e557bf9538427d51788f132",
+        "why": "The toolchain Phase 0 measured (6.4.0). GPG signature verified against the Swift 6.x Release Signing Key 52BB7E3DE28A71BE22EC05FFEF80A866B47A981F (spike, 2026-10-16). 6.4.1 (2026-10-12) is not taken: a toolchain move must re-run the swift-gate fragments, because Embedded Swift's surface changes between releases."
+      },
+      {
+        "pin": "swiftToolchainAmd64",
+        "value": "6.4.0-RELEASE debian13 (x86_64)",
+        "url": "https://download.swift.org/swift-6.4.0-release/debian13/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13.tar.gz",
+        "sha256": "b623947404e7ea9843cfc315ed8624e85410fae571eb353339780ed222243737",
+        "bytes": 1122646127,
+        "recipeContains": "b623947404e7ea9843cfc315ed8624e85410fae571eb353339780ed222243737",
+        "why": "Review S7: Plantoir supports Intel Macs, and an arm64-only image would leave every Swift block not ready on one for ever. Chosen by TARGETARCH. Downloaded once to take this SHA-256; GPG signature verified (2026-10-17). Compiling on x86_64 is not measured."
+      },
+      {
+        "pin": "wasmSdk",
+        "value": "swift-6.4.0-RELEASE_wasm",
+        "url": "https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz",
+        "sha256": "f07b7be3c586d92d7a07051fc6d303b87ebea67eadc40640ba59d5a8b79aa86d",
+        "bytes": 92760992,
+        "recipeContains": "f07b7be3c586d92d7a07051fc6d303b87ebea67eadc40640ba59d5a8b79aa86d",
+        "why": "ONE bundle for both host architectures (releases.json lists one checksum; it holds headers, modules and wasm libraries, no host programs), carrying the Embedded and the full SDK. Fetched with curl, checked with sha256sum and installed from the local file: `swift sdk install <url>` crashes on Linux 6.4.0 after its download (spike G1)."
+      },
+      {
+        "pin": "binaryenArm64",
+        "value": "version_133 aarch64-linux",
+        "url": "https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-aarch64-linux.tar.gz",
+        "sha256": "89c07ea56faf38d0fbecf36ca8ec0721756716185f265b568e133d427f299bf8",
+        "bytes": 105577739,
+        "recipeContains": "89c07ea56faf38d0fbecf36ca8ec0721756716185f265b568e133d427f299bf8",
+        "why": "wasm-opt only (static; 17 MB kept), the version Phase 0 measured. OFF PATH: clang runs any wasm-opt on PATH by itself (Phase 0 trap 1). Matches GitHub's asset digest."
+      },
+      {
+        "pin": "binaryenAmd64",
+        "value": "version_133 x86_64-linux",
+        "url": "https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-x86_64-linux.tar.gz",
+        "sha256": "2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489",
+        "bytes": 111200018,
+        "recipeContains": "2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489",
+        "why": "Review S7, as the toolchain. Matches GitHub's asset digest (2026-10-17)."
+      }
+    ],
+    "rejected": "The toolchain in the website builder's image (every teacher would download 1.3 GB for a language most never use); a Docker socket in the main container so the build could start this one (a container that can start containers can do anything on the Mac); SwiftPM per block (about 1 s more each, Phase 0); one module per course with every block an entry point (Path B: the full library is 0.9 MB brotli per block, not the 17 MB once feared, and Path B would rewrite top-level code into functions, changing what `main.swift` means); a hand-bumped version in the cache key instead of hashing the recipe (#485's reason)."
   }
 }

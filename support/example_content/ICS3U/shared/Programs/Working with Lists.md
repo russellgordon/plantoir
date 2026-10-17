@@ -1,6 +1,7 @@
 ---
 title: Working with Lists
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - programs
@@ -13,7 +14,7 @@ talking.
 
 ## The program
 
-```python
+```python run readonly
 # Mark check-in helper for Mr. Ferreira. It works with marks only —
 # no names, no student numbers. He matches the numbers to people
 # himself, from his own class list.

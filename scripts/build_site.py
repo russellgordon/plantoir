@@ -27,7 +27,9 @@ import how_i_teach
 import page_visibility
 import page_features
 import figures
+import swift_blocks
 import print_settings
+import quizzes
 import reference_course
 import stop_preview
 import toolchain_paths
@@ -1455,20 +1457,33 @@ def install_quartz_additions(output_dir: Path) -> int:
     return copied
 
 
+# Plantoir's components, each added to the components list once, in the
+# same block: the Print button's date line (#454), then the runnable code's
+# script carrier (#455). A list that already has the first gets the second.
+_PLANTOIR_COMPONENTS = (
+    ("PlantoirMetaLine", "./PlantoirMetaLine", "the Print button"),
+    ("CodeRunner", "./CodeRunner", "the code students run"),
+)
+
+
 def _wire_components_index(index_ts: Path) -> None:
     text = index_ts.read_text(encoding="utf-8")
-    if "PlantoirMetaLine" in text:
-        return
-    if "\nexport {\n" not in text:
-        print("⚠️ Could not add the Print button: the components list has changed shape.")
-        return
-    text = text.replace(
-        "\nexport {\n",
-        f'\nimport PlantoirMetaLine from "./PlantoirMetaLine" // {QUARTZ_ADDITIONS_MARKER}\n'
-        "\nexport {\n  PlantoirMetaLine,\n",
-        1,
-    )
-    index_ts.write_text(text, encoding="utf-8")
+    changed = False
+    for name, module, what in _PLANTOIR_COMPONENTS:
+        if f"import {name} from" in text:
+            continue
+        if "\nexport {\n" not in text:
+            print(f"⚠️ Could not add {what}: the components list has changed shape.")
+            continue
+        text = text.replace(
+            "\nexport {\n",
+            f'\nimport {name} from "{module}" // {QUARTZ_ADDITIONS_MARKER}\n'
+            f"\nexport {{\n  {name},\n",
+            1,
+        )
+        changed = True
+    if changed:
+        index_ts.write_text(text, encoding="utf-8")
 
 
 def _wire_content_layout(layout_ts: Path) -> None:
@@ -1494,14 +1509,60 @@ def _wire_content_layout(layout_ts: Path) -> None:
 
 
 def _wire_transformers_index(index_ts: Path) -> None:
-    """Export the figures transformer (#485 E1) beside Quartz's own."""
+    """Export the figures transformer (#485 E1), the runnable code's (#455)
+    and the self-check quizzes' (#563) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
-    if "PlantoirFigures" in text:
+    changed = False
+    for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
+                         ("PlantoirQuizzes", "./plantoirQuizzes")):
+        if f"export {{ {name} }}" in text:
+            continue
+        if not text.endswith("\n"):
+            text += "\n"
+        text += f'export {{ {name} }} from "{module}" // {QUARTZ_ADDITIONS_MARKER}\n'
+        changed = True
+    if changed:
+        index_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_code_runner_transformer(config_ts: Path) -> None:
+    """Put the runnable code's transformer (#455) straight BEFORE
+    SyntaxHighlighting: it wraps a block at the markdown stage, and the
+    highlighter must then see the block exactly as it always did."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.CodeRunnerFences(" in text:
         return
-    if not text.endswith("\n"):
-        text += "\n"
-    text += f'export {{ PlantoirFigures }} from "./plantoirFigures" // {QUARTZ_ADDITIONS_MARKER}\n'
-    index_ts.write_text(text, encoding="utf-8")
+    anchor = "Plugin.SyntaxHighlighting("
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the code students run: the site's settings have changed shape.")
+        return
+    at = text.index(anchor)
+    line_start = text.rfind("\n", 0, at) + 1
+    indent = text[line_start:at]
+    if indent.strip():
+        print("⚠️ Could not add the code students run: the site's settings have changed shape.")
+        return
+    text = text[:line_start] + indent + "Plugin.CodeRunnerFences(),\n" + text[line_start:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_code_runner_component(layout_ts: Path) -> None:
+    """Put the runnable code's component (#455) at the head of the shared
+    afterBody list. It renders nothing; it carries the page's script and
+    styles into every page."""
+    text = layout_ts.read_text(encoding="utf-8")
+    if "Component.CodeRunner()" in text:
+        return
+    anchor = "afterBody: ["
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the code students run: the page layout has changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    if text.startswith("]", at):
+        text = text[:at] + "Component.CodeRunner()" + text[at:]
+    else:
+        text = text[:at] + "Component.CodeRunner(), " + text[at:]
+    layout_ts.write_text(text, encoding="utf-8")
 
 
 def _wire_figures_transformer(config_ts: Path) -> None:
@@ -1522,9 +1583,38 @@ def _wire_figures_transformer(config_ts: Path) -> None:
     config_ts.write_text(text, encoding="utf-8")
 
 
+def _wire_quizzes_transformer(config_ts: Path) -> None:
+    """Put the self-check quizzes' transformer (#563) straight AFTER the
+    figures transformer, and so after Description: its html stage makes the
+    page's search text and summary again without the quizzes' answers, which
+    Description has just read (#563 plan M5, review S3). Anchored on
+    PlantoirFigures rather than Description so the two always stand in the
+    same order, on a fresh site and an old one alike (review N7)."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirQuizzes(" in text:
+        return
+    anchor = "Plugin.PlantoirFigures(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the self-check questions: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not add the self-check questions: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirQuizzes()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
 def wire_quartz_additions(output_dir: Path) -> None:
     """The edits that connect support/quartz to Quartz: the Print button's two
-    (#454) and the figures transformer's two (#485 E1). Idempotent; an
+    (#454), the figures transformer's two (#485 E1), the runnable code's
+    two more (#455: its transformer before SyntaxHighlighting, its component
+    in afterBody; its exports ride the two index edits), and the self-check
+    quizzes' one (#563: its transformer after the figures'; its export rides
+    the transformers index, and its script and styles ride the Print
+    button's component). Idempotent; an
     anchor that has moved warns and leaves the file alone.
 
     Deliberately NOT a third edit to mermaid.inline.ts (an event saying the
@@ -1536,6 +1626,9 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.layout.ts", _wire_content_layout),
         (output_dir / "quartz" / "plugins" / "transformers" / "index.ts", _wire_transformers_index),
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
+        (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
+        (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
+        (output_dir / "quartz.layout.ts", _wire_code_runner_component),
     ):
         try:
             wire(path)
@@ -1606,6 +1699,41 @@ def _resolve_print_settings_of_pages(content_root: Path, course_dir: Path) -> di
     return {"problems": problems, "counts": counts}
 
 
+def _vault_source_of(page):
+    """The teacher's own file a page in the build's copy came from, or None
+    (a page the build wrote itself)."""
+    source = _vault_sources.get(page)
+    return source[0] if source is not None else None
+
+
+def _check_quizzes(content_root: Path, output_dir: Path) -> list:
+    """
+    Self-check quizzes (#563; scripts/quizzes.py), ALWAYS: every `> [!quiz]`
+    on the pages students can see, by the gate's own visibility rule, read
+    by the rules the site uses. A quiz that cannot be checked is said on a
+    `plantoir: error:` line with its page, place and line in the teacher's
+    file, and becomes the `quiz_problems` fact for the quizzesNotReady
+    finding. Then quartz/plantoir_quiz.json (the words) and
+    quartz/plantoir_quiz_pages.json (what was found where, for the site's
+    safety net) are written, on every build. Never stops a build: if this
+    cannot run, the site still renders every quiz by its own reading.
+    """
+    checked = None
+    try:
+        pages = figures.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            _vault_source_of, skip=_is_media_name, must_contain="[!")
+        checked = quizzes.check_pages(pages)
+    except Exception as error:
+        print(f"⚠️ Could not check the self-check questions: {error}")
+    try:
+        quizzes.write_quiz_files(output_dir, checked)
+    except OSError as error:
+        print(f"⚠️ Could not set up the self-check questions: {error}")
+    return checked["problems"] if checked is not None else []
+
+
 def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, full_rebuild: bool) -> dict:
     """
     Diagrams and graphs (#485 E1; scripts/figures.py): every ```tikz drawn and
@@ -1616,14 +1744,10 @@ def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, ful
     code on the site and the build says so in one line.
     """
     try:
-        def source_of(page):
-            source = _vault_sources.get(page)
-            return source[0] if source is not None else None
-
         pages = figures.pages_students_see(
             content_root, _is_draft,
             lambda page: _place_in_the_course(page, content_root),
-            source_of, skip=_is_media_name)
+            _vault_source_of, skip=_is_media_name)
         cache_root = toolchain_paths.merged_output_root(course_dir) / figures.CACHE_FOLDER
         return figures.prepare(pages, output_dir, cache_root, full_rebuild=full_rebuild)
     except Exception as error:
@@ -1631,6 +1755,75 @@ def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, ful
         shutil.rmtree(output_dir / "quartz" / figures.WORKSPACE, ignore_errors=True)
         return {"counts": {figures.GRAPH_ENGINE: 0}, "fonts": [], "problems": [], "notes": [],
                 "drawn": 0, "fromBefore": 0, "figures": 0}
+
+
+def _count_runner_pages(content_root: Path) -> dict:
+    """
+    Runnable code (#455; page_features.RUNNER_LANGUAGES): how many pages
+    students can see make the site carry each language's engine - the page
+    says `codeRunner: true` (read from the build's own copy, after
+    process_frontmatter has written it back) AND holds a runnable block of
+    that language. The same pages figures.py reads, by the gate's own
+    visibility rule. Never stops a build: a page that cannot be read counts
+    for nothing, and if this cannot run at all the blocks stay plain code.
+    """
+    counts = {}
+    for row in page_features.RUNNER_LANGUAGES.values():
+        counts[row["engine"]] = 0
+    if frontmatter is None:
+        return counts
+    try:
+        pages = figures.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            lambda page: None, skip=_is_media_name)
+    except Exception as error:
+        print(f"⚠️ Could not look for code students run: {error}")
+        return counts
+    for page in pages:
+        if "codeRunner" not in page["text"]:
+            continue
+        try:
+            post = frontmatter.loads(page["text"])
+        except Exception:
+            continue
+        for engine in page_features.runner_engines_on_page(post.get("codeRunner"), post.content):
+            counts[engine] = counts.get(engine, 0) + 1
+    return counts
+
+
+def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Path) -> dict:
+    """
+    Runnable Swift (#493; scripts/swift_blocks.py): the programs the launcher
+    compiled before this build, copied into the site for every ```swift run
+    block on a page students can see that opts in, and every block without
+    one named - on a `plantoir: error:` line and as one folder problem. Never
+    compiles (the main container cannot start the Swift image) and never
+    stops a build: if this cannot run, the blocks stay plain code.
+    """
+    try:
+        def source_of(page):
+            source = _vault_sources.get(page)
+            return source[0] if source is not None else None
+
+        pages = []
+        for page in figures.pages_students_see(
+                content_root, _is_draft,
+                lambda page: _place_in_the_course(page, content_root),
+                source_of, skip=_is_media_name):
+            if "codeRunner" not in page["text"] or frontmatter is None:
+                continue
+            try:
+                post = frontmatter.loads(page["text"])
+            except Exception:
+                continue
+            pages.append({"place": page["place"], "codeRunner": post.get("codeRunner"),
+                          "body": post.content, "source": page["source"]})
+        cache_root = toolchain_paths.merged_output_root(course_dir) / swift_blocks.CACHE_FOLDER
+        return swift_blocks.prepare(pages, output_dir, cache_root)
+    except Exception as error:
+        print(f"⚠️ Could not prepare the Swift programs students run: {error}")
+        return {"problems": [], "blocks": 0, "ready": 0}
 
 
 LOCALES_SRC_CANDIDATES = [
@@ -4138,6 +4331,149 @@ def patch_katex_mhchem(latex_ts_path: Path):
         print("✅ Patched latex.ts to enable mhchem chemistry notation")
     except Exception as e:
         print(f"⚠️ Error enabling mhchem: {e}")
+
+
+# ---- KaTeX served by the site itself (#494) ----------------------------------
+#
+# Quartz v4.5.0's latex.ts links KaTeX's stylesheet and copy-tex from
+# cdn.jsdelivr.net on EVERY page, at version 0.16.11, while its own lockfile
+# installs 0.16.21 and renders every formula with that at build time: sites
+# rendered with one version and were styled with another, and maths depended
+# on a third party and a network. Every build now copies the installed
+# package's stylesheet, copy-tex, woff2 faces and licence into
+# quartz/static/katex (284,817 bytes plus the licence), and latex.ts links
+# them relative to each page. Both ALWAYS and idempotent, so a section built
+# before #494 is healed by its next build. documentation/06 -> "C2".
+KATEX_LOCAL_MARKER = "PLANTOIR-KATEX-LOCAL"
+KATEX_STATIC_FOLDER = "katex"
+
+# Quartz v4.5.0's externalResources block, exactly. Anything else is a
+# latex.ts this patch was not written for: it says so and leaves it alone.
+_KATEX_CDN_BLOCK = """    externalResources() {
+      switch (engine) {
+        case "katex":
+          return {
+            css: [{ content: "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" }],
+            js: [
+              {
+                // fix copy behaviour: https://github.com/KaTeX/KaTeX/blob/main/contrib/copy-tex/README.md
+                src: "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/copy-tex.min.js",
+                loadTime: "afterDOMReady",
+                contentType: "external",
+              },
+            ],
+          }
+      }
+    },"""
+
+_KATEX_LOCAL_BLOCK = """    externalResources(ctx) {
+      switch (engine) {
+        case "katex": {
+          // PLANTOIR-KATEX-LOCAL (#494): the site's own copy of the KaTeX
+          // that rendered the page (build_site.install_katex_assets), linked
+          // relative to each page so a site served under a folder finds it,
+          // and kept across the site's page changes like index.css. The 404
+          // page is served at any depth, so it links from the site's root
+          // path, the rule Head.tsx uses.
+          const root = new URL(`https://${ctx.cfg.configuration.baseUrl || "example.com"}`).pathname as FullSlug
+          const base = (slug: FullSlug) => (slug === "404" ? root : pathToRoot(slug))
+          return {
+            additionalHead: [
+              (fileData: QuartzPluginData) =>
+                h("link", {
+                  rel: "stylesheet",
+                  href: joinSegments(base(fileData.slug!), "static/katex/katex.min.css"),
+                  "spa-preserve": true,
+                }),
+              (fileData: QuartzPluginData) =>
+                h("script", {
+                  src: joinSegments(base(fileData.slug!), "static/katex/contrib/copy-tex.min.js"),
+                  defer: true,
+                  "spa-preserve": true,
+                }),
+            ],
+          }
+        }
+      }
+    },"""
+
+_KATEX_LOCAL_IMPORTS = """import { QuartzTransformerPlugin } from "../types"
+// PLANTOIR-KATEX-LOCAL (#494): what the site's own links are made with.
+import { h } from "preact"
+import { QuartzPluginData } from "../vfile"
+import { FullSlug, joinSegments, pathToRoot } from "../../util/path\""""
+
+
+def install_katex_assets(output_dir, katex_dir=None, printer=print) -> int:
+    """
+    Copy KaTeX's stylesheet, copy-tex, woff2 faces and LICENSE from Quartz's
+    own node_modules/katex into the section's quartz/static/katex, where the
+    bytes differ, removing anything else there. Answers how many files were
+    copied. A missing package is one plain line, and the build carries on:
+    the formulas are still rendered, only unstyled.
+    """
+    source = Path(katex_dir) if katex_dir is not None else toolchain_paths.QUARTZ_DIR / "node_modules" / "katex"
+    target = Path(output_dir) / "quartz" / "static" / KATEX_STATIC_FOLDER
+    wanted = {}
+    try:
+        stylesheet = source / "dist" / "katex.min.css"
+        copy_tex = source / "dist" / "contrib" / "copy-tex.min.js"
+        licence = source / "LICENSE"
+        if not (stylesheet.is_file() and copy_tex.is_file() and licence.is_file()):
+            printer("⚠️ The maths on this site will show without its fonts: this copy of Plantoir is missing them.")
+            return 0
+        wanted[Path("katex.min.css")] = stylesheet
+        wanted[Path("contrib") / "copy-tex.min.js"] = copy_tex
+        wanted[Path("LICENSE")] = licence
+        for face in sorted((source / "dist" / "fonts").glob("*.woff2")):
+            wanted[Path("fonts") / face.name] = face
+        copied = 0
+        for relative in sorted(wanted):
+            item = wanted[relative]
+            destination = target / relative
+            if destination.is_file() and destination.read_bytes() == item.read_bytes():
+                continue
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(item, destination)
+            copied += 1
+        for existing in sorted(target.rglob("*"), reverse=True):
+            if existing.is_file() and existing.relative_to(target) not in wanted:
+                existing.unlink()
+        return copied
+    except OSError as error:
+        printer(f"⚠️ Could not set up the fonts for the maths on this site: {error}")
+        return 0
+
+
+def patch_katex_local(latex_ts_path, printer=print) -> bool:
+    """
+    Point latex.ts's KaTeX links at the site's own copy instead of
+    cdn.jsdelivr.net (#494). Idempotent (its own marker), and independent of
+    patch_katex_mhchem, which edits the imports above. Answers whether the
+    file changed; a file of another shape is said once and left alone.
+    """
+    path = Path(latex_ts_path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
+        printer(f"⚠️ Could not serve the maths fonts from the site: latex.ts could not be read ({error})")
+        return False
+    if KATEX_LOCAL_MARKER in text:
+        return False
+    imports_anchor = 'import { QuartzTransformerPlugin } from "../types"'
+    if text.count(_KATEX_CDN_BLOCK) != 1 or text.count(imports_anchor) != 1:
+        printer("⚠️ Could not serve the maths fonts from the site: latex.ts has changed shape, "
+                "so the maths still loads them from another website.")
+        return False
+    text = text.replace(imports_anchor, _KATEX_LOCAL_IMPORTS, 1)
+    text = text.replace(_KATEX_CDN_BLOCK, _KATEX_LOCAL_BLOCK, 1)
+    try:
+        path.write_text(text, encoding="utf-8")
+    except OSError as error:
+        printer(f"⚠️ Could not serve the maths fonts from the site: {error}")
+        return False
+    printer("✅ Patched latex.ts to serve KaTeX from the site itself")
+    return True
 
 
 def patch_google_font_href(theme_ts_path: Path, head_tsx_path: Path):
@@ -7201,6 +7537,100 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
         print(f"✅ Backlinks panel will skip: {', '.join(names)}")
 
 
+
+def _quartz_page_slug(relative: Path) -> str:
+    """
+    The slug Quartz gives a page, as its backlinks index spells it.
+
+    Quartz v4.5.0's `sluggify`, segment by segment: white space becomes a
+    hyphen, `&` becomes `-and-`, `%` becomes `-percent`, and `?` and `#` are
+    dropped. `_quartz_slug` handles only the spaces, which is enough for the
+    coverage map's own links; the backlinks panel compares slugs exactly, so
+    a name with `&` in it would match nothing (#505 review, N8).
+    """
+    parts = list(relative.parts)
+    parts[-1] = relative.stem
+    slugged = []
+    for part in parts:
+        segment = re.sub(r"\s", "-", part)
+        segment = segment.replace("&", "-and-").replace("%", "-percent")
+        segment = segment.replace("?", "").replace("#", "")
+        slugged.append(segment)
+    return "/".join(slugged)
+
+
+def overall_backlink_children(content_root: Path, plan: list = None) -> dict:
+    """
+    {overall expectation page's slug: [its specific expectations' slugs]}.
+
+    "When did we do this?" on an overall expectation (B1) lists the pages
+    that link it AND the pages that link any of its specific expectations
+    (B1.1, B1.2, …), because classes connect to specific expectations and the
+    overall page was otherwise empty (#505). Read from the same pages the
+    coverage map reads (`_collect_expectations`, `overall_of`), folder by
+    folder: two curriculum folders can each have a B1, and each B1 gathers
+    only its own folder's B1.x. A digit-first or College Board code has no
+    overall expectation (`overall_of` is None), so it gathers nothing, and
+    an overall page with no specific expectations is left out.
+
+    `plan` is `plan_coverage_maps(...)`.
+    """
+    def say_nothing(_line):
+        # The coverage map already says when a code is met twice.
+        return None
+
+    children = {}
+    for folder, _title in plan or []:
+        specific, overall = _collect_expectations(folder, printer=say_nothing)
+        for overall_code, overall_page in overall.items():
+            specific_slugs = []
+            for code, page in specific.items():
+                if overall_of(code) == overall_code:
+                    specific_slugs.append(_quartz_page_slug(page.relative_to(content_root)))
+            if specific_slugs:
+                overall_slug = _quartz_page_slug(overall_page.relative_to(content_root))
+                children[overall_slug] = specific_slugs
+    return children
+
+
+def set_backlinks_overall_children(backlinks_tsx_path: Path, content_root: Path,
+                                   plan: list = None):
+    """
+    Write `overall_backlink_children` into Backlinks.tsx (CQ4T-OVERALL-ANCHOR),
+    the way `set_backlinks_structural_pages` writes its set — on every build,
+    map or no map, because the panel is on every page either way (#505).
+
+    One line, always: the pattern replaces the whole `const overallChildren`
+    line, so the nested brackets of the map never have to be matched.
+    """
+    if not backlinks_tsx_path.exists():
+        return
+    children = overall_backlink_children(content_root, plan)
+    entries = []
+    for overall_slug, specific_slugs in children.items():
+        entries.append(json.dumps([overall_slug, specific_slugs], ensure_ascii=False))
+    formatted = ", ".join(entries)
+    text = backlinks_tsx_path.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r'(?P<anchor>^[ \t]*//[ \t]*CQ4T-OVERALL-ANCHOR:[^\n]*\n)'
+        r'[ \t]*const[ \t]+overallChildren[ \t]*=[^\n]*',
+        re.MULTILINE)
+
+    def replace(match):
+        indent = "    "
+        return (f'{match.group("anchor")}{indent}'
+                f'const overallChildren = new Map<string, string[]>([{formatted}])')
+
+    updated, count = pattern.subn(replace, text)
+    if count:
+        backlinks_tsx_path.write_text(updated, encoding="utf-8")
+        total = 0
+        for specific_slugs in children.values():
+            total += len(specific_slugs)
+        print(f"✅ Backlinks panel: {len(children)} overall expectation page(s) also list "
+              f"the pages of their {total} specific expectation(s).")
+
+
 def link_coverage_from_key_links(content_root: Path, maps: list):
     """
     Put each coverage map in Key Links, directly under its folder's entry.
@@ -7496,6 +7926,7 @@ def build_section_site(
     append_coverage_styles(output_dir / "quartz" / "styles" / "base.scss")
     latex_ts = output_dir / "quartz" / "plugins" / "transformers" / "latex.ts"
     patch_katex_mhchem(latex_ts)
+    patch_katex_local(latex_ts)
     patch_mermaid_font_wait(mermaid_ts)
     patch_mermaid_pie_title_fit(mermaid_ts)
     patch_mermaid_pie_colours(mermaid_ts)
@@ -7651,6 +8082,14 @@ def build_section_site(
     # the checks, so a figure that cannot be drawn is said where every folder
     # problem is said.
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
+    # Runnable code (#455), ALWAYS: which language engines this site carries.
+    runner_pages_here = _count_runner_pages(content_root)
+    # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into
+    # the site, and each block without one said where every folder problem is.
+    swift_here = _prepare_runnable_swift(content_root, output_dir, course_dir)
+    # Self-check quizzes (#563), ALWAYS: the folder check, and the two files
+    # the site reads.
+    quiz_problems_here = _check_quizzes(content_root, output_dir)
 
     health_facts = {
         "coverage_wanted": coverage_wanted,
@@ -7687,6 +8126,9 @@ def build_section_site(
         "print_pdf_problems": print_pages_here["problems"],
         # Diagrams and graphs that could not be drawn (#485 E1).
         "figure_problems": figures.health_finding_facts(figures_here),
+        # Runnable Swift blocks with no program (#493).
+        "swift_problems": swift_blocks.health_finding_facts(swift_here),
+        "quiz_problems": quiz_problems_here,
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)
@@ -7725,6 +8167,9 @@ def build_section_site(
     else:
         print("ℹ️ Curriculum Coverage page is switched off for this course.")
     set_backlinks_structural_pages(
+        output_dir / "quartz" / "components" / "Backlinks.tsx", content_root,
+        coverage_plan)
+    set_backlinks_overall_children(
         output_dir / "quartz" / "components" / "Backlinks.tsx", content_root,
         coverage_plan)
     # ==========================================================================
@@ -7834,9 +8279,25 @@ def build_section_site(
     # edit to quartz.layout.ts above, so nothing rewrites the wrapped line.
     # A graph's engine rides the same gate (#485 E1): its count comes from the
     # figures pass, not from a page setting.
+    # Runnable code's engines ride it too (#455), each with its overlay from
+    # support/gated, and the site is told which engines it carries, so a block
+    # the build did not count stays plain code with a `plantoir: error:` line
+    # rather than a Run button that can never work (codeRunnerBlocks.siteDisagrees).
     gated_counts = dict(print_pages_here["counts"])
     gated_counts.update(figures_here["counts"])
-    page_features.install_gated_assets(output_dir, gated_counts)
+    gated_counts.update(runner_pages_here)
+    gated_outcome = page_features.install_gated_assets(output_dir, gated_counts)
+    carried_runner_engines = set()
+    for engine in runner_pages_here:
+        if gated_outcome.get(engine, {}).get("installed"):
+            carried_runner_engines.add(engine)
+    try:
+        page_features.write_runner_words(output_dir, carried_runner_engines)
+    except OSError as error:
+        print(f"⚠️ Could not set up the code students run: {error}")
+    # KaTeX from the site itself (#494), ALWAYS and on every site: the
+    # stylesheet, copy-tex and the woff2 faces the maths is set in.
+    install_katex_assets(output_dir)
     try:
         print_settings.write(output_dir, config, displayed_course_code(config, course_code))
     except Exception as error:

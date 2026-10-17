@@ -1,6 +1,7 @@
 ---
 title: Functions Practice
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - exercises
@@ -16,7 +17,7 @@ through `return`, and everything else stays inside.
    these four things: the definition, the parameter, the argument, and
    what `return "B"` does.
 2. **Predict the output.**
-   ```python
+   ```python run
    def double(number):
        print(number * 2)
 
@@ -24,7 +25,7 @@ through `return`, and everything else stays inside.
    print(result)
    ```
 3. **Find the fault.** This is supposed to give `69.5`.
-   ```python
+   ```python run
    def average(values):
        total = 0
        for value in values:
@@ -34,7 +35,7 @@ through `return`, and everything else stays inside.
    print(average([78, 91, 46, 63]))
    ```
 4. Why does this fail, and what should the last line be instead?
-   ```python
+   ```python run
    def total_of(values):
        total = 0
        for value in values:
@@ -83,7 +84,7 @@ through `return`, and everything else stays inside.
 > [!success]- Answer 3
 > The last line of the function computes the average and throws it
 > away — there is no `return`, so the call produces `None`. Add it:
-> ```python
+> ```python run
 > def average(values):
 >     total = 0
 >     for value in values:
@@ -108,7 +109,7 @@ through `return`, and everything else stays inside.
 > inside it.
 
 > [!success]- Answer 5
-> ```python
+> ```python run
 > def kilograms_to_pounds(kilograms):
 >     return kilograms * 2.2
 >
@@ -121,7 +122,7 @@ through `return`, and everything else stays inside.
 > at the point of display, not inside the calculation.
 
 > [!success]- Answer 6
-> ```python
+> ```python run
 > def is_overdue(days_late):
 >     return days_late > 0
 >
@@ -133,7 +134,7 @@ through `return`, and everything else stays inside.
 > is the cheapest readability win in the language.
 
 > [!success]- Answer 7
-> ```python
+> ```python run
 > def greet(name, greeting="Hello"):
 >     return f"{greeting}, {name}."
 >
@@ -148,7 +149,7 @@ through `return`, and everything else stays inside.
 > come after the parameters that have none.
 
 > [!success]- Answer 8
-> ```python
+> ```python run
 > def as_hours_and_minutes(minutes):
 >     return f"{minutes // 60} h {minutes % 60} min"
 >

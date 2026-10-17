@@ -494,7 +494,7 @@ built from what is really there:
 ```
 # Plantoir: keeps Netlify's own ad badge off. Rewritten on every deploy; edit the lines outside this block, not these.
 /*
-  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
+  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-…' 'sha256-…' …;
 ```
 
 Only `script-src` is set, never `default-src` — nothing else about a page
@@ -517,6 +517,97 @@ itself (`static/function-plot/`), loaded by the bundled `postscript.js`, so
 no inline script is added and no new hash is needed. Cloudflare Pages sets no
 policy. Not yet measured on the live hosts; `verify-deploy.sh` is where that
 is done before the release.
+
+(Until #494 the host list ended `https://cdn.jsdelivr.net`, because Quartz
+linked KaTeX's copy-tex script from there on every page. Since every site
+serves KaTeX itself (06 → C2-26), that script is `'self'` and the host falls
+out of the list by itself — `write_netlify_headers_file` builds the list
+from the scripts the built pages really name. verify-deploy.sh checks a
+published Netlify page's CSP names no CDN.)
+
+### Runnable code and KaTeX on each host (#455, #494, v1.8.0)
+
+A page with runnable code (06 → I) makes its site carry Python
+(`static/pyodide/`, 13.5 MB) and every site carries KaTeX's own files
+(`static/katex/`, 285 KB). Three things every host must get right, or a
+student is told "Python couldn't start" (the 45 s watchdog) instead of a
+program running:
+
+1. **`.wasm` as `application/wasm`.** Pyodide compiles with
+   `WebAssembly.instantiateStreaming`, which refuses any other type, with no
+   fallback (#455 review S1).
+2. **`.mjs` and the worker as a JavaScript type.** A module worker whose
+   script comes back as `application/octet-stream` fails to start.
+3. **A CSP, if any, that lets WebAssembly compile**: `'unsafe-eval'` (which
+   Netlify's policy above always carried, for graphs) or
+   `'wasm-unsafe-eval'` (measured enough on its own in Safari, review S1). The
+   worker is a same-origin FILE, so `'self'` covers it with no `worker-src`;
+   a Blob worker would have been refused (no `worker-src`, so `blob:` is not
+   allowed).
+
+**Measured 2026-10-17** by `verify-deploy.sh` (ADA1O section 1 in
+`~/Desktop/plantoir-overnight`, M4 Pro, home network) — every host passed all
+three:
+
+| Host | `.wasm` | `.mjs`, worker | CSP on the worker | KaTeX css / face |
+|---|---|---|---|---|
+| Plantoir's preview (Quartz serve-handler) | 200 `application/wasm` | `application/javascript` | none | 200 `text/css` / 200 |
+| Netlify | 200 `application/wasm` | JavaScript | `script-src 'self' 'unsafe-eval' <hashes>` — no jsdelivr | 200 `text/css` / 200 |
+| Cloudflare Pages | 200 `application/wasm` | JavaScript | none | 200 `text/css` / 200 |
+| A folder publish | the pinned files byte for byte | — | — | the pinned files |
+
+**What a student downloads on the first Run** (the six files the worker
+fetches; later Runs on the page, and other pages of the visit, come from the
+browser's cache): Netlify 6,114,806 bytes and Cloudflare 6,339,708 bytes
+(brotli for everything but the stdlib zip, which is already compressed),
+the preview 13.5 MB (it does not compress). Time to the first program's
+output in Safari 26.6 on the M4 Pro: Netlify 1.51 s, Cloudflare 1.37 s; a
+second Run 52 ms. A school's iPad on its Wi-Fi is Russell's smoke test.
+
+**What a publish costs** (`verify-deploy.sh` measures each leg: `date +%s`
+around the launcher, the upload counts from the logs, the bytes as the
+`netstat -ibn` Obytes delta on `en0`):
+
+| Publish | Seconds | Uploaded | Sent |
+|---|---:|---|---:|
+| Netlify, first with the engine | 14 | Netlify required 238 files | 9.4 MiB |
+| Netlify, the next | 13 | 232 files | 9.0 MiB |
+| Cloudflare, first with the engine | 14 | 265 files (10 already there) | 30.4 MiB |
+| Cloudflare, the next | 9 | 232 files (43 already there) | 9.4 MiB |
+
+Cloudflare de-duplicates per project, so its first publish shows the
+engine's real cost: **+21 MiB and +5 s, once**. Netlify de-duplicates by
+content across the account, and its store already held these exact files
+from earlier test deploys, so its first publish here required only six
+more files than the next — a NEW Netlify account would pay roughly what
+Cloudflare did, once. Every publish re-uploads about 232 pages either way
+(the production rebuild changes every page's HTML — the explorer's random
+id — which predates this; see "Why determinism matters").
+
+**Runnable Swift (#493)** adds `static/swift/` (the thread
+`plantoir-swift-worker.js` and the shim `plantoir-wasi.mjs`, 10,925 bytes)
+and one program per Swift block in `static/swift-wasm/<key>.wasm`. A module
+worker and the module it imports must come back as a JavaScript type, as
+for Python; the programs are compiled from their BYTES (06 → I10), so a host
+that sends `.wasm` with the wrong type still runs them - the type is
+reported, not required. **Measured 2026-10-17** by `verify-deploy.sh`
+(the borrowed page carries one Swift block; `127 passed, 0 failed, 0
+skipped`): the preview, Netlify, Cloudflare Pages and both pairings send the
+thread and the shim as `application/javascript` and the page's program
+(45,843 bytes) as `application/wasm`; a folder publish carries the thread
+byte for byte as `support/gated/swift` holds it, and the program.
+
+**A school's own web server** (a folder publish served by IIS, nginx,
+Apache…) must map `.wasm` to `application/wasm` and `.mjs` to
+`text/javascript`; older default MIME tables miss both. Without them a
+student sees `couldNotLoad` after the watchdog, not a broken page. A site
+OPENED AS FILES runs none of its scripts (measured, Safari and Chrome), so
+runnable blocks show as plain code there.
+
+**Still third-party, deliberately out of #494's scope:** Quartz's Mermaid
+(`cdnjs.cloudflare.com`, and its `preconnect`), Google Fonts (a site's own
+font choice), and plausible where a teacher turned it on. A separate
+toolchain issue owns them.
 
 **The block is marked and REPLACED, never appended again (#462).** Lines
 somebody else put in `_headers` are kept, and until 2026-10-08 the function

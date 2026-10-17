@@ -1784,6 +1784,43 @@ round passed it).
   decision on #224 said to delete it in both launchers, on the premise that
   the twin had the same fault; measured by reading, it does not, so it was
   left as it is rather than removing a working question from Windows.
+- **Gets runnable Swift ready** (`prepare_runnable_swift`, #493), just before
+  the build and after the address is announced: it asks the website builder
+  which Swift blocks the course's cache lacks (`docker exec … swift_blocks.py
+  plan --course=C --format=lines` - KEY=value lines, because a teacher's Mac
+  has no JSON reader the launcher can rely on, and `/usr/bin/python3` would
+  offer to install the command-line tools). None: nothing more, so a course
+  with no Swift never meets the Swift image. Otherwise it makes sure the Swift
+  image (`teaching-quartz-swift:src-<hash of support/swift>`) exists -
+  building it the first time ("🧱 Getting Swift ready for this course's
+  runnable code — the first time downloads about 1.3 GB and takes a few
+  minutes…") after asking the website builder for its free space (`df` of its
+  root; under 6 GB it builds nothing, writes `{state: noRoom}` into the
+  cache's `state.json` and says so - review S9; the check runs before ANY
+  missing-image build, even one that would reuse cached layers; a build that
+  fails writes `{state: notDownloaded}`), under a lock in
+  `/tmp/plantoir-swift-build-<uid>.lock` so two launchers never download it
+  side by side (review S3; a lock whose holder has gone is taken over, and a
+  wait longer than 20 minutes gives up with a line) - then compiles with one
+  `docker run --rm --network none` mounting the course's `.swift-cache` at
+  its own path (the builds-root rule; it is under `$HOME`, so Colima can see
+  it). Its own output goes to `logs/swift-build-<pid>.log` and
+  `logs/compile-<pid>.log` beside the cache - one per run, so two launchers
+  never write into one file (implementation review N3); plan removes them
+  after a day - not to the console: the console says "🦅 Making N Swift
+  programs ready to run…" and, if anything went wrong, one plain line.
+  **Nothing here ever stops the preview**: an image that could not be built
+  (offline), too little room, or a compile that failed all leave the build to
+  say, block by block, that a program is not ready (05 → Runnable Swift). No
+  new progress marker (ruling Q3: it would move generated contract keys and
+  Windows' suite); the app shows its usual building state. A scheduled
+  publish runs the same step (ruling Q4). The one build that does NOT pass
+  through it is `deploy.py`'s own rebuild for a different web address
+  (`rebuild_for_production`, review N1), which runs `build_site.py
+  --build-only` inside the container: it uses whatever a preview compiled,
+  and a block it finds no program for ships not ready, said the same way.
+  `preview.ps1` has no such step: Windows compiles no Swift in v1.8 (12 →
+  "Runnable Swift").
 - Runs `build_site.py`, which (by default) ends by serving the site on
   the requested container port (8081–8084), with Quartz's live-reload
   websocket on port + 1000 (`--wsPort`) — the reason the container

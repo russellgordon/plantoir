@@ -209,7 +209,13 @@ python3 website/shots/capture.py --scenes   # the eleven v1.4.0 scenes (marketin
 python3 website/shots/capture.py --app      # the hero and the older app windows (demo folder)
 python3 website/shots/capture.py --sites    # the class sites and the phone
 python3 website/shots/capture.py --print-set   # what printing does: a preview of MPM2D (~/Plantoir Print)
+python3 website/shots/capture.py --code        # the Code page: previews of ICS3U and ICS4U (~/Plantoir Marketing)
 ```
+
+`--code` judges itself like `--print-set`: a prepare script presses Run or
+Check and must see "Finished." (or the quiz's "Right!") before the picture,
+and Vision must read `expectText`. Still look: the block, its output and the
+heading above it should all be in the window, with no focus ring.
 
 The scenes re-take one at a time too: `capture.py --only reference,two-maps`
 (names in `website/shots/scenes.py`). **Unlike `--app`, a scenes run judges

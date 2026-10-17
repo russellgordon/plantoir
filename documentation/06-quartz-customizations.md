@@ -318,9 +318,11 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-20 | **mhchem enabled** | `quartz/plugins/transformers/latex.ts` | Adds `import "katex/contrib/mhchem"`, so `$\ce{CaCO3(s) <=> CaO(s) + CO2(g)}$` renders. KaTeX runs at build time here, and the `katex` package Quartz already installs ships the extension, so this downloads nothing. |
 | C2-21 | **Curriculum coverage map styles** | `quartz/styles/base.scss` (appended) | The grid, chips, and the five-step red → orange → yellow → green → blue scale for the generated `Curriculum Coverage` page. The colours are deliberately NOT taken from the course's colour scheme — the map's whole meaning is that ordered reading, and a scheme that recoloured it would destroy that. The scale was SEARCHED rather than picked by eye: `scripts/choose_coverage_scale.py` scores candidates on CIEDE2000 separation and through deuteranopia and protanopia simulation, which is why the top step is blue rather than a darker green — the closest pair an ordinary-sighted reader now sees is ΔE 31, against ΔE 10 before. Cells carry the expectation's code and nothing else: a digit in every cell turned the map into a table of numbers, so the count now reaches a screen reader through the cell's label and a teacher through the hover preview. The legend is a vertical list below a rule, worded "addressed once", "addressed twice", and so on. The ring marking assessed work is two rings — white inside dark — so that it stays legible on all five cell colours; a single tone disappeared on either the yellow or the darkest step depending on which was chosen. The style block is REPLACED rather than skipped when it is already present, so a stylesheet surviving from an earlier build still picks up changes. |
 | C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form. Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
+| C2-22b | **Backlinks overall-expectation map (#505)** | `quartz/components/Backlinks.tsx` | Rewrites the one `const overallChildren = new Map<string, string[]>([…])` line behind the `// CQ4T-OVERALL-ANCHOR` comment, on every build and with or without a coverage map (`set_backlinks_overall_children`, called right after C2-22): each overall expectation page's slug, mapped to its specific expectations' slugs (`overall_backlink_children`). See D1. |
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
 | C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
+| C2-26 | **KaTeX from the site itself (#494)** | `quartz/plugins/transformers/latex.ts`; `quartz/static/katex/` | Quartz v4.5.0's `externalResources` linked `cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css` and `contrib/copy-tex.min.js` on EVERY page (400 links each on a built ICS3U site), while its own lockfile installs **0.16.21** and rehype-katex renders every formula with that at build time — so sites were rendered with one version and styled with another, and the maths depended on a third party and a network. `patch_katex_local` (marker `PLANTOIR-KATEX-LOCAL`, idempotent, independent of C2-20's import) replaces that block with two `additionalHead` functions: `<link rel=stylesheet href="<pathToRoot>/static/katex/katex.min.css" spa-preserve>` and `<script src=".../static/katex/contrib/copy-tex.min.js" defer spa-preserve>`, relative to each page so a site served under a folder finds them, kept across the site's page changes like `index.css`; the 404 page, served at any depth, links from the `baseUrl`'s path (review N6, Head.tsx's own rule). `install_katex_assets` copies the files from Quartz's own `node_modules/katex` every build (05 → Runnable code, step 4): the stylesheet (23,352 bytes), copy-tex (1,673), the **20 woff2 faces** (259,792) and the MIT licence — 284,817 bytes on EVERY site, woff2 only because every browser that can run a site's code takes woff2 first. Netlify's CSP loses `https://cdn.jsdelivr.net` by itself (07). **Rejected:** gating it per site on maths (Python cannot tell maths the way remark-math does — `$` in prose, currency — and a wrong guess breaks every formula silently; the cost is about 2% of Pyodide, uploaded once by content hash); all three font formats (1.10 MB); inlining the CSS into index.css (a generated SCSS file from node_modules every build); absolute `/static/katex/` (breaks a folder published under a subpath). **The print path had to follow** (#455 review S1): a link kept across page changes keeps its RELATIVE href, which then resolves against the new page — one folder off. print.inline.ts now takes every stylesheet for the print frame from the address the sheet was really fetched from (`link.sheet.href`), which fixed the same latent fault in its `index.css` lookup; measured by `browser-checks/maths_offline.mjs`: with the old code a handout printed after a page change from the top of the site to a page one folder down got a 404 KaTeX stylesheet (0 rules), now 249 rules. **The regression the plan expected did not happen:** a folder publish OPENED AS A FILE was expected to lose KaTeX's faces in Chrome (an opaque origin); measured 2026-10-17, Chrome for Testing 155 and Safari 26.6 both loaded `KaTeX_Main` and `KaTeX_Math` from `static/katex/fonts/` beside a page opened from disk, so the maths keeps its look offline from a file too (it used to need the network for the CDN). |
 
 ### C3. Content-level transformations (every build)
 
@@ -391,13 +393,65 @@ Contents" are likewise renamed to plain-language labels.
 
 ### D1. Patched `Backlinks.tsx` (`support/Backlinks.tsx`)
 
-Complements the locale change, and carries two changes. First, an
+Complements the locale change, and carries three changes. First, an
 `excludeBacklinks: true` frontmatter flag that suppresses the backlinks panel
 on a specific page — useful where "when did we do this?" makes no sense (a
 style guide, a syllabus) or where the link graph would mislead. Second, the
 `CQ4T-STRUCTURAL-ANCHOR` set that C2-22 rewrites each build, which keeps the
 curriculum indexes and the generated coverage maps out of every other page's
-backlinks.
+backlinks. Third, the `CQ4T-OVERALL-ANCHOR` map that C2-22b rewrites each
+build, which makes an overall expectation's page list the lessons that did
+its specific expectations (#505, below).
+
+#### An overall expectation lists its specific expectations' lessons (#505)
+
+**The rule** (`contracts/shared-rules.json` → `curriculumRules.overallBacklinks`,
+run by `scripts/test_overall_backlinks.py`): "When did we do this?" on an
+overall expectation's page (B1) lists every page that links B1 **or** any of
+its specific expectations (B1.1, B1.2, `b1.3`) in the same curriculum folder.
+One unlabelled list, each page once, in Quartz's order: the component runs
+ONE filter over `allFiles` with `targets = [slug, ...overallChildren.get(slug)]`,
+which de-duplicates for free. A specific expectation's page is unchanged
+(direct links only), and structural pages stay out exactly as before.
+
+**Why the overall page was empty.** Not the embed form and not Quartz skipping
+the page: the data. Classes connect to SPECIFIC expectations. Measured on the
+MPM2D example course: the only page linking "B1. Using Linear Systems to Solve
+Problems" was the Curriculum index, which is structural; across all example
+content, 44 pages outside a curriculum folder link an overall page directly,
+almost all of them a Learning Goals page. Built with this change (MPM2D,
+section 1 and section 2 alike), every one of the ten overall pages went from 0
+listed pages to between 4 and 15 (B1: 13), each list equal to the union of the
+direct links to the overall page and its specific expectations, while all
+specific expectation pages list exactly their direct links (B1.3: 2, as
+before).
+
+**How.** `overall_backlink_children(content_root, plan)` reads each mapped
+folder with `_collect_expectations` and groups specific expectations under
+`overall_of(code)` — the coverage map's own rule, so the panel and the map's
+overall chips count the same work. It is built PER FOLDER (two curriculum
+folders can each have a B1, and each gathers only its own), and slugs are
+written as Quartz v4.5.0's `sluggify` writes them (white space to `-`, `&` to
+`-and-`, `%` to `-percent`, `?` and `#` dropped) by `_quartz_page_slug`; the
+older `_quartz_slug` handles only spaces, which the coverage map's links can
+live with but an exact slug comparison cannot. A digit-first or College
+Board code has no overall expectation, so it gathers nothing. The map is a
+JavaScript `Map`, not an object literal, so a page whose slug is
+`constructor` finds nothing rather than a function.
+
+**Rejected.** Direct links only (the panel would say "Not yet addressed in
+class." for work the coverage map counts). Two lists — direct links first,
+then the specific expectations' pages — or a labelled second list ("through
+B1.3"): a page linking B1 and B1.3 would appear twice, and the label draws a
+distinction the coverage map does not make. A map keyed by code across every
+folder: two folders' B1 pages would each collect the other's lessons.
+
+**Checked** by `verify.sh` 6h (continued), on a real EXC2O build: a page
+embedding only `![[A2.1]]` must be listed once on the A2 page (it is listed
+nowhere there on the old component — measured), and a page embedding both
+`![[A2.1]]` and the A2 page must be listed once on A2 and once on A2.1.
+Windows builds with the same `build_site.py` and the same component, so it
+inherits this unchanged; `PythonToolchainTests` discovers the test.
 
 ### Curriculum maps: a second curriculum, and the codes a map reads (#128)
 
@@ -1141,13 +1195,22 @@ script's and the styles' size; a site without figures carries neither
 
 Write ` ```functionplot ` for a graph students can explore and ` ```tikz `
 for a precise diagram; preview, and anything that cannot be drawn is named
-with its page and line. In Obsidian, a TikZ fence shows as a picture only
-with the community plugin **TikZJax** installed (Plantoir does not install
-it yet — #495); the functionplot plugin is no longer in Obsidian's plugin
-directory (review S1, checked 2026-10-09 against `community-plugins.json`
-and the removed list), so there a graph shows as its text — the site draws
-it. The skill `plantoir-math-graphs` (support/agent_guidance) carries the
-whole syntax for an assistant.
+with its page and line. In Obsidian, a fence shows as a picture only with
+its add-on installed and switched on in that course: **TikZJax** for
+` ```tikz `, and **Functionplot** 1.2.1 for ` ```functionplot ` — which is no
+longer in Obsidian's plugin directory (review S1, checked 2026-10-09 against
+`community-plugins.json` and the removed list), so it cannot be installed
+from Obsidian itself. Without them the fence shows as its text; the site
+draws it either way. **On the Mac, Plantoir carries both and offers to add
+them** when a course with figures is opened in Obsidian from Plantoir (#495,
+09 → "Obsidian's add-ons for diagrams and graphs (#495)"); Obsidian then asks
+once per course whether the teacher trusts its author — "Trust author and
+enable plugins". On Windows, until its issue lands, TikZJax comes from
+Obsidian's directory and functionplot fences stay text in Obsidian. If
+Obsidian updates TikZJax past 0.5.2, a diagram may draw differently there
+from the site, whose engine is 0.5.2's (`obsidianAddOnsForFigures.knownLimits`).
+The skill `plantoir-math-graphs` (support/agent_guidance) carries the whole
+syntax for an assistant.
 
 **Rejected** (with the reasons in 05 and 02): TikZJax in the browser;
 `<img>` SVGs; every Computer Modern face on every site (140 faces, 20–33 KB
@@ -1360,18 +1423,668 @@ has every folder CLOSED, and the dot appears only inside an open one, so none
 is expected to change by a pixel; the cut spot-checks them rather than
 retaking (ruling 5).
 
+## I. Runnable code (#455, v1.8.0)
+
+A page whose settings say `codeRunner: true` turns each ` ```python run `
+block into a small program students edit and run in their own browser, with
+nothing installed: an editor, an input box when the program reads input,
+**Run**, **Stop** and **Reset**, a status line and the output, and their edits
+kept in the browser. The rules are data in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`codeRunnerBlocks` and [`file-formats.json`](../contracts/file-formats.json) →
+`pageOptIns`; the build's half is
+[05 → Runnable code](05-build-pipeline.md#runnable-code-what-the-build-does-455-v180),
+the engine's layer [02](02-docker-image.md#optvendorpyodide-455-v180-and-katexs-pin-494).
+
+**Compatibility.** A page that does not opt in, and every block that is not
+runnable, comes out exactly as before: the transformer acts only on a page
+whose frontmatter is the boolean `true`, and wraps only runnable blocks.
+verify.sh 6j checks a page with every contract fence that does NOT opt in
+has no runner markup and its code blocks come out byte for byte as the same
+code in plain ` ```python ` fences (the word `run` changes nothing the
+highlighter does). The page's script and styles are in every site's shared
+`postscript.js` and `index.css` (every rule under `.plantoir-runner`, B2;
+the script returns at once without a wrapper), so those two files grow on
+every site — I8 has the numbers.
+
+### I1. The files (all installed every build)
+
+| File | What it does |
+|---|---|
+| `support/quartz/plugins/transformers/codeRunnerRule.ts` | The rules, with nothing of Quartz's: the language table (`LANGUAGES`, the literal mirror of `codeRunnerBlocks.languages`), `runnerFor` (the fence rule), `runnerId`, `findRunners` (document order, per-language numbering, and the nested-container skip below), the `{language}` filler and FNV-1a. `check_runner_rules_against_the_site.py` bundles it with Quartz's own parser and runs every case in Node. |
+| `support/quartz/plugins/transformers/codeRunner.ts` | `CodeRunnerFences`, wired straight BEFORE `Plugin.SyntaxHighlighting(` in `quartz.config.ts`: on a `codeRunner: true` page it wraps each runnable block, at the MARKDOWN stage, in `<div class="plantoir-runner" data-runner-id data-runner-flags data-runner-language data-runner-runtime data-runner-engine data-original>`. A wrapper rather than attributes because rehype-pretty-code 0.14 drops every property on `<pre>` and `<code>` (measured 2026-10-09); the wrapper survives at the top level, in lists, in quotes and in folded callouts, and the block inside is highlighted exactly as before (the meta is left alone). `data-original` is mdast's `value`, the teacher's code exactly. Reads `quartz/plantoir_code_runner.json` with `fs` (mtime-cached) for the engines the site carries (I6). |
+| `support/quartz/components/CodeRunner.tsx` | Renders NOTHING. Placed at the head of `sharedPageComponents.afterBody` (Quartz renders `page-footer` on every page whatever it holds, so no page's HTML changes), it carries the script and styles into the site's one `postscript.js` and `index.css`. |
+| `support/quartz/components/scripts/codeRunner.inline.ts` | Everything in the browser (I2–I5). Imports `quartz/plantoir_code_runner.json` (words and limits; bundled by esbuild, as the patched explorer imports `course_config.json`). |
+| `support/quartz/components/styles/codeRunner.scss` | Every rule under `.plantoir-runner`; the editor's font is the site's code font at `max(16px, …)`; touch targets 44 px. |
+| `support/gated/pyodide/plantoir-worker.js` | The thread a page's Python runs in, laid over `VENDOR_DIR/pyodide` by the gate, so it reaches a site only beside the engine it starts (I3). |
+
+### I2. The block on the page
+
+Built on Quartz's `nav` event, for every `.plantoir-runner` without
+`data-built` (elements, never one looked up by id: an embedded page brings
+its blocks with their ids, N1). In this order (Q3): the editor (or, for
+`readonly`, the highlighted code as it is); the input box, shown when the
+block has the `stdin` flag or its CURRENT code matches the row's
+`inputPattern` (`\binput\s*\(`), filled before Run, one line per `input()`,
+never stored; Run, Stop, Reset (Reset only when editable); a status line
+(`role="status" aria-live="polite"`); the output (`<pre aria-label>`,
+stderr in `span.plantoir-runner-err`). The highlighted copy is put away by a
+CLASS (`.plantoir-runner-original`), never `hidden` or an inline style, so
+the print rules can bring it back (N2). Popovers, a page without script and
+a page opened from a feed show the highlighted code alone.
+
+**The editor** is a `<textarea>` in the site's code font, at least 16 px
+(iPadOS zooms the page on focus below 16 px), spellcheck, autocapitalise,
+autocorrect and autocomplete off, `wrap=off`. It grows with its code up to
+24 lines, then scrolls; growing (and the editor replacing the shorter
+highlighted copy) lifts an OPEN ancestor callout's inline `max-height`,
+which Quartz's `callout.inline.ts` fixed when the callout opened and would
+otherwise clip it (2026-10-09 finding D). Tab inserts four spaces or indents
+every selected line, Shift-Tab takes up to four off; Escape then Tab leaves
+the editor (the keyboard-trap rule); nothing while an input method is
+composing; Enter is never intercepted. Cmd/Ctrl-Enter runs (from the editor
+or the input box). Edits go through `execCommand("insertText")` so they can
+be undone, with `setRangeText` where a browser refuses.
+
+### I3. The thread, the harness and the language table's seam
+
+`RUNTIMES = { pyodide: … }`; a block's `data-runner-runtime` picks one, and
+`PyodideRuntime` is the only class. It starts
+`<pathToRoot>/static/<engine>/<worker>` — from the CURRENT page's slug, so an
+embedded block works at any depth — as a **module worker** on the first Run
+on a page (#455 review B1: Pyodide 314's `pyodide.js` probes
+`importScripts("data:…")` and throws "Classic web workers are not
+supported" wherever no CSP blocks `data:`: the preview, Cloudflare, a folder
+publish, the app's pane). It is kept warm for the rest of the page's visit
+and ended by `addCleanup` when the page changes. **One program per page**
+(Q2): Run on another block ends the thread (`words.stoppedForAnother`) and
+starts a fresh one; an `autorun` block that comes into view while another
+program runs waits its turn (N4). **Stop** ends the thread — without
+cross-origin isolation (which a folder publish cannot send) there is no
+other way to interrupt Python — and the next Run starts a new one. Online
+that costs a few `304`s (Netlify's and Cloudflare's default `cache-control`
+is `max-age=0, must-revalidate`); OFFLINE it fails with `couldNotLoad`
+(measured by the implementation review: a warm Run offline finished; Stop,
+then Run, failed in 53 ms). So the page works without a connection only
+until a program is stopped, another block runs (that ends the thread too),
+the output cap is reached, or the page changes; the skill says so.
+
+The worker imports `./pyodide.mjs` and calls `loadPyodide` with `indexURL`,
+`lockFileURL`, `packageBaseUrl` and `cdnUrl` all its own folder; nothing is
+ever fetched for an `import`. Its harness (`codeRunnerBlocks.harness`):
+`compile(source, "main.py", "exec")` with fresh globals and the source in
+`linecache`, the traceback trimmed to start at the first `main.py` frame, so
+its line numbers are the editor's and its wording CPython's (measured:
+`File "main.py", line 3, in <module>` for a NameError on the editor's third
+line); a SyntaxError prints without the Traceback header, as CPython does;
+SystemExit is silent. **Before every run** (review S3, measured: one block's
+`builtins.print = lambda *a: None` silenced the next run on the page) the
+builtins are restored from a copy taken at load, the three streams and the
+recursion limit reset, and the program starts in a fresh empty folder that
+is removed after. stdout and stderr are `isatty` writers decoded with a
+streaming `TextDecoder`, so output arrives line by line as CPython's would in
+a terminal (a `time.sleep(0.3)` loop arrived at 0, 300 and 600 ms in Node);
+`print("a", end="")` waits for its line, as in a terminal.
+
+**Adding a language** is: a row in `codeRunnerBlocks.languages` and in its
+two mirrors (`LANGUAGES` here, `RUNNER_LANGUAGES` in `page_features.py`; the
+tests pin both field for field), a runtime class in `RUNTIMES`, a vendor
+layer in the Dockerfile (and `fetch-runtime.ps1`), and a pin in
+`toolchain.json`. Nothing else: the fence rule, the ids, the gate, the words
+and the print rules read the table, never the word "python" (Russell,
+2026-10-09). **Swift (#493) tested that sentence.** For a language the
+browser runs as written, it holds as stated. A language compiled ahead of
+time needed more, and the honest list is: a table row (`prebuilt: true`,
+`editable: false`); a runtime class (`SwiftWasmRuntime`), which widened the
+`CodeRuntime` interface (`run(…, program)`, an optional `started`, and
+`done(error, said)` for its crash and exit-code words); a compile layer in
+place of a vendor folder (`support/swift/` and `scripts/swift_blocks.py`:
+the launcher's plan-and-compile step in `preview.sh`, and a `build_site`
+call that prepares the programs); a folder problem of its own
+(`swiftCouldNotBePrepared`); a pin (`toolchain.json` → `swiftImage`); and
+two generic `prebuilt` rules - the gate takes the overlay as the whole engine
+(`page_features.OVERLAY_IS_THE_ENGINE`), and the transformer looks a
+prebuilt block's key up in `quartz/plantoir-runners/<engine>.json` (I10).
+The fence rule, the ids, the gate's count and Python's gate were not
+touched (implementation review N4 asked for this list instead of "that is
+all").
+
+### I4. Input, output and the words
+
+`input()` takes the box's lines in order; each line read is echoed into the
+output straight after its prompt (Q4: `Name? Ada`, not `Name? Hello Ada`),
+and past the last line `input()` raises `EOFError` (measured: `EOFError: EOF
+when reading a line`). Output is gathered once per animation frame; at
+100,000 characters the program is stopped and `words.outputTooLong` shown
+(Q5), and only what was left of the allowance reaches the page — one
+`print("x" * 50_000_000)` used to be painted whole (implementation review
+S1, measured: 50 million characters in the `<pre>`); now at most 100,000. The words are `codeRunnerBlocks.words` with `{language}` and
+`{inputCall}` filled from the table row; none names the engine, WebAssembly,
+a worker or a thread (`test_page_features.py` sweeps them).
+
+### I5. Loading, and the hosts that break it
+
+Nothing is fetched until Run: verify's browser check counts zero requests
+under `static/pyodide/` on page load. A site opened as files: Safari 26.6
+and Chrome for Testing 155 run NONE of a Quartz page's scripts from
+`file://` (its `postscript.js` is a module script, which a file's opaque
+origin may not load — measured 2026-10-17: no block built, no SPA), so the
+blocks show as their highlighted code with no Run button; a browser that did
+run the script would start nothing and say `words.needsWebAddress`. A 45 s watchdog after the thread starts ends in
+`words.couldNotLoad` (review S1: a server that sends `.wasm` as
+`application/octet-stream`, or a CSP with no wasm permission, otherwise
+leaves "Loading Python…" for ever — measured in Chrome for Testing 155 as a
+silent hang in BOTH cases, caught at 45 s by the watchdog). A thread that
+fails to start is classified by ONE `HEAD` request for the worker file: 404
+→ `words.engineMissing`, anything else → `words.couldNotLoad` (a worker
+error event carries no reason, and a wrong type looks exactly like a 404).
+
+### I6. When the build and the site disagree (review S2)
+
+The build counts runnable blocks with the toolchain's fence reader; the site
+reads them with Quartz's parser. Measured with remark against
+`markdown_code.fenced_blocks`: callouts, folded callouts, tab-indented list
+items and `%%` in code read alike; a fence opened on a line that opens a
+list item holding another container (`- - ```python run`) was a block to the
+site and nothing to the build, and a lazy line in a list item ends the block
+on the site and not in the build. Russell's ruling (2026-10-17): the site
+never shows "isn't on this site yet" for ever because of it. So:
+
+- the build's reader now opens the nested-container block too (`nested`),
+  and neither side makes it runnable (`findRunners` skips a block whose
+  opening line opens a list item followed by another container on that
+  line), so it stays plain highlighted code and the fences after it are read
+  alike;
+- the lazy line gives one runner on both sides (the site's body runs);
+- and the SAFETY NET: the transformer leaves any runnable block whose
+  engine the site does not carry as plain code and prints
+  `plantoir: error: <page>.md: python block <n>: ` +
+  `words.blockNotPrepared`, or `words.blockAfterUnclosedFence` when a fenced
+  block above it on the page was never closed (the likeliest cause, review
+  N3: the site closes such a fence at the end of its list item, the build's
+  reader carries on) — never for a page students cannot see (the
+  transformer applies `patches/publish.ts`'s test). The line is in the
+  build's output only: the transformer runs after the folder checks are
+  said, so it is not a folder problem in the app (a gap recorded on #455).
+- both sides split the info string on the SAME separators (`INFO_SPACE`:
+  tab, space and Unicode's space separators, NBSP — Option-Space — among
+  them; review N2: micromark leaves `python<NBSP>run` all in `lang`, and the
+  build used to call it a runner the site did not).
+
+**Fuzzed** (review N2's generator, 2026-10-17): 856 random pages over 28
+placements (428 with Unicode separators, 428 ASCII), each read by
+`findRunners` over Quartz's parser and by `runner_fences`. 38 disagree, all
+in known groups: the build alone counts a fence indented four spaces at the
+top of a page or inside an HTML block (the site carries the engine for
+nothing); the site alone decodes a character reference in the info string
+(`&#114;un`), keeps a fence inside `$$` as maths, rejects a backtick in a
+backtick fence's info string differently, and reads a few deeper
+quote-and-list nestings differently — each of those shows as plain code
+with the line above; and a lazy line that leaves a list fence open makes the
+build's reader carry on and count a block the site shows as code text (the
+fixes review's second fuzz, 1,284 pages, met it 3 times; bytes only)
+(`knownLimits`). `blockAfterUnclosedFence` tells a teacher to close the open
+block with a line like the one that opened it, indented the same: a closer at
+column 0 under a list item or callout closes nothing on the site (measured
+by the review; `pageShapes` pins the indented close).
+
+`check_runner_rules_against_the_site.py` runs every `pageShapes` case
+through both readers, and the transformer itself with the engine carried,
+not carried, and on an unpublished page.
+
+### I7. Saved edits, and print
+
+**Storage** (`codeRunnerBlocks.storage`): `localStorage` key
+`plantoir:runner:<base>:<id>`, `<base>` the site root's path as this page
+resolves it (N5: previews reuse ports and folder publishes share a host),
+holding `{originalHash, code}` (FNV-1a 32 of the teacher's code — not
+`crypto.subtle`, which a preview reached over a school network's plain http
+lacks). Written 400 ms after the last keystroke and at once on `pagehide`,
+`beforeprint` and `addCleanup` (an edit then a link within 400 ms is kept).
+Code equal to the teacher's removes the key. When the teacher's code has
+changed since (the hash differs) the saved value moves to `<key>:set-aside`,
+the live key is removed, the new code is shown and `words.teacherChangedIt`
+said — once, because the live key is gone (S4); set-aside work is NOT
+offered back. Ids are positional, so a block inserted ABOVE others sets aside
+the edits on every block below it (knownLimits; the skill says to add blocks
+after existing ones). `readonly` stores nothing.
+
+**Print** (decision 8, `codeRunnerBlocks.print`): a synced
+`<pre class="plantoir-runner-print" aria-hidden="true">` holds the current
+code and the wrapper is `.plantoir-runner-edited` while it differs from the
+teacher's (a textarea's typed value is not part of a printed or cloned
+page). `@media print` hides the editor, input, buttons, status and output;
+an unedited block prints its highlighted code, an edited one the student's
+code. Paged.js promotes the same rules for the Print button, which awaits a
+flush-and-sync pushed onto `window.plantoirPrint.prepare` (and removed in
+`addCleanup`). print.inline.ts's code numbering sees the print copy as a
+`pre` without `data-line` and counts its text lines.
+
+### I8. Measured (2026-10-17, M4 Pro, macOS 26.6)
+
+Against the verify fixture and a measuring page in EXC2O, served by
+Plantoir's own preview unless the row says otherwise. "First Run" is the
+press of Run to the first program's last line, Python loading included;
+nothing of the engine was fetched on page load in any of them.
+
+| Browser | First Run | Second Run | After Stop | `time.sleep(0.5)` lines arrived | Other |
+|---|---:|---:|---:|---|---|
+| Safari 26.6 | 954 ms | 25 ms | 887 ms | 15, 501, 1,001 ms | editor 16 px; on Netlify 1,509 ms, on Cloudflare 1,368 ms (6.1 and 6.3 MB brotli) |
+| Chrome for Testing 155 (headless, verify.sh) | 1,077 ms | 159 ms | — | — | the whole of `browser-checks/code_runner.mjs` |
+| Microsoft Edge 155.0.4283.45 (headless) | 1,069 ms | 255 ms | — | — | the whole of `code_runner.mjs` |
+| iPad (A16) simulator, iOS 18.6, Safari by WebDriver | 1,040–1,050 ms | 21 ms | 990–1,056 ms | 4, 500, 1,000 ms | no zoom on focus (`visualViewport.scale` 1 → 1); Tab, Shift-Tab and Escape-then-Tab as I2 says (Escape-then-Tab only after the fix below) |
+| WKWebView, the preview pane's configuration (an off-screen window) | 1,718 ms | 999 ms | 999 ms | all at once at the end | works end to end; its times are not comparable — macOS throttles timers and animation frames in a window nobody can see |
+
+In Chrome and Edge the three broken servers end as I5 says: worker missing
+→ `engineMissing` in 0.1 s; `.wasm` as octet-stream and a CSP without wasm →
+`couldNotLoad` at the 45 s watchdog (both silent hangs otherwise). Five page
+changes leave at most one worker (CDP `Target.setAutoAttach`). A simulator
+can drive neither the on-screen keyboard nor a real iPad's Wi-Fi: those are
+Russell's smoke test (Q6).
+
+**Found by measuring, and fixed:** in the iPad simulator, Escape then Tab did
+NOT leave the editor. Quartz's own Escape handler (`search.inline.ts` →
+`hideSearch`) moves the focus to the search button on EVERY page, so the next
+Tab (which in Safari visits form controls only) came straight back to the
+editor. The editor now keeps its Escape (`stopPropagation`), and
+`code_runner.mjs` checks that Escape alone leaves the focus in the editor —
+red against the earlier script, green now.
+
+**Print** (Chrome for Testing 155, `pdftotext`): ⌘P of an unedited block
+prints the teacher's code and no button, input box or output; of an edited
+one the student's code and not the teacher's; the Print button's handout,
+after the edit, the student's code. ⌘P of pages that do not opt in, built
+before and after this branch: Help Sessions 1 page and Building Series and
+Parallel Circuits 3 pages each time, identical text.
+
+**What every site's bundles cost** (EXC2O built with `origin/dev` 1f29ff04a's
+image and with this branch's): `postscript.js` 106,596 → 121,277 bytes
+(+14,681), `index.css` 57,824 → 60,812 (+2,988). Of 299 pages, 293 are
+identical once the two KaTeX lines in the head (C2-26) and Quartz's own build
+variance (the explorer's random id) are set aside; the other 6 (Curriculum
+and tag listings) differ only in the order of entries that share a
+build-time date — the variance F names.
+
+
+### I9. Teacher note: "Writing a runnable block"
+
+Add `codeRunner: true` to the page's settings and `run` after `python` on the
+block's first line; add `readonly`, `stdin` or (sparingly) `autorun` after
+it. Tell students what to type in the input box, one line per `input()`.
+Preview and press Run on each block; a block that shows as plain code is
+named on a `plantoir: error:` line. The skill `plantoir-runnable-code`
+(support/agent_guidance) carries the whole of this for an assistant.
+
+**Rejected** (with the reasons above and in 02 and 05): Skulpt; Custom
+Frames or JupyterLite; SharedArrayBuffer for input and interrupts (a folder
+publish cannot send COOP/COEP); window.prompt for input; CodeMirror (a large
+editor per page for indentation); a Blob worker (Netlify's CSP has no
+`worker-src`, so `blob:` is refused there); a classic worker (B1); an html-
+stage plugin after pretty-code (the properties are gone by then); the
+transformer's `externalResources` (inlined into every page); auto-indent on
+Enter (it fights the iPadOS keyboard and IME); a `# plantoir: run` first
+line (Obsidian takes only the info string's first word, so ` ```python run `
+is an ordinary Python block there — verified from Obsidian 1.12.7's and
+1.13.7's own code, 2026-10-08).
+
+### I10. Swift (#493)
+
+A ` ```swift run ` block on a page that opts in runs as a WebAssembly program
+compiled ahead of time by the build's launcher ([05 → Runnable
+Swift](05-build-pipeline.md#runnable-swift-what-the-launcher-and-the-build-do-493-v180),
+[02 → The Swift image](02-docker-image.md#the-swift-image-493-v180)) -
+Swift has no interpreter a browser can carry. Path A of the Phase 0 report on
+#493: Embedded Swift per block (about 12-110 KB), and the full standard
+library (about 3.4 MB, 0.9 MB brotli) for a block Embedded Swift cannot
+compile or would print `(cannot print value in embedded Swift)` for.
+Rules: `codeRunnerBlocks.swift`.
+
+**Read-only, and why.** The student changes the input box, never the code:
+editing would need a compiler somewhere other than the student's browser -
+the compile service of #493 §7 (SwiftFiddle's runner), specified and
+deliberately not built, so a service outage can never block a lesson. The
+row's `editable: false` makes every Swift block keep its highlighted code
+with Run and Stop only (no Reset, nothing stored), and `words.cannotEdit`
+says so once, quietly, under the code (`.plantoir-runner-note`, hidden in
+print). `readonly` is therefore not a Swift flag; `stdin` and `autorun` are.
+
+**On the page.** The transformer wraps a Swift block like any runnable block
+and, because the row is `prebuilt`, computes the block's key from the code
+Quartz's parser read (`programKey`: SHA-256 of `normaliseProgram`, node's
+crypto - not in `codeRunnerRule.ts`, which the page's script bundles too)
+and looks it up in `quartz/plantoir-runners/swift.json`, which the build
+wrote: `data-runner-wasm="static/swift-wasm/<key>.wasm"` when the program
+exists, `data-runner-unready="<reason>"` when the build said why not (then
+Run is off and `words.notReady` shows), and when the key is not listed at
+all - the build's reader and Quartz's read the block differently, or the
+page changed under a running preview - plain code and a `plantoir: error:`
+line with `words.blockNotCompiled` (review S2's safety net, extended).
+
+**The thread** is `static/swift/plantoir-swift-worker.js`, a module worker
+like Python's, with the hand-rolled WASI shim beside it
+(`plantoir-wasi.mjs`, the same file verify.sh's gate runs in Node). It
+starts at once - there is no engine to load - and each Run sends the
+program's address and the input lines. The program is fetched once per
+visit and compiled from its BYTES (`WebAssembly.compile`, not
+`compileStreaming`, which refuses a `.wasm` sent with the wrong type -
+review N4: a self-hosted folder often sends `application/octet-stream`), and
+every Run is a FRESH instance (a Swift program runs once; its globals cannot
+be reset). Fetching is watched like an engine's loading: past 45 s,
+`words.couldNotLoad`. Stop ends the thread, as for Python; the next Run
+starts another, and the program comes from the browser's cache.
+
+**The shim** answers what the compiled programs import - eight calls for
+Embedded Swift, fourteen for the full library (Phase 0 and the spike
+measured the same lists; any other import answers ENOSYS, so a toolchain
+that adds one never fails to link). Three rules in it were each measured
+into place:
+
+- **fds 0-2 are a terminal**: `fd_fdstat_get` says CHARACTER_DEVICE AND
+  leaves FD_SEEK and FD_TELL out of the rights. wasi-libc's `isatty()` needs
+  both; with only the file type, stdout went fully buffered after its first
+  line (the spike counted 2 writes for 01 instead of 5), and Embedded
+  Swift's `Fatal error:` line - which goes to stdout - was LOST on a trap
+  (spike G5, correcting Phase 0). verify.sh runs the must-fail: with every
+  right set, fragment 10's line is lost; with the shim's, it is kept.
+- **One stdin line per read, echoed as it is taken** (review S6), so the
+  transcript reads `What is your name?` / `Ada` / `Hello, Ada!` as Python's
+  does; past the last line, 0 bytes, and `readLine()` is `nil`. A prompt
+  printed with `terminator: ""` would still sit in stdout's buffer when the
+  program reads, and the echoed line came FIRST (measured 2026-10-17); so
+  readLine() flushes stdout before reading - `ReadLineShim.swift` for
+  Embedded Swift, `FlushBeforeRead.c` linked with
+  `--wrap=swift_stdlib_readLine_stdin` for the full library (swift-gate 13
+  and 14 pin both).
+- **stdout and stderr decoded per stream**, holding a character split
+  across two writes until it is whole (review N4).
+
+**Int is 32 bits** (wasm32): `Int.max` is 2,147,483,647 here and
+9,223,372,036,854,775,807 natively, so `13!` overflows and the program
+traps with `words.crashed` and NO `Fatal error:` line, in both libraries -
+even `-Onone` (7.4 MB) prints none, because an overflow check compiles to a
+bare trap (measured 2026-10-17; implementation review S1; swift-gate 15
+pins it). The skill and `knownLimits` tell teachers to use `Int64` for
+factorials and large totals.
+
+**Traps.** An index out of range, a `nil` unwrapped with `!`, or the 256 MB
+memory cap ends in `WebAssembly.RuntimeError`; a recursion past the
+browser's own stack ends in `RangeError`, which is NOT a RuntimeError
+(review S5, Chrome 155 and Safari 26.6) - both are `words.crashed`. The
+`Fatal error: ...` line is already in the output when the program printed
+one (stdout under Embedded Swift, stderr under the full library); a stack
+overflow prints none. `exit(n)` with n ≠ 0 is `words.exitCode`. The memory
+cap is a link flag (`--max-memory=268435456`): without it a list that grows
+for ever reached 2 GB in a tab before trapping (review S5); with it, 0.06 s
+in Node. Embedded Swift then says `Fatal error: Unexpectedly found nil while
+unwrapping an Optional value` - misleading, measured, in `knownLimits`.
+
+**The S4 finding, and why reproducibility does not matter.** A one-call
+`swiftc` puts a random temporary path into a 16-byte module-hash segment, so
+the same code compiled twice gave different bytes (spike G4); compiling to a
+fixed object path per key (`/tmp/plantoir-swift/<key>/main.o`) makes one
+image give the same bytes every time (verify.sh checks two fragments), but
+the macOS and Linux toolchains still differ in that segment, and parallel
+compiles in different folders would too (review S4, measured with three
+folder names). None of it matters, because NOTHING keys on the program: the
+cache key is the code's hash plus the recipe's (the toolchain id), and a
+program is only ever produced from that pair and served by that key. The
+reproducible-bytes requirement the spike's correction implied was dropped
+(review S4 ruling); the fixed path stays because it costs nothing.
+
+**Measured** (2026-10-17, M4 Pro, macOS 26.6), on verify's planted Swift
+Playground (a greeting reading two lines, a loop that never ends, an index
+out of range, `exit(3)`, a block that does not compile, and swift-gate 05,
+which needs the full library), served from the Mac with no compression.
+"First Run" is the press of Run to the status saying it ended, the thread
+and the program's fetch included; nothing of Swift was fetched on page load
+in any of them.
+
+| Browser | Embedded, first Run | Embedded, again | Full library, first Run | Full, again | Stop | Everything else |
+|---|---:|---:|---:|---:|---:|---|
+| Chrome for Testing 155 (headless, verify.sh's `swift_runner.mjs`) | 57 ms | — | 54 ms | — | 2 ms | the whole check: read-only with the note, input echoed after each prompt, changed input changes the output, Run after Stop, the trap's `Fatal error: Index out of range` line and `words.crashed`, `words.exitCode` with 3, `words.notReady` with Run off |
+| Safari 26.6 (AppleScript, the page's own script) | 25 ms | 11 ms | 21 ms | 15 ms | 0 ms | the same, all as expected |
+| iPad (A16) simulator, iPadOS 18.6, Safari | 35 ms | 12 ms | 32 ms | 12 ms | 0 ms | the same, all as expected (driven by a measuring script the page loads and posts back - safaridriver's remote automation was off on this Mac) |
+
+**What a student downloads on the first Run of a block**: its program -
+the Embedded greeting 62,347 bytes (28,144 gzip, 23,951 brotli), the
+full-library block 3,453,463 bytes (1,238,667 gzip, 927,100 brotli) - plus
+the thread and the shim once per visit (10,925 bytes). Later Runs of the
+same block come from the thread's own compiled copy; after Stop, from the
+browser's cache. A real iPad on school Wi-Fi is Russell's smoke test, and
+so is a real iPad's recursion depth (review S5 measured Safari 26.6 on the
+Mac at about 2,000 calls).
+
+**What every site's bundles cost** for the Swift runtime (EXC2O, against
+#455's numbers in I8): `postscript.js` 121,277 → 125,230 bytes (+3,953),
+`index.css` 60,812 → 60,949 (+137).
+
+**Rejected:** Path B (one module per course, every block an entry point:
+the full library is 0.9 MB brotli per block, not the 17 MB once feared, and
+Path B would rewrite top-level code into functions, changing what
+`main.swift` means); editing (the compile service, §7); `@bjorn3/browser_wasi_shim`
+(the hand-rolled shim is about 220 lines and does exactly what the programs
+import); `compileStreaming` (N4); one long-lived instance (a Swift program
+runs once); mapping only RuntimeError to the crash words (S5); a dedicated
+"called itself too many times" word (considered; one crash sentence, and the
+known limit tells teachers how deep is safe); stopping the build on a compile
+error (ruling Q1).
+
+## J. Self-check quizzes (#563, v1.8.0)
+
+The first half of #511. A `> [!quiz]` callout at the left edge of a page
+becomes a question a student answers and checks in the browser: multiple
+choice (one box ticked), select all that apply (two or more), short answer
+and fill in the blank (an `[!answer]` inside the quiz, one line per blank),
+each with an optional `[!explain]` revealed after the first Check or Show
+answer, and `[!quiz|shuffle]` to shuffle the choices. Self-check only: no
+accounts, no network, nothing reaches the teacher. The rules are data in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`quizCallouts`; the build's half is
+[05 → Self-check quizzes](05-build-pipeline.md#self-check-quizzes-what-the-build-does-563-v180).
+Format and syntax are #511's (decided 2026-10-11, not reopened); the eight
+rulings of 2026-10-17 (Q1-Q8) and the plan review's ten should-fixes are in
+the closing comment of #563.
+
+**Compatibility.** A page with no `[!quiz]` outside fenced or indented
+code comes out exactly as before: the text hook returns it untouched
+(checked in Node for every `untouched` case - quiz syntax shown in a fence
+(review S2) and in indented code at the page's level, inside a callout and
+under a list item (the implementation review's S1: a `>` four or more
+columns past its container's content opens nothing, in both readers) - and
+by verify 6k on a planted `Quiz Code Shown`, which is also named in no
+folder problem), and the two later stages act only on a page whose text
+holds `[!quiz`. `[!question]`, and `[!answer]` and `[!explain]`
+outside a quiz, are untouched and stay searchable. The script and styles are
+in every site's shared `postscript.js` and `index.css` (ruling Q2; every
+rule under a `plantoir-quiz` class, the script returns at once with no
+quiz). Measured on EXC2O (no quiz): `postscript.js` 122,138 → 136,068 bytes
+(+13,930; gzip 40,867 → 45,378, +4,511), `index.css` 60,812 → 65,787
+(+4,975; gzip +700), and 297 of 302 pages and feeds identical (05 has the
+other five, which differ between two builds of the same image).
+
+### J1. The files (all in `support/quartz/`, installed every build)
+
+| File | What it does |
+|---|---|
+| `plugins/transformers/quizRules.ts` | The ONE implementation of the rules, pure (no DOM, no imports): `parseAnswerLine`, `splitAlternatives`, `parseNumber`, `normalise`, `accepts`, `shuffledOrder`, `verdict`, `isBlank`, and the text hook `nestedTitlesOwnTheirLine`. The transformer decides what each quiz is with it; the page's script checks answers with it. `scripts/check_quiz_rules_against_the_site.py` bundles it and runs every parse, check and shuffle case in Node (110 on 2026-10-17). The Python mirror, `scripts/quizzes.py`, parses and decides but never checks an answer. |
+| `plugins/transformers/plantoirQuizzes.ts` | `PlantoirQuizzes`, wired straight after `Plugin.PlantoirFigures(),` (so after Description; anchored on the figures line so a fresh site and an old one stand in the same order, review N7). Three hooks, below. |
+| `components/scripts/quiz.inline.ts` | Check, Show answer, feedback, the shuffle, keyboard folds, the score (J4). Imports `quartz/plantoir_quiz.json` (the words only). Works out the page's slug and root itself: importing `util/path` put a second copy of that module into `postscript.js` (3,266 bytes, measured). |
+| `components/styles/quiz.scss` | Every rule under `.plantoir-quiz` (or `.plantoir-quiz-score`); 16 px boxes (no zoom on focus), 44 px targets, the theme's colours with dark-mode marks, `@media print` (J5). |
+| `components/PlantoirMetaLine.tsx` | Carries the script and styles, as it carries the figures' (no new component or layout edit). |
+
+### J2. Three stages, and why
+
+* **Text** (before parsing). ObsidianFlavoredMarkdown gives a callout's
+  title line a paragraph of its own only at the page's left edge (its
+  `calloutLineRegex` is `^> *\[!…`), so in `> > [!answer]-` then `> > $2^7$`
+  the answer went INTO the title (measured, plan M2: the title read "Answer
+  2^7", the body empty; an explanation's first line likewise). Inside a quiz
+  only (ruling Q1 - the general fix would change existing sites and the
+  printing skill's empty-`>` advice; a separate issue), after any nested
+  callout's first line, the hook adds one line holding just its `>` markers.
+  Line endings are made LF first (review S1: Windows writes every build copy
+  in text mode, CR LF, and the hook did nothing there), fences are skipped
+  at every depth (S2), and a page with no quiz outside fenced code comes
+  back as it came - CR LF included.
+* **Markdown** (after GitHubFlavoredMarkdown; a task item's `checked` is set
+  at parse time, M1). Every quiz that is a CHILD OF THE PAGE becomes the
+  markup below; one inside a list or callout (ruling Q3) is rendered not
+  ready with `notAtTopLevel`. Answer lines are read from the page's own
+  text by the `[!answer]` blockquote's lines (two `>` markers off, trimmed),
+  never from the parsed tree, which has already turned "quotes" curly and
+  `\|` into `|` (M3). Every task box's tick is taken off the page (M7: a
+  task list renders `<input checked disabled>`, the answer key on screen).
+  A `$...$` answer is shown through the page's own parser (`this.parse`):
+  only a parsed formula node carries what rehype-katex renders (review S9;
+  measured, the revealed answer holds `.katex`).
+* **HTML** (after Description, before Latex). The question's id, the
+  choices' `aria-labelledby` and `aria-describedby`, blanks
+  (`<code>____</code>`, M4) made into boxes, and the page's search text and
+  summary made again WITHOUT the quizzes' answers and explanations
+  (ruling Q5; review S3: Description had put "Answer 42" into the meta
+  description, og:description, the RSS item and contentIndex.json). The
+  summary is recomputed only when the page names no description of its
+  own, with Description's own rules copied (150 / 300 characters, its link
+  rule); a blank reads as `…` in both ("Fill … and …." - pinned by 6k).
+
+### J3. The markup, and what a screen reader hears
+
+Quartz's callout stays (colours, title, fold) and gains `plantoir-quiz`,
+`data-quiz-n` (place among the page's top-level quizzes), `data-quiz-source`
+(the slug of the page it was written on), `data-quiz-kind`,
+`data-quiz-shuffle`, `data-quiz-hash` (FNV-1a 32 of its source) and
+`data-quiz` (the correct places, or the answer lines - a self-check, so the
+page's source showing answers is accepted, knownLimits). Not ready:
+`data-quiz-kind="notReady"` and `data-quiz-problem`, the question and its
+choices with every box empty, and `words.site.notReady` (ruling Q6).
+
+* Choices are a `<fieldset>` labelled by the question; each is a real radio
+  button or checkbox inside a `<label>` with the choice's first line.
+  Anything after it - a graph, an image, code to run - sits OUTSIDE the
+  label (pressing Run never ticks it; measured) and describes the box
+  (`aria-describedby`, review S7), so "Graph A" is read with the graph's
+  description. A box needs words after it on its line to be a box at all
+  (measured), so a choice with no words of its own is named
+  `choiceNumber` and the figure's description when it happens.
+* No `name` is set when the site is built: the script gives each quiz on
+  the page its own, and renames an id a transclusion has duplicated.
+* Blanks are text boxes labelled "Blank n of count"; a short answer's box
+  `answerLabel`. Autocomplete, autocapitalize, autocorrect and spellcheck
+  off.
+* Feedback is a polite live region; a blank is marked in words and a sign
+  (✓ Right / ✗ Not right) and `aria-invalid`, never colour alone.
+* Folds (review S6): Quartz's fold titles listen for clicks only, and a
+  folded callout's content stays focusable. Inside a quiz, each fold title
+  is `role=button tabindex=0 aria-expanded` and opens with Enter or Space;
+  folded content is `inert` until opened; a revealed explanation is opened
+  (its height recomputed - Quartz measured it while hidden, M9).
+
+### J4. Checking, the shuffle, and the score
+
+`accepts` (contract `answers`): alternatives on ` | ` with a space or tab on
+both sides; numbers by value (decimals with or without a leading digit,
+integer fractions, `+ - −`; not `1e3`, `0x10`, `Infinity`, a comma, `½`,
+ruling Q7); `A ± T` only as a number ± a number not negative, so `±3` and
+`x = ±3` are answers and `+-` typed matches `±` (review S8); `$...$`
+compared inside; NFKC then `toLowerCase()` with no locale (STRASSE is not
+straße - pinned), curly quotes made straight (iOS Smart Punctuation).
+
+The shuffle moves the choices (reading and Tab order follow what is seen;
+CSS `order` was rejected, WCAG 1.3.2) with `shuffledOrder(n, Math.random)`
+on every load; `beforeprint` puts Markdown order back for ⌘P and
+`afterprint` the shuffle; the handout sorts its own copy by `data-choice`.
+
+The score (ruling Q4, right on the FIRST Check): `localStorage`
+`plantoir:quiz:<site root path>:<page slug>` = `{v: 1, quizzes:
+{"<source slug>#<n>": {hash, firstTry}}}`, keyed by the quiz's SOURCE page
+so a transcluded quiz keeps its own entry (review S5); a hash that no
+longer matches is ignored; every call in try/catch. Shown after the page's
+last quiz once one is answered, with Start again; a quiz shown twice on a
+page (two transclusions) counts once, and each copy's ids are its own
+(measured on the planted `Quiz Twice`).
+
+**Transclusion (review S5), measured rather than limited:** Quartz copies
+the source page's finished HTML into the host, so a transcluded quiz keeps
+its own `data-quiz-source`, ids and answers; on `Quiz Host` (its own quiz 1
+and `![[Quiz Source]]`'s quiz 1) the two have distinct ids, labels and
+radio groups, and the transcluded one is scored as `Quiz-Source#1`. So it is
+interactive, not the not-ready fallback the ruling allowed.
+
+### J5. On paper (ruling Q8)
+
+A quiz prints as its question: buttons, feedback, score, answer, explanation,
+marks and the not-ready line hidden; native boxes hidden and an empty ○ (one
+answer) or □ (select all) drawn; a blank an empty line. `print.inline.ts`
+gives callouts INSIDE a quiz no role (a folded `[!answer]` there would have
+been lifted into the handout's key, M10), and its handout copy removes what a
+quiz holds back, sorts the choices back and draws the boxes (a copy keeps
+what a student ticked or typed). Measured: `Quiz Printable`'s handout holds
+both quizzes' questions, the page's own folded answer in its key, and
+neither quiz's answer nor its explanation. The answer key for quizzes is
+#511's.
+
+### J6. Measured (2026-10-17, M4 Pro, macOS 26.6, Chrome for Testing 155)
+
+`browser-checks/quiz_check.mjs` on the verify fixture's `Quiz Playground`
+(eight quizzes: every kind, a shuffle, a folded quiz of graphs, code to run
+and a picture in choices, graphs and code in explanations), `Quiz Host` and
+`Quiz Printable`: every kind wrong then right in the contract's words; an
+empty answer never checked; the explanation's TEXT visible after a Check and
+its graph drawn; Show answer's badge, and its formula set by KaTeX; Enter in
+a box checks it; a folded quiz's title opens with Enter and its content was
+inert; Run in a choice does not tick it; Swift (#493) runs in a choice and in a revealed explanation, printing `6` from each (measured after merging #493, the compile through preview.sh's Swift image); answering asks no website and the
+site for nothing; the shuffle in 19 orders over 20 loads; print media hides
+every held-back part and draws ○ and □; the score kept across a reload and
+cleared by Start again, and every quiz still checks with `localStorage`
+throwing; five page changes leave one listener set per quiz and one for
+printing; the transclusion above; the handout. Light and dark screenshots
+read cleanly (marks and badges have dark-mode colours). NOT measured here:
+Safari, iPadOS, VoiceOver, the mac preview pane, Netlify (#563's closing
+comment lists them as owed).
+
+### J7. Teacher note: "Writing a self-check question"
+
+Start a callout at the left edge with `> [!quiz]` and the question; tick the
+right choice with `- [x]` (two or more for select all), or put the answer
+inside on its own line under `> > [!answer]-` (one line per `` `____` ``
+blank); add `> > [!explain]- Why` for the reason. Separate accepted answers
+with ` | `; `3.14 ± 0.01` for a range. Preview and answer each question; one
+that cannot be checked is named in the folder problems with its line. The
+skill `plantoir-quizzes` (support/agent_guidance) carries the whole of this,
+with patterns, for an assistant.
+
+**Rejected** (with the reasons above and in the plan): a ```` ```quiz ````
+fence (#511: no maths or graphs inside, and Obsidian shows a code block);
+CSS `order` for the shuffle; a frontmatter key (a second switch that can
+disagree with the page); a per-page `<script>` (Quartz's SPA head patch, and
+a second loading mechanism); patching ObsidianFlavoredMarkdown for every
+nested callout (Q1); Python checking answers (one implementation only);
+`<label>` around a choice's blocks (Run would tick it); a radio `name` at
+build time (a transclusion would join the page's group); one words-and-pages
+JSON (the page's script bundles the words, so a file that changes with every
+quiz problem would change `postscript.js` too).
+
+**Departures from #563's wording**, recorded so they are not mistaken for
+omissions: assets ride every site's shared bundle rather than "only on pages
+that use a quiz" (ruling Q2, measured above), and a malformed quiz is a
+folder problem with page and line rather than "build fails" (the ruling for
+#493: a build is never stopped by one page).
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
-except the page marker H adds on top of them from `support/quartz` — with five asset exceptions, all in
+except the page marker H adds on top of them from `support/quartz` — with six asset exceptions, all in
 `quartz/static/` and all written every build: `og-image.png` is redrawn as the
 section's social sharing card (C2-13), and `favicon.ico`, `icon.svg`,
-`apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25). Two of
+`apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25); since
+#494 every site also carries `static/katex/`, KaTeX's own stylesheet, copy-tex
+and faces, which its maths was linked to on a CDN before (C2-26). Two of
 those OVERWRITE files Quartz itself ships — `og-image.png` and `icon.png` —
 which is deliberate: a built site should carry no Quartz artwork, including
 where nothing links to it. (`quartz/util/og.tsx` reaches for `static/icon.png`
 when it draws generated OG images, so it now picks up Plantoir's mark too.)
-Beyond those: the Markdown/OFM transformer
+Beyond those (and the gated engines F, G and I carry only where a page asks):
+the Markdown/OFM transformer
 pipeline, full-text search (FlexSearch), syntax highlighting, LaTeX
 rendering, callouts, popovers, RSS/sitemap emitters, mobile layout, and
 light/dark mode. The customizations are deliberately thin wrappers around

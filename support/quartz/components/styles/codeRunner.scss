@@ -1,0 +1,179 @@
+// Runnable code (#455). EVERY rule here is under .plantoir-runner (#455 plan
+// B2): this stylesheet goes into the site's one index.css, which every page
+// links, so a page with no runnable block must look and print exactly as it
+// did. No @page, no element selectors on their own, no classes on <html>.
+
+.plantoir-runner {
+  margin: 1rem 0;
+
+  & [hidden] {
+    display: none !important;
+  }
+
+  // Once the page's script has built the editor, the highlighted copy is put
+  // away by a CLASS (N2), so the print rules below can bring it back.
+  &.plantoir-runner-live:not(.plantoir-runner-readonly) > .plantoir-runner-original {
+    display: none;
+  }
+
+  & > .plantoir-runner-original {
+    margin-bottom: 0.5rem;
+  }
+
+  & .plantoir-runner-editor,
+  & .plantoir-runner-input-lines {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    font-family: var(--codeFont);
+    // iPadOS zooms the page when a field under 16 px takes the focus.
+    font-size: max(16px, 0.9em);
+    line-height: 1.5;
+    color: var(--dark);
+    background: var(--light);
+    border: 1px solid var(--lightgray);
+    border-radius: 5px;
+    tab-size: 4;
+    white-space: pre;
+    overflow: auto;
+    resize: vertical;
+  }
+
+  & .plantoir-runner-editor:focus,
+  & .plantoir-runner-input-lines:focus {
+    outline: 2px solid var(--secondary);
+    outline-offset: 1px;
+  }
+
+  & .plantoir-runner-input {
+    margin-top: 0.6rem;
+  }
+
+  & .plantoir-runner-input-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.9em;
+    color: var(--darkgray);
+  }
+
+  & .plantoir-runner-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+  }
+
+  & .plantoir-runner-controls > button {
+    min-height: 44px;
+    min-width: 4.5rem;
+    padding: 0.3rem 1rem;
+    font: inherit;
+    font-size: 0.95em;
+    color: var(--dark);
+    background: var(--light);
+    border: 1px solid var(--lightgray);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  & .plantoir-runner-controls > button.plantoir-runner-run {
+    color: var(--light);
+    background: var(--secondary);
+    border-color: var(--secondary);
+  }
+
+  & .plantoir-runner-controls > button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  & .plantoir-runner-controls > button:focus-visible {
+    outline: 2px solid var(--tertiary);
+    outline-offset: 2px;
+  }
+
+  & .plantoir-runner-status {
+    margin: 0.4rem 0 0;
+    font-size: 0.9em;
+    color: var(--darkgray);
+  }
+
+  & .plantoir-runner-status:empty {
+    margin: 0;
+  }
+
+  // A language students cannot edit (Swift, #493) says so once, quietly.
+  & .plantoir-runner-note {
+    margin: 0.3rem 0 0.4rem;
+    font-size: 0.85em;
+    color: var(--darkgray);
+  }
+
+  & .plantoir-runner-output {
+    margin: 0.4rem 0 0;
+    padding: 0.5rem 0.75rem;
+    max-height: 24em;
+    overflow: auto;
+    font-family: var(--codeFont);
+    font-size: 0.9em;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--dark);
+    background: var(--highlight);
+    border: 1px solid var(--lightgray);
+    border-radius: 5px;
+  }
+
+  & .plantoir-runner-err {
+    color: #b42318;
+  }
+
+  & .plantoir-runner-print {
+    display: none;
+  }
+}
+
+:root[saved-theme="dark"] .plantoir-runner .plantoir-runner-err {
+  color: #ff8f85;
+}
+
+// On paper a runnable block is code and nothing else (codeRunnerBlocks.print,
+// decision 8): the highlighted copy when the student has not edited it, the
+// student's code when they have. Paged.js promotes these rules for the Print
+// button, so one set serves it and ⌘P.
+@media print {
+  .plantoir-runner {
+    & .plantoir-runner-editor,
+    & .plantoir-runner-input,
+    & .plantoir-runner-controls,
+    & .plantoir-runner-status,
+    & .plantoir-runner-note,
+    & .plantoir-runner-output {
+      display: none !important;
+    }
+
+    &.plantoir-runner-live > .plantoir-runner-original {
+      display: block !important;
+    }
+
+    &.plantoir-runner-edited > .plantoir-runner-original {
+      display: none !important;
+    }
+
+    &.plantoir-runner-edited > .plantoir-runner-print {
+      display: block !important;
+      margin: 0;
+      padding: 0.5rem 0.75rem;
+      font-family: var(--codeFont);
+      font-size: 0.85em;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--lightgray);
+      border-radius: 5px;
+    }
+  }
+}

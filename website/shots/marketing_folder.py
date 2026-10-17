@@ -19,6 +19,12 @@ Principles, each with two curriculum folders:
    what ticking the box in Course Settings writes; ICS3U's is declared through
    the app by the curriculum-settings scene, because that is the picture;
 4. a **How I Teach** page in ICS3U, in our own words (``marketing/How I Teach.md``);
+4a. the code figures' pages (#562): ICS3U's pages that the ready-made course
+   has made runnable since the folder was made (#561) are brought up to date
+   from the payload (``refresh_runnable_pages``), and two pages of our own are
+   planted — a runnable Swift program in ICS4U and a page of self-check
+   quizzes in ICS3U (``CODE_PAGES``) — so ``capture.py --code`` photographs
+   real runnable blocks and a real quiz;
 5. ICS3U and ICS4U each publish to a FOLDER inside the kept folder (ICS3U to
    ``School Web Space``, ICS4U to ``School Web Space/ICS4U``), so the
    scheduled-publish scene needs no account, no network, and nothing either
@@ -62,6 +68,22 @@ CORRELATION_FILE = HERE / "csp-correlation.json"
 ICS4U_CORRELATION_FILE = HERE / "csp-correlation-ics4u.json"
 HOW_I_TEACH_SOURCE = HERE / "marketing" / "How I Teach.md"
 HOW_I_TEACH_NAME = "How I Teach.md"
+
+# The pages the code figures on plantoir.app's Code page are taken of (#562)
+# that no ready-made course carries: (course, the page's place in it, its
+# source in marketing/). No payload has Swift (ruling Q5 of #561/#562: the
+# Swift demo page lives only in the marketing ICS4U), and no payload has a
+# quiz yet (#563 shipped the feature, not content). Planted like How I Teach:
+# written when absent, never over a page somebody changed.
+CODE_PAGES: list[tuple[str, str, Path]] = [
+    ("ICS4U", "Programs/Reading Input in Swift.md", HERE / "marketing" / "Reading Input in Swift.md"),
+    ("ICS3U", "Exercises/Check Your Loops.md", HERE / "marketing" / "Check Your Loops.md"),
+]
+# The ready-made course whose runnable pages (#561) are brought into the
+# kept folder, and where the repository keeps it.
+RUNNABLE_COURSE = "ICS3U"
+REPO = HERE.parent.parent
+SUPPORT = REPO / "support"
 
 # The courses the folder holds, with the sections the app is asked to make,
 # and the AP CSP half of each: read from marketing/folders.json, the one place
@@ -381,6 +403,179 @@ def add_how_i_teach(course_dir: Path, report: Report, source: Path = HOW_I_TEACH
                     f"{course_dir.name}/{HOW_I_TEACH_NAME}")
 
 
+def add_code_pages(folder: Path, report: Report) -> None:
+    """Plant CODE_PAGES, each written only where missing (#562)."""
+    for code, place, source in CODE_PAGES:
+        course_dir = folder / "courses" / code
+        if read_config(course_dir) is None:
+            report.skip(f"{code} — the course has not been made yet (the app makes it first)")
+            continue
+        write_if_absent(course_dir / place, source.read_text(encoding="utf-8"), report, f"{code}/{place}")
+
+
+# ---------- Bringing in what the ready-made course has gained (#562) ----------
+#
+# The kept folder's ICS3U was installed from the payload before #561 made 83
+# of its Python blocks runnable, and installing never overwrites a page, so
+# its pages still show plain code (measured 2026-10-17: Warm-Ups/Spot the
+# Bug.md had a plain ```python fence and no codeRunner). A page is brought up
+# to date ONLY when it is still exactly what an earlier payload would have
+# made of it — the same body once the installer's and this set-up's own
+# changes are set aside — so a page Russell has changed is left as he changed
+# it and named. What the installer changes on the way in: the frontmatter's
+# dates and publish states become per-section keys (kept as the folder has
+# them; only the `codeRunner: true` line is added, after them, where a fresh
+# install puts it) and the %%curriculum-start%% markers go. What this set-up
+# adds: the College Board embeds, which `link_activities` puts back after.
+
+CURRICULUM_MARKERS = ("%%curriculum-start%%", "%%curriculum-end%%")
+PER_SECTION_KEY = re.compile(r"^(createdSection|publishForSection)\d+\s*:")
+CODE_RUNNER_LINE = "codeRunner: true"
+
+
+def split_frontmatter(text: str) -> tuple[list[str], str]:
+    """The frontmatter's lines and everything after its closing `---`."""
+    if not text.startswith("---\n"):
+        return [], text
+    end = text.find("\n---", 4)
+    if end < 0:
+        return [], text
+    return text[4:end].split("\n"), text[end + 4:]
+
+
+def without_curriculum_markers(body: str) -> str:
+    """The installer's `strip_curriculum_blocks(keep_content=True)`: only the
+    marker lines go."""
+    kept: list[str] = []
+    for line in body.split("\n"):
+        if line.strip() in CURRICULUM_MARKERS:
+            continue
+        kept.append(line)
+    return "\n".join(kept)
+
+
+def without_embeds_of(body: str, codes: list[str]) -> str:
+    """The body as it was before `link_activity` added these codes' embeds:
+    each `![[CODE]]` line it wrote goes, with the blank line it wrote before
+    it."""
+    lines = body.split("\n")
+    wanted = set(codes)
+    result: list[str] = []
+    for line in lines:
+        match = EMBED.match(line.strip())
+        if match and match.group(1).strip() in wanted:
+            if result and result[-1] == "":
+                result.pop()
+            continue
+        result.append(line)
+    return "\n".join(result)
+
+
+def git_versions(path: Path) -> list[str]:
+    """Every committed version of a payload page, newest first; empty when
+    git cannot say (then no kept page is ever taken for an earlier one)."""
+    import subprocess
+    try:
+        relative = path.resolve().relative_to(REPO)
+    except ValueError:
+        return []
+    listed = subprocess.run(["git", "-C", str(REPO), "rev-list", "HEAD", "--", str(relative)],
+                            capture_output=True, text=True)
+    if listed.returncode != 0:
+        return []
+    versions: list[str] = []
+    for revision in listed.stdout.split():
+        shown = subprocess.run(["git", "-C", str(REPO), "show", f"{revision}:{relative}"],
+                               capture_output=True, text=True)
+        if shown.returncode == 0:
+            versions.append(shown.stdout)
+    return versions
+
+
+def has_code_runner(head: list[str]) -> bool:
+    for line in head:
+        if line.strip() == CODE_RUNNER_LINE:
+            return True
+    return False
+
+
+def with_code_runner(head: list[str]) -> list[str]:
+    """The kept frontmatter with `codeRunner: true` after its per-section
+    keys — where a fresh install of a page whose payload says
+    `publish: true` then `codeRunner: true` puts it — or at its end."""
+    last_per_section = -1
+    for index, line in enumerate(head):
+        if PER_SECTION_KEY.match(line):
+            last_per_section = index
+    if last_per_section == -1:
+        return head + [CODE_RUNNER_LINE]
+    return head[:last_per_section + 1] + [CODE_RUNNER_LINE] + head[last_per_section + 1:]
+
+
+def refresh_runnable_pages(course_dir: Path, payload_shared: Path, codes_by_page: dict[str, list[str]],
+                           report: Report, earlier_versions=git_versions) -> None:
+    """Bring each page the payload makes runnable (`codeRunner: true`) into
+    the kept course, when the kept page is still what an earlier payload
+    made. `codes_by_page` names the College Board codes this set-up embeds
+    in each page (by its place without `.md`), so they can be set aside for
+    the comparison; `link_activities` puts them back afterwards."""
+    for source in sorted(payload_shared.rglob("*.md")):
+        current = source.read_text(encoding="utf-8")
+        payload_head, payload_body = split_frontmatter(current)
+        if not has_code_runner(payload_head):
+            continue
+        place = source.relative_to(payload_shared).as_posix()
+        label = f"{course_dir.name}/{place} runnable"
+        kept_path = course_dir / place
+        if not kept_path.is_file():
+            report.skip(f"{label} — the page is not in the course")
+            continue
+        kept_head, kept_body = split_frontmatter(kept_path.read_text(encoding="utf-8"))
+        codes = codes_by_page.get(place[:-3], [])
+        kept_core = without_curriculum_markers(without_embeds_of(kept_body, codes))
+        wanted_core = without_curriculum_markers(payload_body)
+        if has_code_runner(kept_head):
+            if kept_core == wanted_core:
+                report.note("already there", label)
+            else:
+                report.note("left as you changed it", label)
+            continue
+        made_earlier = False
+        for version in earlier_versions(source):
+            _, earlier_body = split_frontmatter(version)
+            if without_curriculum_markers(earlier_body) == kept_core:
+                made_earlier = True
+                break
+        if not made_earlier:
+            report.note("left as you changed it", label)
+            continue
+        head = with_code_runner(kept_head)
+        kept_path.write_text("---\n" + "\n".join(head) + "\n---" + wanted_core, encoding="utf-8")
+        report.note("made", label)
+
+
+def apply_code_steps(folder: Path, report: Report, earlier_versions=git_versions) -> None:
+    """What the code figures need in the kept folder (#562): ICS3U's runnable
+    pages brought up to date (its College Board embeds put back after), and
+    CODE_PAGES planted. Run by `apply_file_steps` and on its own by
+    `capture.py --code`, which needs no College Board pages."""
+    course_dir = folder / "courses" / RUNNABLE_COURSE
+    if read_config(course_dir) is not None:
+        rows: list[dict] = []
+        for course in CSP_COURSES:
+            if course["code"] == RUNNABLE_COURSE:
+                rows = load_correlation(course["correlation"])
+        codes_by_page: dict[str, list[str]] = {}
+        for row in rows:
+            codes_by_page[row["page"]] = list(row["codes"])
+        refresh_runnable_pages(course_dir, SUPPORT / "example_content" / RUNNABLE_COURSE / "shared",
+                               codes_by_page, report, earlier_versions)
+        link_activities(course_dir, rows, report)
+    else:
+        report.skip(f"{RUNNABLE_COURSE} — the course has not been made yet (the app makes it first)")
+    add_code_pages(folder, report)
+
+
 # The start-of-year scene is "the week before school starts" for section 2,
 # so section 2 is a SECOND-SEMESTER section: its classes begin in the week of
 # folders.json → marketing.secondSemester.startsInTheWeekOf (1 February), in
@@ -492,6 +687,8 @@ def apply_file_steps(folder: Path, college_board_pages: dict[str, str] | None) -
             declare_curriculum_folder(course_dir, COLLEGE_BOARD_FOLDER, report)
         link_activities(course_dir, load_correlation(course["correlation"]), report)
         publish_to_folder(course_dir, folder / course["publish_to"], report)
+
+    apply_code_steps(folder, report)
 
     course_dir = folder / "courses" / CURRICULUM_COURSE
     if read_config(course_dir) is None:

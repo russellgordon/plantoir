@@ -87,6 +87,17 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// How the install now under way came about, for `update installing`.
     @ObservationIgnored private var installMoment: UpdateTrail.InstallMoment = .straightAway
 
+    /// Whether the app has handed the installer the teacher's Install, so
+    /// the quit that follows is the installer's (#560: the `app closed` line
+    /// says "to install a new version"). Set only where the APP decides to
+    /// install — `installNow`, and the postponed install let go in
+    /// `heldWorkIsDone` — never from `willInstallUpdate`, which also fires
+    /// when the teacher quits with an update ready (that quit is theirs).
+    /// Cleared when the updater stops, and when the installer's last look
+    /// postpones the relaunch for work under way (a ⌘Q in that wait is the
+    /// teacher's).
+    @ObservationIgnored private(set) var isQuittingToInstall: Bool = false
+
     /// Watches for held work to end.
     @ObservationIgnored private var watchTask: Task<Void, Never>?
 
@@ -399,6 +410,11 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         }
         postponedInstall = installHandler
         prepared = .postponedAtInstall
+        // The relaunch is waiting on the work, so a quit during the wait is
+        // the teacher's (#560 review): the update installs as Plantoir quits,
+        // as Install on Quit does, and its own line says so. Set again when
+        // the held work ends and the app lets the install go.
+        isQuittingToInstall = false
         hold(for: work)
         return true
     }
@@ -456,6 +472,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             installNow(.afterHeldWork(work))
         case .postponedAtInstall:
             installMoment = .afterHeldWork(work)
+            isQuittingToInstall = true
             let handler: (() -> Void)? = postponedInstall
             postponedInstall = nil
             prepared = .none
@@ -470,6 +487,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// Gives the installer the teacher's Install.
     private func installNow(_ moment: UpdateTrail.InstallMoment) {
         installMoment = moment
+        isQuittingToInstall = true
         prepared = .none
         heldWork = nil
         watchTask?.cancel()
@@ -735,6 +753,10 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// told in our words.
     func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
         let code: Int = (error as NSError).code
+        // Whatever stopped it, the install is not happening now, so a later
+        // quit is the teacher's again (#560; 4007, a password not given, is
+        // the one seen in practice).
+        isQuittingToInstall = false
         if code == 1001 {
             return
         }
@@ -750,6 +772,8 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         error: (any Error)?
     ) {
         if let error {
+            // A cycle that ended in an error installed nothing (#560).
+            isQuittingToInstall = false
             let code: Int = (error as NSError).code
             if code == 1001 {
                 // Nothing newer: whatever offer was pending has left the

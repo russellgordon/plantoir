@@ -4337,6 +4337,89 @@ final class AssistToolRunnerTests: XCTestCase {
         )
     }
 
+    /// #555: an undo that finds every file ALREADY back — the teacher set
+    /// the page back by hand — writes nothing, takes the change off the list,
+    /// answers with the whole-undo sentence and still brings the preview back
+    /// (review S4: the new path has to reach step (c)). MUST FAIL on the code
+    /// before #555, which called the restored page edited, answered
+    /// couldNotUndo, kept the change and left the preview stopped.
+    @MainActor
+    func testAnUndoThatFindsEveryFileAlreadyBackTakesTheChangeOffAndBringsThePreviewBack() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        defer { FakePreview.shared.forget() }
+
+        try write(page: "Unit 1, Day 1", publish: "true", body: "One.", in: made.course)
+        let before: [URL: Data] = try AssistToolRunnerTests.everyFile(in: made.course.directoryURL)
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 1, Day 1"]
+        ))
+        XCTAssertEqual(made.runner.changeCount, 1)
+        XCTAssertTrue(text(ofPage: "Unit 1, Day 1", in: made.course).contains("publish: false"))
+        for (url, data) in before {
+            try data.write(to: url)
+        }
+
+        FakePreview.shared.register(folderPath: made.root.path, courseCode: "ICS3U", sectionNumber: 1)
+        let outcome: AssistToolOutcome = await made.runner.run(call: call("undo_last_change"))
+
+        XCTAssertEqual(made.runner.changeCount, 0, "the change is still on the list: \(outcome.summary)")
+        let template: [String] = AssistWording.undid("\u{1}").components(separatedBy: "\u{1}")
+        XCTAssertTrue(
+            outcome.summary.hasPrefix(template[0]) && outcome.summary.hasSuffix(template[template.count - 1]),
+            "not the whole-undo sentence: \(outcome.summary)"
+        )
+        XCTAssertEqual(FakePreview.shared.events, ["stop-begins", "stop-ends", "start"],
+                       "the preview has to come back up after an undo that took the change off")
+    }
+
+    /// An undo that writes NOTHING (every file edited since) still stopped
+    /// the preview at step (a), so it has to put it back up as it was —
+    /// with no sentence added, since nothing on disk changed. Until #555 it
+    /// was left stopped, and a repeat press while a page is still edited now
+    /// always ends this way (review S4). MUST FAIL on the code before #555.
+    @MainActor
+    func testAnUndoThatWritesNothingPutsThePreviewBackAsItWas() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        defer { FakePreview.shared.forget() }
+
+        try write(page: "Unit 1, Day 1", publish: "true", body: "One.", in: made.course)
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 1, Day 1"]
+        ))
+        let pageURL: URL = ClassPages.folderURL(forSection: 1, in: made.course)
+            .appendingPathComponent("Unit 1, Day 1.md")
+        let indexURL: URL = made.course.directoryURL
+            .appendingPathComponent("section1").appendingPathComponent("index.md")
+        for url in [pageURL, indexURL] where FileManager.default.fileExists(atPath: url.path) {
+            let now: String = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+            try (now + "\n\nWritten since.\n").write(to: url, atomically: true, encoding: .utf8)
+        }
+
+        FakePreview.shared.register(folderPath: made.root.path, courseCode: "ICS3U", sectionNumber: 1)
+        let outcome: AssistToolOutcome = await made.runner.run(call: call("undo_last_change"))
+
+        XCTAssertEqual(made.runner.changeCount, 1, "nothing went back, so the change stays")
+        XCTAssertTrue(outcome.summary.contains("I have not changed anything"), outcome.summary)
+        XCTAssertEqual(FakePreview.shared.events, ["stop-begins", "stop-ends", "start"],
+                       "a preview stopped for an undo that wrote nothing must come back as it was")
+    }
+
+    /// Every file under a folder, with its bytes, so a test can put a course
+    /// back exactly as it was by hand.
+    static func everyFile(in folder: URL) throws -> [URL: Data] {
+        var files: [URL: Data] = [:]
+        let walker: FileManager.DirectoryEnumerator? = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.isRegularFileKey])
+        while let url = walker?.nextObject() as? URL {
+            let values: URLResourceValues = try url.resourceValues(forKeys: [.isRegularFileKey])
+            if values.isRegularFile == true {
+                files[url] = try Data(contentsOf: url)
+            }
+        }
+        return files
+    }
+
     /// And it does NOT rebuild for a change that never touched the preview.
     ///
     /// A created class page arrives unpublished, so making it changed nothing

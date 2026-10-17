@@ -43,6 +43,17 @@ targets:
       - path: Vendor/helpers
         buildPhase: resources
         type: folder
+      # Obsidian's add-ons for diagrams and graphs (TikZJax 0.5.2,
+      # Functionplot 1.2.1, with their MIT licences), fetched by
+      # Vendor/fetch-obsidian-addons.sh from the pins in
+      # contracts/shared-rules.json → obsidianAddOnsForFigures (#495). A folder
+      # reference, landing at Contents/Resources/obsidian-addons/<id>/; the app
+      # re-hashes a file before writing it into a course. About 12.9 MB of
+      # JavaScript and CSS — resources, so nothing to sign beyond the app's own
+      # seal. Run the fetch before `xcodegen generate`.
+      - path: Vendor/obsidian-addons
+        buildPhase: resources
+        type: folder
       # The app icon, authored in Icon Composer.
       - path: Plantoir.icon
         buildPhase: resources
@@ -184,7 +195,7 @@ targets:
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
         # The Icon Composer icon: compiled by the asset tooling, named here.
         ASSETCATALOG_COMPILER_APPICON_NAME: Plantoir
-        MARKETING_VERSION: "1.7.2"
+        MARKETING_VERSION: "1.8.0"
         # A PLACEHOLDER for local builds only. A bundle that leaves this Mac
         # is built by publish.sh, which overrides this with
         # `git rev-list --count HEAD` so that no two artifacts ever share a

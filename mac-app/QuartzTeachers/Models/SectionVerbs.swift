@@ -133,11 +133,9 @@ final class SectionVerbs {
         let undoListMoved: Bool = changesAfter != changesBefore || before != lastChange
         var ending: String = "changed nothing"
         if item == .undoLastChange {
-            if undoListMoved {
-                ending = "took the last change back"
-            } else if writesAfter != writesBefore {
-                ending = "took part of the last change back"
-            }
+            ending = SectionVerbs.undoEnding(
+                undoListMoved: undoListMoved, wroteWithNoNewUndoEntry: writesAfter != writesBefore
+            )
         } else if undoListMoved || writesAfter != writesBefore {
             ending = "carried out"
         } else if item == .rebuildPreview {
@@ -151,6 +149,20 @@ final class SectionVerbs {
         }
         SectionVerbs.noteRan(item, ending: ending, counts: counts, courseCode: courseCode, sectionNumber: sectionNumber)
         return outcome
+    }
+
+    /// How Undo Last Change's "ran from a menu" line ends — the three
+    /// endings of #531, in one place so `undoFiles.presses` in the contract
+    /// (#555) can name them per press. A press that only found files already
+    /// back takes the entry off, so it ends "took the last change back".
+    static func undoEnding(undoListMoved: Bool, wroteWithNoNewUndoEntry: Bool) -> String {
+        if undoListMoved {
+            return "took the last change back"
+        }
+        if wroteWithNoNewUndoEntry {
+            return "took part of the last change back"
+        }
+        return "changed nothing"
     }
 
     /// A plan the teacher cancelled, or a sheet closed before anything ran.

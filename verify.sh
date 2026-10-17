@@ -307,6 +307,13 @@ else
   cat /tmp/verify_graded_new_course_test.log
 fi
 
+if (cd scripts && python3 test_folder_titles.py) >/tmp/verify_folder_titles_test.log 2>&1; then
+  pass "setup_course.py: a folder's index page names it in a title YAML reads back, by the titleQuoting rule (scripts/test_folder_titles.py, #506)"
+else
+  fail "setup_course.py: a folder's index page names it in a title YAML reads back, by the titleQuoting rule (scripts/test_folder_titles.py, #506)"
+  cat /tmp/verify_folder_titles_test.log
+fi
+
 if (cd scripts && python3 test_course_code_rule.py) >/tmp/verify_course_code_rule_test.log 2>&1; then
   pass "setup_course.py: a typed course code is asked the apps' rule, every courseCode case (scripts/test_course_code_rule.py, #402)"
 else
@@ -368,6 +375,13 @@ if (cd scripts && python3 test_deploy_cloudflare_project.py) >/tmp/verify_deploy
 else
   fail "deploy: Cloudflare's own deploy tool is never left a question to ask, and a deleted project is made again (scripts/test_deploy_cloudflare_project.py)"
   cat /tmp/verify_deploy_cloudflare_project_test.log
+fi
+
+if (cd scripts && python3 test_backup_leaves_plantoir_addons.py) >/tmp/verify_backup_addons_test.log 2>&1; then
+  pass "the setup wizard's backup leaves Plantoir's Obsidian add-ons out and keeps the teacher's own (scripts/test_backup_leaves_plantoir_addons.py, #495)"
+else
+  fail "the setup wizard's backup leaves Plantoir's Obsidian add-ons out and keeps the teacher's own (scripts/test_backup_leaves_plantoir_addons.py, #495)"
+  cat /tmp/verify_backup_addons_test.log
 fi
 
 if (cd scripts && python3 test_reference_course.py) >/tmp/verify_reference_course_test.log 2>&1; then
@@ -473,12 +487,53 @@ fi
 # Printable pages (#454): which pages opt in and which make a site carry the
 # print engine, a teacher's own PDF resolved against Media, the gate, and the
 # printPdfNotFound finding; then the corners, page labels and words a printed
-# page carries. Both read the contract; stdlib only.
+# page carries. Both read the contract; stdlib only. Since #455 the same file
+# runs runnable code's cases too: the language table, which fences run and
+# where they can sit, ids, what a site carries, the engine's overlay, and the
+# words file.
 if (cd scripts && python3 test_page_features.py) >/tmp/verify_page_features_test.log 2>&1; then
-  pass "printable pages: opting in, a page's own PDF, and the per-site print engine (scripts/test_page_features.py, #454)"
+  pass "pages that ask for more: printing, a page's own PDF, runnable code, and the engines a site carries (scripts/test_page_features.py, #454, #455)"
 else
-  fail "printable pages: opting in, a page's own PDF, and the per-site print engine (scripts/test_page_features.py, #454)"
+  fail "pages that ask for more: printing, a page's own PDF, runnable code, and the engines a site carries (scripts/test_page_features.py, #454, #455)"
   cat /tmp/verify_page_features_test.log
+fi
+
+# Runnable Swift (#493): the key a block is cached by, the toolchain id, what
+# the launcher's plan writes and what the build's prepare gives the site and
+# says, and that the Swift image's recipe holds every pin and flag the
+# contract names. Stdlib only; the compiler itself is the Swift gate below.
+if (cd scripts && python3 test_swift_blocks.py) >/tmp/verify_swift_blocks_test.log 2>&1; then
+  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+else
+  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+  cat /tmp/verify_swift_blocks_test.log
+fi
+
+# KaTeX served by the site itself (#494): the copy from Quartz's own package
+# and the latex.ts patch that links it; and (#455) the edits that wire
+# Plantoir's additions into a section's Quartz copy. Stdlib only.
+if (cd scripts && python3 test_katex_assets.py) >/tmp/verify_katex_assets_test.log 2>&1; then
+  pass "maths: KaTeX's stylesheet, copy-tex and faces copied into every site, and latex.ts linking them instead of a CDN (scripts/test_katex_assets.py, #494)"
+else
+  fail "maths: KaTeX's stylesheet, copy-tex and faces copied into every site, and latex.ts linking them instead of a CDN (scripts/test_katex_assets.py, #494)"
+  cat /tmp/verify_katex_assets_test.log
+fi
+if (cd scripts && python3 test_quartz_additions_wiring.py) >/tmp/verify_quartz_wiring_test.log 2>&1; then
+  pass "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
+else
+  fail "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
+  cat /tmp/verify_quartz_wiring_test.log
+fi
+
+# Self-check quizzes (#563): every recognise and answers.parse case through
+# the folder check's mirror, the line in the teacher's file, the
+# quizzesNotReady finding, the words and pages files the site reads, and the
+# pages the check reads. Stdlib only.
+if (cd scripts && python3 test_quizzes.py) >/tmp/verify_quizzes_test.log 2>&1; then
+  pass "self-check quizzes: every quiz shape the contract names read by the folder check, its lines in the teacher's file, the quizzesNotReady finding, and the files the site reads (scripts/test_quizzes.py, #563)"
+else
+  fail "self-check quizzes: every quiz shape the contract names read by the folder check, its lines in the teacher's file, the quizzesNotReady finding, and the files the site reads (scripts/test_quizzes.py, #563)"
+  cat /tmp/verify_quizzes_test.log
 fi
 
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
@@ -578,6 +633,14 @@ if (cd scripts && python3 test_coverage_maps.py) >/tmp/verify_coverage_maps_test
 else
   fail "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
   sed 's/^/     /' /tmp/verify_coverage_maps_test.log | tail -40
+fi
+
+# Issue #505: an overall expectation's backlinks gather its specific expectations'.
+if (cd scripts && python3 test_overall_backlinks.py) >/tmp/verify_overall_backlinks_test.log 2>&1; then
+  pass "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
+else
+  fail "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
+  sed 's/^/     /' /tmp/verify_overall_backlinks_test.log | tail -40
 fi
 
 if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
@@ -889,6 +952,22 @@ else
   cat /tmp/verify_class_folder_test.log
 fi
 
+# ---- folder titles read back through the build's own reader (#506) ----
+# The host run in step 0 has no frontmatter reader, so it checks the rule and
+# the wizard's pages only; here every titleQuoting case and a sweep of awkward
+# names are read back by the reader the build uses, and a missing reader fails.
+echo ""
+echo "🔎 Checking that every folder title reads back through the build's reader…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_folder_titles.py" /opt/scripts/test_folder_titles.py),readonly" \
+  -e PLANTOIR_REQUIRE_FRONTMATTER=1 \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_folder_titles.py >/tmp/verify_folder_titles_image_test.log 2>&1; then
+  pass "folder titles: every titleQuoting case and the sweep read back as their names in the build's reader (scripts/test_folder_titles.py in the image, #506)"
+else
+  fail "folder titles: every titleQuoting case and the sweep read back as their names in the build's reader (scripts/test_folder_titles.py in the image, #506)"
+  cat /tmp/verify_folder_titles_image_test.log
+fi
+
 # ---- build_site.py: pages take their class's date, in the teacher's files ----
 # The front page and every page a visible class brings (#275, #276), run
 # against the shared contract in the image for the same reason as above — and
@@ -1023,6 +1102,44 @@ if docker run --rm \
 else
   fail "every printablePages rule case holds in the site's own code, and every pageOptIns line reads as the contract says (scripts/check_print_rules_against_the_site.py, #454)"
   cat /tmp/verify_print_rules_site.log
+fi
+
+# ---- Runnable code (#455): the rules, run where they really run ----
+# codeRunnerRule.ts (the file the site's transformer and the page's script
+# both import) is bundled with Quartz's own parser, and every fences,
+# pageShapes and ids case is run through it in Node; the transformer is run
+# over a page whose engine the site does and does not carry (siteDisagrees);
+# the build's fence reader reads every pageShapes case too; and every typed
+# codeRunner: line goes through the build's own reader.
+echo ""
+echo "🔎 Checking the runnable-code rules against what the site and the build run…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_runner_rules_against_the_site.py" /opt/scripts/check_runner_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_runner_rules_against_the_site.py \
+  >/tmp/verify_runner_rules_site.log 2>&1; then
+  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
+else
+  fail "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
+  cat /tmp/verify_runner_rules_site.log
+fi
+
+# ---- Self-check quizzes (#563): the rules, run where they really run ----
+# quizRules.ts (the file the site's transformer and the page's script both
+# check answers with) is bundled and every answers.parse, answers.check and
+# shuffle case is run through it in Node, with 1,000 shuffles each a
+# permutation; the transformer's text hook leaves every untouched page byte
+# for byte and makes a CR LF page LF; and every word the site asks for is in
+# the contract.
+echo ""
+echo "🔎 Checking the self-check quiz rules against what the site runs…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_quiz_rules_against_the_site.py" /opt/scripts/check_quiz_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_quiz_rules_against_the_site.py \
+  >/tmp/verify_quiz_rules_site.log 2>&1; then
+  pass "every quizCallouts answer, check and shuffle case holds in the site's own code, the text hook leaves pages without a quiz untouched, and every word the site shows is the contract's (scripts/check_quiz_rules_against_the_site.py, #563)"
+else
+  fail "every quizCallouts answer, check and shuffle case holds in the site's own code, the text hook leaves pages without a quiz untouched, and every word the site shows is the contract's (scripts/check_quiz_rules_against_the_site.py, #563)"
+  cat /tmp/verify_quiz_rules_site.log
 fi
 
 # ---- Diagrams and graphs (#485 E1): the rules, run against the real engines ----
@@ -1367,9 +1484,15 @@ check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
 # Diagrams and graphs (#485 E1): the build's pass, and (in the loop) the
 # helper, its lockfile and the site's transformer, script and styles.
 check_baked scripts/figures.py            /opt/scripts/figures.py
+# Runnable Swift (#493): plan and prepare; and (in the loop) the Swift image's
+# recipe, which the build hashes for its toolchain id, and the page's thread.
+check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
+# Self-check quizzes (#563): the folder check. The site's transformer, script
+# and styles are in support/quartz (the loop below).
+check_baked scripts/quizzes.py            /opt/scripts/quizzes.py
 while IFS= read -r addition; do
   check_baked "$addition" "/opt/$addition"
-done < <(find support/quartz support/agent_guidance support/figures -type f ! -name '.*' | sort)
+done < <(find support/quartz support/agent_guidance support/figures support/gated support/swift -type f ! -name '.*' | sort)
 # The print engine itself, by the hash the pin carries (contracts/toolchain.json).
 PAGEDJS_PIN="$(python3 -c 'import json; print([p["fileSha256"] for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "pagedjs"][0])')"
 PAGEDJS_BAKED="$(docker run --rm "$DEV_TEST_IMAGE" sha256sum /opt/vendor/pagedjs/paged.min.js 2>/dev/null | cut -d' ' -f1)"
@@ -1434,6 +1557,41 @@ if [[ -z "$FIGURE_ENGINE_PROBLEMS" ]]; then
   pass "The image carries function-plot and node-tikzjax at /opt/vendor, matching their pins, with their licences (#485)"
 else
   fail "The image's figure engines do not match contracts/toolchain.json: $FIGURE_ENGINE_PROBLEMS"
+fi
+# Runnable code's engine (#455) and the site's own KaTeX (#494), by their
+# pins: exactly the five Pyodide files, each matching, with the README that
+# names the licence; and Quartz's katex at the pinned version, with the three
+# files a site carries hashed.
+RUNNER_ENGINE_PROBLEMS="$(python3 - "$DEV_TEST_IMAGE" <<'REPY'
+import json, subprocess, sys
+pins = {p["pin"]: p for p in json.load(open("contracts/toolchain.json"))["pins"]}
+pyodide, katex = pins["pyodide"], pins["katex"]
+names = sorted(pyodide["files"])
+kfiles = sorted(katex["files"])
+script = ("cd /opt/vendor/pyodide && ls -1 && echo LISTED && sha256sum " + " ".join(names)
+          + " && cat README.txt && cd /opt/quartz/node_modules/katex && node -p 'require(\"./package.json\").version' && sha256sum " + " ".join(kfiles))
+out = subprocess.run(["docker", "run", "--rm", sys.argv[1], "sh", "-c", script], capture_output=True, text=True).stdout
+problems = []
+listed = out.split("LISTED\n", 1)[0].split()
+if sorted(listed) != sorted(names + ["README.txt"]):
+    problems.append(f"/opt/vendor/pyodide holds {sorted(listed)}, not the five pinned files and the README")
+for name in names:
+    if pyodide["files"][name] + "  " + name not in out:
+        problems.append(f"Pyodide's {name} does not match its pin")
+if "MPL-2.0" not in out:
+    problems.append("Pyodide's README does not name its licence")
+if "\n" + katex["value"] + "\n" not in "\n" + out:
+    problems.append(f"Quartz's katex is not {katex['value']}")
+for name in kfiles:
+    if katex["files"][name] + "  " + name not in out:
+        problems.append(f"katex's {name} does not match its pin")
+print("; ".join(problems))
+REPY
+)"
+if [[ -z "$RUNNER_ENGINE_PROBLEMS" ]]; then
+  pass "The image carries Pyodide at /opt/vendor/pyodide (the five pinned files and its README) and Quartz's katex at the pinned version, matching their pins (#455, #494)"
+else
+  fail "The image's Pyodide or katex does not match contracts/toolchain.json: $RUNNER_ENGINE_PROBLEMS"
 fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
@@ -1519,6 +1677,73 @@ else
   fail "Quartz carries ${QUARTZ_COMMITS} commits of history; the clone should be depth 1 (#334)"
 fi
 
+# -------------------- 4c. The Swift gate (#493) --------------------
+# The Swift image is built from support/swift under the tag the launcher
+# itself computes (preview.sh's toolchain_hash over that folder ONLY), so the
+# build in section 5 finds it and compiles its planted blocks without
+# building it again. Reused when it is already on this Mac, as the launcher
+# would; --no-cache rebuilds it. Then every swift-gate/ fragment is compiled
+# in it and run through the site's own WASI shim in Node
+# (browser-checks/wasi_run.mjs): the library each compiled with, its output,
+# its trap and Fatal-error line, the stdin echo, and the must-fail that the
+# Fatal-error line is LOST without the shim's rights (spike G5, review S10).
+# Skipped, saying why, when the image cannot be built (offline the first time).
+eval "$(sed -n '/^toolchain_hash() {/,/^}/p' preview.sh)"
+SWIFT_GATE_TAG="teaching-quartz-swift:src-$(toolchain_hash support/swift)"
+SWIFT_GATE_DIR="$HOME/.plantoir-verify-swift-gate"
+SWIFT_GATE_READY="false"
+echo ""
+echo "🦅 The Swift gate: ${SWIFT_GATE_TAG}…"
+SWIFT_BUILD_STARTED=$(date +%s)
+if [[ -z "$NO_CACHE" ]] && docker image inspect "$SWIFT_GATE_TAG" >/dev/null 2>&1; then
+  SWIFT_GATE_READY="true"
+  SWIFT_BUILT_HOW="already on this Mac"
+elif docker buildx build --load $NO_CACHE --progress=plain -t "$SWIFT_GATE_TAG" support/swift >/tmp/verify_swift_image.log 2>&1; then
+  SWIFT_GATE_READY="true"
+  SWIFT_BUILT_HOW="built in $(( $(date +%s) - SWIFT_BUILD_STARTED )) s"
+fi
+if [[ "$SWIFT_GATE_READY" == "true" ]]; then
+  SWIFT_IMAGE_SIZE="$(docker images --format '{{.Size}}' "$SWIFT_GATE_TAG" 2>/dev/null | head -1)"
+  pass "the Swift image exists from support/swift ($SWIFT_BUILT_HOW, ${SWIFT_IMAGE_SIZE:-size unknown}) (#493)"
+  # The trim (ruling Q2) and the off-PATH wasm-opt (Phase 0 trap 1), as built.
+  if docker run --rm "$SWIFT_GATE_TAG" sh -c 'test ! -e /opt/swift/usr/bin/lldb && test ! -e /opt/swift/usr/bin/sourcekit-lsp && test ! -e /opt/swift/usr/lib/swift_static && ! command -v wasm-opt >/dev/null && test -x /opt/binaryen/bin/wasm-opt && test -d /opt/swift-sdks/swift-6.4.0-RELEASE_wasm.artifactbundle' >/dev/null 2>&1; then
+    pass "the Swift image is trimmed (no lldb, sourcekit or host libraries), its SDK is installed, and wasm-opt is off PATH (#493)"
+  else
+    fail "the Swift image is not trimmed as its recipe says, lacks its SDK, or has wasm-opt on PATH (#493)"
+  fi
+  rm -rf "$SWIFT_GATE_DIR"
+  mkdir -p "$SWIFT_GATE_DIR/jobs" "$SWIFT_GATE_DIR/out" "$SWIFT_GATE_DIR/again/jobs" "$SWIFT_GATE_DIR/again/out"
+  cp swift-gate/*.swift "$SWIFT_GATE_DIR/jobs/"
+  cp swift-gate/01-greeting.swift swift-gate/05-arrays.swift "$SWIFT_GATE_DIR/again/jobs/"
+  SWIFT_COMPILE_STARTED=$(date +%s)
+  docker run --rm --network none --mount "$(bind_mount_argument "$SWIFT_GATE_DIR" "$SWIFT_GATE_DIR")" \
+    "$SWIFT_GATE_TAG" python3 /opt/plantoir-swift/compile.py "$SWIFT_GATE_DIR/jobs" "$SWIFT_GATE_DIR/out" \
+    >/tmp/verify_swift_compile.log 2>&1
+  SWIFT_COMPILE_SECONDS=$(( $(date +%s) - SWIFT_COMPILE_STARTED ))
+  if node browser-checks/wasi_run.mjs swift-gate "$SWIFT_GATE_DIR/out" >/tmp/verify_swift_gate.log 2>&1; then
+    pass "the Swift gate: all $(ls swift-gate/*.swift | wc -l | tr -d ' ') fragments compiled in ${SWIFT_COMPILE_SECONDS} s with the library swift-gate/expected.json names, ran through the site's WASI shim as expected, traps kept their Fatal error line, input echoed after its prompt, and the G5 must-fail failed (browser-checks/wasi_run.mjs, #493)"
+  else
+    fail "the Swift gate: a fragment did not compile, chose the wrong library, printed the wrong thing or lost its Fatal error line (browser-checks/wasi_run.mjs, #493)"
+    cat /tmp/verify_swift_compile.log /tmp/verify_swift_gate.log
+  fi
+  sed -n '/^| fragment/,/^| G5/p' /tmp/verify_swift_gate.log
+  # The same code compiles to the same bytes in a second container (spike G4:
+  # the object file's path is fixed per key).
+  docker run --rm --network none --mount "$(bind_mount_argument "$SWIFT_GATE_DIR" "$SWIFT_GATE_DIR")" \
+    "$SWIFT_GATE_TAG" python3 /opt/plantoir-swift/compile.py "$SWIFT_GATE_DIR/again/jobs" "$SWIFT_GATE_DIR/again/out" \
+    >/tmp/verify_swift_again.log 2>&1
+  if cmp -s "$SWIFT_GATE_DIR/out/01-greeting.wasm" "$SWIFT_GATE_DIR/again/out/01-greeting.wasm" \
+     && cmp -s "$SWIFT_GATE_DIR/out/05-arrays.wasm" "$SWIFT_GATE_DIR/again/out/05-arrays.wasm"; then
+    pass "the Swift image compiles the same code to the same bytes in a second run (spike G4, #493)"
+  else
+    fail "the Swift image compiled the same code to different bytes in a second run (spike G4, #493)"
+  fi
+  rm -rf "$SWIFT_GATE_DIR"
+else
+  RESULTS+=("⏭️  SKIPPED  the Swift gate (#493): the Swift image could not be built - the first build needs the internet (/tmp/verify_swift_image.log)")
+  echo "⏭️  SKIPPED  the Swift gate: the Swift image could not be built (see /tmp/verify_swift_image.log)"
+fi
+
 # -------------------- 5. Drive the real launcher against the image --------------------
 echo ""
 echo "🧹 Removing existing '$CONTAINER_NAME' container so the launcher recreates it"
@@ -1566,6 +1791,15 @@ restore_hit_fixture() {
         "$HIT_COURSE/Printable Too Tall.md" \
         "$HIT_COURSE/Figures Fixture.md" "$HIT_COURSE/Figures Hidden.md" \
         "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
+        "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
+        "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
+        "$HIT_COURSE/Discussions/Runner Printable.md" \
+        "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
+        "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
+        "$HIT_COURSE/Quiz Fixture.md" "$HIT_COURSE/Quiz CRLF.md" "$HIT_COURSE/Quiz Lookalikes.md" \
+        "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
+        "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
+        "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2240,6 +2474,182 @@ printf -- '---\ntitle: Figures Math Heading\n---\nA graph under a heading named 
 printf -- '---\ntitle: Figures Exports Heading\n---\nA graph under a heading named Exports (plantoir-figures-exports-7f3a).\n\n# Exports\n\n```functionplot\ny = x^3 - 2x\n```\n' \
   > "$HIT_COURSE/Figures Exports Heading.md"
 
+# ---- #455: runnable code, planted for the same build ----
+# Runner Fixture: one fence per contracts/shared-rules.json ->
+# codeRunnerBlocks.fences case that opts in (each prints its own case number),
+# then a fence on two list markers' line (never runnable: pageShapes) and a
+# runner after it (counted). Runner Not Opted: the same fences on a page that
+# does not opt in; Runner Plain Twin: the same code in plain ```python
+# fences - the two must come out alike. Runner Playground: three blocks for
+# the browser check; Discussions/Runner Printable: a printable page one
+# folder down with a runner and a formula (the print-after-a-page-change
+# check, #455 review S1); Runner Hidden: a page students cannot see, which
+# must not make the site carry the engine or earn a plantoir: error: line.
+# Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE" <<'RUNNERPLANTS'
+import json, sys
+from pathlib import Path
+course = Path(sys.argv[1])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["codeRunnerBlocks"]
+fences = []
+for number, case in enumerate(rules["fences"]["cases"], start=1):
+    if not case["optedIn"]:
+        continue
+    fences.append((f"{case['lang']} {case['meta']}".rstrip(), f'print("case {number}")'))
+body = "Runnable code planted by verify.sh (plantoir-runner-sentinel-7f3a).\n\n"
+for info, code in fences:
+    body += f"```{info}\n{code}\n```\n\n"
+nested = '- - ```python run\n    print("nested shape")\n    ```\n\n```python run\nprint("after the nested shape")\n```\n'
+(course / "Runner Fixture.md").write_text("---\ntitle: Runner Fixture\ncodeRunner: yes\n---\n" + body + nested, encoding="utf-8")
+(course / "Runner Not Opted.md").write_text("---\ntitle: Runner Not Opted\n---\n" + body, encoding="utf-8")
+# The twin keeps every other word of the info string (a title, line
+# highlighting), so the only difference is the runner's own tokens.
+import re
+twin = "Runnable code planted by verify.sh (plantoir-runner-sentinel-7f3a).\n\n"
+for info, code in fences:
+    # Words as the site's parser splits them: on space and tab only, so a
+    # no-break space stays inside its word (codeRunnerBlocks.fences, N2).
+    words = [w for w in re.findall(r'[^ \t"]*"[^"]*"[^ \t]*|[^ \t]+', info) if w not in ("run", "readonly", "stdin", "autorun")]
+    twin += f"```{' '.join(words)}\n{code}\n```\n\n"
+(course / "Runner Plain Twin.md").write_text("---\ntitle: Runner Plain Twin\n---\n" + twin, encoding="utf-8")
+(course / "Runner Playground.md").write_text(
+    "---\ntitle: Runner Playground\ncodeRunner: true\n---\nThree blocks to run (plantoir-runner-playground-7f3a).\n\n"
+    "```python run\nprint(\"one\")\n```\n\n```python run\nprint(\"two\")\n```\n\n"
+    "> [!example]- In a folded callout\n> ```python run\n> print(\"three\")\n> ```\n", encoding="utf-8")
+(course / "Discussions" / "Runner Printable.md").write_text(
+    "---\ntitle: Runner Printable\nprintable: true\ncodeRunner: true\n---\n"
+    "A printable page with code (plantoir-runner-printable-7f3a), and a formula $\\frac{a}{b} = c^2$.\n\n"
+    "1. What does this print?\n\n```python run\nprint(\"printed\")\n```\n", encoding="utf-8")
+(course / "Runner Autorun.md").write_text(
+    "---\ntitle: Runner Autorun\ncodeRunner: true\n---\nTwo blocks that run by themselves (plantoir-runner-autorun-7f3a).\n\n"
+    "```python run autorun\nimport time\ntime.sleep(4)\nprint(\"first\")\n```\n\n"
+    "```python run autorun\nimport time\ntime.sleep(3)\nprint(\"second\")\n```\n", encoding="utf-8")
+(course / "Runner Hidden.md").write_text(
+    "---\ntitle: Runner Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-runner-hidden-7f3a).\n\n"
+    "```python run\nprint(\"hidden\")\n```\n", encoding="utf-8")
+# #493: Swift Playground - the blocks the Swift browser check runs (a
+# greeting that reads input, a loop that never ends, an index out of range,
+# exit(3), a block that does not compile, and one that needs the full
+# library), and Swift Hidden, a page students cannot see, whose block is
+# compiled (the plan is generous) but never reaches the site.
+gate = Path("swift-gate")
+playground = "---\ntitle: Swift Playground\ncodeRunner: yes\n---\nSwift to run (plantoir-swift-playground-7f3a).\n\n"
+playground += "```swift run\n" + (gate / "01-greeting.swift").read_text(encoding="utf-8") + "```\n\n"
+playground += "```swift run\nprint(\"spinning\")\nvar n = 0\nwhile true { n &+= 1 }\n```\n\n"
+playground += "```swift run\n" + (gate / "10-out-of-range.swift").read_text(encoding="utf-8") + "```\n\n"
+playground += "```swift run\n#if canImport(WASILibc)\nimport WASILibc\n#endif\nprint(\"leaving with 3\")\nexit(3)\n```\n\n"
+playground += "Some words before the block that does not compile.\n\n"
+playground += "```swift run\nlet name = readLine() ?? \"\"\nprint(nmae)\n```\n\n"
+playground += "```swift run stdin\n" + (gate / "05-arrays.swift").read_text(encoding="utf-8") + "```\n"
+(course / "Swift Playground.md").write_text(playground, encoding="utf-8")
+(course / "Swift Hidden.md").write_text(
+    "---\ntitle: Swift Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-swift-hidden-7f3a).\n\n"
+    "```swift run\nprint(\"hidden swift\")\n```\n", encoding="utf-8")
+RUNNERPLANTS
+
+# ---- #505: an overall expectation's backlinks, planted for the same build ----
+# Two pages in a shared folder (so the course's settings are not touched),
+# connected the way a class page embeds expectations, each with a sentinel in
+# its title. "Overall Backlinks Specific" embeds ONLY the specific expectation
+# A2.1: the overall page A2 must list it, which is the aggregation itself (a
+# direct-links-only panel lists it on A2.1 alone - measured: this check passed
+# against the old component until this page was added). "Overall Backlinks
+# Fixture" embeds BOTH A2.1 and A2: A2 must list it ONCE (one filter over A2
+# and its specific expectations, not two lists). Removed by restore_hit_fixture.
+printf -- '---\ntitle: Overall Fixture plantoir-overall-both-7f3a\n---\nA page planted by verify.sh that connects to an overall expectation and one of its specific expectations.\n\n![[A2.1]]\n\n![[A2. Applications, Careers, and Connections]]\n' \
+  > "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md"
+printf -- '---\ntitle: Overall Specific plantoir-overall-specific-7f3a\n---\nA page planted by verify.sh that connects to one specific expectation only.\n\n![[A2.1]]\n' \
+  > "$HIT_COURSE/Discussions/Overall Backlinks Specific.md"
+# ---- #563: self-check quizzes, planted for the same build ----
+# Quiz Fixture: every contracts/shared-rules.json -> quizCallouts.recognise
+# case in order, each after a "Case n" line (6k reads each quiz's kind or
+# problem back, and the build's plantoir: error: lines); Quiz CRLF: the CR LF
+# case on a page saved with CR LF (review S1); Quiz Lookalikes: [!question],
+# a top-level [!answer] and [!explain], and quiz syntax shown in a fence -
+# none of them a quiz; Quiz Printable: a printable page with a folded answer
+# of its own and two quizzes (ruling Q8: neither quiz's answer nor its
+# explanation in the handout); Quiz Hidden: a broken quiz students cannot
+# see (reported nowhere); Quiz Source and Quiz Host: a quiz transcluded onto
+# a page with its own (review S5); Quiz Playground: every kind for the
+# browser check, with graphs, code to run and an image in choices and
+# explanations. Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE" <<'QUIZPLANTS'
+import json, struct, sys, zlib
+from pathlib import Path
+course = Path(sys.argv[1])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["quizCallouts"]
+F = "```"
+body = "Self-check quizzes planted by verify.sh (plantoir-quiz-sentinel-7f3a).\n\n"
+for number, case in enumerate(rules["recognise"]["cases"], start=1):
+    if "\r" in case["markdown"]:
+        continue
+    body += f"Case {number}: {case['name']}.\n\n{case['markdown']}\n"
+(course / "Quiz Fixture.md").write_text("---\ntitle: Quiz Fixture\n---\n" + body, encoding="utf-8")
+crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]][0]
+(course / "Quiz CRLF.md").write_bytes(("---\r\ntitle: Quiz CRLF\r\n---\r\nSaved with CR LF (plantoir-quiz-crlf-7f3a).\r\n\r\n"
+                                       + crlf["markdown"]).encode("utf-8"))
+(course / "Quiz Lookalikes.md").write_text(
+    "---\ntitle: Quiz Lookalikes\n---\nCallouts that are not quizzes (quiz-lookalike-sentinel-7f3a).\n\n"
+    "> [!question] Which is prime?\n> - [x] 5\n> - [ ] 6\n\n"
+    "> [!answer]- Answer\n> lookalike-answer-7f3a\n\n"
+    "> [!explain]- Why\n> lookalike-explain-7f3a\n\n"
+    + F + "markdown\n> [!quiz] Shown, never run.\n> - [x] a\n> > [!answer]- Answer\n> > a\n" + F + "\n", encoding="utf-8")
+(course / "Quiz Printable.md").write_text(
+    "---\ntitle: Quiz Printable\nprintable: true\n---\nA printable page with quizzes (plantoir-quiz-printable-7f3a).\n\n"
+    "## Question 1\n\nSimplify $(x + 3)(x - 2)$.\n\n> [!success]- Answer 1\n> $x^2 + x - 6$\n\n"
+    "> [!quiz] Which is a factor of $x^2 - 9$?\n> - [x] $x - 3$\n> - [ ] $x + 9$\n>\n"
+    "> > [!explain]- Why\n> > printable-explain-7f3a: a difference of squares.\n\n"
+    "> [!quiz] Name the capital of Canada.\n> > [!answer]-\n> > printable-answer-7f3a | Ottawa\n", encoding="utf-8")
+(course / "Quiz Twice.md").write_text(
+    "---\ntitle: Quiz Twice\n---\nOne quiz shown twice (plantoir-quiz-twice-7f3a).\n\n![[Quiz Source]]\n\n![[Quiz Source]]\n",
+    encoding="utf-8")
+(course / "Quiz Code Shown.md").write_text(
+    "---\ntitle: Quiz Code Shown\n---\nQuiz syntax shown as indented code, never a quiz (quiz-code-sentinel-7f3a).\n\n"
+    "    > [!quiz] Shown as code.\n    > > [!answer]- Answer\n    > > a\n\n"
+    "> [!note] How to write one\n>\n>     > [!quiz] Shown as code in a callout.\n>     > > [!answer]- Answer\n>     > > a\n\n"
+    "- Step one: type this\n\n      > [!quiz] Shown as code under a list item.\n      > > [!answer]- Answer\n      > > a\n",
+    encoding="utf-8")
+(course / "Quiz Summary.md").write_text(
+    "---\ntitle: Quiz Summary\n---\n> [!quiz] Fill `____` and `____`.\n> > [!answer]-\n> > summary-answer-7f3a\n> > b\n",
+    encoding="utf-8")
+(course / "Quiz Hidden.md").write_text(
+    "---\ntitle: Quiz Hidden\npublish: false\n---\nHidden (plantoir-quiz-hidden-7f3a).\n\n> [!quiz] Broken.\n> - [ ] a\n> - [ ] b\n",
+    encoding="utf-8")
+(course / "Quiz Source.md").write_text(
+    "---\ntitle: Quiz Source\n---\nA quiz to transclude (plantoir-quiz-source-7f3a).\n\n"
+    "> [!quiz] Source question: pick the odd number.\n> - [x] 7\n> - [ ] 8\n", encoding="utf-8")
+(course / "Quiz Host.md").write_text(
+    "---\ntitle: Quiz Host\n---\nA page with its own quiz and another page's (plantoir-quiz-host-7f3a).\n\n"
+    "> [!quiz] Host question: pick the even number.\n> - [ ] 7\n> - [x] 8\n\n![[Quiz Source]]\n", encoding="utf-8")
+# A tiny image for a choice.
+def png(width, height):
+    raw = b"".join(b"\x00" + b"\x30\x80\xc0" * width for _ in range(height))
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + \
+        chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+(course / "Media").mkdir(exist_ok=True)
+(course / "Media" / "plantoir-quiz-choice.png").write_bytes(png(40, 20))
+(course / "Quiz Playground.md").write_text(
+    "---\ntitle: Quiz Playground\ncodeRunner: true\n---\n"
+    "> [!quiz] Simplify $2^3 \\cdot 2^4$.\n> > [!answer]- Answer\n> > $2^7$ | 2^7\n>\n> > [!explain]- Why\n> > playground-explain-7f3a: same base, add the exponents.\n\n"
+    "Every kind of self-check question (plantoir-quiz-playground-7f3a).\n\n"
+    "> [!quiz] Which graph shows $y = (x-3)^2 + 2$?\n> - [ ] Vertex at $(-3, 2)$\n> - [x] Vertex at $(3, 2)$\n> - [ ] Vertex at $(3, -2)$\n>\n"
+    "> > [!explain]- Why\n> > $y = x^2$ shifts right 3 and up 2:\n> > " + F + "functionplot\n> > y = (x-3)^2 + 2\n> > y = x^2\n> > " + F + "\n\n"
+    "> [!quiz] Which are prime?\n> - [x] 2\n> - [ ] 4\n> - [x] 5\n> - [ ] 9\n\n"
+    "> [!quiz] Water boils at `____` °C at `____` pressure.\n> > [!answer]-\n> > 100 ± 1 | one hundred\n> > sea level | standard | atmospheric\n\n"
+    "> [!quiz|shuffle] Which is a factor of $x^2 - 5x + 6$?\n> - [x] $x - 2$\n> - [ ] $x + 2$\n> - [ ] $x + 3$\n> - [ ] $x + 6$\n> - [ ] $x - 6$\n\n"
+    "> [!quiz]- Which is the graph of $y = -x^2$?\n> - [ ] Graph A\n>   " + F + "functionplot\n>   ---\n>   alt: an upward parabola\n>   ---\n>   y = x^2\n>   " + F + "\n"
+    "> - [x] Graph B\n>   " + F + "functionplot\n>   y = -x^2\n>   " + F + "\n\n"
+    "> [!quiz] What does this print?\n> - [x] 5\n>   " + F + "python run\n>   print(2 + 3)\n>   " + F + "\n> - [ ] 6\n> - [ ] A picture\n>   ![a blue box](Media/plantoir-quiz-choice.png)\n>\n"
+    "> > [!explain]- Why\n> > Run it yourself:\n> > " + F + "python run\n> > print(2 + 3)\n> > " + F + "\n\n"
+    "> [!quiz] Solve $x^2 = 9$.\n> > [!answer]-\n> > ±3 | x = ±3\n\n"
+    # Swift to run (#493) in a choice and in an explanation (#563 review S2).
+    "> [!quiz] What does this Swift program print?\n> - [x] 6\n>   " + F + "swift run\n>   print(2 * 3)\n>   " + F + "\n"
+    "> - [ ] 23\n>\n> > [!explain]- Why\n> > `*` multiplies. Run it:\n> > " + F + "swift run\n> > let n = 2\n> > print(n * 3)\n> > " + F + "\n",
+    encoding="utf-8")
+QUIZPLANTS
+
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
 echo "🚦 Running: ./preview.sh EXC2O 1 --image $DEV_TEST_IMAGE --full-rebuild --build-only"
@@ -2354,6 +2764,54 @@ for planted in "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md
   fi
 done
 [[ "$HIT_OK" == "true" ]] && pass "No How I Teach page reaches the built site, the look-alike does, and the teacher's own pages are untouched (#209)"
+
+# ---- 6h, continued: an overall expectation's backlinks (#505) ----
+# The two pages planted above, read from the built pages. The "When did we do
+# this?" panel on the overall page A2 must name each exactly once - the page
+# that links only A2.1 (aggregated) and the page that links A2 and A2.1
+# (de-duplicated) - and the panel on A2.1 must name each once (unchanged).
+# Counted inside the panel only, so a title shown anywhere else on the page
+# cannot make it pass. Before #505 the A2 page had no panel at all.
+if python3 - "$SITE_PUBLIC" <<'OVERALLCHECK'
+import glob, sys
+public = sys.argv[1]
+sentinels = {"plantoir-overall-both-7f3a": "the page linking A2 and A2.1",
+             "plantoir-overall-specific-7f3a": "the page linking only A2.1"}
+heading = "When did we do this?"
+problems = []
+overall = glob.glob(public + "/Curriculum/A2.-*.html")
+pages = {"the overall expectation A2": overall[0] if len(overall) == 1 else None,
+         "the specific expectation A2.1": public + "/Curriculum/A2.1.html"}
+for what, path in pages.items():
+    if path is None:
+        problems.append(f"{what}: expected one built page Curriculum/A2.-*.html, found {len(overall)}")
+        continue
+    try:
+        html = open(path, encoding="utf-8").read()
+    except OSError:
+        problems.append(f"{what}: no built page at {path}")
+        continue
+    start = html.find('class="backlinks')
+    if start < 0:
+        problems.append(f'{what}: no "{heading}" panel on {path}')
+        continue
+    end = html.find("</ul>", start)
+    panel = html[start:end if end > start else len(html)]
+    if heading not in panel:
+        problems.append(f'{what}: the panel on {path} has no "{heading}" heading')
+    for sentinel, planted in sentinels.items():
+        count = panel.count(sentinel)
+        if count != 1:
+            problems.append(f"{what}: {planted} is listed {count} time(s) in the panel on {path}, not once")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+OVERALLCHECK
+then
+  pass "An overall expectation's page lists the pages of its specific expectations, a page linking both is listed once, and the specific expectation's page is unchanged (#505)"
+else
+  fail "An overall expectation's \"When did we do this?\" panel is wrong (#505) - see the lines above"
+fi
 
 # ---- 6h, continued: printable pages (#454) ----
 # The pages planted with the How I Teach ones, read from the site the launcher
@@ -2527,7 +2985,7 @@ if not engine.is_file() or hashlib.sha256(engine.read_bytes()).hexdigest() != pi
 for path in [page_path, engine] + [path for path in tikz.glob("*.css")]:
     text = path.read_text(encoding="utf-8", errors="ignore") if path.is_file() else ""
     for found in re.findall(r"https?://[^\s\"')]+", text):
-        if "w3.org" in found or "jsdelivr.net/npm/katex" in found or "plausible.io" in found:
+        if "w3.org" in found or "plausible.io" in found:
             continue
         if path == page_path and not any(found in body for _, _, body in figures):
             continue
@@ -2542,6 +3000,340 @@ then
   pass "diagrams and graphs: every fence drawn as an SVG in the page or reported by page and line, the faces and function-plot carried by the site itself, descriptions free of lettering, a hidden graph nowhere (#485)"
 else
   fail "diagrams and graphs: one of the checks above failed (#485)"
+fi
+
+# ---- 6j. Runnable code (#455) and the site's own KaTeX (#494), as the build left them ----
+# The planted Runner Fixture's runnable blocks are exactly the contract's (in
+# order, with their ids, flags, language and the teacher's code); the nested
+# shape stays plain code; the page that does not opt in is untouched and
+# comes out like its twin in plain fences; the site carries the pinned
+# engine with the worker and nothing a CDN would have served, every word
+# the page's code says is in the site's script, and every page links the
+# site's own KaTeX.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log <<'RUNNERPY'
+import hashlib, html, json, re, sys
+from pathlib import Path
+public, log = Path(sys.argv[1]), Path(sys.argv[2])
+problems = []
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["codeRunnerBlocks"]
+pins = {pin["pin"]: pin for pin in json.load(open("contracts/toolchain.json"))["pins"]}
+def page(name):
+    path = public / name
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+fixture = page("Runner-Fixture.html")
+if not fixture:
+    problems.append("Runner-Fixture.html was not built")
+found = re.findall(r'<div class="plantoir-runner" data-runner-id="([^"]*)" data-runner-flags(?:="([^"]*)")? data-runner-language="([^"]*)" data-runner-runtime="([^"]*)" data-runner-engine="([^"]*)" data-original="([^"]*)"', fixture)
+expected = []
+rows = {row["fence"]: row for row in rules["languages"]}
+counters = {}
+for number, case in enumerate(rules["fences"]["cases"], start=1):
+    if case["optedIn"] and case["runner"]:
+        fence = case.get("fence", case["lang"])
+        row = rows[fence]
+        counters[fence] = counters.get(fence, 0) + 1
+        expected.append((f"Runner-Fixture-{row['idPrefix']}-{counters[fence]}", " ".join(case["flags"]), fence, row["runtime"], row["engine"], f'print("case {number}")'))
+expected.append((f"Runner-Fixture-py-{counters['python'] + 1}", "", "python", "pyodide", "pyodide", 'print("after the nested shape")'))
+got = [(rid, flags or "", language, runtime, engine, html.unescape(original)) for rid, flags, language, runtime, engine, original in found]
+if got != expected:
+    problems.append(f"the fixture's runnable blocks are {got}, not the contract's {expected}")
+if "nested shape" not in fixture or re.search(r'data-original="print\(&quot;nested shape', fixture):
+    problems.append("the fence on two list markers' line was made runnable, or is missing")
+not_opted, twin = page("Runner-Not-Opted.html"), page("Runner-Plain-Twin.html")
+if 'class="plantoir-runner"' in not_opted or "data-runner-id" in not_opted:
+    problems.append("the page that does not opt in has a runnable block")
+figures = lambda text: re.findall(r"<figure data-rehype-pretty-code-figure.*?</figure>", text, re.S)
+if not figures(not_opted) or figures(not_opted) != figures(twin):
+    problems.append(f"the page that does not opt in does not come out like its twin in plain fences ({len(figures(not_opted))} and {len(figures(twin))} blocks)")
+if (public / "Runner-Hidden.html").exists():
+    problems.append("the hidden page with code reached the site")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+if re.search(r"plantoir: error: [^\n]*Runner", said):
+    problems.append("the build named a runner page on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*Runner[^\n]*", said).group(0))
+# Quiz Playground (#563) runs Python and Swift inside its quizzes, so it is
+# one more page for each engine.
+if not re.search(r"This site carries what runs Swift for 3 pages\.", said):
+    problems.append("the build did not say the site carries Swift for the three pages students can see with Swift (Runner Fixture, Swift Playground, Quiz Playground)")
+if not re.search(r"This site carries what runs Python for 5 pages\.", said):
+    problems.append("the build did not say the site carries Python for the five pages students can see (not the hidden one; Quiz Playground is the fifth)")
+engine = public / "static" / "pyodide"
+carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
+if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
+    problems.append(f"static/pyodide holds {carried}")
+for name, digest in pins["pyodide"]["files"].items():
+    if (engine / name).is_file() and hashlib.sha256((engine / name).read_bytes()).hexdigest() != digest:
+        problems.append(f"static/pyodide/{name} does not match its pin")
+if (engine / "plantoir-worker.js").read_bytes() != Path("support/gated/pyodide/plantoir-worker.js").read_bytes():
+    problems.append("the site's worker is not support/gated/pyodide/plantoir-worker.js")
+script = page("postscript.js")
+for key, text in rules["words"].items():
+    if key in ("note", "blockNotPrepared"):
+        continue
+    if text not in script and json.dumps(text)[1:-1] not in script:
+        problems.append(f"the site's script does not carry words.{key}")
+# Nothing from the CDN, anywhere: one string inside pyodide.mjs is allowed
+# (a fallback the worker pins out), and nothing else.
+for path in sorted(public.rglob("*")):
+    if path.suffix not in (".html", ".js", ".mjs", ".css") or not path.is_file():
+        continue
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    hits = text.count("cdn.jsdelivr.net")
+    allowed = 1 if path == engine / "pyodide.mjs" else 0
+    if hits != allowed:
+        problems.append(f"{path.relative_to(public)} names cdn.jsdelivr.net {hits} time(s)")
+katex = public / "static" / "katex"
+kfiles = sorted(str(path.relative_to(katex)) for path in katex.rglob("*") if path.is_file()) if katex.is_dir() else []
+faces = [name for name in kfiles if name.startswith("fonts/")]
+if len(faces) != 20 or any(not name.endswith(".woff2") for name in faces) or sorted(set(kfiles) - set(faces)) != ["LICENSE", "contrib/copy-tex.min.js", "katex.min.css"]:
+    problems.append(f"static/katex holds {kfiles}")
+for name, digest in pins["katex"]["files"].items():
+    local = katex / name.replace("dist/", "", 1)
+    if not local.is_file() or hashlib.sha256(local.read_bytes()).hexdigest() != digest:
+        problems.append(f"static/katex/{name.replace('dist/', '', 1)} does not match the pin's {name}")
+for name, depth in (("Help-Sessions.html", 0), ("Discussions/Runner-Printable.html", 1)):
+    head = page(name)
+    links = re.findall(r'<link rel="stylesheet" href="([^"]*katex\.min\.css)"', head)
+    want = ("./" if depth == 0 else "../") + "static/katex/katex.min.css"
+    if links != [want]:
+        problems.append(f"{name} links KaTeX's stylesheet as {links}, not {want}")
+if any("katex-error" in path.read_text(encoding="utf-8", errors="ignore") for path in public.rglob("*.html")):
+    problems.append("a formula on the site failed to render (katex-error)")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+RUNNERPY
+then
+  pass "runnable code: every block the contract says runs (Python and Swift) is wrapped with its id, flags and the teacher's code, the nested shape stays plain, a page that does not opt in is untouched, the hidden page counts for nothing, the site carries the pinned Python with its worker and its script carries every word; maths styled from the site's own KaTeX, and nothing on the site names a CDN but the one string the worker pins out (#455, #494)"
+else
+  fail "runnable code or the site's own KaTeX: one of the checks above failed (#455, #494)"
+fi
+
+# ---- 6j, continued: runnable Swift (#493), as the build left it ----
+# The planted Swift Playground's blocks each carry their program's address
+# (the key of the code the site read) or, for the one that does not compile,
+# data-runner-unready; static/swift-wasm holds exactly the programs pages
+# students can see use (not Swift Hidden's, though the plan compiled it);
+# static/swift is the overlay alone; the build named the broken block at its
+# line in the teacher's file with the compiler's first error, and said it as
+# the swiftCouldNotBePrepared folder problem.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE" <<'SWIFTPY'
+import html, json, re, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+sys.path.insert(0, "scripts")
+import swift_blocks
+public, log, course = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+problems = []
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["codeRunnerBlocks"]
+page = (public / "Swift-Playground.html").read_text(encoding="utf-8") if (public / "Swift-Playground.html").is_file() else ""
+if not page:
+    problems.append("Swift-Playground.html was not built")
+# Attribute by attribute: a value may hold ">" (data-original is the code).
+wrappers = re.findall(r'<div class="plantoir-runner"((?:\s+[\w-]+(?:="[^"]*")?)*)\s*>', page)
+def attribute(text, name):
+    found = re.search(name + r'="([^"]*)"', text)
+    return html.unescape(found.group(1)) if found else None
+source = (course / "Swift Playground.md").read_text(encoding="utf-8")
+bodies = [block["body"] for block in swift_blocks.swift_fences(source, True)]
+if len(wrappers) != 6 or len(bodies) != 6:
+    problems.append(f"Swift Playground has {len(wrappers)} runnable blocks on the site and {len(bodies)} in the page, not 6")
+for index, (attributes, body) in enumerate(zip(wrappers, bodies), start=1):
+    key = swift_blocks.key_of(body)
+    if attribute(attributes, "data-runner-language") != "swift" or attribute(attributes, "data-runner-id") != f"Swift-Playground-swift-{index}":
+        problems.append(f"Swift block {index} is not wrapped as Swift with its id: {attributes[:160]}")
+    if index == 5:
+        if attribute(attributes, "data-runner-unready") != "compileError" or attribute(attributes, "data-runner-wasm") is not None:
+            problems.append(f"the block that does not compile is not marked compileError: {attributes[:200]}")
+    elif attribute(attributes, "data-runner-wasm") != f"static/swift-wasm/{key}.wasm":
+        problems.append(f"Swift block {index} does not name its program static/swift-wasm/{key}.wasm: {attribute(attributes, 'data-runner-wasm')}")
+wanted = set()
+for body in bodies[:4] + bodies[5:]:
+    wanted.add(swift_blocks.key_of(body) + ".wasm")
+# The self-check quizzes' playground runs Swift in a choice and in an
+# explanation (#563), so its programs are on the site too.
+quiz_playground = course / "Quiz Playground.md"
+if quiz_playground.is_file():
+    for block in swift_blocks.swift_fences(quiz_playground.read_text(encoding="utf-8"), True):
+        wanted.add(swift_blocks.key_of(block["body"]) + ".wasm")
+for number, case in enumerate(rules["fences"]["cases"], start=1):
+    if case["optedIn"] and case["runner"] and case.get("fence", case["lang"]) == "swift":
+        wanted.add(swift_blocks.key_of(f'print("case {number}")') + ".wasm")
+carried = public / "static" / "swift-wasm"
+got = set(path.name for path in carried.iterdir()) if carried.is_dir() else set()
+if got != wanted:
+    problems.append(f"static/swift-wasm holds {sorted(got)}, not exactly {sorted(wanted)}")
+if (carried / (swift_blocks.key_of('print("hidden swift")') + ".wasm")).exists():
+    problems.append("the hidden page's Swift program reached the site")
+for path in sorted(carried.glob("*.wasm")) if carried.is_dir() else []:
+    if path.read_bytes()[:4] != b"\0asm":
+        problems.append(f"{path.name} is not a WebAssembly program")
+engine = public / "static" / "swift"
+overlay = Path("support/gated/swift")
+if not engine.is_dir() or sorted(p.name for p in engine.iterdir()) != sorted(p.name for p in overlay.iterdir()):
+    problems.append(f"static/swift holds {sorted(p.name for p in engine.iterdir()) if engine.is_dir() else 'nothing'}")
+else:
+    for item in overlay.iterdir():
+        if (engine / item.name).read_bytes() != item.read_bytes():
+            problems.append(f"static/swift/{item.name} is not support/gated/swift/{item.name}")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+broken_line = source.splitlines().index("print(nmae)") + 1
+reason = rules["swift"]["reasons"]["compileError"].replace("{said}", "cannot find 'nmae' in scope")
+line = f"plantoir: error: Swift Playground.md: swift block 5, line {broken_line}: {reason}"
+if line not in said:
+    problems.append(f"the build did not say: {line}")
+if not re.search(r'"name": "swiftCouldNotBePrepared"[^\n]*Swift Playground', said):
+    problems.append("the build did not report the broken Swift block as the swiftCouldNotBePrepared folder problem")
+if re.search(r"plantoir: error: [^\n]*swift block", said.replace(line, "")):
+    problems.append("the build named another Swift block on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*swift block[^\n]*", said.replace(line, "")).group(0))
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+SWIFTPY
+then
+  pass "runnable Swift: each block names its program (or compileError), static/swift-wasm holds exactly the programs visible pages use, static/swift is the overlay, and the block that does not compile is named at its line in the teacher's file with the compiler's first error, as a folder problem too (#493)"
+else
+  fail "runnable Swift: one of the checks above failed (#493)"
+fi
+
+# ---- 6k. Self-check quizzes (#563), as the build left them ----
+# The site's side: every quiz on the planted Quiz Fixture is the kind - or
+# the problem - contracts/shared-rules.json -> quizCallouts.recognise says,
+# in order, with its correct choices or answer lines, and the CR LF page too
+# (S1). The folder check's side: one plantoir: error: line per problem, with
+# the quiz's place and its line in the teacher's file, one quizzesNotReady
+# finding, and no line saying the two read a quiz differently. The
+# look-alikes are no quiz; no tick reaches a quiz page; no planted answer or
+# explanation is in the search index, the feed, the sitemap or a summary
+# (Q5, S3); every word the site shows is in its script; the hidden page is
+# named nowhere; a transcluded quiz keeps its own page's name (S5).
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log <<'QUIZPY'
+import html, json, re, sys
+from pathlib import Path
+public, log = Path(sys.argv[1]), Path(sys.argv[2])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["quizCallouts"]
+problems = []
+said = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
+def page(name):
+    path = public / name
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+def quizzes_in(text):
+    found = []
+    for attributes in re.findall(r'<blockquote class="[^"]*\bplantoir-quiz\b[^"]*"([^>]*)>', text):
+        get = lambda name: (re.search(name + r'="([^"]*)"', attributes) or [None, None])[1]
+        found.append({"n": get("data-quiz-n"), "kind": get("data-quiz-kind"), "problem": get("data-quiz-problem"),
+                      "data": json.loads(html.unescape(get("data-quiz") or "{}")), "source": get("data-quiz-source")})
+    return found
+# The fixture, case by case, as the plant laid it out.
+fixture_lines = Path("courses/EXC2O/Quiz Fixture.md").read_text(encoding="utf-8").split("\n")
+expected, lines_said = [], []
+top = 0
+for number, case in enumerate(rules["recognise"]["cases"], start=1):
+    if "\r" in case["markdown"]:
+        continue
+    start = fixture_lines.index(f"Case {number}: {case['name']}.") + 3  # its markdown's first line, 1-based
+    for quiz in case["quizzes"]:
+        n = None
+        if quiz.get("problem") != "notAtTopLevel":
+            top += 1
+            n = top
+        if "problem" in quiz:
+            expected.append(("notReady", quiz["problem"], {}))
+            reason = rules["words"]["problems"][quiz["problem"]]
+            for key, value in quiz.get("fill", {}).items():
+                reason = reason.replace("{" + key + "}", str(value))
+            where = f"quiz {n}, line {start + quiz['line'] - 1}" if n is not None else f"line {start + quiz['line'] - 1}"
+            lines_said.append(f"plantoir: error: Quiz Fixture.md: {where}: {reason}")
+        else:
+            data = {"correct": quiz["correct"]} if quiz["kind"] in ("single", "multiple") else {"answers": quiz["answers"]}
+            expected.append((quiz["kind"], None, data))
+got = [(quiz["kind"], quiz["problem"], quiz["data"] if quiz["kind"] != "notReady" else {}) for quiz in quizzes_in(page("Quiz-Fixture.html"))]
+if got != expected:
+    problems.append(f"Quiz Fixture's quizzes are not the contract's: got {got}, expected {expected}")
+for line in lines_said:
+    if line not in said:
+        problems.append("the build did not say: " + line)
+counted = len(re.findall(r"plantoir: error: Quiz Fixture\.md: ", said))
+if counted != len(lines_said):
+    problems.append(f"the build said {counted} plantoir: error: lines for Quiz Fixture, expected {len(lines_said)}")
+if rules["words"]["problems"]["readDifferently"] in said:
+    problems.append("the site and the folder check read a quiz differently: " + re.search(r"plantoir: error: [^\n]*" + re.escape(rules["words"]["problems"]["readDifferently"][:30]), said).group(0))
+markers = [line for line in said.splitlines() if "PLANTOIR_HEALTH:" in line and '"quizzesNotReady"' in line]
+if len(markers) != 1 or f'"sentence": "{len(lines_said)} self-check questions' not in markers[0]:
+    problems.append(f"expected one quizzesNotReady finding for {len(lines_said)} questions, got {markers}")
+crlf = quizzes_in(page("Quiz-CRLF.html"))
+if [(quiz["kind"], quiz["data"]) for quiz in crlf] != [("short", {"answers": ["$2^7$"]})]:
+    problems.append(f"the page saved with CR LF read as {crlf}")
+shown = page("Quiz-Code-Shown.html")
+if not shown or "plantoir-quiz\"" in shown or "data-quiz" in shown:
+    problems.append("Quiz Code Shown is missing or was made a quiz")
+code = re.sub(r"<span[^>]*>|</span>", "", shown).replace("&gt;", ">")
+if len(re.findall(r"<code>> \[!quiz\] Shown as code[^\n]*\n> > \[!answer\]- Answer\n> > a\n</code>", code)) != 3:
+    problems.append("quiz syntax shown as indented code was changed (a line added to the code)")
+if "Quiz Code Shown" in "\n".join(line for line in said.splitlines() if "plantoir: error:" in line):
+    problems.append("quiz syntax shown as indented code was named as a folder problem")
+summary = re.findall(r'<meta name="description" content="([^"]*)"', page("Quiz-Summary.html"))
+if summary != ["Fill … and …."]:
+    problems.append(f"a summary that opens with blanks reads {summary}, expected 'Fill … and ….'")
+lookalikes = page("Quiz-Lookalikes.html")
+if not lookalikes or "plantoir-quiz" in lookalikes or "data-quiz" in lookalikes:
+    problems.append("Quiz Lookalikes is missing or was made a quiz")
+from html.parser import HTMLParser
+class TickInsideAQuiz(HTMLParser):
+    """A ticked box anywhere inside a quiz's blockquote (the answer key)."""
+    def __init__(self):
+        super().__init__()
+        self.stack, self.ticked = [], 0
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "blockquote":
+            inside = bool(self.stack and self.stack[-1]) or "plantoir-quiz" in (attributes.get("class") or "").split()
+            self.stack.append(inside)
+        elif tag == "input" and "checked" in attributes and self.stack and self.stack[-1]:
+            self.ticked += 1
+    def handle_endtag(self, tag):
+        if tag == "blockquote" and self.stack:
+            self.stack.pop()
+for name in ("Quiz-Fixture.html", "Quiz-Playground.html", "Quiz-Printable.html", "Quiz-CRLF.html", "Quiz-Host.html"):
+    reader = TickInsideAQuiz()
+    reader.feed(page(name))
+    if reader.ticked:
+        problems.append(f"{name} carries {reader.ticked} ticked box(es) inside a quiz (the answer key)")
+host = quizzes_in(page("Quiz-Host.html"))
+if [(quiz["n"], quiz["source"]) for quiz in host] != [("1", "Quiz-Host"), ("1", "Quiz-Source")]:
+    problems.append(f"the transcluded quiz did not keep its own page's name: {host}")
+# Answers and explanations: only on their own pages, never in a summary.
+for path in public.rglob("*"):
+    if not path.is_file() or path.suffix not in (".html", ".json", ".xml", ".txt"):
+        continue
+    text = path.read_text(encoding="utf-8", errors="replace")
+    for secret in ("playground-explain-7f3a", "printable-answer-7f3a", "printable-explain-7f3a", "summary-answer-7f3a"):
+        if secret in text and path.name not in ("Quiz-Playground.html", "Quiz-Printable.html", "Quiz-Summary.html"):
+            problems.append(f"{secret} is in {path.relative_to(public)}")
+playground = page("Quiz-Playground.html")
+for summary in re.findall(r'<meta (?:name="description"|property="og:description") content="([^"]*)"', playground):
+    if "2^7" in summary or "playground-explain" in summary:
+        problems.append("Quiz Playground's summary gives its answer away: " + summary)
+index = json.loads(page("static/contentIndex.json") or "{}")
+if "2^7" in index.get("Quiz-Playground", {}).get("content", "x2^7"):
+    problems.append("the search index holds Quiz Playground's answer")
+if "lookalike-answer-7f3a" not in index.get("Quiz-Lookalikes", {}).get("content", ""):
+    problems.append("a top-level [!answer] outside a quiz was taken out of the search index")
+script = page("postscript.js")
+client = Path("support/quartz/components/scripts/quiz.inline.ts").read_text(encoding="utf-8")
+for key in sorted(set(re.findall(r'\bword\("([A-Za-z]+)"', client))):
+    value = rules["words"]["site"][key]
+    if value not in script and json.dumps(value)[1:-1] not in script:
+        problems.append(f"the site's script does not carry words.site.{key}")
+if (public / "Quiz-Hidden.html").exists() or "Quiz Hidden" in "\n".join(line for line in said.splitlines() if "plantoir: error:" in line):
+    problems.append("the hidden quiz page was built or named")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+QUIZPY
+then
+  pass "self-check quizzes: every quiz the contract names is read alike by the site and the folder check, each problem said with its line, the look-alikes and the hidden page left alone, no tick and no answer on the site but where a student asks for it (#563)"
+else
+  fail "self-check quizzes: one of the checks above failed (#563)"
 fi
 
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
@@ -2638,10 +3430,44 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang (browser-checks/sidebar_page_marker.mjs, #515)"
     cat /tmp/verify_sidebar_page_marker.log
   fi
+  # #494: maths offline from the site's own KaTeX, and (#455 review S1)
+  # print after a change of page keeps the stylesheets.
+  if node browser-checks/maths_offline.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
+       "http://127.0.0.1:$PRINT_PORT/Runner-Playground.html" \
+       "http://127.0.0.1:$PRINT_PORT/Discussions/Runner-Printable.html" >/tmp/verify_maths_offline.log 2>&1; then
+    pass "maths with every other website refused: set in KaTeX's own faces from the site, nothing asked of a CDN; and a page printed after the site's own page change from a page one folder up keeps KaTeX's and the site's stylesheets (#494, #455 review S1, browser-checks/maths_offline.mjs)"
+  else
+    fail "maths did not render from the site's own KaTeX offline, or print after a page change lost its stylesheets (browser-checks/maths_offline.mjs, #494)"
+    cat /tmp/verify_maths_offline.log
+  fi
   kill "$PRINT_SERVER_PID" 2>/dev/null || true
+  # #455: runnable code as a student runs it, against a server the check
+  # starts itself so it can also play the hosts that break it.
+  if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \
+       >/tmp/verify_code_runner.log 2>&1; then
+    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
+  else
+    fail "runnable code did not run in a browser as the contract says (browser-checks/code_runner.mjs, #455)"
+    cat /tmp/verify_code_runner.log
+  fi
+  if node browser-checks/swift_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Swift-Playground.html \
+       >/tmp/verify_swift_runner.log 2>&1; then
+    pass "runnable Swift in a browser: nothing fetched on load; read-only with its note; Run with input echoes it after each prompt, changed input changes the output, Stop ends a loop and Run works again, an index out of range shows its Fatal error line and the crash words, exit(3) its exit code, a block that did not compile says it is not ready - $(head -1 /tmp/verify_swift_runner.log | sed 's/^OK: //') (#493, browser-checks/swift_runner.mjs)"
+  else
+    fail "runnable Swift did not run in a browser as the contract says (browser-checks/swift_runner.mjs, #493)"
+    cat /tmp/verify_swift_runner.log
+  fi
+  # #563: the self-check quizzes as a student answers them, against a server
+  # the check starts itself.
+  if node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
+    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, and paper and the handout questions only - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
+  else
+    fail "self-check quizzes did not answer in a browser as the contract says (browser-checks/quiz_check.mjs, #563)"
+    cat /tmp/verify_quiz_check.log
+  fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), and the sidebar's page dot (#515): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), and the sidebar's page dot (#515): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), and self-check quizzes in a browser (#563): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), and self-check quizzes in a browser (#563): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
@@ -2667,6 +3493,7 @@ SAMEPY
 # found from before, the drawing engine is never started, and the page comes
 # out byte for byte the same.
 cp "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html 2>/dev/null || true
+cp "$SITE_PUBLIC/Swift-Playground.html" /tmp/verify_swift_first.html 2>/dev/null || true
 if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_figures_second.log 2>&1 \
    && grep -Eq "Drew 0 diagrams \([1-9][0-9]* from before\)" /tmp/verify_figures_second.log \
    && same_page_but_for_quartz_ids "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html; then
@@ -2674,6 +3501,20 @@ if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_figu
 else
   fail "diagrams and graphs: a second build drew again or changed the page (#485)"
   grep -n "Drew\|plantoir:" /tmp/verify_figures_second.log | head -5
+fi
+# Runnable Swift (#493 acceptance 10): the same build compiled nothing - the
+# launcher found every block in the cache - the site has the same programs as
+# the first build said (read from it, not a number written here: the quiz
+# playground's two programs, #563, made a written "8 of 9" wrong), and the
+# Swift page came out the same.
+SWIFT_READY_FIRST="$(grep -Eo "[0-9]+ of [0-9]+ Swift programs on this site ready to run" /tmp/verify_main_build.log | tail -1)"
+if ! grep -q "Swift program.* ready to run…" /tmp/verify_figures_second.log \
+   && [[ -n "$SWIFT_READY_FIRST" ]] && grep -q "$SWIFT_READY_FIRST" /tmp/verify_figures_second.log \
+   && same_page_but_for_quartz_ids "$SITE_PUBLIC/Swift-Playground.html" /tmp/verify_swift_first.html; then
+  pass "runnable Swift: a second build compiles nothing and the Swift page is byte-identical (#493)"
+else
+  fail "runnable Swift: a second build compiled again or changed the Swift page (#493)"
+  grep -n "Swift" /tmp/verify_figures_second.log | head -5
 fi
 restore_hit_fixture
 trap release_verify_lock EXIT
@@ -2816,6 +3657,21 @@ for entry in os.listdir("/proc"):
     pass "and with no figure left, the site carries neither figure engine, nothing is drawn, and a page without figures is byte-identical (#485)"
   else
     fail "a site with no figures still carries static/function-plot or static/tikz, drew something, or changed a page without figures (#485)"
+  fi
+  # And no runnable code (#455): the engine is taken out again, while the
+  # site's own KaTeX stays - every site carries it (#494).
+  if [[ -f "$SITE_INDEX" && ! -e "$SITE_PUBLIC/static/pyodide" && -f "$SITE_PUBLIC/static/katex/katex.min.css" ]]; then
+    pass "and with no runnable code left, the site no longer carries Python, and still carries its own KaTeX (#455, #494)"
+  else
+    fail "a site with no runnable code still carries static/pyodide, or lost static/katex (#455, #494)"
+  fi
+  # And no quiz left (#563): the folder check says nothing, and no page is a
+  # quiz.
+  if [[ -f "$SITE_INDEX" ]] && ! grep -q "quizzesNotReady\|plantoir: error: Quiz" /tmp/verify_old_container.log \
+     && ! grep -rlq "plantoir-quiz\"" "$SITE_PUBLIC" --include="*.html"; then
+    pass "and with no quiz left, the folder check finds nothing and no page holds a quiz (#563)"
+  else
+    fail "a site with no quiz still reports a quiz problem or holds a quiz (#563)"
   fi
 else
   fail "could not put back a container without the builds mount"

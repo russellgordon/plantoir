@@ -6948,3 +6948,57 @@ sentences, then a second build from the cache). The helper's `--rules`
 argument must be a `figureRules.js` inside a `"type": "module"` package (a
 section's Quartz is one); handed the repository's copy directly, Node reads
 it as CommonJS and the helper dies before it says it is ready.
+
+## Runnable code (#455) and KaTeX served by the site (#494), v1.8.0: what the runtime owes
+
+The mac shipped both in v1.8.0; the shared Python, the page's code and the
+skill reach this side unchanged (`page_features.py`, `build_site.py`,
+`support/quartz/**`, `support/gated/pyodide/plantoir-worker.js`, the
+`plantoir-runnable-code` skill). What this runtime owes is in the `windows`
+issue for #455 (milestone v1.8.0): `fetch-runtime.ps1` fetching
+`pyodide-core-314.0.7.tar.bz2` and keeping its five files and a README in
+`runtime\vendor\pyodide` (13,531,207 bytes; whether `tar.exe` reads bzip2 is
+unmeasured — the image uses `python3 -m tarfile`), the katex version this
+runtime's lockfile installs (the mac's gives **0.16.21**; record what
+`npm ls katex` says here), `verify-deploy.ps1`'s engine and KaTeX checks, and
+measurements in Edge, Chrome and the WebView2 preview pane. Until the fetch
+lands, `ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` is
+red on the `pyodide` pin, or held open in `NamedGapLedger` by that issue. The
+manual is [06 → I](06-quartz-customizations.md#i-runnable-code-455-v180),
+[06 → C2-26](06-quartz-customizations.md#c2-applied-on-every-build),
+[05 → Runnable code](05-build-pipeline.md#runnable-code-what-the-build-does-455-v180)
+and [07 → Runnable code and KaTeX on each host](07-deployment.md#runnable-code-and-katex-on-each-host-455-494-v180).
+
+## Runnable Swift (#493), v1.8.0: Windows compiles none of it yet
+
+The mac compiles a course's ` ```swift run ` blocks in a SECOND container
+image, started by the launcher before the build (05 → Runnable Swift, 02 →
+The Swift image). Windows has had no container since 2026-08-19, so there is
+nothing to start, and in v1.8.x **Windows compiles no Swift** (#493 option
+(b), Russell's ruling). What reaches this side unchanged, and works today:
+the site's code (the transformer, `SwiftWasmRuntime`, the worker and the
+WASI shim in `support/gated/swift/` - so a site published from a Mac runs its
+Swift blocks in any browser, Edge and the WebView2 pane included), the shared
+Python (`swift_blocks.py`'s prepare runs in every build here, finds no
+programs, and - because it is chosen in the shared Python on `os.name`
+(review N2) - says each block is not ready with
+`codeRunnerBlocks.swift.reasons.notOnWindows`, as a `plantoir: error:` line
+and as the `swiftCouldNotBePrepared` folder problem), the contract cases
+(`swift.reasonCases` carry `appliesOn`), and the skill's Swift section, which
+tells an assistant Windows cannot make Swift runnable yet. The Swift engine
+needs no vendor folder (`page_features.OVERLAY_IS_THE_ENGINE`), so a Windows
+site carries the thread and shows each block with Run off and
+`words.notReady` - never a broken Run button.
+
+**What Windows must decide** is in the `windows` issue for #493: (a) a native
+swift.org Windows toolchain and the same wasm SDK fetched on demand into the
+runtime (size, the wasm cross-compile on Windows and byte-for-byte agreement
+with the mac's programs are all unmeasured; `swift-gate/` is the test), or
+(c) programs carried in the course folder so a Mac-compiled course works
+here (rejected so far: build output stays out of the vault). Until then
+`preview.ps1` has no Swift step. Nothing here should go red: no Windows
+test reads `codeRunnerBlocks.swift` or `swiftImage` yet, and
+`RepairIsOfferedForExactlyTheContractsChecks` finds the new
+`swiftCouldNotBePrepared` check in `siteHealth.repair.neverOffered`, where
+review S8 put it so this suite and the mac's stay green.
+

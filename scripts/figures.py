@@ -139,7 +139,11 @@ def figures_on_page(text: str) -> list:
     counts = {engine: 0 for engine in ENGINES}
     for block in markdown_code.fenced_blocks(text):
         engine = block["lang"]
-        if engine not in ENGINES:
+        if engine not in ENGINES or block["nested"]:
+            # A fence opened after a second container on a list marker's line
+            # (`- - ```tikz`) was never read here, and still is not drawn; the
+            # reader now opens it only so the fences after it are read as the
+            # site reads them (#455 review S2).
             continue
         counts[engine] += 1
         found.append({
@@ -542,13 +546,19 @@ def _write_workspace(output_dir, manifest: dict, svgs: dict) -> None:
 
 # ---- Which pages count ------------------------------------------------------------
 
-def pages_students_see(content_root, is_hidden, place_of, source_of, skip=None) -> list:
+def pages_students_see(content_root, is_hidden, place_of, source_of, skip=None, must_contain=None) -> list:
     """
     The build's copies of the pages students can see, ready for prepare():
     every `.md` under `content_root` that `is_hidden(text)` does not hold
     back (the build passes its own `_is_draft`, the gate's rule), outside any
     folder `skip(first part of its path)` says to leave out (the Media
     folder). A page that cannot be read is left out, as the site leaves it.
+
+    Only pages that could hold what the caller looks for are read past their
+    text: by default a fence (``` or ~~~); `must_contain` names another
+    string instead (#563's quizzes pass "[!"). Each page also carries its
+    `path` in the site's content, with forward slashes - the name the site's
+    own code knows it by.
     """
     root = Path(content_root)
     pages = []
@@ -563,7 +573,10 @@ def pages_students_see(content_root, is_hidden, place_of, source_of, skip=None) 
             text = page.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if "```" not in text and "~~~" not in text:
+        if must_contain is None:
+            if "```" not in text and "~~~" not in text:
+                continue
+        elif must_contain not in text:
             continue
         if is_hidden(text):
             continue
@@ -574,7 +587,8 @@ def pages_students_see(content_root, is_hidden, place_of, source_of, skip=None) 
                 source_text = Path(source).read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 source_text = None
-        pages.append({"place": place_of(page), "text": text, "source": source_text})
+        pages.append({"place": place_of(page), "text": text, "source": source_text,
+                      "path": Path(*parts).as_posix()})
     return pages
 
 

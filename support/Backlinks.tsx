@@ -46,8 +46,31 @@ export default ((opts?: Partial<BacklinksOptions>) => {
       return structural.has(folder)
     }
 
+    // An overall expectation (B1) is done by the lessons that do its
+    // specific expectations (B1.1, B1.2, …): classes connect to the
+    // specific ones, so a list of direct links alone left every overall
+    // page empty (#505). Its page also lists every page that links one of
+    // its specific expectations — one list, each page once, in Quartz's
+    // order. The build writes the map in (CQ4T-OVERALL-ANCHOR) from the
+    // same expectation pages the coverage map reads; a Map, not an
+    // object, so a page called "constructor" finds nothing.
+    // CQ4T-OVERALL-ANCHOR: do not remove; build_site.py rewrites this line
+    const overallChildren = new Map<string, string[]>([])
+    const targets = [slug, ...(overallChildren.get(slug) ?? [])]
+    const linksAnyTarget = (links: string[] | undefined): boolean => {
+      if (!links) {
+        return false
+      }
+      for (const target of targets) {
+        if (links.includes(target)) {
+          return true
+        }
+      }
+      return false
+    }
+
     const backlinkFiles = allFiles.filter(
-      (file) => file.links?.includes(slug) && !isStructural(simplifySlug(file.slug!)),
+      (file) => linksAnyTarget(file.links) && !isStructural(simplifySlug(file.slug!)),
     )
     const excludeBacklinks = fileData.frontmatter?.excludeBacklinks
     if (options.hideWhenEmpty && backlinkFiles.length == 0) {

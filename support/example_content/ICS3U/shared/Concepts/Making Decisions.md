@@ -1,6 +1,7 @@
 ---
 title: Making Decisions
 publish: true
+codeRunner: true
 created: __CREATED__
 tags:
   - concepts
@@ -61,7 +62,7 @@ is what you want.
 
 This looks reasonable and is wrong:
 
-```python
+```python run readonly
 mark = 91
 
 if mark >= 50:

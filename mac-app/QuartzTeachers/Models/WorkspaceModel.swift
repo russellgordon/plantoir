@@ -428,6 +428,23 @@ class WorkspaceModel {
     /// collapsed (#457, the HIG sweep).
     var lockedPagesNoteRequest: LockedPagesNoteRequest?
 
+    /// Obsidian's add-ons question (#495), waiting to be shown before
+    /// Obsidian opens — asked for by `openInObsidian(course:sectionNumber:)`
+    /// and presented by the main window, like the note above.
+    var obsidianAddOnsOfferRequest: ObsidianAddOnsRequest?
+
+    /// "Reopen Obsidian to show diagrams and graphs?" (#495), the same way.
+    var obsidianReopenRequest: ObsidianAddOnsRequest?
+
+    /// What Open in Obsidian asks of Obsidian and the disk (#495) —
+    /// replaced only by a test, so the route can be driven without reaching
+    /// the teacher's Obsidian.
+    @ObservationIgnored var obsidianOpening: ObsidianOpening = ObsidianOpening()
+
+    /// The most recent scan-and-decide Open in Obsidian or a finished preview
+    /// started (#495) — awaited by a test, never by the app.
+    @ObservationIgnored var obsidianAddOnsWork: Task<Void, Never>?
+
     /// Whether the "Reference Courses" group is folded open. Remembered with
     /// the folder, exactly as Archived and Backups are.
     var isShowingReferenceCourses: Bool = false
