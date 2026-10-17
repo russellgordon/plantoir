@@ -34,8 +34,15 @@ field = await waitAt("How old are you?\n")
 if (!field) return "the program never waited at its second prompt; the output is " + JSON.stringify(output.textContent)
 field.value = "14"
 field.dispatchEvent(new Event("input", { bubbles: true }))
-// Framing, as the other code figures: the block's bottom (the field and the
-// status under it) a little above the window's edge.
-const overhang = block.getBoundingClientRect().bottom - (window.innerHeight - 56)
-if (overhang > 0) window.scrollBy(0, overhang)
+// Framing (#583): answering moved the focus to the field, which can scroll
+// the page, so the picture is framed afresh - the section's heading near the
+// top when the whole block fits under it, otherwise the block's bottom (the
+// field, or the output) a little above the window's edge.
+let heading = block.previousElementSibling
+while (heading && !/^H[23]$/.test(heading.tagName)) heading = heading.previousElementSibling
+const blockBottom = block.getBoundingClientRect().bottom + window.scrollY
+let top = heading ? heading.getBoundingClientRect().top + window.scrollY - 24 : window.scrollY
+if (blockBottom - top > window.innerHeight - 56) top = blockBottom - (window.innerHeight - 56)
+window.scrollTo(0, Math.max(0, top))
+await pause(300)
 return "ready"
