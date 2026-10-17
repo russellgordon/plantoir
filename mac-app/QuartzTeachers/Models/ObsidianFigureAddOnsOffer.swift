@@ -215,6 +215,22 @@ nonisolated enum ObsidianFigureAddOnsOffer {
         return FolderActions.openVaultPaths(registryData: registryData)
     }
 
+    /// Whether the course counts as open in Obsidian: Obsidian is running
+    /// and its registry marks the course open — or the registry cannot be
+    /// read at all while Obsidian runs (fixes review N1: Obsidian rewrites it
+    /// in place, so a read can land mid-write; not knowing is not "closed").
+    static func courseIsOpen(coursePath: String, obsidianRunning: Bool, registryData: Data?) -> Bool {
+        if !obsidianRunning {
+            return false
+        }
+        guard let registryData,
+              let registry = try? JSONSerialization.jsonObject(with: registryData) as? [String: Any],
+              registry["vaults"] is [String: Any] else {
+            return true
+        }
+        return FolderActions.openVaultPaths(registryData: registryData).contains(coursePath)
+    }
+
     /// The vault Obsidian opens for a path: the longest registered vault
     /// that is the path or holds it (measured from 1.13.7's `main.js`), or
     /// nil when none does — and then Plantoir registers the course itself.

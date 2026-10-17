@@ -3744,7 +3744,10 @@ course open — windows are never counted** (implementation review B1, measured
 2026-10-17: Russell's Obsidian was hidden with ⌘H, 16 layer-0 windows of
 which 0 on screen, four vaults marked open — so `FolderActions.openVaultPathsNow`,
 which needs a window on screen for the rename feature's sake and is left as it
-is there, read MPM2D as closed while it was loaded). A hidden, minimised,
+is there, read MPM2D as closed while it was loaded). A registry that cannot
+be read while Obsidian runs counts as open too: Obsidian rewrites it in place,
+so a read can land mid-write. Add Them checks again when it is answered, in
+case the course was opened while the question was up. A hidden, minimised,
 full-screen or other-Space Obsidian holds the list in memory all the same. The
 rule over-reports (a stale mark), which is the safe direction: the pass waits
 and Open in Obsidian asks to reopen. The vaults reopened afterwards are every
