@@ -32,6 +32,16 @@ Three halves:
 3. Every typed line in `contracts/file-formats.json` ->
    `pageOptIns.codeRunnerReadingCases` is put through the build's own reader
    (python-frontmatter, after `build_site.process_frontmatter`).
+4. Live input (#583): every `liveInput.asksCases` case through
+   codeRunnerRule.asksFor (what the transformer writes as data-runner-asks);
+   every `isolation.cases` case through the preview's rule
+   (quartz/cli/plantoirIsolation.mjs) AND the publish's
+   (isolation_headers.py), with the preview's constants compared with the
+   contract's; the preview's headers for a page, the engine folders, an
+   encoded name and a file that cannot be read (it fails open); and both
+   patches to Quartz itself (the preview's server, the router) made on the
+   image's own files, ONCE however often the build runs, leaving each file
+   still valid.
 """
 import json
 import os
@@ -49,6 +59,7 @@ import toolchain_paths  # noqa: E402
 
 RULE_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunnerRule.ts"
 TRANSFORMER_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunner.ts"
+ISOLATION_MJS = toolchain_paths.SUPPORT_DIR / "quartz" / "cli" / "plantoirIsolation.mjs"
 NODE_MODULES = toolchain_paths.QUARTZ_DIR / "node_modules"
 ESBUILD = NODE_MODULES / "esbuild" / "bin" / "esbuild"
 
@@ -60,8 +71,9 @@ import { unified } from "unified"
 import remarkParse from "remark-parse"
 import remarkGfm from "remark-gfm"
 import { createHash } from "crypto"
-import { LANGUAGES, runnerFor, findRunners, filled, normaliseProgram } from "RULE_TS"
+import { LANGUAGES, runnerFor, findRunners, filled, normaliseProgram, asksFor } from "RULE_TS"
 import { CodeRunnerFences, programKey } from "TRANSFORMER_TS"
+import { pageVerdict, headersFor, PAGE_HEADERS, ENGINE_HEADERS, ENGINE_FOLDERS, ALLOWED_HOSTS } from "ISOLATION_MJS"
 
 const rules = JSON.parse(readFileSync(process.argv[2], "utf-8"))
 const failures = []
@@ -166,14 +178,86 @@ for (const c of transformerCases) {
     failures.push(`transformer, ${c.name}: wrapped ${wrapped}, said ${JSON.stringify(said)}, program ${wasmRight}, unready ${unreadyRight}`)
   }
 }
+// Live input (#583): which blocks can ask (data-runner-asks).
+for (const c of rules.liveInput.asksCases) {
+  count += 1
+  const language = LANGUAGES.find((row) => row.fence === c.language)
+  const got = asksFor(language, c.flags, c.code)
+  if (got !== c.asks) failures.push(`liveInput.asksCases ${c.name}: ${JSON.stringify(got)}`)
+}
+// ...and the transformer writes it on the wrapper.
+{
+  count += 1
+  const site = mkdtempSync(join(tmpdir(), "plantoir-runner-site-"))
+  mkdirSync(join(site, "quartz"))
+  writeFileSync(join(site, "quartz", "plantoir_code_runner.json"), JSON.stringify({ words, carried: ["pyodide"], limits: {} }))
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25)
+  process.chdir(site)
+  const asking = "```python run\nname = input()\n```\n\n```python run readonly\nprint(1)\n```\n\n```python run\nprint(2)\n```\n"
+  const tree = parse(asking)
+  const log = console.log
+  console.log = () => undefined
+  transform(tree, { value: asking, data: { frontmatter: { codeRunner: true }, slug: "Units/Asks", relativePath: "Units/Asks.md" } })
+  console.log = log
+  process.chdir(home)
+  const asks = []
+  const walk = (node) => {
+    if (node.type === "plantoirRunner") asks.push(node.data.hProperties.dataRunnerAsks ?? null)
+    for (const child of node.children ?? []) walk(child)
+  }
+  walk(tree)
+  if (JSON.stringify(asks) !== JSON.stringify(["input", null, "edit"])) failures.push(`the transformer's data-runner-asks: ${JSON.stringify(asks)}`)
+}
+// Which pages are isolated: the preview's rule, every contract case.
+count += 1
+if (JSON.stringify(PAGE_HEADERS) !== JSON.stringify(rules.isolation.headers.page)
+  || JSON.stringify(ENGINE_HEADERS) !== JSON.stringify(rules.isolation.headers.engine)
+  || JSON.stringify(ENGINE_FOLDERS) !== JSON.stringify(rules.isolation.engineFolders)
+  || JSON.stringify(ALLOWED_HOSTS) !== JSON.stringify(rules.isolation.allowedHosts)) {
+  failures.push("isolation: the preview's headers, engine folders or allowed hosts are not the contract's")
+}
+for (const c of rules.isolation.cases) {
+  count += 1
+  const got = pageVerdict(c.html, rules.isolation.allowedHosts)
+  if (got.verdict !== c.verdict || got.readsInput !== c.readsInput) failures.push(`isolation.cases ${c.name}: the preview says ${JSON.stringify(got)}`)
+}
+// The preview's headers, per address, and failing open.
+{
+  const live = rules.isolation.cases.find((c) => c.verdict === "live" && c.readsInput).html
+  const framed = rules.isolation.cases.find((c) => c.verdict === "frame").html
+  const site = mkdtempSync(join(tmpdir(), "plantoir-isolation-site-"))
+  const pub = join(site, "public")
+  mkdirSync(join(pub, "Units"), { recursive: true })
+  mkdirSync(join(pub, "static", "pyodide"), { recursive: true })
+  mkdirSync(join(pub, "static", "swift"), { recursive: true })
+  mkdirSync(join(pub, "Broken.html"))
+  writeFileSync(join(pub, "Units", "Loops.html"), live)
+  writeFileSync(join(pub, "Units", "Café.html"), live)
+  writeFileSync(join(pub, "Units", "index.html"), live)
+  writeFileSync(join(pub, "Units", "Framed.html"), framed)
+  writeFileSync(join(pub, "Units", "Plain.html"), "<p>Plain</p>")
+  writeFileSync(join(pub, "static", "pyodide", "pyodide.mjs"), "")
+  const expectations = [
+    ["/Units/Loops", PAGE_HEADERS], ["/Units/Loops.html", PAGE_HEADERS], ["/Units/Caf%C3%A9", PAGE_HEADERS],
+    ["/Units/", PAGE_HEADERS], ["/Units/Framed", {}], ["/Units/Plain", {}], ["/Units/Missing", {}],
+    ["/static/pyodide/pyodide.mjs", ENGINE_HEADERS], ["/static/swift/plantoir-swift-worker.js", ENGINE_HEADERS],
+    ["/static/swift-wasm/abc.wasm", {}], ["/index.css", {}], ["/Broken", {}], ["/Broken.html", {}],
+    ["/../../etc/passwd", {}], ["/Units/%E0%A4%A", {}],
+  ]
+  for (const [address, want] of expectations) {
+    count += 1
+    const got = headersFor(pub, address)
+    if (JSON.stringify(got) !== JSON.stringify(want)) failures.push(`the preview's headers for ${address}: ${JSON.stringify(got)}`)
+  }
+}
 console.log(JSON.stringify({ count, failures }))
 """
 
 
 def run_the_rules_in_node(folder: Path) -> list:
     entry = folder / "runner.mjs"
-    entry.write_text(RUNNER.replace("RULE_TS", str(RULE_TS)).replace("TRANSFORMER_TS", str(TRANSFORMER_TS)),
-                     encoding="utf-8")
+    entry.write_text(RUNNER.replace("RULE_TS", str(RULE_TS)).replace("TRANSFORMER_TS", str(TRANSFORMER_TS))
+                     .replace("ISOLATION_MJS", str(ISOLATION_MJS)), encoding="utf-8")
     bundle = folder / "runner.bundle.mjs"
     environment = dict(os.environ, NODE_PATH=str(NODE_MODULES))
     subprocess.run([str(ESBUILD), str(entry), "--bundle", "--format=esm", "--platform=node",
@@ -215,10 +299,55 @@ def run_the_typed_lines(folder: Path) -> list:
     return failures
 
 
+def run_the_isolation_cases_through_the_publish() -> list:
+    """The same isolation.cases through isolation_headers.py, the publish's
+    half: the preview's and the publish's rule agree case for case."""
+    import isolation_headers
+    failures = []
+    rules = contracts.section("shared-rules", "codeRunnerBlocks", "isolation")
+    for case in rules["cases"]:
+        got = isolation_headers.page_verdict(case["html"])
+        if got != {"verdict": case["verdict"], "readsInput": case["readsInput"]}:
+            failures.append(f"isolation.cases {case['name']}: the publish says {got}")
+    print(f"isolation.cases: {len(rules['cases'])} pages read by the publish's rule")
+    return failures
+
+
+def run_the_quartz_patches(folder: Path) -> list:
+    """Both of #583's edits to Quartz, made on copies of the image's own
+    files three times over: each marker once, and each file still valid."""
+    failures = []
+    quartz = toolchain_paths.QUARTZ_DIR / "quartz"
+    for source, wire, marker, name in (
+        # .mjs for the copy: the original is a module only because Quartz's
+        # package.json says so, and `node --check` reads a .js elsewhere as
+        # CommonJS.
+        (quartz / "cli" / "handlers.js", build_site._wire_isolation_serve, build_site.ISOLATION_SERVE_MARKER, "handlers.mjs"),
+        (quartz / "components" / "scripts" / "spa.inline.ts", build_site._wire_isolation_nav, build_site.ISOLATION_NAV_MARKER, "spa.inline.ts"),
+    ):
+        target = folder / name
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+        for _ in range(3):
+            wire(target)
+        text = target.read_text(encoding="utf-8")
+        if text.count(marker) != 1:
+            failures.append(f"{name}: {marker} is there {text.count(marker)} times after three builds")
+        if name.endswith(".mjs"):
+            checked = subprocess.run(["node", "--check", str(target)], capture_output=True, text=True)
+        else:
+            checked = subprocess.run([str(ESBUILD), str(target), "--log-level=error"],
+                                     capture_output=True, text=True)
+        if checked.returncode != 0:
+            failures.append(f"{name}: no longer valid once patched: {checked.stderr.strip()[:300]}")
+    print("Quartz's preview server and router: patched once each, and still valid")
+    return failures
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as name:
         folder = Path(name)
-        failures = run_the_rules_in_node(folder) + run_the_shapes_through_the_build() + run_the_typed_lines(folder)
+        failures = (run_the_rules_in_node(folder) + run_the_shapes_through_the_build() + run_the_typed_lines(folder)
+                    + run_the_isolation_cases_through_the_publish() + run_the_quartz_patches(folder))
     for failure in failures:
         print("FAIL " + failure)
     if failures:
