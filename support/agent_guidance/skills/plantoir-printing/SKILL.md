@@ -153,6 +153,11 @@ black on white, whole, and each graph at the bounds the page gives it,
 whatever a student zoomed to on screen; how to write them is in the
 `plantoir-math-graphs` skill.
 
+Runnable code blocks (` ```python run ` on a page with `codeRunner: true`)
+print as code and nothing else - no buttons, input box or output: the
+teacher's code, or the student's own if they changed it before pressing
+Print. How to write them is in the `plantoir-runnable-code` skill.
+
 ## 6. The Curriculum connection never prints
 
 Many pages end with a section headed `## Curriculum connection` that

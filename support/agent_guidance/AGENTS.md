@@ -18,3 +18,9 @@ that matches the task before writing:
   cannot be done (no sliders) are in
   `.agents/skills/plantoir-math-graphs/SKILL.md` (the same file is at
   `.claude/skills/plantoir-math-graphs/SKILL.md`).
+- **Code students run** - "make this example runnable", a Python program
+  students edit and run in the browser, a program that reads input, "try it
+  yourself": how to opt the page in, the ` ```python run ` block and its
+  flags, input, and what the standard library can and cannot do are in
+  `.agents/skills/plantoir-runnable-code/SKILL.md` (the same file is at
+  `.claude/skills/plantoir-runnable-code/SKILL.md`).
