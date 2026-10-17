@@ -469,7 +469,7 @@ has the rule, what it deliberately costs, and where its cases live.
 
 **A folder added LATER, in Course Settings, starts the way a folder made
 here does** ([#506](https://github.com/russellgordon/plantoir/issues/506),
-mac; Windows owes it — #___). Adding a name to the shared or per-section folder list makes the
+mac; Windows owes it — #580). Adding a name to the shared or per-section folder list makes the
 folder on disk, and since #506 puts the same two pages inside it that this
 step writes: its `index.md` (step 7's shape — per-section keys for a shared
 folder, `created`/`publish: true` for a per-section one — and the same
