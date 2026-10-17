@@ -681,6 +681,41 @@ final class SectionVerbsEndingTests: XCTestCase {
         XCTAssertEqual(third.summary, AssistWording.nothingToUndoFromTheMenu)
     }
 
+    /// #555, `undoFiles.presses` row 2 through the real runner: a repeat
+    /// press while the page is STILL edited writes nothing new — the first
+    /// page is already back, the edited one left alone — so it is answered
+    /// with the existing couldNotUndo sentence, the change stays on the list,
+    /// and the line ends "changed nothing". (Not a must-fail: the code before
+    /// #555 gave the same answer here, for the wrong reason — it called the
+    /// restored page edited too.)
+    func testARepeatUndoWhileThePageIsStillEditedChangesNothing() async throws {
+        let (made, verbs) = try makeVerbs()
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "false", date: "2026-09-09", body: "Two.", in: made.course)
+        _ = await publish(["section1/All Classes/Unit 1, Day 1", "section1/All Classes/Unit 1, Day 2"], with: verbs)
+        let edited: URL = AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course)
+        try (try String(contentsOf: edited, encoding: .utf8) + "\nEdited in Obsidian since.\n")
+            .write(to: edited, atomically: true, encoding: .utf8)
+
+        _ = await verbs.perform(
+            SectionVerbs.undoLastChange(), item: .undoLastChange, courseCode: "ICS3U", sectionNumber: 1
+        )
+        let second: AssistToolOutcome = await verbs.perform(
+            SectionVerbs.undoLastChange(), item: .undoLastChange, courseCode: "ICS3U", sectionNumber: 1
+        )
+        let template: [String] = AssistWording.couldNotUndoFromTheMenu("\u{1}", leftAlone: 1)
+            .components(separatedBy: "\u{1}")
+        XCTAssertTrue(
+            second.summary.hasPrefix(template[0]) && second.summary.contains(template[template.count - 1]),
+            "not couldNotUndo: \(second.summary)"
+        )
+        XCTAssertEqual(verbs.toolRunner.changeCount, 1, "the change must stay on the list")
+        XCTAssertTrue(
+            lastMenuLine().hasSuffix(SectionVerbs.ranLine(.undoLastChange, ending: "changed nothing", counts: "")),
+            lastMenuLine()
+        )
+    }
+
     /// A page list that wrote a page and then stopped part way (#412).
     /// MUST FAIL on the old `perform`.
     func testAPublishThatStoppedAfterAWriteIsCarriedOut() async throws {
