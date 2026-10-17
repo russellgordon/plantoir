@@ -467,6 +467,57 @@ has the rule, what it deliberately costs, and where its cases live.
   `include_curriculum_coverage`; the build treats a missing key as ON, so
   courses created before this existed pick it up on their next build.
 
+**A folder added LATER, in Course Settings, starts the way a folder made
+here does** ([#506](https://github.com/russellgordon/plantoir/issues/506),
+mac; Windows owes it — #___). Adding a name to the shared or per-section folder list makes the
+folder on disk, and since #506 puts the same two pages inside it that this
+step writes: its `index.md` (step 7's shape — per-section keys for a shared
+folder, `created`/`publish: true` for a per-section one — and the same
+sentence word for word), without which the site's sidebar never showed the
+folder although it was not hidden; and a `_DUPLICATE ME.md`, without which a
+teacher had nothing to copy. The template is the generic skeleton's
+(`support/skeletons/general/shared/Concepts/_DUPLICATE ME.md`; all 344
+skeleton templates are that one file, and a test pins it), with its date
+filled in, its keys split per section in a shared folder (held back in every
+one), and its "Curriculum connection" kept, pointed at the course's first
+specific expectation when it has no A1.1, or taken out when the course's
+primary curriculum folder holds no specific expectation. A per-section folder
+gets a template in every section too, though this step never writes one there.
+Pages go only into a folder the click has just made, never into one that was
+already there, and never over a file.
+
+**A folder's name goes into `title:` quoted whenever YAML would misread it
+plain** — here, at creation, as much as for a folder added later
+(`setup_course.title_needs_quoting` / `frontmatter_title`; the mac's
+`FolderScaffold.frontmatterTitle`, which `SectionAdder`'s fallback pages use
+too). Measured on #506's review with the dev-test image: written plain,
+`Unit: One`, `'Tis the Season` and `& Friends` each gave an index page the
+build could not read, so the folder stayed out of the sidebar and the build's
+unreadable-settings notice named a page Plantoir had written; quoted, all three
+— made at creation and added later — are in the sidebar with no notice. The
+rule is generous on purpose (a quoted title is the same title) and simple
+enough to mirror exactly: quoted when empty, when the first character is
+neither an ASCII letter nor beyond ASCII (every YAML indicator, a space, a
+digit), when the last is a space, a tab or a colon, when `: `, ` #` or a
+control character appears, or when the name is one of YAML 1.1's words for
+true, false or null; the quoting is JSON's. Cases:
+`contracts/course-management.json` → `foldersAddedLater.titleQuoting`, run by
+both apps and by `scripts/test_folder_titles.py`, which verify.sh also runs in
+the image to read every case back through the build's own reader. A setup
+re-run does not rewrite an index page that is already there, so a course made
+before this keeps any unreadable one until the teacher fixes it — the build's
+notice says which.
+
+Each app writes them itself, natively: a Settings click does not run this
+script (it would start the website builder, and no app runs Python on the
+host). That is why the texts are pinned as bytes in
+`contracts/course-management.json` → `foldersAddedLater`, computed with
+`setup_course.py`'s own functions. **Rejected:** copying a sibling folder's
+template (it may be a teacher's edited page with stale dates), and a special
+case giving a curriculum folder added later only an `index.md` — whether a
+folder is the curriculum is decided afterwards, by a separate tick, so it
+cannot be told at Add time.
+
 ### 6. Timetable sections
 
 The wizard asks how many sections the teacher has **and which timetable
