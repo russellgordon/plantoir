@@ -5,6 +5,31 @@
     <description>Plantoir for Windows</description>
     <language>en</language>
     <item>
+      <title>Plantoir 1.7.2</title>
+      <description>New in Plantoir 1.7.2
+
+This update brings Windows up to date with what the Mac got in 1.7.2.
+
+Publish Pages, Hide Pages and Publish Class for a Date, in the Section menu, now show the pages in a table: each page, its folder and what will happen to it, with a one-line summary above. Every page is listed, the table scrolls, and you can sort it by any column. Press Enter to go ahead or Escape to cancel, as before.
+
+On your class sites, each page inside an open folder of "Navigate this site" has a small dot before it, and a long title that wraps onto a second line now lines up under its first word, so it no longer looks like two pages. The dot stays visible in a High Contrast theme. Your sites pick this up the next time you preview or deploy.
+
+Schedule a deploy no longer asks you to keep a laptop plugged in. It says what matters: the PC must be on and awake then, with the lid open. On battery a PC goes to sleep sooner, so keep it awake until then.
+
+When you make room for classes and other classes have to move, the assistant now tells you before you press Go that Undo will not take it back. Your backup is the way out.
+
+When you ask Claude or Codex to write your How I Teach page for a course you keep only for reference, the plan now says the course stays as it is, instead of promising a change that would then be refused.
+
+Plantoir now opens no narrower than its smallest size, so at 150% display scaling the Preview, Deploy and Browser buttons are all there from the first launch.
+
+Fixed: after Re-date Classes stops part way, the answer now names the pages that were already re-dated. If the very first change cannot be saved, it says nothing was changed.
+Fixed: Plantoir's activity record (used in problem reports) now says "took part of the last change back" after a partial Undo, and says what happened after a Make Room, or a publish or hide that stopped part way, instead of "changed nothing".</description>
+      <pubDate>Fri, 16 Oct 2026 21:54:13 -04:00</pubDate>
+      <sparkle:version>1.7.2</sparkle:version>
+      <sparkle:shortVersionString>1.7.2</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.2/PlantoirSetup.exe" sparkle:version="1.7.2" sparkle:shortVersionString="1.7.2" length="247405192" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="3z5K3cgad2WBRH3LSKHMP8GRdTcKjTZrBN6zJ5G+f8fzsP6Nx/IJ9VpTLQ0XkaLqaw/162gsOLi6edMpeV/UCw==" />
+    </item>
+    <item>
       <title>Plantoir 1.7.1</title>
       <description>New in Plantoir 1.7.1
 
@@ -26,7 +51,7 @@ Fixed: if you set a scheduled deploy again while an earlier run is still working
       <pubDate>Fri, 16 Oct 2026 00:17:02 -04:00</pubDate>
       <sparkle:version>1.7.1</sparkle:version>
       <sparkle:shortVersionString>1.7.1</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.1/PlantoirSetup.exe" sparkle:version="1.7.1" sparkle:shortVersionString="1.7.1" length="247391000" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="f3vhTeGaOjTpaIjJ3AlSEbLJ6p1jCPfBvDo0SMdT9ZlYzEeLT0YUpzee5Fjw/DmWKXgH4oHd/WaikFtjFCKPBQ==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.1/PlantoirSetup.exe" sparkle:version="1.7.1" sparkle:shortVersionString="1.7.1" length="247391000" sparkle:os="windows" type="application/octet-stream" sparkle:criticalUpdate="false" sparkle:signature="f3vhTeGaOjTpaIjJ3AlSEbLJ6p1jCPfBvDo0SMdT9ZlYzEeLT0YUpzee5Fjw/DmWKXgH4oHd/WaikFtjFCKPBQ==" />
     </item>
     <item>
       <title>Plantoir 1.4.5</title>
