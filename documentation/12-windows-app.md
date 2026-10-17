@@ -1637,6 +1637,78 @@ line and a path-free notice, the skills, Not Now, the hook),
 message, the trail words, a link's destination never on the trail, the
 shim's shape against `print.inline.ts`).
 
+## The sidebar's page dot on Windows (#515, #546)
+
+The dot before each page row inside an open folder of "Navigate this site"
+is one stylesheet in `support/quartz` (`06-quartz-customizations.md` → "H.
+The sidebar's page marker"); Windows inherits it with the toolchain, no C#
+and no contract key. What #546 owed is that it was confirmed on a native
+build, in the app's own pane, and under a REAL contrast theme, which the mac
+can only emulate.
+
+**Measured 2026-10-16** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one
+1920 × 1080 screen at 150%, Edge and WebView2 Runtime 155.0.4283.60, the
+runtime's Node 20.18.1):
+
+- **The mac's check, unchanged, on a native build.** A scratch working folder
+  (`print_set_windows.mirror_toolchain` from this tree, verify.sh's own EXC2O
+  copied from `support/example_course`), with verify.sh's four planted files
+  written byte for byte (`Discussions/Marker Fixture Long.md`, `Marker
+  Fixture Word.md`, `Discussions/Tasks/index.md` and `Marker Fixture Inner
+  Page.md`) **plus its `Plain Long Page.md`**: the check needs one page at the
+  TOP level of the sidebar ("no page at the top level … the check would prove
+  nothing"), EXC2O's own top-level pages are not in the explorer, and in
+  verify.sh that page comes from the #501 fixture. `preview.ps1 EXC2O 1
+  --build-only --non-interactive` with `PLANTOIR_RUNTIME` set; the built
+  `index.css` carries the forced-colours rule (`CanvasText`, one match);
+  `public\` served by `python -m http.server` on 127.0.0.1; then
+  `node --experimental-websocket browser-checks/sidebar_page_marker.mjs
+  "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+  http://127.0.0.1:<port>/Discussions/Marker-Fixture-Long.html
+  http://127.0.0.1:<port>/Discussions/index.html Discussions Tasks "Marker
+  Fixture Page With A Title Long Enough To Wrap Onto A Second Line"`, verbatim:
+  **`OK: light 5.63:1, dark 9.45:1, forced colours 10.41:1`** — the mac's
+  forest-moss figures to the hundredth (7 pages marked, 11 folders bare, the
+  long title on 3 lines with every line at 12.8 px, the dot at 0).
+- **The app's own preview pane.** The x64 Debug build with `--state-dir` on
+  that folder, Preview pressed on EXC2O Section 1, the pane read over
+  WebView2's debugging port (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=
+  --remote-debugging-port=…`) and photographed. Dark (the system's mode) and
+  then light: a dot on every page row of the open Discussions folder and of
+  Tasks inside it, none on a folder row; the three-line long title and the
+  too-wide "Electroencephalographically…" title both hang, every line
+  starting under the first letter; the current page in Quartz's highlight
+  colour (rgb(184, 196, 128) light, rgb(210, 221, 158) dark) and, hovered
+  (by Chromium input over the debugging port), "Energy Source Debate" took
+  the hover colour while its dot kept `--dark`. Two things about the pane at
+  this screen size, neither the dot's: at the 900-epx window the pane is
+  Quartz's narrow layout (the sidebar behind the menu button), and on a
+  maximised window the explorer had been left collapsed, and its folders
+  closed, by the earlier narrow visit, so "Navigate this site" had to be
+  opened by hand. The photographs were taken with the pane zoomed to 75%
+  (Ctrl+−), to fit the folder on a 1080-px screen.
+- **High Contrast, the real theme.** Before: `SPI_GETHIGHCONTRAST` flags 126
+  (off), `CurrentTheme` `…\Themes\Custom.theme`, AppsUseLightTheme 0,
+  SystemUsesLightTheme 0. `SPI_SETHIGHCONTRAST` with `HCF_HIGHCONTRASTON`
+  (not elevated) turned on **High Contrast Black** (`hcblack.theme`; it also
+  set AppsUseLightTheme to 1). In the still-running app's pane and in a
+  headed Edge window on the served build, `matchMedia('(forced-colors:
+  active)')` was **true** in both; every page dot (7 of 7 in Edge, the
+  nested Tasks page included) computed to **rgb(255, 255, 255)**, CanvasText,
+  at the stylesheet's .75 opacity, on Canvas **rgb(32, 32, 32)**: (199, 199,
+  199) on (32, 32, 32), **9.64:1**. Seen: a light grey dot on every page row,
+  none on folder rows, the long titles hanging, in both. (Edge's window
+  photographs blank under the theme, so its picture was taken by Chromium's
+  own `Page.captureScreenshot`; the pane photographs normally.) Turned off
+  with flags 126: flags, `CurrentTheme`, AppsUseLightTheme and
+  SystemUsesLightTheme all read back as before. One residue: Windows now
+  remembers "High Contrast Black" as the scheme the NEXT time contrast is
+  turned on (`lpszDefaultScheme` read "" before).
+
+The emulated figure (10.41:1, black on white) and the real one (9.64:1, the
+dot's .75 opacity over Black's dark Canvas) differ because the emulation's
+Canvas is white; both clear 3:1 by a wide margin.
+
 ## What this page does not cover
 
 Deliberately, so there is one home for each and not two that drift. The macOS
