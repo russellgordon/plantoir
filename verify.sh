@@ -2890,6 +2890,7 @@ fi
 if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE" <<'SWIFTPY'
 import html, json, re, sys
 from pathlib import Path
+sys.dont_write_bytecode = True
 sys.path.insert(0, "scripts")
 import swift_blocks
 public, log, course = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
@@ -2898,7 +2899,8 @@ rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["codeRu
 page = (public / "Swift-Playground.html").read_text(encoding="utf-8") if (public / "Swift-Playground.html").is_file() else ""
 if not page:
     problems.append("Swift-Playground.html was not built")
-wrappers = re.findall(r'<div class="plantoir-runner"([^>]*)>', page)
+# Attribute by attribute: a value may hold ">" (data-original is the code).
+wrappers = re.findall(r'<div class="plantoir-runner"((?:\s+[\w-]+(?:="[^"]*")?)*)\s*>', page)
 def attribute(text, name):
     found = re.search(name + r'="([^"]*)"', text)
     return html.unescape(found.group(1)) if found else None
