@@ -150,6 +150,8 @@ enum SettingsPane: String {
     case assistant
     /// Where Preview opens (#504).
     case preview
+    /// Obsidian's add-ons for diagrams and graphs (#495).
+    case obsidian
     case deploying
 
     // MARK: - Stored properties

@@ -2815,6 +2815,11 @@ struct SectionDetailView: View {
                             )
                         }
                         previewBuildWait.end()
+                        // Obsidian's add-ons for diagrams and graphs (#495):
+                        // after the teacher's yes, a finished preview adds
+                        // what the course needs — silently, off the main
+                        // actor, and never into a course open in Obsidian.
+                        workspace.addObsidianAddOnsAfterAPreview(course: course)
                         // Serving from here: a later end may be a deploy
                         // elsewhere closing it (#433's stack review).
                         previewRunner.hasBeenServing = true

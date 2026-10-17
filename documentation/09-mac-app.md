@@ -30,7 +30,7 @@ interfaces automatically.
 | Deploy | Runs [`deploy.sh`](07-deployment.md) with output streamed into the app (prompts answered inline); if a preview is running or building, stops it and awaits container cleanup first; the finished live-site link wears the section's custom domain when one is set |
 | New Course | Writes the collected answers as `course_config.json`, then runs the real `./setup.sh`, accepting each prompt's default — the wizard re-reads the file as its saved answers, so scaffolding/backups/Quartz patches are all the wizard's own work |
 | Add Section | Context-click a course; scaffolds the new section the way the wizard would, mirroring sibling sections' frontmatter, and gives every course-level page with per-section keys a pair for the new section — found with the build's own fence rule and spliced in by line, so the page's fence, body and line endings never move (#175; `contracts/course-management.json` → `sectionNumbers.addingKeysToAPage`) |
-| Open in Obsidian | Registers the course folder in Obsidian's own vault registry when needed and opens the section at its `index.md` |
+| Open in Obsidian | Registers the course folder in Obsidian's own vault registry when needed and opens the section at its `index.md`; first asks about, or adds, Obsidian's add-ons for a course's diagrams and graphs (#495) |
 
 Beyond the actions, the app owns delivery and resources:
 
@@ -3543,7 +3543,11 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   by the MAIN WINDOW (`MainWindowView`'s `LockedPagesNoteAlert`), not the
   sidebar: the toolbar button is reachable with the sidebar collapsed, and the
   note was driven that way (sidebar hidden, toolbar button, note shown).
-  `ObsidianFolderTests` holds `FolderActions.openInObsidian` to that one file.
+  `ObsidianFolderTests` holds `FolderActions.openInObsidian` to that one file
+  — since #495 to ONE call, inside `ObsidianOpening.open`, which every open
+  goes through so a test can drive the route without reaching Obsidian; the
+  route also asks about Obsidian's add-ons for diagrams and graphs first
+  ("Obsidian's add-ons for diagrams and graphs (#495)").
 - **Delete removes the selected sidebar row — by asking.** The key runs the
   menu item `contracts/shared-rules.json` → `sidebarDeleteKey` names (Remove
   Course…, Remove Section…, Delete Backup…, Delete Archive…) through
@@ -3660,6 +3664,198 @@ default" helper the mac did; an AutoSuggestBox traps Escape the way the mac's
 fields did (measured), so both pickers route through a `PickerEscape` of their
 own; and a failed course or section removal names its act there too ("Could not
 remove EXC2O"), Windows' own addition to `BackupProblemTitle`.
+
+## Obsidian's add-ons for diagrams and graphs (#495)
+
+**What a teacher sees.** A course with a ```` ```tikz ```` or
+```` ```functionplot ```` fence (#485 E1) draws it on the site, and until #495
+showed it as code in Obsidian unless the teacher found TikZJax in Obsidian's
+directory — and functionplot is not in it at all. Now, the first time Open in
+Obsidian is pressed on such a course, BEFORE Obsidian opens, Plantoir asks
+`obsidianAddOnsForFigures.wording.offerTitle`, with three answers: Add Them,
+Not Now (asked again when Plantoir next starts), and Not Now with "Don't ask
+again" ticked (`.dialogSuppressionToggle` on a `confirmationDialog`). One yes
+covers every course. After it, a course gets the add-ons it uses at Open in
+Obsidian and, silently, when a section's preview finishes. Plantoir ▸
+Settings ▸ Obsidian (`ObsidianSettingsView`, a pane after Preview) holds the
+one toggle: on is yes, off is no, never asked shows as off; turning it off
+adds nothing new and removes nothing. It is the only way back from "Don't ask
+again". The rule, the cases and the words are
+`contracts/shared-rules.json` → `obsidianAddOnsForFigures`.
+
+**The mac's own sentence** (S5 of the plan review: shared text is
+platform-neutral until Windows ships this): on the Mac, Plantoir offers to add
+TikZJax and Functionplot when a course with figures is opened in Obsidian from
+Plantoir. The shared skill (`plantoir-math-graphs` §9) and
+`figureFences.knownLimits` do not say so, because a Windows teacher's assistant
+reads them too.
+
+**Where the files come from.** Carried, never downloaded on the yes:
+`mac-app/Vendor/fetch-obsidian-addons.sh` reads every id, version, size,
+SHA-256 and address from `obsidianAddOnsForFigures.addOns` with
+`/usr/bin/plutil` (21 ms on the 1.7 MB contract) and carries no pin of its own
+(`ObsidianFigureAddOnsTests.testTheFetchScriptCarriesNoPinOfItsOwn`); a
+mismatch installs nothing; its cache is outside the repository like
+fetch-helpers.sh's. `project.yml` carries `Vendor/obsidian-addons` as
+`Contents/Resources/obsidian-addons/<id>/` — **required before
+`xcodegen generate`**, like the other three fetches. Seven files, 12,876,029
+bytes: TikZJax 0.5.2 (`main.js` 7,861,284, `styles.css` 4,791,190,
+`manifest.json`, `LICENSE.md`) and Functionplot 1.2.1 (`main.js` 220,867,
+`manifest.json`, `LICENSE`). Both MIT; THIRD_PARTY_LICENSES.md has the rows.
+JavaScript and CSS, so nothing to sign beyond the app's seal. Not in
+`support/`: everything there is hashed into the image tag and mirrored into
+`.toolchain/`. At install time the app hashes the files it is about to write
+against the pins (5–8 ms for all seven) and writes nothing on a mismatch.
+
+**The sequence** (`obsidianAddOnsForFigures.sequence`, the route
+`WorkspaceModel.openInObsidian(course:sectionNumber:)` in
+`OpenInObsidianRoute.swift`):
+
+1. A reference course: as before — lock, the note — never scanned or offered.
+2. No Obsidian, the answer no, or Not Now this run: open, no scan.
+3. Scan off the main actor (`ObsidianFigureAddOns.scan`, `@concurrent`); a
+   second click while it runs does nothing (review N7).
+4. Nothing a pass would add: open.
+5. The vault Obsidian will open is not the course (a parent folder registered
+   as one vault — Obsidian picks the LONGEST registered path holding the
+   target, read from 1.13.7's `main.js`): open, and one trail line per course
+   per run saying why (review S7). Offering there would write 12.9 MB the vault
+   never reads, and promise a trust question that never comes.
+6. Not asked: the offer. If the course is open in Obsidian the offer carries
+   `wording.offerWhileOpen`, and Add Them closes Obsidian first (one dialog,
+   not two — review N6).
+7. Yes, course not open: add, then open. Installing BEFORE the first load is
+   what avoids a reopen in the common case: Obsidian reads
+   `community-plugins.json` and the manifests only when a vault loads
+   (exploration F4).
+8. Yes, course open: `wording.reopenTitle`. Reopen quits Obsidian
+   (`quitObsidianAndWait`), adds them only if Obsidian is no longer running,
+   then reopens every vault that was open, this one last — the registration
+   path's own quit-and-reopen. Later opens as it is and is not asked again
+   for that course this run.
+
+**Never into a course open in Obsidian** (review S3, measured in 1.13.7's
+`app.js`): Obsidian keeps `enabledPlugins` in memory and writes the whole set
+back on every add-on switch and every trusted load, so an id Plantoir added
+under it is dropped the next time the teacher touches any add-on — and the
+marker would then read as "the teacher switched it off", so it would never be
+listed again. **"Open" is: Obsidian is running AND its registry marks the
+course open — windows are never counted** (implementation review B1, measured
+2026-10-17: Russell's Obsidian was hidden with ⌘H, 16 layer-0 windows of
+which 0 on screen, four vaults marked open — so `FolderActions.openVaultPathsNow`,
+which needs a window on screen for the rename feature's sake and is left as it
+is there, read MPM2D as closed while it was loaded). A registry that cannot
+be read while Obsidian runs counts as open too: Obsidian rewrites it in place,
+so a read can land mid-write. Add Them checks again when it is answered, in
+case the course was opened while the question was up. A hidden, minimised,
+full-screen or other-Space Obsidian holds the list in memory all the same. The
+rule over-reports (a stale mark), which is the safe direction: the pass waits
+and Open in Obsidian asks to reopen. The vaults reopened afterwards are every
+one marked open, hidden ones included. After Plantoir's quit request, a pass
+writes only once Obsidian is no longer RUNNING. The preview pass checks after
+its scan, right before writing; the remaining window is the milliseconds
+between that check and the write.
+
+**What a pass writes** (`ObsidianFigureAddOns.install`, serialised by the
+`ObsidianFigureAddOnsQueue` actor — review S2: Open in Obsidian and a finished
+preview can ask at once, and the second pass's "remove a leftover partial
+folder" would delete the first's while it is written; the test runs eight
+passes at once and sees one at a time):
+
+1. Refuse if `.obsidian` or `.obsidian/plugins` is a link.
+2. Re-hash the carried files.
+3. If `.obsidian` is missing, copy the course defaults
+   (`support/obsidian_defaults/.obsidian`, attachments into Media), then
+   **refuse unless `.obsidian/app.json` exists** (review S2): seeding only
+   happens while `.obsidian` is absent, so a `plugins/` created over a failed
+   copy would cost the course its defaults for good (plan finding P7).
+4. Read `community-plugins.json`; anything but an array of strings writes
+   nothing at all (files with no list entry would bring the trust question for
+   an add-on that then loads nothing).
+5. Decide each add-on (`vaultCases`): absent → add; Plantoir's marker and no
+   readable manifest (an unfinished pass) → replace; the teacher's own copy
+   (no marker) → left alone; Plantoir's at another version (Obsidian updated
+   it) → left alone, never downgraded; Plantoir's, same version, unlisted →
+   the teacher switched it off, left off.
+6. Write the list (atomic, as Obsidian writes it: `JSON.stringify(ids,
+   undefined, 2)`, no final newline), THEN each add-on: everything but
+   `manifest.json` into `<id>.plantoir-partial/` with the `.plantoir` marker
+   (`{"addedBy":"Plantoir","version":"0.5.2"}`), renamed to `<id>`, manifest
+   last. Obsidian ignores a folder without a manifest and a listed id with no
+   folder, so a pass stopped anywhere leaves nothing half-loaded.
+
+Only what the course uses: a functionplot-only course gets 220 KB, not
+12.9 MB. A second pass changes no byte and no modification date, and writes
+no trail line (`testASecondPassChangesNoByte`).
+
+**Which pages** (`whichPages`): every `.md` under the course, drafts and
+shared pages included — the vault is the whole course — skipping dot-folders
+and pages iCloud has not downloaded (`SF_DATALESS`; the flag cannot be set by
+a test, so the predicate is injected there and the real flag is unmeasured on
+an evicted file). A byte test first, then `FigureFenceScan` — a Swift port of
+`markdown_code.fenced_blocks`, NOT `MarkdownCode.ranges(in:)`, whose #313 rule
+reads `- ```tikz` as a paragraph and then opens a fence at its closer (review
+S1). It passes all 13 `figureFences.fences.cases`, and 2,000 randomly built
+pages (fences, list markers, nested containers, quotes, `%%`, CR LF, tabs)
+gave the same blocks, lines and nesting as the Python. Nested fences are not
+drawn by the build, so they are not needed.
+
+**Measured** (M4 Pro, macOS 26.6, 2026-10-17): the scan of Russell's real
+courses, cold then warm — MPM2D 289 pages 39 ms / 7 ms (finds `tikz`), ICS3U
+432 pages 63 ms / 9 ms, ICS4U 395 pages 50 ms / 8 ms; the MPM2D example
+payload 2 ms (both kinds); 2,000 generated pages 43 ms inside the suite. The
+plan's "about 10 ms" was the warm figure; the review measured 40–51 ms for
+2,000 pages and 228 ms for 9,790. Both triggers run it off the main actor.
+
+**Backups and reference copies.** `CourseArchiver` adds `zip -x
+<course>/.obsidian/plugins/<id>/*` for each folder carrying the marker,
+worked out at zip time (`ObsidianFigureAddOns.backupExclusions`); the
+teacher's own add-ons and the list stay (a REAL zip read back with `zipinfo`
+in the suite). The setup wizard's own backup
+(`setup_course.backup_existing_course_dir`) prunes the same folders (review
+S8; `scripts/test_backup_leaves_plantoir_addons.py`). A restored course gets
+them back at the next pass where the answer is yes — switched on even if the
+teacher had switched one off before the backup (review N3, accepted). A
+reference copy already leaves `plugins/` behind (#255, below);
+`ObsidianAddOns.found` now keeps Plantoir's folders apart by the marker, so the
+sheet does not tell a teacher "your add-ons were left behind" about add-ons
+they never chose, and the trail still names them.
+
+**The live check (L1–L8) was NOT run by an agent** (director ruling B1 on the
+plan review): an isolated Obsidian started from the Bash sandbox can reach
+Russell's real one through `~/.obsidian-cli.sock` (1.13.7 unlinks and
+re-listens on it at every start, at `os.homedir()`), and System Events
+keystrokes go to whichever Obsidian is in front. A prepared script, with a
+`HOME` preflight, PID-set checks and no keystrokes, is for Russell to run.
+Until it has run, three things are ASSUMED from Obsidian 1.13.7's code rather
+than measured: the trust question appears with no directory step when the
+files are on disk before the first load (L1); functionplot 1.2.1 still draws
+on 1.13.x (L2 — if it does not, ship TikZJax only, ruling Q7); and a vault
+already trusted loads an add-on added later with no new question (L6).
+
+**Teacher words** (`wording`, rule 1 with Obsidian's own quoted labels taken
+out first, `testTheWordsNeverNameTheMachinery`): Obsidian's English labels
+from 1.13.7's `i18n.js` — "Trust author and enable plugins", "Browse vault in
+Restricted Mode", "Community plugins", "Exit Restricted mode". The trust
+question puts its focus on "Browse vault in Restricted Mode", so the offer
+says Return chooses the other button; after Trust, Obsidian opens Settings ▸
+Community plugins by itself, so the offer says that too (review S9). The
+key is per vault, so six courses with figures mean six trust clicks.
+
+**The trail** — four events (`activityTrail.mustRecord`): "obsidian add-ons
+offered" (the answer, or why a course was not asked), "obsidian add-ons added"
+(per add-on, by name and version; written when something was added and
+otherwise once per course per run — review N4), "obsidian reopened for
+add-ons", "obsidian add-ons setting changed".
+
+**Rejected** (each with its reason in `obsidianAddOnsForFigures.rejected`):
+writing Obsidian's trust answer into its LevelDB; turning on its CLI to run
+`plugins:restrict off`; add-ons in `support/obsidian_defaults`; a download on
+the yes; asking at course creation, in Course Settings, after a preview or
+through the assistant (no tool or schema byte moved); a build marker for which
+kinds a course uses (the build sees one section's student pages; the vault is
+the whole course); writing into an open course; re-enabling, overwriting or
+downgrading the teacher's add-ons.
 
 ## Opening the preview at the page last viewed (#504)
 
@@ -5367,6 +5563,18 @@ true, "publish": false` in Russell's four — never an account or a site),
 `.obsidian` holds 63 `workspace (… conflicted copy …).json` files; they are a
 sync provider's clutter, not a danger, and matching them would mean matching
 every provider's naming in every language. Russell, 2026-09-25: they come.
+
+**Plantoir's own add-ons are left behind too, and not spoken of** (#495).
+Folders under `plugins/` carrying Plantoir's `.plantoir` marker — TikZJax and
+Functionplot, written on the teacher's yes, a half-written
+`<id>.plantoir-partial` and an iCloud conflict copy among them — go into
+`ObsidianAddOns.Found.plantoirAddOnNames`, not `addOnNames`: `isEmpty` ignores
+them, so neither sheet tells a teacher "your add-ons were left behind" about
+add-ons they never chose, and `trailClause` names them as "Plantoir's add-ons
+for diagrams and graphs left behind (…)". Telling them apart asks ONE name
+inside an add-on's folder, by `lstat` — the only thing inside an add-on this
+file ever looks at. Pinned by the tenth `referenceCourses.obsidianAddOns`
+case.
 
 **Keep a Copy of a LIVE course follows the same rule** (Russell, 2026-09-25).
 The copy is a reference course and is never published, so an add-on in it is
@@ -7229,7 +7437,8 @@ own pinned SHA-256 — and the app's MANIFEST says `arch arm64`, which the
 launcher compares with `uname -m`.
 
 **Fetched, never committed.** `mac-app/Vendor/fetch-helpers.sh` (required
-before `xcodegen generate`, like fetch-llama.sh and fetch-sparkle.sh) reads
+before `xcodegen generate`, like fetch-llama.sh, fetch-sparkle.sh and, since
+#495, fetch-obsidian-addons.sh) reads
 every version and checksum from `setup.sh` rather than carrying its own —
 `HelperVersionsTests` fails if one is written into it — refuses any file that
 does not hash to its pin, and refuses a Colima that does not carry the disk's

@@ -4,7 +4,7 @@ Plantoir's toolchain includes software written by other people. This file
 lists what is carried INSIDE the website builder or copied into a class
 website, under which licence, and where the licence text travels. It was
 started with #485 E1 (v1.7.0); later pieces add their own entries here
-(Pyodide and KaTeX with #455 and #494; the Swift runtime inside compiled Swift programs with #493; GeoGebra and PhET with #485 E2 and E3). Versions and hashes are pinned in
+(Pyodide and KaTeX with #455 and #494; the Swift runtime inside compiled Swift programs with #493; GeoGebra and PhET with #485 E2 and E3; the two Obsidian add-ons the macOS app carries with #495). Versions and hashes are pinned in
 `contracts/toolchain.json` → `pins`.
 
 Tools the image installs only to BUILD (Node, Python, Quartz, wrangler,
@@ -25,6 +25,19 @@ teacher's site. Fonts a site carries for its own look are described in
 | **The Swift standard library and runtime, inside each compiled Swift program** — every `static/swift-wasm/<key>.wasm` a page's ` ```swift run ` block was compiled to (#493): Embedded Swift's library (with its Unicode tables) or the full one, linked statically, and wasi-libc | Swift 6.4.0-RELEASE and its wasm SDK, as pinned in `contracts/toolchain.json` → `swiftImage` | Apache License 2.0 **with the Runtime Library Exception** (© Apple Inc. and the Swift project authors); wasi-libc is under Apache-2.0 WITH LLVM-exception, MIT and the musl licence (MIT) | The Runtime Library Exception waives the attribution requirement for programs compiled with Swift, so a site's programs carry no notice; named here so the record is complete. `static/swift/` holds only Plantoir's own code (the thread and its WASI shim) |
 | **KaTeX** — the stylesheet, copy-tex and woff2 faces a site's maths is styled and copied with, on EVERY site (#494) | 0.16.21 | MIT, © 2013-2020 Khan Academy and other contributors | `static/katex/LICENSE` beside the files |
 | **BaKoMa Computer Modern TrueType fonts** — the lettering of a page's ` ```tikz ` diagrams; only the faces the site's diagrams name (#485 E1) | as shipped in node-tikzjax 1.0.5 | BaKoMa Fonts Licence, © 1994, 1995 Basil K. Malyshev: copying and distribution permitted with the notice; embedding in SVG and printing needs no notice | `static/tikz/LICENCE` beside the faces |
+
+## Carried inside the macOS app, written into a course on the teacher's yes
+
+Obsidian's add-ons for diagrams and graphs (#495): carried in
+`Plantoir.app/Contents/Resources/obsidian-addons/<id>/`, pinned in
+`contracts/shared-rules.json` → `obsidianAddOnsForFigures.addOns`, and copied
+unchanged into a course's `.obsidian/plugins/<id>/` only when the teacher has
+said yes. Never in a class website (the build skips `.obsidian`).
+
+| What | Version | Licence | Where its licence travels |
+|---|---|---|---|
+| **obsidian-tikzjax** — draws ` ```tikz ` fences inside Obsidian | 0.5.2 | MIT, © 2022 artisticat1. Its `main.js` embeds the TikZJax engine and TeX files (LPPL-1.3c, the node-tikzjax row below), and its `styles.css` the BaKoMa faces as `data:` URLs (the BaKoMa row above) | `LICENSE.md` beside the files, in the app and in the course |
+| **obsidian-functionplot** — draws ` ```functionplot ` fences inside Obsidian | 1.2.1 | MIT, © 2022 Leonhard Masche; its `main.js` bundles function-plot (MIT, the row above) | `LICENSE` beside the files, in the app and in the course |
 
 ## Carried by plantoir.app itself
 

@@ -51,8 +51,18 @@ nonisolated enum ObsidianAddOns {
         // MARK: - Stored properties
 
         /// The add-ons installed, by folder name, sorted. A name starting
-        /// with a dot is not an add-on (`.DS_Store`, `.hotreload`).
+        /// with a dot is not an add-on (`.DS_Store`, `.hotreload`). Plantoir's
+        /// own are NOT here: see `plantoirAddOnNames`.
         var addOnNames: [String] = []
+
+        /// The add-ons PLANTOIR put there for diagrams and graphs (#495), by
+        /// folder name, sorted — the folders carrying its `.plantoir` marker,
+        /// a half-written `<id>.plantoir-partial` or an iCloud conflict copy
+        /// among them. Left behind like every add-on, but never the reason
+        /// the sheet speaks: the teacher did not choose them, and a sentence
+        /// saying "your add-ons were left behind" about them would be false.
+        /// The trail still names them.
+        var plantoirAddOnNames: [String] = []
 
         /// `.obsidian/plugins` is itself a link. Never followed, so what it
         /// leads to is not known — and it is said, because an add-on folder
@@ -78,7 +88,7 @@ nonisolated enum ObsidianAddOns {
         /// True when there is nothing to say. An EMPTY `plugins/` and a
         /// `community-plugins.json` of `[]` — measured in Russell's own ICS3U
         /// — are nothing: telling a teacher their add-ons were left behind
-        /// when they had none would be false.
+        /// when they had none would be false. So are Plantoir's own (#495).
         var isEmpty: Bool {
             if !addOnNames.isEmpty {
                 return false
@@ -141,7 +151,9 @@ nonisolated enum ObsidianAddOns {
 
     /// What a course's `.obsidian` holds that a reference copy leaves
     /// behind. One `lstat` per entry and one listing of `plugins/`; nothing is
-    /// followed and nothing inside an add-on is looked at.
+    /// followed. Inside an add-on only ONE name is asked about, by `lstat`:
+    /// Plantoir's `.plantoir` marker (#495), which tells its add-ons from the
+    /// teacher's. Nothing inside an add-on is ever opened or read.
     static func found(inCourseAt courseURL: URL) -> Found {
         var found: Found = Found()
         let settingsURL: URL = courseURL.appendingPathComponent(ObsidianAddOns.settingsFolderName)
@@ -163,14 +175,19 @@ nonisolated enum ObsidianAddOns {
             if let directory = opendir(pluginsURL.path) {
                 closedir(directory)
                 var names: [String] = []
+                let plantoirs: [String] = ObsidianFigureAddOns.plantoirAddOnFolders(inPluginsAt: pluginsURL)
                 for name in ReferenceTreeCopier.names(inFolderAt: pluginsURL) {
                     let text: String = String(decoding: name, as: UTF8.self)
                     if text.hasPrefix(".") {
                         continue
                     }
+                    if plantoirs.contains(text) {
+                        continue
+                    }
                     names.append(text)
                 }
                 found.addOnNames = names
+                found.plantoirAddOnNames = plantoirs
             } else {
                 found.addOnsFolderCouldNotBeRead = true
             }
@@ -197,6 +214,12 @@ nonisolated enum ObsidianAddOns {
             clauses.append(
                 "\(found.addOnNames.count) Obsidian \(noun) left behind ("
                 + found.addOnNames.joined(separator: ", ") + ")"
+            )
+        }
+        if !found.plantoirAddOnNames.isEmpty {
+            clauses.append(
+                "Plantoir's add-ons for diagrams and graphs left behind ("
+                + found.plantoirAddOnNames.joined(separator: ", ") + ")"
             )
         }
         if found.addOnsFolderIsALink {
