@@ -2181,9 +2181,18 @@ def capture_quiz_set(marketing: Path, demo: Path, only: list[str] | None = None)
                 raise SystemExit("The marketing folder is missing what the quiz figure needs. "
                                  "Make it first: capture.py --provision.")
         print(f"   {marketing_folder.summary(report)}")
-        if report.left_as_changed:
-            raise SystemExit("A quiz page in the folder was changed by hand, so the figure would not be of "
-                             "the committed page. Put it back, or delete it to have it planted again.")
+        # Only the pages these figures show matter here: another planted
+        # page (the Code page's Swift program) may be mid-revision for its
+        # own figure, and is that figure's business.
+        for shot in shots:
+            capture = shot["capture"]
+            if capture["workspace"] != workspace:
+                continue
+            page = capture["path"].strip("/").replace("-", " ")
+            changed = f"left as you changed it: {capture['course']}/{page}.md"
+            if changed in report.lines:
+                raise SystemExit(f"{capture['course']}/{page}.md was changed by hand, so {shot['id']} would not be "
+                                 "of the committed page. Put it back, or delete it to have it planted again.")
         ensure_launchers(folder, resources=recipe)
         mirror_toolchain(folder, resources=recipe)
         mine: list[dict] = []

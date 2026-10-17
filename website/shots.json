@@ -227,8 +227,7 @@
         "Right!",
         "Why",
         "Check"
-      ],
-      "awaiting_capture": true
+      ]
     },
     {
       "id": "quiz-chemistry",
@@ -248,8 +247,7 @@
         "Not right",
         "Why",
         "middle step"
-      ],
-      "awaiting_capture": true
+      ]
     },
     {
       "id": "quiz-english",
@@ -269,8 +267,7 @@
         "Right!",
         "where the light did not reach",
         "Why"
-      ],
-      "awaiting_capture": true
+      ]
     },
     {
       "id": "quiz-code-run",
@@ -291,8 +288,7 @@
         "Right!",
         "4 of 5 right on the first try",
         "Start again"
-      ],
-      "awaiting_capture": true
+      ]
     },
     {
       "id": "site-mcv4u",
