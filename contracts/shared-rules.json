@@ -25404,12 +25404,648 @@
       "debounceMilliseconds": 400
     },
     "editor": {
-      "rule": "A plain textarea in the site's code font, at least 16 px (iPadOS zooms the page on focus below 16 px), spellcheck, autocapitalise, autocorrect and autocomplete off, no wrapping. It grows with its code up to `maxLines` lines, then scrolls; growing inside an open callout lifts the callout's fixed height so nothing is clipped. Tab inserts four spaces (or indents every selected line), Shift-Tab takes up to four off; Escape then Tab leaves the editor (the keyboard trap rule); nothing happens while an input method is composing; Enter is never intercepted (no auto-indent: it fights the iPadOS keyboard). Cmd/Ctrl-Enter runs. `readonly` keeps the highlighted code and shows only Run and Stop. REJECTED: CodeMirror (a 400 KB editor per page for indentation), auto-indent.",
+      "rule": "A plain textarea in the site's code font, at least 16 px (iPadOS zooms the page on focus below 16 px), spellcheck, autocapitalise, autocorrect and autocomplete off, no wrapping, in a FRAME (#585): a gutter of line numbers (`lineNumbers`), then a cell where a coloured copy of the code (`colour`) sits under the textarea, whose own text is transparent and whose caret is not; the frame owns the border, the corner and the focus ring (:focus-within - the frame clips for its corner and would cut the textarea's own outline away, #585 plan review F3). It grows with its code up to `maxLines` lines, then scrolls; growing inside an open callout lifts the callout's fixed height so nothing is clipped. Tab inserts four spaces (or indents every selected line), Shift-Tab takes up to four off; Escape then Tab leaves the editor (the keyboard trap rule); nothing happens while an input method is composing; Enter is never intercepted (no auto-indent: it fights the iPadOS keyboard). Cmd/Ctrl-Enter runs. `readonly` keeps the highlighted code and shows only Run and Stop. REJECTED: CodeMirror (a 400 KB editor per page for indentation), auto-indent, contenteditable (iPadOS input methods and undo), Shiki itself in the browser (its grammars and regular-expression engine are hundreds of KB per site), Prism and the like (a new dependency whose token classes would still need mapping to Shiki's colours), the CSS Custom Highlight API (it cannot colour a textarea's text), re-rendering the whole copy per keystroke (50 ms for 500 lines at a sixfold CPU slowdown), and moving the copy by a transform (it sat a fraction of a pixel off the typed letters wherever the block did not start on a whole pixel: the copy is a scroll box scrolled to the textarea's place).",
       "maxLines": 24,
-      "indent": "    "
+      "indent": "    ",
+      "colour": {
+        "rule": "The editor shows the code in the static blocks' own colours, in light and dark (ruling R2). Every line the student has NOT changed shows the highlighted copy's own line - Shiki's spans, byte for byte (`reuse`); a line they have changed is coloured by support/quartz/components/scripts/codeRunnerColour.ts, the tokenizer the language row's `colour` names, whose categories carry Shiki's own two custom properties (`categories`), so Quartz's syntax.scss colours them for the theme exactly as it colours a static block's spans. On a keystroke the tokenizer reads the whole program (0.4 ms for 500 lines) and only the lines whose HTML changed are touched. While an input method composes, the textarea draws its own text and the copy waits for the end. The copy is aria-hidden and cannot be selected; it and the textarea share one rule of metrics (font, size, line height, padding, tab size, no ligatures), so each coloured letter sits exactly under its typed one. Nothing of this reaches the GUI's words: the copy and the gutter say nothing to a screen reader.",
+        "categories": {
+          "plain": [
+            "#24292E",
+            "#E1E4E8"
+          ],
+          "k": [
+            "#D73A49",
+            "#F97583"
+          ],
+          "s": [
+            "#032F62",
+            "#9ECBFF"
+          ],
+          "c": [
+            "#005CC5",
+            "#79B8FF"
+          ],
+          "f": [
+            "#6F42C1",
+            "#B392F0"
+          ],
+          "m": [
+            "#6A737D",
+            "#6A737D"
+          ],
+          "p": [
+            "#E36209",
+            "#FFAB70"
+          ],
+          "g": [
+            "#22863A",
+            "#85E89D"
+          ],
+          "r": [
+            "#032F62",
+            "#DBEDFF"
+          ]
+        },
+        "categoriesRule": "Each category's light and dark colour as the image's own Shiki gives them for the site's two themes (quartz.config.ts: github-light and github-dark; a teacher cannot change them). k: keywords and operators; s: strings and their prefixes' text; c: numbers, builtins, constants, self, ALL_CAPS names, escapes and placeholders; f: the names a def, class, func, struct or enum defines, base classes and decorators; m: comments; p: a call's keyword-argument names, and Python 2's names; g: a regular expression's escapes; r: a regular expression's own text (a string's colour in light, a paler blue in dark - found by the check, which compares both themes); plain: everything else (the copy's default). codeRunner.scss's .plantoir-tok-<category> sets exactly these as --shiki-light and --shiki-dark, and scripts/check_runner_rules_against_the_site.py pins all three copies - this table, the stylesheet and the image's Shiki - to each other: a case whose Shiki colour is not in the table, or a stylesheet value that is not the table's, fails.",
+        "reuse": "Which original line a current line may show Shiki's spans for (codeRunnerColour.reusePlan): by POSITION first - the lines the original and the current code share at the top, then at the bottom - where the line's text AND the state the tokenizer starts it in (inside which kind of string, with which prefix, inside which brackets) are both the original's; only the edited middle falls back to a lookup by text and state, and only for a key every original line that has it colours alike. A blank line is drawn empty. The plan's key - the text and one inside-a-triple-quote flag - coloured the same line inside f\"\"\", \"\"\" and r\"\"\" alike, and a call's keyword argument like a def's default (#585 plan review F1): `reuseCases` pins the plan for both, and the check also confirms against the image's Shiki that every line reused is coloured as Shiki colours the current code.",
+        "reuseCases": [
+          {
+            "name": "the same line inside f\"\"\", \"\"\", r\"\"\" and a continued string, after a line added above",
+            "language": "python",
+            "original": "a = f\"\"\"\ntotal {x} and \\n done\n\"\"\"\nb = \"\"\"\ntotal {x} and \\n done\n\"\"\"\nc = r\"\"\"\ntotal {x} and \\n done\n\"\"\"\nd = \"abc \\\ntotal {x} and \\n done\"",
+            "current": "# a line added\na = f\"\"\"\ntotal {x} and \\n done\n\"\"\"\nb = \"\"\"\ntotal {x} and \\n done\n\"\"\"\nc = r\"\"\"\ntotal {x} and \\n done\n\"\"\"\nd = \"abc \\\ntotal {x} and \\n done\"",
+            "plan": [
+              null,
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10
+            ]
+          },
+          {
+            "name": "the same line inside a multi-line call and a multi-line def, after an edit above both",
+            "language": "python",
+            "original": "print(\n    \"a\",\n    sep=\"\",\n)\ndef h(\n    sep=\"\",\n):\n    pass\nx = foo(a=1,\n        b=2)",
+            "current": "print(\n    \"b\",\n    sep=\"\",\n)\ndef h(\n    sep=\"\",\n):\n    pass\nx = foo(a=1,\n        b=2)",
+            "plan": [
+              0,
+              null,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ]
+          },
+          {
+            "name": "lines that move inside a string are not reused",
+            "language": "python",
+            "original": "x = 1\ny = \"a\"\nprint(y)",
+            "current": "s = \"\"\"\nx = 1\ny = \"a\"\nprint(y)",
+            "plan": [
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "name": "a copied line in the edited middle is found by its text and state",
+            "language": "python",
+            "original": "total = 0\nfor n in range(3):\n    total += n\nprint(total)",
+            "current": "total = 0\nfor n in range(3):\n    total += n\n    total += n\nprint(total)",
+            "plan": [
+              0,
+              1,
+              2,
+              2,
+              3
+            ]
+          },
+          {
+            "name": "nothing changed: every line is its own",
+            "language": "python",
+            "original": "name = input(\"Name? \")\nprint(f\"Hi {name}\")",
+            "current": "name = input(\"Name? \")\nprint(f\"Hi {name}\")",
+            "plan": [
+              0,
+              1
+            ]
+          }
+        ],
+        "agreement": {
+          "python": 99.5,
+          "swift": 99.0
+        },
+        "agreementRule": "The least share of non-space characters the tokenizer must colour as the image's own Shiki does, over every ```python and ```swift block in support/example_content plus scripts/fixtures/runner-colour. Measured 2026-10-17 (Shiki 1.26.2): Python 100 % over the example content's 4,180 lines and 99.99 % over 4,603 held-out lines of the repository's own Python (scripts/*.py); Swift 100 % over the example content and the Swift gate. Only an edited line can show a difference, since an untouched line is Shiki's own; `knownDifferences` are the measured ones a student can type.",
+        "cases": [
+          {
+            "name": "keywords and operators",
+            "language": "python",
+            "code": "if x >= 10 and not done: total += 1",
+            "lines": [
+              "kk . kk cc kkk kkk ..... ..... kk c"
+            ]
+          },
+          {
+            "name": "soft keywords match and case",
+            "language": "python",
+            "code": "match command:\n    case \"go\" | \"run\":\n        pass\n    case _:\n        pass",
+            "lines": [
+              "kkkkk ........",
+              "    kkkk ssss k sssss.",
+              "        kkkk",
+              "    kkkk ..",
+              "        kkkk"
+            ]
+          },
+          {
+            "name": "match used as a name",
+            "language": "python",
+            "code": "match = re.match(pattern, text)",
+            "lines": [
+              "..... k ................. ....."
+            ]
+          },
+          {
+            "name": "strings and prefixes",
+            "language": "python",
+            "code": "s = 'one' + \"two\" + b\"three\" + u\"four\"",
+            "lines": [
+              ". k sssss k sssss k ksssssss k kssssss"
+            ]
+          },
+          {
+            "name": "escapes",
+            "language": "python",
+            "code": "print(\"tab\\tnew\\n \\x41 \\u00e9 \\N{BULLET} \\012 \\\\ \\d\")",
+            "lines": [
+              "ccccc.ssssccssscc cccc cccccc cccccccccc cccc cc sss."
+            ]
+          },
+          {
+            "name": "percent placeholders",
+            "language": "python",
+            "code": "print(\"%d items, %(n)s, %-5.2f%%\" % (3, 4))",
+            "lines": [
+              "ccccc.scc ssssss cccccs ccccccccs k .c. c.."
+            ]
+          },
+          {
+            "name": "brace placeholders in a plain string",
+            "language": "python",
+            "code": "print(\"{} and {name:>10} and {0!r}\".format(1, name=2))",
+            "lines": [
+              "ccccc.scc sss ccccckkkkc sss cckkcs........c. ppppkc.."
+            ]
+          },
+          {
+            "name": "bytes keep percent but not braces",
+            "language": "python",
+            "code": "data = b\"%s {x}\"",
+            "lines": [
+              ".... k kscc ssss"
+            ]
+          },
+          {
+            "name": "docstring has no placeholders",
+            "language": "python",
+            "code": "def f():\n    \"\"\"Return {x} and %d with \\n\"\"\"",
+            "lines": [
+              "kkk f...",
+              "    sssssssss sss sss ss ssss ccsss"
+            ]
+          },
+          {
+            "name": "triple quotes across lines",
+            "language": "python",
+            "code": "text = \"\"\"first {x}\nsecond %s\nthird\"\"\"",
+            "lines": [
+              ".... k ssssssss ccc",
+              "ssssss cc",
+              "ssssssss"
+            ]
+          },
+          {
+            "name": "f-string with a format spec and conversion",
+            "language": "python",
+            "code": "print(f\"{name!r:>10} costs ${price:.2f} {{literal}}\")",
+            "lines": [
+              "ccccc.ksc....kkkkkkc sssss sc.....kkkkc ccsssssssccs."
+            ]
+          },
+          {
+            "name": "f-string with a nested format spec",
+            "language": "python",
+            "code": "print(f\"{value:{width}.{precision}f}\")",
+            "lines": [
+              "ccccc.ksc.....kc.....c.c.........ckcs."
+            ]
+          },
+          {
+            "name": "f-string self-documenting",
+            "language": "python",
+            "code": "print(f\"{total=}\")",
+            "lines": [
+              "ccccc.ksc.....kcs."
+            ]
+          },
+          {
+            "name": "f-string expression is code",
+            "language": "python",
+            "code": "print(f\"{len(items) + 1} items, {'yes' if ok else 'no'}\")",
+            "lines": [
+              "ccccc.kscccc....... k cc ssssss csssss kk .. kkkk sssscs."
+            ]
+          },
+          {
+            "name": "triple-quoted f-string across lines",
+            "language": "python",
+            "code": "report = f\"\"\"\nTotal: {total}\n\"\"\"",
+            "lines": [
+              "...... k ksss",
+              "ssssss c.....c",
+              "sss"
+            ]
+          },
+          {
+            "name": "raw string read as a regular expression",
+            "language": "python",
+            "code": "pattern = r\"^\\d{2,3}[^a-z]*(?P<word>\\w+)|\\.$\"",
+            "lines": [
+              "....... k ksccckkkkkckcccckcggggggggcckckggcs"
+            ]
+          },
+          {
+            "name": "a regular expression's own text",
+            "language": "python",
+            "code": "found = re.search(r\"Total: (\\d+) kg\", line)",
+            "lines": [
+              "..... k ..........ksrrrrrr ccckc rrs. ....."
+            ]
+          },
+          {
+            "name": "raw f-string is not a regular expression",
+            "language": "python",
+            "code": "path = rf\"C:\\new\\{name}\"",
+            "lines": [
+              ".... k kkssssssssc....cs"
+            ]
+          },
+          {
+            "name": "uppercase R is raw but not a regular expression",
+            "language": "python",
+            "code": "note = R\"\\d {0}\"",
+            "lines": [
+              ".... k ksss cccs"
+            ]
+          },
+          {
+            "name": "numbers",
+            "language": "python",
+            "code": "values = [1_000, 0x1F, 0b101, 0o17, 3.14e-2, 2j, .5]",
+            "lines": [
+              "...... k .ccccc. kkcc. kkccc. kkcc. ccccccc. ck. cc."
+            ]
+          },
+          {
+            "name": "constants and self",
+            "language": "python",
+            "code": "if self.ready is None or flag is True: return NotImplemented",
+            "lines": [
+              "kk cccc...... kk cccc kk .... kk cccc. kkkkkk cccccccccccccc"
+            ]
+          },
+          {
+            "name": "builtins and exceptions",
+            "language": "python",
+            "code": "print(len(items), int(\"3\"), range(10))\nraise ValueError(\"bad\")",
+            "lines": [
+              "ccccc.ccc........ ccc.sss.. ccccc.cc..",
+              "kkkkk cccccccccc.sssss."
+            ]
+          },
+          {
+            "name": "ALL_CAPS names",
+            "language": "python",
+            "code": "MAX_SIZE = 10\nprint(Pin.OUT, DATA[0], X)",
+            "lines": [
+              "cccccccc k cc",
+              "ccccc.....ccc. cccc.c.. .."
+            ]
+          },
+          {
+            "name": "dunder names",
+            "language": "python",
+            "code": "print(__name__, obj.__class__)",
+            "lines": [
+              "ccccc.cccccccc. ....ccccccccc."
+            ]
+          },
+          {
+            "name": "def and class names",
+            "language": "python",
+            "code": "def area(width, height):\n    return width * height\nclass Circle(Shape):\n    pass",
+            "lines": [
+              "kkk ffff....... ........",
+              "    kkkkkk ..... k ......",
+              "kkkkk ffffff.fffff..",
+              "    kkkk"
+            ]
+          },
+          {
+            "name": "self in a signature is plain",
+            "language": "python",
+            "code": "class Point:\n    def __init__(self, x: int = 0) -> None:\n        self.x = x",
+            "lines": [
+              "kkkkk fffff.",
+              "    kkk cccccccc...... .. ccc k c. .. cccc.",
+              "        cccc.. k ."
+            ]
+          },
+          {
+            "name": "decorators",
+            "language": "python",
+            "code": "@property\n@app.route(\"/home\")\n@dataclass(frozen=True)\ndef view(): pass",
+            "lines": [
+              "fcccccccc",
+              "ffffffffff.sssssss.",
+              "ffffffffff.ppppppkcccc.",
+              "kkk ffff... kkkk"
+            ]
+          },
+          {
+            "name": "keyword arguments at a call",
+            "language": "python",
+            "code": "print(\"a\", \"b\", sep=\", \", end=\"\")",
+            "lines": [
+              "ccccc.sss. sss. pppkss s. pppkss."
+            ]
+          },
+          {
+            "name": "keyword arguments in a multi-line call",
+            "language": "python",
+            "code": "print(\n    \"a\",\n    sep=\"\",\n)",
+            "lines": [
+              "ccccc.",
+              "    sss.",
+              "    pppkss.",
+              "."
+            ]
+          },
+          {
+            "name": "defaults in a multi-line def are not keyword arguments",
+            "language": "python",
+            "code": "def h(\n    sep=\"\",\n):\n    pass",
+            "lines": [
+              "kkk f.",
+              "    ...kss.",
+              "..",
+              "    kkkk"
+            ]
+          },
+          {
+            "name": "a call's name and an index's name",
+            "language": "python",
+            "code": "total = compute(values) + list[0] + print[0]",
+            "lines": [
+              "..... k ............... k .....c. k ccccc.c."
+            ]
+          },
+          {
+            "name": "builtin types are plain when indexed",
+            "language": "python",
+            "code": "def mean(numbers: list[float]) -> float: pass",
+            "lines": [
+              "kkk ffff......... .....ccccc.. .. ccccc. kkkk"
+            ]
+          },
+          {
+            "name": "comments and code tags",
+            "language": "python",
+            "code": "# TODO: tidy this HACK later\nx = 1  # a note",
+            "lines": [
+              "m kkkkm mmmm mmmm kkkk mmmmm",
+              ". k c  m m mmmm"
+            ]
+          },
+          {
+            "name": "lambda and comprehension",
+            "language": "python",
+            "code": "squares = [n ** 2 for n in range(10) if n % 2 == 0]\ndouble = lambda n: n * 2",
+            "lines": [
+              "....... k .. kk c kkk . kk ccccc.cc. kk . k c kk c.",
+              "...... k kkkkkk .. . k c"
+            ]
+          },
+          {
+            "name": "walrus and unpacking",
+            "language": "python",
+            "code": "if (n := len(items)) > 3: first, *rest = items",
+            "lines": [
+              "kk .. kk ccc........ k c. ...... k.... k ....."
+            ]
+          },
+          {
+            "name": "legacy names",
+            "language": "python",
+            "code": "name = raw_input(\"Name? \")",
+            "lines": [
+              ".... k ppppppppp.ssssss s."
+            ]
+          },
+          {
+            "name": "line continuation",
+            "language": "python",
+            "code": "total = 1 + \\\n    2",
+            "lines": [
+              "..... k c k .",
+              "    c"
+            ]
+          },
+          {
+            "name": "declarations",
+            "language": "swift",
+            "code": "let name = \"Ann\"\nvar count: Int = 0",
+            "lines": [
+              "kkk .... k sssss",
+              "kkk ...... ccc k c"
+            ]
+          },
+          {
+            "name": "functions and labels",
+            "language": "swift",
+            "code": "func greet(_ person: String, from place: String = \"here\") -> String {\n    return \"Hi\"\n}\ngreet(\"Ann\", from: \"home\")",
+            "lines": [
+              "kkkk fffff.f ....... cccccc. ffff ...... cccccc k ssssss. kk cccccc .",
+              "    kkkkkk ssss",
+              ".",
+              "ccccc.sssss. cccc. ssssss."
+            ]
+          },
+          {
+            "name": "types and generics",
+            "language": "swift",
+            "code": "struct Box<T: Equatable> where T: Hashable { let value: T }",
+            "lines": [
+              "kkkkkk fff.c. ccccccccc. kkkkk .k cccccccc . kkk ...... . ."
+            ]
+          },
+          {
+            "name": "inheritance",
+            "language": "swift",
+            "code": "class Dog: Animal, CustomStringConvertible {\n    override init() { super.init() }\n}",
+            "lines": [
+              "kkkkk fff. ffffff. ccccccccccccccccccccccc .",
+              "    kkkkkkkk kkkk.. . ccccc.kkkk.. .",
+              "."
+            ]
+          },
+          {
+            "name": "enum cases",
+            "language": "swift",
+            "code": "enum Direction: String, CaseIterable {\n    case north, south\n    case move(steps: Int)\n}",
+            "lines": [
+              "kkkk fffffffff. cccccc. ffffffffffff .",
+              "    kkkk ccccc. ccccc",
+              "    kkkk cccc....... ccc.",
+              "."
+            ]
+          },
+          {
+            "name": "extension and protocol",
+            "language": "swift",
+            "code": "extension Int { func squared() -> Int { self * self } }\nprotocol Shape { associatedtype Unit }",
+            "lines": [
+              "kkkkkkkkk ccc . kkkk fffffff.. kk ccc . cccc k cccc . .",
+              "kkkkkkkk fffff . kkkkkkkkkkkkkk cccc ."
+            ]
+          },
+          {
+            "name": "strings and interpolation",
+            "language": "swift",
+            "code": "print(\"Hello, \\(name)! You are \\(age + 1).\\n\\u{1F600}\")",
+            "lines": [
+              "ccccc.sssssss ssssssss sss sss sssss k csscccccccccccs."
+            ]
+          },
+          {
+            "name": "multi-line strings",
+            "language": "swift",
+            "code": "let poem = \"\"\"\n    Roses \\(colour)\n    \"\"\"",
+            "lines": [
+              "kkk .... k sss",
+              "    sssss sssssssss",
+              "    sss"
+            ]
+          },
+          {
+            "name": "raw strings",
+            "language": "swift",
+            "code": "let raw = #\"no \\(escape) here \\#(value)\"#",
+            "lines": [
+              "kkk ... k ssss sssssssss ssss sssssssssss"
+            ]
+          },
+          {
+            "name": "numbers",
+            "language": "swift",
+            "code": "let numbers = [1_000, 0xFF, 0b1010, 0o17, 3.14e-2, -5]",
+            "lines": [
+              "kkk ....... k .ccccc. cccc. cccccc. cccc. ccccccc. cc."
+            ]
+          },
+          {
+            "name": "attributes and directives",
+            "language": "swift",
+            "code": "@discardableResult\n@available(iOS 17, *)\nfunc go() -> Int { return 1 }\n#if DEBUG\nprint(#line)\n#endif",
+            "lines": [
+              "kkkkkkkkkkkkkkkkkk",
+              "kkkkkkkkkk.kkk cc. k.",
+              "kkkk ff.. kk ccc . kkkkkk c .",
+              ".kk .....",
+              "ccccc.ccccc.",
+              ".kkkkk"
+            ]
+          },
+          {
+            "name": "members",
+            "language": "swift",
+            "code": "let n = items.count + items.first! + text.isEmpty.description + items.map { $0 * 2 }.count",
+            "lines": [
+              "kkk . k ......ccccc k ......ccccck k .....ccccccc.ccccccccccc k ......ccc . cc k c ..ccccc"
+            ]
+          },
+          {
+            "name": "optionals and operators",
+            "language": "swift",
+            "code": "let value = maybe ?? 0; let forced = maybe!; let typed = v as? Int; let tried = try? load()",
+            "lines": [
+              "kkk ..... k ..... kk c. kkk ...... k .....k. kkk ..... k . kkk ccc. kkk ..... k kkkk cccc.."
+            ]
+          },
+          {
+            "name": "colons",
+            "language": "swift",
+            "code": "let ages = [\"Ann\": 15]\nlet label = score > 50 ? \"pass\" : \"fail\"\nswitch score {\ncase 0..<50: print(\"low\")\ndefault: break\n}",
+            "lines": [
+              "kkk .... k .sssssk cc.",
+              "kkk ..... k ..... k cc k ssssss k ssssss",
+              "kkkkkk ..... .",
+              "kkkk ckkkcck ccccc.sssss.",
+              "kkkkkkkk kkkkk",
+              "."
+            ]
+          },
+          {
+            "name": "closures",
+            "language": "swift",
+            "code": "let sorted = names.sorted { $0 < $1 }\nlet doubled = nums.map { (n: Int) -> Int in n * 2 }",
+            "lines": [
+              "kkk ...... k ......cccccc . cc k cc .",
+              "kkk ....... k .....ccc . .c. ccc. kk ccc kk . k c ."
+            ]
+          },
+          {
+            "name": "comments",
+            "language": "swift",
+            "code": "// a line comment\n/* a block /* nested */ comment */\nlet x = 1 /// documentation",
+            "lines": [
+              "mm m mmmm mmmmmmm",
+              "mm m mmmmm mm mmmmmm mm mmmmmmm mm",
+              "kkk . k c mmm mmmmmmmmmmmmm"
+            ]
+          },
+          {
+            "name": "control flow",
+            "language": "swift",
+            "code": "guard let n = Int(readLine()!) else { fatalError(\"bad\") }\nfor _ in 1...3 { continue }",
+            "lines": [
+              "kkkkk kkk . k ccc.cccccccc..k. kkkk . cccccccccc.sssss. .",
+              "kkk c kk ckkkc . kkkkkkkk ."
+            ]
+          }
+        ],
+        "casesRule": "Each line of `lines` gives each character's category (`.` plain, a space for any space). The check runs every case through the tokenizer AND through the image's Shiki (mapped by `categories`): both must give exactly these, so a case can neither drift from Shiki nor from the tokenizer.",
+        "knownDifferences": [
+          {
+            "name": "a keyword constant after a dot",
+            "language": "python",
+            "code": "x = obj.True",
+            "note": "Shiki colours True red after a dot; the tokenizer leaves a name after a dot plain."
+          },
+          {
+            "name": "a regular-expression literal",
+            "language": "swift",
+            "code": "let pattern = /[a-z]+/",
+            "note": "Shiki reads a bare /.../ as a regular expression; the tokenizer reads the slashes as operators."
+          },
+          {
+            "name": "an initializer declared after a semicolon",
+            "language": "swift",
+            "code": "class A { var n: Int; init(n: Int) { self.n = n } }",
+            "note": "Shiki leaves init and its label plain there; the tokenizer colours them as it does an initializer that starts its line."
+          }
+        ],
+        "knownDifferencesRule": "Measured differences from Shiki, each confirmed by the check to still differ (one that no longer does is taken out of this list)."
+      },
+      "lineNumbers": {
+        "rule": "Every runnable block shows its line numbers, always - editable and read-only, every language, no fence flag (ruling R1): an editable block in a gutter beside the editor (pre.plantoir-runner-gutter, aria-hidden, rewritten only when the line count changes, moved with the editor's vertical scroll, and never setting the frame's height - a gutter that did grew the frame to 12,020 px for 500 lines); a read-only block, and every Swift block, keeps its highlighted copy, whose lines Quartz already numbers. Line 1 is the code's first line, so a traceback's `line N` is the number the student sees. ONE style for the gutter and for every static code block on every site (support/quartz/components/styles/codeLines.scss, ruling R3): Quartz's own dimmed colour rgba(115, 138, 148, 0.6), the code font at the block's own size, right-aligned in a box --plantoir-digits characters wide (2; 3 from line 100 and 4 from line 1000, said in CSS so a page with no script has it - Quartz's 1rem box was too narrow from line 10), 0.75ch of padding, then a 1 px hairline in var(--lightgray), no fill. On paper the hairline is drawn down each line itself, past its wrapped rows, and the handout hangs a wrapped row under the first row's code, not under its number (print.scss, #585 plan review F4). No programming ligatures in any code block, the editor or its copy (ruling Q5)."
+      }
     },
     "print": {
-      "rule": "DECISION 8. On paper a runnable block prints as code and nothing else - no buttons, input box, status or output: an UNEDITED block prints its highlighted code as every other block does; an EDITED one prints the student's current code, from a copy kept in step with the editor (pre.plantoir-runner-print, wrapper class plantoir-runner-edited), because a textarea's typed value is not part of what a printed or copied page holds. The same rules serve ⌘P and the Print button (Paged.js promotes @media print), and the Print button waits for the copy to be brought up to date (window.plantoirPrint.prepare). Every rule is scoped under .plantoir-runner, so a page with no runnable block prints exactly as before (B2)."
+      "rule": "DECISION 8. On paper a runnable block prints as code and nothing else - no buttons, input box, status or output: an UNEDITED block prints its highlighted code as every other block does; an EDITED one prints the student's current code, from a copy (pre.plantoir-runner-print, wrapper class plantoir-runner-edited), because a textarea's typed value is not part of what a printed or copied page holds. Since #585 the copy is built as a static block is - pre > code > span[data-line], Shiki's own spans for the lines the student did not change and the editor's colours for those they did - so an edited block prints coloured and numbered exactly as an unedited one does (ruling Q3), and it is brought up to date when the page may be printed or left (beforeprint, pagehide, the Print button's window.plantoirPrint.prepare), not on every keystroke (#585 plan review S2: 29 ms per key for 500 lines at a sixfold CPU slowdown). The same rules serve ⌘P and the Print button (Paged.js promotes @media print). Every rule is scoped under .plantoir-runner, so a page with no runnable block prints exactly as before (B2)."
     },
     "words": {
       "note": "English, as data, on a page students read. {language} is the table row's displayName and {inputCall} its inputCall. No word names the machinery (CLAUDE.md rule 1): never the engine's name, WebAssembly, a worker or a thread. blockNotPrepared, blockAfterUnclosedFence and blockNotCompiled are reasons on a `plantoir: error:` line (siteDisagrees), which an assistant and a teacher read. cannotEdit, notReady, crashed and exitCode ({code}: the number the program gave exit()) are #493's: the note under a block whose language is not editable, the status of a block with no program, a program that trapped (its `Fatal error:` line, when it printed one, is already in the output), and a program that ended with a non-zero exit code. #583's: inputAhead (the box's line where the page cannot stop to ask), answerLabel, waitingForInput and endInput (live input), and notLiveBecause ({what}: notLiveFrame, notLivePicture or notLiveOther) and notLiveCapped ({count}), which are reasons on a `plantoir: note:` line (isolation) that a teacher and an assistant read.",
@@ -25757,7 +26393,9 @@
       "Netlify page paths are written lower-cased (and as-is where that differs beyond ASCII): measured with é, Ü, ß, è as a combining accent and 日本語; a name whose lower case Netlify and Python spell differently (the Turkish dotted İ) was not measured.",
       "The first ask of a program that a person did not start with Run - an autorun - raises no on-screen keyboard on an iPad until the student taps the field: iPadOS raises it only for a focus inside a tap (liveInput.focus).",
       "The note line for a runner page that keeps the box (words.notLiveBecause) is printed by each publish and by the preview's server when the page is first opened in that preview - not by the build: in preview mode Quartz builds inside its own server, after build_site.py can read the built pages, and `preview.sh --build-only` prints nothing (review N2, accepted by the director).",
-      "The not-live rule's two readers differ in edge cases Quartz never emits or that were not measured to break (review N3): frame words inside a <textarea> read as a frame to the preview's rule and not to the publish's (the stricter one errs safe); a CSS `@import \"https://...\"` written without url() is seen by neither; and a cross-origin <audio><source> is named with the frame's words (notLiveFrame) rather than notLiveOther."
+      "The not-live rule's two readers differ in edge cases Quartz never emits or that were not measured to break (review N3): frame words inside a <textarea> read as a frame to the preview's rule and not to the publish's (the stricter one errs safe); a CSS `@import \"https://...\"` written without url() is seen by neither; and a cross-origin <audio><source> is named with the frame's words (notLiveFrame) rather than notLiveOther.",
+      "Find in the page counts an editable block's code twice, and a drag selection that runs through the block copies its line numbers: the coloured copy and the gutter are aria-hidden and cannot be selected on their own, but find-in-page and a selection that crosses them still read them (#585 plan review S6).",
+      "The Swift tokenizer ships with no caller yet: every Swift block is read-only and shows Shiki's own highlighted copy, so codeRunnerColour.ts colours Swift only in the contract's cases and the check's agreement score until an editable Swift block exists (#579). Its row's `colour` is already \"swift\", so that block needs no further wiring."
     ]
   },
   "quizCallouts": {
