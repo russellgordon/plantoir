@@ -317,7 +317,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-19 | **Google Fonts request filtered** | `quartz/util/theme.ts`, `quartz/components/Head.tsx` | Quartz builds ONE stylesheet request from all three font choices, and this app offers system stacks. Google rejects the whole request if any family is unknown to it — HTTP 400, so NO fonts downloaded, including the code font mermaid measures in. System stacks and families are now filtered out, and an empty request is dropped entirely. |
 | C2-20 | **mhchem enabled** | `quartz/plugins/transformers/latex.ts` | Adds `import "katex/contrib/mhchem"`, so `$\ce{CaCO3(s) <=> CaO(s) + CO2(g)}$` renders. KaTeX runs at build time here, and the `katex` package Quartz already installs ships the extension, so this downloads nothing. |
 | C2-21 | **Curriculum coverage map styles** | `quartz/styles/base.scss` (appended) | The grid, chips, and the five-step red → orange → yellow → green → blue scale for the generated `Curriculum Coverage` page. The colours are deliberately NOT taken from the course's colour scheme — the map's whole meaning is that ordered reading, and a scheme that recoloured it would destroy that. The scale was SEARCHED rather than picked by eye: `scripts/choose_coverage_scale.py` scores candidates on CIEDE2000 separation and through deuteranopia and protanopia simulation, which is why the top step is blue rather than a darker green — the closest pair an ordinary-sighted reader now sees is ΔE 31, against ΔE 10 before. Cells carry the expectation's code and nothing else: a digit in every cell turned the map into a table of numbers, so the count now reaches a screen reader through the cell's label and a teacher through the hover preview. The legend is a vertical list below a rule, worded "addressed once", "addressed twice", and so on. The ring marking assessed work is two rings — white inside dark — so that it stays legible on all five cell colours; a single tone disappeared on either the yellow or the darkest step depending on which was chosen. The style block is REPLACED rather than skipped when it is already present, so a stylesheet surviving from an earlier build still picks up changes. |
-| C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form. Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
+| C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form — the slug being Quartz's own (`_quartz_segment_slug`: `Q&A Curriculum` is `Q-and-A-Curriculum`; until #569 only spaces were replaced, so a folder named with `&` stayed in every panel). Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
 | C2-22b | **Backlinks overall-expectation map (#505)** | `quartz/components/Backlinks.tsx` | Rewrites the one `const overallChildren = new Map<string, string[]>([…])` line behind the `// CQ4T-OVERALL-ANCHOR` comment, on every build and with or without a coverage map (`set_backlinks_overall_children`, called right after C2-22): each overall expectation page's slug, mapped to its specific expectations' slugs (`overall_backlink_children`). See D1. |
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
 | C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
@@ -432,12 +432,40 @@ folder with `_collect_expectations` and groups specific expectations under
 overall chips count the same work. It is built PER FOLDER (two curriculum
 folders can each have a B1, and each gathers only its own), and slugs are
 written as Quartz v4.5.0's `sluggify` writes them (white space to `-`, `&` to
-`-and-`, `%` to `-percent`, `?` and `#` dropped) by `_quartz_page_slug`; the
-older `_quartz_slug` handles only spaces, which the coverage map's links can
-live with but an exact slug comparison cannot. A digit-first or College
+`-and-`, `%` to `-percent`, `?` and `#` dropped) by `_quartz_page_slug`,
+which applies `_quartz_segment_slug` to each folder and to the page's name.
+A digit-first or College
 Board code has no overall expectation, so it gathers nothing. The map is a
 JavaScript `Map`, not an object literal, so a page whose slug is
 `constructor` finds nothing rather than a function.
+
+**The coverage map's links use the same slug (#569).** They used an older
+helper, `_quartz_slug`, that replaced only spaces. Measured on the #569 plan
+with the ICS3U example course: renaming `Curriculum/A3. Subprograms.md` to
+`A3. Subprograms 100% Done.md` stopped the build — Quartz said `URI malformed
+at decodeURI … transformInternalLink` on `Curriculum Coverage.md`, then a
+traceback and exit 1, with no sentence for the teacher. With the map's cells
+and chips on `_quartz_page_slug` the same course built (exit 0) and the chip
+linked `./Curriculum/A3.-Subprograms-100-percent-Done`, the page Quartz had
+emitted. A `#` ("A3. C# Basics") made the rest of the old href a fragment, and
+a folder named `Q&A Curriculum` gave links to `Q&A-Curriculum/…`, which Quartz
+does not serve. The same plan measured the backlinks side: with that folder,
+the structural set held `Q&A Curriculum` and `Q&A-Curriculum`, so its index
+(slug `Q-and-A-Curriculum/index`) was listed on every expectation — the noise
+#505 removed; it now holds `Q-and-A-Curriculum`. The slug is taken from the
+whole segment, never `Path.stem` (a folder `Gr. 9 Curriculum` would lose
+`. 9 Curriculum`). Measured on the #569 review: the new rule and the old one
+agree on all 13,998 file and folder names under `support/`, so no existing
+link moves. **Escaping was chosen over refusing** such a name with a folder
+problem: Quartz already serves the page at its slug and only our href was
+wrong, so a refusal would have given the teacher a sentence to act on where
+nothing needs doing. **Not de-duplicated:** a name with nothing to slug is
+still written twice into the structural set, as before, so the component's
+bytes for every existing course are the ones `scripts/test_coverage_maps.py`'s
+goldens hold. Cases: `curriculumRules.coverageMapLinks` (run by
+`test_coverage_maps.py`) and a fifth `overallBacklinks` case; verify.sh 6h
+plants `Curriculum/Z1. Planted 100% Overall.md` in the Example Course and reads
+the built map.
 
 **Rejected.** Direct links only (the panel would say "Not yet addressed in
 class." for work the coverage map counts). Two lists — direct links first,

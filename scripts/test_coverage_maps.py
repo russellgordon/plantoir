@@ -10,6 +10,7 @@ anybody noticing.
 
 The rule cases are deserialised from `contracts/shared-rules.json`
 (`curriculumRules.isExpectationCode`, `curriculumRules.coveragePageTitles`,
+`curriculumRules.coverageMapLinks` (#569, run by this file only),
 `specialNames.curriculumFoldersResolution`), the lists both apps run too. The
 single-map output is held to goldens captured from origin/dev BEFORE the
 change: a course with one map gets exactly the page it always had.
@@ -19,6 +20,7 @@ and Windows' PythonToolchainTests discovers it.
 """
 import io
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -482,6 +484,41 @@ class LowerCaseCodes(unittest.TestCase):
             self.assertIn("coverage-chip coverage-chip-yes", page)
             self.assertIn('aria-label="b2.3, addressed once, included in assessed work"', page)
             self.assertIn("| Overall expectations with no assessed work | 0 |", page)
+
+
+class TheMapLinksQuartzsSlugs(unittest.TestCase):
+    """#569: `curriculumRules.coverageMapLinks`. A `%` in an expectation's
+    name stopped the build ("URI malformed" on the map), and a `#` or a
+    folder named with `&` gave a link to a page Quartz does not serve: the
+    map's links replaced only spaces. They are Quartz's slugs now."""
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contracts()
+        cls.cases = contracts.section("shared-rules", "curriculumRules", "coverageMapLinks", "cases")
+
+    def href(self, page: str, reads: str, code: str) -> str:
+        if reads == "chip":
+            pattern = r'<a class="internal coverage-chip [^"]*" href="([^"]*)">' + re.escape(code) + "</a>"
+        else:
+            pattern = (r'<a class="internal coverage-cell [^"]*" href="([^"]*)"[^>]*'
+                       r'aria-label="' + re.escape(code) + ',')
+        found = re.findall(pattern, page)
+        self.assertEqual(len(found), 1, f"one {reads} for {code} expected, found {found}")
+        return found[0]
+
+    def test_every_case(self):
+        self.assertGreaterEqual(len(self.cases), 5)
+        for case in self.cases:
+            with self.subTest(case["name"]):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    for name in case["pages"]:
+                        write(root / name, "---\ntitle: " + Path(name).stem + "\n---\nAn expectation.\n")
+                    maps, _ = build(root, case["folders"])
+                    self.assertEqual(len(maps), 1, case["name"])
+                    page = (root / (maps[0]["title"] + ".md")).read_text(encoding="utf-8")
+                    self.assertEqual(self.href(page, case["reads"], case["code"]), case["href"])
 
 
 if __name__ == "__main__":

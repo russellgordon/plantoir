@@ -6534,13 +6534,6 @@ def _strand_sort_key(strand: str):
     return (0, 0, strand)
 
 
-def _quartz_slug(relative: Path) -> str:
-    """The URL Quartz gives a page: spaces become hyphens, no extension."""
-    parts = list(relative.parts)
-    parts[-1] = relative.stem
-    return "/".join(part.replace(" ", "-") for part in parts)
-
-
 def _is_single_folder_name(name: str) -> bool:
     """
     Whether a configured folder name is just that — a name, not a path.
@@ -7257,7 +7250,7 @@ def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assess
     nothing.
     """
     level = min(count, 4)
-    href = _quartz_slug(page.relative_to(content_root))
+    href = _quartz_page_slug(page.relative_to(content_root))
     marker = ' data-assessed="true"' if assessed else ""
     label = f"{code}, {COVERAGE_WORDS[level]}"
     if assessed:
@@ -7378,7 +7371,7 @@ def _coverage_page(content_root: Path, course_code: str, title: str, folder: str
             page = overall.get(overall_code)
             state = "yes" if evaluated else "no"
             if page:
-                href = _quartz_slug(page.relative_to(content_root))
+                href = _quartz_page_slug(page.relative_to(content_root))
                 chips.append(f'<a class="internal coverage-chip coverage-chip-{state}" '
                              f'href="{href}">{overall_code}</a>')
             else:
@@ -7506,18 +7499,23 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
         return
     plan = plan or []
     # Both forms: the folder is matched by name, but a page is matched by
-    # its SLUG, and Quartz slugs replace spaces with hyphens. Writing only
-    # the title left the coverage map in the panel it was meant to leave.
+    # its SLUG. Writing only the title left the coverage map in the panel it
+    # was meant to leave; writing a slug with only its spaces replaced left a
+    # folder named "Q&A Curriculum" in it, because Quartz's slug for that is
+    # `Q-and-A-Curriculum` (#569). A name with nothing to slug is written
+    # twice, as it always was: de-duplicating would change the component's
+    # bytes for every course, which test_coverage_maps.py's goldens (taken
+    # before #128) hold still.
     titles = [title for _, title in plan] or [COVERAGE_PAGE_TITLE]
     if COVERAGE_PAGE_TITLE not in titles:
         titles.append(COVERAGE_PAGE_TITLE)
     names = []
     for title in titles:
         names.append(title)
-        names.append(title.replace(" ", "-"))
+        names.append(_quartz_segment_slug(title))
     for folder, _ in plan:
         names.append(folder.name)
-        names.append(folder.name.replace(" ", "-"))
+        names.append(_quartz_segment_slug(folder.name))
     formatted = ", ".join(json.dumps(name, ensure_ascii=False) for name in names)
     text = backlinks_tsx_path.read_text(encoding="utf-8")
     pattern = re.compile(
@@ -7538,24 +7536,40 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
 
 
 
+def _quartz_segment_slug(segment: str) -> str:
+    """
+    Quartz v4.5.0's `sluggify` on ONE path segment — a folder's name, a page's
+    name without its extension, or a coverage map's title: white space becomes
+    a hyphen, `&` becomes `-and-`, `%` becomes `-percent`, and `?` and `#` are
+    dropped. Whole segment, never `Path.stem`: a folder "Gr. 9 Curriculum"
+    would lose ". 9 Curriculum" as a stem.
+    """
+    slug = re.sub(r"\s", "-", segment)
+    slug = slug.replace("&", "-and-").replace("%", "-percent")
+    slug = slug.replace("?", "").replace("#", "")
+    return slug
+
+
 def _quartz_page_slug(relative: Path) -> str:
     """
-    The slug Quartz gives a page, as its backlinks index spells it.
+    The slug Quartz gives a page — the address it serves the page at, and how
+    its backlinks index spells it.
 
-    Quartz v4.5.0's `sluggify`, segment by segment: white space becomes a
-    hyphen, `&` becomes `-and-`, `%` becomes `-percent`, and `?` and `#` are
-    dropped. `_quartz_slug` handles only the spaces, which is enough for the
-    coverage map's own links; the backlinks panel compares slugs exactly, so
-    a name with `&` in it would match nothing (#505 review, N8).
+    `_quartz_segment_slug` on each folder and on the page's name. The coverage
+    map's cells and chips link with it too (#569): they used an older helper
+    that replaced only spaces, so a page named "A3. Subprograms 100% Done"
+    put a raw `%` in an href and Quartz's `decodeURI` stopped the build with
+    "URI malformed", and a `#` ("A3. C# Basics") made the rest of the href a
+    fragment. Quartz already serves such a page at `…-100-percent-Done`; only
+    our href was wrong, so the build escapes the name rather than refusing it.
+    The backlinks panel compares slugs exactly, so a name with `&` in it would
+    otherwise match nothing (#505 review, N8).
     """
     parts = list(relative.parts)
     parts[-1] = relative.stem
     slugged = []
     for part in parts:
-        segment = re.sub(r"\s", "-", part)
-        segment = segment.replace("&", "-and-").replace("%", "-percent")
-        segment = segment.replace("?", "").replace("#", "")
-        slugged.append(segment)
+        slugged.append(_quartz_segment_slug(part))
     return "/".join(slugged)
 
 

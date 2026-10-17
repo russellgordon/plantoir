@@ -1796,6 +1796,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Discussions/Runner Printable.md" \
         "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
         "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
+        "$HIT_COURSE/Curriculum/Z1. Planted 100% Overall.md" "$HIT_COURSE/Curriculum/Z1.1.md" \
         "$HIT_COURSE/Quiz Fixture.md" "$HIT_COURSE/Quiz CRLF.md" "$HIT_COURSE/Quiz Lookalikes.md" \
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
@@ -2560,6 +2561,16 @@ printf -- '---\ntitle: Overall Fixture plantoir-overall-both-7f3a\n---\nA page p
   > "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md"
 printf -- '---\ntitle: Overall Specific plantoir-overall-specific-7f3a\n---\nA page planted by verify.sh that connects to one specific expectation only.\n\n![[A2.1]]\n' \
   > "$HIT_COURSE/Discussions/Overall Backlinks Specific.md"
+# ---- #569: a % in an expectation's name, planted for the same build ----
+# An overall expectation whose file name holds "%", and one specific
+# expectation under it so the coverage map draws its chip. Before #569 the
+# chip's href kept the raw "%" and Quartz stopped the whole build with "URI
+# malformed" on the coverage map (measured on the #569 plan). Strand Z, so no
+# real expectation's cell or chip moves. Removed by restore_hit_fixture.
+printf -- '---\ntitle: Z1. Planted 100%% Overall\n---\nAn overall expectation planted by verify.sh (#569).\n' \
+  > "$HIT_COURSE/Curriculum/Z1. Planted 100% Overall.md"
+printf -- '---\ntitle: Z1.1\n---\nA specific expectation planted by verify.sh under Z1 (#569).\n' \
+  > "$HIT_COURSE/Curriculum/Z1.1.md"
 # ---- #563: self-check quizzes, planted for the same build ----
 # Quiz Fixture: every contracts/shared-rules.json -> quizCallouts.recognise
 # case in order, each after a "Case n" line (6k reads each quiz's kind or
@@ -2811,6 +2822,18 @@ then
   pass "An overall expectation's page lists the pages of its specific expectations, a page linking both is listed once, and the specific expectation's page is unchanged (#505)"
 else
   fail "An overall expectation's \"When did we do this?\" panel is wrong (#505) - see the lines above"
+fi
+
+# ---- 6h, continued: a % in an expectation's name (#569) ----
+# The build above passed with the planted "Z1. Planted 100% Overall" page in
+# the curriculum folder; before #569 it stopped there. The coverage map's chip
+# must link Quartz's own slug, and that page must be in the site.
+if [[ -f "$SITE_PUBLIC/Curriculum-Coverage.html" ]] \
+   && grep -Fq 'Curriculum/Z1.-Planted-100-percent-Overall"' "$SITE_PUBLIC/Curriculum-Coverage.html" \
+   && [[ -f "$SITE_PUBLIC/Curriculum/Z1.-Planted-100-percent-Overall.html" ]]; then
+  pass "A % in an expectation's file name builds, and the coverage map links the page Quartz serves (#569)"
+else
+  fail "The coverage map's link to a page named with % is wrong, or the page is missing (#569): $SITE_PUBLIC/Curriculum-Coverage.html, $SITE_PUBLIC/Curriculum/Z1.-Planted-100-percent-Overall.html"
 fi
 
 # ---- 6h, continued: printable pages (#454) ----
