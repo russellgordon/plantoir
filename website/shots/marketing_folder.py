@@ -534,12 +534,12 @@ def refresh_runnable_pages(course_dir: Path, payload_shared: Path, codes_by_page
         codes = codes_by_page.get(place[:-3], [])
         kept_core = without_curriculum_markers(without_embeds_of(kept_body, codes))
         wanted_core = without_curriculum_markers(payload_body)
-        if has_code_runner(kept_head):
-            if kept_core == wanted_core:
-                report.note("already there", label)
-            else:
-                report.note("left as you changed it", label)
+        if has_code_runner(kept_head) and kept_core == wanted_core:
+            report.note("already there", label)
             continue
+        # Already runnable but the payload has moved on since (#583 reworded
+        # its input sentences): brought up to date by the same rule - only
+        # when the kept page is still exactly what an earlier payload made.
         made_earlier = False
         for version in earlier_versions(source):
             _, earlier_body = split_frontmatter(version)
@@ -549,7 +549,7 @@ def refresh_runnable_pages(course_dir: Path, payload_shared: Path, codes_by_page
         if not made_earlier:
             report.note("left as you changed it", label)
             continue
-        head = with_code_runner(kept_head)
+        head = kept_head if has_code_runner(kept_head) else with_code_runner(kept_head)
         kept_path.write_text("---\n" + "\n".join(head) + "\n---" + wanted_core, encoding="utf-8")
         report.note("made", label)
 

@@ -364,6 +364,32 @@ class CodePageTests(unittest.TestCase):
         self.assertIn(f"made: ICS3U/{place}.md runnable", report.lines)
         self.assertEqual(refreshed, up_to_date, "the payload's runnable page, with the embeds put back where they were")
 
+    def test_a_runnable_page_whose_payload_moved_on_is_brought_up_to_date(self):
+        # #583 reworded the payload's input sentences on pages that were
+        # already runnable: a kept page still exactly an earlier payload's
+        # runnable version takes the new words, its frontmatter kept.
+        place = "Programs/Talking to the User"
+        source = SUPPORT / "example_content" / "ICS3U" / "shared" / (place + ".md")
+        current = source.read_text(encoding="utf-8")
+        earlier = current.replace("press Run, and when it asks, type", "type, on two lines of the input box,")
+        self.assertNotEqual(earlier, current)
+
+        def versions(path: Path) -> list:
+            return [earlier] if path == source else []
+
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = staged_folder(Path(temporary))
+            kept = folder / "courses" / "ICS3U" / (place + ".md")
+            kept.write_text(installed(earlier).replace("publishForSection2: true\n", "publishForSection2: true\ncodeRunner: true\n", 1)
+                            if "codeRunner: true" not in installed(earlier) else installed(earlier), encoding="utf-8")
+            before = kept.read_text(encoding="utf-8")
+            report = mf.Report()
+            mf.apply_code_steps(folder, report, earlier_versions=versions)
+            after = kept.read_text(encoding="utf-8")
+        self.assertIn(f"made: ICS3U/{place}.md runnable", report.lines)
+        self.assertIn("press Run, and when it asks, type", after)
+        self.assertEqual(after.split("\n---", 1)[0], before.split("\n---", 1)[0], "the frontmatter is kept")
+
     def test_a_page_somebody_changed_is_left_as_they_changed_it(self):
         place = "Warm-Ups/Spot the Bug"
         source = SUPPORT / "example_content" / "ICS3U" / "shared" / (place + ".md")
