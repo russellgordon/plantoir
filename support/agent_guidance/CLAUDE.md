@@ -22,3 +22,9 @@ matches the task before writing:
   (`.claude/skills/plantoir-runnable-code/SKILL.md`) - how to opt the page
   in, the ` ```python run ` block and its flags, input, and what the
   standard library can and cannot do.
+- **Questions students check themselves** - "add a 5-question check", a
+  quiz, practice questions, a self-check, an exit ticket, multiple choice,
+  fill in the blank: the `plantoir-quizzes` skill
+  (`.claude/skills/plantoir-quizzes/SKILL.md`) - the ` > [!quiz] ` callout
+  for every kind, how answers are checked, shuffling, and graphs and code
+  inside questions.
