@@ -125,7 +125,14 @@ does not exist, is reported. `--check` turns that into a non-zero exit, which
 is what the release checklist runs.
 
 **Add a page to `site.json`'s `nav` list** or it will be built but never
-linked.
+linked. Measure the header before you do: nine links (since #587) fit one
+row from 820 px up, and two rows on a phone only just. At the phone sizes in
+`assets/style.css` (14 px, 12 px gap; 13.5 px, 10 px gap at 370 px and
+below), 373 px gives two rows and 371 px gives three, and 360 px gives two
+and 355 px three. That leaves about 2–5 px to spare at 360–390 px (measured
+2026-10-17, Chrome for Testing). Android's Roboto or a larger text setting
+can tip 360 or 375 back to three rows, which is harmless, since the page
+never scrolls sideways. A tenth link needs a new layout, not a smaller font.
 
 ## Screenshots
 
