@@ -351,6 +351,10 @@ def matches_outside_code(pattern, text: str, ranges: list = None, offset: int = 
 
 # A list item's marker and the spaces after it, on the line a fence opens on.
 _LIST_MARKER = re.compile(r"^[ \t]*(?:[-*+]|[0-9]{1,9}[.)])[ \t]+")
+# Another container opened on that same line after the marker: a second
+# marker (`- - ```...`) or a quote (`1. > ```...`). The site's parser reads a
+# fence there, so fenced_blocks does too, marking it `nested` (#455 review S2).
+_NESTED_CONTAINER = re.compile(r"^(?:(?:[-*+]|[0-9]{1,9}[.)])[ \t]+|>[ \t]?)")
 
 
 def _column(prefix: str) -> int:
@@ -417,7 +421,9 @@ def fenced_blocks(text: str) -> list:
     {"lang": the info string's first word as written, "meta": the rest of it,
      "body": the content with the quote markers of the fence's depth and up
      to the opener's own indent taken off each line, joined with "\\n",
-     "line": the 1-based line of the OPENING fence in `text` as given}.
+     "line": the 1-based line of the OPENING fence in `text` as given,
+     "nested": True when the opening line also opened another container
+     after a list marker}.
 
     The rule is the one `code_ranges` uses (readingALink.whatIsCode); an
     unclosed fence runs to the end of the page, and a line at a smaller quote
@@ -425,7 +431,12 @@ def fenced_blocks(text: str) -> list:
     `1. ```functionplot`) IS a block here (#485 E1 review S1: the site's
     parser draws one, so the build must draw it too); its content lines lose
     up to the fence's own column of indent, as CommonMark's list item does.
-    `code_ranges` keeps its #313 rule unchanged.
+    So is one opened after a second container on that line (`- - ```...`,
+    `1. > ```...`), marked `nested` (#455 review S2): the site's parser reads a
+    block there, and before this the build read its closing fence as an
+    opening one and misread every fence after it. Callers decide what a
+    nested block is worth - figures and runnable code both leave it alone,
+    as they always did. `code_ranges` keeps its #313 rule unchanged.
     """
     stripped, origin = _without_comments(text)
     found = []
@@ -439,6 +450,7 @@ def fenced_blocks(text: str) -> list:
                 "meta": open_block["meta"],
                 "body": "\n".join(open_block["lines"]),
                 "line": open_block["line"],
+                "nested": open_block["nested"],
             })
         open_block = None
 
@@ -468,24 +480,41 @@ def fenced_blocks(text: str) -> list:
         else:
             fence = _FENCE.match(body)
             marker = 0
+            nested = False
+            quotes_after_marker = 0
             if not fence:
                 after_marker = _LIST_MARKER.match(body)
                 if after_marker:
-                    fence = _FENCE.match(body[after_marker.end():])
                     marker = after_marker.end()
+                    fence = _FENCE.match(body[marker:])
+                    # `- - ```` or `1. > ````: more containers, then the fence.
+                    while not fence:
+                        container = _NESTED_CONTAINER.match(body[marker:])
+                        if not container:
+                            break
+                        nested = True
+                        if container.group(0).startswith(">"):
+                            quotes_after_marker += 1
+                        marker += container.end()
+                        fence = _FENCE.match(body[marker:])
             if fence and not (fence.group(1)[0] == "`" and "`" in fence.group(2)):
                 info = fence.group(2).strip(_WHITESPACE)
                 words = info.split(None, 1)
                 where = line_start if origin is None else origin[line_start]
+                indent = _column(body[:marker + len(body[marker:]) - len(body[marker:].lstrip(" \t"))])
                 open_block = {
                     "char": fence.group(1)[0],
                     "length": len(fence.group(1)),
-                    "depth": depth,
-                    "indent": _column(body[:marker + len(body[marker:]) - len(body[marker:].lstrip(" \t"))]),
+                    # A quote opened after the marker holds the block: its
+                    # lines carry that `>` too (`   > print(7)`), and a line
+                    # without it ends the block, as the site reads it.
+                    "depth": depth + quotes_after_marker,
+                    "indent": 0 if quotes_after_marker else indent,
                     "lang": words[0] if words else "",
                     "meta": words[1] if len(words) > 1 else "",
                     "line": text.count("\n", 0, where) + 1,
                     "lines": [],
+                    "nested": nested,
                 }
 
         if newline < 0:

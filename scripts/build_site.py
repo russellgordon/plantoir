@@ -1633,6 +1633,41 @@ def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, ful
                 "drawn": 0, "fromBefore": 0, "figures": 0}
 
 
+def _count_runner_pages(content_root: Path) -> dict:
+    """
+    Runnable code (#455; page_features.RUNNER_LANGUAGES): how many pages
+    students can see make the site carry each language's engine - the page
+    says `codeRunner: true` (read from the build's own copy, after
+    process_frontmatter has written it back) AND holds a runnable block of
+    that language. The same pages figures.py reads, by the gate's own
+    visibility rule. Never stops a build: a page that cannot be read counts
+    for nothing, and if this cannot run at all the blocks stay plain code.
+    """
+    counts = {}
+    for row in page_features.RUNNER_LANGUAGES.values():
+        counts[row["engine"]] = 0
+    if frontmatter is None:
+        return counts
+    try:
+        pages = figures.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            lambda page: None, skip=_is_media_name)
+    except Exception as error:
+        print(f"⚠️ Could not look for code students run: {error}")
+        return counts
+    for page in pages:
+        if "codeRunner" not in page["text"]:
+            continue
+        try:
+            post = frontmatter.loads(page["text"])
+        except Exception:
+            continue
+        for engine in page_features.runner_engines_on_page(post.get("codeRunner"), post.content):
+            counts[engine] = counts.get(engine, 0) + 1
+    return counts
+
+
 LOCALES_SRC_CANDIDATES = [
     Path("support/locales"),
     toolchain_paths.SUPPORT_DIR / "locales",
@@ -7662,6 +7697,8 @@ def build_section_site(
     # the checks, so a figure that cannot be drawn is said where every folder
     # problem is said.
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
+    # Runnable code (#455), ALWAYS: which language engines this site carries.
+    runner_pages_here = _count_runner_pages(content_root)
 
     health_facts = {
         "coverage_wanted": coverage_wanted,
@@ -7845,9 +7882,22 @@ def build_section_site(
     # edit to quartz.layout.ts above, so nothing rewrites the wrapped line.
     # A graph's engine rides the same gate (#485 E1): its count comes from the
     # figures pass, not from a page setting.
+    # Runnable code's engines ride it too (#455), each with its overlay from
+    # support/gated, and the site is told which engines it carries, so a block
+    # the build did not count stays plain code with a `plantoir: error:` line
+    # rather than a Run button that can never work (codeRunnerBlocks.siteDisagrees).
     gated_counts = dict(print_pages_here["counts"])
     gated_counts.update(figures_here["counts"])
-    page_features.install_gated_assets(output_dir, gated_counts)
+    gated_counts.update(runner_pages_here)
+    gated_outcome = page_features.install_gated_assets(output_dir, gated_counts)
+    carried_runner_engines = set()
+    for engine in runner_pages_here:
+        if gated_outcome.get(engine, {}).get("installed"):
+            carried_runner_engines.add(engine)
+    try:
+        page_features.write_runner_words(output_dir, carried_runner_engines)
+    except OSError as error:
+        print(f"⚠️ Could not set up the code students run: {error}")
     try:
         print_settings.write(output_dir, config, displayed_course_code(config, course_code))
     except Exception as error:

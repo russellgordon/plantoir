@@ -21,22 +21,54 @@ frontmatter, so its test runs on a machine without it (Windows'
 PythonToolchainTests). What PyYAML makes of each TYPED line is checked down the
 real chain, inside the image, by `check_print_rules_against_the_site.py`.
 
-#455 adds `codeRunner` to GATED_ASSETS beside `printable`. #485 E1 added
-`function-plot`, which no frontmatter key asks for: a ```functionplot fence on
-a page students can see does (scripts/figures.py counts them), and the build
-hands the count in beside the printable pages'.
+#485 E1 added `function-plot`, which no frontmatter key asks for: a
+```functionplot fence on a page students can see does (scripts/figures.py
+counts them), and the build hands the count in beside the printable pages'.
+
+#455 adds a third key, `codeRunner: true`, and with it the LANGUAGE TABLE
+(RUNNER_LANGUAGES, the literal mirror of contracts/shared-rules.json ->
+codeRunnerBlocks.languages): a page that opts in AND holds a runnable block of
+a language (```python run) makes its site carry that language's engine. The
+engine is VENDOR_DIR/<engine> with SUPPORT_DIR/gated/<engine> laid over it
+(the page's own half, plantoir-worker.js), so the worker reaches the image and
+the Windows runtime through support/ without a line of its own. The fence rule,
+the gate and the words read the table, never the word "python".
 """
 
+import json
 import os
 import shutil
 import unicodedata
 from pathlib import Path
 
+import contracts
+import markdown_code
 import toolchain_paths
 
+# The languages a ```<fence> run block can be written in (#455): the literal
+# mirror of contracts/shared-rules.json -> codeRunnerBlocks.languages, keyed by
+# `fence`, which test_page_features.py pins field for field. A literal rather
+# than a read of the contract because the gate must work where the contract
+# cannot be read (a stale copy), and the site's own mirror
+# (support/quartz/plugins/transformers/codeRunnerRule.ts) has to be a literal
+# anyway. A second language is a second row here and there - nothing else in
+# this file names a language.
+RUNNER_LANGUAGES = {
+    "python": {"idPrefix": "py", "displayName": "Python", "runtime": "pyodide", "engine": "pyodide",
+               "worker": "plantoir-worker.js", "editable": True, "flags": ("readonly", "stdin", "autorun"),
+               "inputCall": "input()", "inputPattern": r"\binput\s*\(", "prebuilt": False},
+}
+
+# The file the site's code reads: the words, the limits and the engines this
+# site carries (codeRunnerBlocks.siteDisagrees), written on every build.
+RUNNER_WORDS_FILE = "plantoir_code_runner.json"
+
 # Which engine each opt-in key pulls into a site. The engine's folder under
-# VENDOR_DIR, and under the site's quartz/static, has the same name.
+# VENDOR_DIR, and under the site's quartz/static, has the same name. Every
+# runnable language's engine rides the `codeRunner` key.
 GATED_ASSETS = {"pagedjs": "printable", "function-plot": "functionplot"}
+for _row in RUNNER_LANGUAGES.values():
+    GATED_ASSETS[_row["engine"]] = "codeRunner"
 
 # What the build says about each engine, in the words of what it is FOR - a
 # graph is not a print layout (#485 review S9: the first draft would have
@@ -55,6 +87,18 @@ ENGINE_WORDS = {
         "failed": "⚠️ Could not set up the graphs: {error}",
     },
 }
+# A runnable language's engine is said in the words of what it is for: the
+# language a student runs. {language} is the table's displayName.
+_RUNNER_ENGINE_WORDS = {
+    "missing": "⚠️ {pages} page(s) have {language} code to run, but this copy of Plantoir is missing "
+               "what runs it, so students will see the code without a Run button.",
+    "carried": "▶️  This site carries what runs {language} for {pages} {noun}.",
+    "failed": "⚠️ Could not set up {language} for the code students run: {error}",
+}
+for _row in RUNNER_LANGUAGES.values():
+    ENGINE_WORDS[_row["engine"]] = {
+        kind: text.replace("{language}", _row["displayName"]) for kind, text in _RUNNER_ENGINE_WORDS.items()
+    }
 
 # A PDF's first five bytes. A file named .pdf that does not start with them
 # opens in a browser as an error page, which is worse than the handout.
@@ -175,16 +219,26 @@ def resolve_print_pdf(value, printable: bool, visible: bool, media_dir) -> dict:
     return {"button": "pdf", "file": found, "problem": None, "typed": name}
 
 
-def _sync_folder(source: Path, target: Path) -> int:
-    """Copy `source` over `target` where the bytes differ; drop extras. Counts copies."""
+def _sync_folder(sources, target: Path) -> int:
+    """
+    Copy `sources` over `target` where the bytes differ; drop extras. Counts
+    copies. `sources` is one folder or a list of them, LATER ones winning
+    file by file (#455: the engine, then its overlay from support/gated) -
+    one pass rather than a copy after the sync, which would delete the
+    overlay as an extra and copy it again on every build.
+    """
+    if isinstance(sources, (str, Path)):
+        sources = [sources]
     copied = 0
     target.mkdir(parents=True, exist_ok=True)
-    wanted = set()
-    for item in sorted(source.rglob("*")):
-        if not item.is_file():
-            continue
-        relative = item.relative_to(source)
-        wanted.add(relative)
+    wanted = {}
+    for source in sources:
+        source = Path(source)
+        for item in sorted(source.rglob("*")):
+            if item.is_file():
+                wanted[item.relative_to(source)] = item
+    for relative in sorted(wanted):
+        item = wanted[relative]
         destination = target / relative
         if destination.is_file() and destination.read_bytes() == item.read_bytes():
             continue
@@ -197,16 +251,22 @@ def _sync_folder(source: Path, target: Path) -> int:
     return copied
 
 
-def install_gated_assets(output_dir, counts: dict, vendor_dir=None, printer=print) -> dict:
+def install_gated_assets(output_dir, counts: dict, vendor_dir=None, printer=print, support_dir=None) -> dict:
     """
     Put each engine into the site's quartz/static when at least one page
     students can see asks for it, and take it out when none does.
 
     `counts` is {engine: pages asking}. Never raises: a missing engine is said
     in one plain line and the build carries on, because the Print button still
-    prints without it (the browser lays the page out instead).
+    prints without it (the browser lays the page out instead), a graph shows
+    its text, and runnable code stays plain code.
+
+    An engine with an overlay in SUPPORT_DIR/gated/<engine> (#455's worker)
+    gets it laid over the vendor copy. The vendor folder IS the engine: an
+    overlay alone installs nothing and is said as missing.
     """
     vendor = Path(vendor_dir) if vendor_dir is not None else toolchain_paths.VENDOR_DIR
+    support = Path(support_dir) if support_dir is not None else toolchain_paths.SUPPORT_DIR
     static = Path(output_dir) / "quartz" / "static"
     outcome = {}
     for engine in GATED_ASSETS:
@@ -221,9 +281,15 @@ def install_gated_assets(output_dir, counts: dict, vendor_dir=None, printer=prin
             said = ENGINE_WORDS[engine]
             source = vendor / engine
             if not source.is_dir():
+                if target.exists():
+                    shutil.rmtree(target, ignore_errors=True)
                 printer(said["missing"].format(pages=pages))
                 continue
-            outcome[engine]["copied"] = _sync_folder(source, target)
+            sources = [source]
+            overlay = support / "gated" / engine
+            if overlay.is_dir():
+                sources.append(overlay)
+            outcome[engine]["copied"] = _sync_folder(sources, target)
             outcome[engine]["installed"] = True
             noun = "page" if pages == 1 else "pages"
             printer(said["carried"].format(pages=pages, noun=noun))
@@ -232,26 +298,123 @@ def install_gated_assets(output_dir, counts: dict, vendor_dir=None, printer=prin
     return outcome
 
 
-# ---- Runnable code (#455) - STUBS, replaced by the next commit ----
-RUNNER_LANGUAGES = {}
-RUNNER_WORDS_FILE = "plantoir_code_runner.json"
+
+# ---- Runnable code (#455): contracts/shared-rules.json -> codeRunnerBlocks ----
+
+def _runner_row(fence: str):
+    row = RUNNER_LANGUAGES.get(fence)
+    if row is None:
+        return None
+    return dict(row, fence=fence)
 
 
 def runner_for(lang, meta, opted_in):
-    raise NotImplementedError("#455")
+    """
+    Is a fence with this info string a runnable block (codeRunnerBlocks.fences)?
+    Answers {"fence", "flags", "row"} or None. The language is the info
+    string's first word, exactly; `run` must be a whitespace-separated token
+    of the rest; flags are the row's own, exact, each once, in the row's order.
+    """
+    if not opted_in:
+        return None
+    row = _runner_row(lang or "")
+    if row is None:
+        return None
+    tokens = (meta or "").split()
+    if "run" not in tokens:
+        return None
+    flags = [flag for flag in row["flags"] if flag in tokens]
+    return {"fence": row["fence"], "flags": flags, "row": row}
 
 
-def runner_fences(body, opted_in):
-    raise NotImplementedError("#455")
+def runner_fences(body: str, opted_in) -> list:
+    """
+    The runnable blocks on one page's body, in order, read with the #313 fence
+    rule (markdown_code.fenced_blocks): [{"fence", "flags", "line", "body"}].
+    A block opened after a second container on a list marker's line is not
+    runnable (codeRunnerBlocks.fences.pageShapes), on either side.
+    """
+    if not opts_in(opted_in) or ("```" not in body and "~~~" not in body):
+        return []
+    found = []
+    for block in markdown_code.fenced_blocks(body):
+        if block["nested"]:
+            continue
+        runner = runner_for(block["lang"], block["meta"], True)
+        if runner is None:
+            continue
+        found.append({"fence": runner["fence"], "flags": runner["flags"],
+                      "line": block["line"], "body": block["body"]})
+    return found
 
 
-def runner_ids(slug, body):
-    raise NotImplementedError("#455")
+def runner_id(slug: str, fence: str, n: int) -> str:
+    """`<slug>-<idPrefix>-<n>` (codeRunnerBlocks.ids)."""
+    return f"{slug}-{RUNNER_LANGUAGES[fence]['idPrefix']}-{n}"
 
 
-def runner_engines_on_page(code_runner_value, body):
-    raise NotImplementedError("#455")
+def runner_ids(slug: str, body: str) -> list:
+    """The id of every runnable block on a page that opts in, n counting each
+    language's blocks from 1. The site names them (codeRunner.ts); this is the
+    same rule, for the contract's cases."""
+    counts = {}
+    ids = []
+    for runner in runner_fences(body, True):
+        counts[runner["fence"]] = counts.get(runner["fence"], 0) + 1
+        ids.append(runner_id(slug, runner["fence"], counts[runner["fence"]]))
+    return ids
 
 
-def write_runner_words(output_dir, carried):
-    raise NotImplementedError("#455")
+def runner_engines_on_page(code_runner_value, body: str) -> set:
+    """The engines one page makes its site carry: none unless it opts in
+    (`codeRunner` is the boolean true) AND holds a runnable block of the
+    language (codeRunnerBlocks.siteCarriesEngine). The caller applies the
+    visibility rule."""
+    engines = set()
+    for runner in runner_fences(body, code_runner_value):
+        engines.add(RUNNER_LANGUAGES[runner["fence"]]["engine"])
+    return engines
+
+
+def runner_words() -> dict:
+    """What quartz/plantoir_code_runner.json carries, apart from `carried`."""
+    rules = contracts.section("shared-rules", "codeRunnerBlocks")
+    words = {}
+    for key, text in rules["words"].items():
+        if key != "note":
+            words[key] = text
+    return {
+        "words": words,
+        "limits": {
+            "outputCharacters": rules["output"]["maxCharacters"],
+            "loadSeconds": rules["loading"]["watchdogSeconds"],
+            "debounceMilliseconds": rules["storage"]["debounceMilliseconds"],
+            "editorLines": rules["editor"]["maxLines"],
+            "indent": rules["editor"]["indent"],
+        },
+    }
+
+
+def write_runner_words(output_dir, carried) -> bool:
+    """
+    Write quartz/plantoir_code_runner.json - the words and limits from the
+    contract, and the engines this site carries - where the page's code
+    (bundled into the site's script) and the transformer read it. Same input,
+    same bytes; answers whether the file changed. If the contract cannot be
+    read, the file still says which engines are carried, with no words, and
+    the transformer then makes no block runnable.
+    """
+    try:
+        content = runner_words()
+    except Exception as error:  # a stale contract must not stop a build
+        print(f"⚠️ Could not read the words for the code students run: {error}")
+        content = {"words": {}, "limits": {}}
+        carried = set()
+    content["carried"] = sorted(carried)
+    data = (json.dumps(content, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
+    path = Path(output_dir) / "quartz" / RUNNER_WORDS_FILE
+    if path.is_file() and path.read_bytes() == data:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return True
