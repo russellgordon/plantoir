@@ -58,6 +58,7 @@ import {
   parseAnswerLine,
   QuizModel,
   splitAlternatives,
+  TASK_ITEM_TEXT,
   Verdict,
   verdict,
 } from "./quizRules"
@@ -69,6 +70,7 @@ type PageFindings = {
   nested: number
   nestedProblems: number[]
   lines?: Array<number | null>
+  nestedLines?: Array<number | null>
 }
 type QuizPages = { examined: string[]; pages: Record<string, PageFindings> }
 
@@ -440,6 +442,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
   let choices: Array<boolean | null> = []
   const answers: string[][] = []
   let blanks = blanksInTitle(titleHtml)
+  let htmlChoices = false
   for (const child of content?.children ?? []) {
     const kind = calloutKind(child)
     if (child.type === "list") {
@@ -456,6 +459,12 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
       answers.push(answerLines(child, source))
     } else if (child.type === "paragraph") {
       blanks += blanksIn(child)
+    } else if (child.type === "html") {
+      for (const line of String((child as unknown as Html).value).split("\n")) {
+        if (TASK_ITEM_TEXT.test(line)) {
+          htmlChoices = true
+        }
+      }
     }
   }
   return {
@@ -464,6 +473,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
     choices,
     answers,
     blanks,
+    htmlChoices,
   }
 }
 
@@ -555,7 +565,18 @@ export const PlantoirQuizzes: QuartzTransformerPlugin = () => ({
             const line = found.lines?.[place - 1]
             return typeof line === "number" ? `quiz ${place}, line ${line}` : `quiz ${place}`
           }
-          if (found.quizzes !== n || found.nested !== nested) {
+          if (found.quizzes === n && found.nested !== nested) {
+            // Only the quizzes inside a list or callout differ: name the
+            // first of those the folder check found, by its own line.
+            const line = found.nestedLines?.find((value) => typeof value === "number")
+            sayDisagreement(
+              page,
+              typeof line === "number" ? `a quiz inside a list or another callout at line ${line}` : "a quiz inside a list or another callout",
+              said,
+            )
+            return
+          }
+          if (found.quizzes !== n) {
             // No place can be trusted when the counts differ: name the first
             // quiz either side found.
             const line = found.lines?.find((value) => typeof value === "number")

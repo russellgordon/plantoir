@@ -31,6 +31,9 @@ export type QuizModel = {
   choices: Array<boolean | null>
   answers: string[][]
   blanks: number
+  // A list of choices that an HTML block swallowed (a `<div>` or a line
+  // holding only a tag straight before it): the site reads it as HTML.
+  htmlChoices?: boolean
 }
 
 export type QuizKind = "single" | "multiple" | "short" | "fill"
@@ -296,8 +299,14 @@ export function verdict(model: QuizModel): Verdict {
     }
     return { kind: "fill", shuffle, correct: [], answers: lines.slice() }
   }
+  if (model.htmlChoices) {
+    return problem("choicesInHtml")
+  }
   return problem("nothingToCheck")
 }
+
+// A task item, as it would read if it were not inside HTML.
+export const TASK_ITEM_TEXT = /^ {0,3}(?:[-*+]|[0-9]{1,9}[.)])[ \t]+\[[ xX]\][ \t]+\S/
 
 // A blank in a question: a code span holding only three or more underscores.
 // `value` is the span as the site's parser reads it, which has already taken
@@ -329,6 +338,13 @@ const FENCE_OPEN = /^((?:[-*+]|[0-9]{1,9}[.)])[ \t]+)*(`{3,}|~{3,})(.*)$/
 const BLOCK_START =
   /^[ \t]{0,3}(?:[-*+](?:[ \t]|$)|[0-9]{1,9}[.)](?:[ \t]|$)|#{1,6}(?:[ \t]|$)|`{3,}|~{3,}|<|(?:-[ \t]*){3,}$|(?:\*[ \t]*){3,}$|(?:_[ \t]*){3,}$)/
 const LIST_ITEM = /^([-*+]|[0-9]{1,9}[.)])([ \t]+|$)/
+// CommonMark's HTML blocks of types 6 (a block-level tag) and 7 (a line
+// holding only one whole tag, which cannot interrupt a paragraph), each to
+// the next empty line - the folder check's _HTML_BLOCK and _HTML_TAG_LINE.
+const HTML_BLOCK =
+  /^ {0,3}<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:[ \t>]|\/>|$)/i
+const HTML_TAG_LINE =
+  /^ {0,3}(?:<(?!(?:script|style|pre|textarea)\b)[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>]*)?\/?>|<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$/i
 const CALLOUT_START = /^\[![\w-]+(?:\|.*?)?\][+-]?/
 
 // Columns of leading spaces and tabs from `at`, and where they end.
@@ -426,6 +442,7 @@ export function nestedTitlesOwnTheirLine(source: string): string {
   let quizDepth = 0
   let paragraph = false
   let previousBlank = true
+  let inHtml = false
   // The content column of the page-level list item the lines belong to.
   let listContent = 0
   for (const line of lines) {
@@ -451,6 +468,16 @@ export function nestedTitlesOwnTheirLine(source: string): string {
       quizDepth = 0
       paragraph = false
       previousBlank = true
+      inHtml = false
+      continue
+    }
+    // An HTML block at the page's level: everything to the next empty line
+    // is HTML, quiz syntax included, and is never changed.
+    if (inHtml || (depth === 0 && listContent === 0 && (HTML_BLOCK.test(line) || (!paragraph && HTML_TAG_LINE.test(line))))) {
+      inHtml = true
+      previousBlank = false
+      paragraph = false
+      quizDepth = 0
       continue
     }
     if (depth === 0) {

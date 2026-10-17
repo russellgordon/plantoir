@@ -274,7 +274,8 @@ class QuizFilesTests(unittest.TestCase):
         checked = quizzes.check_pages(pages, printer=said.append)
         self.assertEqual(checked["examined"], ["Other.md", "Units/Practice.md"])
         self.assertEqual(checked["pages"], {"Units/Practice.md": {"quizzes": 2, "problems": [2], "nested": 1,
-                                                                  "nestedProblems": [1], "lines": [None, None]}})
+                                                                  "nestedProblems": [1], "lines": [None, None],
+                                                                  "nestedLines": [None]}})
         self.assertEqual(len(said), 2)
         self.assertTrue(said[0].startswith("plantoir: error: Units/Practice.md: quiz 2: "))
         self.assertTrue(said[1].startswith("plantoir: error: Units/Practice.md: "))

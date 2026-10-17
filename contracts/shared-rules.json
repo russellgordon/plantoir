@@ -25085,7 +25085,7 @@
   },
   "quizCallouts": {
     "note": "#563, v1.8.0 (the first half of #511). A `> [!quiz]` callout on any page becomes a self-check question a student answers and checks in the browser: multiple choice (one box ticked), select all that apply (two or more), short answer and fill in the blank (an [!answer] callout inside the quiz, one line per blank), with an optional [!explain] shown after the student answers. Self-check only, never a grade book: no accounts, no network, nothing reaches the teacher. The site's half is support/quartz (quizRules.ts - the ONE implementation of these rules, used by the build and by the page's script - plantoirQuizzes.ts, quiz.inline.ts, quiz.scss); the folder check is scripts/quizzes.py, which mirrors recognise and answers.parse and never checks an answer. No frontmatter key: the callout itself opts the page in (documentation/06-quartz-customizations.md -> 'J. Self-check quizzes (#563)'). No trail event: the app does nothing new a teacher sees.",
-    "rule": "Only a TOP-LEVEL quiz is interactive (ruling Q3): a blockquote that starts at the page's left edge - outside any list, fenced code or other blockquote - whose first line, after ONE `>` (at most three spaces in, any spaces after), is a callout of kind `quiz` in any case (`[!quiz]`, `[!QUIZ]-`, `[!quiz|shuffle]+`), read as Quartz's ObsidianFlavoredMarkdown reads a callout: `[!` then the kind (letters, digits, `_`, `-`), an optional `|` and settings up to the first `]`, an optional fold mark, then the title. It runs while its lines carry `>` and over lazy lines that continue a paragraph; an empty line ends it. Inside it, the FIRST list holding a task box (`- [ ]`, `- [x]` or `- [X]`, then a space and more on that line - a box with nothing after it is plain text to the site's parser, measured) is the choices; a nested blockquote at the quiz's own level whose first line is `[!answer]` or `[!explain]` is that callout; everything else is the question. Line endings are read as LF (a CR LF or a lone CR is one ending, review S1), and `%%` comments are taken out before anything is counted, as the site takes them out (review S10). `[!question]`, `[!answer]` and `[!explain]` OUTSIDE a quiz, and `[!quizzes]`, are left exactly as they were, byte for byte; so is a page that only shows quiz syntax inside fenced or indented code (review S2; the implementation review's S1: a `>` four or more columns past its container's content opens nothing, at the page's level, in a quote or under a list item). An HTML block (CommonMark's block-level tags, to the next empty line) swallows what it holds, a list of choices included, on both sides.",
+    "rule": "Only a TOP-LEVEL quiz is interactive (ruling Q3): a blockquote that starts at the page's left edge - outside any list, fenced code or other blockquote - whose first line, after ONE `>` (at most three spaces in, any spaces after), is a callout of kind `quiz` in any case (`[!quiz]`, `[!QUIZ]-`, `[!quiz|shuffle]+`), read as Quartz's ObsidianFlavoredMarkdown reads a callout: `[!` then the kind (letters, digits, `_`, `-`), an optional `|` and settings up to the first `]`, an optional fold mark, then the title. It runs while its lines carry `>` and over lazy lines that continue a paragraph; an empty line ends it. Inside it, the FIRST list holding a task box (`- [ ]`, `- [x]` or `- [X]`, then a space and more on that line - a box with nothing after it is plain text to the site's parser, measured) is the choices; a nested blockquote at the quiz's own level whose first line is `[!answer]` or `[!explain]` is that callout; everything else is the question. Line endings are read as LF (a CR LF or a lone CR is one ending, review S1), and `%%` comments are taken out before anything is counted, as the site takes them out (review S10). `[!question]`, `[!answer]` and `[!explain]` OUTSIDE a quiz, and `[!quizzes]`, are left exactly as they were, byte for byte; so is a page that only shows quiz syntax inside fenced or indented code (review S2; the implementation review's S1: a `>` four or more columns past its container's content opens nothing, at the page's level, in a quote or under a list item). An HTML block - CommonMark's type 6 (a block-level tag) or type 7 (a line holding only one tag, not after a paragraph), to the next empty line - swallows what it holds on both sides: quiz syntax inside one at the page's level is no quiz and is left byte for byte, and a list of choices inside one makes the quiz `choicesInHtml`.",
     "recognise": {
       "note": "Each case is a page's markdown and every quiz on it, in order: `kind` (single | multiple | short | fill) with `correct` (the ticked choices' 0-based places, in Markdown order) or `answers` (the [!answer]'s lines as written, markers off, trimmed, empty lines left out) and `shuffle`; or `problem` (a words.problems key) with its `fill`. `line` is the quiz's first line on the page, 1-based, or for a problem about one answer line (emptyAlternative, badTolerance) that line. `untouched` true: nothing on the page is a quiz, and it renders exactly as without this feature. The order problems are looked for is `order`. Python (scripts/test_quizzes.py) runs every case; the site's side is verify.sh 6k, which plants every case on one page (and the CRLF one on a page saved with CR LF) and reads each quiz's data-quiz-kind and data-quiz-problem back from the built page.",
       "order": [
@@ -25101,6 +25101,7 @@
         "badTolerance",
         "oneAnswerLine",
         "blanksAndLines",
+        "choicesInHtml",
         "nothingToCheck"
       ],
       "blanks": "A blank is a code span holding only three or more underscores (`____`), after CommonMark takes one space off each end of a span that has both. Blanks are counted in the quiz's title and its question's own paragraphs - never inside a choice, a fence, a table or a heading. A quiz with blanks and an [!answer] is fill in the blank and needs one answer line per blank, in order.",
@@ -25641,11 +25642,28 @@
           "markdown": "> [!quiz] Pick one.\n> <div>Read this first.</div>\n> - [x] a\n> - [ ] b\n",
           "quizzes": [
             {
-              "problem": "nothingToCheck",
+              "problem": "choicesInHtml",
               "line": 1
             }
           ],
           "untouched": false
+        },
+        {
+          "name": "aLineHoldingOnlyATagSwallowsTheList",
+          "markdown": "> [!quiz] Pick the smaller picture.\n> <img src=\"Media/a.png\" width=\"20\">\n> - [x] a\n> - [ ] b\n",
+          "quizzes": [
+            {
+              "problem": "choicesInHtml",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "quizSyntaxInAnHtmlBlock",
+          "markdown": "<div>\n> [!quiz] Shown in HTML.\n> > [!answer]-\n> > 4\n</div>\n",
+          "quizzes": [],
+          "untouched": true
         }
       ]
     },
@@ -26239,7 +26257,7 @@
       "why": "Self-check, never a grade book (#511): nothing leaves the browser and nothing is collected; what is kept is a convenience for the one student at that browser."
     },
     "print": "On paper a quiz prints as its question only (ruling Q8; the answer key is #511's): the buttons, feedback, score, answer block, explanation, correctness marks and the not-ready line are hidden; native boxes are hidden and an empty ○ (one answer) or □ (select all) is drawn instead, so a student's selection never prints; a blank prints as an empty line. Choices print in Markdown order. In a printable page's handout the answers of a quiz are in NEITHER the questions part nor the key, and its explanations never print: print.inline.ts gives callouts inside a quiz no role, and the handout's copy removes what a quiz holds back.",
-    "safetyNet": "The folder check writes quartz/plantoir_quiz_pages.json on every build: `examined` (each page it read, by its path in the site's content) and, for each page with a quiz, {quizzes, problems (the n of each it reported), nested, nestedProblems, lines (each top-level quiz's first line in the teacher's file, or null)}. The site compares, page by page, only for pages examined and published: a different count, or a quiz one side reports and the other does not, prints `plantoir: error: <page>: quiz <n>, line <L>: <words.problems.readDifferently>` (the line in the teacher's file when the folder check knows it, from `lines`; when the counts differ, `the quiz at line <L>` of the first quiz the folder check found, or `quiz 1`; never a count). A quiz is matched by its place among the page's top-level quizzes, guarded by the count (a count that differs is one line for the page, since no place can then be trusted); one that is not at the top level by its place among those. The site renders what IT read; the line says the two disagree. It works because the site builds with --concurrency 1 (build_site.py), so the line reaches the build's output (review N1).",
+    "safetyNet": "The folder check writes quartz/plantoir_quiz_pages.json on every build: `examined` (each page it read, by its path in the site's content) and, for each page with a quiz, {quizzes, problems (the n of each it reported), nested, nestedProblems, lines (each top-level quiz's first line in the teacher's file, or null), nestedLines (the same for each quiz that is not at the top level)}. The site compares, page by page, only for pages examined and published: a different count, or a quiz one side reports and the other does not, prints `plantoir: error: <page>: quiz <n>, line <L>: <words.problems.readDifferently>` (the line in the teacher's file when the folder check knows it, from `lines`; when the top-level counts differ, `the quiz at line <L>` of the first quiz the folder check found, or `quiz 1`; when only the quizzes inside a list or callout differ, `a quiz inside a list or another callout at line <L>` from `nestedLines`; never a count). A quiz is matched by its place among the page's top-level quizzes, guarded by the count (a count that differs is one line for the page, since no place can then be trusted); one that is not at the top level by its place among those. The site renders what IT read; the line says the two disagree. It works because the site builds with --concurrency 1 (build_site.py), so the line reaches the build's output (review N1).",
     "words": {
       "site": {
         "note": "English, as data, on a page students read. No word names the machinery (CLAUDE.md rule 1). {n} and {count} are numbers; {answer} and {answers} stand for the answer as shown (a formula stays a formula); {value} and {tolerance} are as the teacher wrote them; {right} and {total} count quizzes on the page.",
@@ -26281,7 +26299,8 @@
         "emptyAlternative": "answer line {n} has an empty answer between its | marks",
         "badTolerance": "answer line {n} has a ± that is not a number ± a number, like 3.14 ± 0.01",
         "unknownOption": "“{option}” is not a quiz setting - the only one is shuffle",
-        "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
+        "choicesInHtml": "a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out",
+      "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
         "readDifferently": "the site and the folder check read this question differently - preview the site again, and if this line comes back, rewrite it from one of the patterns in the plantoir-quizzes skill"
       }
     },
