@@ -38,7 +38,9 @@ its absolute path, never found on PATH: clang runs any wasm-opt it finds on
 PATH by itself during the link, which changes the output (Phase 0 trap 1).
 `-swift-version 5` is pinned (Phase 0 trap 2: Swift 6 mode changes an
 Embedded verdict). `-assert-config Debug` keeps the `Fatal error:` line a
-trap prints. The link caps memory at MAX_MEMORY (review S5: with no maximum a
+trap prints. readLine() flushes stdout before it reads (ReadLineShim.swift
+for Embedded, FlushBeforeRead.c by `--wrap` for the full library), so a
+prompt printed with `terminator: ""` comes before the echoed input. The link caps memory at MAX_MEMORY (review S5: with no maximum a
 runaway list grew to 2 GB in a student's tab before it trapped).
 
 The values here are this image's: they are part of the toolchain id
@@ -65,6 +67,8 @@ SDK = os.environ.get(
     "/opt/swift-sdks/swift-6.4.0-RELEASE_wasm.artifactbundle/swift-6.4.0-RELEASE_wasm/wasm32-unknown-wasip1")
 WASM_OPT = os.environ.get("PLANTOIR_WASM_OPT", "/opt/binaryen/bin/wasm-opt")
 SHIM = Path(__file__).resolve().parent / "ReadLineShim.swift"
+FLUSH = Path(__file__).resolve().parent / "FlushBeforeRead.c"
+CLANG = os.path.join(os.path.dirname(SWIFTC), "clang")
 
 # The sentence Embedded Swift prints where it cannot print a value.
 PLACEHOLDER = b"cannot print value in embedded Swift"
@@ -102,7 +106,11 @@ FULL_COMPILE = COMMON + [
     "-O", "-assert-config", "Debug", "-swift-version", "5"]
 FULL_LINK = COMMON + [
     "-resource-dir", f"{SDK}/swift.xctoolchain/usr/lib/swift_static",
-    "-Xlinker", f"--max-memory={MAX_MEMORY}"]
+    "-Xlinker", f"--max-memory={MAX_MEMORY}",
+    # readLine() flushes stdout first (FlushBeforeRead.c).
+    "-Xlinker", "--wrap=swift_stdlib_readLine_stdin"]
+
+FLUSH_COMPILE = ["--target=wasm32-unknown-wasip1", f"--sysroot={SDK}/WASI.sdk", "-Os", "-c"]
 
 WASM_OPT_FLAGS = ["-Os", "--strip-debug", "--strip-producers"]
 
@@ -125,7 +133,7 @@ def run(arguments: list) -> tuple:
     return done.returncode, (done.stdout or "") + (done.stderr or "")
 
 
-def compile_one_way(sources: list, compile_flags: list, link_flags: list, work: Path) -> tuple:
+def compile_one_way(sources: list, compile_flags: list, link_flags: list, work: Path, extra_objects=()) -> tuple:
     """`-c` to work/main.o, then link to work/main.wasm, then wasm-opt to
     work/main.opt.wasm. Answers (path of the optimised binary or None, the
     compiler's words)."""
@@ -137,7 +145,8 @@ def compile_one_way(sources: list, compile_flags: list, link_flags: list, work: 
                        + [str(source) for source in sources] + ["-o", str(objects / "main.o")])
     if status != 0:
         return None, said
-    status, linked = run([SWIFTC] + link_flags + [str(objects / "main.o"), "-o", str(objects / "main.wasm")])
+    status, linked = run([SWIFTC] + link_flags + [str(objects / "main.o")] + [str(item) for item in extra_objects]
+                         + ["-o", str(objects / "main.wasm")])
     if status != 0:
         return None, said + linked
     status, optimised = run([WASM_OPT] + WASM_OPT_FLAGS + [str(objects / "main.wasm"),
@@ -179,7 +188,12 @@ def compile_job(job: Path, out: Path) -> str:
             binary = None
         if binary is None:
             sdk = "full"
-            binary, said = compile_one_way([main], FULL_COMPILE, FULL_LINK, work)
+            flush = work / "flush.o"
+            status, flush_said = run([CLANG] + FLUSH_COMPILE + [str(FLUSH), "-o", str(flush)])
+            if status != 0:
+                binary, said = None, flush_said
+            else:
+                binary, said = compile_one_way([main], FULL_COMPILE, FULL_LINK, work, extra_objects=[flush])
         seconds = round(time.monotonic() - began, 2)
         if binary is None:
             entry = {"ok": False, "reason": "compileError", "diagnostics": tidy(said, work),

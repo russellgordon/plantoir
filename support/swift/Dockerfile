@@ -102,8 +102,9 @@ RUN set -e; \
     rm /tmp/binaryen.tar.gz; \
     /opt/binaryen/bin/wasm-opt --version
 
-# The compile step and the readLine shim Embedded Swift needs (Phase 0 §3:
-# without it every block that calls readLine() fails to link).
-COPY compile.py ReadLineShim.swift /opt/plantoir-swift/
+# The compile step, the readLine shim Embedded Swift needs (Phase 0 §3:
+# without it every block that calls readLine() fails to link), and the flush
+# the full library's readLine() is wrapped with.
+COPY compile.py ReadLineShim.swift FlushBeforeRead.c /opt/plantoir-swift/
 
 WORKDIR /tmp
