@@ -273,7 +273,7 @@ final class CourseManagementContractTests: XCTestCase {
         let created: String = try XCTUnwrap(section["created"] as? String)
         let template: String = try XCTUnwrap(FolderScaffold.bundledTemplate(), "the bundle carries no template")
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 6, "foldersAddedLater has shrunk")
+        XCTAssertGreaterThanOrEqual(cases.count, 7, "foldersAddedLater has shrunk")
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let folder: String = try XCTUnwrap(testCase["folder"] as? String)
@@ -314,6 +314,22 @@ final class CourseManagementContractTests: XCTestCase {
                     "\(name): \(path) wrote \((written ?? "nothing").debugDescription)"
                 )
             }
+        }
+    }
+
+    /// The title rule every index page Plantoir writes for a folder follows —
+    /// `FolderScaffold.frontmatterTitle`, which `SectionAdder`'s fallback
+    /// pages use too, against `foldersAddedLater.titleQuoting`; setup's
+    /// `frontmatter_title` runs the same list (`scripts/test_folder_titles.py`).
+    func testEveryTitleQuotingCase() throws {
+        let section: [String: Any] = try CourseManagementContractTests.section("foldersAddedLater")
+        let rule: [String: Any] = try XCTUnwrap(section["titleQuoting"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 15, "titleQuoting has shrunk")
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let title: String = try XCTUnwrap(testCase["title"] as? String)
+            XCTAssertEqual(FolderScaffold.frontmatterTitle(name), title, name)
         }
     }
 

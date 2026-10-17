@@ -303,7 +303,7 @@
         "why": "Afterwards a course whose pages say 'Module 2, Day 3' looks exactly like one that always did, and every link has been rewritten to match. 'When did these pages stop being Units?' — the first question when the next-class button or the curriculum map starts counting the wrong pages — has no other answer. The same event records a rename that stopped part way (how many pages had moved, and why it stopped) and one whose pages moved but whose settings could not be written, because those are the two states somebody will be asked to explain."
       },
       {
-        "carries": "the course code, the folder name, which list it was added to, and — since #506 — whether its index page and a page to duplicate were put inside it (\", with its index page and a page to duplicate\"; \", with its index page\" when only that was written)",
+        "carries": "the course code, the folder name, which list it was added to, and — since #506 — whether its index page and a page to duplicate were put inside it (\", with its index page and a page to duplicate\"; \", with its index page\" or \", with a page to duplicate\" when only that one was written; nothing when neither was)",
         "event": "folder created",
         "why": "Adding a name in Course Settings now creates the folder on disk, so a folder appears in the teacher's vault that they did not make in Obsidian. Separate from the rename because it answers a different question, and unexplained new folders are exactly what a teacher reports as 'Plantoir did something to my notes'. Since #506 the folder arrives with an index.md and a _DUPLICATE ME.md inside it, pages the teacher did not write; the line says so, because 'where did this page come from?' is the same report one level down."
       },
