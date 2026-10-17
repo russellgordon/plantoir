@@ -300,6 +300,16 @@ place and is reported to the teacher as the folder problem
 [05](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170)
 and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170).
 
+One CALLOUT is read from page content too, since #563 (v1.8.0), and it is
+likewise its own opt-in: `> [!quiz]` at the left edge of a page is a
+self-check question (multiple choice, select all, short answer, fill in the
+blank), with `> > [!answer]` and `> > [!explain]` inside it. One that cannot
+be checked shows its question with a short note, and is reported as the
+folder problem `quizzesNotReady`, beside `figuresCouldNotBeDrawn`. The rules
+and every case are in `contracts/shared-rules.json` → `quizCallouts`; the
+reasons are in [05](05-build-pipeline.md#self-check-quizzes-what-the-build-does-563-v180)
+and [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180).
+
 <a name="whether-students-see-a-page"></a>
 
 ## Whether students see a page
