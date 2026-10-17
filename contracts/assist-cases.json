@@ -1700,7 +1700,7 @@
       "tools",
       "toolSchemas"
     ],
-    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
+    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits, undoFiles — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
   },
   "hideIsUnpublish" : {
     "accepted" : [
@@ -6401,6 +6401,236 @@
       }
     ],
     "note" : "The tool definitions exactly as each client sends them. The DESCRIPTIONS are measured, not decorative — see the note on steering with code rather than with tool descriptions. `local` is what the on-device model is shown; `mcp` is what Claude Code sees. Point a routing measurement at these rather than at a copy."
+  },
+  "undoFiles" : {
+    "files" : [
+      {
+        "after" : "the page as the change left it",
+        "before" : "the page before the change",
+        "current" : "the page as the change left it",
+        "expect" : "putBack",
+        "name" : "a page nobody has touched since the change",
+        "why" : "The plain undo: the disk holds what the change left, so the copy from before is written back."
+      },
+      {
+        "after" : "the page as the change left it",
+        "before" : "the page before the change",
+        "current" : "the page as the change left it, edited in Obsidian since",
+        "expect" : "leftAlone",
+        "name" : "a page the teacher has edited since",
+        "why" : "Writing the old copy back would throw the teacher's newer work away."
+      },
+      {
+        "after" : "the page as the change left it",
+        "before" : "the page before the change",
+        "current" : "the page before the change",
+        "expect" : "alreadyBack",
+        "name" : "a page an earlier press already put back",
+        "why" : "#555: the disk holds BEFORE, so there is nothing to write and nothing holding the change on the list. Until #555 this read as edited and the entry never came off."
+      },
+      {
+        "after" : "the page as the change left it",
+        "before" : null,
+        "current" : "the page as the change left it",
+        "expect" : "putBack",
+        "name" : "a page the change created, untouched since",
+        "why" : "Taking a created page back removes it again."
+      },
+      {
+        "after" : "the page as the change left it",
+        "before" : null,
+        "current" : null,
+        "expect" : "alreadyBack",
+        "name" : "a page the change created, already gone",
+        "why" : "#555: an earlier press removed it, or the teacher deleted it. Nothing is at the path, which is what BEFORE says. Until #555 this was skipped as edited, and held the entry for ever."
+      },
+      {
+        "after" : "the page as the change left it",
+        "before" : null,
+        "currentKind" : "folder",
+        "expect" : "leftAlone",
+        "name" : "a folder where the created page was",
+        "why" : "#555 plan review S1: a folder reads back as no text, exactly as a missing file does, but it is not gone. Calling it already back would take the change off the list with nothing removed."
+      },
+      {
+        "after" : "the page as the change left it",
+        "before" : null,
+        "currentKind" : "notUTF8",
+        "expect" : "leftAlone",
+        "name" : "a file that is not text where the created page was",
+        "why" : "The same as the folder: a file that cannot be read as UTF-8 is still a file, so the path is not empty and BEFORE (nothing) does not match."
+      },
+      {
+        "after" : null,
+        "before" : "the page before the change",
+        "current" : null,
+        "expect" : "putBack",
+        "name" : "the source half of a move, untouched since",
+        "why" : "A move is two saved files; the source has AFTER null. Nothing is at the path, as the move left it, so the page is written back there."
+      },
+      {
+        "after" : null,
+        "before" : "the page before the change",
+        "current" : "the page before the change",
+        "expect" : "alreadyBack",
+        "name" : "the source half of a move, already back",
+        "why" : "#555: an earlier press wrote the page back to where it came from."
+      },
+      {
+        "after" : null,
+        "before" : "the page before the change",
+        "current" : "the page as the change left it, edited in Obsidian since",
+        "expect" : "leftAlone",
+        "name" : "the source half of a move, with a different page there now",
+        "why" : "Something the teacher put at that path since is newer work."
+      },
+      {
+        "after" : null,
+        "before" : "the page before the change",
+        "currentKind" : "notUTF8",
+        "expect" : "leftAlone",
+        "name" : "the source half of a move, with a file that is not text there now",
+        "why" : "Not 'nothing at the path': until #555 a file that could not be read as text compared equal to AFTER null and was written over. The same rule as the created page: null means gone."
+      },
+      {
+        "after" : null,
+        "before" : null,
+        "current" : null,
+        "expect" : "alreadyBack",
+        "name" : "no file before, after or now",
+        "why" : "#555 plan review S2: BEFORE is compared first, so nothing is removed that is not there. Comparing AFTER first would try the removal, fail, and hold the change on the list on every press."
+      },
+      {
+        "after" : "the page before the change",
+        "before" : "the page before the change",
+        "current" : "the page before the change",
+        "expect" : "alreadyBack",
+        "name" : "a page the change left as it found it",
+        "why" : "BEFORE and AFTER are the same, so BEFORE wins and nothing is written; the change can still come off the list."
+      },
+      {
+        "after" : "the page as the change left it",
+        "before" : "the page before the change",
+        "current" : null,
+        "expect" : "leftAlone",
+        "name" : "a page the change edited and the teacher has since deleted",
+        "why" : "Decided, not an accident (#555 plan review N1): the deletion is the teacher's newer work, so the change stays on the list, as it did before #555. Nothing is at the path, which matches neither copy."
+      }
+    ],
+    "note" : "#555, AUTHORED on the mac 2026-10-17. What Undo Last Change does with each file a change touched, and when the change comes off the list. Each saved file holds the page as it was BEFORE the change and as the change left it (AFTER); null means there was no file (a created page has BEFORE null, the source half of a move has AFTER null). Every press reads every file and gives it ONE verdict: alreadyBack when the disk holds BEFORE (nothing is written, and it is not counted as put back), else putBack when the disk holds AFTER (BEFORE is written back, or the file removed when BEFORE is null), else leftAlone (the teacher has changed it since; nothing is written). 'Holds null' means NOTHING is at the path: a folder, or a file that is not UTF-8 text, holds neither copy, so it is leftAlone, never gone. BEFORE is compared first, which only matters when BEFORE equals AFTER (the all-null row): nothing would be written, and comparing AFTER first would try to remove a file that is not there and hold the change for ever. The change comes off the list when no file is leftAlone. Until #555 there was no alreadyBack: a file an earlier press had put back read as edited, so once a press had taken a change back in part the change never came off, and every later press said couldNotUndo. files: one saved file per row. current is the text at the path, null for nothing there; currentKind folder or notUTF8 puts that at the path instead. After the press a putBack file holds BEFORE (nothing, when null) and any other file is exactly as it was. presses: a change of several files, pressed more than once. Each step first applies edit (a file name to its new text; null deletes it), presses Undo once, and gives the verdict counts, how many changes are left on the list (this change is the only one), the sentence that answers the press by its AssistWording key, and how the Section menu's trail line ends (#531). The start-of-year undo sheet sorts files by the same verdict before the teacher agrees: putBack as to be put back, leftAlone as left alone, alreadyBack in neither list. REJECTED (#555's options 1 and 3): taking the change off the list after any press that wrote something, which silently loses the undo of the page still edited; and keeping today's rule with a sentence telling the teacher to use the backup, which leaves the change stuck on the list.",
+    "presses" : [
+      {
+        "files" : [
+          {
+            "after" : "the page as the change left it",
+            "before" : "the page before the change",
+            "current" : "the page as the change left it",
+            "name" : "one.md"
+          },
+          {
+            "after" : "the page as the change left it",
+            "before" : "the page before the change",
+            "current" : "the page as the change left it, edited in Obsidian since",
+            "name" : "two.md"
+          }
+        ],
+        "name" : "one page edited, then set back by the teacher",
+        "steps" : [
+          {
+            "expectAlreadyBack" : 0,
+            "expectEnding" : "took part of the last change back",
+            "expectEntriesLeft" : 1,
+            "expectLeftAlone" : 1,
+            "expectPutBack" : 1,
+            "expectSentence" : "undidPartly"
+          },
+          {
+            "edit" : {
+              "two.md" : "the page as the change left it"
+            },
+            "expectAlreadyBack" : 1,
+            "expectEnding" : "took the last change back",
+            "expectEntriesLeft" : 0,
+            "expectLeftAlone" : 0,
+            "expectPutBack" : 1,
+            "expectSentence" : "undid"
+          },
+          {
+            "expectAlreadyBack" : 0,
+            "expectEnding" : "changed nothing",
+            "expectEntriesLeft" : 0,
+            "expectLeftAlone" : 0,
+            "expectPutBack" : 0,
+            "expectSentence" : "nothingToUndo"
+          }
+        ],
+        "why" : "The fault #555 reported. The first press puts one page back and keeps the change for the edited one. Once the teacher has dealt with that page, the second press puts it back, finds the first already back, and takes the change off the list. Until #555 the second press skipped the first page as edited and the change never came off."
+      },
+      {
+        "files" : [
+          {
+            "after" : "the page as the change left it",
+            "before" : "the page before the change",
+            "current" : "the page as the change left it",
+            "name" : "one.md"
+          },
+          {
+            "after" : "the page as the change left it",
+            "before" : "the page before the change",
+            "current" : "the page as the change left it, edited in Obsidian since",
+            "name" : "two.md"
+          }
+        ],
+        "name" : "a repeat press while the page is still edited",
+        "steps" : [
+          {
+            "expectAlreadyBack" : 0,
+            "expectEnding" : "took part of the last change back",
+            "expectEntriesLeft" : 1,
+            "expectLeftAlone" : 1,
+            "expectPutBack" : 1,
+            "expectSentence" : "undidPartly"
+          },
+          {
+            "expectAlreadyBack" : 1,
+            "expectEnding" : "changed nothing",
+            "expectEntriesLeft" : 1,
+            "expectLeftAlone" : 1,
+            "expectPutBack" : 0,
+            "expectSentence" : "couldNotUndo"
+          }
+        ],
+        "why" : "#555 Q2: a press that writes nothing new because a page is still edited is answered with the existing couldNotUndo sentence, which names the edited page. No new sentence."
+      },
+      {
+        "files" : [
+          {
+            "after" : "the page as the change left it",
+            "before" : "the page before the change",
+            "current" : "the page as the change left it",
+            "name" : "one.md"
+          },
+          {
+            "after" : "the page as the change left it",
+            "before" : null,
+            "current" : null,
+            "name" : "new.md"
+          }
+        ],
+        "name" : "a created page the teacher already deleted",
+        "steps" : [
+          {
+            "expectAlreadyBack" : 1,
+            "expectEnding" : "took the last change back",
+            "expectEntriesLeft" : 0,
+            "expectLeftAlone" : 0,
+            "expectPutBack" : 1,
+            "expectSentence" : "undid"
+          }
+        ],
+        "why" : "A first press can find a file already back too. Until #555 the deleted page was skipped, and the change stayed on the list for ever."
+      }
+    ]
   },
   "windowBinding" : {
     "cases" : [

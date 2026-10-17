@@ -212,15 +212,21 @@ enum StartOfYearPreparation {
     /// The files an undo would put back, and the ones it would leave because
     /// they changed after the change was made — asked before the teacher
     /// agrees, so the undo sheet can list both.
+    ///
+    /// Sorted by the undo's own rule, `AssistUndoVerdict.of` (#555), so the
+    /// sheet cannot call a page "left alone" that the undo then treats as
+    /// back already. A file already as it was before the change is in
+    /// neither list: the undo writes nothing to it and does not count it as
+    /// put back, so the sheet's count and the finished undo's agree.
     static func whatAnUndoWouldDo(_ entry: StartOfYearUndoRegistry.Entry) -> (putBack: [URL], skipped: [URL]) {
         var putBack: [URL] = []
         var skipped: [URL] = []
         for file in entry.change.files {
-            let current: String? = try? String(contentsOf: file.fileURL, encoding: .utf8)
-            if current != file.after {
-                skipped.append(file.fileURL)
-            } else {
+            let verdict: AssistUndoVerdict = AssistUndoVerdict.of(file)
+            if verdict == .putBack {
                 putBack.append(file.fileURL)
+            } else if verdict == .leftAlone {
+                skipped.append(file.fileURL)
             }
         }
         return (putBack, skipped)
