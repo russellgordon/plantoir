@@ -95,6 +95,8 @@ public class MenuBarReachUiTests
         EndToEnd.PressMenuBarItem(app, "Section", "sectionScheduleDeploy");
         var schedule = MenuBar.Dialog(app, "Section > Schedule Deploy…");
         Assert.Equal("Schedule a deploy", schedule.Name);
+        // #547: the battery line is RENDERED, as its own text under the opening.
+        Assert.Contains(Plantoir.Core.Assist.ScheduledDeploy.OnBatterySleepsSooner, DrivenApp.TextsUnder(schedule));
         MenuBar.CloseDialog(app);
 
         // Help ▸ Publishing and Deploying…, in the contract's words.

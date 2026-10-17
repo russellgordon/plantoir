@@ -311,6 +311,22 @@ public class ContractTests
         Assert.Equal(wording["deployWaitsForAnOpenQuestion"]!.ToString(),
                      AssistWording.DeployWaitsForAnOpenQuestion("{course}", "{section}"));
 
+        // #548 (mac #524): the plan's one-page pieces and the menu's plan table.
+        // The constants are compared by the value walk below; the methods here.
+        Assert.Equal(wording["planWillBecomeVisibleWithTheDateOf"]!.ToString(),
+                     AssistWording.PlanWillBecomeVisibleWithTheDateOf(new[] { "Unit 4, Day 24" }));
+        Assert.Equal(wording["planWillBecomeVisibleWithTheDateOf"]!.ToString(),
+                     AssistWording.PlanWillBecome(true, new[] { "Unit 4, Day 24" }));
+        Assert.Equal(wording["planWillBecomeVisible"]!.ToString(), AssistWording.PlanWillBecome(true, Array.Empty<string>()));
+        Assert.Equal(wording["planWillBecomeHidden"]!.ToString(), AssistWording.PlanWillBecome(false, Array.Empty<string>()));
+        Assert.Equal(wording["planStaysVisibleBecause"]!.ToString(),
+                     AssistWording.PlanStaysVisibleBecause(AssistWorkspace.KeptBecauseInKeyLinks));
+        Assert.Equal(wording["menuPlanSummary"]!.ToString(), AssistWording.MenuPlanSummary(8, 8, publishing: true));
+        Assert.Equal(wording["menuPlanSummaryHiding"]!.ToString(), AssistWording.MenuPlanSummaryHiding(3, 2));
+        Assert.Equal(wording["menuPlanSummaryHiding"]!.ToString(), AssistWording.MenuPlanSummary(3, 2, publishing: false));
+        Assert.Equal(wording["menuPlanSummaryOnePage"]!.ToString(), AssistWording.MenuPlanSummary(1, 0, publishing: true));
+        Assert.Equal(wording["planNothingWouldChange"]!.ToString(), AssistWording.MenuPlanSummary(0, 5, publishing: true));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
@@ -375,6 +391,10 @@ public class ContractTests
             "the same sentence (not generated into the contract); wording.deployWentOutTo follows #391's needs-an-answer sentence",
         ["DeployToMultipleDestinationsDidNotFinish"] =
             "this app's own sentence for a deploy that reached none of several destinations; owed on #400",
+        ["PlanWillBecome"] =
+            "the mac's planWillBecome(visible:withTheDatesOf:) — the dispatcher over planWillBecomeVisible, " +
+            "planWillBecomeHidden and planWillBecomeVisibleWithTheDateOf, which the contract samples under those " +
+            "keys; neither app gives the dispatcher a key of its own (#548, mac #524)",
         // ScheduleADeployNeedsATime left this list with #466: the mac
         // implemented #424's frames (#449) and the key is generated now.
     };
