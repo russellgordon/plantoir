@@ -1,6 +1,6 @@
 ---
 name: plantoir-runnable-code
-description: Use when a Plantoir course page should let students RUN code in the browser - "make this example runnable", "let students try it", an interactive or editable Python example, a program that reads input, a practice exercise students edit and run, "runnable", "live code", "try it yourself". Says how to opt the page in, how to write a runnable block and its flags, how input() works, what the standard library can and cannot do, how it prints, and how to check it.
+description: Use when a Plantoir course page should let students RUN code in the browser - "make this example runnable", "make this Swift example runnable", "let students try it", an interactive or editable Python example, a Swift program students run with their own input, a program that reads input (input() or readLine()), a practice exercise students edit and run, "runnable", "live code", "try it yourself". Covers Python (editable) and Swift (read-only, students change the input). Says how to opt the page in, how to write a runnable block and its flags, how input works, what each language can and cannot do, how it prints, and how to check it.
 ---
 
 # Runnable code on a Plantoir page
@@ -13,6 +13,10 @@ with nothing to install and no account. They see the code in an editor, an
 input box when the program reads input, **Run**, **Stop** and **Reset**
 buttons, and the program's output underneath. Their edits are kept in their
 browser for next time; Reset brings back the teacher's code.
+
+Two languages can run: **Python** (students edit the code and run it) and
+**Swift** (students run it with their own input; the code itself is
+read-only). The opt-in is the same for both; each has its section below.
 
 This file is managed by Plantoir and is replaced when Plantoir updates; do
 not edit it.
@@ -164,3 +168,117 @@ check that the page says `codeRunner: true` and the block's first line is
 ` ```python run `. When the site is built, a block it could not set up is
 named on a line that starts `plantoir: error:`, with the page, the block's
 number and what to change.
+
+## Swift
+
+A ` ```swift run ` block runs too - read-only: students see the code,
+type into the input box, and press **Run** (and **Stop**). They cannot
+change the code, and a short note under each block says so. Plantoir
+compiles each Swift block when the site is previewed, so the program a
+student runs is ready before they open the page. Use Swift blocks for
+programs worth running with different input; use plain ` ```swift ` blocks
+for code to read.
+
+### 1. Opt in and write the block
+
+The page needs `codeRunner: true` (Python's section 1, exactly the same).
+Then add `run` after `swift`, lowercase:
+
+````markdown
+```swift run
+print("What is your name?")
+let name = readLine() ?? ""
+print("Hello, \(name)!")
+```
+````
+
+` ```Swift run ` (capital S) is NOT runnable. Swift takes two flags after
+`run`: `stdin` (always show the input box) and `autorun` (run once when the
+block scrolls into view). `readonly` is not needed - every Swift block is
+read-only already.
+
+### 2. Programs that read input
+
+`readLine()` reads the input box, **one line for each `readLine()` call**,
+in order; each line read is shown after its prompt in the output, even a
+prompt printed with `print("Name? ", terminator: "")`. Past the last line,
+`readLine()` returns `nil` - so write `readLine() ?? ""`, or
+`while let line = readLine() { ... }` to read every line. Tell students in
+the page's text what to type, one value per line, and remind them that
+changing the input and pressing Run again is the whole point:
+
+````markdown
+Type your name on the first line of the input box and your age on the
+second, then press Run. Try a different age and run it again.
+
+```swift run
+print("What is your name?")
+let name = readLine() ?? ""
+print("How old are you?")
+let age = Int(readLine() ?? "") ?? 0
+print("\(name) will be \(age + 1) next year.")
+```
+````
+
+The input box appears by itself when the code calls `readLine(`.
+
+### 3. What Swift can and cannot do here
+
+It is Swift 6.4 in Swift 5 language mode, compiled to a small program for
+the browser:
+
+- **Works**: variables, `if`/`switch`/loops, functions, optionals, arrays,
+  dictionaries, sets, strings (including `lowercased()`, `split`,
+  `contains`, accented letters), structs, classes and inheritance, enums
+  with associated values, protocols, closures, errors with `do`/`catch`,
+  `Int.random(in:)`, `Double` maths, and printing any of these with
+  `print(...)` or `"\(...)"`.
+- **Bigger, still works**: a block that prints an array, an optional, a
+  struct or an error inside a string, or uses `String.contains` with a
+  string, is compiled with Swift's full library - about 1 MB for a student's
+  browser to fetch on its first Run, instead of about 50-100 KB. If a page
+  has many such blocks, that adds up on an iPad on school Wi-Fi; a loop that
+  prints each item is smaller than `print(array)`.
+- **Does not work**: anything needing an app or a screen (SwiftUI, UIKit),
+  files on the student's computer, the network, the time of day, or a
+  package from outside Swift itself. `import Foundation` compiles but makes
+  the program over 40 MB - do not use it.
+- A program that **crashes** (an index past the end of an array,
+  unwrapping a `nil` with `!`) stops with its `Fatal error: ...` line and
+  "The program stopped because of an error." - which is often worth
+  showing students on purpose.
+- Deep **recursion** stops early: Safari allows only about 2,000 nested
+  calls (Chrome about 5,000), and a program past that just crashes, with
+  no Fatal error line. Keep recursive examples well under 1,000 calls deep.
+- A list that grows for ever stops at 256 MB; Swift then says, misleadingly,
+  "Unexpectedly found nil while unwrapping an Optional value".
+- `exit(n)` from WASILibc shows "The program ended with exit code n."
+
+### 4. When a block does not compile
+
+A Swift block with an error is not a broken site: the preview still opens,
+the block shows its code with Run turned off ("This program isn't ready to
+run yet."), and the build says where - on a line starting
+`plantoir: error:` with the page, the block's number, the line in the page
+and Swift's own first error message, and as a folder problem in Plantoir.
+Fix the code and preview again. Check every Swift block you write compiles
+(Swift 5 mode) before handing it over.
+
+### 5. Things to know
+
+- The first preview of a course with Swift on a Mac downloads about 1.3 GB
+  and takes a few minutes, once, to get Swift ready; later previews compile
+  only blocks that changed (a second or two each). Previewing while offline
+  the first time leaves the blocks "not ready" until the next preview online.
+- Plantoir on Windows cannot make Swift blocks runnable yet: they show "not
+  ready". Preview the course on a Mac.
+- `%%`, adding blocks after existing ones, printing and opening the site as
+  files work exactly as for Python (sections 5-7 above).
+- If a Swift block shows as plain code with no Run button and no "not
+  ready", the build's `plantoir: error:` line names it: start its ```` ``` ````
+  on a line of its own and indent every line of the block alike.
+
+### 6. Check it
+
+Ask the teacher to preview the section, open the page, type input and press
+Run on each Swift block, then change the input and run it again.
