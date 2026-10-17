@@ -2797,6 +2797,21 @@ mirrors it and `courses/MPM2D/Unit 2/Parabolas.md` (vertex form, the example
 
 One run per row unless the row says otherwise, as for printing.
 
+**The runnable-code skill (#455), measured the same way, 2026-10-17.**
+`plantoir-runnable-code` is ONE skill for every language in
+`codeRunnerBlocks.languages` (a language that joins adds a section, not a
+second skill); today it carries Python's: the opt-in, the fence and its
+flags, `input()` and EOFError, the measured list of what imports and what
+does not, files, `%%`, adding blocks after existing ones, where it works,
+printing, checking. Scratch working folder with the guidance as the app
+mirrors it (both root files' managed sections, all three skills in both
+homes) and `courses/ICS3U/Unit 2/Loops.md` (two plain ` ```python ` examples,
+the second calling `input()`):
+
+| Launcher | Started at | Prompt | Result |
+|---|---|---|---|
+| `claude -p` (2.1.302, `--permission-mode acceptEdits`) | working folder root | `Make the examples on the page "courses/ICS3U/Unit 2/Loops.md" runnable, so students can try them.` | PASS — `codeRunner: true` added to the settings, both fences ` ```python run ` (no flag, so the sum stays editable for the page's "Try it" task), and a sentence before the input example telling students to type a number in the input box before pressing Run; read by `page_features.runner_fences` as two runnable blocks. It ended by saying to preview and press Run on each block, as the skill's last section says |
+
 **Why Codex fails inside a course, measured.** Codex reads `AGENTS.md`
 files from its PROJECT ROOT down to where it was started, and finds the root
 by `project_root_markers`, which defaults to `[".git"]` (in the 0.162.0
