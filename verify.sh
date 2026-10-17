@@ -2586,7 +2586,11 @@ playground += "\n```swift run\n" + (gate / "13-prompt.swift").read_text(encoding
     "<iframe class=\"plantoir-live-frame\" src=\"Help-Sessions\" title=\"Help Sessions\"></iframe>\n", encoding="utf-8")
 (course / "Live Autorun.md").write_text(
     "---\ntitle: Live Autorun\ncodeRunner: true\n---\nTwo blocks that run by themselves, and the first asks (plantoir-live-autorun-7f3a). Then [[Live Framed]].\n\n"
-    "```python run autorun\nname = input(\"Name? \")\nprint(\"Hi\", name)\n```\n\n```python run autorun\nprint(\"second\")\n```\n", encoding="utf-8")
+    "```python run autorun\nname = input(\"Name? \")\nprint(\"Hi\", name)\n```\n\n"
+    # Far enough down that the second autorun comes into view only when the
+    # check scrolls to it - after the first is already waiting.
+    + "".join(f"Filler paragraph {n} keeps the second block out of view.\n\n" for n in range(1, 61))
+    + "```python run autorun\nprint(\"second\")\n```\n", encoding="utf-8")
 (course / "Live Box.md").write_text(
     "---\ntitle: Live Box\ncodeRunner: true\n---\nCode that reads input beside a frame (plantoir-live-box-7f3a).\n\n"
     "<iframe src=\"Help-Sessions\" title=\"Help Sessions\"></iframe>\n\n```python run\nprint(input(\"Name? \"))\n```\n", encoding="utf-8")
@@ -3605,14 +3609,14 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # starts itself so it can also play the hosts that break it.
   if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \
        >/tmp/verify_code_runner.log 2>&1; then
-    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
+    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; live input on an isolated page (#583: the field focused at Run, the prompt before it, the transcript byte for byte the box's, Ctrl-D and the end button, a two-line paste, IME and Escape, Stop and another block while it waits, echoes counted, an autorun that asks takes no focus and holds the queue, whole loads across the isolation line both ways, the handout's KaTeX), and the box's line where the page is not isolated; a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
   else
     fail "runnable code did not run in a browser as the contract says (browser-checks/code_runner.mjs, #455)"
     cat /tmp/verify_code_runner.log
   fi
   if node browser-checks/swift_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Swift-Playground.html \
        >/tmp/verify_swift_runner.log 2>&1; then
-    pass "runnable Swift in a browser: nothing fetched on load; read-only with its note; Run with input echoes it after each prompt, changed input changes the output, Stop ends a loop and Run works again, an index out of range shows its Fatal error line and the crash words, exit(3) its exit code, a block that did not compile says it is not ready - $(head -1 /tmp/verify_swift_runner.log | sed 's/^OK: //') (#493, browser-checks/swift_runner.mjs)"
+    pass "runnable Swift in a browser: nothing fetched on load; read-only with its note; Run with input echoes it after each prompt, changed input changes the output, Stop ends a loop and Run works again, an index out of range shows its Fatal error line and the crash words, exit(3) its exit code, a block that did not compile says it is not ready; live input on an isolated page with the box's transcript, Embedded, full library and a prompt on the answer's line, Ctrl-D as nil, Stop while it waits (#583) - $(head -1 /tmp/verify_swift_runner.log | sed 's/^OK: //') (#493, browser-checks/swift_runner.mjs)"
   else
     fail "runnable Swift did not run in a browser as the contract says (browser-checks/swift_runner.mjs, #493)"
     cat /tmp/verify_swift_runner.log
@@ -3620,7 +3624,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # #563: the self-check quizzes as a student answers them, against a server
   # the check starts itself.
   if node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
-    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, and paper and the handout questions only - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
+    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, code in a choice and an explanation asking live with Return ticking, checking and folding nothing (#583), and paper and the handout questions only - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
   else
     fail "self-check quizzes did not answer in a browser as the contract says (browser-checks/quiz_check.mjs, #563)"
     cat /tmp/verify_quiz_check.log

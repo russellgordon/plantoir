@@ -33,7 +33,9 @@
 //     count toward the cap; an autorun that asks takes no focus and holds
 //     the queue; and the site's own links load a page WHOLE across the
 //     isolation line (both ways, the frame on the far side loading) while a
-//     page change that stays on one side is still the site's own. Served
+//     page change that stays on one side is still the site's own; and a
+//     printable runner page's handout, made on an isolated page, still
+//     loads KaTeX's stylesheet and faces in its print frame. Served
 //     without the headers, the box shows its words.inputAhead line;
 //
 // then, against the same files served three wrong ways, that the student is
@@ -572,6 +574,9 @@ async function connect(chunk) {
       // An autorun that asks takes no focus and holds the queue.
       await open(liveBase + LIVE_AUTORUN)
       const autorunWaits = await waitFor(0, WAITING)
+      // The second autorun comes into view only now, while the first waits.
+      await evaluate("(() => { window.__runner.block(1).scrollIntoView(); return 1 })()")
+      await pause(1000)
       state = await evaluate("window.__runner.state(0)")
       const queuedBlock = await evaluate("window.__runner.state(1)")
       expect("an autorun that asks waits, takes no focus, and the next autorun waits its turn", autorunWaits === said("waitingForInput")
@@ -613,6 +618,48 @@ async function connect(chunk) {
         return await Promise.race([arrived, new Promise((resolve) => setTimeout(() => resolve(false), 15000))]) && window.__plantoirSamePage === true
       })()`)
       expect("a page change that stays on one side of the line is still the site's own", staying)
+
+      // A printable runner page's handout on an isolated page: the print
+      // frame inherits the page's headers and must still load KaTeX's
+      // stylesheet and faces from the site (caught at the moment it is
+      // printed, the way maths_offline.mjs catches it).
+      await open(liveBase + pagePath)
+      await evaluate(`(() => {
+        window.__printFrame = null
+        new MutationObserver((changes) => {
+          for (const change of changes) for (const node of change.addedNodes) {
+            if (node.tagName !== "IFRAME") continue
+            node.contentWindow.print = () => {
+              const frame = node.contentDocument
+              window.__printFrame = {
+                sheets: Array.from(frame.querySelectorAll('link[rel="stylesheet"]')).map((link) => {
+                  let rules = -1
+                  try { rules = link.sheet ? link.sheet.cssRules.length : 0 } catch { rules = -1 }
+                  return { href: link.href, rules }
+                }),
+                faces: Array.from(frame.fonts).filter((face) => face.status === "loaded").map((face) => face.family.replace(/["']/g, "")),
+                formulas: frame.querySelectorAll(".katex").length,
+              }
+            }
+          }
+        }).observe(document.body, { childList: true })
+        return 1
+      })()`)
+      await evaluate(`(async () => {
+        const arrived = new Promise((resolve) => document.addEventListener("nav", () => resolve(true), { once: true }))
+        window.spaNavigate(new URL(${JSON.stringify(liveBase + secondPath + "#plantoir-print=questionsOnly&paper=portrait")}))
+        return await Promise.race([arrived, new Promise((resolve) => setTimeout(() => resolve(false), 15000))])
+      })()`)
+      let printFrame = null
+      for (let tries = 0; tries < 120 && printFrame === null; tries += 1) {
+        await pause(250)
+        printFrame = await evaluate("window.__printFrame")
+      }
+      const printableIsolated = await evaluate("self.crossOriginIsolated === true")
+      const katexSheet = (printFrame?.sheets ?? []).filter((sheet) => sheet.href.includes("katex.min.css"))
+      expect("a printable runner page's handout on an isolated page loads KaTeX's stylesheet and faces in its print frame",
+        printableIsolated && printFrame !== null && katexSheet.length === 1 && katexSheet[0].rules > 0 && printFrame.formulas > 0
+        && printFrame.faces.some((face) => face.startsWith("KaTeX")), { printableIsolated, printFrame })
 
       // The three wrong servers.
       const wrong = {}
