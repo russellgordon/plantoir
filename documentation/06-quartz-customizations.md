@@ -318,6 +318,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-20 | **mhchem enabled** | `quartz/plugins/transformers/latex.ts` | Adds `import "katex/contrib/mhchem"`, so `$\ce{CaCO3(s) <=> CaO(s) + CO2(g)}$` renders. KaTeX runs at build time here, and the `katex` package Quartz already installs ships the extension, so this downloads nothing. |
 | C2-21 | **Curriculum coverage map styles** | `quartz/styles/base.scss` (appended) | The grid, chips, and the five-step red → orange → yellow → green → blue scale for the generated `Curriculum Coverage` page. The colours are deliberately NOT taken from the course's colour scheme — the map's whole meaning is that ordered reading, and a scheme that recoloured it would destroy that. The scale was SEARCHED rather than picked by eye: `scripts/choose_coverage_scale.py` scores candidates on CIEDE2000 separation and through deuteranopia and protanopia simulation, which is why the top step is blue rather than a darker green — the closest pair an ordinary-sighted reader now sees is ΔE 31, against ΔE 10 before. Cells carry the expectation's code and nothing else: a digit in every cell turned the map into a table of numbers, so the count now reaches a screen reader through the cell's label and a teacher through the hover preview. The legend is a vertical list below a rule, worded "addressed once", "addressed twice", and so on. The ring marking assessed work is two rings — white inside dark — so that it stays legible on all five cell colours; a single tone disappeared on either the yellow or the darkest step depending on which was chosen. The style block is REPLACED rather than skipped when it is already present, so a stylesheet surviving from an earlier build still picks up changes. |
 | C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form. Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
+| C2-22b | **Backlinks overall-expectation map (#505)** | `quartz/components/Backlinks.tsx` | Rewrites the one `const overallChildren = new Map<string, string[]>([…])` line behind the `// CQ4T-OVERALL-ANCHOR` comment, on every build and with or without a coverage map (`set_backlinks_overall_children`, called right after C2-22): each overall expectation page's slug, mapped to its specific expectations' slugs (`overall_backlink_children`). See D1. |
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
 | C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
@@ -392,13 +393,65 @@ Contents" are likewise renamed to plain-language labels.
 
 ### D1. Patched `Backlinks.tsx` (`support/Backlinks.tsx`)
 
-Complements the locale change, and carries two changes. First, an
+Complements the locale change, and carries three changes. First, an
 `excludeBacklinks: true` frontmatter flag that suppresses the backlinks panel
 on a specific page — useful where "when did we do this?" makes no sense (a
 style guide, a syllabus) or where the link graph would mislead. Second, the
 `CQ4T-STRUCTURAL-ANCHOR` set that C2-22 rewrites each build, which keeps the
 curriculum indexes and the generated coverage maps out of every other page's
-backlinks.
+backlinks. Third, the `CQ4T-OVERALL-ANCHOR` map that C2-22b rewrites each
+build, which makes an overall expectation's page list the lessons that did
+its specific expectations (#505, below).
+
+#### An overall expectation lists its specific expectations' lessons (#505)
+
+**The rule** (`contracts/shared-rules.json` → `curriculumRules.overallBacklinks`,
+run by `scripts/test_overall_backlinks.py`): "When did we do this?" on an
+overall expectation's page (B1) lists every page that links B1 **or** any of
+its specific expectations (B1.1, B1.2, `b1.3`) in the same curriculum folder.
+One unlabelled list, each page once, in Quartz's order: the component runs
+ONE filter over `allFiles` with `targets = [slug, ...overallChildren.get(slug)]`,
+which de-duplicates for free. A specific expectation's page is unchanged
+(direct links only), and structural pages stay out exactly as before.
+
+**Why the overall page was empty.** Not the embed form and not Quartz skipping
+the page: the data. Classes connect to SPECIFIC expectations. Measured on the
+MPM2D example course: the only page linking "B1. Using Linear Systems to Solve
+Problems" was the Curriculum index, which is structural; across all example
+content, 44 pages outside a curriculum folder link an overall page directly,
+almost all of them a Learning Goals page. Built with this change (MPM2D,
+section 1 and section 2 alike), every one of the ten overall pages went from 0
+listed pages to between 4 and 15 (B1: 13), each list equal to the union of the
+direct links to the overall page and its specific expectations, while all
+specific expectation pages list exactly their direct links (B1.3: 2, as
+before).
+
+**How.** `overall_backlink_children(content_root, plan)` reads each mapped
+folder with `_collect_expectations` and groups specific expectations under
+`overall_of(code)` — the coverage map's own rule, so the panel and the map's
+overall chips count the same work. It is built PER FOLDER (two curriculum
+folders can each have a B1, and each gathers only its own), and slugs are
+written as Quartz v4.5.0's `sluggify` writes them (white space to `-`, `&` to
+`-and-`, `%` to `-percent`, `?` and `#` dropped) by `_quartz_page_slug`; the
+older `_quartz_slug` handles only spaces, which the coverage map's links can
+live with but an exact slug comparison cannot. A digit-first or College
+Board code has no overall expectation, so it gathers nothing. The map is a
+JavaScript `Map`, not an object literal, so a page whose slug is
+`constructor` finds nothing rather than a function.
+
+**Rejected.** Direct links only (the panel would say "Not yet addressed in
+class." for work the coverage map counts). Two lists — direct links first,
+then the specific expectations' pages — or a labelled second list ("through
+B1.3"): a page linking B1 and B1.3 would appear twice, and the label draws a
+distinction the coverage map does not make. A map keyed by code across every
+folder: two folders' B1 pages would each collect the other's lessons.
+
+**Checked** by `verify.sh` 6h (continued), on a real EXC2O build: a page
+embedding only `![[A2.1]]` must be listed once on the A2 page (it is listed
+nowhere there on the old component — measured), and a page embedding both
+`![[A2.1]]` and the A2 page must be listed once on A2 and once on A2.1.
+Windows builds with the same `build_site.py` and the same component, so it
+inherits this unchanged; `PythonToolchainTests` discovers the test.
 
 ### Curriculum maps: a second curriculum, and the codes a map reads (#128)
 
@@ -1806,6 +1859,207 @@ runs once); mapping only RuntimeError to the crash words (S5); a dedicated
 "called itself too many times" word (considered; one crash sentence, and the
 known limit tells teachers how deep is safe); stopping the build on a compile
 error (ruling Q1).
+
+## J. Self-check quizzes (#563, v1.8.0)
+
+The first half of #511. A `> [!quiz]` callout at the left edge of a page
+becomes a question a student answers and checks in the browser: multiple
+choice (one box ticked), select all that apply (two or more), short answer
+and fill in the blank (an `[!answer]` inside the quiz, one line per blank),
+each with an optional `[!explain]` revealed after the first Check or Show
+answer, and `[!quiz|shuffle]` to shuffle the choices. Self-check only: no
+accounts, no network, nothing reaches the teacher. The rules are data in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`quizCallouts`; the build's half is
+[05 → Self-check quizzes](05-build-pipeline.md#self-check-quizzes-what-the-build-does-563-v180).
+Format and syntax are #511's (decided 2026-10-11, not reopened); the eight
+rulings of 2026-10-17 (Q1-Q8) and the plan review's ten should-fixes are in
+the closing comment of #563.
+
+**Compatibility.** A page with no `[!quiz]` outside fenced or indented
+code comes out exactly as before: the text hook returns it untouched
+(checked in Node for every `untouched` case - quiz syntax shown in a fence
+(review S2) and in indented code at the page's level, inside a callout and
+under a list item (the implementation review's S1: a `>` four or more
+columns past its container's content opens nothing, in both readers) - and
+by verify 6k on a planted `Quiz Code Shown`, which is also named in no
+folder problem), and the two later stages act only on a page whose text
+holds `[!quiz`. `[!question]`, and `[!answer]` and `[!explain]`
+outside a quiz, are untouched and stay searchable. The script and styles are
+in every site's shared `postscript.js` and `index.css` (ruling Q2; every
+rule under a `plantoir-quiz` class, the script returns at once with no
+quiz). Measured on EXC2O (no quiz): `postscript.js` 122,138 → 136,068 bytes
+(+13,930; gzip 40,867 → 45,378, +4,511), `index.css` 60,812 → 65,787
+(+4,975; gzip +700), and 297 of 302 pages and feeds identical (05 has the
+other five, which differ between two builds of the same image).
+
+### J1. The files (all in `support/quartz/`, installed every build)
+
+| File | What it does |
+|---|---|
+| `plugins/transformers/quizRules.ts` | The ONE implementation of the rules, pure (no DOM, no imports): `parseAnswerLine`, `splitAlternatives`, `parseNumber`, `normalise`, `accepts`, `shuffledOrder`, `verdict`, `isBlank`, and the text hook `nestedTitlesOwnTheirLine`. The transformer decides what each quiz is with it; the page's script checks answers with it. `scripts/check_quiz_rules_against_the_site.py` bundles it and runs every parse, check and shuffle case in Node (110 on 2026-10-17). The Python mirror, `scripts/quizzes.py`, parses and decides but never checks an answer. |
+| `plugins/transformers/plantoirQuizzes.ts` | `PlantoirQuizzes`, wired straight after `Plugin.PlantoirFigures(),` (so after Description; anchored on the figures line so a fresh site and an old one stand in the same order, review N7). Three hooks, below. |
+| `components/scripts/quiz.inline.ts` | Check, Show answer, feedback, the shuffle, keyboard folds, the score (J4). Imports `quartz/plantoir_quiz.json` (the words only). Works out the page's slug and root itself: importing `util/path` put a second copy of that module into `postscript.js` (3,266 bytes, measured). |
+| `components/styles/quiz.scss` | Every rule under `.plantoir-quiz` (or `.plantoir-quiz-score`); 16 px boxes (no zoom on focus), 44 px targets, the theme's colours with dark-mode marks, `@media print` (J5). |
+| `components/PlantoirMetaLine.tsx` | Carries the script and styles, as it carries the figures' (no new component or layout edit). |
+
+### J2. Three stages, and why
+
+* **Text** (before parsing). ObsidianFlavoredMarkdown gives a callout's
+  title line a paragraph of its own only at the page's left edge (its
+  `calloutLineRegex` is `^> *\[!…`), so in `> > [!answer]-` then `> > $2^7$`
+  the answer went INTO the title (measured, plan M2: the title read "Answer
+  2^7", the body empty; an explanation's first line likewise). Inside a quiz
+  only (ruling Q1 - the general fix would change existing sites and the
+  printing skill's empty-`>` advice; a separate issue), after any nested
+  callout's first line, the hook adds one line holding just its `>` markers.
+  Line endings are made LF first (review S1: Windows writes every build copy
+  in text mode, CR LF, and the hook did nothing there), fences are skipped
+  at every depth (S2), and a page with no quiz outside fenced code comes
+  back as it came - CR LF included.
+* **Markdown** (after GitHubFlavoredMarkdown; a task item's `checked` is set
+  at parse time, M1). Every quiz that is a CHILD OF THE PAGE becomes the
+  markup below; one inside a list or callout (ruling Q3) is rendered not
+  ready with `notAtTopLevel`. Answer lines are read from the page's own
+  text by the `[!answer]` blockquote's lines (two `>` markers off, trimmed),
+  never from the parsed tree, which has already turned "quotes" curly and
+  `\|` into `|` (M3). Every task box's tick is taken off the page (M7: a
+  task list renders `<input checked disabled>`, the answer key on screen).
+  A `$...$` answer is shown through the page's own parser (`this.parse`):
+  only a parsed formula node carries what rehype-katex renders (review S9;
+  measured, the revealed answer holds `.katex`).
+* **HTML** (after Description, before Latex). The question's id, the
+  choices' `aria-labelledby` and `aria-describedby`, blanks
+  (`<code>____</code>`, M4) made into boxes, and the page's search text and
+  summary made again WITHOUT the quizzes' answers and explanations
+  (ruling Q5; review S3: Description had put "Answer 42" into the meta
+  description, og:description, the RSS item and contentIndex.json). The
+  summary is recomputed only when the page names no description of its
+  own, with Description's own rules copied (150 / 300 characters, its link
+  rule); a blank reads as `…` in both ("Fill … and …." - pinned by 6k).
+
+### J3. The markup, and what a screen reader hears
+
+Quartz's callout stays (colours, title, fold) and gains `plantoir-quiz`,
+`data-quiz-n` (place among the page's top-level quizzes), `data-quiz-source`
+(the slug of the page it was written on), `data-quiz-kind`,
+`data-quiz-shuffle`, `data-quiz-hash` (FNV-1a 32 of its source) and
+`data-quiz` (the correct places, or the answer lines - a self-check, so the
+page's source showing answers is accepted, knownLimits). Not ready:
+`data-quiz-kind="notReady"` and `data-quiz-problem`, the question and its
+choices with every box empty, and `words.site.notReady` (ruling Q6).
+
+* Choices are a `<fieldset>` labelled by the question; each is a real radio
+  button or checkbox inside a `<label>` with the choice's first line.
+  Anything after it - a graph, an image, code to run - sits OUTSIDE the
+  label (pressing Run never ticks it; measured) and describes the box
+  (`aria-describedby`, review S7), so "Graph A" is read with the graph's
+  description. A box needs words after it on its line to be a box at all
+  (measured), so a choice with no words of its own is named
+  `choiceNumber` and the figure's description when it happens.
+* No `name` is set when the site is built: the script gives each quiz on
+  the page its own, and renames an id a transclusion has duplicated.
+* Blanks are text boxes labelled "Blank n of count"; a short answer's box
+  `answerLabel`. Autocomplete, autocapitalize, autocorrect and spellcheck
+  off.
+* Feedback is a polite live region; a blank is marked in words and a sign
+  (✓ Right / ✗ Not right) and `aria-invalid`, never colour alone.
+* Folds (review S6): Quartz's fold titles listen for clicks only, and a
+  folded callout's content stays focusable. Inside a quiz, each fold title
+  is `role=button tabindex=0 aria-expanded` and opens with Enter or Space;
+  folded content is `inert` until opened; a revealed explanation is opened
+  (its height recomputed - Quartz measured it while hidden, M9).
+
+### J4. Checking, the shuffle, and the score
+
+`accepts` (contract `answers`): alternatives on ` | ` with a space or tab on
+both sides; numbers by value (decimals with or without a leading digit,
+integer fractions, `+ - −`; not `1e3`, `0x10`, `Infinity`, a comma, `½`,
+ruling Q7); `A ± T` only as a number ± a number not negative, so `±3` and
+`x = ±3` are answers and `+-` typed matches `±` (review S8); `$...$`
+compared inside; NFKC then `toLowerCase()` with no locale (STRASSE is not
+straße - pinned), curly quotes made straight (iOS Smart Punctuation).
+
+The shuffle moves the choices (reading and Tab order follow what is seen;
+CSS `order` was rejected, WCAG 1.3.2) with `shuffledOrder(n, Math.random)`
+on every load; `beforeprint` puts Markdown order back for ⌘P and
+`afterprint` the shuffle; the handout sorts its own copy by `data-choice`.
+
+The score (ruling Q4, right on the FIRST Check): `localStorage`
+`plantoir:quiz:<site root path>:<page slug>` = `{v: 1, quizzes:
+{"<source slug>#<n>": {hash, firstTry}}}`, keyed by the quiz's SOURCE page
+so a transcluded quiz keeps its own entry (review S5); a hash that no
+longer matches is ignored; every call in try/catch. Shown after the page's
+last quiz once one is answered, with Start again; a quiz shown twice on a
+page (two transclusions) counts once, and each copy's ids are its own
+(measured on the planted `Quiz Twice`).
+
+**Transclusion (review S5), measured rather than limited:** Quartz copies
+the source page's finished HTML into the host, so a transcluded quiz keeps
+its own `data-quiz-source`, ids and answers; on `Quiz Host` (its own quiz 1
+and `![[Quiz Source]]`'s quiz 1) the two have distinct ids, labels and
+radio groups, and the transcluded one is scored as `Quiz-Source#1`. So it is
+interactive, not the not-ready fallback the ruling allowed.
+
+### J5. On paper (ruling Q8)
+
+A quiz prints as its question: buttons, feedback, score, answer, explanation,
+marks and the not-ready line hidden; native boxes hidden and an empty ○ (one
+answer) or □ (select all) drawn; a blank an empty line. `print.inline.ts`
+gives callouts INSIDE a quiz no role (a folded `[!answer]` there would have
+been lifted into the handout's key, M10), and its handout copy removes what a
+quiz holds back, sorts the choices back and draws the boxes (a copy keeps
+what a student ticked or typed). Measured: `Quiz Printable`'s handout holds
+both quizzes' questions, the page's own folded answer in its key, and
+neither quiz's answer nor its explanation. The answer key for quizzes is
+#511's.
+
+### J6. Measured (2026-10-17, M4 Pro, macOS 26.6, Chrome for Testing 155)
+
+`browser-checks/quiz_check.mjs` on the verify fixture's `Quiz Playground`
+(eight quizzes: every kind, a shuffle, a folded quiz of graphs, code to run
+and a picture in choices, graphs and code in explanations), `Quiz Host` and
+`Quiz Printable`: every kind wrong then right in the contract's words; an
+empty answer never checked; the explanation's TEXT visible after a Check and
+its graph drawn; Show answer's badge, and its formula set by KaTeX; Enter in
+a box checks it; a folded quiz's title opens with Enter and its content was
+inert; Run in a choice does not tick it; Swift (#493) runs in a choice and in a revealed explanation, printing `6` from each (measured after merging #493, the compile through preview.sh's Swift image); answering asks no website and the
+site for nothing; the shuffle in 19 orders over 20 loads; print media hides
+every held-back part and draws ○ and □; the score kept across a reload and
+cleared by Start again, and every quiz still checks with `localStorage`
+throwing; five page changes leave one listener set per quiz and one for
+printing; the transclusion above; the handout. Light and dark screenshots
+read cleanly (marks and badges have dark-mode colours). NOT measured here:
+Safari, iPadOS, VoiceOver, the mac preview pane, Netlify (#563's closing
+comment lists them as owed).
+
+### J7. Teacher note: "Writing a self-check question"
+
+Start a callout at the left edge with `> [!quiz]` and the question; tick the
+right choice with `- [x]` (two or more for select all), or put the answer
+inside on its own line under `> > [!answer]-` (one line per `` `____` ``
+blank); add `> > [!explain]- Why` for the reason. Separate accepted answers
+with ` | `; `3.14 ± 0.01` for a range. Preview and answer each question; one
+that cannot be checked is named in the folder problems with its line. The
+skill `plantoir-quizzes` (support/agent_guidance) carries the whole of this,
+with patterns, for an assistant.
+
+**Rejected** (with the reasons above and in the plan): a ```` ```quiz ````
+fence (#511: no maths or graphs inside, and Obsidian shows a code block);
+CSS `order` for the shuffle; a frontmatter key (a second switch that can
+disagree with the page); a per-page `<script>` (Quartz's SPA head patch, and
+a second loading mechanism); patching ObsidianFlavoredMarkdown for every
+nested callout (Q1); Python checking answers (one implementation only);
+`<label>` around a choice's blocks (Run would tick it); a radio `name` at
+build time (a transclusion would join the page's group); one words-and-pages
+JSON (the page's script bundles the words, so a file that changes with every
+quiz problem would change `postscript.js` too).
+
+**Departures from #563's wording**, recorded so they are not mistaken for
+omissions: assets ride every site's shared bundle rather than "only on pages
+that use a quiz" (ruling Q2, measured above), and a malformed quiz is a
+folder problem with page and line rather than "build fails" (the ruling for
+#493: a build is never stopped by one page).
 
 ## E. Summary: what is *not* customized
 

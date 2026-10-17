@@ -1543,6 +1543,10 @@ expectations and chips; a map with none leaves out the chip sentence, the
 notes, and an empty chips `div` is never written. The old sort key read
 `int(code.split(".")[0][1:])`, which is `int("")` for `1.A`: widening the rule
 without replacing it would have stopped every such build with a traceback.
+The same `overall_of` decides what an overall expectation's page lists under
+"When did we do this?": every page that links it or any of its specific
+expectations in the same folder (#505, `documentation/06-quartz-customizations.md`
+→ D1).
 
 **Nested pages and repeats.** Pages are collected RECURSIVELY, shallowest
 first then by path — a plain path sort puts `(old)/A1.1` and `2019 version/A1.1`
@@ -1765,6 +1769,8 @@ cases: `contracts/shared-rules.json` → `figureFences`.
    `plantoir: error: Units/Similar Triangles.md: tikz block 2, line 14: …`;
    a drawing with no `% alt:` and a graph setting nobody reads are
    `plantoir: note:` lines only (ruling E1-3).
+   (`quizzesNotReady`, #563, is reported the same way: see "Self-check
+   quizzes: what the build does".)
 
 **Measured** (M4 Pro, Colima at 6 CPUs, the dev-test image, Node 20.20.2):
 the verify fixture's first build drew its 7 distinct diagrams and checked 5
@@ -2018,6 +2024,99 @@ teacher would download 1.3 GB for a language most never use); failing the
 build on a compile error (ruling Q1); clearing the cache on `--full-rebuild`;
 a hand-bumped toolchain version in the key; caching a failure that was not
 the compiler's; one job folder per course.
+
+## Self-check quizzes: what the build does (#563, v1.8.0)
+
+A `> [!quiz]` callout at the left edge of a page becomes a question students
+answer and check in their browser; the site's half is
+[06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), the rules
+`contracts/shared-rules.json` → `quizCallouts`. There is no frontmatter key
+and no engine to gate: the callout opts the page in, and the script and
+styles ride every site's shared `postscript.js` and `index.css` (ruling Q2).
+The build's share is a folder check and two files, ALWAYS, beside the
+runnable-code count (`_check_quizzes`):
+
+1. **Reading.** `figures.pages_students_see(..., must_contain="[!")` - the
+   gate's own visibility rule, outside Media, only pages that could hold a
+   callout - then `quizzes.quizzes_on_page` on each build copy's raw text.
+   The reader is line by line, not a Markdown parser (the reason
+   `markdown_code` gives): line endings made LF (CR LF and a lone CR, review
+   S1), `%%` comments taken out first as ObsidianFlavoredMarkdown takes them
+   (S10, keeping a map back to the page's own lines), fenced code skipped
+   at any quote depth, then what `quizCallouts.rule` says a top-level quiz
+   is. Inside one: the first list holding a task box is the choices (a box
+   needs words after it on its line - measured: `- [ ]` alone is plain text
+   to the site's parser; a `>` four or more columns past its container's
+   content is indented code, and an HTML block - a block-level tag, or a
+   line holding only one tag - swallows what follows it to the next empty
+   line, as the site reads both: quiz syntax in one at the page's level is
+   no quiz, and a list of choices in one makes the quiz `choicesInHtml`, on
+   both sides); a nested `> [!answer]` or
+   `> [!explain]` at the
+   quiz's own level is that callout; the rest is the question, whose
+   paragraphs (and title) are where blanks are counted. `verdict` - the
+   mirror of quizRules.ts's, with the problems in `recognise.order` - says
+   what the quiz is. The mirror PARSES answer lines (`parse_answer_line`)
+   and never checks what a student typed: that is quizRules.ts's alone.
+2. **Lines in the teacher's file.** A build copy can carry lines the
+   teacher's page does not (rewritten frontmatter, a removed region), so
+   each quiz is matched to the one in the teacher's page with the same
+   title, counting equal titles in order (review N8), and a problem keeps
+   its distance from the quiz's first line - the answer line for an answer
+   problem, otherwise the quiz's first line. One that cannot be matched
+   loses its line (`quizLineNoLine`).
+3. **What the teacher and an assistant are told.** One line per quiz that
+   cannot be checked:
+   `plantoir: error: Units/Practice.md: quiz 3, line 41: <quizCallouts.words.problems[reason]>`
+   (`line 41` alone for a quiz inside a list or callout, which has no
+   place), and ONE folder problem per section build, `quizzesNotReady`
+   (at most ten named, after every other finding), surfaced by both apps
+   and recorded on the trail as the existing "found a problem with this
+   course's folders" - no new trail event. It never stops a build (the
+   ruling for #493): one question must not keep a site from being built,
+   and refusing would break the preview the teacher is fixing it in. Not
+   repairable (`siteHealth.repair.neverOffered`).
+4. **The two files** (`quizzes.write_quiz_files`, every build, the same
+   bytes for the same input): `quartz/plantoir_quiz.json` carries only the
+   words (`words.site`, `words.problems`), because the page's script
+   bundles it and must change only when the words do; and
+   `quartz/plantoir_quiz_pages.json` carries `examined` (every page read,
+   by its path in the site's content) and, for each page with a quiz, how
+   many top-level and nested quizzes it found and which it reported. The
+   transformer reads both with `fs` (mtime-cached). An unreadable contract
+   writes empty words, and the site then renders every quiz as not ready -
+   never with its answers on show.
+
+**The safety net** (`quizCallouts.safetyNet`, review S4). The site renders
+what IT read; for a page this check examined and that is published, it
+compares counts and, quiz by quiz, whether each side found a problem, and
+says `plantoir: error: <page>: quiz <n>, line <L>: <readDifferently>`
+where they differ (the line from the pages file's `lines`; when the
+top-level counts differ, "the quiz at line L" of the first quiz the check
+found; when only the quizzes in a list or callout differ, "a quiz inside a
+list or another callout at line L" from `nestedLines`) - quiet otherwise. It relies on `build --concurrency 1` (the line
+reaches the build's output from the one parsing thread, review N1).
+Measured: a `- [ ] ` choice with nothing after the box was read as a box
+here and as text by the site, and the net said so on its first build; the
+rule was then corrected on both sides and pinned (`aBoxNeedsWordsAfterIt`).
+A page students cannot see is parsed by Quartz too and never named.
+
+**The live-preview edge.** As for runnable code: the preview's own rebuilds
+do not re-run the check or rewrite the files, so a quiz added while a
+preview serves is rendered by the site's own reading (its verdict is the
+site's, the same rules), and its folder problem and any safety-net line
+come with the next Preview.
+
+**Measured** (2026-10-17, M4 Pro, macOS 26.6, the branch's image): the
+verify fixture's 35 quizzes (every recognise case on one page) were read
+alike by both sides - every kind and every problem, with no safety-net
+line; EXC2O built with the pre-branch image and with this branch is 297 of
+302 pages and feeds identical once Quartz's random list ids and build
+times are set aside, the other five being folder and tag listings ordered
+by build time, which differ between two builds of the SAME image too
+(measured: six differ there); MPM2D's `Similar Triangles Practice` (eight
+top-level `[!answer]-` callouts), a page of look-alikes and its CR LF twin
+are identical.
 
 ## Stage 4: Configuration patching
 

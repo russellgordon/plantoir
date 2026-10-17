@@ -43,6 +43,13 @@ import figuresScript from "./scripts/figures.inline"
 // reaches the sidebar of every page, folder and tag pages included. It changes
 // no page's HTML; the rows it marks are drawn in the browser.
 import sidebarPageMarkerStyle from "./styles/sidebarPageMarker.scss"
+// Self-check quizzes (#563) ride along for the same reason as the figures:
+// every content page might hold one. Every style is under a .plantoir-quiz
+// class and the script returns at once on a page with no quiz (ruling Q2:
+// the shared index.css and postscript.js, not a second per-page loader).
+import quizStyle from "./styles/quiz.scss"
+// @ts-ignore
+import quizScript from "./scripts/quiz.inline"
 
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
 type PrintSettings = {
@@ -211,8 +218,8 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, quizStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
-  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript)
+  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript)
   return PlantoirMetaLine
 }) satisfies QuartzComponentConstructor<QuartzComponent>

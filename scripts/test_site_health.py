@@ -71,6 +71,8 @@ class SiteHealthTests(unittest.TestCase):
                                   "line": 12, "reason": "undefinedCommand", "name": "\\foo"}]},
             {"swift_problems": [{"page": "Units/Strings", "block": 1, "line": 9,
                                  "reason": "compileError", "said": "cannot find 'nmae' in scope"}]},
+            {"quiz_problems": [{"page": "Unit 2/Practice", "n": 3, "line": 41,
+                                "reason": "noCorrectChoice", "fill": {}}]},
         ):
             broken = dict(HEALTHY)
             broken.update(facts)

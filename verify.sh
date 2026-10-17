@@ -511,6 +511,17 @@ else
   cat /tmp/verify_quartz_wiring_test.log
 fi
 
+# Self-check quizzes (#563): every recognise and answers.parse case through
+# the folder check's mirror, the line in the teacher's file, the
+# quizzesNotReady finding, the words and pages files the site reads, and the
+# pages the check reads. Stdlib only.
+if (cd scripts && python3 test_quizzes.py) >/tmp/verify_quizzes_test.log 2>&1; then
+  pass "self-check quizzes: every quiz shape the contract names read by the folder check, its lines in the teacher's file, the quizzesNotReady finding, and the files the site reads (scripts/test_quizzes.py, #563)"
+else
+  fail "self-check quizzes: every quiz shape the contract names read by the folder check, its lines in the teacher's file, the quizzesNotReady finding, and the files the site reads (scripts/test_quizzes.py, #563)"
+  cat /tmp/verify_quizzes_test.log
+fi
+
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
 else
@@ -608,6 +619,14 @@ if (cd scripts && python3 test_coverage_maps.py) >/tmp/verify_coverage_maps_test
 else
   fail "build_site.py: one curriculum coverage map per curriculum folder, the code rule, and single-map output unchanged (scripts/test_coverage_maps.py)"
   sed 's/^/     /' /tmp/verify_coverage_maps_test.log | tail -40
+fi
+
+# Issue #505: an overall expectation's backlinks gather its specific expectations'.
+if (cd scripts && python3 test_overall_backlinks.py) >/tmp/verify_overall_backlinks_test.log 2>&1; then
+  pass "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
+else
+  fail "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
+  sed 's/^/     /' /tmp/verify_overall_backlinks_test.log | tail -40
 fi
 
 if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
@@ -1074,6 +1093,25 @@ else
   cat /tmp/verify_runner_rules_site.log
 fi
 
+# ---- Self-check quizzes (#563): the rules, run where they really run ----
+# quizRules.ts (the file the site's transformer and the page's script both
+# check answers with) is bundled and every answers.parse, answers.check and
+# shuffle case is run through it in Node, with 1,000 shuffles each a
+# permutation; the transformer's text hook leaves every untouched page byte
+# for byte and makes a CR LF page LF; and every word the site asks for is in
+# the contract.
+echo ""
+echo "🔎 Checking the self-check quiz rules against what the site runs…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_quiz_rules_against_the_site.py" /opt/scripts/check_quiz_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_quiz_rules_against_the_site.py \
+  >/tmp/verify_quiz_rules_site.log 2>&1; then
+  pass "every quizCallouts answer, check and shuffle case holds in the site's own code, the text hook leaves pages without a quiz untouched, and every word the site shows is the contract's (scripts/check_quiz_rules_against_the_site.py, #563)"
+else
+  fail "every quizCallouts answer, check and shuffle case holds in the site's own code, the text hook leaves pages without a quiz untouched, and every word the site shows is the contract's (scripts/check_quiz_rules_against_the_site.py, #563)"
+  cat /tmp/verify_quiz_rules_site.log
+fi
+
 # ---- Diagrams and graphs (#485 E1): the rules, run against the real engines ----
 # figureRules.js (the file the site's transformer and the build's helper both
 # import) runs every tidy and cacheKey case in Node; the helper, driven as a
@@ -1419,6 +1457,9 @@ check_baked scripts/figures.py            /opt/scripts/figures.py
 # Runnable Swift (#493): plan and prepare; and (in the loop) the Swift image's
 # recipe, which the build hashes for its toolchain id, and the page's thread.
 check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
+# Self-check quizzes (#563): the folder check. The site's transformer, script
+# and styles are in support/quartz (the loop below).
+check_baked scripts/quizzes.py            /opt/scripts/quizzes.py
 while IFS= read -r addition; do
   check_baked "$addition" "/opt/$addition"
 done < <(find support/quartz support/agent_guidance support/figures support/gated support/swift -type f ! -name '.*' | sort)
@@ -1724,6 +1765,11 @@ restore_hit_fixture() {
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
         "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
+        "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
+        "$HIT_COURSE/Quiz Fixture.md" "$HIT_COURSE/Quiz CRLF.md" "$HIT_COURSE/Quiz Lookalikes.md" \
+        "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
+        "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
+        "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2471,6 +2517,109 @@ playground += "```swift run stdin\n" + (gate / "05-arrays.swift").read_text(enco
     "```swift run\nprint(\"hidden swift\")\n```\n", encoding="utf-8")
 RUNNERPLANTS
 
+# ---- #505: an overall expectation's backlinks, planted for the same build ----
+# Two pages in a shared folder (so the course's settings are not touched),
+# connected the way a class page embeds expectations, each with a sentinel in
+# its title. "Overall Backlinks Specific" embeds ONLY the specific expectation
+# A2.1: the overall page A2 must list it, which is the aggregation itself (a
+# direct-links-only panel lists it on A2.1 alone - measured: this check passed
+# against the old component until this page was added). "Overall Backlinks
+# Fixture" embeds BOTH A2.1 and A2: A2 must list it ONCE (one filter over A2
+# and its specific expectations, not two lists). Removed by restore_hit_fixture.
+printf -- '---\ntitle: Overall Fixture plantoir-overall-both-7f3a\n---\nA page planted by verify.sh that connects to an overall expectation and one of its specific expectations.\n\n![[A2.1]]\n\n![[A2. Applications, Careers, and Connections]]\n' \
+  > "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md"
+printf -- '---\ntitle: Overall Specific plantoir-overall-specific-7f3a\n---\nA page planted by verify.sh that connects to one specific expectation only.\n\n![[A2.1]]\n' \
+  > "$HIT_COURSE/Discussions/Overall Backlinks Specific.md"
+# ---- #563: self-check quizzes, planted for the same build ----
+# Quiz Fixture: every contracts/shared-rules.json -> quizCallouts.recognise
+# case in order, each after a "Case n" line (6k reads each quiz's kind or
+# problem back, and the build's plantoir: error: lines); Quiz CRLF: the CR LF
+# case on a page saved with CR LF (review S1); Quiz Lookalikes: [!question],
+# a top-level [!answer] and [!explain], and quiz syntax shown in a fence -
+# none of them a quiz; Quiz Printable: a printable page with a folded answer
+# of its own and two quizzes (ruling Q8: neither quiz's answer nor its
+# explanation in the handout); Quiz Hidden: a broken quiz students cannot
+# see (reported nowhere); Quiz Source and Quiz Host: a quiz transcluded onto
+# a page with its own (review S5); Quiz Playground: every kind for the
+# browser check, with graphs, code to run and an image in choices and
+# explanations. Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE" <<'QUIZPLANTS'
+import json, struct, sys, zlib
+from pathlib import Path
+course = Path(sys.argv[1])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["quizCallouts"]
+F = "```"
+body = "Self-check quizzes planted by verify.sh (plantoir-quiz-sentinel-7f3a).\n\n"
+for number, case in enumerate(rules["recognise"]["cases"], start=1):
+    if "\r" in case["markdown"]:
+        continue
+    body += f"Case {number}: {case['name']}.\n\n{case['markdown']}\n"
+(course / "Quiz Fixture.md").write_text("---\ntitle: Quiz Fixture\n---\n" + body, encoding="utf-8")
+crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]][0]
+(course / "Quiz CRLF.md").write_bytes(("---\r\ntitle: Quiz CRLF\r\n---\r\nSaved with CR LF (plantoir-quiz-crlf-7f3a).\r\n\r\n"
+                                       + crlf["markdown"]).encode("utf-8"))
+(course / "Quiz Lookalikes.md").write_text(
+    "---\ntitle: Quiz Lookalikes\n---\nCallouts that are not quizzes (quiz-lookalike-sentinel-7f3a).\n\n"
+    "> [!question] Which is prime?\n> - [x] 5\n> - [ ] 6\n\n"
+    "> [!answer]- Answer\n> lookalike-answer-7f3a\n\n"
+    "> [!explain]- Why\n> lookalike-explain-7f3a\n\n"
+    + F + "markdown\n> [!quiz] Shown, never run.\n> - [x] a\n> > [!answer]- Answer\n> > a\n" + F + "\n", encoding="utf-8")
+(course / "Quiz Printable.md").write_text(
+    "---\ntitle: Quiz Printable\nprintable: true\n---\nA printable page with quizzes (plantoir-quiz-printable-7f3a).\n\n"
+    "## Question 1\n\nSimplify $(x + 3)(x - 2)$.\n\n> [!success]- Answer 1\n> $x^2 + x - 6$\n\n"
+    "> [!quiz] Which is a factor of $x^2 - 9$?\n> - [x] $x - 3$\n> - [ ] $x + 9$\n>\n"
+    "> > [!explain]- Why\n> > printable-explain-7f3a: a difference of squares.\n\n"
+    "> [!quiz] Name the capital of Canada.\n> > [!answer]-\n> > printable-answer-7f3a | Ottawa\n", encoding="utf-8")
+(course / "Quiz Twice.md").write_text(
+    "---\ntitle: Quiz Twice\n---\nOne quiz shown twice (plantoir-quiz-twice-7f3a).\n\n![[Quiz Source]]\n\n![[Quiz Source]]\n",
+    encoding="utf-8")
+(course / "Quiz Code Shown.md").write_text(
+    "---\ntitle: Quiz Code Shown\n---\nQuiz syntax shown as indented code, never a quiz (quiz-code-sentinel-7f3a).\n\n"
+    "    > [!quiz] Shown as code.\n    > > [!answer]- Answer\n    > > a\n\n"
+    "> [!note] How to write one\n>\n>     > [!quiz] Shown as code in a callout.\n>     > > [!answer]- Answer\n>     > > a\n\n"
+    "- Step one: type this\n\n      > [!quiz] Shown as code under a list item.\n      > > [!answer]- Answer\n      > > a\n",
+    encoding="utf-8")
+(course / "Quiz Summary.md").write_text(
+    "---\ntitle: Quiz Summary\n---\n> [!quiz] Fill `____` and `____`.\n> > [!answer]-\n> > summary-answer-7f3a\n> > b\n",
+    encoding="utf-8")
+(course / "Quiz Hidden.md").write_text(
+    "---\ntitle: Quiz Hidden\npublish: false\n---\nHidden (plantoir-quiz-hidden-7f3a).\n\n> [!quiz] Broken.\n> - [ ] a\n> - [ ] b\n",
+    encoding="utf-8")
+(course / "Quiz Source.md").write_text(
+    "---\ntitle: Quiz Source\n---\nA quiz to transclude (plantoir-quiz-source-7f3a).\n\n"
+    "> [!quiz] Source question: pick the odd number.\n> - [x] 7\n> - [ ] 8\n", encoding="utf-8")
+(course / "Quiz Host.md").write_text(
+    "---\ntitle: Quiz Host\n---\nA page with its own quiz and another page's (plantoir-quiz-host-7f3a).\n\n"
+    "> [!quiz] Host question: pick the even number.\n> - [ ] 7\n> - [x] 8\n\n![[Quiz Source]]\n", encoding="utf-8")
+# A tiny image for a choice.
+def png(width, height):
+    raw = b"".join(b"\x00" + b"\x30\x80\xc0" * width for _ in range(height))
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + \
+        chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+(course / "Media").mkdir(exist_ok=True)
+(course / "Media" / "plantoir-quiz-choice.png").write_bytes(png(40, 20))
+(course / "Quiz Playground.md").write_text(
+    "---\ntitle: Quiz Playground\ncodeRunner: true\n---\n"
+    "> [!quiz] Simplify $2^3 \\cdot 2^4$.\n> > [!answer]- Answer\n> > $2^7$ | 2^7\n>\n> > [!explain]- Why\n> > playground-explain-7f3a: same base, add the exponents.\n\n"
+    "Every kind of self-check question (plantoir-quiz-playground-7f3a).\n\n"
+    "> [!quiz] Which graph shows $y = (x-3)^2 + 2$?\n> - [ ] Vertex at $(-3, 2)$\n> - [x] Vertex at $(3, 2)$\n> - [ ] Vertex at $(3, -2)$\n>\n"
+    "> > [!explain]- Why\n> > $y = x^2$ shifts right 3 and up 2:\n> > " + F + "functionplot\n> > y = (x-3)^2 + 2\n> > y = x^2\n> > " + F + "\n\n"
+    "> [!quiz] Which are prime?\n> - [x] 2\n> - [ ] 4\n> - [x] 5\n> - [ ] 9\n\n"
+    "> [!quiz] Water boils at `____` °C at `____` pressure.\n> > [!answer]-\n> > 100 ± 1 | one hundred\n> > sea level | standard | atmospheric\n\n"
+    "> [!quiz|shuffle] Which is a factor of $x^2 - 5x + 6$?\n> - [x] $x - 2$\n> - [ ] $x + 2$\n> - [ ] $x + 3$\n> - [ ] $x + 6$\n> - [ ] $x - 6$\n\n"
+    "> [!quiz]- Which is the graph of $y = -x^2$?\n> - [ ] Graph A\n>   " + F + "functionplot\n>   ---\n>   alt: an upward parabola\n>   ---\n>   y = x^2\n>   " + F + "\n"
+    "> - [x] Graph B\n>   " + F + "functionplot\n>   y = -x^2\n>   " + F + "\n\n"
+    "> [!quiz] What does this print?\n> - [x] 5\n>   " + F + "python run\n>   print(2 + 3)\n>   " + F + "\n> - [ ] 6\n> - [ ] A picture\n>   ![a blue box](Media/plantoir-quiz-choice.png)\n>\n"
+    "> > [!explain]- Why\n> > Run it yourself:\n> > " + F + "python run\n> > print(2 + 3)\n> > " + F + "\n\n"
+    "> [!quiz] Solve $x^2 = 9$.\n> > [!answer]-\n> > ±3 | x = ±3\n\n"
+    # Swift to run (#493) in a choice and in an explanation (#563 review S2).
+    "> [!quiz] What does this Swift program print?\n> - [x] 6\n>   " + F + "swift run\n>   print(2 * 3)\n>   " + F + "\n"
+    "> - [ ] 23\n>\n> > [!explain]- Why\n> > `*` multiplies. Run it:\n> > " + F + "swift run\n> > let n = 2\n> > print(n * 3)\n> > " + F + "\n",
+    encoding="utf-8")
+QUIZPLANTS
+
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
 echo "🚦 Running: ./preview.sh EXC2O 1 --image $DEV_TEST_IMAGE --full-rebuild --build-only"
@@ -2585,6 +2734,54 @@ for planted in "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md
   fi
 done
 [[ "$HIT_OK" == "true" ]] && pass "No How I Teach page reaches the built site, the look-alike does, and the teacher's own pages are untouched (#209)"
+
+# ---- 6h, continued: an overall expectation's backlinks (#505) ----
+# The two pages planted above, read from the built pages. The "When did we do
+# this?" panel on the overall page A2 must name each exactly once - the page
+# that links only A2.1 (aggregated) and the page that links A2 and A2.1
+# (de-duplicated) - and the panel on A2.1 must name each once (unchanged).
+# Counted inside the panel only, so a title shown anywhere else on the page
+# cannot make it pass. Before #505 the A2 page had no panel at all.
+if python3 - "$SITE_PUBLIC" <<'OVERALLCHECK'
+import glob, sys
+public = sys.argv[1]
+sentinels = {"plantoir-overall-both-7f3a": "the page linking A2 and A2.1",
+             "plantoir-overall-specific-7f3a": "the page linking only A2.1"}
+heading = "When did we do this?"
+problems = []
+overall = glob.glob(public + "/Curriculum/A2.-*.html")
+pages = {"the overall expectation A2": overall[0] if len(overall) == 1 else None,
+         "the specific expectation A2.1": public + "/Curriculum/A2.1.html"}
+for what, path in pages.items():
+    if path is None:
+        problems.append(f"{what}: expected one built page Curriculum/A2.-*.html, found {len(overall)}")
+        continue
+    try:
+        html = open(path, encoding="utf-8").read()
+    except OSError:
+        problems.append(f"{what}: no built page at {path}")
+        continue
+    start = html.find('class="backlinks')
+    if start < 0:
+        problems.append(f'{what}: no "{heading}" panel on {path}')
+        continue
+    end = html.find("</ul>", start)
+    panel = html[start:end if end > start else len(html)]
+    if heading not in panel:
+        problems.append(f'{what}: the panel on {path} has no "{heading}" heading')
+    for sentinel, planted in sentinels.items():
+        count = panel.count(sentinel)
+        if count != 1:
+            problems.append(f"{what}: {planted} is listed {count} time(s) in the panel on {path}, not once")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+OVERALLCHECK
+then
+  pass "An overall expectation's page lists the pages of its specific expectations, a page linking both is listed once, and the specific expectation's page is unchanged (#505)"
+else
+  fail "An overall expectation's \"When did we do this?\" panel is wrong (#505) - see the lines above"
+fi
 
 # ---- 6h, continued: printable pages (#454) ----
 # The pages planted with the How I Teach ones, read from the site the launcher
@@ -2823,10 +3020,12 @@ if (public / "Runner-Hidden.html").exists():
 said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
 if re.search(r"plantoir: error: [^\n]*Runner", said):
     problems.append("the build named a runner page on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*Runner[^\n]*", said).group(0))
-if not re.search(r"This site carries what runs Swift for 2 pages\.", said):
-    problems.append("the build did not say the site carries Swift for the two pages students can see with Swift (Runner Fixture, Swift Playground)")
-if not re.search(r"This site carries what runs Python for 4 pages\.", said):
-    problems.append("the build did not say the site carries Python for the four pages students can see (not the hidden one)")
+# Quiz Playground (#563) runs Python and Swift inside its quizzes, so it is
+# one more page for each engine.
+if not re.search(r"This site carries what runs Swift for 3 pages\.", said):
+    problems.append("the build did not say the site carries Swift for the three pages students can see with Swift (Runner Fixture, Swift Playground, Quiz Playground)")
+if not re.search(r"This site carries what runs Python for 5 pages\.", said):
+    problems.append("the build did not say the site carries Python for the five pages students can see (not the hidden one; Quiz Playground is the fifth)")
 engine = public / "static" / "pyodide"
 carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
 if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
@@ -2920,6 +3119,12 @@ for index, (attributes, body) in enumerate(zip(wrappers, bodies), start=1):
 wanted = set()
 for body in bodies[:4] + bodies[5:]:
     wanted.add(swift_blocks.key_of(body) + ".wasm")
+# The self-check quizzes' playground runs Swift in a choice and in an
+# explanation (#563), so its programs are on the site too.
+quiz_playground = course / "Quiz Playground.md"
+if quiz_playground.is_file():
+    for block in swift_blocks.swift_fences(quiz_playground.read_text(encoding="utf-8"), True):
+        wanted.add(swift_blocks.key_of(block["body"]) + ".wasm")
 for number, case in enumerate(rules["fences"]["cases"], start=1):
     if case["optedIn"] and case["runner"] and case.get("fence", case["lang"]) == "swift":
         wanted.add(swift_blocks.key_of(f'print("case {number}")') + ".wasm")
@@ -2958,6 +3163,147 @@ then
   pass "runnable Swift: each block names its program (or compileError), static/swift-wasm holds exactly the programs visible pages use, static/swift is the overlay, and the block that does not compile is named at its line in the teacher's file with the compiler's first error, as a folder problem too (#493)"
 else
   fail "runnable Swift: one of the checks above failed (#493)"
+fi
+
+# ---- 6k. Self-check quizzes (#563), as the build left them ----
+# The site's side: every quiz on the planted Quiz Fixture is the kind - or
+# the problem - contracts/shared-rules.json -> quizCallouts.recognise says,
+# in order, with its correct choices or answer lines, and the CR LF page too
+# (S1). The folder check's side: one plantoir: error: line per problem, with
+# the quiz's place and its line in the teacher's file, one quizzesNotReady
+# finding, and no line saying the two read a quiz differently. The
+# look-alikes are no quiz; no tick reaches a quiz page; no planted answer or
+# explanation is in the search index, the feed, the sitemap or a summary
+# (Q5, S3); every word the site shows is in its script; the hidden page is
+# named nowhere; a transcluded quiz keeps its own page's name (S5).
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log <<'QUIZPY'
+import html, json, re, sys
+from pathlib import Path
+public, log = Path(sys.argv[1]), Path(sys.argv[2])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["quizCallouts"]
+problems = []
+said = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
+def page(name):
+    path = public / name
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+def quizzes_in(text):
+    found = []
+    for attributes in re.findall(r'<blockquote class="[^"]*\bplantoir-quiz\b[^"]*"([^>]*)>', text):
+        get = lambda name: (re.search(name + r'="([^"]*)"', attributes) or [None, None])[1]
+        found.append({"n": get("data-quiz-n"), "kind": get("data-quiz-kind"), "problem": get("data-quiz-problem"),
+                      "data": json.loads(html.unescape(get("data-quiz") or "{}")), "source": get("data-quiz-source")})
+    return found
+# The fixture, case by case, as the plant laid it out.
+fixture_lines = Path("courses/EXC2O/Quiz Fixture.md").read_text(encoding="utf-8").split("\n")
+expected, lines_said = [], []
+top = 0
+for number, case in enumerate(rules["recognise"]["cases"], start=1):
+    if "\r" in case["markdown"]:
+        continue
+    start = fixture_lines.index(f"Case {number}: {case['name']}.") + 3  # its markdown's first line, 1-based
+    for quiz in case["quizzes"]:
+        n = None
+        if quiz.get("problem") != "notAtTopLevel":
+            top += 1
+            n = top
+        if "problem" in quiz:
+            expected.append(("notReady", quiz["problem"], {}))
+            reason = rules["words"]["problems"][quiz["problem"]]
+            for key, value in quiz.get("fill", {}).items():
+                reason = reason.replace("{" + key + "}", str(value))
+            where = f"quiz {n}, line {start + quiz['line'] - 1}" if n is not None else f"line {start + quiz['line'] - 1}"
+            lines_said.append(f"plantoir: error: Quiz Fixture.md: {where}: {reason}")
+        else:
+            data = {"correct": quiz["correct"]} if quiz["kind"] in ("single", "multiple") else {"answers": quiz["answers"]}
+            expected.append((quiz["kind"], None, data))
+got = [(quiz["kind"], quiz["problem"], quiz["data"] if quiz["kind"] != "notReady" else {}) for quiz in quizzes_in(page("Quiz-Fixture.html"))]
+if got != expected:
+    problems.append(f"Quiz Fixture's quizzes are not the contract's: got {got}, expected {expected}")
+for line in lines_said:
+    if line not in said:
+        problems.append("the build did not say: " + line)
+counted = len(re.findall(r"plantoir: error: Quiz Fixture\.md: ", said))
+if counted != len(lines_said):
+    problems.append(f"the build said {counted} plantoir: error: lines for Quiz Fixture, expected {len(lines_said)}")
+if rules["words"]["problems"]["readDifferently"] in said:
+    problems.append("the site and the folder check read a quiz differently: " + re.search(r"plantoir: error: [^\n]*" + re.escape(rules["words"]["problems"]["readDifferently"][:30]), said).group(0))
+markers = [line for line in said.splitlines() if "PLANTOIR_HEALTH:" in line and '"quizzesNotReady"' in line]
+if len(markers) != 1 or f'"sentence": "{len(lines_said)} self-check questions' not in markers[0]:
+    problems.append(f"expected one quizzesNotReady finding for {len(lines_said)} questions, got {markers}")
+crlf = quizzes_in(page("Quiz-CRLF.html"))
+if [(quiz["kind"], quiz["data"]) for quiz in crlf] != [("short", {"answers": ["$2^7$"]})]:
+    problems.append(f"the page saved with CR LF read as {crlf}")
+shown = page("Quiz-Code-Shown.html")
+if not shown or "plantoir-quiz\"" in shown or "data-quiz" in shown:
+    problems.append("Quiz Code Shown is missing or was made a quiz")
+code = re.sub(r"<span[^>]*>|</span>", "", shown).replace("&gt;", ">")
+if len(re.findall(r"<code>> \[!quiz\] Shown as code[^\n]*\n> > \[!answer\]- Answer\n> > a\n</code>", code)) != 3:
+    problems.append("quiz syntax shown as indented code was changed (a line added to the code)")
+if "Quiz Code Shown" in "\n".join(line for line in said.splitlines() if "plantoir: error:" in line):
+    problems.append("quiz syntax shown as indented code was named as a folder problem")
+summary = re.findall(r'<meta name="description" content="([^"]*)"', page("Quiz-Summary.html"))
+if summary != ["Fill … and …."]:
+    problems.append(f"a summary that opens with blanks reads {summary}, expected 'Fill … and ….'")
+lookalikes = page("Quiz-Lookalikes.html")
+if not lookalikes or "plantoir-quiz" in lookalikes or "data-quiz" in lookalikes:
+    problems.append("Quiz Lookalikes is missing or was made a quiz")
+from html.parser import HTMLParser
+class TickInsideAQuiz(HTMLParser):
+    """A ticked box anywhere inside a quiz's blockquote (the answer key)."""
+    def __init__(self):
+        super().__init__()
+        self.stack, self.ticked = [], 0
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "blockquote":
+            inside = bool(self.stack and self.stack[-1]) or "plantoir-quiz" in (attributes.get("class") or "").split()
+            self.stack.append(inside)
+        elif tag == "input" and "checked" in attributes and self.stack and self.stack[-1]:
+            self.ticked += 1
+    def handle_endtag(self, tag):
+        if tag == "blockquote" and self.stack:
+            self.stack.pop()
+for name in ("Quiz-Fixture.html", "Quiz-Playground.html", "Quiz-Printable.html", "Quiz-CRLF.html", "Quiz-Host.html"):
+    reader = TickInsideAQuiz()
+    reader.feed(page(name))
+    if reader.ticked:
+        problems.append(f"{name} carries {reader.ticked} ticked box(es) inside a quiz (the answer key)")
+host = quizzes_in(page("Quiz-Host.html"))
+if [(quiz["n"], quiz["source"]) for quiz in host] != [("1", "Quiz-Host"), ("1", "Quiz-Source")]:
+    problems.append(f"the transcluded quiz did not keep its own page's name: {host}")
+# Answers and explanations: only on their own pages, never in a summary.
+for path in public.rglob("*"):
+    if not path.is_file() or path.suffix not in (".html", ".json", ".xml", ".txt"):
+        continue
+    text = path.read_text(encoding="utf-8", errors="replace")
+    for secret in ("playground-explain-7f3a", "printable-answer-7f3a", "printable-explain-7f3a", "summary-answer-7f3a"):
+        if secret in text and path.name not in ("Quiz-Playground.html", "Quiz-Printable.html", "Quiz-Summary.html"):
+            problems.append(f"{secret} is in {path.relative_to(public)}")
+playground = page("Quiz-Playground.html")
+for summary in re.findall(r'<meta (?:name="description"|property="og:description") content="([^"]*)"', playground):
+    if "2^7" in summary or "playground-explain" in summary:
+        problems.append("Quiz Playground's summary gives its answer away: " + summary)
+index = json.loads(page("static/contentIndex.json") or "{}")
+if "2^7" in index.get("Quiz-Playground", {}).get("content", "x2^7"):
+    problems.append("the search index holds Quiz Playground's answer")
+if "lookalike-answer-7f3a" not in index.get("Quiz-Lookalikes", {}).get("content", ""):
+    problems.append("a top-level [!answer] outside a quiz was taken out of the search index")
+script = page("postscript.js")
+client = Path("support/quartz/components/scripts/quiz.inline.ts").read_text(encoding="utf-8")
+for key in sorted(set(re.findall(r'\bword\("([A-Za-z]+)"', client))):
+    value = rules["words"]["site"][key]
+    if value not in script and json.dumps(value)[1:-1] not in script:
+        problems.append(f"the site's script does not carry words.site.{key}")
+if (public / "Quiz-Hidden.html").exists() or "Quiz Hidden" in "\n".join(line for line in said.splitlines() if "plantoir: error:" in line):
+    problems.append("the hidden quiz page was built or named")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+QUIZPY
+then
+  pass "self-check quizzes: every quiz the contract names is read alike by the site and the folder check, each problem said with its line, the look-alikes and the hidden page left alone, no tick and no answer on the site but where a student asks for it (#563)"
+else
+  fail "self-check quizzes: one of the checks above failed (#563)"
 fi
 
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
@@ -3081,9 +3427,17 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "runnable Swift did not run in a browser as the contract says (browser-checks/swift_runner.mjs, #493)"
     cat /tmp/verify_swift_runner.log
   fi
+  # #563: the self-check quizzes as a student answers them, against a server
+  # the check starts itself.
+  if node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
+    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, and paper and the handout questions only - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
+  else
+    fail "self-check quizzes did not answer in a browser as the contract says (browser-checks/quiz_check.mjs, #563)"
+    cat /tmp/verify_quiz_check.log
+  fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), and runnable code in a browser (#455): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), and runnable code in a browser (#455): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), and self-check quizzes in a browser (#563): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), and self-check quizzes in a browser (#563): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
@@ -3119,9 +3473,13 @@ else
   grep -n "Drew\|plantoir:" /tmp/verify_figures_second.log | head -5
 fi
 # Runnable Swift (#493 acceptance 10): the same build compiled nothing - the
-# launcher found every block in the cache - and the Swift page came out the same.
+# launcher found every block in the cache - the site has the same programs as
+# the first build said (read from it, not a number written here: the quiz
+# playground's two programs, #563, made a written "8 of 9" wrong), and the
+# Swift page came out the same.
+SWIFT_READY_FIRST="$(grep -Eo "[0-9]+ of [0-9]+ Swift programs on this site ready to run" /tmp/verify_main_build.log | tail -1)"
 if ! grep -q "Swift program.* ready to run…" /tmp/verify_figures_second.log \
-   && grep -Eq "8 of 9 Swift programs on this site ready to run" /tmp/verify_figures_second.log \
+   && [[ -n "$SWIFT_READY_FIRST" ]] && grep -q "$SWIFT_READY_FIRST" /tmp/verify_figures_second.log \
    && same_page_but_for_quartz_ids "$SITE_PUBLIC/Swift-Playground.html" /tmp/verify_swift_first.html; then
   pass "runnable Swift: a second build compiles nothing and the Swift page is byte-identical (#493)"
 else
@@ -3276,6 +3634,14 @@ for entry in os.listdir("/proc"):
     pass "and with no runnable code left, the site no longer carries Python, and still carries its own KaTeX (#455, #494)"
   else
     fail "a site with no runnable code still carries static/pyodide, or lost static/katex (#455, #494)"
+  fi
+  # And no quiz left (#563): the folder check says nothing, and no page is a
+  # quiz.
+  if [[ -f "$SITE_INDEX" ]] && ! grep -q "quizzesNotReady\|plantoir: error: Quiz" /tmp/verify_old_container.log \
+     && ! grep -rlq "plantoir-quiz\"" "$SITE_PUBLIC" --include="*.html"; then
+    pass "and with no quiz left, the folder check finds nothing and no page holds a quiz (#563)"
+  else
+    fail "a site with no quiz still reports a quiz problem or holds a quiz (#563)"
   fi
 else
   fail "could not put back a container without the builds mount"
