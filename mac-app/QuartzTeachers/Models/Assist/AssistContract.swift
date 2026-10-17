@@ -18,13 +18,13 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** Twelve top-level keys of the
+/// **What it deliberately does NOT generate.** Thirteen top-level keys of the
 /// cases file are hand-written and are preserved on every run: `nearMisses`,
 /// `scenarios`, `promptHistory`, `deployAtATime`, `windowBinding`,
 /// `hideIsUnpublish`, `echoedRequest`, `linksQuestion` (#167),
-/// `pagesNamingNoPage` (#197), `toolDescriptions` (#114) and
-/// `scheduleAndCancel` (#424, proposed from Windows; read here since #449) and
-/// `nextClassUnits` (#440). Nothing
+/// `pagesNamingNoPage` (#197), `toolDescriptions` (#114),
+/// `scheduleAndCancel` (#424, proposed from Windows; read here since #449),
+/// `nextClassUnits` (#440) and `undoFiles` (#555). Nothing
 /// in the code says which near-miss phrasings are worth guarding, which ORDER
 /// events must happen in, which spellings of a time a teacher actually types,
 /// or which arguments a window takes back from the model and which it refuses
@@ -1062,7 +1062,7 @@ enum AssistContract {
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
                   + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
                   + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, "
-                  + "pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits — "
+                  + "pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits, undoFiles — "
                   + "is hand-written "
                   + "intent and is PRESERVED by a regeneration, so "
                   + "a case may be proposed from either platform. Listing them rather than naming "

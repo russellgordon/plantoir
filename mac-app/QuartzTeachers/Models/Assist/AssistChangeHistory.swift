@@ -125,6 +125,99 @@ struct AssistChange: Equatable {
     }
 }
 
+/// What an undo does with one saved file (#555). One rule, asked by the
+/// undo itself (`AssistChangeHistory.undo()`) and by the start-of-year undo
+/// sheet before the teacher agrees (`StartOfYearPreparation.whatAnUndoWouldDo`),
+/// so the sheet can never list a page differently from how the undo treats it.
+/// The rows are `contracts/assist-cases.json` → `undoFiles.files`.
+enum AssistUndoVerdict: String {
+
+    /// The file is exactly as the change left it, so the copy from before is
+    /// written back (or the page the change created is removed again).
+    case putBack
+
+    /// The file is ALREADY as it was before the change — an earlier press of
+    /// Undo put it back, or the teacher did — so nothing is written, and it
+    /// does not hold the change on the list. Until #555 such a file counted
+    /// as "edited since", so a change that one press had taken back in part
+    /// could never come off the list however the teacher tidied up.
+    case alreadyBack
+
+    /// The file is neither: the teacher has changed it since. Left exactly as
+    /// it is, because putting the old copy back would throw newer work away.
+    case leftAlone
+
+    // MARK: - Functions
+
+    /// Which of the three this file is, read off the disk now.
+    ///
+    /// **"No file" means the path is GONE**, never "could not be read as
+    /// text". A folder, or a file that is not UTF-8, at the path reads back
+    /// as nil through `String(contentsOf:)` exactly as an absent file does,
+    /// and treating that nil as "absent" would call a created page that is
+    /// still there "already back" and take the change off the list with the
+    /// page never removed (#555 plan review, S1). So an unreadable file
+    /// matches neither copy, and is left alone.
+    ///
+    /// **Both copies are compared, and "before" wins when both match.** They
+    /// can only both match when the change left the file as it found it (an
+    /// all-absent row is the plain case). Nothing would be written then, and
+    /// checking "after" first would try to remove a file that is not there,
+    /// fail, and hold the change on the list for ever (review S2).
+    static func of(_ file: AssistSavedFile) -> AssistUndoVerdict {
+        let matchesAfter: Bool = AssistUndoVerdict.disk(at: file.fileURL, holds: file.after)
+        let matchesBefore: Bool = AssistUndoVerdict.disk(at: file.fileURL, holds: file.before)
+        if matchesBefore {
+            return .alreadyBack
+        }
+        if matchesAfter {
+            return .putBack
+        }
+        return .leftAlone
+    }
+
+    /// Whether the disk holds this copy: `nil` is "there is nothing at this
+    /// path at all", and text is "a readable file with exactly this text".
+    private static func disk(at fileURL: URL, holds expected: String?) -> Bool {
+        guard let expected else {
+            return !FileManager.default.fileExists(atPath: fileURL.path)
+        }
+        var isFolder: ObjCBool = false
+        if !FileManager.default.fileExists(atPath: fileURL.path, isDirectory: &isFolder) {
+            return false
+        }
+        if isFolder.boolValue {
+            return false
+        }
+        guard let current = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            return false
+        }
+        return current == expected
+    }
+}
+
+/// Which of the assistant's sentences an undo is answered with — chosen in
+/// one place so the conversation, the Section menu and the contract rows
+/// (`undoFiles.presses`, by these names) agree. The raw values are the
+/// `AssistWording` keys.
+enum AssistUndoAnswer: String {
+
+    /// There was nothing to take back.
+    case nothingToUndo
+
+    /// Nothing was written, because a file the change touched has been
+    /// edited since. The change stays on the list.
+    case couldNotUndo
+
+    /// The change came off the list: every file is back, whether this press
+    /// wrote it or it was back already (#555).
+    case undid
+
+    /// Some files went back and an edited one was left alone, so the change
+    /// stays on the list and Undo can be pressed again.
+    case undidPartly
+}
+
 /// How an undo went.
 struct AssistUndoResult {
 
@@ -136,13 +229,36 @@ struct AssistUndoResult {
     /// The change's own clause, for the sentence the teacher reads.
     let whatHappened: String
 
+    /// Files this press WROTE back — what the trail and the start-of-year
+    /// sheet count as "put back".
     let restored: [URL]
+
+    /// Files that were already as they were before the change (#555): not
+    /// written, not counted as put back, and not holding the change on the
+    /// list.
+    let alreadyBack: [URL]
 
     /// Files left alone because they have changed since — putting the old copy
     /// back would throw away newer work.
     let skipped: [URL]
 
     let succeeded: Bool
+
+    // MARK: - Computed properties
+
+    /// Which sentence answers this undo.
+    var answer: AssistUndoAnswer {
+        if restored.isEmpty && skipped.isEmpty && alreadyBack.isEmpty {
+            return .nothingToUndo
+        }
+        if skipped.isEmpty {
+            return .undid
+        }
+        if restored.isEmpty {
+            return .couldNotUndo
+        }
+        return .undidPartly
+    }
 }
 
 /// What this conversation has changed, so it can be taken back.
@@ -156,7 +272,8 @@ struct AssistUndoResult {
 /// assistant wrote it is left exactly as it is. A teacher who published a class
 /// and then spent ten minutes writing it in Obsidian must not lose those ten
 /// minutes to "undo that" — so the undo puts back only what it can prove it
-/// still owns, and says plainly what it left behind.
+/// still owns, and says plainly what it left behind. A file that is already
+/// as it was before the change is neither (#555): see `AssistUndoVerdict`.
 @MainActor
 final class AssistChangeHistory {
 
@@ -196,20 +313,29 @@ final class AssistChangeHistory {
                 description: AssistWording.nothingToUndo,
                 whatHappened: "",
                 restored: [],
+                alreadyBack: [],
                 skipped: [],
                 succeeded: false
             )
         }
 
         var restored: [URL] = []
+        var alreadyBack: [URL] = []
         var skipped: [URL] = []
         for file in change.files {
-            let current: String? = try? String(contentsOf: file.fileURL, encoding: .utf8)
-            // Covers the created page too, and covers it correctly: a page the
-            // teacher has since deleted themselves reads back as nil, which
-            // does not match what the change left, so it is skipped rather
-            // than "restored" by deleting something already gone.
-            if current != file.after {
+            // Covers the created page too: one the teacher has since deleted
+            // themselves is GONE, which is what "before" says, so it is
+            // already back — nothing is deleted and nothing holds the change
+            // on the list (#555; until then it was skipped, which held the
+            // entry for ever). A modified page the teacher deleted matches
+            // neither copy and is left alone, on purpose: the change is still
+            // there to take back once the teacher has decided about the page.
+            let verdict: AssistUndoVerdict = AssistUndoVerdict.of(file)
+            if verdict == .alreadyBack {
+                alreadyBack.append(file.fileURL)
+                continue
+            }
+            if verdict == .leftAlone {
                 skipped.append(file.fileURL)
                 continue
             }
@@ -228,8 +354,11 @@ final class AssistChangeHistory {
         }
 
         // A change with something left behind stays on the list, so it can be
-        // tried again once the teacher has dealt with the file in the way.
-        if skipped.isEmpty {
+        // tried again once the teacher has dealt with the file in the way. A
+        // file already back is not left behind (#555): a second press after
+        // the teacher has dealt with it takes the entry off.
+        let entryCameOff: Bool = skipped.isEmpty
+        if entryCameOff {
             changes.removeLast()
         }
 
@@ -237,8 +366,9 @@ final class AssistChangeHistory {
             description: change.description,
             whatHappened: change.whatHappened,
             restored: restored,
+            alreadyBack: alreadyBack,
             skipped: skipped,
-            succeeded: !restored.isEmpty
+            succeeded: !restored.isEmpty || entryCameOff
         )
     }
 }

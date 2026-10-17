@@ -2707,8 +2707,9 @@ final class AssistToolRunner {
         let course: Course? = course(withCode: pending.courseCode)
 
         // (a) Stop the preview, and wait until it has actually stopped.
+        var previewWasStopped: Bool = false
         if let course, pending.rebuildsThePreview {
-            _ = await stopThePreviewBeforeWriting(
+            previewWasStopped = await stopThePreviewBeforeWriting(
                 for: course, sectionNumber: pending.sectionNumber
             )
         }
@@ -2730,13 +2731,18 @@ final class AssistToolRunner {
             )
         }
 
-        if result.restored.isEmpty && result.skipped.isEmpty {
+        let answer: AssistUndoAnswer = result.answer
+        if answer == .nothingToUndo {
+            restartThePreviewNothingChanged(previewWasStopped, course: course, sectionNumber: pending.sectionNumber)
             return AssistToolOutcome.refused(result.description)
         }
 
-        // Nothing went back, because every file has been edited since. This
-        // must not read like a success, and it used to.
-        if result.restored.isEmpty {
+        // Nothing was written, because a file the change touched has been
+        // edited since (every other file is back already, or edited too).
+        // This must not read like a success, and it used to. A repeat press
+        // while a page is still edited lands here too (#555 Q2).
+        if answer == .couldNotUndo {
+            restartThePreviewNothingChanged(previewWasStopped, course: course, sectionNumber: pending.sectionNumber)
             var refusal: String = AssistWording.couldNotUndo(
                 result.whatHappened, leftAlone: result.skipped.count
             )
@@ -2750,8 +2756,12 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(refusal)
         }
 
+        // The change came off the list — every file is back, whether this
+        // press wrote it or an earlier one did (#555: a press that only
+        // finds files already back still takes the entry off, and still
+        // reaches (c) below, so the preview comes back up).
         var summary: String
-        if result.skipped.isEmpty {
+        if answer == .undid {
             summary = AssistWording.undid(result.whatHappened)
             if fromTheMenu {
                 summary = AssistWording.undidFromTheMenu(result.whatHappened)
@@ -2786,6 +2796,19 @@ final class AssistToolRunner {
         detail += "\n\n" + AssistWording.undoDoesNotReachTheLiveSite
 
         return AssistToolOutcome.wrote(summary, detail: detail)
+    }
+
+    /// An undo that wrote nothing still stopped the preview at step (a), and
+    /// the preview has to come back as it was: nothing on disk changed, so
+    /// the window's own Preview is started again with no sentence added to
+    /// the refusal. Until #555 these two returns left a running preview
+    /// stopped, and the review of #555's plan (S4) pointed out that a repeat
+    /// press while a page is still edited now always comes this way.
+    private func restartThePreviewNothingChanged(_ previewWasStopped: Bool, course: Course?, sectionNumber: Int) {
+        guard previewWasStopped, let course else {
+            return
+        }
+        sectionWindow(for: course, sectionNumber: sectionNumber)?.startPreview()
     }
 
     // MARK: - Getting a section ready for the start of the year (#96)
