@@ -4,7 +4,7 @@ Plantoir's toolchain includes software written by other people. This file
 lists what is carried INSIDE the website builder or copied into a class
 website, under which licence, and where the licence text travels. It was
 started with #485 E1 (v1.7.0); later pieces add their own entries here
-(GeoGebra and PhET with #485 E2 and E3). Versions and hashes are pinned in
+(Pyodide and KaTeX with #455 and #494; GeoGebra and PhET with #485 E2 and E3). Versions and hashes are pinned in
 `contracts/toolchain.json` → `pins`.
 
 Tools the image installs only to BUILD (Node, Python, Quartz, wrangler,
@@ -20,6 +20,9 @@ teacher's site. Fonts a site carries for its own look are described in
 | **Latin Modern** — the faces a printed handout is set in (#499) | Debian fonts-lmodern 2.005 | GUST Font License (an instance of the LPPL 1.3c) | `static/pagedjs/fonts/LICENSE-Latin-Modern.txt` |
 | **function-plot** — draws a page's ` ```functionplot ` graphs (#485 E1) | 1.25.4 | MIT, © 2015 Mauricio Poppe | `static/function-plot/LICENSE` beside the file |
 | **Inside function-plot.js** — it is one bundled file built from d3-axis, d3-color, d3-format, d3-interpolate, d3-scale, d3-selection, d3-shape and d3-zoom (ISC, © Mike Bostock), built-in-math-eval and interval-arithmetic-eval (MIT, © Mauricio Poppe) and events (MIT, © Joyent) | as bundled in function-plot 1.25.4 | ISC and MIT: each asks that its copyright and permission notice travel with copies | function-plot.js carries no notices of its own; this row is where they are named, and the ISC and MIT texts are the standard ones (the MIT text is the `LICENSE` beside the file) |
+| **Pyodide** — runs a page's ` ```python run ` blocks in the student's browser (#455): `pyodide.mjs`, `pyodide.asm.mjs`, `pyodide.asm.wasm`, `pyodide-lock.json` | 314.0.7 | MPL-2.0 (Mozilla Public License 2.0), © the Pyodide contributors; unmodified, so the licence asks only that it say where the source is | `static/pyodide/README.txt` names the licence and the source (https://github.com/pyodide/pyodide/tree/314.0.7); the tarball carries no LICENSE file of its own |
+| **CPython and its standard library, inside Pyodide** — `pyodide.asm.wasm` and `python_stdlib.zip` | 3.14.2, as built by Pyodide 314.0.7 | PSF License Agreement (Python Software Foundation License Version 2), with the parts of the standard library under their own permissive terms as Python ships them | Named here: neither file carries a licence text (measured: no LICENSE in `python_stdlib.zip`), and the PSF text is the standard one at https://docs.python.org/3/license.html |
+| **KaTeX** — the stylesheet, copy-tex and woff2 faces a site's maths is styled and copied with, on EVERY site (#494) | 0.16.21 | MIT, © 2013-2020 Khan Academy and other contributors | `static/katex/LICENSE` beside the files |
 | **BaKoMa Computer Modern TrueType fonts** — the lettering of a page's ` ```tikz ` diagrams; only the faces the site's diagrams name (#485 E1) | as shipped in node-tikzjax 1.0.5 | BaKoMa Fonts Licence, © 1994, 1995 Basil K. Malyshev: copying and distribution permitted with the notice; embedding in SVG and printing needs no notice | `static/tikz/LICENCE` beside the faces |
 
 ## Carried by plantoir.app itself

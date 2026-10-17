@@ -1799,7 +1799,10 @@ so a few shapes the site's parser reads differently still slip past it
 whose content is less indented than the marker's text (lazy lines), a
 numbered fence straight after a paragraph line, a closing fence at column 0
 under a bullet. Each shows students "couldn't be drawn" (or turns the next
-figure into plain code), and Obsidian shows the same shapes broken too. Not
+figure into plain code), and Obsidian shows the same shapes broken too.
+(Since #455 the fence reader OPENS the nested-marker block as the site does,
+marked `nested`, so the fences after it are read alike; figures still leave
+the nested one itself undrawn, as before — runnable code's review S2.) Not
 raised as a finding because the only place that knows is Quartz's own
 parse, after the folder checks have been said; a post-build scan for a
 failed figure with no manifest failure would do it and is the way to add it
@@ -1813,6 +1816,80 @@ rewrites raw text, and the drawing's single glyphs flooded the page's
 description); SVGs as `<img>` (no page fonts and no theme colours); a cache
 in the teacher's vault; a `math_engines.json` switch (the fence is the
 opt-in); stopping the build on a figure (`--strict`).
+
+## Runnable code: what the build does (#455, v1.8.0)
+
+A page that says `codeRunner: true` turns its ` ```python run ` blocks into
+programs students edit and run in their browser; the site's half is
+[06 → I](06-quartz-customizations.md#i-runnable-code-455-v180), the rules
+`contracts/shared-rules.json` → `codeRunnerBlocks`. The build's share is the
+#454 gate again, plus one file, all in the ALWAYS section:
+
+1. **Counting** (`_count_runner_pages`, straight after `_prepare_figures`):
+   the same pages figures read (`figures.pages_students_see` — the gate's own
+   visibility rule, outside Media), each read with python-frontmatter after
+   `process_frontmatter` has written it back (so `codeRunner: yes` is
+   `true`), and `page_features.runner_engines_on_page` asks two things: does
+   the page opt in, and does it hold a runnable block of a language in the
+   table (`page_features.runner_fences`, over `markdown_code.fenced_blocks`,
+   the #313 fence rule)? A page that opts in with no runnable block counts for
+   nothing (#455 Q1, 2026-10-17: with two languages the key alone cannot say
+   which engine to carry; the price is the known limit below). page_features
+   never imports frontmatter, so its test still runs on Windows.
+2. **The gate.** The counts join print's and graphs' in
+   `page_features.install_gated_assets`, which since #455 takes a LIST of
+   sources per engine, later winning file by file: `VENDOR_DIR/<engine>` (the
+   five pinned Pyodide files and the README, see 02) and
+   `SUPPORT_DIR/gated/<engine>` (`plantoir-worker.js`, the page's thread). One
+   sync, not a copy after it: a copy after the sync would be deleted as an
+   extra and copied again on every build. The vendor folder IS the engine: an
+   overlay alone installs nothing and says so ("…this copy of Plantoir is
+   missing what runs it, so students will see the code without a Run
+   button."). The carried line: "▶️ This site carries what runs Python for 3
+   pages." No engine with no runnable block: verify.sh 6c checks
+   `static/pyodide` leaves with the last one.
+3. **The words file** (`page_features.write_runner_words`, straight after the
+   gate): `quartz/plantoir_code_runner.json` holds the words and limits from
+   the contract and **the engines the gate actually installed**. The page's
+   script bundles it (esbuild); the transformer reads it with `fs` at build
+   time, and leaves any runnable block whose engine is NOT carried as the
+   plain code it was, with one line an assistant reads:
+   `plantoir: error: Units/Loops.md: python block 2: ` +
+   `codeRunnerBlocks.words.blockNotPrepared` (siteDisagrees, review S2). So a
+   block the build did not count can never become a Run button that says
+   "isn't on this site yet" to students for ever. No line for a page students
+   cannot see: Quartz parses those too and drops them later (the transformer
+   applies `patches/publish.ts`'s own test).
+4. **The KaTeX copy** (#494, `install_katex_assets`, beside the gate, EVERY
+   site): Quartz's own `node_modules/katex` — `dist/katex.min.css`,
+   `dist/contrib/copy-tex.min.js`, the 20 woff2 faces and `LICENSE` — into
+   `quartz/static/katex`, same-bytes skip, extras removed, a missing package
+   one line. Its patch to latex.ts (`patch_katex_local`, beside
+   `patch_katex_mhchem`) is 06 → C2-26.
+
+**The live-preview edge.** The preview's own rebuilds (a page edited while
+it serves) do not run the gate or rewrite the words file. A page that gains
+`codeRunner: true` or its first runnable block while a preview is ALREADY
+running therefore shows its blocks as plain code, with the `plantoir: error:`
+line in the preview's output, until the next Preview — never a Run button
+that cannot work. A page that already had runnable code keeps working.
+
+**Known limit.** The build counts runnable blocks with the toolchain's fence
+rule, not Quartz's parser. Every shape the reviews measured is now read alike
+(`codeRunnerBlocks.fences.pageShapes`, checked through both readers in the
+image by `check_runner_rules_against_the_site.py`); a fence opened after a
+second container on a list marker's line (`- - ```python run`) is runnable on
+NEITHER side; a lazy line in a list item gives both sides one runner but
+different bodies (the site's is the one that runs). A shape nobody has
+measured that the two read differently shows as plain code with the
+`plantoir: error:` line above — the safety net, rather than a folder problem,
+because only Quartz's parse knows, after the folder checks have been said.
+
+**Rejected:** a course-level switch (Russell, 2026-10-05: per page only); the
+key alone deciding (above); downloading Pyodide when a site is built (a build
+would need the network); copying the worker into `/opt/vendor` (it would
+need its own line in both runtimes) or into every site's `static/` (a site
+without runnable code would carry it).
 
 ## Stage 4: Configuration patching
 

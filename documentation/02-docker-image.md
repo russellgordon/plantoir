@@ -246,7 +246,7 @@ since — so a browser change it does not keep up with is ours to work around.
 **Rejected:** loading it from a CDN (a printed worksheet must work offline and
 from a folder publish), carrying it in every site (half a megabyte per site
 for a feature most pages never use), and committing the file (the repository
-ships recipes, not binaries). #455 adds Pyodide to the same folder.
+ships recipes, not binaries). #455 adds Pyodide to the same folder (below).
 
 ### `/opt/vendor/function-plot` and `/opt/vendor/tikz-engine` (#485 E1, v1.7.0)
 
@@ -305,6 +305,54 @@ could move Quartz's versions); bundling it with esbuild (it reads `tex/`
 beside itself by `__dirname`); a fork without jsdom (ours to maintain);
 loading either engine from a CDN (a site must work from a folder publish and
 offline, and the issue asks for no other origin).
+
+### `/opt/vendor/pyodide` (#455, v1.8.0) and KaTeX's pin (#494)
+
+**`/opt/vendor/pyodide/`** — Pyodide **314.0.7** (2026-09-14, CPython
+3.14.2 compiled to WebAssembly; MPL-2.0), the Python a page's
+` ```python run ` blocks run in, in the student's browser
+([06 → I](06-quartz-customizations.md#i-runnable-code-455-v180)). The layer
+fetches the core tarball `pyodide-core-314.0.7.tar.bz2` from the project's
+GitHub release by exact version (6,757,104 bytes, SHA-256
+`2abdcc2e…3f95`), checks it, extracts it with `python3 -m tarfile` (the slim
+base has no `bzip2`), and keeps exactly five files — **13,531,207 bytes**:
+
+| File | Bytes | What it is |
+|---|---:|---|
+| `pyodide.mjs` | 17,931 | the loader a MODULE worker imports (#455 review B1: Pyodide 314 throws "Classic web workers are not supported" wherever data: scripts are allowed, so not `pyodide.js`) |
+| `pyodide.asm.mjs` | 1,250,344 | the Emscripten glue (`.mjs` since Pyodide 0.28, not `.asm.js`) |
+| `pyodide.asm.wasm` | 9,598,218 | CPython itself |
+| `python_stdlib.zip` | 2,545,637 | the standard library |
+| `pyodide-lock.json` | 119,077 | the package index the loader reads at start (no package is ever fetched) |
+
+plus a `README.txt` naming the licence and source, because the tarball
+carries no LICENSE file. Gated like the other engines: a section's site
+carries it (`static/pyodide/`, with `support/gated/pyodide/plantoir-worker.js`
+laid over it) only while a page students can see opts in with a runnable
+block. `pyodide.mjs` names ONE other address, a jsdelivr fallback for
+packages (`https://cdn.jsdelivr.net/pyodide/v${U}/full/`); the worker points
+`indexURL`, `packageBaseUrl` and `cdnUrl` at its own folder, so it is never
+used, and verify.sh 6j allows exactly that one string on a site. The layer
+sits after function-plot and before the tikz-engine `COPY`, so editing a
+script never downloads it again. `contracts/toolchain.json` → `pins` →
+`pyodide` carries the tarball's hash and the five files'; verify.sh checks the
+image holds exactly those five and the README (section 4), and the site
+holds them byte for byte (6j).
+
+**KaTeX** needs no layer: Quartz's own `npm install` already installs
+**katex 0.16.21** (rehype-katex 7.0.1 renders every formula with it at build
+time), and since #494 every site serves its stylesheet, copy-tex and woff2
+faces itself (06 → C2-26). `RUN cd /opt/quartz && npm ls katex@0.16.21`,
+straight after that install, fails the image build if the lockfile ever
+resolves another version (measured: `npm ls katex@0.16.22` exits 1, and the
+tree holds a single, deduped 0.16.21). `pins` → `katex` carries the three
+files' hashes, which verify.sh checks in the image and on the site.
+
+**Rejected:** loading Pyodide from its CDN (a third party and a network on
+every Run, and no folder publish offline); downloading it when a site is
+built (a build would need the network); the scaffold's `static/` (every site
+would carry 13.5 MB); Skulpt (a Python-2-era subset students would outgrow);
+JupyterLite or Custom Frames (a whole notebook per page).
 
 ### What the first build downloads (measured for #334)
 
