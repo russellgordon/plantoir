@@ -665,7 +665,7 @@ EachStatusIsReadAsTheServerAnsweredIt` ("Expected: 200, Actual: null", 7 s,
 11.6 s into the 1.7.1 cut's run), its sibling `AStoppedPreviewEndsTheAsking
 RatherThanReadingItAsSilence` ("No exception was thrown", 7 s, 26.8 s into a
 run), and `ConPtyRedirectedParentTests.AChildStartedFromARedirectedParent
-StillWritesToItsPseudoConsole` (11 s, twice; its messages were not kept).
+StillWritesToItsPseudoConsole` (11 s the second time; the first's duration and both messages were not kept).
 Seven seconds is the product's 5 s per-try clock (`previewStartPage.
 secondsPerAttempt`) plus about two; eleven is the test's 10 s wait plus one.
 
@@ -6426,7 +6426,7 @@ long title shortens before the buttons are pushed out.
 
 **Measured 2026-10-15** (Intel i5-8365U, Windows 11 Pro 26200, one 1920 ×
 1080 screen at 150%, the sidebar at its only width, 230 epx; widths are the
-window's outer pixels; **the next two sentences were wrong — see the
+window's outer pixels; **the next sentence, and the table's last row label, were wrong — see the
 correction below the table**): the window's minimum is **900 PIXELS, not 900 epx** —
 `PreferredMinimumWidth` is in the AppWindow's physical units — so at 150% it
 is 600 epx, and dragging the edge stops there.
@@ -6482,7 +6482,7 @@ a minimum wider than the screen would trap the window. Once the content
 loads (from `XamlRoot.RasterizationScale`) and again on `XamlRoot.Changed`
 when the scale changes (a monitor move, a display-scale change),
 `EnforceMinimumSize` re-applies the minimum AND grows a window left below it,
-unless it is maximised — the minimum alone does not grow one. **What holds
+unless it is maximised or minimised — the minimum alone does not grow one. **What holds
 what:** the first-run clamp is held by `WindowMinimumUiTests` (named above), on this one display
 at one scale; the remembered-frame order, the re-apply and the grow on a
 scale change (the multi-monitor cases) are held by reading the code, since
