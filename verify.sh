@@ -2558,7 +2558,7 @@ for info, code in fences:
     "```python run\nprint(\"one\")\n```\n\n```python run\nprint(\"two\")\n```\n\n"
     "> [!example]- In a folded callout\n> ```python run\n> print(\"three\")\n> ```\n\n"
     # #585: a plain block, whose numbers the editor's gutter must match.
-    "A plain block (plantoir-runner-static-7f3a):\n\n```python\nprint(\"static\")\n```\n", encoding="utf-8")
+    "A plain block (plantoir-runner-static-7f3a), and `a != b` written inline:\n\n```python\nprint(\"static\")\n```\n", encoding="utf-8")
 (course / "Discussions" / "Runner Printable.md").write_text(
     "---\ntitle: Runner Printable\nprintable: true\ncodeRunner: true\n---\n"
     "A printable page with code (plantoir-runner-printable-7f3a), and a formula $\\frac{a}{b} = c^2$.\n\n"

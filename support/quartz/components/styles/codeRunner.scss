@@ -57,7 +57,7 @@
   // span per line) sits UNDER the textarea, whose own text is transparent
   // and whose caret is not. The copy and the textarea share every metric
   // below in ONE rule, so the coloured letters fall exactly where the typed
-  // ones are (measured to the pixel in documentation/06, I11). The frame
+  // ones are (measured to the pixel in documentation/06, I12). The frame
   // owns the border, the corner and the focus ring the textarea had.
   & .plantoir-runner-frame {
     display: grid;
@@ -391,6 +391,24 @@
     // coloured and numbered exactly as one does (#585, ruling Q3).
     &.plantoir-runner-edited > .plantoir-runner-print {
       display: block !important;
+    }
+  }
+
+  // ...and a student's long line wraps on paper, as it did before #585,
+  // starting each wrapped row under its first row's code (the number's
+  // whole box: digits, the gutter's padding and hairline, the gap). The
+  // handout hangs every line its own way (print.scss).
+  html:not(.plantoir-print-frame) .plantoir-runner.plantoir-runner-edited > .plantoir-runner-print > code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+
+    & > [data-line] {
+      padding-left: calc(0.25rem + (var(--plantoir-digits, 2) + 1.75) * 1ch + 1px);
+      text-indent: calc((var(--plantoir-digits, 2) + 1.75) * -1ch - 1px);
+    }
+
+    & > [data-line]::before {
+      text-indent: 0;
     }
   }
 }
