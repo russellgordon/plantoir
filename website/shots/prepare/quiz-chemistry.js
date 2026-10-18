@@ -6,8 +6,8 @@
 // of an async function run by webwindow.swift --prepare; `timeoutMs` is its
 // bound. Returns "ready" or the reason it is not. The words are the
 // contract's (contracts/shared-rules.json → quizCallouts.words.site:
-// someBlanksRight with right 1 and count 2).
-const ONE_OF_TWO = "1 of 2 blanks are right. Try again, or show the answer."
+// oneBlankRight with count 2, feedback.blanks, #588).
+const ONE_OF_TWO = "1 of 2 blanks is right. Try again, or show the answer."
 const ANSWERS = ["0.0998", "4.39"]
 const until = Date.now() + timeoutMs
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))

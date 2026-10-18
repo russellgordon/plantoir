@@ -319,10 +319,19 @@ export function isBlank(value: string): boolean {
 // What a fill-in-the-blank question says when it is checked (#588,
 // quizCallouts.feedback.blanks): the key of the words in words.site and the
 // numbers they are filled with. Only `fill` says how many blanks are right;
-// every other kind says right or notRight.
+// every other kind says right or notRight. One blank, wrong, says what a
+// short answer says ("0 of 1 blanks are right" read oddly, and the blank's
+// own mark already says it is not right); exactly one right of two or more
+// takes the singular (wording A, the default pending Russell).
 export function blanksFeedback(right: number, count: number): { key: string; values: Record<string, number> } {
   if (right === count) {
     return { key: "right", values: {} }
+  }
+  if (count === 1) {
+    return { key: "notRight", values: {} }
+  }
+  if (right === 1) {
+    return { key: "oneBlankRight", values: { count } }
   }
   return { key: "someBlanksRight", values: { right, count } }
 }

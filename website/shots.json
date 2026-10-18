@@ -280,11 +280,11 @@
         "scene": "quizzes",
         "prepare": "quiz-chemistry.js"
       },
-      "alt": "A self-check question on a class website with the balanced equation for burning propane and two blanks: 0.0998 mol marked right and 4.39 g marked not right, the line 1 of 2 blanks are right, and the explanation opened under it, which names the step that answer skipped.",
+      "alt": "A self-check question on a class website with the balanced equation for burning propane and two blanks: 0.0998 mol marked right and 4.39 g marked not right, the line 1 of 2 blanks is right, and the explanation opened under it, which names the step that answer skipped.",
       "caption": "Wrong, and why: each blank marked on its own.",
       "windows": false,
       "expectText": [
-        "1 of 2 blanks are right",
+        "1 of 2 blanks is right",
         "Not right",
         "Why",
         "middle step"

@@ -26926,19 +26926,16 @@
     },
     "markup": "What the page's script builds on (quiz.inline.ts), and what a page shows without it. The quiz keeps Quartz's callout (its colours, title and fold) and gains the class plantoir-quiz, data-quiz-n (its place among the page's top-level quizzes), data-quiz-source (the slug of the page it was written on), data-quiz-kind, data-quiz-shuffle, data-quiz-hash (FNV-1a 32 of its source, so a saved score from before the teacher changed it is ignored) and data-quiz (the correct places, or the answer lines: a self-check, so view-source showing answers is accepted, knownLimits). Choices are a <fieldset> labelled by the question (aria-labelledby the title's id), each a real radio button or checkbox inside a <label> with the choice's first line; anything after that line (a graph, an image, code to run) sits OUTSIDE the label, so pressing Run never ticks it, and the box is described by it (aria-describedby), so a choice whose words are 'Graph A' is read with the graph's description or an image's alt text (review S7). A choice with no words of its own - which only markup the site's parser reads as a box can give - is named words.site.choiceNumber, with the figure's description after it. Select all that apply carries words.site.selectAll as its description. No `name` is set when the site is built: the page's script gives each quiz on the page its own, so a quiz shown twice (a transclusion) is never one radio group. A short answer has one text box labelled words.site.answerLabel; a blank becomes a text box labelled words.site.blankLabel. Every box has autocomplete, autocapitalize, autocorrect and spellcheck off and a 16px font (no zoom on focus). The answer is shown in a hidden block (words.site.answerIs - blankAnswerIs for each blank of a fill-in-the-blank question - then alsoAccepted; a tolerance through words.site.tolerance; a `$...$` answer as a formula; in the page's summary and search text each blank reads as `…`), and the explanation is Quartz's own callout inside a hidden block, revealed - and opened - after the first Check or Show answer. Fold titles inside a quiz are role=button, tabindex=0, aria-expanded, and open and close with Enter and Space; the content of a folded quiz or explanation is `inert` until it is opened (review S6). Every task box's tick is taken off the page, so the key never reaches it (plan M7).",
     "notReady": "A quiz that cannot be checked - any problem in recognise, or one that is not at the top level - shows its question and its choices with every box empty, then words.site.notReady; its answer and explanation are removed from the page (ruling Q6). The folder check names it (siteHealth -> quizzesNotReady, and a `plantoir: error:` line).",
-    "checking": "Check compares the selected choices with the ticked ones exactly (single and multiple), or each box with its answer line (quizRules.accepts). A blank's box is marked right or not right in words AND a sign (words.site.markRight / markWrong), never colour alone, and aria-invalid. The feedback (words.site.right, notRight, someBlanksRight, chooseFirst, typeFirst, answerShown) is a polite live region; what a fill-in-the-blank question says is feedback.blanks. Enter in a box is Check. Show answer marks the correct choices with words.site.correctChoice, or shows the answer block.",
+    "checking": "Check compares the selected choices with the ticked ones exactly (single and multiple), or each box with its answer line (quizRules.accepts). A blank's box is marked right or not right in words AND a sign (words.site.markRight / markWrong), never colour alone, and aria-invalid. The feedback (words.site.right, notRight, oneBlankRight, someBlanksRight, chooseFirst, typeFirst, answerShown) is a polite live region; what a fill-in-the-blank question says is feedback.blanks. Enter in a box is Check. Show answer marks the correct choices with words.site.correctChoice, or shows the answer block.",
     "feedback": {
       "blanks": {
-        "rule": "quizRules.blanksFeedback(right, count): only a fill-in-the-blank question says how many of its blanks are right; single, multiple and short answer say right or notRight, and the page's score line is unchanged. Every blank right says words.site.right; otherwise words.site.someBlanksRight with {right} and {count}.",
+        "rule": "quizRules.blanksFeedback(right, count): only a fill-in-the-blank question says how many of its blanks are right; single, multiple and short answer say right or notRight, and the page's score line is unchanged. Every blank right says words.site.right. Otherwise (wording A, #588, the default pending Russell): a question with ONE blank says words.site.notRight - what a short answer says, since \"0 of 1 blanks are right\" read oddly and the blank's own mark (markWrong) already says which; exactly one right of two or more says words.site.oneBlankRight with {count} (\"1 of 2 blanks is right\"); any other count says words.site.someBlanksRight with {right} and {count}. Rejected (wording B): a sentence of its own for the one wrong blank (\"Your blank isn't right yet\") with \"1 of 2 blanks are right\" left as it was. \"1 of 1 blanks is right\" is never said: one of one right is right.",
         "cases": [
           {
             "count": 1,
             "right": 0,
-            "say": "someBlanksRight",
-            "values": {
-              "right": 0,
-              "count": 1
-            }
+            "say": "notRight",
+            "values": {}
           },
           {
             "count": 1,
@@ -26958,9 +26955,8 @@
           {
             "count": 2,
             "right": 1,
-            "say": "someBlanksRight",
+            "say": "oneBlankRight",
             "values": {
-              "right": 1,
               "count": 2
             }
           },
@@ -26973,9 +26969,8 @@
           {
             "count": 3,
             "right": 1,
-            "say": "someBlanksRight",
+            "say": "oneBlankRight",
             "values": {
-              "right": 1,
               "count": 3
             }
           },
@@ -27005,6 +27000,7 @@
         "right": "Right!",
         "notRight": "Not quite. Try again, or show the answer.",
         "someBlanksRight": "{right} of {count} blanks are right. Try again, or show the answer.",
+        "oneBlankRight": "1 of {count} blanks is right. Try again, or show the answer.",
         "chooseFirst": "Choose an answer first.",
         "typeFirst": "Type an answer first.",
         "answerShown": "Here is the answer.",
