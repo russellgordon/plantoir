@@ -2112,6 +2112,12 @@ n = 109  # CODE-109
 n = 110  # CODE-110
 ```
 
+And a line too long for the paper, which wraps (plantoir-wrap-7f3a):
+
+```python
+print("WRAP-7f3a: a line of code much longer than a printed page is wide, in portrait or in landscape, so that it wraps onto a second row and then onto a third, whichever way the paper is turned")
+```
+
 > [!SOLUTION]-
 >
 > It counts to 110 (plantoir-ans-5), and its output looks like this (plantoir-before-answer-picture):
@@ -2550,7 +2556,9 @@ for info, code in fences:
 (course / "Runner Playground.md").write_text(
     "---\ntitle: Runner Playground\ncodeRunner: true\n---\nThree blocks to run (plantoir-runner-playground-7f3a).\n\n"
     "```python run\nprint(\"one\")\n```\n\n```python run\nprint(\"two\")\n```\n\n"
-    "> [!example]- In a folded callout\n> ```python run\n> print(\"three\")\n> ```\n", encoding="utf-8")
+    "> [!example]- In a folded callout\n> ```python run\n> print(\"three\")\n> ```\n\n"
+    # #585: a plain block, whose numbers the editor's gutter must match.
+    "A plain block (plantoir-runner-static-7f3a):\n\n```python\nprint(\"static\")\n```\n", encoding="utf-8")
 (course / "Discussions" / "Runner Printable.md").write_text(
     "---\ntitle: Runner Printable\nprintable: true\ncodeRunner: true\n---\n"
     "A printable page with code (plantoir-runner-printable-7f3a), and a formula $\\frac{a}{b} = c^2$.\n\n"
@@ -3618,7 +3626,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # starts itself so it can also play the hosts that break it.
   if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \
        >/tmp/verify_code_runner.log 2>&1; then
-    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; live input on an isolated page (#583: the field focused at Run, the prompt before it, the transcript byte for byte the box's, Ctrl-D and the end button, a two-line paste, IME and Escape, Stop and another block while it waits, echoes counted, an autorun that asks takes no focus and holds the queue, whole loads across the isolation line both ways, the handout's KaTeX), and the box's line where the page is not isolated; a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
+    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; live input on an isolated page (#583: the field focused at Run, the prompt before it, the transcript byte for byte the box's, Ctrl-D and the end button, a two-line paste, IME and Escape, Stop and another block while it waits, echoes counted, an autorun that asks takes no focus and holds the queue, whole loads across the isolation line both ways, the handout's KaTeX), and the box's line where the page is not isolated; the editor's colours and line numbers (#585: Shiki's own lines untouched, the tokenizer's typed, the copy in step through undo, an input method, a saved edit, Reset and scrolling, 0 pixels off the typed letters, the frame's focus ring, one gutter style, no ligatures, an edited block printed coloured and numbered); a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
   else
     fail "runnable code did not run in a browser as the contract says (browser-checks/code_runner.mjs, #455)"
     cat /tmp/verify_code_runner.log

@@ -363,6 +363,14 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
         color: #000 !important;
         background: none !important;
       }
+
+      // ...but each line keeps the gutter's hairline (#585), drawn down the
+      // line so it runs past a wrapped row; no fill.
+      & > [data-line] {
+        background: linear-gradient(#bbb, #bbb) no-repeat !important;
+        background-size: 1px 100% !important;
+        background-position: var(--plantoir-hairline-x, calc(0.25rem + var(--plantoir-digits, 2) * 1ch + 0.75ch)) 0 !important;
+      }
     }
   }
 
@@ -703,7 +711,9 @@ html.plantoir-print-frame {
     display: block;
     padding-left: calc((var(--plantoir-digits, 2) + 1.75) * 1ch + 1px);
     text-indent: calc((var(--plantoir-digits, 2) + 1.75) * -1ch - 1px);
-    background-position: calc(var(--plantoir-digits, 2) * 1ch + 0.75ch) 0 !important;
+    // The hairline (plantoir-paper) sits at the number box's edge, which
+    // here starts at the line's own left edge.
+    --plantoir-hairline-x: calc(var(--plantoir-digits, 2) * 1ch + 0.75ch);
   }
 
   pre > code > [data-plantoir-line]::before {
@@ -714,6 +724,7 @@ html.plantoir-print-frame {
     width: calc(var(--plantoir-digits, 2) * 1ch) !important;
     text-align: right !important;
     margin-right: 1ch !important;
+    border-right-color: transparent !important;
     color: #777 !important;
   }
 
