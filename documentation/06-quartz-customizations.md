@@ -1702,6 +1702,8 @@ code. Since #585 the copy is built as a static block is - `pre > code >
 span[data-line]`, Shiki's own spans for the lines the student did not touch
 and the editor's colours for those they did - so an edited block prints
 coloured (where the page prints colour) and numbered, by Quartz's counter
+(its rows sit tighter than a static block's - 18 px against 25.6 px - which is
+left as is, #585 fixes review N2)
 under ⌘P and by print.inline.ts's `data-plantoir-line` in the handout,
 exactly as an unedited one does (ruling Q3). It is rebuilt only on a flush
 (`beforeprint`, `pagehide`, leaving the page, and the Print button's
