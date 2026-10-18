@@ -199,8 +199,9 @@ class DownloadTests(unittest.TestCase):
             pins[entry["platform"]] = entry.get("pinned")
         self.assertIsNone(pins["macOS"])
         # PlantoirSetup.exe joined v1.7.2 on 2026-10-16; the mac-only v1.8.0
-        # cut (2026-10-17) pins Windows to 1.7.2 until its 1.8.0 installer
-        # joins that release, and that cut unpins it again.
+        # cut (2026-10-17) and the mac-only v1.8.1 cut (2026-10-18) pin
+        # Windows to 1.7.2 until its 1.8 installer joins a release, and that
+        # cut unpins it again.
         self.assertEqual(pins["Windows"], "1.7.2")
 
 
