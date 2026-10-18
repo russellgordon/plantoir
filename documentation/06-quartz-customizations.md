@@ -324,6 +324,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
 | C2-26 | **KaTeX from the site itself (#494)** | `quartz/plugins/transformers/latex.ts`; `quartz/static/katex/` | Quartz v4.5.0's `externalResources` linked `cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css` and `contrib/copy-tex.min.js` on EVERY page (400 links each on a built ICS3U site), while its own lockfile installs **0.16.21** and rehype-katex renders every formula with that at build time — so sites were rendered with one version and styled with another, and the maths depended on a third party and a network. `patch_katex_local` (marker `PLANTOIR-KATEX-LOCAL`, idempotent, independent of C2-20's import) replaces that block with two `additionalHead` functions: `<link rel=stylesheet href="<pathToRoot>/static/katex/katex.min.css" spa-preserve>` and `<script src=".../static/katex/contrib/copy-tex.min.js" defer spa-preserve>`, relative to each page so a site served under a folder finds them, kept across the site's page changes like `index.css`; the 404 page, served at any depth, links from the `baseUrl`'s path (review N6, Head.tsx's own rule). `install_katex_assets` copies the files from Quartz's own `node_modules/katex` every build (05 → Runnable code, step 4): the stylesheet (23,352 bytes), copy-tex (1,673), the **20 woff2 faces** (259,792) and the MIT licence — 284,817 bytes on EVERY site, woff2 only because every browser that can run a site's code takes woff2 first. Netlify's CSP loses `https://cdn.jsdelivr.net` by itself (07). **Rejected:** gating it per site on maths (Python cannot tell maths the way remark-math does — `$` in prose, currency — and a wrong guess breaks every formula silently; the cost is about 2% of Pyodide, uploaded once by content hash); all three font formats (1.10 MB); inlining the CSS into index.css (a generated SCSS file from node_modules every build); absolute `/static/katex/` (breaks a folder published under a subpath). **The print path had to follow** (#455 review S1): a link kept across page changes keeps its RELATIVE href, which then resolves against the new page — one folder off. print.inline.ts now takes every stylesheet for the print frame from the address the sheet was really fetched from (`link.sheet.href`), which fixed the same latent fault in its `index.css` lookup; measured by `browser-checks/maths_offline.mjs`: with the old code a handout printed after a page change from the top of the site to a page one folder down got a 404 KaTeX stylesheet (0 rules), now 249 rules. **The regression the plan expected did not happen:** a folder publish OPENED AS A FILE was expected to lose KaTeX's faces in Chrome (an opaque origin); measured 2026-10-17, Chrome for Testing 155 and Safari 26.6 both loaded `KaTeX_Main` and `KaTeX_Math` from `static/katex/fonts/` beside a page opened from disk, so the maths keeps its look offline from a file too (it used to need the network for the CDN). |
 | C2-27 | **A folder page's table of contents (#520)** | `quartz.layout.ts` | `_wire_list_page_toc`, one of `wire_quartz_additions`' edits, puts `Component.DesktopOnly(Component.TableOfContents())` — the content layout's own — in `defaultListPageLayout`'s right column, which is `[]` in v4.5.0, and touches nothing else. Quartz renders every `folder/index.md` with that layout (and the tag pages), so a curriculum folder's index with `enableToc: true` and five headings of its own showed no table of contents: the data was computed and placed nowhere. Quartz's own rule then decides, as on any page — shown by default, `enableToc: false` hides it, and only with two or more headings of depth 3 or less on the page itself — so tag pages and folder pages with no headings of their own are unchanged. Measured on the #520 plan by editing a built layout and re-running Quartz: the curriculum index showed "Navigate this page" with its strand headings, while `Concepts/index`, `tags/A1` and the front page stayed at 0; expectation pages had shown a table of contents all along. Idempotent, every build; a list layout of another shape warns and is left alone. **Chosen** (ruling Q2 on the plan): on every folder page with the headings, as Quartz does on every other page — 49 of 1,009 folder index pages across `support/` show one, 9 of them without having asked. **Rejected:** only on folder pages that say `enableToc: true` (a wrapper component of our own, and a rule unlike every other page's). `scripts/test_folder_page_toc.py` drives it through `wire_quartz_additions`; verify.sh 6h reads EXC2O's built `Curriculum/index.html`. |
+| C2-28 | **Every code block's line numbers, hairline and no ligatures (#585)** | `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, carried into `index.css` by `codeRunner.scss`) | Quartz numbers every highlighted line in a 1rem box with no separator. One gutter style for static blocks and the runnable editor: Quartz's own dimmed colour, the code font, a box `--plantoir-digits` wide (3 from line 100, 4 from line 1000, by CSS), a 1 px hairline in `var(--lightgray)`, no fill; no programming ligatures in any code block. On paper the hairline runs down each line past wrapped rows. Every site, every page with code - I12 says why and what was measured. |
 
 ### C3. Content-level transformations (every build)
 
@@ -2047,6 +2048,229 @@ get under Cloudflare's cap (one splat would isolate the folder's plain pages
 too); `window.prompt`; `<iframe credentialless>` (Chrome only); removing and
 re-adding the field per prompt (the plan's first shape - the iPad keyboard);
 `encodeInto` into shared memory (Chrome).
+
+### I12. Colour and line numbers (#585, v1.8.1)
+
+An editable block shows the code in the site's own syntax colours while the
+student types, and every runnable block shows its line numbers. Rules:
+`codeRunnerBlocks.editor.colour` and `.lineNumbers`; rulings R1-R3 and the
+director's Q1-Q5 on the plan (Swift's tokenizer ships; the hairline on every
+code block; an edited block prints coloured and numbered; up to 0.3 % of
+characters may differ from Shiki on EDITED lines; no ligatures anywhere).
+
+**How a static block is coloured, and why the editor can match it exactly.**
+Shiki writes `style="--shiki-light:#D73A49;--shiki-dark:#F97583"` on every
+token span, and Quartz's `syntax.scss` turns those into the colour
+(`code[data-theme*=" "] span { color: var(--shiki-light) }`, and
+`--shiki-dark` under `[saved-theme="dark"]`). The themes are pinned to
+github-light and github-dark in `quartz.config.ts`; a teacher cannot change
+them. So a coloured copy only needs spans carrying the SAME two custom
+properties: light and dark then follow through Quartz's own rule. The editor's
+categories (`codeRunner.scss`, `.plantoir-tok-<category>`) set exactly
+Shiki's pairs - nine of them, measured from the image's Shiki 1.26.2:
+
+| Category | Light | Dark | What |
+|---|---|---|---|
+| plain | #24292E | #E1E4E8 | the copy's default |
+| k | #D73A49 | #F97583 | keywords, operators, string prefixes, format specs, code tags |
+| s | #032F62 | #9ECBFF | strings |
+| c | #005CC5 | #79B8FF | numbers, builtins, constants, `self`, ALL_CAPS, `__dunder__`, escapes, placeholders |
+| f | #6F42C1 | #B392F0 | names a `def`/`class`/`func`/`struct` defines, base classes, decorators |
+| m | #6A737D | #6A737D | comments |
+| p | #E36209 | #FFAB70 | a call's keyword-argument names; Python 2's names (`raw_input`) |
+| g | #22863A | #85E89D | a regular expression's escapes |
+| r | #032F62 | #DBEDFF | a regular expression's own text (a raw string with a lowercase `r`) |
+
+`r` was found by the check, not by the plan: comparing only light colours, a
+regular expression's text looked like a string's; in dark it is a paler blue.
+The check now compares both themes, and pins the table, the stylesheet and
+the image's Shiki to each other.
+
+**The DOM (an editable block).**
+
+```
+div.plantoir-runner-frame            grid: gutter | cell; the border, corner, background, focus ring
+  pre.plantoir-runner-gutter         aria-hidden; "1\n2\n…" in one span, translateY(-scrollTop)
+  div.plantoir-runner-cell           position: relative
+    pre.plantoir-runner-colour       aria-hidden, absolute over the cell, overflow hidden, pointer-events none
+      code[data-theme]               one span.plantoir-runner-line per line, each ending in its own "\n"
+    textarea.plantoir-runner-editor  transparent text, caret var(--dark)
+```
+
+ONE rule gives the textarea and the copy every metric (font, size, line
+height, padding, tab size, `white-space: pre`, no ligatures). The copy's
+`code` overrides each of Quartz's `pre > code` rules (grid, padding,
+0.85rem, `overflow-x: auto`, the counter) and is `width: max-content`.
+Each line span ends in its own line break, so the copy's text is the
+textarea's character for character.
+
+**Untouched lines are Shiki's own.** The page keeps the highlighted copy's
+lines (`.plantoir-runner-original pre > code > [data-line]`, each usable only
+where its text is the teacher's line; a blank one holds a space) and
+`codeRunnerColour.reusePlan` decides, per keystroke, which original line a
+current line may show: by POSITION first - the lines shared at the top, then
+at the bottom - where text AND the tokenizer's start state (inside which kind
+of string with which prefix, inside which brackets) both match; only the
+edited middle falls back to a lookup by text and state, and only for a key
+every original line colours alike. The plan's key (text plus one
+inside-a-triple-quote flag) showed the line `total {x} and \n done` with
+the first copy's colours inside `f"""`, `"""` and `r"""` - Shiki colours it
+three ways - and a call's keyword argument like a def's default (#585 plan
+review F1, measured with the image's Shiki). `reuseCases` pins both, and the
+check confirms every line reused is coloured as Shiki colours the current
+code. A line the student changed is coloured by the tokenizer; only the
+lines whose HTML changed are touched.
+
+**The tokenizer** (`codeRunnerColour.ts`, no DOM, no imports) reads the
+whole program on each keystroke - 0.38 ms median, 0.59 ms p95 for 500 lines
+in Node 22 - with MagicPython's rules as Shiki applies them: keywords and
+soft `match`/`case`; operators red; strings with every prefix, triple quotes
+across lines, a backslash-continued string; escapes (`\x41`, `é`,
+`\N{BULLET}`, `\012`; not `\u` in bytes; none in raw strings); `%` and `{}`
+placeholders (none in bytes' braces or in a docstring - a string that opens
+a statement); f-strings with their expressions read as code, `!r` and a
+format spec red, a nested spec's fields; raw strings with a lowercase `r` as
+regular expressions (classes and groups blue, quantifiers red, escapes
+green, the text `r`, `#` comments in a triple-quoted one) while `R` and
+`rf` are raw without; numbers with `0x`/`0b`/`0o` prefixes red and `j` red;
+builtins, builtin exceptions, `self`, ALL_CAPS (two capitals at least: a lone
+`X` is a name), `__dunder__` after a dot or not; a call's name plain unless a
+builtin; `list[int]` plain (the builtin TYPES when indexed); def and class
+names, base classes, decorators (`@property`'s name blue, `@app.route`
+purple throughout); a call's keyword arguments orange, and a def's defaults
+not; comments with NOTE/XXX/HACK/FIXME/BUG/TODO red (in docstrings too).
+Swift: keywords, attributes, `#available`/`#if`, declared names, known types
+and members by Shiki's lists (`count`, `isEmpty`, `first` blue; `width`
+plain), calls and trailing closures blue, argument labels blue and a
+declaration's external labels purple, generics, inheritance lists, enum
+cases, interpolation in the string's colour with its members, raw strings,
+nested block comments, `-5` as one number, and the colons Shiki colours red
+(a dictionary, the ternary, a case, a `where`, a label).
+
+**Agreement with Shiki, per non-space character** (the check, every build of
+verify.sh; Shiki 1.26.2):
+
+| Corpus | Python | Swift |
+|---|---:|---:|
+| support/example_content, every block (558 Python; no Swift) | 100 % (109,250 characters) | — |
+| plus the committed stress fixture (`scripts/fixtures/runner-colour`) | 99.99 % (112,577) | — |
+| the Swift gate and the marketing page's block | — | 100 % |
+| plus the Swift stress fixture | — | 99.92 % (11,290) |
+| held out: 4,603 lines of the repository's own Python (`scripts/*.py`), never tuned on | 99.99 % (153,642) | — |
+
+The floors in the contract are 99.5 % (Python) and 99.0 % (Swift). **Known
+differences** (`knownDifferences`, each confirmed by the check to still
+differ): `obj.True` (Shiki red after a dot); Swift's bare regular-expression
+literal `/[a-z]+/`; a Swift `init(` declared after a `;` on one line (Shiki
+leaves it plain). In the held-out Python the only other misses were `{}`
+inside a long triple-quoted string holding JavaScript (12 characters).
+These can show only on an EDITED line. The Swift tokenizer has no caller yet
+- every Swift block is read-only and shows Shiki's copy - and runs only in
+the check until an editable Swift block exists (#579); its row's `colour` is
+already `"swift"`.
+
+**Alignment, measured with the reviewer's recipe** (#585 plan review F2): the
+light theme; state A is the textarea's own text in black with the copy
+hidden; state B the copy's text in black with every line's colour spans
+taken out (`span.textContent = span.textContent`) and the textarea
+transparent; a pixel more than 40/255 apart in any channel is "strong". In
+dark mode the same diff is blind (black on #121417 never differs by 40),
+which is why the planner's first measurements did not count; with colour
+spans left in, antialiasing at span edges gives hundreds of strong pixels
+for correct code. A copy moved half a pixel is the positive control.
+
+| Browser | Short block, A/B strong | Long line scrolled 200 px sideways | Copy half a pixel off (control) |
+|---|---:|---:|---:|
+| Chrome for Testing 155, headless, 2× (verify.sh's check and by hand) | 0 | 0 | 7,089 / 6,555 by hand; > 300 required by the check (one-line block: 1,196) |
+| Safari 26.6, macOS 26.6, window capture at 1.7× | 44 | 43 | 26,740 / 9,701 |
+| iPad (A16) simulator, Safari (iOS 18.6 runtime), 2× | 0 | 10 | 24,921 / 22,020 |
+
+Safari's and the iPad's residue is one device-pixel row or column on the
+cell's clip edge (antialiasing where both layers are cut); none is inside
+the text. The planner's dark-mode runs are not counted (see above).
+
+**Found by measuring, and fixed:** the plan moved the copy with
+`transform: translate(-scrollLeft, -scrollTop)`. A browser puts a scroll
+box's text on whole device pixels; a transformed copy keeps the fraction, so
+wherever the block itself starts on a fractional pixel (here x = 416.375) a
+few glyphs land in a different sub-pixel bin: 481 strong pixels for correct
+code, and worse with a whole-pixel padding (10,573 with 0.75rem). The copy is
+now a scroll box of its own, scrolled to the textarea's place, stopping where
+the textarea's scroll bars start (so both have the same room to scroll):
+0 strong pixels, unscrolled and with a long line scrolled both ways.
+`overflow-anchor: none` keeps the browser's scroll anchoring from moving the
+copy when a line's colours change. Must-fails: the copy's `code` given
+`overflow-x: auto` at the pre's width (the iPadOS clipping the planner
+found) gives 25,063 strong pixels on the scrolled long line by hand; in the
+browser check, the built page script with the sideways scroll sync taken out
+gives 25,656 and fails, and the focus ring put back on the textarea fails
+the ring's check.
+
+**Per keystroke** (render plus the layout it forces, one character typed at a
+random place in a 500-line program):
+
+| Browser | Median | p95 |
+|---|---:|---:|
+| Chrome for Testing 155 | 2.5 ms | 6.5 ms |
+| Chrome for Testing 155, sixfold CPU slowdown | 14.6 ms | 23.3 ms |
+| Safari 26.6 (timer resolution 1 ms) | 5 ms | 6 ms |
+
+The tokenizer is under 1 ms of it; the rest is the DOM and the layout it
+forces. Touching only the lines whose HTML changed (one per keystroke on
+average) is what keeps a slow Chromebook under a frame.
+
+**Behaviour, through the real page script** (`browser-checks/code_runner.mjs`
+section 6, Chrome for Testing 155): an unedited block's copy is the
+highlighted copy's lines byte for byte; typed lines are the tokenizer's and
+the line above stays Shiki's; Tab, `execCommand("undo")`, an input method
+(`Input.imeSetComposition`: the textarea shows its own text while composing,
+the copy catches up on `compositionend`), a saved edit and Reset keep the copy
+in step; a scrolled editor's copy and gutter follow it; the focus ring is the
+frame's; a static block's numbers and the gutter compute the same colour,
+font, alignment and hairline; `font-variant-ligatures` is `none` on a static
+block, the editor, its copy and the output; ⌘P of an edited block reads back
+(pdftotext) as `1  print("edited-585-a")`, `2  …`. Selection paints Quartz's
+own `::selection` over the transparent text, as it does on static code.
+
+**Line numbers (R1, R3).** Quartz 4.5 numbers EVERY highlighted line, not only
+`showLineNumbers` blocks (`base.scss`, `[data-line]::before { content:
+counter(line) }`), in a fixed 1rem box that crowded two digits, with no
+separator. `codeLines.scss` (carried by `codeRunner.scss`, so every site has
+it) gives that box and the editor's gutter ONE mixin: Quartz's dimmed
+rgba(115, 138, 148, 0.6), the code font at the block's own size,
+right-aligned, `--plantoir-digits` characters wide (2; 3 from line 100 and 4
+from line 1000, by `:has(> [data-line]:nth-child(100))` so a page with no
+script has it - the page script returns at once on a page with no runner),
+0.75ch of padding, a 1 px hairline in `var(--lightgray)`, no fill. Component
+styles come BEFORE Quartz's base styles in `index.css`, so the selector
+carries `:root` to outrank Quartz's widest rule. The gutter is
+`height: 0; min-height: 100%` - a gutter that sets its own height grew the
+frame to 12,020 px for 500 lines (the planner's first try). Line 1 is the
+code's first line, so a traceback's line is the number beside it.
+
+**On paper.** A border on the number's box stops at a wrapped line's first
+row, and the handout's hanging indent (`(digits + 1.2)ch`) did not count the
+gutter's padding and hairline: the wrapped row poked 6.4 px left of the code
+(#585 plan review F4). Now the hairline is drawn down the line itself (a 1 px
+background at the number box's edge) in print, and the handout hangs by the
+whole box, `(digits + 1.75)ch + 1px`; `print_handout.mjs` measures a wrapped
+fixture line's rows in both orientations.
+
+**What every site's bundles cost** (EXC2O, dev 0fe0d1cba's build against this
+branch's): `postscript.js` 143,510 → 164,508 bytes (+20,998; gzipped 47,495 → 56,115, +8,620 - both tokenizers and the frame), `index.css` 66,571 → 70,456 (+3,885; gzipped +684). Every site carries them, as it carries the rest of the runner.
+
+**Rejected:** `contenteditable` (iPadOS input methods and undo); Shiki itself
+in the browser (its grammars and the regular-expression engine are hundreds
+of KB per site); Prism and the like (a new dependency with its own token
+classes, still needing a map to Shiki's colours); the CSS Custom Highlight
+API (it cannot colour a textarea's text); a build-time palette harvested
+from the transformer (the page script is bundled before it could be
+written; the pinned check does the same job); re-rendering the whole copy
+per keystroke (50 ms for 500 lines at a sixfold CPU slowdown, against 16 ms
+for touched lines only); the gutter inside the textarea's padding
+(horizontally scrolled text paints over a scroll box's padding); a transform
+for the scroll (above); the plan's reuse key (above); ligatures in static
+code (the ruling: one look everywhere).
 
 ## J. Self-check quizzes (#563, v1.8.0)
 
