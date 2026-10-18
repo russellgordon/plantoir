@@ -24,8 +24,30 @@
   & li.task-list-item:has(> .plantoir-task-label > input.plantoir-task:checked),
   & li.task-list-item:has(> p:first-child > .plantoir-task-label > input.plantoir-task:checked) {
     text-decoration: line-through;
-    text-decoration-color: var(--gray);
-    color: var(--gray);
+    text-decoration-color: var(--darkgray);
+    color: var(--darkgray);
+  }
+}
+
+// The look (#519 Q3, the default pending Russell): Quartz draws an unticked
+// box's edge in --lightgray (1.18-1.52:1 against the page in all 43 colour
+// schemes - a control needs 3:1), fills a ticked one with --secondary and
+// draws its tick in --light (as low as 1.06:1), and greys a ticked item's
+// words to --gray (1.76:1 in the default light scheme - unreadable on a list
+// a student is working through). Here the edge and the tick are --darkgray
+// with no fill (at least 6.06:1 everywhere), and a ticked item's words stay
+// readable, struck through in the same colour. scripts/test_task_box_contrast.py
+// holds every colour named here to its minimum in every scheme, light and dark.
+input[type="checkbox"].plantoir-task {
+  border-color: var(--darkgray);
+
+  &:checked {
+    border-color: var(--darkgray);
+    background-color: transparent;
+
+    &::after {
+      border-color: var(--darkgray);
+    }
   }
 }
 
