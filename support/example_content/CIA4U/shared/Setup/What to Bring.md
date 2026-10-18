@@ -37,8 +37,8 @@ being kept properly.
 ## A list to copy into your notebook
 
 Copy this onto the inside cover and read down it before you hand anything
-in. It is printed here, not interactive — nothing on this site records what
-you have done.
+in. You can tick it here too: your browser keeps the ticks on this computer,
+and nobody else sees them.
 
 - [ ] Notebook, bound, with the inside cover kept for this list
 - [ ] Calculator, and a device that can reach a table

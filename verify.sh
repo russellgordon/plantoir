@@ -1866,6 +1866,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz One Blank.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
+        "$HIT_COURSE/Task Raw Box.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2770,7 +2771,9 @@ QUIZPLANTS
 # step); Task Twin A and B: two pages alike in every element but their items'
 # words, so Quartz's router reuses one's boxes for the other (review F3 - the
 # browser check proves the reuse happened before it trusts what it reads);
-# Task Printable: a printable page with a task list (what paper shows).
+# Task Printable: a printable page with a task list (what paper shows); Task
+# Raw Box: a checkbox the page writes in HTML, which is no task item and is
+# left alone (6l must not count it - review F5).
 # Removed by restore_hit_fixture.
 python3 - "$HIT_COURSE" <<'TASKPLANTS'
 import json, sys
@@ -2795,6 +2798,9 @@ for twin in ("A", "B"):
     (course / f"Task Twin {twin}.md").write_text(
         f"---\ntitle: Task Twin {twin}\n---\nA twin page planted by verify.sh.\n\n"
         f"- [ ] Twin {twin} first item\n- [ ] Twin {twin} second item\n", encoding="utf-8")
+(course / "Task Raw Box.md").write_text(
+    "---\ntitle: Task Raw Box\n---\nA checkbox the page writes itself, not a task item (plantoir-task-raw-7f3a):\n\n"
+    "<label><input type=\"checkbox\"> a box of the page's own</label>\n", encoding="utf-8")
 (course / "Task Printable.md").write_text(
     "---\ntitle: Task Printable\nprintable: true\n---\nA printable checklist (plantoir-task-printable-7f3a).\n\n"
     "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
@@ -3650,6 +3656,8 @@ for path in sorted(public.rglob("*.html")):
         pages += 1
     for box in found:
         attributes = box["attributes"]
+        if not box["task_item"]:
+            continue  # a checkbox a page wrote itself is not a task item (review F5)
         stamped = "plantoir-task" in (attributes.get("class") or "").split()
         if box["in_quiz"]:
             if attributes.get("class") and "plantoir-quiz-input" in attributes["class"]:
@@ -3685,6 +3693,9 @@ if host != ["Task-Host"] + ["Task-Fixture"] * 6:
     problems.append(f"the transcluded boxes did not keep their source page's name: {host}")
 if (ids_on("Task-Host.html") or [None])[1:4] != (fixture or [None, None, None])[-3:]:
     problems.append("a transcluded box's id is not its source's")
+raw = boxes_in(public / "Task-Raw-Box.html") if (public / "Task-Raw-Box.html").is_file() else []
+if len(raw) != 1 or raw[0]["task_item"] or "plantoir-task" in (raw[0]["attributes"].get("class") or ""):
+    problems.append(f"Task Raw Box's own checkbox was read as a task item or changed: {raw}")
 if kept == 0:
     problems.append("no box inside a quiz was found to check (the not-ready quizzes on Quiz Fixture have some)")
 script = (public / "postscript.js").read_text(encoding="utf-8") if (public / "postscript.js").is_file() else ""

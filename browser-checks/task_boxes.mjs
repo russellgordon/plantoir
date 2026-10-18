@@ -448,6 +448,24 @@ async function connect(chunk) {
       expect("with storage refused a box still ticks", refusedBefore === false && refusedAfter === true, { refusedBefore, refusedAfter })
       expect("and a tick reports nothing to the console", consoleErrors.length === 0, consoleErrors)
       expect("and loading the boxes adds no error to Quartz's own", onLoad.length === baseline, { baseline, onLoad })
+      // ... and a handout from the Print button keeps the ticks made on this
+      // page (review F1: the print hook re-read the refused store and put
+      // every box back to the Markdown's state, on the handout and on screen).
+      await open(base + "/Task-Printable.html")
+      await click("window.__task.boxes()[0]")
+      const refusedPage = await evaluate("window.__task.state()")
+      await evaluate("window.__handoutBoxes = null")
+      await evaluate(`(() => { document.querySelector("summary.plantoir-print-button").click(); document.querySelector('.plantoir-print-menu button[data-mode="questionsOnly"]').click() })()`)
+      let refusedHandout = null
+      for (let tries = 0; tries < 240 && refusedHandout === null; tries += 1) {
+        await pause(250)
+        refusedHandout = (await evaluate("window.__handoutBoxes ?? null").catch(() => null)) ?? null
+      }
+      await pause(500)
+      const refusedAfter2 = await evaluate("window.__task.state()")
+      expect("with storage refused, a handout keeps the ticks made on the page, and so does the page",
+        refusedPage === "xx_" && refusedHandout === refusedPage && refusedAfter2 === refusedPage, { refusedPage, refusedHandout, refusedAfter2 })
+      measured.push(`storage refused: handout ${refusedHandout} (the page showed ${refusedPage})`)
 
       clearTimeout(timer)
       if (problems.length > 0) {

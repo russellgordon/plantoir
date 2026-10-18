@@ -49,8 +49,9 @@ graded on in [[The Media Trials]]:
 
 `lastname-unit2-linocut-relief-print-nov14`
 
-Copy this list into [[The Sketchbook]] — the boxes below are printed on
-the page and nothing you do to them is saved anywhere.
+Tick the boxes below as you set up; your browser keeps the ticks on this
+computer. Copy the list into [[The Sketchbook]] too, for the days you shoot
+without it.
 
 - [ ] Flash and filters off
 - [ ] No shadow of yours in the frame

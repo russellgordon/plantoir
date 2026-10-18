@@ -64,8 +64,12 @@ document.addEventListener("change", (event) => {
   }
 })
 
-// Every box on the page, from its tick or the Markdown's own state.
-function restoreTicks() {
+// Every box on the page from its tick - and, on a page shown (`nav`), a box
+// with no tick from the Markdown's own state. Before a handout only STORED
+// ticks are applied (onlyStored): with storage refused every read is empty,
+// and falling back to the Markdown's state there would wipe the ticks the
+// student made on this page (#519 implementation review F1).
+function restoreTicks(onlyStored = false) {
   const boxes = boxesOnThePage()
   if (boxes.length === 0) {
     return
@@ -85,22 +89,28 @@ function restoreTicks() {
   }
   for (const box of boxes) {
     const tick = ticksByPage[box.dataset.taskPage ?? ""][box.dataset.taskItem ?? ""]
-    box.checked = tick ?? box.defaultChecked
+    if (tick !== null) {
+      box.checked = tick
+    } else if (!onlyStored) {
+      box.checked = box.defaultChecked
+    }
   }
 }
 
-document.addEventListener("nav", restoreTicks)
+document.addEventListener("nav", () => restoreTicks())
 
 // Paper shows the student's ticks (taskBoxes.print, ruling Q1, the default
 // pending Russell): the handout copies the live page (print.inline.ts), so
 // the boxes are restored once more just before it is made - opened from
 // Plantoir's preview with a print request, the handout can start in the
-// same page load, before this script's own `nav` listener has run.
+// same page load, before this script's own `nav` listener has run. That is
+// a first load, so a box without a stored tick already holds the Markdown's
+// state, and only stored ticks are applied.
 const printHooks = window as unknown as { plantoirPrint?: { prepare: Array<() => Promise<void>> }; plantoirTasksHooked?: boolean }
 if (!printHooks.plantoirPrint) {
   printHooks.plantoirPrint = { prepare: [] }
 }
 if (!printHooks.plantoirTasksHooked) {
   printHooks.plantoirTasksHooked = true
-  printHooks.plantoirPrint.prepare.push(async () => restoreTicks())
+  printHooks.plantoirPrint.prepare.push(async () => restoreTicks(true))
 }
