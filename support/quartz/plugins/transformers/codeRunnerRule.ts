@@ -13,6 +13,8 @@
 // codeRunner.inline.ts, a vendor layer and a pin - nothing else. Swift (#493)
 // is the second: `prebuilt`, so its vendor layer is the compile step
 // (scripts/swift_blocks.py, support/swift) and its pin the Swift image's.
+// `colour` (#585) names the tokenizer in components/scripts/
+// codeRunnerColour.ts that colours the language's editor.
 
 export type RunnerLanguage = {
   fence: string // the info string's first word, exactly (lowercase, Q1)
@@ -26,6 +28,7 @@ export type RunnerLanguage = {
   inputCall: string // fills {inputCall}
   inputPattern: string // shows the input box without the stdin flag
   prebuilt: boolean // false: the browser runs the source as written; true: the build compiled it (#493)
+  colour: string | null // the editor's colours (#585): codeRunnerColour.ts's tokenizer for this language, or none
 }
 
 export const LANGUAGES: RunnerLanguage[] = [
@@ -41,6 +44,7 @@ export const LANGUAGES: RunnerLanguage[] = [
     inputCall: "input()",
     inputPattern: "\\binput\\s*\\(",
     prebuilt: false,
+    colour: "python",
   },
   {
     fence: "swift",
@@ -54,6 +58,7 @@ export const LANGUAGES: RunnerLanguage[] = [
     inputCall: "readLine()",
     inputPattern: "\\breadLine\\s*\\(",
     prebuilt: true,
+    colour: "swift",
   },
 ]
 
