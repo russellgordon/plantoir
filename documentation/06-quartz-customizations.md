@@ -2688,7 +2688,7 @@ order of tag-list entries sharing a date); the 120 pages that hold a task item
 changed (+33,411 bytes in all, +6,255 gzipped); the other 6 differ only in
 that variance. Every site's two shared bundles grow, measured again at the branch's head
 against `origin/dev` 0c755ce97 (after #585): `postscript.js` 163,996 →
-165,912 bytes (+1,916; gzip 55,947 → 56,528) and `index.css` 71,601 → 73,127
+165,912 bytes (+1,916, on verify.sh's EXC2O fixture site; gzip 55,947 → 56,528) and `index.css` 71,601 → 73,127
 (+1,526; gzip 12,772 → 12,952), #588's few bytes included. (The first
 measurement, +1,696, was taken before the print hook.) A page with no
 task item outside a quiz is untouched by the transformer, which returns
@@ -2717,7 +2717,7 @@ listener for another open tab (its cost against a rare case - that tab
 catches up on its next load).
 
 **The guidance, and its lint.** Every page that said the boxes cannot be
-ticked was rewritten (the 90 showcase pages, 33 other paragraphs), and
+ticked was rewritten (the 90 showcase pages, 37 other paragraphs), and
 `.claude/skills/example-content/lint_payload.py` fails a payload that says
 so: a phrase list (read-only, printed/not interactive, not clickable, do not
 save, does nothing...) within reach of a box, and a rule for paraphrases - a
@@ -2725,7 +2725,10 @@ sentence naming a box, checklist, tick or click that says nothing is
 recorded, saved or stored, or that the site records nothing - read with the
 lines joined, so a wrapped phrase is found. Still missed: a claim worded with
 none of those words ("the boxes are only for show"), or one that says
-nothing carries over between visits.
+nothing carries over between visits. It also misses "ticks are not saved
+anywhere" and "your browser keeps nothing", and it can flag a true privacy
+sentence ("nothing you click is recorded against your name") - a payload
+that says so should phrase it another way (#519 fixes review R2).
 
 **Teacher note.** A checklist on a class site is one each student ticks for
 themselves; the ticks stay in that student's browser and nobody else sees
