@@ -483,7 +483,9 @@ async function connect(chunk) {
         && JSON.stringify(frame.copyLines) === JSON.stringify(frame.shikiLines), frame)
       // Scrolling: the copy and the gutter follow the editor.
       const LONG = 'print("' + "a long line that runs well past the right edge of the editor, ".repeat(3) + '")'
-      const forty = Array.from({ length: 40 }, (_, at) => `n = ${at + 1}`).join("\n") + "\n" + LONG
+      // Forty lines, every one long, so the rows in view after scrolling are
+      // full of letters for the alignment measure below (#585 review F6e).
+      const forty = Array.from({ length: 40 }, (_, at) => `line_${at + 1} = "every row of this program is long enough to still show letters after scrolling sideways"`).join("\n") + "\n" + LONG
       await evaluate(`window.__runner.setCode(0, ${JSON.stringify(forty)})`)
       await settle()
       await evaluate(`(() => { const area = window.__runner.block(0).querySelector("textarea.plantoir-runner-editor"); area.scrollTop = area.scrollHeight; area.scrollLeft = 150; area.dispatchEvent(new Event("scroll")); return 1 })()`)
@@ -857,7 +859,7 @@ async function connect(chunk) {
       clearTimeout(timer)
       const ok = problems.length === 0
       finish(ok ? 0 : 1, (ok ? "OK: " : "FAIL: " + problems.join("\n  ") + "\n")
-        + JSON.stringify({ firstRunMs, secondRunMs, engineFiles: new Set(good.engineRequests).size, wrong }))
+        + JSON.stringify({ firstRunMs, secondRunMs, engineFiles: new Set(good.engineRequests).size, wrong, aligned: { short: alignedShort, long: alignedLong } }))
     } catch (error) {
       finish(1, "FAIL: " + (problems.length > 0 ? problems.join("\n  ") + "\n  and then: " : "") + (error?.stack ?? error))
     }
