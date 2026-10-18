@@ -45,11 +45,12 @@ folder-by-folder map is [[How This Site Is Organised]], and the tour of
 what the pages can actually do — previews, diagrams, embedded curriculum —
 is [[What This Site Can Do]].
 
-> [!warning] The checkboxes here do not save
-> Class pages list things to do with a box beside them. Those boxes are
-> part of the printed page: nothing you do to one is stored, nothing is
-> sent to me, and reloading returns them to how they started. Treat them
-> as a list to copy into [[The Sketchbook]], not as a place to keep track.
+> [!note] The checkboxes here are yours
+> Class pages list things to do with a box beside them. Tick one and your
+> browser keeps it for you: nothing is sent to me, nobody else sees it,
+> and it is still ticked when you come back on this computer. On another
+> computer the boxes start again, so a list you need everywhere belongs in
+> [[The Sketchbook]] too.
 
 Two directions get you unstuck. Lost in a class page? Follow it to the
 concept. Lost in a concept? Use the backlinks to find the class where we

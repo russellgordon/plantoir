@@ -56,10 +56,11 @@ graph LR
 - [ ] Bring a real job posting
 - [ ] Bring one number with its source
 
-> [!warning] These do not save
-> A checkbox on this site is printed, not interactive. Clicking it
-> records nothing and the site does not know who you are. Copy the list
-> into your own notebook if you want to work through it.
+> [!note] Ticks stay in this browser
+> Tick a box here and your browser keeps it for you. Nothing is sent
+> anywhere, the site does not know who you are, and on another computer
+> the boxes start again. Copy the list into your own notebook if you want
+> it everywhere.
 
 ## Money
 

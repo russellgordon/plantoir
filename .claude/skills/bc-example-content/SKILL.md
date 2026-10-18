@@ -435,7 +435,8 @@ reminder of:
   it in its own words.
 - **The whole style contract** — frontmatter shape, Canadian spelling, em
   dashes, ~80-column wrap, one Obsidian feature per page, exercises' folded
-  answers with no "(click to expand)" hint, checklists framed as read-only,
+  answers with no "(click to expand)" hint, checklists framed as boxes each
+  student ticks in their own browser (never as read-only — #519),
   escaped pipes in table cells, KaTeX-safe math formatting, mermaid pie
   chart rules, chemistry via `\ce{}` — all of it, unchanged.
 - **"No page stands on its own"** — every page reachable within two hops of

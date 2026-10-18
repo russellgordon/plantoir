@@ -50,6 +50,13 @@ import sidebarPageMarkerStyle from "./styles/sidebarPageMarker.scss"
 import quizStyle from "./styles/quiz.scss"
 // @ts-ignore
 import quizScript from "./scripts/quiz.inline"
+// Task boxes students tick (#519) ride along for the same reason: any
+// content page might hold a task list. Every style is under the
+// transformer's own classes and the script does nothing on a page with no
+// task box (one change listener on the document, added once).
+import tasksStyle from "./styles/tasks.scss"
+// @ts-ignore
+import tasksScript from "./scripts/tasks.inline"
 
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
 type PrintSettings = {
@@ -218,8 +225,8 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, quizStyle)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, quizStyle, tasksStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
-  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript)
+  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript, tasksScript)
   return PlantoirMetaLine
 }) satisfies QuartzComponentConstructor<QuartzComponent>

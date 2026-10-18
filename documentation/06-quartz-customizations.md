@@ -568,7 +568,8 @@ against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
 change), every rule in them scoped so it cannot touch an ordinary page.
 Those are history, as #501's +316 above is: since #515 (v1.7.2) `index.css`
 also carries the sidebar's page marker, 454 bytes, which DOES touch every page's
-sidebar on screen (H); `postscript.js` is unchanged by it.
+sidebar on screen (H); `postscript.js` is unchanged by it. Since #519 (v1.8.1) every page with a task item outside a quiz changes
+its HTML (the boxes become tickable), and both bundles grow again (K7).
 
 ### F1. The files and how they reach a section
 
@@ -2389,7 +2390,9 @@ Quartz's callout stays (colours, title, fold) and gains `plantoir-quiz`,
 `data-quiz` (the correct places, or the answer lines - a self-check, so the
 page's source showing answers is accepted, knownLimits). Not ready:
 `data-quiz-kind="notReady"` and `data-quiz-problem`, the question and its
-choices with every box empty, and `words.site.notReady` (ruling Q6).
+choices with every box empty, and `words.site.notReady` (ruling Q6). Those
+boxes stay disabled task items: the task boxes students tick (#519, K) skip
+everything inside a `.plantoir-quiz`.
 
 * Choices are a `<fieldset>` labelled by the question; each is a real radio
   button or checkbox inside a `<label>` with the choice's first line.
@@ -2421,6 +2424,24 @@ ruling Q7); `A ± T` only as a number ± a number not negative, so `±3` and
 `x = ±3` are answers and `+-` typed matches `±` (review S8); `$...$`
 compared inside; NFKC then `toLowerCase()` with no locale (STRASSE is not
 straße - pinned), curly quotes made straight (iOS Smart Punctuation).
+
+**What a fill-in-the-blank question says (#588, v1.8.1):** one rule,
+`quizRules.blanksFeedback(right, count)`, pinned by
+`quizCallouts.feedback.blanks.cases` and run by the quiz checker. Every
+blank right says `right`. Otherwise - wording A, the default pending
+Russell - ONE blank says `notRight`, what a short answer says: "0 of 1
+blanks are right" read oddly, and the blank's own ✗ Not right already says
+which; exactly one right of two or more says `oneBlankRight`, "1 of 2
+blanks is right"; any other count keeps `someBlanksRight`. Only `fill` is
+affected; the score line ("1 of 1 right on the first try") reads fine and is
+unchanged. Rejected: wording B, a sentence of its own for the one wrong
+blank ("Your blank isn't right yet") with "1 of 2 blanks are right" left as
+it was. "1 of 1 blanks is right" is not a reachable string (one of one is
+right). The quiz checker's word audit reads quizRules.ts's `key: "..."`
+literals as well as the script's `word("...")` calls, since the script shows
+these through `word(feedback.key)` (review F4). Measured: `Quiz One Blank`
+(planted by verify.sh) wrong says `notRight`; on the code before this, it
+said "0 of 1 blanks are right" and the browser check failed.
 
 The shuffle moves the choices (reading and Tab order follow what is seen;
 CSS `order` was rejected, WCAG 1.3.2) with `shuffledOrder(n, Math.random)`
@@ -2502,6 +2523,217 @@ omissions: assets ride every site's shared bundle rather than "only on pages
 that use a quiz" (ruling Q2, measured above), and a malformed quiz is a
 folder problem with page and line rather than "build fails" (the ruling for
 #493: a build is never stopped by one page).
+
+## K. Task boxes students tick (#519, v1.8.1)
+
+A Markdown task list (`- [ ] Bring a pencil`) is drawn by Quartz as disabled
+checkboxes. On a class site every such box that is not inside a self-check
+quiz can now be ticked by a student, and the tick is kept in that student's
+own browser - nothing is sent anywhere, and the teacher's page never
+changes. The rules are data in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`taskBoxes`; Windows inherits all of it with `support/quartz` and the same
+build wiring, and owes only a measured look (its `windows` issue).
+
+### K1. The files (all in `support/quartz/`, installed every build)
+
+| File | What it does |
+|---|---|
+| `plugins/transformers/taskRules.ts` | The rules, pure: `taskItemText`, `taskItemId`, `siteRootFrom`, `taskKey`, `readTicks`. Bundled by `scripts/check_task_rules_against_the_site.py` and run over every contract case. |
+| `plugins/transformers/plantoirTasks.ts` | Html stage, wired straight after `PlantoirQuizzes` (`build_site._wire_tasks_transformer`): takes `disabled` off every task box outside a `.plantoir-quiz`, stamps it, and wraps it in a label. The ONLY producer of item ids. |
+| `components/scripts/tasks.inline.ts` | Rides `PlantoirMetaLine.afterDOMLoaded` into every page's `postscript.js`: one delegated `change` listener, and the restore on every `nav`. |
+| `components/styles/tasks.scss` | Rides `PlantoirMetaLine.css` into `index.css`: Quartz's task-item rules said again for the label shape, the look, the focus ring, unclickable previews, and the paper ink. |
+
+### K2. The id, the key and the read API
+
+**An item's id is made from its first line AS QUARTZ PARSED IT** (review
+F1): Quartz trims the file and runs every text transform before parsing, so
+an Obsidian link to a heading (`[[P#Install Steps]]`) is read as
+`[[P#install-steps|Install Steps]]`, a link to a website as a Markdown link,
+a `%%comment%%` is gone, and a callout's title is given a line of its own -
+which also means an item's position in the parsed text is NOT its line in
+the teacher's file. The transformer reads the line at the `li`'s position in
+`file.value` (the transformed text), takes off the `>` markers, indent, list
+markers and box, collapses ASCII white space, normalises to NFC, and hashes
+it with `codeRunnerRule.fnv1a` (UTF-16 code units, 8 hex). From the text
+alone: adding or moving an item never moves another's tick, `[ ]` → `[x]` in
+the file keeps the id, and the same words twice on a page share one tick
+(ruling Q5). The ids are stamped on the boxes (`data-task-item`), and that
+stamp is the only source: the page's script never derives one, and #545 (My
+progress) reads the stamps from the built pages rather than re-deriving ids
+from the raw Markdown, which would disagree on every rewritten shape above.
+The contract pins each shape against Quartz's own text transform
+(`itemText.cases` with `quartzReads`; the checker runs the real transform
+and the real parser in the image), and verify.sh 6l reads every case's id
+back from the real build.
+
+**The key** is `plantoir:task:<site root path>:<page slug>:<item id>`, value
+`"1"` or `"0"`; no entry means the Markdown's own state. `<page slug>` is the
+page the item was WRITTEN on (`data-task-page`, stamped at build), so a
+transcluded checklist shows and sets its source's ticks, and two copies on
+one page stay in step. The shape is a contract case (Russell, #519 comment of
+2026-10-16): changing it resets every student's ticks.
+
+**The read API** for #545: `readTicks(siteRoot, pageSlug, itemIds, store)`
+→ `{id: true | false | null}`, with `taskKey` and `siteRootFrom` exported
+beside it; #545's page imports `taskRules.ts`. A store that throws, or a value
+that is neither `"1"` nor `"0"`, reads as `null`.
+
+### K3. The page's script, and Quartz's router
+
+One `change` listener on the document, added when `postscript.js` first
+runs - never per page, so changing page never stacks them (the browser check
+counts them after five round trips). On every `nav` (first load, a link
+followed, Back) every box's `checked` is ASSIGNED, from its tick or from
+`defaultChecked`. Never left alone: Quartz's router morphs the new page into
+the old one's DOM (micromorph), reusing same-tag elements by position, so a
+box can be the previous page's element still holding its tick (#519 plan M5).
+The review (F3) found the reuse depends on the page pair - one of nine
+measured trips reused inputs - so verify.sh plants `Task Twin A` and `B`,
+alike in every element but their items' words, and the browser check first
+proves the router reused A's box for B (an expando on the element) before it
+trusts that B shows B's state. Must-fail: assigning only when a tick is
+stored shows Twin A's tick on Twin B, and the check fails.
+
+Nothing is written when a page loads. Storage refused (a private window, a
+blocked site): every box still ticks, and nothing is kept; the task boxes add
+nothing to the console (Quartz's own scripts already report the refused
+store on every page). A handout printed with storage refused keeps the ticks
+made on the page: the print hook (K6) applies only STORED ticks and never
+falls back to the Markdown's state - the implementation review (F1) measured
+the first version, which did fall back, putting every box back to `_x_` on
+the handout and on screen; task_boxes.mjs now prints that case, and it fails
+on that version.
+
+Ticking a parent item strikes its nested items through as well, ticked or
+not: the strike is on the `li`, as Quartz's own `li:has(> input:checked)`
+rule always did. Kept as Quartz's behaviour, and a known limit.
+
+### K4. The label, and what a screen reader hears
+
+The box and the item's inline words, up to the first child that is not
+phrasing content (a nested list, a paragraph, a table, a figure, a heading,
+a video - review F10), are wrapped in `<label class="plantoir-task-label">`:
+an implicit label, so no ids to collide under transclusion. A click on the
+words ticks the box; a link inside the words still navigates and ticks
+nothing (HTML's activation rule; measured); Tab reaches each box and Space
+ticks it, with a 2 px `--darkgray` focus ring. Quartz's own task-item rules
+(`li:has(> input[type="checkbox"])`) no longer match a box inside a label, so
+tasks.scss says them again for the tight shape and the loose one
+(`li > p > label > input`), which Quartz never matched. A box in a link's
+preview or a search result shows the page's own state and cannot be ticked
+(`pointer-events: none`); it stays Tab-focusable there, and Space toggles it
+on screen without saving - harmless.
+
+### K5. The look (ruling Q3, the default pending Russell)
+
+Quartz's box was measured across the 43 colour schemes of
+`support/colour_schemes.json`, light and dark: the unticked edge
+(`--lightgray`) 1.18-1.52:1 against `--light` everywhere (a control needs
+3:1); the ticked fill (`--secondary`) with its tick in `--light` as low as
+1.06:1; a ticked item's words (`--gray`) 1.76:1 in the default light scheme.
+Now the edge and the tick are `--darkgray` with no fill, and a ticked item's
+words and the line through them stay `--darkgray`: at least 6.06:1 in light
+mode (desert-sandstone) and 12.19:1 in dark. `scripts/test_task_box_contrast.py`
+(stdlib, so Windows runs it) holds every colour tasks.scss names to 3:1 (marks)
+and 4.5:1 (words) in every scheme; the browser check reads the computed
+colours. This drops Quartz's coloured fill.
+
+### K6. On paper: the ink
+
+With the browser's "background graphics" off (its default), Quartz's ticked
+box printed as an EMPTY box with a green edge (#519 plan M7; measured again
+here in light mode): the fill and the white tick drawn on it are both
+backgrounds or light-on-fill. Whatever paper shows, a print style was owed:
+under `@media print` the box is an outline and the tick a stroke, both in
+`--darkgray`. A page that is not printable keeps the dark theme's colours on
+paper, where `--darkgray` is light: measured, no edge darker than 200 of 255
+- the box and tick all but vanished while Chrome darkened the words beside
+them - so in the dark theme they print in `#4e4e4e` (Quartz's light-theme dark
+grey, 8.5:1 on white). The browser check prints `Task Printable` and `Task
+Twin A` in both themes with `Page.printToPDF` (backgrounds off), renders the
+PDF with poppler's `pdftoppm`, finds each box by its inked sides, and counts
+the ink inside: 50-66 dark pixels inside a ticked box, 0 inside an unticked
+one; with the print block taken out, 0 inside the ticked box and the
+unticked box not found at all. Safari is not measured (no headless Safari
+here; recorded as owed).
+
+**What paper shows (ruling Q1, the default pending Russell):** the boxes as
+the student ticked them, on ⌘P and on the handout - Russell's #519 comment
+of 2026-10-13, the same rule as a runnable block printing the student's
+edits (DECISIONS 8). Both copy the live page, so the ticks travel for free
+(plan M6); the script also pushes a `plantoirPrint.prepare` hook that
+restores the ticks once more just before the handout is built, because a
+handout opened from Plantoir's preview (`#plantoir-print=`) starts inside
+the same `nav` as the page and, with no other hook awaited first, would copy
+the boxes before tasks.inline's own `nav` listener had run. The hook applies
+only stored ticks (a first load already shows the Markdown's state), so with
+storage refused it changes nothing (review F1). Measured: tick
+the first item and untick the teacher's `[x]` on the second of `Task
+Printable`, then Questions only - the handout's boxes read `x__`, as the
+page did (the Markdown's state is `_x_`). Rejected for now: the Markdown's
+state on paper (the issue body; #545's note of 2026-10-16) - it would need a
+beforeprint/afterprint restore from memory (re-reading storage loses the
+ticks when storage is refused) and a reset in every copy print.inline.ts
+makes; if Russell chooses it, #545's own page is the one exception.
+
+### K7. Byte identity, restated
+
+Every page with a task item outside a quiz changes: `disabled` removed, a
+class and two data attributes, the label. Measured on EXC2O against
+`origin/dev` 0fe0d1cba, both builds from the same planted course: 190 of 316
+pages byte-identical once Quartz's own build-to-build variance is set aside
+(the random `<ul class="overflow">` ids, build-time `<time datetime>`, and the
+order of tag-list entries sharing a date); the 120 pages that hold a task item
+changed (+33,411 bytes in all, +6,255 gzipped); the other 6 differ only in
+that variance. Every site's two shared bundles grow, measured again at the branch's head
+against `origin/dev` 0c755ce97 (after #585): `postscript.js` 163,996 →
+165,912 bytes (+1,916, on verify.sh's EXC2O fixture site; gzip 55,947 → 56,528) and `index.css` 71,601 → 73,127
+(+1,526; gzip 12,772 → 12,952), #588's few bytes included. (The first
+measurement, +1,696, was taken before the print hook.) A page with no
+task item outside a quiz is untouched by the transformer, which returns
+without changing the tree.
+
+### K8. Measured, and rejected
+
+Measured (2026-10-18, M4 Pro, macOS 26.6, Chrome for Testing 155, the verify
+fixture): `browser-checks/task_boxes.mjs` - the Markdown's state and nothing
+written on load; the contract's exact key with `"1"`, an untick of `[x]` with
+`"0"`, both kept across a reload; the words, a link, Tab and Space; a
+transcluded copy setting its source's tick, both copies in step; five round
+trips and one change listener; the twins; a tick kept under another text's id
+ignored; a not-ready quiz's 18 boxes still disabled and unstamped; storage
+refused; the look; the ink above. verify.sh 6l: 266 boxes on 121 pages
+tickable and stamped, ids as the contract says (a callout, rewritten links, a
+comment, CR LF).
+
+Rejected: Quartz's own `enableCheckbox` (it rewrites every checkbox on a
+page, the quizzes' inputs among them, and keys a tick by position - plan M2);
+an id from the item's position or a per-page occurrence number (Q5); ids
+re-derived from the raw Markdown by Python (F1); a per-page JSON of ids now
+(#545 may add one, reading the stamps); a `window.*` read API (scripts are
+bundled separately, their order is not a contract); a `storage` event
+listener for another open tab (its cost against a rare case - that tab
+catches up on its next load).
+
+**The guidance, and its lint.** Every page that said the boxes cannot be
+ticked was rewritten (the 90 showcase pages, 37 other paragraphs), and
+`.claude/skills/example-content/lint_payload.py` fails a payload that says
+so: a phrase list (read-only, printed/not interactive, not clickable, do not
+save, does nothing...) within reach of a box, and a rule for paraphrases - a
+sentence naming a box, checklist, tick or click that says nothing is
+recorded, saved or stored, or that the site records nothing - read with the
+lines joined, so a wrapped phrase is found. Still missed: a claim worded with
+none of those words ("the boxes are only for show"), or one that says
+nothing carries over between visits. It also misses "ticks are not saved
+anywhere" and "your browser keeps nothing", and it can flag a true privacy
+sentence ("nothing you click is recorded against your name") - a payload
+that says so should phrase it another way (#519 fixes review R2).
+
+**Teacher note.** A checklist on a class site is one each student ticks for
+themselves; the ticks stay in that student's browser and nobody else sees
+them. Change an item's words and every student's tick on it clears; ticking
+`[x]` in the file only changes what an untouched box shows.
 
 ## E. Summary: what is *not* customized
 

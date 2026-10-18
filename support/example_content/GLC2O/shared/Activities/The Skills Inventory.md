@@ -41,8 +41,9 @@ competence, and this is the fastest fix available.
 
 ## What to end up with
 
-Copy this into your notebook — the boxes below are printed, not
-clickable, and nothing here is recorded.
+Tick the boxes below as you go; your browser keeps the ticks on this
+computer, and nobody else sees them. Copy the list into your notebook if
+you want it with you.
 
 - [ ] At least twelve situations, dated at least roughly
 - [ ] A skill named beside each one

@@ -11,7 +11,7 @@ created: __CREATED__
 - [ ] A book of your own for the reading periods. Not optional at this
       level either.
 
-Copy that into your notebook — the boxes here are printed, not clickable.
+Tick the boxes as you pack, or copy that into your notebook.
 
 ## Why annotation happens on paper
 
