@@ -2377,6 +2377,23 @@ one; with the print block taken out, 0 inside the ticked box and the
 unticked box not found at all. Safari is not measured (no headless Safari
 here; recorded as owed).
 
+**What paper shows (ruling Q1, the default pending Russell):** the boxes as
+the student ticked them, on ⌘P and on the handout - Russell's #519 comment
+of 2026-10-13, the same rule as a runnable block printing the student's
+edits (DECISIONS 8). Both copy the live page, so the ticks travel for free
+(plan M6); the script also pushes a `plantoirPrint.prepare` hook that
+restores the ticks once more just before the handout is built, because a
+handout opened from Plantoir's preview (`#plantoir-print=`) starts inside
+the same `nav` as the page and, with no other hook awaited first, would copy
+the boxes before tasks.inline's own `nav` listener had run. Measured: tick
+the first item and untick the teacher's `[x]` on the second of `Task
+Printable`, then Questions only - the handout's boxes read `x__`, as the
+page did (the Markdown's state is `_x_`). Rejected for now: the Markdown's
+state on paper (the issue body; #545's note of 2026-10-16) - it would need a
+beforeprint/afterprint restore from memory (re-reading storage loses the
+ticks when storage is refused) and a reset in every copy print.inline.ts
+makes; if Russell chooses it, #545's own page is the one exception.
+
 ### K7. Byte identity, restated
 
 Every page with a task item outside a quiz changes: `disabled` removed, a
