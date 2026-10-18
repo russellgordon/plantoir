@@ -1,4 +1,42 @@
 <style>div.sparkle-installed-version, div.sparkle-installed-version ~ div { display: none; }</style>
+<div data-sparkle-version="3898" data-required-warning>
+<h2>Plantoir 1.8.1</h2>
+<p>Plantoir 1.8.1 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself.</p>
+<h3>Before you update</h3>
+<ul>
+<li><strong>Preview and deploy each section again to bring the new features to your sites.</strong> A site deployed by 1.8.0 keeps working exactly as it did. Programs that ask for input as they run, the coloured editor with line numbers, and checklists students can tick reach a site the next time you preview and deploy it with 1.8.1.</li>
+<li><strong>Programs that ask for input as they run need Netlify or Cloudflare.</strong> On a site deployed to a folder or a school web space, students still type their input into the box before pressing Run, as in 1.8.0. So does a page that also shows a video, a PDF or a picture from another website; Plantoir names those pages when you preview and deploy.</li>
+<li><strong>Code looks a little different on every site.</strong> The runnable editor now shows line numbers and your site&#x27;s colours, every code block has a thin line beside its line numbers, and programming ligatures (where characters such as <code>-&gt;</code> or <code>!=</code> are drawn joined as one symbol) are turned off in all code, including code inside a sentence.</li>
+<li><strong>Checklists on your class sites become tickable.</strong> Each student&#x27;s ticks are kept in their own browser only: they are never sent anywhere, you never see them, and they do not follow a student to another device. Your notes are never changed.</li>
+<li><strong>The ready-made courses&#x27; &quot;What This Site Can Do&quot; pages are rewritten</strong>, because they said checklists could not be ticked. If you already created a course from a ready-made one, your copy stays exactly as it is.</li>
+<li><strong>A course with a colon in its name that you started empty may not build.</strong> If its name holds a colon followed by a space (for example &quot;Physics: Mechanics&quot;) and you started it with no example content or ready-made pages, the build may say a section&#x27;s front page cannot be read, near line 2. To fix it, open <code>sectionN/index.md</code> in Obsidian and put double quotes around the title on line 2, so it reads <code>title: &quot;Grade 12 Physics: Mechanics, Section 1&quot;</code>. Courses made from now on are written that way already.</li>
+</ul>
+<h3>Three choices made for now</h3>
+<p>These are this release&#x27;s defaults, and a later release may change them:</p>
+<ul>
+<li><strong>A printed page shows the student&#x27;s own ticks.</strong> When a student prints a page with a checklist, the boxes they ticked print ticked and the others print empty.</li>
+<li><strong>A fill-in-the-blank question with one blank says &quot;Not quite. Try again, or show the answer.&quot;</strong> when the answer is wrong, the same as a short-answer question. A question with two or more blanks where exactly one is right says &quot;1 of 2 blanks is right. Try again, or show the answer.&quot;</li>
+<li><strong>Checklist boxes are drawn in dark grey with no fill</strong>, and a ticked item&#x27;s words stay easy to read.</li>
+</ul>
+<h3>New</h3>
+<ul>
+<li><strong>Programs that stop and ask.</strong> In Preview, and on a site deployed to Netlify or Cloudflare, a runnable Python or Swift program now waits when it asks for input: its question appears in the output with a box right after it, and the student types an answer and presses Return, as in a real terminal. Pasting several lines answers one question per line, and &quot;No more input&quot; ends the input.</li>
+<li><strong>Students can tick the checklists on your pages</strong>, and each student&#x27;s ticks are remembered in their own browser from one visit to the next.</li>
+<li><strong>plantoir.app has a new Quizzes page</strong> showing self-check quizzes in mathematics, chemistry, English and computer science, as assessment as learning.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li><strong>The runnable editor keeps your site&#x27;s colours while students type</strong>, and every runnable program shows line numbers. A program a student has changed prints in colour, with its line numbers.</li>
+<li><strong>Fill-in-the-blank feedback reads properly when a question has one blank</strong>, rather than &quot;0 of 1 blanks are right&quot; (see &quot;Three choices made for now&quot;).</li>
+<li><strong>Plantoir&#x27;s offer to add Obsidian&#x27;s add-ons no longer says Obsidian will open its settings</strong> after you trust the author. It does not: the open note simply redraws with its diagrams and graphs.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li><strong>A course name with a colon</strong> (for example &quot;Physics: Mechanics&quot;) no longer stops a section&#x27;s front page from being built. See &quot;Before you update&quot; for a course you already made.</li>
+<li><strong>A % sign in the name of a curriculum page no longer stops the site from building</strong>, and the coverage map now links pages whose names hold %, # or &amp; correctly. A curriculum folder whose name holds an &amp; no longer appears in the &quot;When did we do this?&quot; lists.</li>
+<li><strong>Folder pages show their table of contents</strong> when they have headings, including your curriculum folder&#x27;s front page, which ignored &quot;enableToc: true&quot;.</li>
+</ul>
+</div>
 <div data-sparkle-version="3848" data-required-warning>
 <h2>Plantoir 1.8.0</h2>
 <p>Plantoir 1.8.0 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself.</p>
