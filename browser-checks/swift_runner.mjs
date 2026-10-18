@@ -9,7 +9,9 @@
 //
 //  1. loading the page fetches nothing of Swift; every block is read-only
 //     (no editor, Run and Stop only) with words.cannotEdit under it, and the
-//     input box shows for code that calls readLine();
+//     input box shows for code that calls readLine(); and once the page's
+//     script has run every block still shows Shiki's own colours, each line
+//     numbered beside the hairline (#585);
 //  2. Run with input prints the greeting, each input line echoed after its
 //     prompt; changed input and Run again changes the output;
 //  3. Stop ends the loop at once, and Run works again;
@@ -230,6 +232,25 @@ async function connect(chunk) {
       expect("a Swift block is read-only with Run and Stop and the cannot-edit note", first && first.built && !first.editor
         && JSON.stringify(first.buttons) === JSON.stringify([said("run"), said("stop")]) && first.note === said("cannotEdit"), first)
       expect("the input box shows for code that calls readLine()", first && first.inputShown, first)
+      // #585: a read-only Swift block keeps Shiki's own colours and every
+      // line its number and hairline once the page's script has run (ruling
+      // R1 and the director's Q1: nothing in the runner strips them).
+      const looks = await evaluate(`(() => {
+        const out = []
+        for (const block of document.querySelectorAll(".plantoir-runner")) {
+          const original = block.querySelector(".plantoir-runner-original")
+          const lines = Array.from(block.querySelectorAll(".plantoir-runner-original pre > code > [data-line]"))
+          const coloured = block.querySelectorAll(".plantoir-runner-original pre > code [style*='--shiki-light'][style*='--shiki-dark']").length
+          const number = lines.length > 0 ? getComputedStyle(lines[0], "::before") : null
+          out.push({ built: block.dataset.built === "true", shown: original ? getComputedStyle(original).display !== "none" : false,
+            lines: lines.length, coloured, numbered: number ? number.content === "counter(line)" : false,
+            hairline: number ? number.borderRightWidth + " " + number.borderRightStyle : "", frame: !!block.querySelector(".plantoir-runner-frame") })
+        }
+        return out
+      })()`)
+      expect("every Swift block shows Shiki's colours with every line numbered beside a hairline, and no editor frame (#585)",
+        looks.length === 7 && looks.every((one) => one.built && one.shown && one.lines > 0 && one.coloured > 0 && one.numbered
+          && one.hairline === "1px solid" && !one.frame), looks)
 
       // 2. Run with input; then changed input.
       let state = await run(0, "Ada\n15")

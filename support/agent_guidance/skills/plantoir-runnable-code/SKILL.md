@@ -142,7 +142,11 @@ only**:
   any program, including one stuck in a loop.
 
 Tracebacks look exactly like CPython's, and their line numbers are the lines
-in the editor.
+in the editor. Every runnable block shows its line numbers down the left
+side - Python and Swift, editable or `readonly`, with nothing to add - so the
+number in a traceback is the number a student sees beside the line, and
+instructions can say "look at line 3". The editor keeps the same colours as
+the site's other code blocks while a student types.
 
 ### 5. Things to avoid
 

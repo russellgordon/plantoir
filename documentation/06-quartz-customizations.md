@@ -1484,7 +1484,9 @@ every site — I8 has the numbers.
 | `support/quartz/plugins/transformers/codeRunner.ts` | `CodeRunnerFences`, wired straight BEFORE `Plugin.SyntaxHighlighting(` in `quartz.config.ts`: on a `codeRunner: true` page it wraps each runnable block, at the MARKDOWN stage, in `<div class="plantoir-runner" data-runner-id data-runner-flags data-runner-language data-runner-runtime data-runner-engine data-original>`. A wrapper rather than attributes because rehype-pretty-code 0.14 drops every property on `<pre>` and `<code>` (measured 2026-10-09); the wrapper survives at the top level, in lists, in quotes and in folded callouts, and the block inside is highlighted exactly as before (the meta is left alone). `data-original` is mdast's `value`, the teacher's code exactly. Reads `quartz/plantoir_code_runner.json` with `fs` (mtime-cached) for the engines the site carries (I6). |
 | `support/quartz/components/CodeRunner.tsx` | Renders NOTHING. Placed at the head of `sharedPageComponents.afterBody` (Quartz renders `page-footer` on every page whatever it holds, so no page's HTML changes), it carries the script and styles into the site's one `postscript.js` and `index.css`. |
 | `support/quartz/components/scripts/codeRunner.inline.ts` | Everything in the browser (I2–I5). Imports `quartz/plantoir_code_runner.json` (words and limits; bundled by esbuild, as the patched explorer imports `course_config.json`). |
-| `support/quartz/components/styles/codeRunner.scss` | Every rule under `.plantoir-runner`; the editor's font is the site's code font at `max(16px, …)`; touch targets 44 px. |
+| `support/quartz/components/scripts/codeRunnerColour.ts` | The editor's colours (#585, I12): the Python and Swift tokenizers, each line's start state, and `reusePlan` (which original line a current line may show Shiki's spans for). No DOM, no imports; the check bundles it beside the image's Shiki. |
+| `support/quartz/components/styles/codeRunner.scss` | Every rule under `.plantoir-runner`; the editor's font is the site's code font at `max(16px, …)`; touch targets 44 px; the editor's frame, coloured copy, gutter and the colour categories' classes (I12). |
+| `support/quartz/components/styles/codeLines.scss` | `@use`d by `codeRunner.scss`, and the one stylesheet here NOT under `.plantoir-runner`: every code block's line-number gutter and hairline, and no ligatures in code, on every page of every site (#585, I12, C2-28). |
 | `support/gated/pyodide/plantoir-worker.js` | The thread a page's Python runs in, laid over `VENDOR_DIR/pyodide` by the gate, so it reaches a site only beside the engine it starts (I3). |
 
 ### I2. The block on the page
@@ -1504,8 +1506,15 @@ a page opened from a feed show the highlighted code alone.
 
 **The editor** is a `<textarea>` in the site's code font, at least 16 px
 (iPadOS zooms the page on focus below 16 px), spellcheck, autocapitalise,
-autocorrect and autocomplete off, `wrap=off`. It grows with its code up to
-24 lines, then scrolls; growing (and the editor replacing the shorter
+autocorrect and autocomplete off, `wrap=off` - since #585 inside a FRAME
+(`div.plantoir-runner-frame`): a gutter of line numbers, then a cell in which
+a coloured copy of the code sits UNDER the textarea, whose own text is
+transparent and whose caret is not, so the student types in a plain textarea
+and sees the site's syntax colours (I12 has the shape, the rules and the
+measurements). The frame owns the border, the corner and the focus ring
+(`:focus-within`). A `readonly` block, and every Swift block, keeps its
+highlighted copy, whose lines Quartz numbers like any static block's. It
+grows with its code up to 24 lines, then scrolls; growing (and the editor replacing the shorter
 highlighted copy) lifts an OPEN ancestor callout's inline `max-height`,
 which Quartz's `callout.inline.ts` fixed when the callout opened and would
 otherwise clip it (2026-10-09 finding D). Tab inserts four spaces or indents
@@ -1682,16 +1691,22 @@ offered back. Ids are positional, so a block inserted ABOVE others sets aside
 the edits on every block below it (knownLimits; the skill says to add blocks
 after existing ones). `readonly` stores nothing.
 
-**Print** (decision 8, `codeRunnerBlocks.print`): a synced
+**Print** (decision 8, `codeRunnerBlocks.print`): a
 `<pre class="plantoir-runner-print" aria-hidden="true">` holds the current
 code and the wrapper is `.plantoir-runner-edited` while it differs from the
 teacher's (a textarea's typed value is not part of a printed or cloned
-page). `@media print` hides the editor, input, buttons, status and output;
+page). `@media print` hides the frame, input, buttons, status and output;
 an unedited block prints its highlighted code, an edited one the student's
-code. Paged.js promotes the same rules for the Print button, which awaits a
-flush-and-sync pushed onto `window.plantoirPrint.prepare` (and removed in
-`addCleanup`). print.inline.ts's code numbering sees the print copy as a
-`pre` without `data-line` and counts its text lines.
+code. Since #585 the copy is built as a static block is - `pre > code >
+span[data-line]`, Shiki's own spans for the lines the student did not touch
+and the editor's colours for those they did - so an edited block prints
+coloured (where the page prints colour) and numbered, by Quartz's counter
+under ⌘P and by print.inline.ts's `data-plantoir-line` in the handout,
+exactly as an unedited one does (ruling Q3). It is rebuilt only on a flush
+(`beforeprint`, `pagehide`, leaving the page, and the Print button's
+`window.plantoirPrint.prepare`), not on every keystroke (#585 plan review S2:
+29.5 ms against 18.1 ms per key for 500 lines at a sixfold CPU slowdown).
+Paged.js promotes the same rules for the Print button.
 
 ### I8. Measured (2026-10-17, M4 Pro, macOS 26.6)
 
@@ -1761,7 +1776,10 @@ transformer's `externalResources` (inlined into every page); auto-indent on
 Enter (it fights the iPadOS keyboard and IME); a `# plantoir: run` first
 line (Obsidian takes only the info string's first word, so ` ```python run `
 is an ordinary Python block there — verified from Obsidian 1.12.7's and
-1.13.7's own code, 2026-10-08).
+1.13.7's own code, 2026-10-08). For the editor's colours (#585, I12):
+`contenteditable` (iPadOS input methods and undo), Shiki in the browser,
+Prism and the like, the CSS Custom Highlight API, re-rendering the whole
+copy per keystroke, and moving the copy by a transform.
 
 ### I10. Swift (#493)
 
