@@ -47,10 +47,10 @@ Ministry expectations that page addresses, in the Ministry's own words.
 They are there so you can see what the course is claiming to teach, and
 check it.
 
-> [!warning] Checkboxes here do not save
-> The `- [ ]` lists on these pages are for reading down or copying into
-> your notebook. Clicking one does nothing, nothing is recorded, and the
-> site does not know who you are.
+> [!note] Checkboxes here are yours
+> The `- [ ]` lists on these pages can be ticked as you go. Your browser
+> keeps the ticks on this computer; nothing is sent anywhere, and the site
+> does not know who you are.
 
 ## If a link does not work yet
 

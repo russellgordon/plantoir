@@ -4,8 +4,9 @@ publish: true
 created: __CREATED__
 ---
 What has to be in your journal and folder before
-[[The Portfolio Conversation]] in the last week. Copy this into your
-notebook — the boxes here are printed, not clickable.
+[[The Portfolio Conversation]] in the last week. Tick the boxes as you go
+(your browser keeps the ticks on this computer), or copy this into your
+notebook.
 
 ## From the whole course
 

@@ -15,7 +15,7 @@
 // here.
 
 import settings from "../../plantoir_quiz.json"
-import { accepts, filledWords, parseAnswerLine, shuffledOrder } from "../../plugins/transformers/quizRules"
+import { accepts, blanksFeedback, filledWords, parseAnswerLine, shuffledOrder } from "../../plugins/transformers/quizRules"
 
 const WORDS = ((settings as { words?: Record<string, string> }).words ?? {}) as Record<string, string>
 
@@ -322,10 +322,11 @@ function setUp(root: HTMLElement, record: (quiz: Quiz, right: boolean) => void, 
         }
       })
       right = rightCount === boxes.length
-      if (right) {
+      if (kind === "fill") {
+        const feedback = blanksFeedback(rightCount, boxes.length)
+        say(word(feedback.key, feedback.values))
+      } else if (right) {
         say(word("right"))
-      } else if (kind === "fill") {
-        say(word("someBlanksRight", { right: rightCount, count: boxes.length }))
       } else {
         say(word("notRight"))
       }

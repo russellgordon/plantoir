@@ -205,9 +205,10 @@ sentence; double ones give it a line to itself.
 - [ ] Every new test failed at least once before it passed
 - [ ] Somebody who is not on my team could run this from my README
 
-On the site they are read-only — the boxes show what the page says, and
-clicking one does nothing. Copied into your own notes, they are how
-[[Journal Checklist]] turns from advice into habit.
+On the site each student can tick them; the ticks stay in their own
+browser, nobody else sees them, and changing a line's words clears its
+tick. Ticked as you go, they are how [[Journal Checklist]] turns from
+advice into habit.
 
 ---
 

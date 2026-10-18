@@ -28,9 +28,11 @@ is run through it in Node:
   among them - comes back byte for byte (review S2), and a page saved with
   CR LF comes back with LF endings and the nested title on a line of its
   own (S1);
+* `feedback.blanks.cases` through blanksFeedback (#588);
 * every word the page's script and the transformer ask for
-  (`word("...")`, `words.<key>`) is in `words.site`, and no word there goes
-  unused.
+  (`word("...")`, `words.<key>`), and every key quizRules.ts hands the
+  script to show (`key: "..."`, #588), is in `words.site`, and no word there
+  goes unused.
 """
 import json
 import os
@@ -54,7 +56,7 @@ ESBUILD = NODE_MODULES / "esbuild" / "bin" / "esbuild"
 
 RUNNER = r"""
 import { readFileSync } from "fs"
-import { accepts, nestedTitlesOwnTheirLine, parseAnswerLine, shuffledOrder } from "RULE_TS"
+import { accepts, blanksFeedback, nestedTitlesOwnTheirLine, parseAnswerLine, shuffledOrder } from "RULE_TS"
 
 const rules = JSON.parse(readFileSync(process.argv[2], "utf-8"))
 const failures = []
@@ -120,6 +122,13 @@ for (const c of rules.recognise.cases) {
     if (!out.includes("> > [!answer]- Answer\n> >\n")) failures.push(`recognise ${c.name}: the nested title has no line of its own: ${JSON.stringify(out)}`)
   }
 }
+for (const c of rules.feedback.blanks.cases) {
+  count += 1
+  const got = blanksFeedback(c.right, c.count)
+  if (got.key !== c.say || JSON.stringify(got.values) !== JSON.stringify(c.values)) {
+    failures.push(`feedback.blanks ${c.right} of ${c.count}: ${JSON.stringify(got)}, the contract says ${c.say} ${JSON.stringify(c.values)}`)
+  }
+}
 console.log(JSON.stringify({ count, failures }))
 """
 
@@ -149,6 +158,10 @@ def check_the_words() -> list:
         asked.update(re.findall(r'\bword\("([A-Za-z]+)"', text))
         asked.update(re.findall(r'\bsaid\("([A-Za-z]+)"', text))
         asked.update(re.findall(r'\bwords\.([A-Za-z]+)\b', text))
+    # The rules file names the words a fill-in-the-blank question says
+    # (blanksFeedback returns `{ key: "..." }`, which the page's script shows
+    # through word(feedback.key)) - #588 review F4.
+    asked.update(re.findall(r'\bkey: "([A-Za-z]+)"', RULE_TS.read_text(encoding="utf-8")))
     asked.discard("site")
     failures = []
     for key in sorted(asked - site):

@@ -41,8 +41,9 @@ what kind of thing you are about to read.
 > depend on the one you are reading, which is often the better route in.
 
 One thing to be clear about: the site does not know who you are. Nothing
-you open, search for or click is recorded against your name, nothing is
-marked here, and nothing carries over to your next visit. Your work lives
-in your notebook, not in this site. For why it is laid out this way, read
+you open, search for or click is recorded against your name, and nothing
+is marked here. The one thing that carries over is a box you tick on a
+checklist, and only in this browser, on this computer, where nobody else
+sees it. Your work lives in your notebook, not in this site. For why it is laid out this way, read
 [[How This Site Is Organised]]; for what the pages themselves can do, read
 [[What This Site Can Do]].

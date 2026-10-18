@@ -44,8 +44,8 @@ Do not become a second casualty — get help rather than going in after
 someone. Then tell your teacher and report it: injury, near miss, spill,
 fire, damage, or a rule you have just realised you broke.
 
-Copy this into your work record; the boxes below are printed only, and
-nothing you do to them is saved anywhere.
+Copy this into your work record. You can tick the boxes below here too;
+your browser keeps the ticks on this computer, and nobody else sees them.
 
 - [ ] Machine isolated before hands go near it
 - [ ] Guards present, floors and walkways clear

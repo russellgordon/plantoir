@@ -540,6 +540,6 @@ Added for v1.8.1 (#587, macOS only — `windows: false`, owed by name in
 | ID | Subject | Page |
 |---|---|---|
 | `quiz-math` | A root estimated from the graph in the question, 0.35, right within the tolerance, explanation open | MCV4U `/Exercises/Check-Your-Curve-Sketching` (demo) |
-| `quiz-chemistry` | A `\ce{}` equation and two blanks: the moles right, the mass wrong (4.39 g), "1 of 2 blanks are right", explanation open | SCH3U `/Exercises/Check-Your-Stoichiometry` (demo) |
+| `quiz-chemistry` | A `\ce{}` equation and two blanks: the moles right, the mass wrong (4.39 g), "1 of 2 blanks is right", explanation open | SCH3U `/Exercises/Check-Your-Stoichiometry` (demo) |
 | `quiz-english` | The sight passage and a select-all question under it, both right choices ticked, right | ENG2D `/Exercises/Check-Your-Reading` (demo) |
 | `quiz-code-run` | The fifth question's program run (2, 5, 8), answered 3, right, and the page's score: 4 of 5 right on the first try | ICS3U `/Exercises/Check-Your-Loops` (marketing) |

@@ -30,8 +30,8 @@ Three dates, not two. Compare 1939 with 1945, and then compare 1945 with
 - [ ] Veterans' benefits, and who was and was not eligible for them
 - [ ] The family allowance, introduced as the war ended
 
-Those boxes are printed, not interactive — nothing is saved when you tap
-one. Copy the list into your own notes and tick it there.
+Tick those boxes as you go: your browser keeps the ticks on this computer,
+and nobody else sees them.
 
 ## The reasoning the class does
 

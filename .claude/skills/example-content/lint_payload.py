@@ -279,23 +279,46 @@ def lint(course_code: str) -> int:
                 f"polarity is inverted (draft: true is publish: false)"
             )
 
-        # A checklist on the site cannot be ticked — nothing is saved and
-        # clicking does nothing. A page that says otherwise lies about the
-        # software to the student reading it.
-        lowered = text.lower()
-        for phrase in ("click to check", "clicking checks", "check them off",
-                       "tick them off", "tick these off", "checkboxes are clickable",
-                       "clickable checklist", "click each box", "tick each box"):
+        # A checklist on the site CAN be ticked, since #519: each student's
+        # ticks are kept in their own browser. A page that says the boxes
+        # are read-only, do nothing or save nothing lies about the software
+        # to the student reading it. (Until #519 this rule pointed the other
+        # way and failed any page that said a box could be ticked.)
+        # Lines joined first, so a phrase wrapped across two lines is found.
+        lowered = re.sub(r"\s+", " ", text.lower())
+        said_unticked = False
+        for phrase in ("read-only — the boxes", "are read-only", "read-only box", "printed, not interactive", "not interactive", "printed, not stored", "printed only",
+                       "printed, not clickable", "not clickable", "boxes do not tick", "do not tick on this site",
+                       "checkboxes here do not save", "these do not save", "boxes save nothing",
+                       "clicking one does nothing", "clicking does nothing", "clicking them does nothing"):
             at = lowered.find(phrase)
-            while at >= 0:
-                # Ticking a printed copy is honest and worth saying, so the
-                # sentence around the phrase decides.
-                sentence = lowered[max(0, at - 120):at + 160]
-                if not any(word in sentence for word in
-                           ("paper", "notebook", "printed", "print it", "your own copy")):
-                    problems.append(f"{rel}: says a checklist can be ticked — it is read-only")
-                    break
+            while at >= 0 and not said_unticked:
+                # The sentence around the phrase decides: only one about a
+                # box or a checklist is wrong.
+                sentence = lowered[max(0, at - 160):at + 160]
+                if any(word in sentence for word in ("box", "checklist", "- [ ]", "tick")):
+                    problems.append(f"{rel}: says a checklist cannot be ticked — on the site each student can tick it")
+                    said_unticked = True
                 at = lowered.find(phrase, at + 1)
+        # And the paraphrases that say the same as a rule: a sentence about a
+        # box, a checklist or ticking that says nothing is recorded, saved or
+        # stored, or that the site records nothing, in the same sentence as a
+        # box, a checklist, a tick or a click. (Not caught: a claim
+        # worded without any of those words - "the boxes are only for show", or
+        # "nothing carries over to your next visit".)
+        if not said_unticked:
+            for match in re.finditer(
+                    r"[^.!?\n]*(?:records? nothing|nothing (?:on this site |here |you (?:tick|click|do)[^.!?]{0,30}?)?"
+                    r"(?:is |gets )?(?:saved|recorded|stored|records)|(?:does not|doesn't|never) (?:save|record|store))[^.!?]*",
+                    lowered):
+                # The SENTENCE itself must be about the boxes: "feedback only,
+                # nothing recorded" on a class page sits beside a checklist
+                # and is about marks.
+                sentence = match.group(0)
+                if any(word in sentence for word in ("box", "checklist", "tick", "click")) \
+                        and "browser keeps" not in sentence:
+                    problems.append(f"{rel}: says a checklist cannot be ticked — on the site each student can tick it")
+                    break
 
         # Mermaid prints each pie percentage at its slice's mid-angle with
         # no collision avoidance, and rounds to whole numbers.

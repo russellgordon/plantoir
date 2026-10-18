@@ -1,0 +1,116 @@
+// Task boxes students tick (#519): the page's half, in the student's browser.
+// contracts/shared-rules.json -> taskBoxes.
+//
+// The transformer (plugins/transformers/plantoirTasks.ts) left every task box
+// outside a quiz enabled, inside a <label>, stamped with the page it was
+// written on and the item's id. This keeps each tick in the student's own
+// browser (localStorage, taskRules.taskKey) and puts the boxes back the way
+// the student left them on every page shown. Nothing is sent anywhere, and
+// nothing is written until a box is changed: no entry means the Markdown's
+// own state ([ ] or [x]) applies.
+//
+// * ONE change listener, on the document, added once when the script first
+//   runs - never per page, so changing page never stacks them.
+// * On every page shown (Quartz's `nav`, which also fires on the first load
+//   and on Back), every box's `checked` is ASSIGNED, from the stored tick or
+//   else from the Markdown's own state (defaultChecked). Never left alone:
+//   Quartz's router patches the new page into the old one's elements, so a
+//   box can be the previous page's, still holding its tick (#519 plan M5).
+// * A box in a link's preview or a search result is the page's, not the
+//   student's: never saved from (the styles make them unclickable).
+
+import { readTicks, siteRootFrom, taskKey, TICKED, UNTICKED } from "../../plugins/transformers/taskRules"
+
+const BOX = "input.plantoir-task"
+const PREVIEW = ".popover, .preview-container"
+
+const store = {
+  getItem(key: string): string | null {
+    return window.localStorage.getItem(key)
+  },
+}
+
+function siteRoot(): string {
+  return siteRootFrom(document.body.dataset.slug ?? "", location.href)
+}
+
+function boxesOnThePage(): HTMLInputElement[] {
+  const found: HTMLInputElement[] = []
+  for (const box of document.querySelectorAll<HTMLInputElement>(BOX)) {
+    if (box.closest(PREVIEW) === null) {
+      found.push(box)
+    }
+  }
+  return found
+}
+
+document.addEventListener("change", (event) => {
+  const box = event.target
+  if (!(box instanceof HTMLInputElement) || !box.matches(BOX) || box.closest(PREVIEW) !== null) {
+    return
+  }
+  const page = box.dataset.taskPage ?? ""
+  const item = box.dataset.taskItem ?? ""
+  try {
+    window.localStorage.setItem(taskKey(siteRoot(), page, item), box.checked ? TICKED : UNTICKED)
+  } catch {
+    // A browser that refuses storage: the box still ticks, and forgets.
+  }
+  // The same item shown twice (a page transcluded twice) stays in step.
+  for (const other of boxesOnThePage()) {
+    if (other !== box && other.dataset.taskPage === page && other.dataset.taskItem === item) {
+      other.checked = box.checked
+    }
+  }
+})
+
+// Every box on the page from its tick - and, on a page shown (`nav`), a box
+// with no tick from the Markdown's own state. Before a handout only STORED
+// ticks are applied (onlyStored): with storage refused every read is empty,
+// and falling back to the Markdown's state there would wipe the ticks the
+// student made on this page (#519 implementation review F1).
+function restoreTicks(onlyStored = false) {
+  const boxes = boxesOnThePage()
+  if (boxes.length === 0) {
+    return
+  }
+  const root = siteRoot()
+  const itemsByPage: Record<string, string[]> = {}
+  for (const box of boxes) {
+    const page = box.dataset.taskPage ?? ""
+    if (!(page in itemsByPage)) {
+      itemsByPage[page] = []
+    }
+    itemsByPage[page].push(box.dataset.taskItem ?? "")
+  }
+  const ticksByPage: Record<string, Record<string, boolean | null>> = {}
+  for (const page of Object.keys(itemsByPage)) {
+    ticksByPage[page] = readTicks(root, page, itemsByPage[page], store)
+  }
+  for (const box of boxes) {
+    const tick = ticksByPage[box.dataset.taskPage ?? ""][box.dataset.taskItem ?? ""]
+    if (tick !== null) {
+      box.checked = tick
+    } else if (!onlyStored) {
+      box.checked = box.defaultChecked
+    }
+  }
+}
+
+document.addEventListener("nav", () => restoreTicks())
+
+// Paper shows the student's ticks (taskBoxes.print, ruling Q1, the default
+// pending Russell): the handout copies the live page (print.inline.ts), so
+// the boxes are restored once more just before it is made - opened from
+// Plantoir's preview with a print request, the handout can start in the
+// same page load, before this script's own `nav` listener has run. That is
+// a first load, so a box without a stored tick already holds the Markdown's
+// state, and only stored ticks are applied.
+const printHooks = window as unknown as { plantoirPrint?: { prepare: Array<() => Promise<void>> }; plantoirTasksHooked?: boolean }
+if (!printHooks.plantoirPrint) {
+  printHooks.plantoirPrint = { prepare: [] }
+}
+if (!printHooks.plantoirTasksHooked) {
+  printHooks.plantoirTasksHooked = true
+  printHooks.plantoirPrint.prepare.push(async () => restoreTicks(true))
+}
