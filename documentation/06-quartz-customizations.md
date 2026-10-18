@@ -2181,7 +2181,7 @@ for correct code. A copy moved half a pixel is the positive control.
 
 | Browser | Short block, A/B strong | Long line scrolled 200 px sideways | Copy half a pixel off (control) |
 |---|---:|---:|---:|
-| Chrome for Testing 155, headless, 2× (verify.sh's check and by hand) | 0 | 0 | 7,089 / 6,555 by hand; > 300 required by the check (one-line block: 1,196) |
+| Chrome for Testing 155, headless, 2× (verify.sh's check and by hand) | 0 | 0 | 7,089 / 6,555 by hand; the check needs 10,000 on its 24-row block of long lines (measured 125,663) |
 | Safari 26.6, macOS 26.6, window capture at 1.7× | 44 | 43 | 26,740 / 9,701 |
 | iPad (A16) simulator, Safari (iOS 18.6 runtime), 2× | 0 | 10 | 24,921 / 22,020 |
 
@@ -2285,7 +2285,7 @@ Safari itself cannot be told to print to a file from a script)
 (implementation review F2).
 
 **What every site's bundles cost** (EXC2O, dev 0fe0d1cba's build against this
-branch's): `postscript.js` 143,510 → 164,508 bytes (+20,998; gzipped 47,495 → 56,115, +8,620 - both tokenizers and the frame), `index.css` 66,571 → 70,456 (+3,885; gzipped +684). Every site carries them, as it carries the rest of the runner.
+branch's): `postscript.js` 143,510 → 164,508 bytes (+20,998; gzipped 47,495 → 56,115, +8,620 - both tokenizers and the frame), `index.css` 66,571 → 71,531 (+4,960; gzipped +777, with the review's print and inline-code rules). Every site carries them, as it carries the rest of the runner.
 
 **Rejected:** `contenteditable` (iPadOS input methods and undo); Shiki itself
 in the browser (its grammars and the regular-expression engine are hundreds
