@@ -21,8 +21,8 @@
 // UNTOUCHED LINES ARE SHIKI'S OWN. The page's script keeps the highlighted
 // copy's lines and shows Shiki's own spans for every line a student has not
 // changed (reusePlan, below); this tokenizer only colours the lines they
-// have. Where the two disagree (documentation/06, I11: about 0.3 % of the
-// characters on edited Python lines), only an edited line can show it.
+// have. Where the two disagree (documentation/06, I12: under 0.01 % of the
+// characters of held-out Python), only an edited line can show it.
 //
 // THE STATE A LINE STARTS IN. Shiki's colouring of a line is decided by the
 // line's text and the state the grammar is in when the line starts: inside a

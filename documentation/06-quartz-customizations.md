@@ -324,7 +324,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
 | C2-26 | **KaTeX from the site itself (#494)** | `quartz/plugins/transformers/latex.ts`; `quartz/static/katex/` | Quartz v4.5.0's `externalResources` linked `cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css` and `contrib/copy-tex.min.js` on EVERY page (400 links each on a built ICS3U site), while its own lockfile installs **0.16.21** and rehype-katex renders every formula with that at build time — so sites were rendered with one version and styled with another, and the maths depended on a third party and a network. `patch_katex_local` (marker `PLANTOIR-KATEX-LOCAL`, idempotent, independent of C2-20's import) replaces that block with two `additionalHead` functions: `<link rel=stylesheet href="<pathToRoot>/static/katex/katex.min.css" spa-preserve>` and `<script src=".../static/katex/contrib/copy-tex.min.js" defer spa-preserve>`, relative to each page so a site served under a folder finds them, kept across the site's page changes like `index.css`; the 404 page, served at any depth, links from the `baseUrl`'s path (review N6, Head.tsx's own rule). `install_katex_assets` copies the files from Quartz's own `node_modules/katex` every build (05 → Runnable code, step 4): the stylesheet (23,352 bytes), copy-tex (1,673), the **20 woff2 faces** (259,792) and the MIT licence — 284,817 bytes on EVERY site, woff2 only because every browser that can run a site's code takes woff2 first. Netlify's CSP loses `https://cdn.jsdelivr.net` by itself (07). **Rejected:** gating it per site on maths (Python cannot tell maths the way remark-math does — `$` in prose, currency — and a wrong guess breaks every formula silently; the cost is about 2% of Pyodide, uploaded once by content hash); all three font formats (1.10 MB); inlining the CSS into index.css (a generated SCSS file from node_modules every build); absolute `/static/katex/` (breaks a folder published under a subpath). **The print path had to follow** (#455 review S1): a link kept across page changes keeps its RELATIVE href, which then resolves against the new page — one folder off. print.inline.ts now takes every stylesheet for the print frame from the address the sheet was really fetched from (`link.sheet.href`), which fixed the same latent fault in its `index.css` lookup; measured by `browser-checks/maths_offline.mjs`: with the old code a handout printed after a page change from the top of the site to a page one folder down got a 404 KaTeX stylesheet (0 rules), now 249 rules. **The regression the plan expected did not happen:** a folder publish OPENED AS A FILE was expected to lose KaTeX's faces in Chrome (an opaque origin); measured 2026-10-17, Chrome for Testing 155 and Safari 26.6 both loaded `KaTeX_Main` and `KaTeX_Math` from `static/katex/fonts/` beside a page opened from disk, so the maths keeps its look offline from a file too (it used to need the network for the CDN). |
 | C2-27 | **A folder page's table of contents (#520)** | `quartz.layout.ts` | `_wire_list_page_toc`, one of `wire_quartz_additions`' edits, puts `Component.DesktopOnly(Component.TableOfContents())` — the content layout's own — in `defaultListPageLayout`'s right column, which is `[]` in v4.5.0, and touches nothing else. Quartz renders every `folder/index.md` with that layout (and the tag pages), so a curriculum folder's index with `enableToc: true` and five headings of its own showed no table of contents: the data was computed and placed nowhere. Quartz's own rule then decides, as on any page — shown by default, `enableToc: false` hides it, and only with two or more headings of depth 3 or less on the page itself — so tag pages and folder pages with no headings of their own are unchanged. Measured on the #520 plan by editing a built layout and re-running Quartz: the curriculum index showed "Navigate this page" with its strand headings, while `Concepts/index`, `tags/A1` and the front page stayed at 0; expectation pages had shown a table of contents all along. Idempotent, every build; a list layout of another shape warns and is left alone. **Chosen** (ruling Q2 on the plan): on every folder page with the headings, as Quartz does on every other page — 49 of 1,009 folder index pages across `support/` show one, 9 of them without having asked. **Rejected:** only on folder pages that say `enableToc: true` (a wrapper component of our own, and a rule unlike every other page's). `scripts/test_folder_page_toc.py` drives it through `wire_quartz_additions`; verify.sh 6h reads EXC2O's built `Curriculum/index.html`. |
-| C2-28 | **Every code block's line numbers, hairline and no ligatures (#585)** | `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, carried into `index.css` by `codeRunner.scss`) | Quartz numbers every highlighted line in a 1rem box with no separator. One gutter style for static blocks and the runnable editor: Quartz's own dimmed colour, the code font, a box `--plantoir-digits` wide (3 from line 100, 4 from line 1000, by CSS), a 1 px hairline in `var(--lightgray)`, no fill; no programming ligatures in any code block. On paper the hairline runs down each line past wrapped rows. Every site, every page with code - I12 says why and what was measured. |
+| C2-28 | **Every code block's line numbers, hairline and no ligatures (#585)** | `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, carried into `index.css` by `codeRunner.scss`) | Quartz numbers every highlighted line in a 1rem box with no separator. One gutter style for static blocks and the runnable editor: Quartz's own dimmed colour, the code font, a box `--plantoir-digits` wide (3 from line 100, 4 from line 1000, by CSS), a 1 px hairline in `var(--lightgray)`, no fill; no programming ligatures in any code element, inline code in prose included. On paper the hairline runs down each line past wrapped rows, printed even with a browser's background graphics off. Every site, every page with code - I12 says why and what was measured. |
 
 ### C3. Content-level transformations (every build)
 
@@ -2189,6 +2189,17 @@ Safari's and the iPad's residue is one device-pixel row or column on the
 cell's clip edge (antialiasing where both layers are cut); none is inside
 the text. The planner's dark-mode runs are not counted (see above).
 
+**At a fractional scale it is not exact** (implementation review F3,
+Chrome, the same recipe): at device scale 1 and 2 every case is 0 strong
+pixels - tabs, trailing spaces, a long line scrolled 250 px or to its end,
+and the 500-line block in its middle and at its bottom - but at 1.1, 1.25,
+1.5 and 2.5 (browser zoom of 110-150 %, and Chromebooks or Windows laptops
+at 125 or 150 %) up to 70,899 strong pixels, and a grid search finds one
+UNIFORM shift that zeroes them: 0.2-0.6 CSS px, mostly vertical, sometimes
+0.4 px across. In Safari at 85 % zoom, scrolled fully right, the copy stops
+1 px short of the textarea (scrollLeft 1,682 against 1,683). The letters are
+the same letters a fraction of a pixel apart - cosmetic, and left as it is.
+
 **Found by measuring, and fixed:** the plan moved the copy with
 `transform: translate(-scrollLeft, -scrollTop)`. A browser puts a scroll
 box's text on whole device pixels; a transformed copy keeps the fraction, so
@@ -2207,17 +2218,21 @@ gives 25,656 and fails, and the focus ring put back on the textarea fails
 the ring's check.
 
 **Per keystroke** (render plus the layout it forces, one character typed at a
-random place in a 500-line program):
+random place in a 500-line program; the second program, the implementation
+review's, has a comment and an f-string on every line):
 
-| Browser | Median | p95 |
+| Browser | 500 lines, 13.6 k characters: median / p95 | 500 lines, ~25 k characters: median / p95 |
 |---|---:|---:|
-| Chrome for Testing 155 | 2.5 ms | 6.5 ms |
-| Chrome for Testing 155, sixfold CPU slowdown | 14.6 ms | 23.3 ms |
-| Safari 26.6 (timer resolution 1 ms) | 5 ms | 6 ms |
+| Chrome for Testing 155 | 2.5 / 6.5 ms | 5.1 / 8.9 ms |
+| Chrome for Testing 155, sixfold CPU slowdown | 14.6 / 23.3 ms | 20.0-20.9 / 23-25.6 ms |
+| Safari 26.6 (timer resolution 1 ms) | 5 / 6 ms | 9.6 / 11.2 ms |
 
-The tokenizer is under 1 ms of it; the rest is the DOM and the layout it
-forces. Touching only the lines whose HTML changed (one per keystroke on
-average) is what keeps a slow Chromebook under a frame.
+Dev's plain textarea costs 2.7 ms at the sixfold slowdown. Every keystroke
+re-reads the whole program and re-plans its lines; touching only the lines
+whose HTML changed (one on average) keeps the DOM work small, but on dense
+code at a sixfold slowdown a keystroke takes more than a 16 ms frame. Making
+the tokenizer and the plan incremental is the next step if a slow
+Chromebook is ever seen to lag; not done now (the director's ruling F4).
 
 **Behaviour, through the real page script** (`browser-checks/code_runner.mjs`
 section 6, Chrome for Testing 155): an unedited block's copy is the
@@ -2228,9 +2243,15 @@ the copy catches up on `compositionend`), a saved edit and Reset keep the copy
 in step; a scrolled editor's copy and gutter follow it; the focus ring is the
 frame's; a static block's numbers and the gutter compute the same colour,
 font, alignment and hairline; `font-variant-ligatures` is `none` on a static
-block, the editor, its copy and the output; ⌘P of an edited block reads back
-(pdftotext) as `1  print("edited-585-a")`, `2  …`. Selection paints Quartz's
-own `::selection` over the transparent text, as it does on static code.
+block, inline code in prose, the editor, its copy and the output; ⌘P of an
+edited block reads back (pdftotext) as `1  print("edited-585-a")`, `2  …`,
+and its long line wraps whole, as before #585 (the copy is `pre-wrap`
+outside the handout, each wrapped row hung under its code). Selection
+paints Quartz's own `::selection` over the transparent text, as it does on
+static code. **Find in the page counts an editable block's code twice**
+(the copy is text too; Chrome's `window.find` counts 4 where dev counted 3),
+and a drag selection across the block can pick up its numbers - a known
+limit (`codeRunnerBlocks.knownLimits`).
 
 **Line numbers (R1, R3).** Quartz 4.5 numbers EVERY highlighted line, not only
 `showLineNumbers` blocks (`base.scss`, `[data-line]::before { content:
@@ -2254,7 +2275,14 @@ gutter's padding and hairline: the wrapped row poked 6.4 px left of the code
 (#585 plan review F4). Now the hairline is drawn down the line itself (a 1 px
 background at the number box's edge) in print, and the handout hangs by the
 whole box, `(digits + 1.75)ch + 1px`; `print_handout.mjs` measures a wrapped
-fixture line's rows in both orientations.
+fixture line's rows in both orientations. A background is something Chrome
+("Background graphics") and Safari ("Print backgrounds") leave out by
+default, so the line asks `print-color-adjust: exact` (no fill is kept):
+measured with the hairline printed and backgrounds off in Chrome for
+Testing 155 (`printToPDF`, `printBackground: false`) and in WebKit's own
+print path (a WKWebView's print operation, `shouldPrintBackgrounds` false -
+Safari itself cannot be told to print to a file from a script)
+(implementation review F2).
 
 **What every site's bundles cost** (EXC2O, dev 0fe0d1cba's build against this
 branch's): `postscript.js` 143,510 → 164,508 bytes (+20,998; gzipped 47,495 → 56,115, +8,620 - both tokenizers and the frame), `index.css` 66,571 → 70,456 (+3,885; gzipped +684). Every site carries them, as it carries the rest of the runner.

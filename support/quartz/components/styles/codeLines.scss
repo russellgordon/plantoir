@@ -15,7 +15,7 @@
 //   theme's muted border colour, no fill. A static block's numbers and a
 //   runnable block's gutter (codeRunner.scss, .plantoir-runner-gutter) both
 //   wear it, so the two match in font, colour, width, padding and line.
-// * no programming ligatures in any code block (ruling Q5): Fira Code and
+// * no programming ligatures in any code, inline included (ruling Q5): Fira Code and
 //   JetBrains Mono would otherwise draw `!=` as one glyph, and an editor's
 //   coloured copy could join a pair across a token's edge where the text a
 //   student types does not.
@@ -51,19 +51,27 @@
   --plantoir-digits: 4;
 }
 
+// Every code element, inline code in prose included (Russell: "No
+// ligatures anywhere. Let's be consistent.").
 :root pre,
-:root pre code,
+:root code,
 :root .plantoir-runner .plantoir-runner-editor {
   font-variant-ligatures: none;
 }
 
-// On paper a long line wraps (print.scss, plantoir-paper), and a border on
+// On paper a long line can wrap (print.scss, plantoir-paper), and a border on
 // the number's box stops at the first row: the hairline is drawn down the
 // LINE's left side instead, at the same place, so it runs past every
 // wrapped row (#585 plan review F4). The handout's own hanging indent is in
 // print.scss.
 @media print {
+  // print-color-adjust: exact, or a browser printing with its default
+  // settings (no background graphics, in Chrome and Safari alike) drops the
+  // hairline; no fill is kept (#585 review F2).
   :root pre > code:not(.mermaid) > [data-line] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background-color: transparent;
     background-image: linear-gradient(var(--lightgray), var(--lightgray));
     background-repeat: no-repeat;
     background-size: 1px 100%;

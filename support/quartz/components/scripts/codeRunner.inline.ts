@@ -556,7 +556,7 @@ function buildFrame(wrapper: HTMLElement, editor: HTMLTextAreaElement, language:
   // a browser puts a scroll box's text on whole device pixels, so a copy
   // moved by a transform instead sat a fraction of a pixel off the typed
   // letters wherever the block itself did not start on a whole pixel
-  // (measured, documentation/06 I11). It stops where the textarea's scroll
+  // (measured, documentation/06 I12). It stops where the textarea's scroll
   // bars start, so the two have the same room to scroll and no letter shows
   // through a bar.
   const sync = () => {

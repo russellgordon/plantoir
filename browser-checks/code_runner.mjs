@@ -540,8 +540,8 @@ async function connect(chunk) {
       const alignedLong = await aligned(0)
       await evaluate(`(() => { document.getElementById("plantoir-align-check").remove(); return 1 })()`)
       await send("Emulation.clearDeviceMetricsOverride")
-      expect("the coloured letters sit exactly under the typed ones, a short block and a long line scrolled both ways (0 strong pixels), and half a pixel off shows",
-        alignedShort.strong === 0 && alignedLong.strong === 0 && alignedShort.control > 300 && alignedLong.control > 300, { alignedShort, alignedLong })
+      expect("the coloured letters sit exactly under the typed ones, a short block and a long line scrolled both ways (0 strong pixels), and half a pixel off shows (10,000 pixels at least on the 24-row block)",
+        alignedShort.strong === 0 && alignedLong.strong === 0 && alignedShort.control > 300 && alignedLong.control >= 10000, { alignedShort, alignedLong })
       // The focus ring is the frame's (#585 plan review F3).
       const ring = await evaluate(`(() => { const block = window.__runner.block(1); const area = block.querySelector("textarea.plantoir-runner-editor"); area.focus(); const frame = getComputedStyle(block.querySelector(".plantoir-runner-frame")); return { frame: frame.outlineStyle + " " + frame.outlineWidth, area: getComputedStyle(area).outlineStyle } })()`)
       expect("the editor's focus ring is drawn on its frame, uncut by the frame's corner", ring.frame === "solid 2px" && ring.area === "none", ring)
@@ -550,14 +550,15 @@ async function connect(chunk) {
         const pick = (style) => ({ color: style.color, font: style.fontFamily, align: style.textAlign, line: style.borderRightWidth + " " + style.borderRightStyle + " " + style.borderRightColor })
         const statics = Array.from(document.querySelectorAll("pre > code > [data-line]")).filter((line) => !line.closest(".plantoir-runner"))
         const gutter = window.__runner.block(1).querySelector("pre.plantoir-runner-gutter")
-        const ligatures = [document.querySelector("pre > code"), window.__runner.block(1).querySelector("textarea.plantoir-runner-editor"), window.__runner.block(1).querySelector("pre.plantoir-runner-colour > code"), window.__runner.block(1).querySelector("pre.plantoir-runner-output")].map((element) => getComputedStyle(element).fontVariantLigatures)
+        const ligatures = [document.querySelector("pre > code"), document.querySelector("article p > code"), window.__runner.block(1).querySelector("textarea.plantoir-runner-editor"), window.__runner.block(1).querySelector("pre.plantoir-runner-colour > code"), window.__runner.block(1).querySelector("pre.plantoir-runner-output")].map((element) => getComputedStyle(element).fontVariantLigatures)
         return { staticLine: statics.length > 0 ? pick(getComputedStyle(statics[0], "::before")) : null, gutter: pick(getComputedStyle(gutter)), ligatures }
       })()`)
       expect("a static block's numbers and the editor's gutter wear one style: colour, font, alignment and a 1 px hairline",
         styles.staticLine !== null && JSON.stringify(styles.staticLine) === JSON.stringify(styles.gutter) && /^1px solid/.test(styles.gutter.line), styles)
-      expect("no ligatures in a static block, the editor, its copy or the output", styles.ligatures.every((value) => value === "none"), styles.ligatures)
+      expect("no ligatures in a static block, inline code in prose, the editor, its copy or the output", styles.ligatures.every((value) => value === "none"), styles.ligatures)
       // An edited block prints coloured and numbered, as a static block does.
-      await evaluate(`window.__runner.setCode(0, ${JSON.stringify('print("edited-585-a")\nprint("edited-585-b")')})`)
+      const WRAPPED = 'print("edited-585-b: a line a student made much longer than the printed page is wide, so that on paper it has to wrap WRAPTAIL-585")'
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify('print("edited-585-a")\n')} + ${JSON.stringify(WRAPPED)})`)
       await evaluate(`(() => { window.dispatchEvent(new Event("beforeprint")); return 1 })()`)
       state = await evaluate("window.__runner.state(0)")
       const printedSpans = await evaluate(`window.__runner.block(0).querySelectorAll(".plantoir-runner-print > code > [data-line] [style*='--shiki-light'], .plantoir-runner-print > code > [data-line] [class^='plantoir-tok-']").length`)
@@ -565,9 +566,9 @@ async function connect(chunk) {
       const pdfFile = join(work, "edited.pdf")
       writeFileSync(pdfFile, Buffer.from(pdf.data, "base64"))
       const printedText = execFileSync("pdftotext", ["-layout", pdfFile, "-"], { encoding: "utf-8" })
-      expect("an edited block prints its lines coloured and numbered as a static block's (⌘P)",
-        JSON.stringify(state.printLines) === JSON.stringify(['print("edited-585-a")', 'print("edited-585-b")']) && printedSpans > 0
-        && /\b1\s+print\("edited-585-a"\)/.test(printedText) && /\b2\s+print\("edited-585-b"\)/.test(printedText), { lines: state.printLines, printedSpans, printed: printedText.slice(0, 600) })
+      expect("an edited block prints its lines coloured and numbered as a static block's, a long one wrapped whole (⌘P)",
+        JSON.stringify(state.printLines) === JSON.stringify(['print("edited-585-a")', WRAPPED]) && printedSpans > 0
+        && /\b1\s+print\("edited-585-a"\)/.test(printedText) && /\b2\s+print\("edited-585-b:/.test(printedText) && printedText.includes("WRAPTAIL-585"), { lines: state.printLines, printedSpans, printed: printedText.slice(0, 600) })
       await evaluate(`window.__runner.press(0, "reset")`)
 
       // 4. Page changes leave at most one thread.

@@ -95,10 +95,19 @@ class GutterStyleTests(unittest.TestCase):
         self.assertIn(":root pre > code:has(> [data-line]:nth-child(1000)) {\n  --plantoir-digits: 4;", self.lines)
 
     def test_no_ligatures_in_any_code_the_editor_or_its_copy(self):
-        ligatures = block_after(self.lines, ":root pre,\n:root pre code,\n:root .plantoir-runner .plantoir-runner-editor")
+        # Every code element, inline code in prose included (Russell, #585 review F5).
+        ligatures = block_after(self.lines, ":root pre,\n:root code,\n:root .plantoir-runner .plantoir-runner-editor")
         self.assertIn("font-variant-ligatures: none;", ligatures)
         shared = block_after(self.runner, "  & .plantoir-runner-cell > .plantoir-runner-editor,\n  & .plantoir-runner-cell > pre.plantoir-runner-colour")
         self.assertIn("font-variant-ligatures: none;", shared)
+
+    def test_the_paper_hairline_prints_with_a_browsers_default_settings(self):
+        # Chrome and Safari print no backgrounds by default: the hairline is
+        # one, so it asks to be printed exactly (#585 review F2).
+        printing = self.lines[self.lines.index("@media print"):]
+        self.assertIn("print-color-adjust: exact;", block_after(printing, "  :root pre > code:not(.mermaid) > [data-line]"))
+        paper = read_text(PRINT_STYLES)
+        self.assertIn("print-color-adjust: exact;", block_after(paper, "      & > [data-line]"))
 
     def test_the_stylesheet_reaches_the_site(self):
         carrier = read_text(CARRIER)

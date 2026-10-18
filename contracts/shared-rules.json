@@ -25448,7 +25448,7 @@
           ]
         },
         "categoriesRule": "Each category's light and dark colour as the image's own Shiki gives them for the site's two themes (quartz.config.ts: github-light and github-dark; a teacher cannot change them). k: keywords and operators; s: strings and their prefixes' text; c: numbers, builtins, constants, self, ALL_CAPS names, escapes and placeholders; f: the names a def, class, func, struct or enum defines, base classes and decorators; m: comments; p: a call's keyword-argument names, and Python 2's names; g: a regular expression's escapes; r: a regular expression's own text (a string's colour in light, a paler blue in dark - found by the check, which compares both themes); plain: everything else (the copy's default). codeRunner.scss's .plantoir-tok-<category> sets exactly these as --shiki-light and --shiki-dark, and scripts/check_runner_rules_against_the_site.py pins all three copies - this table, the stylesheet and the image's Shiki - to each other: a case whose Shiki colour is not in the table, or a stylesheet value that is not the table's, fails.",
-        "reuse": "Which original line a current line may show Shiki's spans for (codeRunnerColour.reusePlan): by POSITION first - the lines the original and the current code share at the top, then at the bottom - where the line's text AND the state the tokenizer starts it in (inside which kind of string, with which prefix, inside which brackets) are both the original's; only the edited middle falls back to a lookup by text and state, and only for a key every original line that has it colours alike. A blank line is drawn empty. The plan's key - the text and one inside-a-triple-quote flag - coloured the same line inside f\"\"\", \"\"\" and r\"\"\" alike, and a call's keyword argument like a def's default (#585 plan review F1): `reuseCases` pins the plan for both, and the check also confirms against the image's Shiki that every line reused is coloured as Shiki colours the current code.",
+        "reuse": "Which original line a current line may show Shiki's spans for (codeRunnerColour.reusePlan): by POSITION first - the lines the original and the current code share at the top, then at the bottom - where the line's text AND the state the tokenizer starts it in (inside which kind of string, with which prefix, inside which brackets) are both the original's; only the edited middle falls back to a lookup by text and state, and only for a key every original line that has it colours alike. A blank line is drawn empty. The plan's key - the text and one inside-a-triple-quote flag - coloured the same line inside f\"\"\", \"\"\" and r\"\"\" alike, and a call's keyword argument like a def's default (#585 plan review F1): `reuseCases` pins the plan for both - by position, and in the edited middle a keyword argument typed below a def whose default has the same text, and two original lines with one text and state that Shiki colours differently (a line inside an f-string's field and the same line in its text), which are never looked up - and the check also confirms against the image's Shiki that every line reused is coloured as Shiki colours the current code.",
         "reuseCases": [
           {
             "name": "the same line inside f\"\"\", \"\"\", r\"\"\" and a continued string, after a line added above",
@@ -25521,6 +25521,36 @@
             "plan": [
               0,
               1
+            ]
+          },
+          {
+            "name": "a keyword argument typed into a new call below a def whose default is the same text",
+            "language": "python",
+            "original": "def h(\n    sep=\"\",\n):\n    pass",
+            "current": "def h(\n    sep=\"\",\n):\n    pass\nprint(\n    sep=\"\",\n)",
+            "plan": [
+              0,
+              1,
+              2,
+              3,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "name": "two original lines with one text and state that Shiki colours differently are never looked up",
+            "language": "python",
+            "original": "b = f\"\"\"{\nx\n}\"\"\"\na = f\"\"\"\nx\n\"\"\"",
+            "current": "b = f\"\"\"{\nx\n}\"\"\"\na = f\"\"\"\nx\nx\n\"\"\"",
+            "plan": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              null,
+              5
             ]
           }
         ],
@@ -26041,7 +26071,7 @@
         "knownDifferencesRule": "Measured differences from Shiki, each confirmed by the check to still differ (one that no longer does is taken out of this list)."
       },
       "lineNumbers": {
-        "rule": "Every runnable block shows its line numbers, always - editable and read-only, every language, no fence flag (ruling R1): an editable block in a gutter beside the editor (pre.plantoir-runner-gutter, aria-hidden, rewritten only when the line count changes, moved with the editor's vertical scroll, and never setting the frame's height - a gutter that did grew the frame to 12,020 px for 500 lines); a read-only block, and every Swift block, keeps its highlighted copy, whose lines Quartz already numbers. Line 1 is the code's first line, so a traceback's `line N` is the number the student sees. ONE style for the gutter and for every static code block on every site (support/quartz/components/styles/codeLines.scss, ruling R3): Quartz's own dimmed colour rgba(115, 138, 148, 0.6), the code font at the block's own size, right-aligned in a box --plantoir-digits characters wide (2; 3 from line 100 and 4 from line 1000, said in CSS so a page with no script has it - Quartz's 1rem box was too narrow from line 10), 0.75ch of padding, then a 1 px hairline in var(--lightgray), no fill. On paper the hairline is drawn down each line itself, past its wrapped rows, and the handout hangs a wrapped row under the first row's code, not under its number (print.scss, #585 plan review F4). No programming ligatures in any code block, the editor or its copy (ruling Q5)."
+        "rule": "Every runnable block shows its line numbers, always - editable and read-only, every language, no fence flag (ruling R1): an editable block in a gutter beside the editor (pre.plantoir-runner-gutter, aria-hidden, rewritten only when the line count changes, moved with the editor's vertical scroll, and never setting the frame's height - a gutter that did grew the frame to 12,020 px for 500 lines); a read-only block, and every Swift block, keeps its highlighted copy, whose lines Quartz already numbers. Line 1 is the code's first line, so a traceback's `line N` is the number the student sees. ONE style for the gutter and for every static code block on every site (support/quartz/components/styles/codeLines.scss, ruling R3): Quartz's own dimmed colour rgba(115, 138, 148, 0.6), the code font at the block's own size, right-aligned in a box --plantoir-digits characters wide (2; 3 from line 100 and 4 from line 1000, said in CSS so a page with no script has it - Quartz's 1rem box was too narrow from line 10), 0.75ch of padding, then a 1 px hairline in var(--lightgray), no fill. On paper the hairline is drawn down each line itself, past its wrapped rows, with print-color-adjust: exact so a browser printing without background graphics keeps it, and the handout hangs a wrapped row under the first row's code, not under its number (print.scss, #585 plan review F4). No programming ligatures in any code element - every block, inline code in prose, the editor and its copy (ruling Q5; Russell, 2026-10-17: \"No ligatures anywhere. Let's be consistent.\")."
       }
     },
     "print": {

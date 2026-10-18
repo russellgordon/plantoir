@@ -367,6 +367,8 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
       // ...but each line keeps the gutter's hairline (#585), drawn down the
       // line so it runs past a wrapped row; no fill.
       & > [data-line] {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
         background: linear-gradient(#bbb, #bbb) no-repeat !important;
         background-size: 1px 100% !important;
         background-position: var(--plantoir-hairline-x, calc(0.25rem + var(--plantoir-digits, 2) * 1ch + 0.75ch)) 0 !important;
