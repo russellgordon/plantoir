@@ -518,11 +518,17 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     nothing else. The value here is the one taken after #443's wording was
     merged in (2026-10-07): the two changes touch the same line, so the
     hash carries both.
+
+    Moved ON PURPOSE again: #519 (2026-10-18) made the task boxes on a
+    class site tickable, so `Style/What This Site Can Do.md` no longer says
+    they are read-only and clicking one does nothing. Checked by installing
+    against origin/dev 0fe0d1cba and diffing: that one file, that one
+    paragraph (three lines become four), nothing else.
     """
 
     PAYLOAD_FILE_COUNT = 295
     PAYLOAD_NAMES_HASH = "6de9b151539aeb40eae91152641a3c2870d36b9618af02a49aff30e7b516e612"
-    PAYLOAD_CONTENT_HASH = "6c9018927bc1277e83f1fdd87d181bfc6d736f70d1892b85171d652a73466247"
+    PAYLOAD_CONTENT_HASH = "f12fe56815b95bb764fde1707864f10cbbe0430b04afeea8b9966bc69c419c9c"
 
     def test_a_payload_course_is_installed_byte_for_byte_as_it_always_was(self):
         payload = find_example_content_dir("ADA1O")

@@ -55,10 +55,11 @@ graph LR
 - [ ] Figure carries its table number
 - [ ] Figure carries its release date
 
-> [!warning] These boxes save nothing
-> A checkbox here is printed, not interactive. Clicking does nothing, no
-> state is recorded, and the site does not know who you are. Copy the list
-> into your notebook if you want to work through it.
+> [!note] Ticks stay in this browser
+> Tick a box here and your browser keeps it for you. Nothing is sent
+> anywhere, the site does not know who you are, and on another computer
+> the boxes start again. Copy the list into your notebook if you want it
+> everywhere.
 
 ## Footnotes
 

@@ -229,9 +229,10 @@ for one already done.
 - [ ] Consent noted for every recognisable face
 - [ ] Caption, credit, and byline in place
 
-On the site they are read-only — the boxes show what the page says, and
-clicking one does nothing. Copied into a notebook, they are useful for
-keeping your place while setting up a shoot.
+On the site each student can tick them; the ticks stay in their own
+browser, nobody else sees them, and changing a line's words clears its
+tick. Ticked as you go, they are useful for keeping your place while
+setting up a shoot.
 
 ---
 

@@ -35,9 +35,10 @@ inside pages, not just titles.
 **A folded block hides something.** A line with a small arrow opens when
 clicked, usually a check-yourself question.
 
-> [!warning] Checkboxes here do not save
-> The `- [ ]` lists are for reading down or copying into your own record.
-> Clicking does nothing and the site does not know who you are.
+> [!note] Checkboxes here are yours
+> The `- [ ]` lists can be ticked as you go; your browser keeps the ticks
+> on this computer, and the site does not know who you are. Your own
+> record is still the place for anything you need later.
 
 ## Before a practical day
 

@@ -93,6 +93,11 @@ Rules that matter:
   the `]` so the teacher's own view in Obsidian keeps the answer tucked away.
 - A short answer has ONE answer line; put every accepted answer on it,
   separated by ` | `.
+- Outside a `[!quiz]`, `- [ ]` is an ordinary checklist: on the website
+  each student can tick its boxes for themselves, and the ticks stay in
+  that student's own browser. Inside a quiz the same boxes are choices. So
+  a checklist for students to work through needs no quiz around it - and
+  changing an item's words later clears every student's tick on it.
 
 ## 2. How a typed answer is checked
 
