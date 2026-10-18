@@ -5,7 +5,8 @@ created: __CREATED__
 tags:
   - portfolios
 ---
-Copy this into your notebook — the boxes here are printed, not clickable.
+Tick the boxes as you go (your browser keeps the ticks on this computer),
+or copy this into your notebook.
 
 > [!note] What is checked, and what was marked
 > The portfolio itself carries no mark. I check that it is there and that

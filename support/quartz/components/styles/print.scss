@@ -363,6 +363,16 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
         color: #000 !important;
         background: none !important;
       }
+
+      // ...but each line keeps the gutter's hairline (#585), drawn down the
+      // line so it runs past a wrapped row; no fill.
+      & > [data-line] {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        background: linear-gradient(#bbb, #bbb) no-repeat !important;
+        background-size: 1px 100% !important;
+        background-position: var(--plantoir-hairline-x, calc(0.25rem + var(--plantoir-digits, 2) * 1ch + 0.75ch)) 0 !important;
+      }
     }
   }
 
@@ -694,11 +704,18 @@ html.plantoir-print-frame {
   // Line numbers as the handout writes them (Quartz's counter does not cross
   // pages), in a box as wide as the block's longest number, never wrapped:
   // "100" in Quartz's 1rem box printed as 1 / 0 / 0 (#499 fault 2).
-  // A long line wraps under the code, not under its number.
+  // A long line wraps under the code, not under its number: the hang is the
+  // number's whole box - its digits, the gutter's padding and hairline
+  // (codeLines.scss, #585) and the gap before the code - so a wrapped row
+  // starts exactly under the first row's code (#585 plan review F4), and
+  // the hairline is drawn down the line itself, past every wrapped row.
   pre > code > [data-plantoir-line] {
     display: block;
-    padding-left: calc((var(--plantoir-digits, 2) + 1.2) * 1ch);
-    text-indent: calc((var(--plantoir-digits, 2) + 1.2) * -1ch);
+    padding-left: calc((var(--plantoir-digits, 2) + 1.75) * 1ch + 1px);
+    text-indent: calc((var(--plantoir-digits, 2) + 1.75) * -1ch - 1px);
+    // The hairline (plantoir-paper) sits at the number box's edge, which
+    // here starts at the line's own left edge.
+    --plantoir-hairline-x: calc(var(--plantoir-digits, 2) * 1ch + 0.75ch);
   }
 
   pre > code > [data-plantoir-line]::before {
@@ -708,7 +725,8 @@ html.plantoir-print-frame {
     overflow-wrap: normal !important;
     width: calc(var(--plantoir-digits, 2) * 1ch) !important;
     text-align: right !important;
-    margin-right: 1.2ch !important;
+    margin-right: 1ch !important;
+    border-right-color: transparent !important;
     color: #777 !important;
   }
 

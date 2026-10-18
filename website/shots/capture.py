@@ -2077,6 +2077,17 @@ def capture_code_set(folder: Path, only: list[str] | None = None) -> list[str]:
     recipe = committed_recipe()
     ensure_launchers(folder, resources=recipe)
     mirror_toolchain(folder, resources=recipe)
+    return photograph_preview_shots(folder, shots)
+
+
+def photograph_preview_shots(folder: Path, shots: list[dict]) -> list[str]:
+    """Each `preview-page` shot of `shots`, from a preview of its course in
+    `folder` (one preview per course, stopped after its shots): the prepare
+    script presses Run or Check and sees the result, webwindow.swift
+    photographs the page in light then dark, and Vision must read
+    `expectText` on each picture. Returns the pictures taken, as
+    `<id>-light` / `<id>-dark`. Shared by the Code page's figures and the
+    Quizzes page's (#587)."""
     helper = Path(__file__).resolve().parent / "webwindow.swift"
     taken: list[str] = []
     courses: list[str] = []
@@ -2113,6 +2124,82 @@ def capture_code_set(folder: Path, only: list[str] | None = None) -> list[str]:
         finally:
             subprocess.run(["./preview.sh", code, "1", "--stop"], cwd=folder, capture_output=True)
             server.terminate()
+    return taken
+
+
+# ---------- The Quizzes page (#587) ----------
+
+def capture_quiz_set(marketing: Path, demo: Path, only: list[str] | None = None) -> list[str]:
+    """The Quizzes page's figures: one self-check question from each
+    subject, just checked — mathematics (MCV4U), chemistry (SCH3U) and
+    English (ENG2D) from the demo folder, computer science (ICS3U, a program
+    run inside the question, and the page's score) from the marketing folder.
+
+    Each folder is first given its planted pages — the demo folder's three
+    quiz pages (folders.json → demo.plantedPages) and the marketing folder's
+    Check Your Loops, brought up to date if it is still an earlier version —
+    then this tree's committed recipe, and is previewed course by course
+    (`photograph_preview_shots`). The demo folder is refused unless it HOLDS
+    the demo courses (`demo_folders.identify`): while the v1.4.0 scenes run,
+    the marketing folder sits at ~/Desktop/Teaching. Neither folder is
+    moved: no path shows in these pictures.
+
+    Returns the pictures taken, as `<id>-light` / `<id>-dark`.
+    """
+    import marketing_folder
+    shots: list[dict] = []
+    for shot in shots_of_kind("preview-page", scene="quizzes"):
+        if only is None or shot["id"] in only:
+            shots.append(shot)
+    if only is not None and len(shots) != len(only):
+        raise SystemExit(f"Not every one of {only} is a Quizzes page figure in shots.json.")
+    folders: dict[str, Path] = {"demo": demo, "marketing": marketing}
+    wanted: list[str] = []
+    for shot in shots:
+        if shot["capture"]["workspace"] not in wanted:
+            wanted.append(shot["capture"]["workspace"])
+    if "demo" in wanted and demo_folders.identify(demo) != "demo":
+        raise SystemExit(f"{demo} does not hold the demo courses (ENG2D, MCV4U, SCH3U) and nothing else. "
+                         "If the v1.4.0 scenes stopped part-way, the marketing folder may still be there: "
+                         "put the folders back first.")
+    if "marketing" in wanted:
+        marketing_folder.refuse_foreign_courses(marketing)
+    recipe = committed_recipe()
+    taken: list[str] = []
+    for workspace in wanted:
+        folder = folders[workspace]
+        announce(f"Photographing the Quizzes page's figures in {folder}")
+        report = marketing_folder.Report()
+        if workspace == "demo":
+            demo_folders.apply_planted_pages(folder, report)
+            if demo_folders.planted_page_problems(folder):
+                raise SystemExit("The demo folder is missing a quiz page: "
+                                 + "; ".join(demo_folders.planted_page_problems(folder)))
+        else:
+            marketing_folder.add_code_pages(folder, report)
+            if report.named_and_skipped:
+                raise SystemExit("The marketing folder is missing what the quiz figure needs. "
+                                 "Make it first: capture.py --provision.")
+        print(f"   {marketing_folder.summary(report)}")
+        # Only the pages these figures show matter here: another planted
+        # page (the Code page's Swift program) may be mid-revision for its
+        # own figure, and is that figure's business.
+        for shot in shots:
+            capture = shot["capture"]
+            if capture["workspace"] != workspace:
+                continue
+            page = capture["path"].strip("/").replace("-", " ")
+            changed = f"left as you changed it: {capture['course']}/{page}.md"
+            if changed in report.lines:
+                raise SystemExit(f"{capture['course']}/{page}.md was changed by hand, so {shot['id']} would not be "
+                                 "of the committed page. Put it back, or delete it to have it planted again.")
+        ensure_launchers(folder, resources=recipe)
+        mirror_toolchain(folder, resources=recipe)
+        mine: list[dict] = []
+        for shot in shots:
+            if shot["capture"]["workspace"] == workspace:
+                mine.append(shot)
+        taken.extend(photograph_preview_shots(folder, mine))
     return taken
 
 
@@ -2158,6 +2245,11 @@ def main() -> int:
                              "after Run, and a quiz just checked, from previews of the marketing folder (#562)")
     parser.add_argument("--code-shots", default=None,
                         help="with --code, only these figures, comma-separated ids (code-python,…)")
+    parser.add_argument("--quizzes", action="store_true",
+                        help="only photograph the Quizzes page's figures: a self-check question from each "
+                             "subject, just checked, from previews of the demo and marketing folders (#587)")
+    parser.add_argument("--quiz-shots", default=None,
+                        help="with --quizzes, only these figures, comma-separated ids (quiz-math,…)")
     parser.add_argument("--hero", action="store_true",
                         help="only reassemble the hero composite from parts already captured")
     arguments = parser.parse_args()
@@ -2230,6 +2322,20 @@ def main() -> int:
         try:
             only_code = arguments.code_shots.split(",") if arguments.code_shots else None
             taken = capture_code_set(marketing, only_code)
+        finally:
+            keeping_awake.terminate()
+        announce("Checking every picture's corners")
+        result = refuse_drawn_corners()
+        promote_captured_shots(taken)
+        rebuild_site()
+        return result
+
+    if arguments.quizzes:
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        keeping_awake = stay_awake()
+        try:
+            only_quizzes = arguments.quiz_shots.split(",") if arguments.quiz_shots else None
+            taken = capture_quiz_set(marketing, workspace, only_quizzes)
         finally:
             keeping_awake.terminate()
         announce("Checking every picture's corners")

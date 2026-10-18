@@ -125,7 +125,14 @@ does not exist, is reported. `--check` turns that into a non-zero exit, which
 is what the release checklist runs.
 
 **Add a page to `site.json`'s `nav` list** or it will be built but never
-linked.
+linked. Measure the header before you do: nine links (since #587) fit one
+row from 820 px up, and two rows on a phone only just. At the phone sizes in
+`assets/style.css` (14 px, 12 px gap; 13.5 px, 10 px gap at 370 px and
+below), 373 px gives two rows and 371 px gives three, and 360 px gives two
+and 355 px three. That leaves about 2–5 px to spare at 360–390 px (measured
+2026-10-17, Chrome for Testing). Android's Roboto or a larger text setting
+can tip 360 or 375 back to three rows, which is harmless, since the page
+never scrolls sideways. A tenth link needs a new layout, not a smaller font.
 
 ## Screenshots
 
@@ -387,6 +394,7 @@ python3 website/shots/capture.py --colour-figures   # only the two colour figure
 python3 website/shots/capture.py --browser-shots <id,id>   # only these class-site shots
 python3 website/shots/capture.py --print-set   # what printing does (v1.7.0): see below
 python3 website/shots/capture.py --code        # the Code page (v1.8.0, #562): see below
+python3 website/shots/capture.py --quizzes     # the Quizzes page (v1.8.1, #587): see below
 python3 website/build.py && python3 website/build.py --check
 ```
 
@@ -440,6 +448,46 @@ traceback names `main.py` while the page's prose says `hours.py` (#561's
 known mismatch: that prose is about a program on the student's computer),
 and `code-python` keeps the paragraph under Spot the Bug's block, which
 describes the bug, out of frame, because the picture shows it fixed.
+
+**The Quizzes page (v1.8.1, #587, `--quizzes`).** One self-check question per
+subject, just checked, light and dark, Mac only (`windows: false`, owed by
+name in `WINDOWS_PICTURE_OWED`): `quiz-math` (MCV4U, *Check Your Curve
+Sketching*: a root estimated from a graph inside the question, answered 0.35
+against `0.35 ± 0.06`), `quiz-chemistry` (SCH3U, *Check Your Stoichiometry*:
+a `\ce{}` equation and two blanks, the moles right and the mass wrong — 4.39 g,
+the answer that skips the mole ratio — so one blank shows ✓ and one ✗ with the
+explanation open), `quiz-english` (ENG2D, *Check Your Reading*: the sight
+passage above a select-all question) — all three previews of the DEMO folder,
+`~/Desktop/Teaching` (`--workspace`) — and `quiz-code-run` (ICS3U in the
+marketing folder: *Check Your Loops*' fifth question, whose stem holds a
+` ```python run ` block, run, answered, and the page's score under it). The
+page also shows `code-quiz` again, for code highlighted in a stem. The three
+demo pages live in `shots/demo/` and are named in `folders.json →
+demo.plantedPages`, so `demo_folders.apply_demo_state` plants them on both
+platforms (Windows' `capture_windows.py` included) and a clone makes them
+from the repository; Check Your Loops is `CODE_PAGES`' own. Both kinds are
+planted by `demo_folders.plant_page`: written when absent, brought up to
+date when the kept page is still an earlier committed version of its source
+(how the kept four-question Check Your Loops gets its fifth question), and
+otherwise left as somebody changed it and named — and `--quizzes` then
+stops, because the picture would not be of the committed page. The run
+REFUSES a demo folder that does not hold exactly ENG2D, MCV4U and SCH3U
+(`demo_folders.identify`): while the v1.4.0 scenes run, the marketing folder
+sits at `~/Desktop/Teaching`. Then, as `--code` does, it mirrors the
+committed recipe into each folder and photographs each page in
+`webwindow.swift` with `--prepare shots/prepare/<id>.js`: the script waits for
+the quiz to be built (and, for `quiz-math`, its graph drawn and its
+mathematics set; for `quiz-chemistry`, typeset with no `.katex-error`),
+answers, presses Check, waits for the contract's words (`right`,
+`notRight`, `oneBlankRight`, `score`, `finished`), then scrolls only as far as it takes
+to bring the quiz's bottom (the score, for `quiz-code-run`) 56 points inside
+the window — and FAILS, naming the height, when that pushes the question's
+top (the passage's, for `quiz-english`) under the title bar, so a cut-off
+quiz is never photographed. Planting puts the three pages into
+`~/Desktop/Teaching` for good: later hero and app-window retakes show them
+in the sidebar, and the live demo sites carry them from their next deploy.
+`--quiz-shots quiz-math` retakes some; `--code --code-shots code-quiz`
+retakes the Code page's quiz, whose frame shows the page's opening sentence.
 
 **Before starting:** the screen unlocked and left alone for about an hour,
 

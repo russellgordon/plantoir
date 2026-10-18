@@ -44,11 +44,11 @@ answer feels like learning and is not.
 "before" reading is not optional — [[Fieldwork Safety]] exists because
 things on it have gone wrong to real people.
 
-> [!warning] Checkboxes here do not save
-> The `- [ ]` lists on these pages are printed, not interactive.
-> Clicking does nothing, nothing is recorded, and the site does not know
-> who you are. Copy the list into your notebook, which is where it does
-> the job.
+> [!note] Checkboxes here are yours
+> The `- [ ]` lists on these pages can be ticked. Your browser keeps the
+> ticks on this computer; nothing is sent anywhere, and the site does not
+> know who you are. Copy a list into your notebook when it has to come
+> into the field.
 
 ## If a link does not work yet
 

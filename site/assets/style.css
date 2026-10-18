@@ -97,11 +97,13 @@ summary:focus-visible {
   flex-wrap: wrap;
 }
 
-/* Seven nouns and the brand need about 700px, more than the 620px text
-   column (measured 2026-10-09 in headless Chromium: nav 591px, brand 97px,
-   gap 20px). On a window wide enough, the bar alone reaches 60px past the
-   column on each side so it stays one row; below that it wraps, brand above
-   the links (DECISIONS 41a). */
+/* The nouns and the brand need more than the 620px text column: seven
+   needed about 700px (measured 2026-10-09 in headless Chromium: nav 591px,
+   brand 97px, gap 20px), and nine (Quizzes and Code since v1.8) set the nav
+   at 725px. On a window wide enough, the bar alone reaches 60px past the
+   column on each side, 740px, so the nine links stay one row from 820px up
+   (measured 2026-10-17, Chrome for Testing); below that the brand goes
+   above the links (DECISIONS 41a). */
 @media (min-width: 820px) {
   .topbar { margin: 0 -60px; }
 }
@@ -609,8 +611,11 @@ footer .footer-nav a { margin-right: 18px; }
   .rule { margin: 44px 0; }
   .note { padding: 20px; }
   .topbar { gap: 12px; padding-top: 18px; }
-  /* Seven links wrap to two rows on a phone; keep the rows close together. */
-  .nav { gap: 6px 16px; font-size: 15px; }
+  /* The nine links wrap to two rows on a phone; keep the rows close
+     together. At 15px with a 16px gap they took three rows at 390px and
+     375px (measured 2026-10-17, Chrome for Testing, #587); at 14px with a
+     12px gap they take two from 375px up. */
+  .nav { gap: 6px 12px; font-size: 14px; }
 
   /* Stack the label above its link instead of squeezing it into a column */
   ul.links .label { display: block; min-width: 0; margin-bottom: 1px; }
@@ -620,4 +625,11 @@ footer .footer-nav a { margin-right: 18px; }
   kbd { white-space: normal; }
 
   ol.steps li { padding-left: 38px; }
+}
+
+/* A narrower phone (360px) keeps two rows a little smaller. At 320px no
+   size that stays readable fits two rows; it takes three, as the eight
+   links did before Quizzes (measured 2026-10-17, #587). */
+@media (max-width: 370px) {
+  .nav { gap: 6px 10px; font-size: 13.5px; }
 }

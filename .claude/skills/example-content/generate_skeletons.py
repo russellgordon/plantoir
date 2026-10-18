@@ -1035,9 +1035,9 @@ a dead end.
 - [ ] A line that starts with `- [ ]`
 - [x] One already done, written `- [x]`
 
-On the site they are read-only — the boxes show what the page says, and
-clicking one does nothing. Copied into a notebook, they are useful for
-keeping your place.
+On the site each student can tick them; the ticks stay in their own
+browser, nobody else sees them, and changing a line's words clears its
+tick. Ticked as you go, they are useful for keeping your place.
 
 ---
 

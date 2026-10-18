@@ -49,8 +49,8 @@ that has no way to require it of you. Those are covered further in
       family in this class answer differently?
 
 Copy those three questions into [[Your Civic Notebook]] and answer them
-there; the boxes above are printed, not clickable, and nothing you do to
-them is recorded.
+there; tick the boxes above as you do, and your browser keeps the ticks
+for you.
 
 ## Responsibilities that do not stop at the border
 

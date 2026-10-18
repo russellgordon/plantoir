@@ -225,6 +225,7 @@ python3 website/shots/capture.py --app      # app windows only
 python3 website/shots/capture.py --sites    # class websites only
 python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir Marketing
 python3 website/shots/capture.py --code     # the Code page's figures (v1.8.0, #562)
+python3 website/shots/capture.py --quizzes  # the Quizzes page's figures (v1.8.1, #587)
 ```
 
 - **App Windows**: Driven by `MarketingScreenshotTests.swift` in
@@ -259,7 +260,10 @@ python3 website/shots/capture.py --code     # the Code page's figures (v1.8.0, #
   window with no browser round it (`webwindow.swift`), because their subject
   is the sites, and three toolbars read as three browsers.
 - **The Code page's figures** (#562: `code-python`, `code-python-error`,
-  `code-swift`, `code-quiz`) are pages of a local PREVIEW of the marketing
+  `code-swift`, `code-quiz`; #583 added `code-python-live` and
+  `code-swift-live`, a program waiting at a prompt with its answer being
+  typed - the preview isolates runner pages since #583, so every Run there
+  asks live, and the prepare scripts answer in the field) are pages of a local PREVIEW of the marketing
   folder in a `webwindow.swift` window, put into the state each promises by a
   prepare script (`website/shots/prepare/`, `--prepare`): it presses Run or
   Check, waits for the contract's words ("Finished.", "Finished with an
@@ -273,6 +277,18 @@ python3 website/shots/capture.py --code     # the Code page's figures (v1.8.0, #
   site in v1.8, and `capture_windows.py` makes no marketing preview, so the
   four are `windows: false` and owed by name; its print set takes only scene
   `print-set`. `website/README.md` → "The Code page" has the run.
+- **The Quizzes page's figures** (#587: `quiz-math`, `quiz-chemistry`,
+  `quiz-english`, `quiz-code-run`) are taken the same way, by `capture.py
+  --quizzes`: previews of the DEMO folder (`~/Desktop/Teaching`: MCV4U,
+  SCH3U, ENG2D) and of the marketing folder (ICS3U), each of a quiz page
+  planted there from the repository (`shots/demo/`, named in `folders.json →
+  demo.plantedPages`; Check Your Loops in `shots/marketing/`). A prepare
+  script answers the first quiz (the fifth and the score, for
+  `quiz-code-run`), presses Check, waits for the contract's words, and fails
+  rather than photographs a quiz too tall for the 1280 × 860 window. The run
+  refuses a demo folder that does not hold the three demo courses. Mac only:
+  Windows has no quizzes until #571, so the four are `windows: false` and
+  owed by name. `website/README.md` → "The Quizzes page" has the run.
 - **Mobile View**: Photographed in the iOS Simulator using RocketSim to render
   the authentic device bezel.
 - **Appearance Switching**: Machine appearance is toggled between Light and
@@ -512,6 +528,18 @@ marketing folder, prepare scripts in `website/shots/prepare/`):
 | ID | Subject | Page |
 |---|---|---|
 | `code-python` | Spot the Bug's Python, fixed in the editor, run, its output and "Finished." | ICS3U `/Warm-Ups/Spot-the-Bug` |
-| `code-python-error` | Reading an Error Message's Python, `abc` in the input box, the traceback naming line 2 | ICS3U `/Tutorials/Reading-an-Error-Message` |
-| `code-swift` | A read-only Swift program with a name and an age in its input box, run | ICS4U `/Programs/Reading-Input-in-Swift` (planted) |
+| `code-python-live` | #583: Talking to the User's Python asking live: `Priya` answered, waiting at its second prompt with `185` typed in the field | ICS3U `/Programs/Talking-to-the-User` |
+| `code-python-error` | Reading an Error Message's Python, answered `abc` as it asked (#583; the input box before), the traceback naming line 2 | ICS3U `/Tutorials/Reading-an-Error-Message` |
+| `code-swift-live` | #583: a read-only Swift program asking live: `Priya` answered, waiting at "How old are you?" with `14` typed in the field | ICS4U `/Programs/Reading-Input-in-Swift` (planted) |
+| `code-swift` | A read-only Swift program answered a name and an age as it asked (#583; the input box before), finished | ICS4U `/Programs/Reading-Input-in-Swift` (planted) |
 | `code-quiz` | A multiple-choice quiz answered right and checked, its explanation open | ICS3U `/Exercises/Check-Your-Loops` (planted) |
+
+Added for v1.8.1 (#587, macOS only — `windows: false`, owed by name in
+`WINDOWS_PICTURE_OWED`; taken by `capture.py --quizzes`; every page planted):
+
+| ID | Subject | Page |
+|---|---|---|
+| `quiz-math` | A root estimated from the graph in the question, 0.35, right within the tolerance, explanation open | MCV4U `/Exercises/Check-Your-Curve-Sketching` (demo) |
+| `quiz-chemistry` | A `\ce{}` equation and two blanks: the moles right, the mass wrong (4.39 g), "1 of 2 blanks is right", explanation open | SCH3U `/Exercises/Check-Your-Stoichiometry` (demo) |
+| `quiz-english` | The sight passage and a select-all question under it, both right choices ticked, right | ENG2D `/Exercises/Check-Your-Reading` (demo) |
+| `quiz-code-run` | The fifth question's program run (2, 5, 8), answered 3, right, and the page's score: 4 of 5 right on the first try | ICS3U `/Exercises/Check-Your-Loops` (marketing) |

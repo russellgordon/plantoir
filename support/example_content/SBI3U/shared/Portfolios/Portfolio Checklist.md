@@ -21,6 +21,7 @@ That last line is the one worth keeping. A list of questions you could not
 answer at the start of the course and can at the end of the course IS the
 evidence that the course worked.
 
-> [!note] Read-only boxes
-> The boxes above do not tick on this site — nothing is saved when you
-> click. Copy the list into your notebook, where a pencil works.
+> [!note] Your ticks, in your browser
+> Tick the boxes above as you go: your browser keeps the ticks on this
+> computer, and nobody else sees them. The copy in your notebook is the
+> one that travels.

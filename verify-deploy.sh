@@ -277,6 +277,33 @@ check_engine() {  # check_engine <label> <site base url ending in />
       no "$1 answered HTTP $code for $program, or not a WebAssembly program"
     fi
   fi
+  # Live input (#583): the page of runnable code (it reads input, and shows
+  # nothing from another website) is sent the headers that isolate it -
+  # following the host's redirect, since Netlify answers the address with
+  # capitals with a 301 to its lower-case form - the engine folders carry
+  # COEP, and a page with no runnable code carries neither
+  # (contracts/shared-rules.json -> codeRunnerBlocks.isolation).
+  headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null | tr -d '\r' | awk 'BEGIN{RS=""} {last=$0} END{print last}')
+  if printf '%s\n' "$headers" | grep -qi '^cross-origin-opener-policy: same-origin' \
+     && printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
+    ok "$1 isolates the page of runnable code (COOP same-origin, COEP require-corp), so it asks for input as it runs"
+  else
+    no "$1 does not send COOP and COEP on the page of runnable code, so it keeps the input box"
+  fi
+  for name in pyodide/pyodide.mjs pyodide/plantoir-worker.js swift/plantoir-wasi.mjs swift/plantoir-swift-worker.js; do
+    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/$name" 2>/dev/null | tr -d '\r')
+    if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
+      ok "$1 sends COEP on static/$name"
+    else
+      no "$1 sends no COEP on static/$name, which an isolated page's worker needs"
+    fi
+  done
+  headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}" 2>/dev/null | tr -d '\r' | awk 'BEGIN{RS=""} {last=$0} END{print last}')
+  if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy:'; then
+    no "$1 sends COEP on the front page, which has no runnable code - its frames would break"
+  else
+    ok "$1 sends no COEP on the front page, which has no runnable code"
+  fi
   headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/katex/katex.min.css" 2>/dev/null | tr -d '\r')
   if printf '%s\n' "$headers" | head -1 | grep -q " 200" && printf '%s\n' "$headers" | grep -iq "^content-type: text/css"; then
     ok "$1 serves KaTeX's stylesheet itself (text/css)"

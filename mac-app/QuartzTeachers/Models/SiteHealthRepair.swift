@@ -533,9 +533,11 @@ enum SiteHealthRepair {
         if FileManager.default.fileExists(atPath: indexURL.path) {
             return false
         }
+        // Quoted when written plain it would not read back (#575): a course
+        // name holding ": " would put back a front page the build cannot read.
         let page: String = """
         ---
-        title: \(course.configuration.courseName)
+        title: \(FolderScaffold.frontmatterTitle(course.configuration.courseName))
         ---
 
         """

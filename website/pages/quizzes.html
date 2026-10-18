@@ -1,0 +1,114 @@
+---
+title: Quizzes — Plantoir
+description: Questions students answer and check for themselves on the class website, with your explanation, in any subject. Their answers never leave their browser.
+nav_label: Quizzes
+---
+
+<div class="page-head">
+  <h1>Quizzes</h1>
+  <p class="standfirst">Questions students check for themselves, in any subject. They answer on the class website, see at once whether they were right and why, and try again. Their answers are never recorded or sent anywhere.</p>
+</div>
+
+<hr class="rule">
+
+<section id="as-learning">
+  <h2>Assessment as learning</h2>
+  <p>Growing Success describes assessment <em>as</em> learning: students monitor their own learning, use feedback to decide their next step, and set their own goals. A quiz on a Plantoir page gives students that feedback, and only to them. A student answers, presses <strong>Check</strong>, reads your explanation — right or wrong — and tries again. Each page keeps a score in the student's own browser, with <strong>Start again</strong>.</p>
+  <p>Nothing a student answers leaves their browser. You don't see it, Plantoir doesn't keep it, and it is never a mark — your assessment for and of learning stays yours.</p>
+  <p>Each example below is a page from a sample course, shown as students see it after they press Check. For mathematics and chemistry, the text you type is shown above the picture.</p>
+  {{availability:quizzes}}
+</section>
+
+<hr class="rule">
+
+<section id="mathematics">
+  <h2>Mathematics: read the graph</h2>
+  <p>A graph, a picture or a formula works in a question, a choice or an explanation. This one asks students to read a root off the graph of a cubic.</p>
+  <h4 class="label">What you type</h4>
+  <pre class="fence"><code>&gt; [!quiz] The graph shows $f(x) = x^3 - 3x + 1$. Estimate the root between 0 and 1 from the graph: $x \approx$ `____`
+&gt; ```functionplot
+&gt; ---
+&gt; bounds: [-1.5, 1.5, -1.5, 3.5]
+&gt; alt: The cubic y = x^3 - 3x + 1, falling from a local maximum at (-1, 3) through a root between 0 and 1 to a local minimum at (1, -1)
+&gt; ---
+&gt; y = x^3 - 3x + 1
+&gt; ```
+&gt; &gt; [!answer]-
+&gt; &gt; 0.35 ± 0.06
+&gt;
+&gt; &gt; [!explain]- Why
+&gt; &gt; The curve crosses the axis between the grid lines at 0.2 and 0.4, a
+&gt; &gt; little past halfway, so any estimate from 0.3 to 0.4 is right. Checking
+&gt; &gt; signs pins it down: $f(0.34) \approx 0.019 &gt; 0$ and
+&gt; &gt; $f(0.35) \approx -0.007 &lt; 0$, so the root is $x \approx 0.347$.</code></pre>
+  <h4 class="label">What students get</h4>
+  <p>The graph in the question, which students can drag, and a blank to type into. <code>0.35 ± 0.06</code> accepts anything from 0.29 to 0.41, so a fair reading of the graph is right, and the explanation shows how to pin the root down:</p>
+  {{shot:quiz-math}}
+</section>
+
+<hr class="rule">
+
+<section id="chemistry">
+  <h2>Chemistry: work it through</h2>
+  <p>Reactions are written as you write them elsewhere on the site, <code>\ce{…}</code> and all. A question can have more than one blank, each with its own answer.</p>
+  <h4 class="label">What you type</h4>
+  <pre class="fence"><code>&gt; [!quiz] Propane burns in plenty of oxygen: $\ce{C3H8(g) + 5O2(g) -&gt; 3CO2(g) + 4H2O(g)}$. Burning 4.40 g of propane uses `____` mol of propane and makes `____` g of carbon dioxide.
+&gt; &gt; [!answer]-
+&gt; &gt; 0.0998 ± 0.0005
+&gt; &gt; 13.2 ± 0.1
+&gt;
+&gt; &gt; [!explain]- Why
+&gt; &gt; Mass to moles: $n = \frac{4.40\ \text{g}}{44.11\ \text{g/mol}} \approx 0.09975\ \text{mol}$ of propane.
+&gt; &gt; Moles to moles, from the balanced equation: three $\ce{CO2}$ for every
+&gt; &gt; one $\ce{C3H8}$, so $3 \times 0.09975 \approx 0.2993\ \text{mol}$.
+&gt; &gt; Moles to mass: $0.2993\ \text{mol} \times 44.01\ \text{g/mol} \approx 13.17\ \text{g}$,
+&gt; &gt; which rounds to 13.2 g of carbon dioxide. An answer of 4.39 g skipped
+&gt; &gt; the middle step.</code></pre>
+  <h4 class="label">What students get</h4>
+  <p>Each blank is marked on its own. A student who skips the mole ratio sees which number went wrong, and the explanation says why. Write the unit beside each blank, so students type only the number:</p>
+  {{shot:quiz-chemistry}}
+</section>
+
+<hr class="rule">
+
+<section id="english">
+  <h2>English: read the passage closely</h2>
+  <p>The passage sits on the page above the questions, as it would on a test. Tick two or more choices and the question becomes select all that apply: a student is right only with every right choice and no other.</p>
+  {{shot:quiz-english}}
+</section>
+
+<hr class="rule">
+
+<section id="computer-science">
+  <h2>Computer science: read it, run it, then answer</h2>
+  <p>Code in a question is highlighted as it is anywhere else on the site:</p>
+  {{shot:code-quiz}}
+  <p>A program in a question can run on the page, Python or Swift (the page needs <code>codeRunner: true</code>; see <a href="{{up}}code/#python">Code</a>). Students run it, read what it prints, and answer. After the last question comes the page's score, and <strong>Start again</strong>:</p>
+  {{shot:quiz-code-run}}
+</section>
+
+<hr class="rule">
+
+<section id="what-it-accepts">
+  <h2>What it accepts</h2>
+  <ul class="plain">
+    <li><strong>Multiple choice</strong>: tick the right choice with <code>[x]</code>. Tick two or more and it becomes <strong>select all that apply</strong>.</li>
+    <li><strong>Short answer</strong> and <strong>fill in the blank</strong>: an <code>[!answer]</code> callout inside the quiz, with each accepted answer separated by <code> | </code>. Write a blank as <code>`____`</code>.</li>
+    <li>Numbers are checked by value, so <code>0.5</code> also accepts <code>1/2</code>; <code>3.14 ± 0.01</code> accepts anything in between. Capitals and extra spaces don't count against a student.</li>
+    <li><code>[!explain]</code> inside the quiz is shown after the student checks or shows the answer. <code>[!quiz|shuffle]</code> mixes the choices each time the page loads.</li>
+    <li>Graphs, pictures and runnable code work inside a question, a choice and an explanation.</li>
+  </ul>
+  <p>Each page keeps a score in the student's browser — right on the first try — with <strong>Start again</strong>. On paper a quiz prints its questions only. In Obsidian you see it all, ticks and answers included: your answer key. A quiz that can't be checked shows its question with a line saying so, and Plantoir tells you the page and the line.</p>
+  {{availability:quizzes}}
+</section>
+
+<hr class="rule">
+
+<section id="ask">
+  <h2>Or ask Claude or Codex</h2>
+  <p>Plantoir writes its guidance for quizzes into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows every kind of question and how answers are checked. There is nothing to install or paste.</p>
+  <p>Asked, in a working folder holding an MCV4U course, something like:</p>
+  <pre class="fence ask"><code>Add a 5-question check to the page "courses/MCV4U/Concepts/Curve Sketching.md".</code></pre>
+  <p>Claude Code, asked exactly that in a copy of the demo folder, read its quiz guidance and wrote five <code>[!quiz]</code> callouts of different kinds — multiple choice, select all that apply, short answer, two blanks to fill, and a choice between three graphs, shuffled — each with its answer and an explanation. Plantoir found nothing to fix in any of them.</p>
+  <p>Open either from a course's menu with <a href="{{up}}features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
+</section>

@@ -53,9 +53,11 @@ graph LR
 - [ ] Sketchbook in the bag
 - [ ] Trial annotated
 
-> [!warning] These do not save
-> A checkbox here is printed, not interactive. Nothing is recorded and the
-> site does not know who you are. Copy the list into your sketchbook.
+> [!note] Ticks stay in this browser
+> Tick a box here and your browser keeps it for you. Nothing is sent
+> anywhere, the site does not know who you are, and on another computer
+> the boxes start again. Copy the list into your sketchbook if you want it
+> everywhere.
 
 ## Footnotes
 

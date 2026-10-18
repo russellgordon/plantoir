@@ -41,10 +41,10 @@ opens when you click. It usually holds a check-yourself question or a
 worked example, and it is folded deliberately. Try answering before you
 open it; reading an answer feels like learning and is not.
 
-> [!warning] Checkboxes here do not save
-> The `- [ ]` lists on these pages are for reading down or copying into
-> your notebook. Clicking one does nothing, nothing is recorded, and the
-> site does not know who you are.
+> [!note] Checkboxes here are yours
+> The `- [ ]` lists on these pages can be ticked as you go. Your browser
+> keeps the ticks on this computer; nothing is sent anywhere, and the site
+> does not know who you are.
 
 ## If a link does not work yet
 

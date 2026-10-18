@@ -1,5 +1,5 @@
 {
-  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. A published class site's paths are lowercase because Netlify serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect (measured again 2026-10-17: /Concepts/Derivative-Rules answers 301). A `preview-page` path is the page's own address on a local preview, capitals and all (`/Exercises/Similar-Triangles-Practice`): the preview serves each page by its file name and changes no capital (#562's review). Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `capture.prepare` names the script in website/shots/prepare/ that webwindow.swift runs before a `preview-page` picture, to press Run or Check and wait for what the figure promises (#562; scene `code`, taken by `capture.py --code`); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `waiting_on: \"#<issue>\"` beside it names the GitHub issue a capture waits on for a reason that is not the release — `--deploy` lets such a shot through, and the capture removes both flags; `windows: true` marks the ids capture_windows.py also takes; `windows: false` marks a scene Windows does not have yet, so its visitors are shown the Mac picture and any older `-windows` file is ignored (since 2026-10-04 none is false but the ones `WINDOWS_PICTURE_OWED` in website/test_build_data.py names, each owed by name: every other picture has its Windows twin, #380; `capture_windows.py --print-set` sets the print shots true when it has taken them). `windowsAlt` is the alt text for the Windows picture where the shared one names something only the Mac picture shows; base.html swaps it in as it swaps the image, and a Mac visitor's words never change. `static: true` marks a figure that is one image (`<id>.png`) rather than a light/dark pair; `dark: true` beside it says the figure ALSO has a Dark Mode version, `<id>-dark.png`/`.webp`, which a page in dark mode is given (`<id>.png` stays the light one, so its name never changes; build.py reports it missing as a problem).",
+  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. A published class site's paths are lowercase because Netlify serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect (measured again 2026-10-17: /Concepts/Derivative-Rules answers 301). A `preview-page` path is the page's own address on a local preview, capitals and all (`/Exercises/Similar-Triangles-Practice`): the preview serves each page by its file name and changes no capital (#562's review). Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `capture.prepare` names the script in website/shots/prepare/ that webwindow.swift runs before a `preview-page` picture, to press Run or Check and wait for what the figure promises (#562; scene `code`, taken by `capture.py --code`; scene `quizzes`, taken by `capture.py --quizzes`, whose workspace `demo` previews ~/Desktop/Teaching's MCV4U, SCH3U and ENG2D, #587); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `waiting_on: \"#<issue>\"` beside it names the GitHub issue a capture waits on for a reason that is not the release — `--deploy` lets such a shot through, and the capture removes both flags; `windows: true` marks the ids capture_windows.py also takes; `windows: false` marks a scene Windows does not have yet, so its visitors are shown the Mac picture and any older `-windows` file is ignored (since 2026-10-04 none is false but the ones `WINDOWS_PICTURE_OWED` in website/test_build_data.py names, each owed by name: every other picture has its Windows twin, #380; `capture_windows.py --print-set` sets the print shots true when it has taken them). `windowsAlt` is the alt text for the Windows picture where the shared one names something only the Mac picture shows; base.html swaps it in as it swaps the image, and a Mac visitor's words never change. `static: true` marks a figure that is one image (`<id>.png`) rather than a light/dark pair; `dark: true` beside it says the figure ALSO has a Dark Mode version, `<id>-dark.png`/`.webp`, which a page in dark mode is given (`<id>.png` stays the light one, so its name never changes; build.py reports it missing as a problem).",
   "shots": [
     {
       "id": "hero",
@@ -149,6 +149,26 @@
       ]
     },
     {
+      "id": "code-python-live",
+      "capture": {
+        "kind": "preview-page",
+        "workspace": "marketing",
+        "course": "ICS3U",
+        "path": "/Programs/Talking-to-the-User",
+        "scene": "code",
+        "prepare": "code-python-live.js"
+      },
+      "alt": "A Python program on the Talking to the User page, run and waiting: the output shows Player name: Priya, then Minutes practised this week: with 185 being typed in a field right after the prompt, and the line Waiting for your answer under the buttons.",
+      "caption": "The program stops at each input() and waits. The student types the answer right in the output and presses Return.",
+      "windows": false,
+      "expectText": [
+        "The program",
+        "Player name: Priya",
+        "Minutes practised this week",
+        "Waiting for your answer"
+      ]
+    },
+    {
       "id": "code-python-error",
       "capture": {
         "kind": "preview-page",
@@ -158,8 +178,8 @@
         "scene": "code",
         "prepare": "code-python-error.js"
       },
-      "alt": "A Python program on the Reading an Error Message page with abc typed in the input box under it, and the traceback it ended in: line 2, then ValueError: invalid literal for int() with base 10: 'abc'.",
-      "caption": "Input typed ahead, one line for each input(). An error names the line in the editor, in Python's own words.",
+      "alt": "A Python program on the Reading an Error Message page that asked how many hours, was answered abc, and ended in a traceback: line 2, then ValueError: invalid literal for int() with base 10: 'abc'.",
+      "caption": "Answered abc where it wanted a number. An error names the line in the editor, in Python's own words.",
       "windows": false,
       "expectText": [
         "A crash, in full",
@@ -167,6 +187,27 @@
         "line 2",
         "ValueError",
         "Finished with an error"
+      ]
+    },
+    {
+      "id": "code-swift-live",
+      "capture": {
+        "kind": "preview-page",
+        "workspace": "marketing",
+        "course": "ICS4U",
+        "path": "/Programs/Reading-Input-in-Swift",
+        "scene": "code",
+        "prepare": "code-swift-live.js"
+      },
+      "alt": "A Swift program on a class website, highlighted and not editable, run and waiting: its output shows What is your name?, the answer Priya, How old are you?, and 14 being typed in a field under it, with Waiting for your answer beside the No more input button.",
+      "caption": "Each readLine() waits for an answer, typed where the program asked for it.",
+      "windows": false,
+      "expectText": [
+        "Ask, then answer",
+        "What is your name?",
+        "Priya",
+        "How old are you?",
+        "Waiting for your answer"
       ]
     },
     {
@@ -179,8 +220,8 @@
         "scene": "code",
         "prepare": "code-swift.js"
       },
-      "alt": "A Swift program on a class website, highlighted and not editable, with Priya and 14 typed on two lines of its input box, and its output: each question with the answer read for it, then Hello, Priya! Next year you will be 15.",
-      "caption": "Swift runs with the input students type. The code stays as you wrote it.",
+      "alt": "A Swift program on a class website, highlighted and not editable, answered Priya and 14, and its output: each question with its answer after it, then Hello, Priya! Next year you will be 15.",
+      "caption": "With its answers, the program carries on. The code stays as you wrote it.",
       "windows": false,
       "expectText": [
         "Ask, then answer",
@@ -200,7 +241,7 @@
         "scene": "code",
         "prepare": "code-quiz.js"
       },
-      "alt": "A self-check question on a class website asking what a three-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it.",
+      "alt": "A self-check question on a class website asking what a two-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it.",
       "caption": "A question students check for themselves, with your explanation once they have.",
       "windows": false,
       "expectText": [
@@ -208,6 +249,86 @@
         "Check",
         "Right!",
         "Why"
+      ]
+    },
+    {
+      "id": "quiz-math",
+      "capture": {
+        "kind": "preview-page",
+        "workspace": "demo",
+        "course": "MCV4U",
+        "path": "/Exercises/Check-Your-Curve-Sketching",
+        "scene": "quizzes",
+        "prepare": "quiz-math.js"
+      },
+      "alt": "A self-check question on a class website showing the graph of f(x) = x³ − 3x + 1 and asking for an estimate of its root between 0 and 1, with 0.35 typed in the blank, a tick beside it, the word Right!, and the explanation opened under it.",
+      "caption": "Read the graph, type a number: close enough is right.",
+      "windows": false,
+      "expectText": [
+        "Right!",
+        "Why",
+        "Check"
+      ]
+    },
+    {
+      "id": "quiz-chemistry",
+      "capture": {
+        "kind": "preview-page",
+        "workspace": "demo",
+        "course": "SCH3U",
+        "path": "/Exercises/Check-Your-Stoichiometry",
+        "scene": "quizzes",
+        "prepare": "quiz-chemistry.js"
+      },
+      "alt": "A self-check question on a class website with the balanced equation for burning propane and two blanks: 0.0998 mol marked right and 4.39 g marked not right, the line 1 of 2 blanks is right, and the explanation opened under it, which names the step that answer skipped.",
+      "caption": "Wrong, and why: each blank marked on its own.",
+      "windows": false,
+      "expectText": [
+        "1 of 2 blanks is right",
+        "Not right",
+        "Why",
+        "middle step"
+      ]
+    },
+    {
+      "id": "quiz-english",
+      "capture": {
+        "kind": "preview-page",
+        "workspace": "demo",
+        "course": "ENG2D",
+        "path": "/Exercises/Check-Your-Reading",
+        "scene": "quizzes",
+        "prepare": "quiz-english.js"
+      },
+      "alt": "A sight passage on a class website and, under it, a select-all-that-apply question asking which details show the tins are hidden, with the two right choices ticked, the word Right!, and the explanation opened under it.",
+      "caption": "A passage read closely: select all that apply.",
+      "windows": false,
+      "expectText": [
+        "Select all that apply",
+        "Right!",
+        "where the light did not reach",
+        "Why"
+      ]
+    },
+    {
+      "id": "quiz-code-run",
+      "capture": {
+        "kind": "preview-page",
+        "workspace": "marketing",
+        "course": "ICS3U",
+        "path": "/Exercises/Check-Your-Loops",
+        "scene": "quizzes",
+        "prepare": "quiz-code-run.js"
+      },
+      "alt": "The last self-check question on a class website's Check Your Loops page: a short Python program inside the question, run, with its output 2, 5 and 8 and the word Finished, the answer 3 picked, the word Right!, the explanation, and under it the page's score, 4 of 5 right on the first try, with Start again.",
+      "caption": "Run the program, answer, and see the page's score.",
+      "windows": false,
+      "expectText": [
+        "Run",
+        "Finished",
+        "Right!",
+        "4 of 5 right on the first try",
+        "Start again"
       ]
     },
     {

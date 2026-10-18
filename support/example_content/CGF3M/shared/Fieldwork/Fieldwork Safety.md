@@ -49,10 +49,10 @@ the whole defence.**
   possible and pulling straight out without twisting or squeezing. Wash
   the area. Tell your family, and note the date.
 
-> [!warning] These boxes do not tick
-> That list is printed, not interactive — clicking does nothing and
-> nothing is saved. Copy it into your notebook or your phone the night
-> before, which is when it is any use.
+> [!tip] Tick it the night before
+> Tick that list as you pack; your browser keeps the ticks on this
+> computer. Copy it into your notebook or your phone as well: in the
+> field, that copy is the one that is any use.
 
 ## Sun, heat, and the length of a field day
 

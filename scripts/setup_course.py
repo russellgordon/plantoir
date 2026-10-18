@@ -3553,7 +3553,13 @@ def setup_course(no_backup: bool = False):
                 else:
                     show_grade = bool(raw_show_grade)
                 title_prefix = f"{grade_label} " if (grade_label and show_grade) else ""
-                f.write(f"title: {title_prefix}{course_name}, Section {sec}\n")
+                # Quoted by the folders' rule when written plain it would not
+                # read back (#575): a course NAME holding ": " — 161 of the
+                # catalogue's short names do — gave a front page the build
+                # could not read, so the site was removed. A name that needs
+                # no quoting writes the bytes it always did.
+                front_page_title = f"{title_prefix}{course_name}, Section {sec}"
+                f.write(f"title: {frontmatter_title(front_page_title)}\n")
                 f.write(f"created: {now_str}\n")
                 f.write("publish: true\n")
                 f.write("---\n")

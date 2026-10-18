@@ -15,7 +15,12 @@ reads it and applies the parts that are not made by the app's own panels:
   January 15 of the school year, with every class after it unpublished — made
   THROUGH THE APP's own door (``Plantoir --mcp-stdio`` on the Mac,
   ``plantoir-mcp.exe`` on Windows) with ``unpublish_pages``, so the app
-  repoints the front page itself and no third copy of that rule lives here.
+  repoints the front page itself and no third copy of that rule lives here;
+- the pages of our own planted in each course (``demo.plantedPages``: the
+  Quizzes page's self-check quizzes, #587), each written when absent and
+  brought up to date only while it is still an earlier committed version
+  of its source (``plant_page``, which ``marketing_folder`` uses for its
+  own planted pages too).
 
 Every step says "made", "already there" or "left as you changed it", in
 ``marketing_folder``'s own words, and a second run changes nothing.
@@ -41,6 +46,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parent.parent
 SPEC_FILE = HERE / "marketing" / "folders.json"
 
 DATE_KEY = re.compile(r"^created: (?P<day>\d{4}-\d{2}-\d{2})", re.MULTILINE)
@@ -316,6 +322,18 @@ def colour_problems(folder: Path, spec: dict | None = None) -> list[str]:
     return problems
 
 
+def planted_page_problems(folder: Path, spec: dict | None = None) -> list[str]:
+    """Each planted page that is missing from a course the folder holds."""
+    problems: list[str] = []
+    for page in planted_pages(spec):
+        course_dir = folder / "courses" / page["course"]
+        if read_config(course_dir) is None:
+            continue
+        if not (course_dir / page["place"]).is_file():
+            problems.append(f"{page['course']}/{page['place']} is not planted")
+    return problems
+
+
 def demo_state_problems(folder: Path, spec: dict | None = None) -> list[str]:
     """Read-only: everything in a demo folder that does not match folders.json."""
     if spec is None:
@@ -329,6 +347,7 @@ def demo_state_problems(folder: Path, spec: dict | None = None) -> list[str]:
         for section in course["sections"]:
             problems.extend(front_page_problems(course_dir, section, spec))
     problems.extend(colour_problems(folder, spec))
+    problems.extend(planted_page_problems(folder, spec))
     return problems
 
 
@@ -405,6 +424,78 @@ def remember_teacher_name(folder: Path, report=None, spec: dict | None = None) -
     except OSError:
         pass
     note(report, "made", "the teacher's last name")
+
+
+# ---------- Pages of our own (#587) ----------
+
+def planted_pages(spec: dict | None = None) -> list[dict]:
+    """folders.json → demo.plantedPages: course, place (inside the course)
+    and source (relative to website/shots)."""
+    if spec is None:
+        spec = load_spec()
+    return list(spec["demo"].get("plantedPages", {}).get("pages", []))
+
+
+def git_versions(path: Path) -> list[str]:
+    """Every committed version of a file in this repository, newest first;
+    empty when git cannot say (then no kept page is ever taken for an
+    earlier one)."""
+    try:
+        relative = path.resolve().relative_to(REPO)
+    except ValueError:
+        return []
+    try:
+        listed = subprocess.run(["git", "-C", str(REPO), "rev-list", "HEAD", "--", relative.as_posix()],
+                                capture_output=True, text=True)
+    except OSError:
+        return []
+    if listed.returncode != 0:
+        return []
+    versions: list[str] = []
+    for revision in listed.stdout.split():
+        shown = subprocess.run(["git", "-C", str(REPO), "show", f"{revision}:{relative.as_posix()}"],
+                               capture_output=True, text=True, encoding="utf-8")
+        if shown.returncode == 0:
+            versions.append(shown.stdout)
+    return versions
+
+
+def plant_page(path: Path, source: Path, report, label: str, earlier_versions=git_versions) -> None:
+    """A page of our own, planted in a kept folder: written when absent,
+    "already there" when it is the source, brought up to date when it is
+    still exactly an EARLIER committed version of the source (so a page we
+    changed — Check Your Loops gaining its fifth question — reaches a folder
+    made before the change), and otherwise left as somebody changed it and
+    named. The rule `marketing_folder.refresh_runnable_pages` keeps for the
+    ready-made course's pages, applied to our own."""
+    wanted = source.read_text(encoding="utf-8")
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(wanted, encoding="utf-8")
+        note(report, "made", label)
+        return
+    kept = path.read_text(encoding="utf-8")
+    if kept == wanted:
+        note(report, "already there", label)
+        return
+    for version in earlier_versions(source):
+        if version == kept:
+            path.write_text(wanted, encoding="utf-8")
+            note(report, "made", f"{label} (brought up to date)")
+            return
+    note(report, "left as you changed it", label)
+
+
+def apply_planted_pages(folder: Path, report=None, spec: dict | None = None,
+                        earlier_versions=git_versions) -> None:
+    """Every planted page, in each course the folder holds. A course not
+    made yet is passed over (demo_state_problems names it)."""
+    for page in planted_pages(spec):
+        course_dir = folder / "courses" / page["course"]
+        if read_config(course_dir) is None:
+            continue
+        plant_page(course_dir / page["place"], HERE / page["source"], report,
+                   f"{page['course']}/{page['place']}", earlier_versions)
 
 
 class DoorRefused(Exception):
@@ -594,6 +685,7 @@ def apply_demo_state(folder: Path, server: list[str] | None, report=None, spec: 
     apply_colours(folder, report, spec)
     remember_teacher_name(folder, report, spec)
     write_site_markers(folder, report, spec)
+    apply_planted_pages(folder, report, spec)
     return apply_front_pages(folder, server, report, spec, extra_arguments)
 
 

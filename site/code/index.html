@@ -79,6 +79,7 @@
       <a href="../features/">Features</a>
       <a href="../visualizations/">Visualizations</a>
       <a href="../printing/">Printing</a>
+      <a href="../quizzes/">Quizzes</a>
       <a href="../code/" aria-current="page">Code</a>
       <a href="../day-to-day/">Day to day</a>
       <a href="../deploying/">Deployment</a>
@@ -104,7 +105,7 @@
 
 <section id="python">
   <h2>Python students can run</h2>
-  <p>Mark a page with one line in its settings, add the word <code>run</code> to a Python block, and students get the program in an editor with a <strong>Run</strong> button. They change it, run it, and read what it prints underneath — in the browser they already have, with nothing to install and no account.</p>
+  <p>Mark a page with one line in its settings, add the word <code>run</code> to a Python block, and students get the program in an editor, in the same colours as the rest of the site's code and with its lines numbered, and a <strong>Run</strong> button. They change it, run it, and read what it prints underneath — in the browser they already have, with nothing to install and no account. A program that asks for input stops and waits: the student types the answer right in the output and presses Return, just as in a terminal.</p>
   <h4 class="label">What you type</h4>
   <pre class="fence"><code>---
 codeRunner: true
@@ -127,22 +128,33 @@ for index in range(1, len(names)):
     </picture>
     <figcaption>Students change the program, press Run, and read what it prints underneath.</figcaption>
 </figure>
-  <p>A program that asks for input gets a box under it, one line for each <code>input()</code>. An error ends in Python's own traceback, and its line numbers are the lines in the editor:</p>
+  <p>A program that asks for input stops at each <code>input()</code> and waits, with its prompt in the output and a place right after it to type the answer. Return sends it and the program carries on. This is <em>Talking to the User</em>, answered once and waiting for its second answer:</p>
+  <figure class="shot">
+    <picture>
+      <source srcset="../img/code-python-live-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-python-live-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-python-live-light.webp" type="image/webp">
+      <img src="../img/code-python-live-light.png" alt="A Python program on the Talking to the User page, run and waiting: the output shows Player name: Priya, then Minutes practised this week: with 185 being typed in a field right after the prompt, and the line Waiting for your answer under the buttons."
+           width="1392" height="972" loading="lazy" decoding="async">
+    </picture>
+    <figcaption>The program stops at each input() and waits. The student types the answer right in the output and presses Return.</figcaption>
+</figure>
+  <p>An error ends in Python's own traceback, and its line numbers are the ones down the editor's left side:</p>
   <figure class="shot">
     <picture>
       <source srcset="../img/code-python-error-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
       <source srcset="../img/code-python-error-dark.png" media="(prefers-color-scheme: dark)">
       <source srcset="../img/code-python-error-light.webp" type="image/webp">
-      <img src="../img/code-python-error-light.png" alt="A Python program on the Reading an Error Message page with abc typed in the input box under it, and the traceback it ended in: line 2, then ValueError: invalid literal for int() with base 10: 'abc'."
+      <img src="../img/code-python-error-light.png" alt="A Python program on the Reading an Error Message page that asked how many hours, was answered abc, and ended in a traceback: line 2, then ValueError: invalid literal for int() with base 10: 'abc'."
            width="1392" height="972" loading="lazy" decoding="async">
     </picture>
-    <figcaption>Input typed ahead, one line for each input(). An error names the line in the editor, in Python's own words.</figcaption>
+    <figcaption>Answered abc where it wanted a number. An error names the line in the editor, in Python's own words.</figcaption>
 </figure>
   <h4 class="label">What it accepts</h4>
   <ul class="plain">
     <li><code>codeRunner: true</code> in the settings block opts the page in. Written exactly like that.</li>
     <li><code>```python run</code> makes a block runnable. A plain <code>```python</code> block on the same page stays code to read, so a page can mix the two.</li>
-    <li><code>```python run readonly</code> runs but can't be changed — for a worked example. <code>stdin</code> always shows the input box; <code>autorun</code> runs the block once when it scrolls into view.</li>
+    <li><code>```python run readonly</code> runs but can't be changed — for a worked example. <code>stdin</code> treats a block as asking for input even when its code doesn't visibly call <code>input()</code>; <code>autorun</code> runs the block once when it scrolls into view.</li>
     <li>Python's own standard library: <code>math</code>, <code>random</code>, <code>datetime</code>, <code>json</code>, <code>csv</code> and the rest. Not <code>turtle</code> or <code>tkinter</code>, and nothing that needs <code>pip install</code>.</li>
     <li>A file a program writes lasts for that one run. Each Run starts fresh.</li>
     <li>One program runs on a page at a time, and <strong>Stop</strong> ends any of them, a loop that never ends included.</li>
@@ -154,8 +166,8 @@ for index in range(1, len(names)):
 <hr class="rule">
 
 <section id="swift">
-  <h2>Swift, with the input students type</h2>
-  <p>A <code>```swift run</code> block runs too, on the same page setting. Swift blocks are read-only: students change the input and run it again, and the code stays as you wrote it. Plantoir gets each Swift program ready when you preview the section, so it is waiting when a student opens the page.</p>
+  <h2>Swift that asks, and waits for the answer</h2>
+  <p>A <code>```swift run</code> block runs too, on the same page setting. Swift blocks are read-only: students run the program, answer it as it asks, and run it again with other answers, and the code stays as you wrote it. Plantoir gets each Swift program ready when you preview the section, so it is waiting when a student opens the page.</p>
   <h4 class="label">What you type</h4>
   <pre class="fence"><code>```swift run
 print("What is your name?")
@@ -170,16 +182,27 @@ if let age = Int(ageText) {
 }
 ```</code></pre>
   <h4 class="label">What students get</h4>
-  <p>The code, highlighted, with an input box, <strong>Run</strong> and <strong>Stop</strong>, and a line saying the code itself can't be edited. Each line in the box is one <code>readLine()</code>, shown after its prompt as a terminal would:</p>
+  <p>The code, highlighted, with <strong>Run</strong> and <strong>Stop</strong> and a line saying the code itself can't be edited. Press Run, and each <code>readLine()</code> waits for an answer typed right after its prompt:</p>
+  <figure class="shot">
+    <picture>
+      <source srcset="../img/code-swift-live-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-swift-live-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-swift-live-light.webp" type="image/webp">
+      <img src="../img/code-swift-live-light.png" alt="A Swift program on a class website, highlighted and not editable, run and waiting: its output shows What is your name?, the answer Priya, How old are you?, and 14 being typed in a field under it, with Waiting for your answer beside the No more input button."
+           width="1392" height="972" loading="lazy" decoding="async">
+    </picture>
+    <figcaption>Each readLine() waits for an answer, typed where the program asked for it.</figcaption>
+</figure>
+  <p>With its answers, it carries on — the same transcript a terminal would show:</p>
   <figure class="shot">
     <picture>
       <source srcset="../img/code-swift-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
       <source srcset="../img/code-swift-dark.png" media="(prefers-color-scheme: dark)">
       <source srcset="../img/code-swift-light.webp" type="image/webp">
-      <img src="../img/code-swift-light.png" alt="A Swift program on a class website, highlighted and not editable, with Priya and 14 typed on two lines of its input box, and its output: each question with the answer read for it, then Hello, Priya! Next year you will be 15."
+      <img src="../img/code-swift-light.png" alt="A Swift program on a class website, highlighted and not editable, answered Priya and 14, and its output: each question with its answer after it, then Hello, Priya! Next year you will be 15."
            width="1392" height="972" loading="lazy" decoding="async">
     </picture>
-    <figcaption>Swift runs with the input students type. The code stays as you wrote it.</figcaption>
+    <figcaption>With its answers, the program carries on. The code stays as you wrote it.</figcaption>
 </figure>
   <h4 class="label">What it accepts</h4>
   <ul class="plain">
@@ -218,20 +241,12 @@ if let age = Int(ageText) {
       <source srcset="../img/code-quiz-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
       <source srcset="../img/code-quiz-dark.png" media="(prefers-color-scheme: dark)">
       <source srcset="../img/code-quiz-light.webp" type="image/webp">
-      <img src="../img/code-quiz-light.png" alt="A self-check question on a class website asking what a three-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it."
+      <img src="../img/code-quiz-light.png" alt="A self-check question on a class website asking what a two-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it."
            width="1392" height="972" loading="lazy" decoding="async">
     </picture>
     <figcaption>A question students check for themselves, with your explanation once they have.</figcaption>
 </figure>
-  <h4 class="label">What it accepts</h4>
-  <ul class="plain">
-    <li><strong>Multiple choice</strong>: tick the right choice with <code>[x]</code>. Tick two or more and it becomes <strong>select all that apply</strong>.</li>
-    <li><strong>Short answer</strong> and <strong>fill in the blank</strong>: an <code>[!answer]</code> callout inside the quiz, with each accepted answer separated by <code> | </code>. Write a blank as <code>`____`</code>.</li>
-    <li>Numbers are checked by value, so <code>0.5</code> also accepts <code>1/2</code>; <code>3.14 ± 0.01</code> accepts anything in between. Capitals and extra spaces don't count against a student.</li>
-    <li><code>[!explain]</code> inside the quiz is shown after the student checks or shows the answer. <code>[!quiz|shuffle]</code> mixes the choices each time the page loads.</li>
-    <li>Graphs, pictures and runnable code work inside a question, a choice and an explanation.</li>
-  </ul>
-  <p>Each page keeps a score in the student's browser — right on the first try — with <strong>Start again</strong>. On paper a quiz prints its questions only. In Obsidian you see it all, ticks and answers included: your answer key. A quiz that can't be checked shows its question with a line saying so, and Plantoir tells you the page and the line.</p>
+  <p>Every kind of question, in mathematics, chemistry and English too, and how answers are checked: <a href="../quizzes/">Quizzes</a>.</p>
   <p class="availability">On the Mac. The Windows version gets this in a later release.</p>
 </section>
 
@@ -239,10 +254,10 @@ if let age = Int(ageText) {
 
 <section id="ask">
   <h2>Or ask Claude or Codex</h2>
-  <p>You don't have to learn any of this. Plantoir writes its guidance for runnable code and for quizzes into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows how to opt a page in, which blocks are worth running, what to tell students to type in the input box, and how to write each kind of question. There is nothing to install or paste.</p>
+  <p>You don't have to learn any of this. Plantoir writes its guidance for runnable code and for quizzes into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows how to opt a page in, which blocks are worth running, what to tell students to type when a program asks, and how to write each kind of question. There is nothing to install or paste.</p>
   <p>Asked, in a working folder holding an ICS3U course, something like:</p>
   <pre class="fence ask"><code>Make the examples on the page "courses/ICS3U/Concepts/Functions.md" runnable, so students can try them.</code></pre>
-  <p>its guidance has it add <code>codeRunner: true</code> to the page's settings, the word <code>run</code> to each block worth running, and a sentence telling students what to type in the input box. Asked to <em>add a 5-question check to this page</em>, it writes five <code>[!quiz]</code> callouts of different kinds, each with its answer.</p>
+  <p>its guidance has it add <code>codeRunner: true</code> to the page's settings, the word <code>run</code> to each block worth running, and a sentence telling students what to type when the program asks. Asked to <em>add a 5-question check to this page</em>, it writes five <code>[!quiz]</code> callouts of different kinds, each with its answer.</p>
   <p>Open either from a course's menu with <a href="../features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
 </section>
 
@@ -254,6 +269,7 @@ if let age = Int(ageText) {
     <a href="../features/">Features</a>
     <a href="../visualizations/">Visualizations</a>
     <a href="../printing/">Printing</a>
+    <a href="../quizzes/">Quizzes</a>
     <a href="../code/">Code</a>
     <a href="../day-to-day/">Day to day</a>
     <a href="../deploying/">Deployment</a>

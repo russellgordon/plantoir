@@ -3,8 +3,9 @@ title: Check Your Loops
 publish: true
 tags:
   - exercises
+codeRunner: true
 ---
-Four quick questions on [[Repetition]]. Answer each one, press **Check**,
+Five quick questions on [[Repetition]]. Answer each one, press **Check**,
 and read why. Your score is at the bottom of the page; press **Start
 again** there and see whether you can get every one right first time.
 
@@ -41,3 +42,15 @@ again** there and see whether you can get every one right first time.
 > [!quiz] How many times does `for letter in "loop":` run its block?
 > > [!answer]-
 > > 4 | four
+
+> [!quiz] Run this program, then answer: how many lines does it print?
+> ```python run
+> for number in range(2, 11, 3):
+>     print(number)
+> ```
+> - [ ] 2
+> - [x] 3
+> - [ ] 4
+>
+> > [!explain]- Why
+> > 2, 5 and 8: `range` stops before 11.

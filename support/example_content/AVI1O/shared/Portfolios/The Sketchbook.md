@@ -21,8 +21,9 @@ beautiful pages is usually one that was not used for anything.
 - [ ] Notes from a critique, and what you decided to do about them
 - [ ] The attempts that failed, left in place
 
-Those boxes are printed, not interactive — nothing here is recorded and the
-site does not know who you are. Copy the list inside your own front cover.
+Tick those boxes as you go: your browser keeps the ticks on this computer,
+and nobody else sees them. Copy the list inside your own front cover too,
+since the sketchbook goes where the computer does not.
 
 ## Thumbnails are not small drawings
 

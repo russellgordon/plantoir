@@ -2,6 +2,10 @@
 // B2): this stylesheet goes into the site's one index.css, which every page
 // links, so a page with no runnable block must look and print exactly as it
 // did. No @page, no element selectors on their own, no classes on <html>.
+// (The one file that styles EVERY code block - the line numbers' gutter and
+// hairline, no ligatures - is codeLines.scss, #585.)
+
+@use "codeLines" as lines;
 
 .plantoir-runner {
   margin: 1rem 0;
@@ -47,6 +51,188 @@
     outline-offset: 1px;
   }
 
+  // ---- The editor's frame (#585): numbers, colour, and the textarea ----
+  // div.plantoir-runner-frame holds a gutter of line numbers and a cell; in
+  // the cell a coloured copy of the code (pre.plantoir-runner-colour, one
+  // span per line) sits UNDER the textarea, whose own text is transparent
+  // and whose caret is not. The copy and the textarea share every metric
+  // below in ONE rule, so the coloured letters fall exactly where the typed
+  // ones are (measured to the pixel in documentation/06, I12). The frame
+  // owns the border, the corner and the focus ring the textarea had.
+  & .plantoir-runner-frame {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    border: 1px solid var(--lightgray);
+    border-radius: 5px;
+    background: var(--light);
+    overflow: hidden;
+  }
+
+  // The textarea's ring, moved to the frame: the frame clips for its corner,
+  // and would cut the textarea's own outline away (#585 plan review F3).
+  & .plantoir-runner-frame:focus-within {
+    outline: 2px solid var(--secondary);
+    outline-offset: 1px;
+  }
+
+  & .plantoir-runner-cell {
+    position: relative;
+    min-width: 0;
+  }
+
+  & .plantoir-runner-cell > .plantoir-runner-editor,
+  & .plantoir-runner-cell > pre.plantoir-runner-colour {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0.5rem 0.75rem 0.5rem 1ch;
+    border: 0;
+    border-radius: 0;
+    font-family: var(--codeFont);
+    font-size: max(16px, 0.9em);
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1.5;
+    letter-spacing: normal;
+    tab-size: 4;
+    white-space: pre;
+    font-variant-ligatures: none;
+  }
+
+  & .plantoir-runner-cell > .plantoir-runner-editor {
+    position: relative;
+    z-index: 1;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    caret-color: var(--dark);
+    background: transparent;
+  }
+
+  & .plantoir-runner-cell > .plantoir-runner-editor:focus {
+    outline: none;
+  }
+
+  // Quartz's own `pre` and `pre > code` rules (a border, padding, a grid,
+  // 0.85rem, and overflow-x: auto - which clipped a long line once the
+  // editor scrolled sideways, measured on iPadOS) are each put back here.
+  & .plantoir-runner-cell > pre.plantoir-runner-colour {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    // Scrolled only to follow the textarea, never by the browser's own
+    // anchoring when a line's colours change.
+    overflow-anchor: none;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    background: none;
+  }
+
+  & pre.plantoir-runner-colour > code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+    padding: 0;
+    font: inherit;
+    font-variant-ligatures: none;
+    background: none;
+    border-radius: 0;
+    overflow: visible;
+    counter-reset: none;
+    white-space: inherit;
+    // Unclassed text is Shiki's plain colour, by Shiki's own two properties.
+    --shiki-light: #24292e;
+    --shiki-dark: #e1e4e8;
+  }
+
+  // An input method's text, while it is being composed, is drawn by the
+  // textarea itself: the copy catches up when the composition ends.
+  &.plantoir-runner-composing .plantoir-runner-cell > .plantoir-runner-editor {
+    color: var(--dark);
+    -webkit-text-fill-color: var(--dark);
+  }
+
+  &.plantoir-runner-composing pre.plantoir-runner-colour {
+    visibility: hidden;
+  }
+
+  // The gutter: the same style as every static block's numbers
+  // (codeLines.scss), at the editor's size, held to the cell's height (it
+  // never sets it) and moved with the editor's scroll.
+  & pre.plantoir-runner-gutter {
+    @include lines.plantoir-gutter;
+    position: static;
+    height: 0;
+    min-height: 100%;
+    margin: 0;
+    padding-top: 0.5rem;
+    padding-bottom: 0;
+    padding-left: calc(0.25rem + 3px);
+    border-top: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
+    background: none;
+    overflow: hidden;
+    font-size: max(16px, 0.9em);
+    line-height: 1.5;
+    white-space: pre;
+  }
+
+  & pre.plantoir-runner-gutter > span {
+    display: block;
+    will-change: transform;
+  }
+
+  // The categories of the editor's colours (codeRunnerColour.ts), each
+  // given Shiki's OWN two custom properties: Quartz's syntax.scss then
+  // colours them for the theme exactly as it colours a static block's spans.
+  // The values are pinned to the image's Shiki, theme by theme, by
+  // scripts/check_runner_rules_against_the_site.py (codeRunnerBlocks.editor.
+  // colour.categories).
+  & .plantoir-tok-k {
+    --shiki-light: #d73a49;
+    --shiki-dark: #f97583;
+  }
+
+  & .plantoir-tok-s {
+    --shiki-light: #032f62;
+    --shiki-dark: #9ecbff;
+  }
+
+  & .plantoir-tok-c {
+    --shiki-light: #005cc5;
+    --shiki-dark: #79b8ff;
+  }
+
+  & .plantoir-tok-f {
+    --shiki-light: #6f42c1;
+    --shiki-dark: #b392f0;
+  }
+
+  & .plantoir-tok-m {
+    --shiki-light: #6a737d;
+    --shiki-dark: #6a737d;
+  }
+
+  & .plantoir-tok-p {
+    --shiki-light: #e36209;
+    --shiki-dark: #ffab70;
+  }
+
+  & .plantoir-tok-g {
+    --shiki-light: #22863a;
+    --shiki-dark: #85e89d;
+  }
+
+  & .plantoir-tok-r {
+    --shiki-light: #032f62;
+    --shiki-dark: #dbedff;
+  }
+
   & .plantoir-runner-input {
     margin-top: 0.6rem;
   }
@@ -55,6 +241,13 @@
     display: block;
     margin-bottom: 0.25rem;
     font-size: 0.9em;
+    color: var(--darkgray);
+  }
+
+  // Where the page cannot stop to ask (#583): one quiet line under the label.
+  & .plantoir-runner-input-ahead {
+    margin: 0 0 0.3rem;
+    font-size: 0.85em;
     color: var(--darkgray);
   }
 
@@ -131,6 +324,35 @@
     color: #b42318;
   }
 
+  // Live input (#583): the answer field sits at the end of the output, on
+  // the prompt's line, and fills the rest of it (codeRunner.inline.ts sizes
+  // it; never narrower than 8 characters). 16 px at least, or iPadOS zooms
+  // the page when it takes the focus (the editor's rule).
+  & .plantoir-runner-answer {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 8ch;
+    min-width: 8ch;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 0.2em;
+    font: inherit;
+    font-size: max(16px, 1em);
+    line-height: inherit;
+    vertical-align: baseline;
+    color: var(--dark);
+    background: var(--light);
+    border: none;
+    border-bottom: 2px solid var(--secondary);
+    border-radius: 0;
+    outline: none;
+  }
+
+  & .plantoir-runner-answer:focus-visible,
+  & .plantoir-runner-answer:focus {
+    background: var(--lightgray);
+  }
+
   & .plantoir-runner-print {
     display: none;
   }
@@ -146,6 +368,7 @@
 // button, so one set serves it and ⌘P.
 @media print {
   .plantoir-runner {
+    & .plantoir-runner-frame,
     & .plantoir-runner-editor,
     & .plantoir-runner-input,
     & .plantoir-runner-controls,
@@ -163,17 +386,29 @@
       display: none !important;
     }
 
+    // The student's code, built as a static block is (pre > code >
+    // span[data-line], Shiki's spans for untouched lines): it prints
+    // coloured and numbered exactly as one does (#585, ruling Q3).
     &.plantoir-runner-edited > .plantoir-runner-print {
       display: block !important;
-      margin: 0;
-      padding: 0.5rem 0.75rem;
-      font-family: var(--codeFont);
-      font-size: 0.85em;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      border: 1px solid var(--lightgray);
-      border-radius: 5px;
+    }
+  }
+
+  // ...and a student's long line wraps on paper, as it did before #585,
+  // starting each wrapped row under its first row's code (the number's
+  // whole box: digits, the gutter's padding and hairline, the gap). The
+  // handout hangs every line its own way (print.scss).
+  html:not(.plantoir-print-frame) .plantoir-runner.plantoir-runner-edited > .plantoir-runner-print > code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+
+    & > [data-line] {
+      padding-left: calc(0.25rem + (var(--plantoir-digits, 2) + 1.75) * 1ch + 1px);
+      text-indent: calc((var(--plantoir-digits, 2) + 1.75) * -1ch - 1px);
+    }
+
+    & > [data-line]::before {
+      text-indent: 0;
     }
   }
 }

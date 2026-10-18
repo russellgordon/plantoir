@@ -46,9 +46,11 @@ graph LR
 - [ ] Provenance established before reading for content
 - [ ] Every claim carries a citation
 
-> [!warning] These do not save
-> A checkbox here is printed, not interactive. Nothing is recorded.
-> Copy the list into your notebook.
+> [!note] Ticks stay in this browser
+> Tick a box here and your browser keeps it for you. Nothing is sent
+> anywhere, the site does not know who you are, and on another computer
+> the boxes start again. Copy the list into your notebook if you want it
+> everywhere.
 
 ## Footnotes
 

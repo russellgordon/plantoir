@@ -5,11 +5,13 @@
 // are, in order: 1 a greeting that reads two lines (swift-gate 01), 2 a loop
 // that never ends, 3 an index out of range (swift-gate 10), 4 exit(3), 5 a
 // block that does not compile, 6 a block that needs the full library
-// (swift-gate 05):
+// (swift-gate 05), 7 a prompt on the answer's line (swift-gate 13, #583):
 //
 //  1. loading the page fetches nothing of Swift; every block is read-only
 //     (no editor, Run and Stop only) with words.cannotEdit under it, and the
-//     input box shows for code that calls readLine();
+//     input box shows for code that calls readLine(); and once the page's
+//     script has run every block still shows Shiki's own colours, each line
+//     numbered beside the hairline (#585);
 //  2. Run with input prints the greeting, each input line echoed after its
 //     prompt; changed input and Run again changes the output;
 //  3. Stop ends the loop at once, and Run works again;
@@ -17,6 +19,13 @@
 //  5. exit(3) ends with words.exitCode, 3 filled in;
 //  6. the block that did not compile says words.notReady with Run off;
 //  7. the full-library block prints swift-gate 05's expected output;
+//  8. live input (#583), served as a host with the isolation headers serves
+//     it (the preview's own rule): the box never shows; Run makes and
+//     focuses the answer field; each readLine() waits with its prompt
+//     painted before the field (on the same line after a terminator: ""
+//     prompt); the transcript is BYTE FOR BYTE the box's for the same
+//     answers, Embedded and full library; Ctrl-D is the end of input
+//     (readLine() is nil, and stays nil); Stop ends a program that waits;
 //
 // and it reports the first Run's time and the bytes fetched for an Embedded
 // block and a full-library block (the closing comment's measurements).
@@ -28,6 +37,7 @@ import { createServer } from "node:http"
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
+import { headersFor } from "../support/quartz/cli/plantoirIsolation.mjs"
 
 const [chromePath, siteFolder, pagePath] = process.argv.slice(2)
 if (!chromePath || !siteFolder || !pagePath) {
@@ -46,7 +56,8 @@ const TYPES = {
   ".ico": "image/x-icon", ".woff2": "font/woff2", ".xml": "application/xml", ".txt": "text/plain",
 }
 
-function serve() {
+// isolated: as a host with #583's headers serves it (the preview's rule).
+function serve(isolated = false) {
   const swiftRequests = []
   const server = createServer((request, response) => {
     let path = decodeURIComponent(new URL(request.url, "http://x").pathname)
@@ -70,7 +81,9 @@ function serve() {
     try {
       const body = readFileSync(file)
       if (path.includes("/static/swift")) swiftRequests.push({ path, bytes: body.length })
-      response.writeHead(200, { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-cache" })
+      const headers = { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-cache" }
+      if (isolated) Object.assign(headers, headersFor(siteFolder, new URL(request.url, "http://x").pathname))
+      response.writeHead(200, headers)
       response.end(request.method === "HEAD" ? undefined : body)
     } catch {
       response.writeHead(404).end("not found")
@@ -92,16 +105,18 @@ const chrome = spawn(chromePath, [
 ], { stdio: ["ignore", "ignore", "pipe"] })
 
 let served = null
+let isolatedServed = null
 function finish(code, message) {
   console.log(message)
   served?.server.close()
+  isolatedServed?.server.close()
   chrome.kill()
   setTimeout(() => {
     rmSync(work, { recursive: true, force: true })
     process.exit(code)
   }, 300)
 }
-const timer = setTimeout(() => finish(1, "FAIL: the Swift blocks were not checked within 240 s"), 240000)
+const timer = setTimeout(() => finish(1, "FAIL: the Swift blocks were not checked within 360 s"), 360000)
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
 const PAGE_HELPERS = `
@@ -117,10 +132,18 @@ window.__swift = {
       editor: !!block.querySelector("textarea.plantoir-runner-editor"),
       note: block.querySelector(".plantoir-runner-note")?.textContent ?? null,
       inputShown: !block.querySelector(".plantoir-runner-input").hidden,
-      buttons: Array.from(block.querySelectorAll(".plantoir-runner-controls > button")).map((button) => button.textContent),
+      buttons: Array.from(block.querySelectorAll(".plantoir-runner-controls > button")).filter((button) => !button.hidden).map((button) => button.textContent),
       runDisabled: block.querySelector(".plantoir-runner-run").disabled,
       status: block.querySelector(".plantoir-runner-status").textContent,
       output: output.textContent,
+      answerShown: !!block.querySelector("input.plantoir-runner-answer"),
+      answerFocused: document.activeElement === block.querySelector("input.plantoir-runner-answer"),
+      beforeAnswer: (() => {
+        const field = block.querySelector("input.plantoir-runner-answer")
+        let text = ""
+        for (let node = output.firstChild; node !== null && node !== field; node = node.nextSibling) text += node.textContent
+        return field ? text : null
+      })(),
     }
   },
   setInput: (index, text) => { window.__swift.block(index).querySelector(".plantoir-runner-input-lines").value = text },
@@ -205,13 +228,33 @@ async function connect(chunk) {
       // 1. Nothing fetched; read-only blocks with their note.
       expect("loading the page fetched something of Swift", served.swiftRequests.length === 0, served.swiftRequests)
       const first = await evaluate("window.__swift.state(0)")
-      expect("the page has the six planted Swift blocks", first && first.count === 6, first)
+      expect("the page has the seven planted Swift blocks", first && first.count === 7, first)
       expect("a Swift block is read-only with Run and Stop and the cannot-edit note", first && first.built && !first.editor
         && JSON.stringify(first.buttons) === JSON.stringify([said("run"), said("stop")]) && first.note === said("cannotEdit"), first)
       expect("the input box shows for code that calls readLine()", first && first.inputShown, first)
+      // #585: a read-only Swift block keeps Shiki's own colours and every
+      // line its number and hairline once the page's script has run (ruling
+      // R1 and the director's Q1: nothing in the runner strips them).
+      const looks = await evaluate(`(() => {
+        const out = []
+        for (const block of document.querySelectorAll(".plantoir-runner")) {
+          const original = block.querySelector(".plantoir-runner-original")
+          const lines = Array.from(block.querySelectorAll(".plantoir-runner-original pre > code > [data-line]"))
+          const coloured = block.querySelectorAll(".plantoir-runner-original pre > code [style*='--shiki-light'][style*='--shiki-dark']").length
+          const number = lines.length > 0 ? getComputedStyle(lines[0], "::before") : null
+          out.push({ built: block.dataset.built === "true", shown: original ? getComputedStyle(original).display !== "none" : false,
+            lines: lines.length, coloured, numbered: number ? number.content === "counter(line)" : false,
+            hairline: number ? number.borderRightWidth + " " + number.borderRightStyle : "", frame: !!block.querySelector(".plantoir-runner-frame") })
+        }
+        return out
+      })()`)
+      expect("every Swift block shows Shiki's colours with every line numbered beside a hairline, and no editor frame (#585)",
+        looks.length === 7 && looks.every((one) => one.built && one.shown && one.lines > 0 && one.coloured > 0 && one.numbered
+          && one.hairline === "1px solid" && !one.frame), looks)
 
       // 2. Run with input; then changed input.
       let state = await run(0, "Ada\n15")
+      const greetingBox = state.output
       const embeddedFirstRun = { ms: state.ms, bytes: served.swiftRequests.filter((r) => r.path.endsWith(".wasm")).reduce((sum, r) => sum + r.bytes, 0) }
       expect("Run prints the greeting with each input echoed after its prompt",
         state.output === "What is your name?\nAda\nHello, Ada! Your name has 3 letters.\nHow old are you?\n15\nNext year you will be 16.\nYou can learn to drive in 1 years.\n"
@@ -255,13 +298,79 @@ async function connect(chunk) {
       const wanted = gate("05-arrays.expected").replace("Type some whole numbers separated by spaces:\n",
         "Type some whole numbers separated by spaces:\n" + gate("05-arrays.stdin"))
       expect("the full-library block prints what swift-gate 05 expects", state.output === wanted && state.status === said("finished"), state)
+      const fullBox = state.output
+      state = await run(6, "Ada\n2")
+      const promptBox = state.output
+      const promptWanted = JSON.parse(gate("expected.json")).fragments["13-prompt"].transcript
+      expect("a prompt on the answer's line: the box's transcript", promptBox === promptWanted, state)
+
+      // 8. Live input (#583).
+      isolatedServed = await serve(true)
+      await send("Page.navigate", { url: `http://127.0.0.1:${isolatedServed.port}${pagePath}` })
+      loaded = false
+      for (let tries = 0; tries < 80 && !loaded; tries += 1) {
+        await pause(250)
+        loaded = (await evaluate("document.readyState")) === "complete"
+      }
+      await evaluate(PAGE_HELPERS)
+      await pause(800)
+      expect("served with the headers, the Swift page is cross-origin isolated", (await evaluate("self.crossOriginIsolated === true")) === true)
+      const WAITING = [said("waitingForInput")]
+      const press = async (key, keyCode, modifiers = 0) => {
+        await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key, code: key, windowsVirtualKeyCode: keyCode, modifiers })
+        await send("Input.dispatchKeyEvent", { type: "keyUp", key, code: key, windowsVirtualKeyCode: keyCode, modifiers })
+        await pause(100)
+      }
+      const answerWith = async (text) => {
+        await send("Input.insertText", { text })
+        await press("Enter", 13)
+      }
+      const waitFor = (index, words, seconds = 15) => evaluate(`window.__swift.settled(${index}, ${JSON.stringify(words)}, ${seconds})`)
+      const liveRun = async (index, answers, before) => {
+        await evaluate(`window.__swift.press(${index}, "run")`)
+        const prompts = []
+        for (const answer of answers) {
+          await waitFor(index, WAITING)
+          const now = await evaluate(`window.__swift.state(${index})`)
+          prompts.push({ before: now.beforeAnswer, focused: now.answerFocused })
+          await answerWith(answer)
+        }
+        await waitFor(index, ENDED)
+        await pause(150)
+        return { state: await evaluate(`window.__swift.state(${index})`), prompts }
+      }
+      state = await evaluate("window.__swift.state(0)")
+      expect("on a live page the box never shows for Swift", !state.inputShown, state)
+      let live = await liveRun(0, ["Ada", "15"])
+      expect("Embedded Swift asks live: each prompt painted before the focused field, and the transcript is the box's",
+        live.state.output === greetingBox && live.state.status === said("finished") && !live.state.answerShown
+        && live.prompts[0].before === "What is your name?\n" && live.prompts[0].focused
+        && live.prompts[1].before === "What is your name?\nAda\nHello, Ada! Your name has 3 letters.\nHow old are you?\n", live)
+      live = await liveRun(6, ["Ada", "2"])
+      expect("a prompt on the answer's line: the field waits on that line, and the transcript is the box's",
+        live.state.output === promptBox && live.prompts[0].before === "What is your name? ", live)
+      live = await liveRun(5, gate("05-arrays.stdin").replace(/\n$/, "").split("\n"))
+      expect("the full library asks live, with the box's transcript", live.state.output === fullBox && live.state.status === said("finished"), live)
+      await evaluate(`window.__swift.press(6, "run")`)
+      await waitFor(6, WAITING)
+      await press("d", 68, 2)
+      await waitFor(6, ENDED)
+      await pause(150)
+      state = await evaluate("window.__swift.state(6)")
+      expect("Ctrl-D is the end of input: readLine() is nil, and stays nil", state.output === "What is your name? Nice to meet you, .\nHow many pets do you have? 0 pets. Lovely!\n"
+        && state.status === said("finished"), state)
+      await evaluate(`window.__swift.press(0, "run")`)
+      await waitFor(0, WAITING)
+      await evaluate(`window.__swift.press(0, "stop")`)
+      state = await evaluate("window.__swift.state(0)")
+      expect("Stop ends a Swift program that waits", state.status === said("stopped") && !state.answerShown, state)
 
       clearTimeout(timer)
       const ok = problems.length === 0
       finish(ok ? 0 : 1, (ok ? "OK: " : "FAIL: " + problems.join("\n  ") + "\n")
         + JSON.stringify({ embeddedFirstRun, fullFirstRun, stopMs }))
     } catch (error) {
-      finish(1, "FAIL: " + (error?.stack ?? error))
+      finish(1, "FAIL: " + (problems.length > 0 ? problems.join("\n  ") + "\n  and then: " : "") + (error?.stack ?? error))
     }
   }
 }
