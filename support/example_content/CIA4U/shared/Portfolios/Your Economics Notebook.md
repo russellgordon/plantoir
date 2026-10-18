@@ -29,7 +29,8 @@ Tables are revised, so the retrieval date is what keeps a claim checkable.
 ## What a complete entry contains
 
 Copy this list into the notebook and read down it before each entry goes
-in. The boxes are a form to fill in on paper, not something this records.
+in. You can tick it here too: your browser keeps the ticks on this computer,
+and nobody else sees them.
 
 - [ ] The term or figure, named exactly as the source names it
 - [ ] The reference period — the month, quarter, or year the value is for
