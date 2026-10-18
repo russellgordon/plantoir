@@ -1540,12 +1540,13 @@ def _wire_list_page_toc(layout_ts: Path) -> None:
 
 
 def _wire_transformers_index(index_ts: Path) -> None:
-    """Export the figures transformer (#485 E1), the runnable code's (#455)
-    and the self-check quizzes' (#563) beside Quartz's own."""
+    """Export the figures transformer (#485 E1), the runnable code's (#455),
+    the self-check quizzes' (#563) and the task boxes' (#519) beside
+    Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
-                         ("PlantoirQuizzes", "./plantoirQuizzes")):
+                         ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1638,6 +1639,29 @@ def _wire_quizzes_transformer(config_ts: Path) -> None:
     config_ts.write_text(text, encoding="utf-8")
 
 
+def _wire_tasks_transformer(config_ts: Path) -> None:
+    """Put the task boxes' transformer (#519) straight AFTER the self-check
+    quizzes': it works at the html stage, and must find every quiz already
+    decided and carrying its class, so the boxes inside a quiz stay as the
+    quiz left them. Anchored on PlantoirQuizzes, so a section wired before
+    #519 gets it in the same place as a fresh one."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirTasks(" in text:
+        return
+    anchor = "Plugin.PlantoirQuizzes(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not make the site's task boxes tickable: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not make the site's task boxes tickable: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirTasks()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
 # Live input (#583): the two edits to Quartz itself that cross-origin
 # isolation needs (contracts/shared-rules.json -> codeRunnerBlocks.isolation).
 ISOLATION_SERVE_MARKER = "PLANTOIR-ISOLATION-SERVE"
@@ -1702,7 +1726,9 @@ def wire_quartz_additions(output_dir: Path) -> None:
     in afterBody; its exports ride the two index edits), the self-check
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
-    button's component), the folder pages' table of contents (#520), and
+    button's component), the task boxes' one (#519: its transformer after
+    the quizzes'; export, script and styles ride as the quizzes' do), the
+    folder pages' table of contents (#520), and
     live input's two (#583: the preview's server sends the isolation
     headers, and Quartz's router loads a page whole across the isolation
     line).
@@ -1718,6 +1744,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz" / "plugins" / "transformers" / "index.ts", _wire_transformers_index),
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
+        (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz.layout.ts", _wire_code_runner_component),
         (output_dir / "quartz.layout.ts", _wire_list_page_toc),

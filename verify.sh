@@ -1163,6 +1163,24 @@ else
   cat /tmp/verify_quiz_rules_site.log
 fi
 
+# ---- Task boxes students tick (#519): the rules, run where they really run ----
+# taskRules.ts and the transformer (plantoirTasks.ts - the only producer of an
+# item's id) are bundled with Quartz's own text transform and parser, and every
+# taskBoxes case is run through them in Node: each case's Markdown reads as
+# Quartz rewrites it, the transformer stamps the case's ids in order, and the
+# key, the id and the read API are the contract's.
+echo ""
+echo "🔎 Checking the task-box rules against what the site runs…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_task_rules_against_the_site.py" /opt/scripts/check_task_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_task_rules_against_the_site.py \
+  >/tmp/verify_task_rules_site.log 2>&1; then
+  pass "every taskBoxes case holds in the site's own code over Quartz's own text transform and parser: the item's text, its id, the key and the read API (scripts/check_task_rules_against_the_site.py, #519)"
+else
+  fail "every taskBoxes case holds in the site's own code over Quartz's own text transform and parser: the item's text, its id, the key and the read API (scripts/check_task_rules_against_the_site.py, #519)"
+  cat /tmp/verify_task_rules_site.log
+fi
+
 # ---- Diagrams and graphs (#485 E1): the rules, run against the real engines ----
 # figureRules.js (the file the site's transformer and the build's helper both
 # import) runs every tidy and cacheKey case in Node; the helper, driven as a
@@ -1826,6 +1844,8 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
         "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
+        "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
+        "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2708,6 +2728,45 @@ def png(width, height):
     "> - [ ] 23\n>\n> > [!explain]- Why\n> > `*` multiplies. Run it:\n> > " + F + "swift run\n> > let n = 2\n> > print(n * 3)\n> > " + F + "\n",
     encoding="utf-8")
 QUIZPLANTS
+# ---- #519: task boxes students tick, planted for the same build ----
+# Task Fixture: every contracts/shared-rules.json -> taskBoxes.itemText case
+# in order, each after a "Case n" line (6l reads each box's id back), then a
+# Checklist section of its own; Task CRLF: the CR LF case on a page saved with
+# CR LF; Task Host: the Checklist transcluded twice, and an item of its own
+# (a transcluded box keeps its source page's name, and two copies stay in
+# step); Task Twin A and B: two pages alike in every element but their items'
+# words, so Quartz's router reuses one's boxes for the other (review F3 - the
+# browser check proves the reuse happened before it trusts what it reads);
+# Task Printable: a printable page with a task list (what paper shows).
+# Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE" <<'TASKPLANTS'
+import json, sys
+from pathlib import Path
+course = Path(sys.argv[1])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["taskBoxes"]
+body = "Task boxes planted by verify.sh (plantoir-task-sentinel-7f3a).\n\n## Cases\n\n"
+for number, case in enumerate(rules["itemText"]["cases"], start=1):
+    if case.get("crlf"):
+        continue
+    body += f"Case {number}: {case['name']}.\n\n{case['markdown']}\n\n"
+body += ("## Checklist\n\n- [ ] Sharpen your pencil\n- [x] Find your notebook\n"
+         "- [ ] Read [[Task Host]] before class\n")
+(course / "Task Fixture.md").write_text("---\ntitle: Task Fixture\n---\n" + body, encoding="utf-8")
+crlf = [case for case in rules["itemText"]["cases"] if case.get("crlf")][0]
+(course / "Task CRLF.md").write_bytes(("---\r\ntitle: Task CRLF\r\n---\r\nSaved with CR LF (plantoir-task-crlf-7f3a).\r\n\r\n"
+                                       + crlf["markdown"]).encode("utf-8"))
+(course / "Task Host.md").write_text(
+    "---\ntitle: Task Host\n---\nAnother page's checklist, twice (plantoir-task-host-7f3a).\n\n"
+    "- [ ] An item of the host's own\n\n![[Task Fixture#Checklist]]\n\n![[Task Fixture#Checklist]]\n", encoding="utf-8")
+for twin in ("A", "B"):
+    (course / f"Task Twin {twin}.md").write_text(
+        f"---\ntitle: Task Twin {twin}\n---\nA twin page planted by verify.sh.\n\n"
+        f"- [ ] Twin {twin} first item\n- [ ] Twin {twin} second item\n", encoding="utf-8")
+(course / "Task Printable.md").write_text(
+    "---\ntitle: Task Printable\nprintable: true\n---\nA printable checklist (plantoir-task-printable-7f3a).\n\n"
+    "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
+    encoding="utf-8")
+TASKPLANTS
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -3500,6 +3559,118 @@ else
   fail "self-check quizzes: one of the checks above failed (#563)"
 fi
 
+# ---- 6l. Task boxes students tick (#519), as the build left them ----
+# Every task box outside a quiz, on every page of the site, lost `disabled`,
+# carries plantoir-task, the page it was written on and an id, and sits first
+# in a plantoir-task-label; Task Fixture's and Task CRLF's ids are the
+# contract's itemText ids in order (so the real build - Quartz's text
+# transform, a callout's inserted line, a page saved with CR LF - stamps what
+# the contract says); Task Host's transcluded copies carry Task-Fixture; every
+# box inside a quiz (a not-ready quiz's choices) is still disabled and
+# unstamped; the script and the styles are in every page's postscript.js and
+# index.css.
+if python3 - "$SITE_PUBLIC" <<'TASKPY'
+import json, sys
+from html.parser import HTMLParser
+from pathlib import Path
+public = Path(sys.argv[1])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["taskBoxes"]
+problems = []
+class Boxes(HTMLParser):
+    """Each checkbox in a task item: its attributes, whether a quiz holds it,
+    and whether it opens a plantoir-task-label."""
+    def __init__(self):
+        super().__init__()
+        self.quiz_depth, self.stack, self.boxes, self.last_start = 0, [], [], None
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        classes = (attributes.get("class") or "").split()
+        if tag == "input" and attributes.get("type") == "checkbox":
+            in_task_item = any(item == "li-task" for item in self.stack[-2:])
+            first_in_label = self.last_start is not None and self.last_start[0] == "label" \
+                and "plantoir-task-label" in self.last_start[1]
+            self.boxes.append({"attributes": attributes, "in_quiz": self.quiz_depth > 0,
+                               "first_in_label": first_in_label, "task_item": in_task_item or first_in_label})
+        if tag not in ("input", "img", "br", "hr", "meta", "link", "wbr", "source"):
+            marker = "li-task" if tag == "li" and "task-list-item" in classes else tag
+            quiz = tag == "blockquote" and "plantoir-quiz" in classes
+            self.stack.append(marker)
+            if quiz or (self.quiz_depth > 0):
+                self.quiz_depth += 1
+        self.last_start = (tag, classes)
+    def handle_endtag(self, tag):
+        if tag in ("input", "img", "br", "hr", "meta", "link", "wbr", "source"):
+            return
+        if self.stack:
+            self.stack.pop()
+            if self.quiz_depth > 0:
+                self.quiz_depth -= 1
+        self.last_start = None
+def boxes_in(path):
+    reader = Boxes()
+    reader.feed(path.read_text(encoding="utf-8", errors="replace"))
+    return reader.boxes
+tickable, kept, pages = 0, 0, 0  # boxes outside quizzes, inside them, pages holding either
+for path in sorted(public.rglob("*.html")):
+    found = boxes_in(path)
+    if found:
+        pages += 1
+    for box in found:
+        attributes = box["attributes"]
+        stamped = "plantoir-task" in (attributes.get("class") or "").split()
+        if box["in_quiz"]:
+            if attributes.get("class") and "plantoir-quiz-input" in attributes["class"]:
+                continue
+            kept += 1
+            if stamped or "data-task-item" in attributes or "disabled" not in attributes:
+                problems.append(f"{path.relative_to(public)}: a box inside a quiz was changed: {attributes}")
+            continue
+        tickable += 1
+        if not stamped or "disabled" in attributes or not attributes.get("data-task-page") \
+                or len(attributes.get("data-task-item") or "") != 8 or not box["first_in_label"]:
+            problems.append(f"{path.relative_to(public)}: a task box outside a quiz was not made tickable: {attributes}")
+def ids_on(name):
+    path = public / name
+    return [box["attributes"].get("data-task-item") for box in boxes_in(path)] if path.is_file() else None
+def pages_on(name):
+    path = public / name
+    return [box["attributes"].get("data-task-page") for box in boxes_in(path)] if path.is_file() else None
+expected = []
+for case in rules["itemText"]["cases"]:
+    if not case.get("crlf"):
+        expected += [item["id"] for item in case["items"]]
+fixture = ids_on("Task-Fixture.html")
+if fixture is None or fixture[:len(expected)] != expected or len(fixture) != len(expected) + 3:
+    problems.append(f"Task Fixture's ids are not the contract's: got {fixture}, expected {expected} and the Checklist's three")
+crlf = [case for case in rules["itemText"]["cases"] if case.get("crlf")][0]
+if ids_on("Task-CRLF.html") != [item["id"] for item in crlf["items"]]:
+    problems.append(f"the page saved with CR LF reads {ids_on('Task-CRLF.html')}")
+if set(pages_on("Task-Fixture.html") or ["none"]) != {"Task-Fixture"}:
+    problems.append(f"Task Fixture's boxes name {set(pages_on('Task-Fixture.html') or [])}")
+host = pages_on("Task-Host.html")
+if host != ["Task-Host"] + ["Task-Fixture"] * 6:
+    problems.append(f"the transcluded boxes did not keep their source page's name: {host}")
+if (ids_on("Task-Host.html") or [None])[1:4] != (fixture or [None, None, None])[-3:]:
+    problems.append("a transcluded box's id is not its source's")
+if kept == 0:
+    problems.append("no box inside a quiz was found to check (the not-ready quizzes on Quiz Fixture have some)")
+script = (public / "postscript.js").read_text(encoding="utf-8") if (public / "postscript.js").is_file() else ""
+style = (public / "index.css").read_text(encoding="utf-8") if (public / "index.css").is_file() else ""
+if "plantoir:task:" not in script:
+    problems.append("the site's script does not carry the task boxes'")
+if "plantoir-task-label" not in style:
+    problems.append("the site's styles do not carry the task boxes'")
+for problem in problems[:20]:
+    print("   " + problem)
+print(f"   {tickable} task boxes outside quizzes on {pages} pages; {kept} inside quizzes")
+sys.exit(1 if problems else 0)
+TASKPY
+then
+  pass "task boxes: every box outside a quiz on every page is tickable, labelled and stamped with its page and the contract's id (a callout, a rewritten link and CR LF included), a transcluded box keeps its source page, and a quiz's boxes are left as they were (#519)"
+else
+  fail "task boxes: one of the checks above failed (#519)"
+fi
+
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
 # The rule is in the one index.css every page links, as the site's minifier
 # writes it, and the page rows it relies on are still Quartz's: a page row's
@@ -3629,9 +3800,16 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "self-check quizzes did not answer in a browser as the contract says (browser-checks/quiz_check.mjs, #563)"
     cat /tmp/verify_quiz_check.log
   fi
+  # #519: task boxes ticked in a browser, by mouse and keyboard, and on paper.
+  if node browser-checks/task_boxes.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_task_boxes.log 2>&1; then
+    pass "task boxes in a browser: the Markdown's state until a box is changed and nothing written on load, the contract's key written and kept across a reload, the words, a link inside them, Tab and Space, a transcluded copy setting its source's tick in step, five page changes and one listener, a page the router built from the last one's elements showing its own ticks, a tick under old words ignored, a not-ready quiz left alone, storage refused, and ink for a tick on paper in both themes - $(head -1 /tmp/verify_task_boxes.log | sed 's/^OK: //') (#519, browser-checks/task_boxes.mjs)"
+  else
+    fail "task boxes did not tick in a browser as the contract says (browser-checks/task_boxes.mjs, #519)"
+    cat /tmp/verify_task_boxes.log
+  fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), and self-check quizzes in a browser (#563): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), and self-check quizzes in a browser (#563): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul

@@ -28243,5 +28243,444 @@
       "Writing into a course while it is open in Obsidian: Obsidian writes its in-memory list back on every add-on switch and drops the new id, and the marker would then read as the teacher switching it off - so the preview pass waits and Open in Obsidian asks to reopen.",
       "Re-enabling an add-on the teacher switched off, writing over the teacher's own copy, or downgrading one Obsidian updated."
     ]
+  },
+  "taskBoxes": {
+    "note": "Task boxes students tick (#519, v1.8.1). A Markdown task item (`- [ ] Bring a pencil`) is drawn by Quartz as a disabled checkbox; on a class site every such box outside a self-check quiz can be ticked by a student, and the tick is kept in that student's own browser. The teacher's page never changes: a tick on the site is the student's, not the page's. Implemented once, in support/quartz (plugins/transformers/taskRules.ts and plantoirTasks.ts, components/scripts/tasks.inline.ts, components/styles/tasks.scss), so Windows inherits it with the build; run by scripts/check_task_rules_against_the_site.py, verify.sh 6l and browser-checks/task_boxes.mjs. documentation/06-quartz-customizations.md -> K.",
+    "rule": "Every task box on a page that is not inside a self-check quiz (`.plantoir-quiz`) loses `disabled`, is stamped `class=\"plantoir-task\"`, `data-task-page=<the slug of the page the item is WRITTEN on>` and `data-task-item=<the item's id>`, and is wrapped, with the item's words up to the first thing that is not inline text, in `<label class=\"plantoir-task-label\">`. The page's script restores each box from the student's tick, or from the Markdown's own state when there is none, on every page shown, and keeps a tick when a box is changed.",
+    "why": "Students try to tick a checklist to track their own progress (Russell, 2026-10-13). Nothing is sent anywhere; nothing is collected.",
+    "which": {
+      "rule": "Tickable: `li.task-list-item` whose first child is the box (tight) or whose first paragraph's first child is (loose), with no `.plantoir-quiz` ancestor. Kept exactly as Quartz drew them (disabled, no class, no label): every box inside a quiz - a not-ready quiz's choices among them, and a quiz nested in a list or another callout (always not ready, quizCallouts.recognise) - and a box whose item has no place in the parsed text (none was found in the fixture or the overnight courses).",
+      "cases": [
+        {
+          "where": "a not-ready quiz's choices (`.plantoir-quiz[data-quiz-kind=notReady]`)",
+          "tickable": false
+        },
+        {
+          "where": "a quiz nested inside a list item or another callout",
+          "tickable": false
+        },
+        {
+          "where": "a built quiz's choices (`input.plantoir-quiz-input`, never a task item)",
+          "tickable": false
+        },
+        {
+          "where": "a task item inside an ordinary callout (`> [!todo]`)",
+          "tickable": true
+        },
+        {
+          "where": "a task item in a list nested in another list item",
+          "tickable": true
+        }
+      ]
+    },
+    "itemText": {
+      "rule": "The item's FIRST line as Quartz parsed it - after every text transform, so an Obsidian link to a heading or to a website is read rewritten, a %%comment%% is gone, and a callout's title has a line of its own (review F1) - read from the parsed text at the item's own line: its `>` markers, indent, list markers (`-`, `*`, `+`, `1.`, `1)`) and box (`[ ]`, `[x]`, `[X]`) and the white space after it taken off; ASCII white space (space, tab, CR, LF, FF, VT) trimmed from both ends and each run of it made one space; then Unicode's composed form (NFC). A no-break space, a byte-order mark or U+0085 is part of the text.",
+      "producer": "plantoirTasks.ts, at build time, is the ONLY producer of ids, and stamps each on its box (`data-task-item`). The page's script never derives one, and neither does #545 (My progress): it reads `data-task-item` from the built pages. A mirror re-derived from the teacher's raw file would disagree on every rewritten shape below.",
+      "cases": [
+        {
+          "name": "a plain item",
+          "markdown": "- [ ] Bring a pencil",
+          "items": [
+            {
+              "text": "Bring a pencil",
+              "id": "d705cb65"
+            }
+          ]
+        },
+        {
+          "name": "a ticked item: the box is not part of the text",
+          "markdown": "- [x] Read chapter one",
+          "items": [
+            {
+              "text": "Read chapter one",
+              "id": "22fa9cbc"
+            }
+          ]
+        },
+        {
+          "name": "a capital X",
+          "markdown": "- [X] Read chapter two",
+          "items": [
+            {
+              "text": "Read chapter two",
+              "id": "1baeadc2"
+            }
+          ]
+        },
+        {
+          "name": "a * marker",
+          "markdown": "* [ ] Charge your laptop",
+          "items": [
+            {
+              "text": "Charge your laptop",
+              "id": "60bd7194"
+            }
+          ]
+        },
+        {
+          "name": "a + marker",
+          "markdown": "+ [ ] Pack a lunch",
+          "items": [
+            {
+              "text": "Pack a lunch",
+              "id": "336c4d53"
+            }
+          ]
+        },
+        {
+          "name": "an ordered item, 1.",
+          "markdown": "1. [ ] Open the editor",
+          "items": [
+            {
+              "text": "Open the editor",
+              "id": "92dd3c5b"
+            }
+          ]
+        },
+        {
+          "name": "an ordered item, 1)",
+          "markdown": "1) [ ] Save your file",
+          "items": [
+            {
+              "text": "Save your file",
+              "id": "9b97500f"
+            }
+          ]
+        },
+        {
+          "name": "inside a callout: Quartz gives the title a line of its own, so an item's place in the page is not its line in the file",
+          "markdown": "> [!todo] Before class\n> - [ ] Charge your laptop tonight\n> - [x] Read the handout",
+          "quartzReads": "> [!todo] Before class\n> \n> - [ ] Charge your laptop tonight\n> - [x] Read the handout",
+          "items": [
+            {
+              "text": "Charge your laptop tonight",
+              "id": "e6d2b791"
+            },
+            {
+              "text": "Read the handout",
+              "id": "ed371fe5"
+            }
+          ]
+        },
+        {
+          "name": "inside two quotes",
+          "markdown": "> > - [ ] Inside two quotes",
+          "items": [
+            {
+              "text": "Inside two quotes",
+              "id": "1ebb4d04"
+            }
+          ]
+        },
+        {
+          "name": "a nested item: each line its own",
+          "markdown": "- [ ] Parent step\n  - [ ] Child step",
+          "items": [
+            {
+              "text": "Parent step",
+              "id": "76c4ab35"
+            },
+            {
+              "text": "Child step",
+              "id": "e6d4e315"
+            }
+          ]
+        },
+        {
+          "name": "a tab after the box",
+          "markdown": "- [ ]\tTabbed item",
+          "items": [
+            {
+              "text": "Tabbed item",
+              "id": "1fce867a"
+            }
+          ]
+        },
+        {
+          "name": "runs of spaces made one, and spaces at the end trimmed",
+          "markdown": "- [ ] Two  spaces   inside   ",
+          "items": [
+            {
+              "text": "Two spaces inside",
+              "id": "1900ad90"
+            }
+          ]
+        },
+        {
+          "name": "only the first line counts",
+          "markdown": "- [ ] First line\n  carried on here",
+          "items": [
+            {
+              "text": "First line",
+              "id": "6024cb99"
+            }
+          ]
+        },
+        {
+          "name": "a link with its own words",
+          "markdown": "- [ ] Read [[Setting Up Python|the setup page]]",
+          "items": [
+            {
+              "text": "Read [[Setting Up Python|the setup page]]",
+              "id": "a25bb025"
+            }
+          ]
+        },
+        {
+          "name": "a link to a heading: Quartz rewrites it before it is read",
+          "markdown": "- [ ] Read [[Setting Up Python#Install Steps]] first",
+          "quartzReads": "- [ ] Read [[Setting Up Python#install-steps|Install Steps]] first",
+          "items": [
+            {
+              "text": "Read [[Setting Up Python#install-steps|Install Steps]] first",
+              "id": "59f090dc"
+            }
+          ]
+        },
+        {
+          "name": "an Obsidian link to a website: Quartz rewrites it as a Markdown link",
+          "markdown": "- [ ] See [[https://example.com|the example]]",
+          "quartzReads": "- [ ] See [the example](https://example.com)",
+          "items": [
+            {
+              "text": "See [the example](https://example.com)",
+              "id": "0de45858"
+            }
+          ]
+        },
+        {
+          "name": "a %%comment%%: Quartz takes it out, so the item's id is the one it has without it",
+          "markdown": "- [ ] Bring paper %%teacher note%% and glue",
+          "quartzReads": "- [ ] Bring paper  and glue",
+          "items": [
+            {
+              "text": "Bring paper and glue",
+              "id": "15a15d95"
+            }
+          ]
+        },
+        {
+          "name": "a formula",
+          "markdown": "- [ ] Solve $x^2 = 9$",
+          "items": [
+            {
+              "text": "Solve $x^2 = 9$",
+              "id": "f462ba64"
+            }
+          ]
+        },
+        {
+          "name": "bold first: the words as written, not as the tree holds them (#519 plan M10)",
+          "markdown": "- [ ] **Bold** start",
+          "items": [
+            {
+              "text": "**Bold** start",
+              "id": "da50e58e"
+            }
+          ]
+        },
+        {
+          "name": "the same words twice on one page: one id, one tick (ruling Q5)",
+          "markdown": "- [ ] Check your work\n- [ ] Check your work",
+          "items": [
+            {
+              "text": "Check your work",
+              "id": "3a855a63"
+            },
+            {
+              "text": "Check your work",
+              "id": "3a855a63"
+            }
+          ]
+        },
+        {
+          "name": "a no-break space is part of the text, not white space (review F9)",
+          "markdown": "- [ ] No break",
+          "items": [
+            {
+              "text": "No break",
+              "id": "48e61ca5"
+            }
+          ]
+        },
+        {
+          "name": "decomposed accents read as composed (NFC), so a file saved either way keeps its ticks",
+          "markdown": "- [ ] Café visit",
+          "items": [
+            {
+              "text": "Café visit",
+              "id": "0ef9e937"
+            }
+          ]
+        },
+        {
+          "name": "a page saved with CR LF",
+          "crlf": true,
+          "markdown": "- [ ] Saved on Windows\r\n- [x] Ticked on Windows\r\n",
+          "items": [
+            {
+              "text": "Saved on Windows",
+              "id": "afa15bd4"
+            },
+            {
+              "text": "Ticked on Windows",
+              "id": "d4dee1e3"
+            }
+          ]
+        }
+      ]
+    },
+    "itemId": {
+      "rule": "taskItemId(text) = FNV-1a (32-bit, offset 0x811c9dc5, prime 0x01000193) over the text's UTF-16 code units, as eight lower-case hex digits - the hash runnable code keys a student's edits with (codeRunnerRule.fnv1a). From the text alone: adding, removing or moving an item never moves another's tick, ticking or unticking `[ ]`/`[x]` in the file keeps the id, and the same words twice on one page are one id and one tick (ruling Q5).",
+      "cases": [
+        {
+          "text": "Bring a pencil",
+          "id": "d705cb65",
+          "why": "ASCII"
+        },
+        {
+          "text": "Café visit",
+          "id": "0ef9e937",
+          "why": "a composed accent: one UTF-16 code unit"
+        },
+        {
+          "text": "Pack 🍎 snacks",
+          "id": "232b4649",
+          "why": "an emoji: two UTF-16 code units (a surrogate pair), each hashed - pins the units for any mirror"
+        },
+        {
+          "text": "",
+          "id": "811c9dc5",
+          "why": "an item with no words after its box: FNV-1a's starting value"
+        }
+      ],
+      "tickedOrNot": {
+        "lines": [
+          "- [ ] Hand in the lab",
+          "- [x] Hand in the lab"
+        ],
+        "id": "0fc6bd83"
+      }
+    },
+    "key": {
+      "shape": "plantoir:task:<site root path>:<page slug>:<item id>",
+      "rule": "localStorage, value \"1\" (ticked) or \"0\" (unticked). <site root path> is the site's own path on its host, from the page's slug and address (taskRules.siteRootFrom, as the quizzes and runnable code work it out): \"/\" at a host's root, \"/ics3u/\" under a folder. <page slug> is the page the item was WRITTEN on (data-task-page), so a transcluded copy shares its source's tick - the quizzes' rule for a transcluded quiz. A change to this shape resets every student's ticks; it is pinned here so a change is deliberate (Russell, #519 comment of 2026-10-16).",
+      "cases": [
+        {
+          "pageSlug": "Setup/What-to-Bring",
+          "href": "https://ics3u.example.org/Setup/What-to-Bring",
+          "siteRoot": "/",
+          "itemId": "d705cb65",
+          "key": "plantoir:task:/:Setup/What-to-Bring:d705cb65"
+        },
+        {
+          "pageSlug": "Setup/What-to-Bring",
+          "href": "https://teacher.example.org/ics3u/Setup/What-to-Bring",
+          "siteRoot": "/ics3u/",
+          "itemId": "d705cb65",
+          "key": "plantoir:task:/ics3u/:Setup/What-to-Bring:d705cb65"
+        },
+        {
+          "pageSlug": "index",
+          "href": "https://teacher.example.org/ics3u/",
+          "siteRoot": "/ics3u/",
+          "itemId": "d705cb65",
+          "key": "plantoir:task:/ics3u/:index:d705cb65"
+        },
+        {
+          "pageSlug": "Units/Unit-1,-Ratios-3:2",
+          "href": "https://ics3u.example.org/Units/Unit-1,-Ratios-3:2",
+          "siteRoot": "/",
+          "itemId": "3a855a63",
+          "key": "plantoir:task:/:Units/Unit-1,-Ratios-3:2:3a855a63"
+        }
+      ]
+    },
+    "default": "No entry: the Markdown's own state - a `[x]` item shows ticked, `[ ]` unticked. A student who unticks a teacher's `[x]` stores \"0\", which is kept. Nothing is written when a page loads; only a change to a box writes.",
+    "persistence": "A tick survives a reload and every change of page by the site's own navigation. On every page shown (Quartz's `nav` event, which fires on the first load, on a link followed and on Back) every box's `checked` is ASSIGNED, from its tick or from `defaultChecked`: Quartz's router patches the new page into the old page's elements, so a box can be the previous page's own element still holding its tick (#519 plan M5, measured in review F3). ONE change listener, on the document, added once.",
+    "textChange": "Any change to an item's first line, as Quartz reads it, makes a new id, so the old tick is ignored - never migrated - and the item shows the Markdown's state again. The old entry stays in the student's browser, unread. Ticking the box in the file itself (`[ ]` to `[x]`) is not a change of text.",
+    "transclusion": "A transcluded item carries its source page's slug, so it shows and sets the source's tick; two copies of one item on a page stay in step when either is changed.",
+    "readApi": {
+      "rule": "taskRules.readTicks(siteRoot, pageSlug, itemIds, store) -> {id: true | false | null}: true ticked, false unticked, null never touched (apply the Markdown's state). `store` is anything with getItem; one that throws, or a value that is neither \"1\" nor \"0\", reads as null. taskKey and siteRootFrom are exported beside it. For #545, whose page imports the same file - not a `window` global, since each script is bundled on its own and their order is not a contract.",
+      "cases": [
+        {
+          "name": "a tick, an untick and an item never touched",
+          "stored": {
+            "plantoir:task:/:Setup/What-to-Bring:d705cb65": "1",
+            "plantoir:task:/:Setup/What-to-Bring:22fa9cbc": "0"
+          },
+          "siteRoot": "/",
+          "pageSlug": "Setup/What-to-Bring",
+          "itemIds": [
+            "d705cb65",
+            "22fa9cbc",
+            "3a855a63"
+          ],
+          "expect": {
+            "d705cb65": true,
+            "22fa9cbc": false,
+            "3a855a63": null
+          }
+        },
+        {
+          "name": "a value that is neither 1 nor 0 reads as never touched",
+          "stored": {
+            "plantoir:task:/:Setup/What-to-Bring:d705cb65": "yes"
+          },
+          "siteRoot": "/",
+          "pageSlug": "Setup/What-to-Bring",
+          "itemIds": [
+            "d705cb65"
+          ],
+          "expect": {
+            "d705cb65": null
+          }
+        },
+        {
+          "name": "another page's tick, or another site's, is not this one's",
+          "stored": {
+            "plantoir:task:/:Setup/Other-Page:d705cb65": "1",
+            "plantoir:task:/ics3u/:Setup/What-to-Bring:d705cb65": "1"
+          },
+          "siteRoot": "/",
+          "pageSlug": "Setup/What-to-Bring",
+          "itemIds": [
+            "d705cb65"
+          ],
+          "expect": {
+            "d705cb65": null
+          }
+        },
+        {
+          "name": "a store that throws (storage refused) reads as never touched",
+          "throws": true,
+          "stored": {},
+          "siteRoot": "/",
+          "pageSlug": "Setup/What-to-Bring",
+          "itemIds": [
+            "d705cb65",
+            "22fa9cbc"
+          ],
+          "expect": {
+            "d705cb65": null,
+            "22fa9cbc": null
+          }
+        }
+      ]
+    },
+    "knownLimits": [
+      "Per browser and per site: a student's ticks on another computer, in another browser, or on the teacher's preview of the same site are separate.",
+      "Only an item's first line makes its id; a change further down the item keeps the tick.",
+      "A page renamed or moved has a new slug, so its items' ticks start again.",
+      "A link's preview and a search result show the page's own boxes, not the student's ticks, and cannot be ticked.",
+      "Another tab open on the same page catches up on its next page load; there is no listener for another tab's change (the `storage` event was rejected: its cost against a rare case).",
+      "Teachers' existing courses keep the copy of `Style/What This Site Can Do` they were given, which says the boxes cannot be ticked; the release notes say so."
+    ],
+    "rejected": [
+      "Quartz's own `enableCheckbox`: it rewrites every checkbox on a page, the quizzes' inputs among them, and keys a tick by its position, so adding an item moves every tick below it (#519 plan M2).",
+      "An id from the item's position, or a per-page occurrence number for repeated words: inserting an item would move ticks (ruling Q5).",
+      "Re-deriving ids from the teacher's raw file (a build manifest written by Python): it disagrees with what Quartz parses for links to headings, links to websites and comments (review F1).",
+      "A `window.*` read API: scripts are bundled separately and their order in postscript.js is not a contract."
+    ]
   }
 }

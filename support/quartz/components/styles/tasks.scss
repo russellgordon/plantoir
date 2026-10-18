@@ -1,0 +1,95 @@
+// Task boxes students tick (#519). Rides on PlantoirMetaLine.tsx, as
+// quiz.scss does, so it reaches every page's index.css with no layout edit.
+// Every rule is scoped to the transformer's own classes (input.plantoir-task,
+// .plantoir-task-label), so a page with no task item - and a quiz's boxes -
+// are styled exactly as before.
+//
+// This file comes BEFORE Quartz's base.scss in index.css, so its rules win
+// over Quartz's `input[type="checkbox"]` ones by SPECIFICITY alone - keep the
+// attribute selector in `input[type="checkbox"].plantoir-task`.
+//
+// The transformer puts the box inside a <label>, so Quartz's own rules for a
+// task item (`li:has(> input[type="checkbox"])`: no bullet, no indent, struck
+// through when ticked) no longer match; they are said again here for the new
+// shape, tight (li > label > input) and loose (li > p > label > input) -
+// Quartz never matched the loose shape, so a loose item gains them.
+
+.page article {
+  & li.task-list-item:has(> .plantoir-task-label),
+  & li.task-list-item:has(> p:first-child > .plantoir-task-label) {
+    list-style-type: none;
+    padding-left: 0;
+  }
+
+  & li.task-list-item:has(> .plantoir-task-label > input.plantoir-task:checked),
+  & li.task-list-item:has(> p:first-child > .plantoir-task-label > input.plantoir-task:checked) {
+    text-decoration: line-through;
+    text-decoration-color: var(--gray);
+    color: var(--gray);
+  }
+}
+
+.plantoir-task-label {
+  cursor: pointer;
+}
+
+input[type="checkbox"].plantoir-task {
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--darkgray);
+    outline-offset: 2px;
+  }
+}
+
+// A link's preview and a search result show the page's own boxes, not the
+// student's: nothing there can be ticked.
+.popover,
+.preview-container {
+  & input.plantoir-task,
+  & .plantoir-task-label {
+    pointer-events: none;
+    cursor: default;
+  }
+}
+
+// On paper. With the browser's "background graphics" off (its default),
+// Quartz's ticked box - a coloured fill with a white tick drawn on it -
+// prints as an empty box (measured, #519 plan M7), so a ticked item would
+// read as unticked but for the strike-through. Here the tick is drawn in
+// ink, and the box is only an outline, in the page's dark grey.
+//
+// A page that is not printable keeps the dark theme's colours on paper, and
+// there the dark grey is a light one: on white paper the box and its tick
+// all but vanish (measured: no edge darker than 200 of 255), while Chrome
+// darkens the words beside them. So in the dark theme the box prints in
+// $paper-ink, Quartz's own light-theme dark grey (8.5:1 on white).
+$paper-ink: #4e4e4e;
+
+@media print {
+  input[type="checkbox"].plantoir-task {
+    border-color: var(--darkgray);
+    background-color: transparent;
+
+    &:checked {
+      border-color: var(--darkgray);
+      background-color: transparent;
+
+      &::after {
+        border-color: var(--darkgray);
+      }
+    }
+  }
+
+  :root[saved-theme="dark"] input[type="checkbox"].plantoir-task {
+    border-color: $paper-ink;
+
+    &:checked {
+      border-color: $paper-ink;
+
+      &::after {
+        border-color: $paper-ink;
+      }
+    }
+  }
+}
