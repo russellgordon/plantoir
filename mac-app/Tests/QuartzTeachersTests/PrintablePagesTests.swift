@@ -548,6 +548,10 @@ final class PrintablePagesTests: XCTestCase {
             XCTAssertTrue(skill.contains("## Swift"), home)
             XCTAssertTrue(skill.contains("```swift run"), home)
             XCTAssertTrue(skill.contains("readLine()"), home)
+            // #585: every runnable block numbers its lines, so a traceback's
+            // line is the one a student sees (codeRunnerBlocks.editor.lineNumbers).
+            XCTAssertTrue(skill.contains("line numbers down the left"), home)
+            XCTAssertTrue(skill.contains("look at line 3"), home)
         }
         for name in AgentGuidance.rootFiles {
             let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)

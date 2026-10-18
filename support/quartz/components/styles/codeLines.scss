@@ -1,0 +1,89 @@
+// Every code block's line numbers and letters (#585). THE ONE FILE allowed to
+// restyle Quartz's own static code blocks: CodeRunner.tsx carries it into the
+// site's one index.css beside codeRunner.scss, so it reaches every page on
+// every site, with or without a runnable block - that is the point (rulings
+// R1 and R3: one gutter style for a static block and a runnable one).
+//
+// Quartz 4.5 numbers EVERY highlighted line (base.scss: `pre > code >
+// [data-line]::before { content: counter(line) }`), not only blocks written
+// with showLineNumbers, in a 1rem box with no separator. Here:
+//
+// * plantoir-gutter: the numbers in Quartz's own dimmed colour and the code
+//   font, right-aligned in a box as wide as the block's longest number
+//   (--plantoir-digits, 2 by default, 3 from line 100 and 4 from line 1000 -
+//   Quartz's 1rem box was too narrow from line 10), then a HAIRLINE in the
+//   theme's muted border colour, no fill. A static block's numbers and a
+//   runnable block's gutter (codeRunner.scss, .plantoir-runner-gutter) both
+//   wear it, so the two match in font, colour, width, padding and line.
+// * no programming ligatures in any code, inline included (ruling Q5): Fira Code and
+//   JetBrains Mono would otherwise draw `!=` as one glyph, and an editor's
+//   coloured copy could join a pair across a token's edge where the text a
+//   student types does not.
+//
+// Component styles come BEFORE Quartz's base styles in index.css, so each
+// selector here outranks Quartz's (`:root` adds a class's weight): a tie
+// would lose.
+
+@mixin plantoir-gutter {
+  color: rgba(115, 138, 148, 0.6);
+  font-family: var(--codeFont);
+  text-align: right;
+  width: calc(var(--plantoir-digits, 2) * 1ch);
+  padding-right: 0.75ch;
+  border-right: 1px solid var(--lightgray);
+  box-sizing: content-box;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+:root pre > code:not(.mermaid) > [data-line]::before {
+  @include plantoir-gutter;
+  margin-right: 1ch;
+}
+
+// A block of 100 lines or more needs a third digit; 1000, a fourth. Said in
+// CSS so a page with no script (and no runnable block) gets it too.
+:root pre > code:has(> [data-line]:nth-child(100)) {
+  --plantoir-digits: 3;
+}
+
+:root pre > code:has(> [data-line]:nth-child(1000)) {
+  --plantoir-digits: 4;
+}
+
+// Every code element, inline code in prose included (Russell: "No
+// ligatures anywhere. Let's be consistent.").
+:root pre,
+:root code,
+:root .plantoir-runner .plantoir-runner-editor {
+  font-variant-ligatures: none;
+}
+
+// On paper a long line can wrap (print.scss, plantoir-paper), and a border on
+// the number's box stops at the first row: the hairline is drawn down the
+// LINE's left side instead, at the same place, so it runs past every
+// wrapped row (#585 plan review F4). The handout's own hanging indent is in
+// print.scss.
+@media print {
+  // print-color-adjust: exact, or a browser printing with its default
+  // settings (no background graphics, in Chrome and Safari alike) drops the
+  // hairline; no fill is kept (#585 review F2).
+  :root pre > code:not(.mermaid) > [data-line] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background-image: linear-gradient(var(--lightgray), var(--lightgray));
+    background-repeat: no-repeat;
+    background-size: 1px 100%;
+    background-position: calc(0.25rem + var(--plantoir-digits, 2) * 1ch + 0.75ch) 0;
+  }
+
+  // Only an unhighlighted line gives up its fill: a highlighted one (`{n}`)
+  // keeps Quartz's tint where the page prints backgrounds (#585 fixes review N1).
+  :root pre > code:not(.mermaid) > [data-line]:not([data-highlighted-line]) {
+    background-color: transparent;
+  }
+
+  :root pre > code:not(.mermaid) > [data-line]::before {
+    border-right-color: transparent;
+  }
+}
