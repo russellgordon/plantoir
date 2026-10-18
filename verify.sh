@@ -1854,6 +1854,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
         "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
+        "$HIT_COURSE/Quiz One Blank.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
@@ -2701,6 +2702,11 @@ crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]
 (course / "Quiz Summary.md").write_text(
     "---\ntitle: Quiz Summary\n---\n> [!quiz] Fill `____` and `____`.\n> > [!answer]-\n> > summary-answer-7f3a\n> > b\n",
     encoding="utf-8")
+# #588: a fill-in-the-blank question with ONE blank, on a page of its own so
+# Quiz Playground's quizzes and score are not moved.
+(course / "Quiz One Blank.md").write_text(
+    "---\ntitle: Quiz One Blank\n---\nOne blank (plantoir-quiz-one-blank-7f3a).\n\n"
+    "> [!quiz] The capital of France is `____`.\n> > [!answer]-\n> > Paris\n", encoding="utf-8")
 (course / "Quiz Hidden.md").write_text(
     "---\ntitle: Quiz Hidden\npublish: false\n---\nHidden (plantoir-quiz-hidden-7f3a).\n\n> [!quiz] Broken.\n> - [ ] a\n> - [ ] b\n",
     encoding="utf-8")

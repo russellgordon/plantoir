@@ -316,6 +316,17 @@ export function isBlank(value: string): boolean {
   return /^_{3,}$/.test(value)
 }
 
+// What a fill-in-the-blank question says when it is checked (#588,
+// quizCallouts.feedback.blanks): the key of the words in words.site and the
+// numbers they are filled with. Only `fill` says how many blanks are right;
+// every other kind says right or notRight.
+export function blanksFeedback(right: number, count: number): { key: string; values: Record<string, number> } {
+  if (right === count) {
+    return { key: "right", values: {} }
+  }
+  return { key: "someBlanksRight", values: { right, count } }
+}
+
 // The words a teacher reads, with {name} filled in one pass.
 export function filledWords(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{([A-Za-z]+)\}/g, (whole: string, key: string) =>

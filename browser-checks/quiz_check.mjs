@@ -8,7 +8,8 @@
 // Printable` (a printable page with quizzes):
 //
 //  1. each kind, answered wrongly and then rightly, says the contract's
-//     words; a blank is marked in words; an empty answer is never checked;
+//     words (a fill-in-the-blank question its feedback.blanks case, one
+//     blank on `Quiz One Blank` among them, #588); a blank is marked in words; an empty answer is never checked;
 //     the explanation is revealed - its TEXT visible, not only its title -
 //     and a graph inside it drawn; Show answer marks the right choice, or
 //     shows the answer with its formula set by KaTeX (review S9);
@@ -65,6 +66,12 @@ const RULES = ALL_RULES.quizCallouts
 const RUNNER_WORDS = ALL_RULES.codeRunnerBlocks.words
 const said = (key, values = {}) =>
   RULES.words.site[key].replace(/\{([A-Za-z]+)\}/g, (whole, name) => (name in values ? String(values[name]) : whole))
+// What a fill-in-the-blank question says with `right` of `count` blanks
+// right (quizCallouts.feedback.blanks, #588), from the contract's own case.
+const blanksSay = (right, count) => {
+  const found = RULES.feedback.blanks.cases.find((c) => c.right === right && c.count === count)
+  return said(found.say, found.values)
+}
 
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
@@ -310,7 +317,7 @@ async function connect(chunk) {
 
       // Fill in the blank: marks in words, tolerance and alternatives.
       await evaluate("window.__quiz.type(4, ['50', 'Standard']); window.__quiz.press(4, 'check')")
-      expect("one blank of two says someBlanksRight", (await evaluate("window.__quiz.feedback(4)")) === said("someBlanksRight", { right: 1, count: 2 }))
+      expect("one blank of two right says the contract's feedback.blanks case", (await evaluate("window.__quiz.feedback(4)")) === blanksSay(1, 2))
       const marks = await evaluate("Array.from(window.__quiz.quiz(4).querySelectorAll('.plantoir-quiz-mark')).map((mark) => mark.textContent)")
       expect("each blank is marked in words and a sign", JSON.stringify(marks) === JSON.stringify([said("markWrong"), said("markRight")]), marks)
       const invalid = await evaluate("Array.from(window.__quiz.quiz(4).querySelectorAll('input.plantoir-quiz-blank')).map((box) => box.getAttribute('aria-invalid'))")
@@ -432,6 +439,14 @@ async function connect(chunk) {
       await evaluate("document.querySelector('.plantoir-quiz-start-again').click()")
       const cleared = await evaluate("({ hidden: document.querySelector('.plantoir-quiz-score').hidden, stored: localStorage.getItem('plantoir:quiz:/:Quiz-Playground'), feedback: window.__quiz.feedback(2), ticked: window.__quiz.quiz(2).querySelectorAll('input:checked').length })")
       expect("Start again clears the score and the answers", cleared.hidden && cleared.stored === null && cleared.feedback === "" && cleared.ticked === 0, cleared)
+
+      // A question with one blank (#588): wrong, then right, as the contract says.
+      if (!(await open(base + "/Quiz-One-Blank.html"))) return finish(1, "FAIL: Quiz One Blank did not load")
+      await evaluate("window.__quiz.type(1, ['Lyon']); window.__quiz.press(1, 'check')")
+      const oneBlankWrong = await evaluate("window.__quiz.feedback(1)")
+      expect("one blank, wrong, says the contract's feedback.blanks case", oneBlankWrong === blanksSay(0, 1), oneBlankWrong)
+      await evaluate("window.__quiz.type(1, ['Paris']); window.__quiz.press(1, 'check')")
+      expect("one blank, right, says right", (await evaluate("window.__quiz.feedback(1)")) === blanksSay(1, 1))
 
       // 6. Five changes of page, then back.
       await open(playground)
