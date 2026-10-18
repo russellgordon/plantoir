@@ -9,9 +9,14 @@ This working folder holds courses for Plantoir, which turns each course
 (`courses/<CODE>/`, an Obsidian vault of Markdown pages) into a class
 website. A code block on a page can become a small program students edit
 and **run in their own browser** - on a laptop, a Chromebook or an iPad,
-with nothing to install and no account. They see the code in an editor, an
-input box when the program reads input, **Run**, **Stop** and **Reset**
-buttons, and the program's output underneath. Their edits are kept in their
+with nothing to install and no account. They see the code in an editor,
+**Run**, **Stop** and **Reset** buttons, and the program's output
+underneath. A program that reads input **stops and asks**: the student
+types the answer right in the output and presses Return, just as in a
+terminal. Where the site cannot stop to ask (a copy published to a folder,
+an older browser, or a page that also shows a video or a picture from
+another website), students type the answers in an input box before they
+press Run instead. Their edits are kept in their
 browser for next time; Reset brings back the teacher's code.
 
 Two languages can run: **Python** (students edit the code and run it) and
@@ -61,7 +66,7 @@ Flags go after `run`, separated by spaces, all lowercase:
 | Flag | What it does |
 |---|---|
 | `readonly` | Students can run it but not edit it: the code stays highlighted, with Run and Stop only. For a demonstration whose code should not change. |
-| `stdin` | Always shows the input box, even when the code does not visibly call `input()`. |
+| `stdin` | Treats the block as reading input even when the code does not visibly call `input()` (where the page uses the input box, it always shows). |
 | `autorun` | Runs once by itself when the block scrolls into view. Use sparingly - at most one per page, for output students should see at once. |
 
 ````markdown
@@ -76,16 +81,31 @@ own word - `run,stdin` or `run.py` do not count.
 
 ### 3. Programs that read input
 
-`input()` reads from the input box under the editor, **one line of the box
-for each `input()` call**, in order. Each line read is shown after its
-prompt in the output, as a terminal would. Past the last line, `input()`
-raises `EOFError` ("EOF when reading a line"), as at the end of a file. So
-whenever a program reads input, tell students in the page's text what to
-type in the box, one value per line:
+At each `input()` the program **waits**: its prompt is in the output, with
+a field after it where the student types the answer and presses Return,
+and the program carries on - the same transcript a terminal shows
+(`Name? Ada`). Pressing Ctrl-D, or the **No more input** button (an iPad
+keyboard has no Ctrl-D), ends the input, and `input()` then raises
+`EOFError`, as at the end of a file - a program that reads every line
+(`for line in sys.stdin:`) needs it. Pasting several lines answers one
+`input()` per line.
+
+Some places cannot stop a program to ask: a site published to a folder
+(a school web space), a page opened in an older browser, and a page that
+ALSO shows a video, a PDF in a frame, a GeoGebra or Desmos applet, or a
+picture from another website. There the student types the answers in an
+**input box** under the code before pressing Run, **one line for each
+`input()` call**, in order; past the last line `input()` raises
+`EOFError`. When a page keeps the box because of something it shows, the
+publish names it on a line starting `plantoir: note:`. So:
+
+- write instructions that work BOTH ways - "when it asks, type your name,
+  then your age" - never "type in the input box";
+- put a video, an applet or a hotlinked picture on a page of its own when
+  the code on the page reads input, so students can answer as it asks.
 
 ````markdown
-Type your name on the first line of the input box and your age on the
-second, then press Run.
+When it asks, type your name, then your age.
 
 ```python run
 name = input("Name? ")
@@ -94,8 +114,9 @@ print(f"{name} will be {age + 1} next year.")
 ```
 ````
 
-The input box appears by itself when the code calls `input(`; add `stdin`
-only if the call is hidden (for example in a function another block defines).
+Where the box is used, it appears by itself when the code calls `input(`;
+add `stdin` only if the call is hidden (for example in a function another
+block defines).
 
 ### 4. What Python can and cannot do here
 
@@ -121,7 +142,11 @@ only**:
   any program, including one stuck in a loop.
 
 Tracebacks look exactly like CPython's, and their line numbers are the lines
-in the editor.
+in the editor. Every runnable block shows its line numbers down the left
+side - Python and Swift, editable or `readonly`, with nothing to add - so the
+number in a traceback is the number a student sees beside the line, and
+instructions can say "look at line 3". The editor keeps the same colours as
+the site's other code blocks while a student types.
 
 ### 5. Things to avoid
 
@@ -172,7 +197,9 @@ number and what to change.
 ## Swift
 
 A ` ```swift run ` block runs too - read-only: students see the code,
-type into the input box, and press **Run** (and **Stop**). They cannot
+press **Run** (and **Stop**), and answer each `readLine()` as the program
+asks (or type the answers in the input box first, where the page cannot
+stop to ask - Python's section 3 says where). They cannot
 change the code, and a short note under each block says so. Plantoir
 compiles each Swift block when the site is previewed, so the program a
 student runs is ready before they open the page. Use Swift blocks for
@@ -193,23 +220,25 @@ print("Hello, \(name)!")
 ````
 
 ` ```Swift run ` (capital S) is NOT runnable. Swift takes two flags after
-`run`: `stdin` (always show the input box) and `autorun` (run once when the
+`run`: `stdin` (treat it as reading input) and `autorun` (run once when the
 block scrolls into view). `readonly` is not needed - every Swift block is
 read-only already.
 
 ### 2. Programs that read input
 
-`readLine()` reads the input box, **one line for each `readLine()` call**,
-in order; each line read is shown after its prompt in the output, even a
-prompt printed with `print("Name? ", terminator: "")`. Past the last line,
-`readLine()` returns `nil` - so write `readLine() ?? ""`, or
-`while let line = readLine() { ... }` to read every line. Tell students in
-the page's text what to type, one value per line, and remind them that
-changing the input and pressing Run again is the whole point:
+At each `readLine()` the program waits for the student's answer, typed
+after its prompt in the output - on the same line after a prompt printed
+with `print("Name? ", terminator: "")` - and Return sends it. Ctrl-D or
+**No more input** ends the input: `readLine()` returns `nil` from then on,
+so write `readLine() ?? ""`, or `while let line = readLine() { ... }` to
+read every line. Where the page cannot stop to ask (Python's section 3),
+the answers go in the input box first, one line for each `readLine()`.
+Write instructions that work both ways, and remind students that running
+it again with different answers is the whole point:
 
 ````markdown
-Type your name on the first line of the input box and your age on the
-second, then press Run. Try a different age and run it again.
+When it asks, type your name, then your age. Run it again with a
+different age.
 
 ```swift run
 print("What is your name?")
@@ -220,7 +249,7 @@ print("\(name) will be \(age + 1) next year.")
 ```
 ````
 
-The input box appears by itself when the code calls `readLine(`.
+Where the box is used, it appears by itself when the code calls `readLine(`.
 
 ### 3. What Swift can and cannot do here
 
@@ -311,5 +340,5 @@ Fix the code and preview again. Check every Swift block you write compiles
 
 ### 6. Check it
 
-Ask the teacher to preview the section, open the page, type input and press
-Run on each Swift block, then change the input and run it again.
+Ask the teacher to preview the section, open the page, press Run on each
+Swift block and answer as it asks, then run it again with other answers.

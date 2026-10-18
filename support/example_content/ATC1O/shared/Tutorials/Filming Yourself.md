@@ -39,8 +39,9 @@ films everybody, starting before the entrance and running past the exit.
 
 ## Before you press record
 
-A run-through, every time. The boxes below are printed, not stored, so copy
-the list into your own notes if you want to keep track.
+A run-through, every time. Tick the boxes below as you go; your browser
+keeps the ticks on this computer, so copy the list into your own notes if
+you film somewhere else.
 
 - [ ] Landscape, whole body, floor visible
 - [ ] Camera steady, hip height, square to the front

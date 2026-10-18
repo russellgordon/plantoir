@@ -10,7 +10,9 @@
 // - the print layout ran (never the browser-flow fallback), counted every
 //   piece of the handout and found all of it on a page, none cut off;
 // - every question's words, every answer, every one of the 110 lines of code
-//   with ITS OWN line number (1 to 110, none broken into digits), every table
+//   with ITS OWN line number (1 to 110, none broken into digits) - and a long
+//   line that wraps starting under its first row's code with the gutter's
+//   hairline running down beside it (#585) - every table
 //   row, and the words before and after every picture, drawing, diagram and
 //   formula are in the PDF's text - questions only in the modes that print
 //   questions, answers only in the modes that print answers (#499: Russell's
@@ -134,6 +136,24 @@ const PROBE = `
             const filled = !/^(transparent|rgba\\(0, 0, 0, 0\\))$/.test(style.backgroundColor)
             code.push({ boxed: sides.every((width) => width > 0 && width < 1.5), filled, sides: sides.join("/"), fill: style.backgroundColor })
           }
+          // #585: a long line of code wraps under the first row's CODE, not
+          // under its number, whatever the gutter's padding and hairline add
+          // (plan review F4: the continuation poked 6.4 px to the left).
+          const hang = (() => {
+            const line = Array.from(frame.querySelectorAll("pre > code > [data-plantoir-line]")).find((one) => (one.textContent || "").includes("WRAP-7f3a"))
+            if (!line) return null
+            const range = frame.createRange()
+            range.selectNodeContents(line)
+            const rows = new Map()
+            for (const box of range.getClientRects()) {
+              if (box.width <= 0) continue
+              const top = Math.round(box.top)
+              rows.set(top, Math.min(rows.get(top) ?? Infinity, box.left))
+            }
+            const lefts = Array.from(rows.entries()).sort((a, b) => a[0] - b[0]).map((row) => Math.round(row[1] * 10) / 10)
+            const before = view.getComputedStyle(line, "::before")
+            return { lefts, line: before.borderRightWidth + " " + view.getComputedStyle(line).backgroundImage.slice(0, 40) }
+          })()
           const firstPage = frame.querySelector(".pagedjs_page")
           window.__plantoirPrinted = {
             html: frame.documentElement.outerHTML,
@@ -153,7 +173,7 @@ const PROBE = `
             sourceText: /-->/.test(frame.body.textContent || ""),
             theme: document.documentElement.getAttribute("saved-theme"),
             curriculum: ${CURRICULUM}.test(frame.body.textContent || ""),
-            boxes, icons, headingOnly, numbers, code,
+            boxes, icons, headingOnly, numbers, code, hang,
             example: !!frame.querySelector('blockquote.callout[data-callout="example"]'),
           }
         }
@@ -362,6 +382,10 @@ async function connect(chunk) {
         // The 110-line program splits across pages: at least two pieces, each boxed.
         if (printed.code.length < 3) here.push(`${printed.code.length} pieces of code laid out`)
         if (printed.code.some((piece) => !piece.boxed || piece.filled)) here.push("a piece of code printed without its hairline box, or with a fill: " + JSON.stringify(printed.code))
+        const lefts = printed.hang ? printed.hang.lefts : []
+        if (lefts.length < 2 || lefts.some((left) => Math.abs(left - lefts[0]) > 0.5) || !/gradient/.test(printed.hang.line)) {
+          here.push("a wrapped line of code does not start under its first row's code, or has no hairline down it (#585): " + JSON.stringify(printed.hang))
+        }
       }
       if (mode !== "questionsOnly") {
         for (const number of ["2.", "3.", "5.", "a)", "b)"]) {

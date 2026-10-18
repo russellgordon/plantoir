@@ -317,12 +317,14 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-19 | **Google Fonts request filtered** | `quartz/util/theme.ts`, `quartz/components/Head.tsx` | Quartz builds ONE stylesheet request from all three font choices, and this app offers system stacks. Google rejects the whole request if any family is unknown to it — HTTP 400, so NO fonts downloaded, including the code font mermaid measures in. System stacks and families are now filtered out, and an empty request is dropped entirely. |
 | C2-20 | **mhchem enabled** | `quartz/plugins/transformers/latex.ts` | Adds `import "katex/contrib/mhchem"`, so `$\ce{CaCO3(s) <=> CaO(s) + CO2(g)}$` renders. KaTeX runs at build time here, and the `katex` package Quartz already installs ships the extension, so this downloads nothing. |
 | C2-21 | **Curriculum coverage map styles** | `quartz/styles/base.scss` (appended) | The grid, chips, and the five-step red → orange → yellow → green → blue scale for the generated `Curriculum Coverage` page. The colours are deliberately NOT taken from the course's colour scheme — the map's whole meaning is that ordered reading, and a scheme that recoloured it would destroy that. The scale was SEARCHED rather than picked by eye: `scripts/choose_coverage_scale.py` scores candidates on CIEDE2000 separation and through deuteranopia and protanopia simulation, which is why the top step is blue rather than a darker green — the closest pair an ordinary-sighted reader now sees is ΔE 31, against ΔE 10 before. Cells carry the expectation's code and nothing else: a digit in every cell turned the map into a table of numbers, so the count now reaches a screen reader through the cell's label and a teacher through the hover preview. The legend is a vertical list below a rule, worded "addressed once", "addressed twice", and so on. The ring marking assessed work is two rings — white inside dark — so that it stays legible on all five cell colours; a single tone disappeared on either the yellow or the darkest step depending on which was chosen. The style block is REPLACED rather than skipped when it is already present, so a stylesheet surviving from an earlier build still picks up changes. |
-| C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form. Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
+| C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form — the slug being Quartz's own (`_quartz_segment_slug`: `Q&A Curriculum` is `Q-and-A-Curriculum`; until #569 only spaces were replaced, so a folder named with `&` stayed in every panel). Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
 | C2-22b | **Backlinks overall-expectation map (#505)** | `quartz/components/Backlinks.tsx` | Rewrites the one `const overallChildren = new Map<string, string[]>([…])` line behind the `// CQ4T-OVERALL-ANCHOR` comment, on every build and with or without a coverage map (`set_backlinks_overall_children`, called right after C2-22): each overall expectation page's slug, mapped to its specific expectations' slugs (`overall_backlink_children`). See D1. |
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
 | C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
 | C2-26 | **KaTeX from the site itself (#494)** | `quartz/plugins/transformers/latex.ts`; `quartz/static/katex/` | Quartz v4.5.0's `externalResources` linked `cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css` and `contrib/copy-tex.min.js` on EVERY page (400 links each on a built ICS3U site), while its own lockfile installs **0.16.21** and rehype-katex renders every formula with that at build time — so sites were rendered with one version and styled with another, and the maths depended on a third party and a network. `patch_katex_local` (marker `PLANTOIR-KATEX-LOCAL`, idempotent, independent of C2-20's import) replaces that block with two `additionalHead` functions: `<link rel=stylesheet href="<pathToRoot>/static/katex/katex.min.css" spa-preserve>` and `<script src=".../static/katex/contrib/copy-tex.min.js" defer spa-preserve>`, relative to each page so a site served under a folder finds them, kept across the site's page changes like `index.css`; the 404 page, served at any depth, links from the `baseUrl`'s path (review N6, Head.tsx's own rule). `install_katex_assets` copies the files from Quartz's own `node_modules/katex` every build (05 → Runnable code, step 4): the stylesheet (23,352 bytes), copy-tex (1,673), the **20 woff2 faces** (259,792) and the MIT licence — 284,817 bytes on EVERY site, woff2 only because every browser that can run a site's code takes woff2 first. Netlify's CSP loses `https://cdn.jsdelivr.net` by itself (07). **Rejected:** gating it per site on maths (Python cannot tell maths the way remark-math does — `$` in prose, currency — and a wrong guess breaks every formula silently; the cost is about 2% of Pyodide, uploaded once by content hash); all three font formats (1.10 MB); inlining the CSS into index.css (a generated SCSS file from node_modules every build); absolute `/static/katex/` (breaks a folder published under a subpath). **The print path had to follow** (#455 review S1): a link kept across page changes keeps its RELATIVE href, which then resolves against the new page — one folder off. print.inline.ts now takes every stylesheet for the print frame from the address the sheet was really fetched from (`link.sheet.href`), which fixed the same latent fault in its `index.css` lookup; measured by `browser-checks/maths_offline.mjs`: with the old code a handout printed after a page change from the top of the site to a page one folder down got a 404 KaTeX stylesheet (0 rules), now 249 rules. **The regression the plan expected did not happen:** a folder publish OPENED AS A FILE was expected to lose KaTeX's faces in Chrome (an opaque origin); measured 2026-10-17, Chrome for Testing 155 and Safari 26.6 both loaded `KaTeX_Main` and `KaTeX_Math` from `static/katex/fonts/` beside a page opened from disk, so the maths keeps its look offline from a file too (it used to need the network for the CDN). |
+| C2-27 | **A folder page's table of contents (#520)** | `quartz.layout.ts` | `_wire_list_page_toc`, one of `wire_quartz_additions`' edits, puts `Component.DesktopOnly(Component.TableOfContents())` — the content layout's own — in `defaultListPageLayout`'s right column, which is `[]` in v4.5.0, and touches nothing else. Quartz renders every `folder/index.md` with that layout (and the tag pages), so a curriculum folder's index with `enableToc: true` and five headings of its own showed no table of contents: the data was computed and placed nowhere. Quartz's own rule then decides, as on any page — shown by default, `enableToc: false` hides it, and only with two or more headings of depth 3 or less on the page itself — so tag pages and folder pages with no headings of their own are unchanged. Measured on the #520 plan by editing a built layout and re-running Quartz: the curriculum index showed "Navigate this page" with its strand headings, while `Concepts/index`, `tags/A1` and the front page stayed at 0; expectation pages had shown a table of contents all along. Idempotent, every build; a list layout of another shape warns and is left alone. **Chosen** (ruling Q2 on the plan): on every folder page with the headings, as Quartz does on every other page — 49 of 1,009 folder index pages across `support/` show one, 9 of them without having asked. **Rejected:** only on folder pages that say `enableToc: true` (a wrapper component of our own, and a rule unlike every other page's). `scripts/test_folder_page_toc.py` drives it through `wire_quartz_additions`; verify.sh 6h reads EXC2O's built `Curriculum/index.html`. |
+| C2-28 | **Every code block's line numbers, hairline and no ligatures (#585)** | `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, carried into `index.css` by `codeRunner.scss`) | Quartz numbers every highlighted line in a 1rem box with no separator. One gutter style for static blocks and the runnable editor: Quartz's own dimmed colour, the code font, a box `--plantoir-digits` wide (3 from line 100, 4 from line 1000, by CSS), a 1 px hairline in `var(--lightgray)`, no fill; no programming ligatures in any code element, inline code in prose included. On paper the hairline runs down each line past wrapped rows, printed even with a browser's background graphics off. Every site, every page with code - I12 says why and what was measured. |
 
 ### C3. Content-level transformations (every build)
 
@@ -432,12 +434,40 @@ folder with `_collect_expectations` and groups specific expectations under
 overall chips count the same work. It is built PER FOLDER (two curriculum
 folders can each have a B1, and each gathers only its own), and slugs are
 written as Quartz v4.5.0's `sluggify` writes them (white space to `-`, `&` to
-`-and-`, `%` to `-percent`, `?` and `#` dropped) by `_quartz_page_slug`; the
-older `_quartz_slug` handles only spaces, which the coverage map's links can
-live with but an exact slug comparison cannot. A digit-first or College
+`-and-`, `%` to `-percent`, `?` and `#` dropped) by `_quartz_page_slug`,
+which applies `_quartz_segment_slug` to each folder and to the page's name.
+A digit-first or College
 Board code has no overall expectation, so it gathers nothing. The map is a
 JavaScript `Map`, not an object literal, so a page whose slug is
 `constructor` finds nothing rather than a function.
+
+**The coverage map's links use the same slug (#569).** They used an older
+helper, `_quartz_slug`, that replaced only spaces. Measured on the #569 plan
+with the ICS3U example course: renaming `Curriculum/A3. Subprograms.md` to
+`A3. Subprograms 100% Done.md` stopped the build — Quartz said `URI malformed
+at decodeURI … transformInternalLink` on `Curriculum Coverage.md`, then a
+traceback and exit 1, with no sentence for the teacher. With the map's cells
+and chips on `_quartz_page_slug` the same course built (exit 0) and the chip
+linked `./Curriculum/A3.-Subprograms-100-percent-Done`, the page Quartz had
+emitted. A `#` ("A3. C# Basics") made the rest of the old href a fragment, and
+a folder named `Q&A Curriculum` gave links to `Q&A-Curriculum/…`, which Quartz
+does not serve. The same plan measured the backlinks side: with that folder,
+the structural set held `Q&A Curriculum` and `Q&A-Curriculum`, so its index
+(slug `Q-and-A-Curriculum/index`) was listed on every expectation — the noise
+#505 removed; it now holds `Q-and-A-Curriculum`. The slug is taken from the
+whole segment, never `Path.stem` (a folder `Gr. 9 Curriculum` would lose
+`. 9 Curriculum`). Measured on the #569 review: the new rule and the old one
+agree on all 13,998 file and folder names under `support/`, so no existing
+link moves. **Escaping was chosen over refusing** such a name with a folder
+problem: Quartz already serves the page at its slug and only our href was
+wrong, so a refusal would have given the teacher a sentence to act on where
+nothing needs doing. **Not de-duplicated:** a name with nothing to slug is
+still written twice into the structural set, as before, so the component's
+bytes for every existing course are the ones `scripts/test_coverage_maps.py`'s
+goldens hold. Cases: `curriculumRules.coverageMapLinks` (run by
+`test_coverage_maps.py`) and a fifth `overallBacklinks` case; verify.sh 6h
+plants `Curriculum/Z1. Planted 100% Overall.md` in the Example Course and reads
+the built map.
 
 **Rejected.** Direct links only (the panel would say "Not yet addressed in
 class." for work the coverage map counts). Two lists — direct links first,
@@ -538,7 +568,8 @@ against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
 change), every rule in them scoped so it cannot touch an ordinary page.
 Those are history, as #501's +316 above is: since #515 (v1.7.2) `index.css`
 also carries the sidebar's page marker, 454 bytes, which DOES touch every page's
-sidebar on screen (H); `postscript.js` is unchanged by it.
+sidebar on screen (H); `postscript.js` is unchanged by it. Since #519 (v1.8.1) every page with a task item outside a quiz changes
+its HTML (the boxes become tickable), and both bundles grow again (K7).
 
 ### F1. The files and how they reach a section
 
@@ -1455,7 +1486,9 @@ every site — I8 has the numbers.
 | `support/quartz/plugins/transformers/codeRunner.ts` | `CodeRunnerFences`, wired straight BEFORE `Plugin.SyntaxHighlighting(` in `quartz.config.ts`: on a `codeRunner: true` page it wraps each runnable block, at the MARKDOWN stage, in `<div class="plantoir-runner" data-runner-id data-runner-flags data-runner-language data-runner-runtime data-runner-engine data-original>`. A wrapper rather than attributes because rehype-pretty-code 0.14 drops every property on `<pre>` and `<code>` (measured 2026-10-09); the wrapper survives at the top level, in lists, in quotes and in folded callouts, and the block inside is highlighted exactly as before (the meta is left alone). `data-original` is mdast's `value`, the teacher's code exactly. Reads `quartz/plantoir_code_runner.json` with `fs` (mtime-cached) for the engines the site carries (I6). |
 | `support/quartz/components/CodeRunner.tsx` | Renders NOTHING. Placed at the head of `sharedPageComponents.afterBody` (Quartz renders `page-footer` on every page whatever it holds, so no page's HTML changes), it carries the script and styles into the site's one `postscript.js` and `index.css`. |
 | `support/quartz/components/scripts/codeRunner.inline.ts` | Everything in the browser (I2–I5). Imports `quartz/plantoir_code_runner.json` (words and limits; bundled by esbuild, as the patched explorer imports `course_config.json`). |
-| `support/quartz/components/styles/codeRunner.scss` | Every rule under `.plantoir-runner`; the editor's font is the site's code font at `max(16px, …)`; touch targets 44 px. |
+| `support/quartz/components/scripts/codeRunnerColour.ts` | The editor's colours (#585, I12): the Python and Swift tokenizers, each line's start state, and `reusePlan` (which original line a current line may show Shiki's spans for). No DOM, no imports; the check bundles it beside the image's Shiki. |
+| `support/quartz/components/styles/codeRunner.scss` | Every rule under `.plantoir-runner`; the editor's font is the site's code font at `max(16px, …)`; touch targets 44 px; the editor's frame, coloured copy, gutter and the colour categories' classes (I12). |
+| `support/quartz/components/styles/codeLines.scss` | `@use`d by `codeRunner.scss`, and the one stylesheet here NOT under `.plantoir-runner`: every code block's line-number gutter and hairline, and no ligatures in code, on every page of every site (#585, I12, C2-28). |
 | `support/gated/pyodide/plantoir-worker.js` | The thread a page's Python runs in, laid over `VENDOR_DIR/pyodide` by the gate, so it reaches a site only beside the engine it starts (I3). |
 
 ### I2. The block on the page
@@ -1475,8 +1508,15 @@ a page opened from a feed show the highlighted code alone.
 
 **The editor** is a `<textarea>` in the site's code font, at least 16 px
 (iPadOS zooms the page on focus below 16 px), spellcheck, autocapitalise,
-autocorrect and autocomplete off, `wrap=off`. It grows with its code up to
-24 lines, then scrolls; growing (and the editor replacing the shorter
+autocorrect and autocomplete off, `wrap=off` - since #585 inside a FRAME
+(`div.plantoir-runner-frame`): a gutter of line numbers, then a cell in which
+a coloured copy of the code sits UNDER the textarea, whose own text is
+transparent and whose caret is not, so the student types in a plain textarea
+and sees the site's syntax colours (I12 has the shape, the rules and the
+measurements). The frame owns the border, the corner and the focus ring
+(`:focus-within`). A `readonly` block, and every Swift block, keeps its
+highlighted copy, whose lines Quartz numbers like any static block's. It
+grows with its code up to 24 lines, then scrolls; growing (and the editor replacing the shorter
 highlighted copy) lifts an OPEN ancestor callout's inline `max-height`,
 which Quartz's `callout.inline.ts` fixed when the callout opened and would
 otherwise clip it (2026-10-09 finding D). Tab inserts four spaces or indents
@@ -1551,7 +1591,11 @@ all").
 
 ### I4. Input, output and the words
 
-`input()` takes the box's lines in order; each line read is echoed into the
+Two paths since #583 (I11): on a page its host isolates, the program ASKS -
+each `input()` waits for the student's answer, typed in a field at the end of
+the output - and everywhere else the box, as below, with one line saying why
+(`words.inputAhead`). The transcript is the same on both, byte for byte.
+On the box path, `input()` takes the box's lines in order; each line read is echoed into the
 output straight after its prompt (Q4: `Name? Ada`, not `Name? Hello Ada`),
 and past the last line `input()` raises `EOFError` (measured: `EOFError: EOF
 when reading a line`). Output is gathered once per animation frame; at
@@ -1649,16 +1693,24 @@ offered back. Ids are positional, so a block inserted ABOVE others sets aside
 the edits on every block below it (knownLimits; the skill says to add blocks
 after existing ones). `readonly` stores nothing.
 
-**Print** (decision 8, `codeRunnerBlocks.print`): a synced
+**Print** (decision 8, `codeRunnerBlocks.print`): a
 `<pre class="plantoir-runner-print" aria-hidden="true">` holds the current
 code and the wrapper is `.plantoir-runner-edited` while it differs from the
 teacher's (a textarea's typed value is not part of a printed or cloned
-page). `@media print` hides the editor, input, buttons, status and output;
+page). `@media print` hides the frame, input, buttons, status and output;
 an unedited block prints its highlighted code, an edited one the student's
-code. Paged.js promotes the same rules for the Print button, which awaits a
-flush-and-sync pushed onto `window.plantoirPrint.prepare` (and removed in
-`addCleanup`). print.inline.ts's code numbering sees the print copy as a
-`pre` without `data-line` and counts its text lines.
+code. Since #585 the copy is built as a static block is - `pre > code >
+span[data-line]`, Shiki's own spans for the lines the student did not touch
+and the editor's colours for those they did - so an edited block prints
+coloured (where the page prints colour) and numbered, by Quartz's counter
+(its rows sit tighter than a static block's - 18 px against 25.6 px - which is
+left as is, #585 fixes review N2)
+under ⌘P and by print.inline.ts's `data-plantoir-line` in the handout,
+exactly as an unedited one does (ruling Q3). It is rebuilt only on a flush
+(`beforeprint`, `pagehide`, leaving the page, and the Print button's
+`window.plantoirPrint.prepare`), not on every keystroke (#585 plan review S2:
+29.5 ms against 18.1 ms per key for 500 lines at a sixfold CPU slowdown).
+Paged.js promotes the same rules for the Print button.
 
 ### I8. Measured (2026-10-17, M4 Pro, macOS 26.6)
 
@@ -1710,14 +1762,17 @@ build-time date — the variance F names.
 
 Add `codeRunner: true` to the page's settings and `run` after `python` on the
 block's first line; add `readonly`, `stdin` or (sparingly) `autorun` after
-it. Tell students what to type in the input box, one line per `input()`.
+it. Write instructions that work whether the page asks as the program runs
+or uses the box ("when it asks, type your name"), never "type in the box".
 Preview and press Run on each block; a block that shows as plain code is
 named on a `plantoir: error:` line. The skill `plantoir-runnable-code`
 (support/agent_guidance) carries the whole of this for an assistant.
 
 **Rejected** (with the reasons above and in 02 and 05): Skulpt; Custom
 Frames or JupyterLite; SharedArrayBuffer for input and interrupts (a folder
-publish cannot send COOP/COEP); window.prompt for input; CodeMirror (a large
+publish cannot send COOP/COEP) - **overturned for the isolated case,
+2026-10-17** (#583, I11: on a page its host isolates, input is live; the box
+stays the fallback; the interrupt buffer stays rejected); window.prompt for input; CodeMirror (a large
 editor per page for indentation); a Blob worker (Netlify's CSP has no
 `worker-src`, so `blob:` is refused there); a classic worker (B1); an html-
 stage plugin after pretty-code (the properties are gone by then); the
@@ -1725,7 +1780,10 @@ transformer's `externalResources` (inlined into every page); auto-indent on
 Enter (it fights the iPadOS keyboard and IME); a `# plantoir: run` first
 line (Obsidian takes only the info string's first word, so ` ```python run `
 is an ordinary Python block there — verified from Obsidian 1.12.7's and
-1.13.7's own code, 2026-10-08).
+1.13.7's own code, 2026-10-08). For the editor's colours (#585, I12):
+`contenteditable` (iPadOS input methods and undo), Shiki in the browser,
+Prism and the like, the CSS Custom Highlight API, re-rendering the whole
+copy per keystroke, and moving the copy by a transform.
 
 ### I10. Swift (#493)
 
@@ -1869,6 +1927,382 @@ runs once); mapping only RuntimeError to the crash words (S5); a dedicated
 known limit tells teachers how deep is safe); stopping the build on a compile
 error (ruling Q1).
 
+### I11. Live input (#583, v1.8.1)
+
+A runnable block on a page that is **cross-origin isolated** asks for each
+line as the program reads it; everywhere else the box (I4) stays. Rules:
+`codeRunnerBlocks.liveInput` and `.isolation`; Python and Swift alike
+(Russell's ruling R1).
+
+**How it works.** The page checks `crossOriginIsolated`, `SharedArrayBuffer`
+and `Atomics.wait` once per page. A live run sends a `SharedArrayBuffer`
+(`Int32[0]` state 0 waiting / 1 a line / 2 end of input, `Int32[1]` the byte
+length, UTF-8 from byte 8, room for 4,096 characters); at each read past the
+box's lines the worker posts `ask` and blocks in `Atomics.wait`; the page
+writes the answer and `notify`s. The worker echoes the line through the box's
+own `out` path, so the transcript is identical (pinned in `code_runner.mjs`
+and `swift_runner.mjs`, which compare the two paths' output for the same
+program and answers). Swift's shim gained `ask` (sticky end of input).
+ONE `<input>` per run sits at the end of the output for the whole run (review
+S7: removing a focused field takes an iPad's keyboard down); Run on code that
+reads input makes and focuses it INSIDE the press, because iPadOS raises its
+keyboard only for a focus inside a tap. Return sends (not while an IME
+composes: `isComposing` or `keyCode` 229); Ctrl-D or the "No more input"
+button ends the input (ruling Q2); a multi-line paste is split by the page (a
+one-line field strips line breaks, review S2); Escape and Return go no
+further (quizzes, folds, Quartz's search). An autorun never takes the focus.
+
+**Gotchas, measured.** (1) Chrome refuses `TextDecoder.decode` of, and
+`TextEncoder.encodeInto` into, a view of shared memory - the worker copies
+with `slice()` before decoding and the page encodes then copies with `set()`
+(Safari accepts both, so the wrong code works in one browser only). (2) The
+engine's folder needs COEP too: Chrome checks the worker script, Safari every
+module it imports (COEP on the two worker files alone failed in Safari).
+(3) The worker's `ask` arrives before the next animation frame's paint, so
+the page paints the prompt synchronously before using the field (review S1).
+
+**Measured (2026-10-17, M4 Pro, macOS 26.6).** Plan spikes: Python
+`Name? Zoë⏎Hello Zoë⏎Age? 15⏎16⏎` identical to the box path in Chrome for
+Testing 155, Safari 26.6, the iPad (A16) simulator on iPadOS 18.6 and a plain
+WKWebView; Swift Embedded and full library correct in each; ready 868-1,107
+ms; `terminate()` ends a waiting worker and the next Run is ready in 754-1,062
+ms. Implementation: the preview served by the patched Quartz server in Safari
+26.6 - first prompt 1.07-1.46 s after Run (Python loading), transcript as the
+box's, Swift 01-greeting live, a link from a plain page loaded the runner page
+whole and isolated. Every browser check above runs headless in Chrome for
+Testing 155 under `verify.sh`. **Not measured: the iPad simulator's on-screen
+keyboard between two prompts** (review S7) - this session could not send taps
+to the Simulator (no Accessibility permission; System Events answered
+-25204); the design follows S7 and the closing comment records it as owed.
+
+**Which pages, and the hosts (measured on the test site, 2026-10-17).** A
+page gets COOP `same-origin` + COEP `require-corp` only when a block can ask
+(`data-runner-asks`, written by the transformer) and the built page carries
+nothing COEP would break: any `iframe`/`frame`/`embed`/`object` (YouTube,
+GeoGebra, PhET and Media PDF frames - Safari blocks a same-origin PDF frame
+unless the PDF has COEP itself), or a cross-origin picture, `srcset`, poster,
+script, stylesheet/preload or CSS `url()` outside cdnjs and Google Fonts
+(which send CORP `cross-origin`). Quartz's own Plausible script is added at
+run time and sends CORP `cross-origin` (curl), so it loads. Such a page keeps
+the box, and the publish and the preview name it on a `plantoir: note:` line
+when a block reads input (ruling Q1). The rule exists twice -
+`scripts/isolation_headers.py` (publish) and
+`support/quartz/cli/plantoirIsolation.mjs` (preview) - and both run
+`isolation.cases`.
+
+How each host matches a `_headers` path was measured by deploying the ICS3U
+test site with planted pages (`Café Menu`, `Unit 4, Day 22`, `Q&A Time`,
+`100% Done`, `It's (fine)!`, `C++ Basics`, `Ünïcödé Straße`, `日本語`,
+`Mixed CASE Page`, `Set {1, 2}`, `Ratio a:b`, an NFD `Crème`, a folder
+index), one marker header per spelling, then fetching each page as a browser
+asks (uppercase-hex percent-encoding, redirects followed and re-encoded):
+
+| | Netlify | Cloudflare Pages |
+|---|---|---|
+| Raw UTF-8 rule (`/Café-Menu`) | never matches | never matches |
+| Fully percent-encoded rule (`/C%2B%2B-Basics`, `/Unit-4%2C-Day-22`) | no match for encoded ASCII punctuation | **matches** (and the raw `+ , ' ( ) ! :` forms do NOT) |
+| Browser form (`/c++-basics`, `/set-%7B1,-2%7D`, `/caf%C3%A9-menu`) | **matches**, ASCII case ignored | - |
+| Capitals | every path is 301'd to its lower case, Ü to ü too, so a rule must be lower-cased (`%C3%9C` never matches `%C3%BC`) | case-sensitive; a lower-case request is a 404 |
+| `/x.html`, `/x/` | 301 to the lower-case pretty path | 308 to `/x` |
+| folder `/x`, `/x/index.html` | 301 to `/x/` | 308 to `/x/` |
+
+So Cloudflare's rule is Python's `urllib.parse.quote(path, safe="/")`, and
+Netlify's the browser form of the lower-cased path, plus the as-is form when
+lower-casing changed more than ASCII (so a site Netlify does not redirect
+still matches); a second deploy with exactly those spellings matched every
+page and every redirected form on both hosts. Pinned as `isolation.pathCases`.
+A `*` (a splat on both) gets no rule. Cloudflare reads at most 100 rules:
+input pages first, the rest keep the box, and the publish says how many. A
+teacher's own `_headers` at the course's root reaches `public/` (Quartz copies
+it) and is kept, counting toward that limit.
+
+**Where the headers are written.** `deploy.py`, after any rebuild:
+Netlify before the badge rule's block (which keeps it), Cloudflare before
+wrangler; a block between two markers, replaced every publish. Nothing for a
+folder publish; a `_headers` left in `public/` by an earlier host publish
+rides along in the folder copy, as the badge rule already did in 1.8.0
+(review S6, decided: the folder publish stays byte for byte as before). The
+preview's server sends the same headers (Quartz's `cli/handlers.js`, marker
+`PLANTOIR-ISOLATION-SERVE`), failing open. Quartz's router (`spa.inline.ts`,
+marker `PLANTOIR-ISOLATION-NAV`) loads a page whole when the fetched page's
+COEP disagrees with `crossOriginIsolated` - isolation is fixed when a
+document is made, so morphing would leave a runner page reached by a link
+un-isolated, or carry COEP into a plain page and block its frames (both
+pinned in `code_runner.mjs`; red against the unpatched router).
+
+**Known limits (implementation review).** The note line comes from each
+publish and from the preview's server when the page is first opened there,
+never from the build (N2, accepted: in preview mode Quartz builds inside its
+own server; `--build-only` prints nothing). The two readers of the not-live
+rule differ only where Quartz emits nothing or nothing was measured to break
+(N3): frame words inside a `<textarea>` count as a frame to the preview's
+reader only (it errs safe); `@import "https://…"` without `url()` is seen by
+neither; a cross-origin `<audio><source>` is named with the frame's words.
+Both are in `codeRunnerBlocks.knownLimits`.
+
+**Rejected.** `Cross-Origin-Embedder-Policy: credentialless` (Safari 26.6 does
+not isolate under it, and Chrome blocks the frames anyway); COEP site-wide
+(every page's frames break for a feature on a few); the interrupt buffer as
+Stop (1-2 ms, but a waiting program prints a chained EOFError/KeyboardInterrupt
+traceback and a long C call cannot be stopped - a candidate later for saving
+the ~0.9 s reload after Stop); COEP on `/Media/*` to keep PDF frames live
+(measured to work in Safari; ruling Q4: not in v1.8.1); per-folder splats to
+get under Cloudflare's cap (one splat would isolate the folder's plain pages
+too); `window.prompt`; `<iframe credentialless>` (Chrome only); removing and
+re-adding the field per prompt (the plan's first shape - the iPad keyboard);
+`encodeInto` into shared memory (Chrome).
+
+### I12. Colour and line numbers (#585, v1.8.1)
+
+An editable block shows the code in the site's own syntax colours while the
+student types, and every runnable block shows its line numbers. Rules:
+`codeRunnerBlocks.editor.colour` and `.lineNumbers`; rulings R1-R3 and the
+director's Q1-Q5 on the plan (Swift's tokenizer ships; the hairline on every
+code block; an edited block prints coloured and numbered; up to 0.3 % of
+characters may differ from Shiki on EDITED lines; no ligatures anywhere).
+
+**How a static block is coloured, and why the editor can match it exactly.**
+Shiki writes `style="--shiki-light:#D73A49;--shiki-dark:#F97583"` on every
+token span, and Quartz's `syntax.scss` turns those into the colour
+(`code[data-theme*=" "] span { color: var(--shiki-light) }`, and
+`--shiki-dark` under `[saved-theme="dark"]`). The themes are pinned to
+github-light and github-dark in `quartz.config.ts`; a teacher cannot change
+them. So a coloured copy only needs spans carrying the SAME two custom
+properties: light and dark then follow through Quartz's own rule. The editor's
+categories (`codeRunner.scss`, `.plantoir-tok-<category>`) set exactly
+Shiki's pairs - nine of them, measured from the image's Shiki 1.26.2:
+
+| Category | Light | Dark | What |
+|---|---|---|---|
+| plain | #24292E | #E1E4E8 | the copy's default |
+| k | #D73A49 | #F97583 | keywords, operators, string prefixes, format specs, code tags |
+| s | #032F62 | #9ECBFF | strings |
+| c | #005CC5 | #79B8FF | numbers, builtins, constants, `self`, ALL_CAPS, `__dunder__`, escapes, placeholders |
+| f | #6F42C1 | #B392F0 | names a `def`/`class`/`func`/`struct` defines, base classes, decorators |
+| m | #6A737D | #6A737D | comments |
+| p | #E36209 | #FFAB70 | a call's keyword-argument names; Python 2's names (`raw_input`) |
+| g | #22863A | #85E89D | a regular expression's escapes |
+| r | #032F62 | #DBEDFF | a regular expression's own text (a raw string with a lowercase `r`) |
+
+`r` was found by the check, not by the plan: comparing only light colours, a
+regular expression's text looked like a string's; in dark it is a paler blue.
+The check now compares both themes, and pins the table, the stylesheet and
+the image's Shiki to each other.
+
+**The DOM (an editable block).**
+
+```
+div.plantoir-runner-frame            grid: gutter | cell; the border, corner, background, focus ring
+  pre.plantoir-runner-gutter         aria-hidden; "1\n2\n…" in one span, translateY(-scrollTop)
+  div.plantoir-runner-cell           position: relative
+    pre.plantoir-runner-colour       aria-hidden, absolute over the cell, overflow hidden, pointer-events none
+      code[data-theme]               one span.plantoir-runner-line per line, each ending in its own "\n"
+    textarea.plantoir-runner-editor  transparent text, caret var(--dark)
+```
+
+ONE rule gives the textarea and the copy every metric (font, size, line
+height, padding, tab size, `white-space: pre`, no ligatures). The copy's
+`code` overrides each of Quartz's `pre > code` rules (grid, padding,
+0.85rem, `overflow-x: auto`, the counter) and is `width: max-content`.
+Each line span ends in its own line break, so the copy's text is the
+textarea's character for character.
+
+**Untouched lines are Shiki's own.** The page keeps the highlighted copy's
+lines (`.plantoir-runner-original pre > code > [data-line]`, each usable only
+where its text is the teacher's line; a blank one holds a space) and
+`codeRunnerColour.reusePlan` decides, per keystroke, which original line a
+current line may show: by POSITION first - the lines shared at the top, then
+at the bottom - where text AND the tokenizer's start state (inside which kind
+of string with which prefix, inside which brackets) both match; only the
+edited middle falls back to a lookup by text and state, and only for a key
+every original line colours alike. The plan's key (text plus one
+inside-a-triple-quote flag) showed the line `total {x} and \n done` with
+the first copy's colours inside `f"""`, `"""` and `r"""` - Shiki colours it
+three ways - and a call's keyword argument like a def's default (#585 plan
+review F1, measured with the image's Shiki). `reuseCases` pins both, and the
+check confirms every line reused is coloured as Shiki colours the current
+code. A line the student changed is coloured by the tokenizer; only the
+lines whose HTML changed are touched.
+
+**The tokenizer** (`codeRunnerColour.ts`, no DOM, no imports) reads the
+whole program on each keystroke - 0.38 ms median, 0.59 ms p95 for 500 lines
+in Node 22 - with MagicPython's rules as Shiki applies them: keywords and
+soft `match`/`case`; operators red; strings with every prefix, triple quotes
+across lines, a backslash-continued string; escapes (`\x41`, `é`,
+`\N{BULLET}`, `\012`; not `\u` in bytes; none in raw strings); `%` and `{}`
+placeholders (none in bytes' braces or in a docstring - a string that opens
+a statement); f-strings with their expressions read as code, `!r` and a
+format spec red, a nested spec's fields; raw strings with a lowercase `r` as
+regular expressions (classes and groups blue, quantifiers red, escapes
+green, the text `r`, `#` comments in a triple-quoted one) while `R` and
+`rf` are raw without; numbers with `0x`/`0b`/`0o` prefixes red and `j` red;
+builtins, builtin exceptions, `self`, ALL_CAPS (two capitals at least: a lone
+`X` is a name), `__dunder__` after a dot or not; a call's name plain unless a
+builtin; `list[int]` plain (the builtin TYPES when indexed); def and class
+names, base classes, decorators (`@property`'s name blue, `@app.route`
+purple throughout); a call's keyword arguments orange, and a def's defaults
+not; comments with NOTE/XXX/HACK/FIXME/BUG/TODO red (in docstrings too).
+Swift: keywords, attributes, `#available`/`#if`, declared names, known types
+and members by Shiki's lists (`count`, `isEmpty`, `first` blue; `width`
+plain), calls and trailing closures blue, argument labels blue and a
+declaration's external labels purple, generics, inheritance lists, enum
+cases, interpolation in the string's colour with its members, raw strings,
+nested block comments, `-5` as one number, and the colons Shiki colours red
+(a dictionary, the ternary, a case, a `where`, a label).
+
+**Agreement with Shiki, per non-space character** (the check, every build of
+verify.sh; Shiki 1.26.2):
+
+| Corpus | Python | Swift |
+|---|---:|---:|
+| support/example_content, every block (558 Python; no Swift) | 100 % (109,250 characters) | — |
+| plus the committed stress fixture (`scripts/fixtures/runner-colour`) | 99.99 % (112,577) | — |
+| the Swift gate and the marketing page's block | — | 100 % |
+| plus the Swift stress fixture | — | 99.92 % (11,290) |
+| held out: 4,603 lines of the repository's own Python (`scripts/*.py`), never tuned on | 99.99 % (153,642) | — |
+
+The floors in the contract are 99.5 % (Python) and 99.0 % (Swift). **Known
+differences** (`knownDifferences`, each confirmed by the check to still
+differ): `obj.True` (Shiki red after a dot); Swift's bare regular-expression
+literal `/[a-z]+/`; a Swift `init(` declared after a `;` on one line (Shiki
+leaves it plain). In the held-out Python the only other misses were `{}`
+inside a long triple-quoted string holding JavaScript (12 characters).
+These can show only on an EDITED line. The Swift tokenizer has no caller yet
+- every Swift block is read-only and shows Shiki's copy - and runs only in
+the check until an editable Swift block exists (#579); its row's `colour` is
+already `"swift"`.
+
+**Alignment, measured with the reviewer's recipe** (#585 plan review F2): the
+light theme; state A is the textarea's own text in black with the copy
+hidden; state B the copy's text in black with every line's colour spans
+taken out (`span.textContent = span.textContent`) and the textarea
+transparent; a pixel more than 40/255 apart in any channel is "strong". In
+dark mode the same diff is blind (black on #121417 never differs by 40),
+which is why the planner's first measurements did not count; with colour
+spans left in, antialiasing at span edges gives hundreds of strong pixels
+for correct code. A copy moved half a pixel is the positive control.
+
+| Browser | Short block, A/B strong | Long line scrolled 200 px sideways | Copy half a pixel off (control) |
+|---|---:|---:|---:|
+| Chrome for Testing 155, headless, 2× (verify.sh's check and by hand) | 0 | 0 | 7,089 / 6,555 by hand; the check needs 10,000 on its 24-row block of long lines (measured 125,663) |
+| Safari 26.6, macOS 26.6, window capture at 1.7× | 44 | 43 | 26,740 / 9,701 |
+| iPad (A16) simulator, Safari (iOS 18.6 runtime), 2× | 0 | 10 | 24,921 / 22,020 |
+
+Safari's and the iPad's residue is one device-pixel row or column on the
+cell's clip edge (antialiasing where both layers are cut); none is inside
+the text. The planner's dark-mode runs are not counted (see above).
+
+**At a fractional scale it is not exact** (implementation review F3,
+Chrome, the same recipe): at device scale 1 and 2 every case is 0 strong
+pixels - tabs, trailing spaces, a long line scrolled 250 px or to its end,
+and the 500-line block in its middle and at its bottom - but at 1.1, 1.25,
+1.5 and 2.5 (browser zoom of 110-150 %, and Chromebooks or Windows laptops
+at 125 or 150 %) up to 70,899 strong pixels, and a grid search finds one
+UNIFORM shift that zeroes them: 0.2-0.6 CSS px, mostly vertical, sometimes
+0.4 px across. In Safari at 85 % zoom, scrolled fully right, the copy stops
+1 px short of the textarea (scrollLeft 1,682 against 1,683). The letters are
+the same letters a fraction of a pixel apart - cosmetic, and left as it is.
+
+**Found by measuring, and fixed:** the plan moved the copy with
+`transform: translate(-scrollLeft, -scrollTop)`. A browser puts a scroll
+box's text on whole device pixels; a transformed copy keeps the fraction, so
+wherever the block itself starts on a fractional pixel (here x = 416.375) a
+few glyphs land in a different sub-pixel bin: 481 strong pixels for correct
+code, and worse with a whole-pixel padding (10,573 with 0.75rem). The copy is
+now a scroll box of its own, scrolled to the textarea's place, stopping where
+the textarea's scroll bars start (so both have the same room to scroll):
+0 strong pixels, unscrolled and with a long line scrolled both ways.
+`overflow-anchor: none` keeps the browser's scroll anchoring from moving the
+copy when a line's colours change. Must-fails: the copy's `code` given
+`overflow-x: auto` at the pre's width (the iPadOS clipping the planner
+found) gives 25,063 strong pixels on the scrolled long line by hand; in the
+browser check, the built page script with the sideways scroll sync taken out
+gives 25,656 and fails, and the focus ring put back on the textarea fails
+the ring's check.
+
+**Per keystroke** (render plus the layout it forces, one character typed at a
+random place in a 500-line program; the second program, the implementation
+review's, has a comment and an f-string on every line):
+
+| Browser | 500 lines, 13.6 k characters: median / p95 | 500 lines, ~25 k characters: median / p95 |
+|---|---:|---:|
+| Chrome for Testing 155 | 2.5 / 6.5 ms | 5.1 / 8.9 ms |
+| Chrome for Testing 155, sixfold CPU slowdown | 14.6 / 23.3 ms | 20.0-20.9 / 23-25.6 ms |
+| Safari 26.6 (timer resolution 1 ms) | 5 / 6 ms | 9.6 / 11.2 ms |
+
+Dev's plain textarea costs 2.7 ms at the sixfold slowdown. Every keystroke
+re-reads the whole program and re-plans its lines; touching only the lines
+whose HTML changed (one on average) keeps the DOM work small, but on dense
+code at a sixfold slowdown a keystroke takes more than a 16 ms frame. Making
+the tokenizer and the plan incremental is the next step if a slow
+Chromebook is ever seen to lag; not done now (the director's ruling F4).
+
+**Behaviour, through the real page script** (`browser-checks/code_runner.mjs`
+section 6, Chrome for Testing 155): an unedited block's copy is the
+highlighted copy's lines byte for byte; typed lines are the tokenizer's and
+the line above stays Shiki's; Tab, `execCommand("undo")`, an input method
+(`Input.imeSetComposition`: the textarea shows its own text while composing,
+the copy catches up on `compositionend`), a saved edit and Reset keep the copy
+in step; a scrolled editor's copy and gutter follow it; the focus ring is the
+frame's; a static block's numbers and the gutter compute the same colour,
+font, alignment and hairline; `font-variant-ligatures` is `none` on a static
+block, inline code in prose, the editor, its copy and the output; ⌘P of an
+edited block reads back (pdftotext) as `1  print("edited-585-a")`, `2  …`,
+and its long line wraps whole, as before #585 (the copy is `pre-wrap`
+outside the handout, each wrapped row hung under its code). Selection
+paints Quartz's own `::selection` over the transparent text, as it does on
+static code. **Find in the page counts an editable block's code twice**
+(the copy is text too; Chrome's `window.find` counts 4 where dev counted 3),
+and a drag selection across the block can pick up its numbers - a known
+limit (`codeRunnerBlocks.knownLimits`).
+
+**Line numbers (R1, R3).** Quartz 4.5 numbers EVERY highlighted line, not only
+`showLineNumbers` blocks (`base.scss`, `[data-line]::before { content:
+counter(line) }`), in a fixed 1rem box that crowded two digits, with no
+separator. `codeLines.scss` (carried by `codeRunner.scss`, so every site has
+it) gives that box and the editor's gutter ONE mixin: Quartz's dimmed
+rgba(115, 138, 148, 0.6), the code font at the block's own size,
+right-aligned, `--plantoir-digits` characters wide (2; 3 from line 100 and 4
+from line 1000, by `:has(> [data-line]:nth-child(100))` so a page with no
+script has it - the page script returns at once on a page with no runner),
+0.75ch of padding, a 1 px hairline in `var(--lightgray)`, no fill. Component
+styles come BEFORE Quartz's base styles in `index.css`, so the selector
+carries `:root` to outrank Quartz's widest rule. The gutter is
+`height: 0; min-height: 100%` - a gutter that sets its own height grew the
+frame to 12,020 px for 500 lines (the planner's first try). Line 1 is the
+code's first line, so a traceback's line is the number beside it.
+
+**On paper.** A border on the number's box stops at a wrapped line's first
+row, and the handout's hanging indent (`(digits + 1.2)ch`) did not count the
+gutter's padding and hairline: the wrapped row poked 6.4 px left of the code
+(#585 plan review F4). Now the hairline is drawn down the line itself (a 1 px
+background at the number box's edge) in print, and the handout hangs by the
+whole box, `(digits + 1.75)ch + 1px`; `print_handout.mjs` measures a wrapped
+fixture line's rows in both orientations. A background is something Chrome
+("Background graphics") and Safari ("Print backgrounds") leave out by
+default, so the line asks `print-color-adjust: exact` (no fill is kept):
+measured with the hairline printed and backgrounds off in Chrome for
+Testing 155 (`printToPDF`, `printBackground: false`) and in WebKit's own
+print path (a WKWebView's print operation, `shouldPrintBackgrounds` false -
+Safari itself cannot be told to print to a file from a script)
+(implementation review F2).
+
+**What every site's bundles cost** (EXC2O, dev 0fe0d1cba's build against this
+branch's): `postscript.js` 143,510 → 164,508 bytes (+20,998; gzipped 47,495 → 56,115, +8,620 - both tokenizers and the frame), `index.css` 66,571 → 71,531 (+4,960; gzipped +777, with the review's print and inline-code rules). Every site carries them, as it carries the rest of the runner.
+
+**Rejected:** `contenteditable` (iPadOS input methods and undo); Shiki itself
+in the browser (its grammars and the regular-expression engine are hundreds
+of KB per site); Prism and the like (a new dependency with its own token
+classes, still needing a map to Shiki's colours); the CSS Custom Highlight
+API (it cannot colour a textarea's text); a build-time palette harvested
+from the transformer (the page script is bundled before it could be
+written; the pinned check does the same job); re-rendering the whole copy
+per keystroke (50 ms for 500 lines at a sixfold CPU slowdown, against 16 ms
+for touched lines only); the gutter inside the textarea's padding
+(horizontally scrolled text paints over a scroll box's padding); a transform
+for the scroll (above); the plan's reuse key (above); ligatures in static
+code (the ruling: one look everywhere).
+
 ## J. Self-check quizzes (#563, v1.8.0)
 
 The first half of #511. A `> [!quiz]` callout at the left edge of a page
@@ -1956,7 +2390,9 @@ Quartz's callout stays (colours, title, fold) and gains `plantoir-quiz`,
 `data-quiz` (the correct places, or the answer lines - a self-check, so the
 page's source showing answers is accepted, knownLimits). Not ready:
 `data-quiz-kind="notReady"` and `data-quiz-problem`, the question and its
-choices with every box empty, and `words.site.notReady` (ruling Q6).
+choices with every box empty, and `words.site.notReady` (ruling Q6). Those
+boxes stay disabled task items: the task boxes students tick (#519, K) skip
+everything inside a `.plantoir-quiz`.
 
 * Choices are a `<fieldset>` labelled by the question; each is a real radio
   button or checkbox inside a `<label>` with the choice's first line.
@@ -1988,6 +2424,24 @@ ruling Q7); `A ± T` only as a number ± a number not negative, so `±3` and
 `x = ±3` are answers and `+-` typed matches `±` (review S8); `$...$`
 compared inside; NFKC then `toLowerCase()` with no locale (STRASSE is not
 straße - pinned), curly quotes made straight (iOS Smart Punctuation).
+
+**What a fill-in-the-blank question says (#588, v1.8.1):** one rule,
+`quizRules.blanksFeedback(right, count)`, pinned by
+`quizCallouts.feedback.blanks.cases` and run by the quiz checker. Every
+blank right says `right`. Otherwise - wording A, the default pending
+Russell - ONE blank says `notRight`, what a short answer says: "0 of 1
+blanks are right" read oddly, and the blank's own ✗ Not right already says
+which; exactly one right of two or more says `oneBlankRight`, "1 of 2
+blanks is right"; any other count keeps `someBlanksRight`. Only `fill` is
+affected; the score line ("1 of 1 right on the first try") reads fine and is
+unchanged. Rejected: wording B, a sentence of its own for the one wrong
+blank ("Your blank isn't right yet") with "1 of 2 blanks are right" left as
+it was. "1 of 1 blanks is right" is not a reachable string (one of one is
+right). The quiz checker's word audit reads quizRules.ts's `key: "..."`
+literals as well as the script's `word("...")` calls, since the script shows
+these through `word(feedback.key)` (review F4). Measured: `Quiz One Blank`
+(planted by verify.sh) wrong says `notRight`; on the code before this, it
+said "0 of 1 blanks are right" and the browser check failed.
 
 The shuffle moves the choices (reading and Tab order follow what is seen;
 CSS `order` was rejected, WCAG 1.3.2) with `shuffledOrder(n, Math.random)`
@@ -2069,6 +2523,217 @@ omissions: assets ride every site's shared bundle rather than "only on pages
 that use a quiz" (ruling Q2, measured above), and a malformed quiz is a
 folder problem with page and line rather than "build fails" (the ruling for
 #493: a build is never stopped by one page).
+
+## K. Task boxes students tick (#519, v1.8.1)
+
+A Markdown task list (`- [ ] Bring a pencil`) is drawn by Quartz as disabled
+checkboxes. On a class site every such box that is not inside a self-check
+quiz can now be ticked by a student, and the tick is kept in that student's
+own browser - nothing is sent anywhere, and the teacher's page never
+changes. The rules are data in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`taskBoxes`; Windows inherits all of it with `support/quartz` and the same
+build wiring, and owes only a measured look (its `windows` issue).
+
+### K1. The files (all in `support/quartz/`, installed every build)
+
+| File | What it does |
+|---|---|
+| `plugins/transformers/taskRules.ts` | The rules, pure: `taskItemText`, `taskItemId`, `siteRootFrom`, `taskKey`, `readTicks`. Bundled by `scripts/check_task_rules_against_the_site.py` and run over every contract case. |
+| `plugins/transformers/plantoirTasks.ts` | Html stage, wired straight after `PlantoirQuizzes` (`build_site._wire_tasks_transformer`): takes `disabled` off every task box outside a `.plantoir-quiz`, stamps it, and wraps it in a label. The ONLY producer of item ids. |
+| `components/scripts/tasks.inline.ts` | Rides `PlantoirMetaLine.afterDOMLoaded` into every page's `postscript.js`: one delegated `change` listener, and the restore on every `nav`. |
+| `components/styles/tasks.scss` | Rides `PlantoirMetaLine.css` into `index.css`: Quartz's task-item rules said again for the label shape, the look, the focus ring, unclickable previews, and the paper ink. |
+
+### K2. The id, the key and the read API
+
+**An item's id is made from its first line AS QUARTZ PARSED IT** (review
+F1): Quartz trims the file and runs every text transform before parsing, so
+an Obsidian link to a heading (`[[P#Install Steps]]`) is read as
+`[[P#install-steps|Install Steps]]`, a link to a website as a Markdown link,
+a `%%comment%%` is gone, and a callout's title is given a line of its own -
+which also means an item's position in the parsed text is NOT its line in
+the teacher's file. The transformer reads the line at the `li`'s position in
+`file.value` (the transformed text), takes off the `>` markers, indent, list
+markers and box, collapses ASCII white space, normalises to NFC, and hashes
+it with `codeRunnerRule.fnv1a` (UTF-16 code units, 8 hex). From the text
+alone: adding or moving an item never moves another's tick, `[ ]` → `[x]` in
+the file keeps the id, and the same words twice on a page share one tick
+(ruling Q5). The ids are stamped on the boxes (`data-task-item`), and that
+stamp is the only source: the page's script never derives one, and #545 (My
+progress) reads the stamps from the built pages rather than re-deriving ids
+from the raw Markdown, which would disagree on every rewritten shape above.
+The contract pins each shape against Quartz's own text transform
+(`itemText.cases` with `quartzReads`; the checker runs the real transform
+and the real parser in the image), and verify.sh 6l reads every case's id
+back from the real build.
+
+**The key** is `plantoir:task:<site root path>:<page slug>:<item id>`, value
+`"1"` or `"0"`; no entry means the Markdown's own state. `<page slug>` is the
+page the item was WRITTEN on (`data-task-page`, stamped at build), so a
+transcluded checklist shows and sets its source's ticks, and two copies on
+one page stay in step. The shape is a contract case (Russell, #519 comment of
+2026-10-16): changing it resets every student's ticks.
+
+**The read API** for #545: `readTicks(siteRoot, pageSlug, itemIds, store)`
+→ `{id: true | false | null}`, with `taskKey` and `siteRootFrom` exported
+beside it; #545's page imports `taskRules.ts`. A store that throws, or a value
+that is neither `"1"` nor `"0"`, reads as `null`.
+
+### K3. The page's script, and Quartz's router
+
+One `change` listener on the document, added when `postscript.js` first
+runs - never per page, so changing page never stacks them (the browser check
+counts them after five round trips). On every `nav` (first load, a link
+followed, Back) every box's `checked` is ASSIGNED, from its tick or from
+`defaultChecked`. Never left alone: Quartz's router morphs the new page into
+the old one's DOM (micromorph), reusing same-tag elements by position, so a
+box can be the previous page's element still holding its tick (#519 plan M5).
+The review (F3) found the reuse depends on the page pair - one of nine
+measured trips reused inputs - so verify.sh plants `Task Twin A` and `B`,
+alike in every element but their items' words, and the browser check first
+proves the router reused A's box for B (an expando on the element) before it
+trusts that B shows B's state. Must-fail: assigning only when a tick is
+stored shows Twin A's tick on Twin B, and the check fails.
+
+Nothing is written when a page loads. Storage refused (a private window, a
+blocked site): every box still ticks, and nothing is kept; the task boxes add
+nothing to the console (Quartz's own scripts already report the refused
+store on every page). A handout printed with storage refused keeps the ticks
+made on the page: the print hook (K6) applies only STORED ticks and never
+falls back to the Markdown's state - the implementation review (F1) measured
+the first version, which did fall back, putting every box back to `_x_` on
+the handout and on screen; task_boxes.mjs now prints that case, and it fails
+on that version.
+
+Ticking a parent item strikes its nested items through as well, ticked or
+not: the strike is on the `li`, as Quartz's own `li:has(> input:checked)`
+rule always did. Kept as Quartz's behaviour, and a known limit.
+
+### K4. The label, and what a screen reader hears
+
+The box and the item's inline words, up to the first child that is not
+phrasing content (a nested list, a paragraph, a table, a figure, a heading,
+a video - review F10), are wrapped in `<label class="plantoir-task-label">`:
+an implicit label, so no ids to collide under transclusion. A click on the
+words ticks the box; a link inside the words still navigates and ticks
+nothing (HTML's activation rule; measured); Tab reaches each box and Space
+ticks it, with a 2 px `--darkgray` focus ring. Quartz's own task-item rules
+(`li:has(> input[type="checkbox"])`) no longer match a box inside a label, so
+tasks.scss says them again for the tight shape and the loose one
+(`li > p > label > input`), which Quartz never matched. A box in a link's
+preview or a search result shows the page's own state and cannot be ticked
+(`pointer-events: none`); it stays Tab-focusable there, and Space toggles it
+on screen without saving - harmless.
+
+### K5. The look (ruling Q3, the default pending Russell)
+
+Quartz's box was measured across the 43 colour schemes of
+`support/colour_schemes.json`, light and dark: the unticked edge
+(`--lightgray`) 1.18-1.52:1 against `--light` everywhere (a control needs
+3:1); the ticked fill (`--secondary`) with its tick in `--light` as low as
+1.06:1; a ticked item's words (`--gray`) 1.76:1 in the default light scheme.
+Now the edge and the tick are `--darkgray` with no fill, and a ticked item's
+words and the line through them stay `--darkgray`: at least 6.06:1 in light
+mode (desert-sandstone) and 12.19:1 in dark. `scripts/test_task_box_contrast.py`
+(stdlib, so Windows runs it) holds every colour tasks.scss names to 3:1 (marks)
+and 4.5:1 (words) in every scheme; the browser check reads the computed
+colours. This drops Quartz's coloured fill.
+
+### K6. On paper: the ink
+
+With the browser's "background graphics" off (its default), Quartz's ticked
+box printed as an EMPTY box with a green edge (#519 plan M7; measured again
+here in light mode): the fill and the white tick drawn on it are both
+backgrounds or light-on-fill. Whatever paper shows, a print style was owed:
+under `@media print` the box is an outline and the tick a stroke, both in
+`--darkgray`. A page that is not printable keeps the dark theme's colours on
+paper, where `--darkgray` is light: measured, no edge darker than 200 of 255
+- the box and tick all but vanished while Chrome darkened the words beside
+them - so in the dark theme they print in `#4e4e4e` (Quartz's light-theme dark
+grey, 8.5:1 on white). The browser check prints `Task Printable` and `Task
+Twin A` in both themes with `Page.printToPDF` (backgrounds off), renders the
+PDF with poppler's `pdftoppm`, finds each box by its inked sides, and counts
+the ink inside: 50-66 dark pixels inside a ticked box, 0 inside an unticked
+one; with the print block taken out, 0 inside the ticked box and the
+unticked box not found at all. Safari is not measured (no headless Safari
+here; recorded as owed).
+
+**What paper shows (ruling Q1, the default pending Russell):** the boxes as
+the student ticked them, on ⌘P and on the handout - Russell's #519 comment
+of 2026-10-13, the same rule as a runnable block printing the student's
+edits (DECISIONS 8). Both copy the live page, so the ticks travel for free
+(plan M6); the script also pushes a `plantoirPrint.prepare` hook that
+restores the ticks once more just before the handout is built, because a
+handout opened from Plantoir's preview (`#plantoir-print=`) starts inside
+the same `nav` as the page and, with no other hook awaited first, would copy
+the boxes before tasks.inline's own `nav` listener had run. The hook applies
+only stored ticks (a first load already shows the Markdown's state), so with
+storage refused it changes nothing (review F1). Measured: tick
+the first item and untick the teacher's `[x]` on the second of `Task
+Printable`, then Questions only - the handout's boxes read `x__`, as the
+page did (the Markdown's state is `_x_`). Rejected for now: the Markdown's
+state on paper (the issue body; #545's note of 2026-10-16) - it would need a
+beforeprint/afterprint restore from memory (re-reading storage loses the
+ticks when storage is refused) and a reset in every copy print.inline.ts
+makes; if Russell chooses it, #545's own page is the one exception.
+
+### K7. Byte identity, restated
+
+Every page with a task item outside a quiz changes: `disabled` removed, a
+class and two data attributes, the label. Measured on EXC2O against
+`origin/dev` 0fe0d1cba, both builds from the same planted course: 190 of 316
+pages byte-identical once Quartz's own build-to-build variance is set aside
+(the random `<ul class="overflow">` ids, build-time `<time datetime>`, and the
+order of tag-list entries sharing a date); the 120 pages that hold a task item
+changed (+33,411 bytes in all, +6,255 gzipped); the other 6 differ only in
+that variance. Every site's two shared bundles grow, measured again at the branch's head
+against `origin/dev` 0c755ce97 (after #585): `postscript.js` 163,996 →
+165,912 bytes (+1,916, on verify.sh's EXC2O fixture site; gzip 55,947 → 56,528) and `index.css` 71,601 → 73,127
+(+1,526; gzip 12,772 → 12,952), #588's few bytes included. (The first
+measurement, +1,696, was taken before the print hook.) A page with no
+task item outside a quiz is untouched by the transformer, which returns
+without changing the tree.
+
+### K8. Measured, and rejected
+
+Measured (2026-10-18, M4 Pro, macOS 26.6, Chrome for Testing 155, the verify
+fixture): `browser-checks/task_boxes.mjs` - the Markdown's state and nothing
+written on load; the contract's exact key with `"1"`, an untick of `[x]` with
+`"0"`, both kept across a reload; the words, a link, Tab and Space; a
+transcluded copy setting its source's tick, both copies in step; five round
+trips and one change listener; the twins; a tick kept under another text's id
+ignored; a not-ready quiz's 18 boxes still disabled and unstamped; storage
+refused; the look; the ink above. verify.sh 6l: 266 boxes on 121 pages
+tickable and stamped, ids as the contract says (a callout, rewritten links, a
+comment, CR LF).
+
+Rejected: Quartz's own `enableCheckbox` (it rewrites every checkbox on a
+page, the quizzes' inputs among them, and keys a tick by position - plan M2);
+an id from the item's position or a per-page occurrence number (Q5); ids
+re-derived from the raw Markdown by Python (F1); a per-page JSON of ids now
+(#545 may add one, reading the stamps); a `window.*` read API (scripts are
+bundled separately, their order is not a contract); a `storage` event
+listener for another open tab (its cost against a rare case - that tab
+catches up on its next load).
+
+**The guidance, and its lint.** Every page that said the boxes cannot be
+ticked was rewritten (the 90 showcase pages, 37 other paragraphs), and
+`.claude/skills/example-content/lint_payload.py` fails a payload that says
+so: a phrase list (read-only, printed/not interactive, not clickable, do not
+save, does nothing...) within reach of a box, and a rule for paraphrases - a
+sentence naming a box, checklist, tick or click that says nothing is
+recorded, saved or stored, or that the site records nothing - read with the
+lines joined, so a wrapped phrase is found. Still missed: a claim worded with
+none of those words ("the boxes are only for show"), or one that says
+nothing carries over between visits. It also misses "ticks are not saved
+anywhere" and "your browser keeps nothing", and it can flag a true privacy
+sentence ("nothing you click is recorded against your name") - a payload
+that says so should phrase it another way (#519 fixes review R2).
+
+**Teacher note.** A checklist on a class site is one each student ticks for
+themselves; the ticks stay in that student's browser and nobody else sees
+them. Change an item's words and every student's tick on it clears; ticking
+`[x]` in the file only changes what an untouched box shows.
 
 ## E. Summary: what is *not* customized
 

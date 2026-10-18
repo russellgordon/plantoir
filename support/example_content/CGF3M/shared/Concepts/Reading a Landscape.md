@@ -39,10 +39,10 @@ anything:
 - [ ] Vegetation — what grows, and what the pattern of it follows
 - [ ] Human marks — cuts, fills, drains, walls, fences, roads
 
-> [!warning] The boxes do not tick
-> This checklist is printed, not interactive. Clicking does nothing and
-> nothing is saved. Copy it into your field notebook, which is where it
-> is any use.
+> [!tip] Tick it here, carry it there
+> Tick the boxes as you read the landscape; your browser keeps the ticks
+> on this computer. In the field, the copy in your field notebook is the
+> one that is any use.
 
 Then ask the two questions that turn observation into geography: what is
 the process, and is it still operating? A gully with bare, fresh sides is

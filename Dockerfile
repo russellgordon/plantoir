@@ -238,6 +238,10 @@ COPY scripts/social_card.py /opt/scripts/social_card.py
 # deploy.py imports it by bare name, which only resolves if it is baked in
 # beside it.
 COPY scripts/netlify_badge.py /opt/scripts/netlify_badge.py
+# Live input (#583): which pages a publish isolates, and the _headers block
+# that does it - deploy.py imports it by bare name, so it is baked beside it
+# (test_baked_modules.py).
+COPY scripts/isolation_headers.py /opt/scripts/isolation_headers.py
 
 # Bake the Explorer's hide filter into the image.
 #

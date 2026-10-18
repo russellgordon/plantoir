@@ -941,6 +941,79 @@ final class SectionAdderTests: XCTestCase {
         XCTAssertEqual(frontmatter, "title: Snippets\ncreated: 2026-09-25T07:00:00.000-0400\npublish: true")
     }
 
+    /// #575: a course name holding ": ". The sibling's title may already be
+    /// quoted (setup and this file write it that way now), single-quoted by
+    /// hand, or plain and broken (a course made before the fix); each is read
+    /// back, keeps its wording, and the new section's title is quoted. Before
+    /// #575 the quoted ones lost the teacher's wording to the form's, and
+    /// every one was written plain — a front page the build could not read.
+    @MainActor
+    func testAQuotedOrBrokenSiblingTitleIsReadBackAndQuoted() throws {
+        let siblings: [(written: String, expected: String)] = [
+            ("title: \"Grade 11 Physics: Mechanics, Section 1\"", "title: \"Grade 11 Physics: Mechanics, Section 2\""),
+            ("title: 'Grade 11 Rock ''n'' Roll: Live, Section 1'", "title: \"Grade 11 Rock 'n' Roll: Live, Section 2\""),
+            ("title: Grade 11 Physics: Mechanics, Section 1", "title: \"Grade 11 Physics: Mechanics, Section 2\""),
+            ("title: 'Tis the Season, Section 1", "title: \"'Tis the Season, Section 2\""),
+            ("title: \"Grade 11 \\\"Real\\\" World, Section 1\"", "title: Grade 11 \"Real\" World, Section 2"),
+        ]
+        for sibling in siblings {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let siblingIndex: URL = course.sectionDirectoryURL(forSection: 1).appendingPathComponent("index.md")
+            try "---\n\(sibling.written)\ncreated: 2026-09-01T08:00:00.000-0400\npublish: true\n---\n# Welcome\n"
+                .write(to: siblingIndex, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let written: String = try String(
+                contentsOf: course.sectionDirectoryURL(forSection: 2).appendingPathComponent("index.md"),
+                encoding: .utf8
+            )
+            let titleValue: String = try XCTUnwrap(SectionAdderTests.value(ofKey: "title", in: written), written)
+            XCTAssertEqual("title: " + titleValue, sibling.expected, sibling.written)
+        }
+    }
+
+    /// A double-quoted sibling this reader cannot decode — a YAML-only escape
+    /// such as `\x3A`, or a comment after the closing quote — gives the
+    /// wizard's form, which is what an unreadable sibling has always given.
+    @MainActor
+    func testASiblingTitleOnlyYAMLCouldDecodeFallsBackToTheForm() throws {
+        for written in ["title: \"Grade 11 Physics\\x3A Mechanics, Section 1\"",
+                        "title: \"Grade 11 Physics: Mechanics, Section 1\" # mine"] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let siblingIndex: URL = course.sectionDirectoryURL(forSection: 1).appendingPathComponent("index.md")
+            try "---\n\(written)\npublish: true\n---\n".write(to: siblingIndex, atomically: true, encoding: .utf8)
+
+            XCTAssertEqual(SectionAdder.sectionTitle(for: course, sectionNumber: 2),
+                           "Grade 11 Introduction to Computer Science, Section 2", written)
+        }
+        XCTAssertEqual(SectionAdder.plainTitle(fromValue: "Labs"), "Labs")
+        XCTAssertEqual(SectionAdder.plainTitle(fromValue: "'Tis open"), "'Tis open",
+                       "a quote that never closes is taken as written")
+    }
+
+    /// The scaffold taken from a sibling's frontmatter quotes the swapped
+    /// title by the same rule (#575).
+    @MainActor
+    func testAScaffoldQuotesTheTitleItSwapsIn() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scaffold-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let siblingURL: URL = root.appendingPathComponent("index.md")
+        try Data("---\ntitle: Section 1\ncreated: 2026-08-10T14:30:00.000-0400\npublish: true\n---\n".utf8)
+            .write(to: siblingURL)
+
+        let frontmatter: String = SectionAdder.scaffoldFrontmatter(
+            sibling: siblingURL, replacingTitleWith: "Physics: Mechanics, Section 2",
+            created: "2026-09-25T07:00:00.000-0400"
+        )
+        XCTAssertEqual(frontmatter,
+                       "title: \"Physics: Mechanics, Section 2\"\ncreated: 2026-09-25T07:00:00.000-0400\npublish: true")
+    }
+
     /// The value on a `key: value` line, whatever the line ends with.
     static func value(ofKey key: String, in text: String) -> String? {
         for line in text.components(separatedBy: "\n") {

@@ -4,8 +4,10 @@ The edits that connect support/quartz to a section's Quartz copy
 (build_site.wire_quartz_additions): the Print button's (#454), the figures
 transformer's (#485 E1), since #455 the runnable code's - its transformer
 straight before SyntaxHighlighting and its component at the head of the
-shared afterBody list - and since #563 the self-check quizzes' transformer,
-straight after the figures transformer.
+shared afterBody list - since #563 the self-check quizzes' transformer,
+straight after the figures transformer, and since #519 the task boxes'
+transformer, straight after the quizzes' (its script and styles ride the
+Print button's component, PlantoirMetaLine.tsx).
 
 Run against embedded copies of Quartz v4.5.0's own files (measured in
 quartz-teacher:dev-test, 2026-10-17): wired once, a second build changes
@@ -114,9 +116,12 @@ class WiringTests(unittest.TestCase):
                       "the runner's transformer goes straight before SyntaxHighlighting, at its indent")
         self.assertEqual(self.text("transformers").count('export { PlantoirQuizzes } from "./plantoirQuizzes"'), 1)
         self.assertEqual(config.count("Plugin.PlantoirQuizzes(),"), 1)
-        self.assertIn("      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n"
-                      "      Plugin.Latex(", config,
+        self.assertIn("      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n", config,
                       "the quizzes' transformer goes straight after the figures', so after Description, at its indent")
+        self.assertEqual(self.text("transformers").count('export { PlantoirTasks } from "./plantoirTasks"'), 1)
+        self.assertEqual(config.count("Plugin.PlantoirTasks(),"), 1)
+        self.assertIn("      Plugin.PlantoirQuizzes(),\n      Plugin.PlantoirTasks(),\n      Plugin.Latex(", config,
+                      "the task boxes' transformer goes straight after the quizzes', at its indent")
         layout = self.text("layout")
         self.assertIn("afterBody: [Component.CodeRunner()],", layout)
         self.assertIn("Component.PlantoirMetaLine(Component.ContentMeta())", layout)
@@ -156,6 +161,34 @@ class WiringTests(unittest.TestCase):
         config = self.text("config")
         self.assertEqual(config.count("Plugin.PlantoirFigures("), 1)
         self.assertIn("Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n", config)
+
+    def test_a_section_wired_before_519_gets_the_task_boxes_after_its_quizzes(self):
+        self.files["config"].write_text(CONFIG.replace(
+            "      Plugin.Description(),\n",
+            "      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n", 1),
+            encoding="utf-8")
+        self.files["transformers"].write_text(
+            TRANSFORMERS_INDEX + 'export { PlantoirQuizzes } from "./plantoirQuizzes" // PLANTOIR-ADDITIONS\n',
+            encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        config = self.text("config")
+        self.assertEqual(config.count("Plugin.PlantoirQuizzes("), 1)
+        self.assertIn("Plugin.PlantoirQuizzes(),\n      Plugin.PlantoirTasks(),\n", config)
+        self.assertEqual(self.text("transformers").count("PlantoirTasks"), 1)
+
+    def test_task_boxes_without_the_quizzes_anchor_are_said_and_left_out(self):
+        changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")
+        self.files["config"].write_text(changed, encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        self.assertNotIn("PlantoirTasks", self.text("config"))
+
+    def test_the_print_buttons_component_carries_the_task_boxes_script_and_styles(self):
+        component = (Path(build_site.__file__).resolve().parent.parent / "support" / "quartz" / "components"
+                     / "PlantoirMetaLine.tsx").read_text(encoding="utf-8")
+        self.assertIn('import tasksStyle from "./styles/tasks.scss"', component)
+        self.assertIn('import tasksScript from "./scripts/tasks.inline"', component)
+        self.assertIn("quizStyle, tasksStyle)", component)
+        self.assertIn("quizScript, tasksScript)", component)
 
     def test_quizzes_without_the_figures_anchor_are_said_and_left_out(self):
         changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")

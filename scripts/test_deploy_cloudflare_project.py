@@ -222,5 +222,19 @@ class TheMarkerIsTheContractsOwn(unittest.TestCase):
         self.assertEqual(found["marker"]["prefix"], deploy.CLOUDFLARE_REMADE_MARKER)
 
 
+class LiveInputHeadersTests(unittest.TestCase):
+    """#583: the live input block goes into public/_headers AFTER any rebuild
+    (which empties public/) and BEFORE wrangler uploads the folder."""
+
+    def test_the_block_is_written_between_the_rebuild_and_the_upload(self):
+        import inspect
+        source = inspect.getsource(deploy.publish_to_cloudflare)
+        rebuild_at = source.index("ensure_base_url_and_rebuild(")
+        live_at = source.index('isolation_headers.publish_headers(public_dir, "cloudflare")')
+        upload_at = source.index("deploy_to_cloudflare(public_dir")
+        self.assertLess(rebuild_at, live_at)
+        self.assertLess(live_at, upload_at)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

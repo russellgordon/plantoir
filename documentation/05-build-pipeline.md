@@ -1898,6 +1898,20 @@ would need the network); copying the worker into `/opt/vendor` (it would
 need its own line in both runtimes) or into every site's `static/` (a site
 without runnable code would carry it).
 
+### Live input: what the build adds (#583, v1.8.1)
+
+The transformer marks each runnable block that can ask for input with
+`data-runner-asks="input"` (it reads input as written) or `"edit"` (a
+student can edit it), from `codeRunnerRule.asksFor`. Two edits to Quartz
+itself, both in the ALWAYS section and idempotent (`wire_quartz_additions`):
+the preview server's `cli/handlers.js` (`PLANTOIR-ISOLATION-SERVE`) sends the
+isolation headers per request, and the router's `spa.inline.ts`
+(`PLANTOIR-ISOLATION-NAV`) loads a page whole across the isolation line. The
+build itself prints no note: in preview mode Quartz builds inside its server,
+after `build_site.py` could read anything, so the `plantoir: note:` line for
+a runner page that keeps the box is printed by the preview's server (once per
+page) and by each publish (06 → I11, 07).
+
 ## Runnable Swift: what the launcher and the build do (#493, v1.8.0)
 
 A ` ```swift run ` block on a page that opts in runs as a small WebAssembly

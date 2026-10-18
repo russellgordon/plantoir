@@ -525,6 +525,8 @@ final class PrintablePagesTests: XCTestCase {
         let codeRunnerBlocks: [String: Any] = try SharedRulesContractTests.section("codeRunnerBlocks")
         let guidance: [String: Any] = try XCTUnwrap(codeRunnerBlocks["agentGuidance"] as? [String: Any])
         let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        let words: [String: Any] = try XCTUnwrap(codeRunnerBlocks["words"] as? [String: Any])
+        let endInput: String = try XCTUnwrap(words["endInput"] as? String)
         let outcome: AgentGuidance.Outcome = AgentGuidance.write(
             from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
         XCTAssertEqual(outcome.failures, [])
@@ -532,6 +534,13 @@ final class PrintablePagesTests: XCTestCase {
             let skill: String = try String(
                 contentsOf: folder.appendingPathComponent("\(home)/skills/\(skillName)/SKILL.md"), encoding: .utf8)
             XCTAssertTrue(skill.contains("name: \(skillName)"), home)
+            // #583: live input - the program stops and asks, and the end of
+            // input has its button (named by the contract's word) - and the
+            // box where a page cannot stop to ask, with the note line saying why.
+            XCTAssertTrue(skill.contains("stops and asks"), home)
+            XCTAssertTrue(skill.contains(endInput), home)
+            XCTAssertTrue(skill.contains("input box"), home)
+            XCTAssertTrue(skill.contains("plantoir: note:"), home)
             XCTAssertTrue(skill.contains("codeRunner: true"), home)
             XCTAssertTrue(skill.contains("```python run"), home)
             // #493: ONE skill for every language - Swift is a section of
@@ -539,6 +548,10 @@ final class PrintablePagesTests: XCTestCase {
             XCTAssertTrue(skill.contains("## Swift"), home)
             XCTAssertTrue(skill.contains("```swift run"), home)
             XCTAssertTrue(skill.contains("readLine()"), home)
+            // #585: every runnable block numbers its lines, so a traceback's
+            // line is the one a student sees (codeRunnerBlocks.editor.lineNumbers).
+            XCTAssertTrue(skill.contains("line numbers down the left"), home)
+            XCTAssertTrue(skill.contains("look at line 3"), home)
         }
         for name in AgentGuidance.rootFiles {
             let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)

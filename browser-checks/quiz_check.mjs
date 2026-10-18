@@ -8,7 +8,8 @@
 // Printable` (a printable page with quizzes):
 //
 //  1. each kind, answered wrongly and then rightly, says the contract's
-//     words; a blank is marked in words; an empty answer is never checked;
+//     words (a fill-in-the-blank question its feedback.blanks case, one
+//     blank on `Quiz One Blank` among them, #588); a blank is marked in words; an empty answer is never checked;
 //     the explanation is revealed - its TEXT visible, not only its title -
 //     and a graph inside it drawn; Show answer marks the right choice, or
 //     shows the answer with its formula set by KaTeX (review S9);
@@ -30,7 +31,11 @@
 //  8. on paper (print media) nothing a quiz holds back, and no button,
 //     shows, and choices are drawn as empty circles; a printable page's
 //     handout holds a quiz's question and neither its answer nor its
-//     explanation (ruling Q8).
+//     explanation (ruling Q8);
+//  9. live input (#583): served with the isolation headers (the preview's
+//     own rule), code in a choice and in an explanation asks live, and
+//     Return in its answer field ticks nothing, checks nothing and folds
+//     nothing.
 //
 // "No network" (#511) is checked as: answering asks no other website and
 // nothing of the site itself (graphs and code to run fetch their engines from
@@ -47,6 +52,7 @@ import { createServer } from "node:http"
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
+import { headersFor } from "../support/quartz/cli/plantoirIsolation.mjs"
 
 const [chromePath, siteFolder] = process.argv.slice(2)
 if (!chromePath || !siteFolder) {
@@ -60,6 +66,12 @@ const RULES = ALL_RULES.quizCallouts
 const RUNNER_WORDS = ALL_RULES.codeRunnerBlocks.words
 const said = (key, values = {}) =>
   RULES.words.site[key].replace(/\{([A-Za-z]+)\}/g, (whole, name) => (name in values ? String(values[name]) : whole))
+// What a fill-in-the-blank question says with `right` of `count` blanks
+// right (quizCallouts.feedback.blanks, #588), from the contract's own case.
+const blanksSay = (right, count) => {
+  const found = RULES.feedback.blanks.cases.find((c) => c.right === right && c.count === count)
+  return said(found.say, found.values)
+}
 
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
@@ -67,7 +79,8 @@ const TYPES = {
   ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2", ".xml": "application/xml", ".txt": "text/plain",
 }
 
-function serve() {
+// isolated: as a host with #583's headers serves it (the preview's rule).
+function serve(isolated = false) {
   const requests = []
   const server = createServer((request, response) => {
     let path = decodeURIComponent(new URL(request.url, "http://x").pathname)
@@ -91,7 +104,9 @@ function serve() {
     }
     try {
       const body = readFileSync(file)
-      response.writeHead(200, { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-cache" })
+      const headers = { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-cache" }
+      if (isolated) Object.assign(headers, headersFor(siteFolder, new URL(request.url, "http://x").pathname))
+      response.writeHead(200, headers)
       response.end(request.method === "HEAD" ? undefined : body)
     } catch {
       response.writeHead(404).end("not found")
@@ -113,16 +128,18 @@ const chrome = spawn(chromePath, [
 ], { stdio: ["ignore", "ignore", "pipe"] })
 
 let siteServer = null
+let isolatedServer = null
 function finish(code, message) {
   console.log(message)
   siteServer?.server.close()
+  isolatedServer?.server.close()
   chrome.kill()
   setTimeout(() => {
     rmSync(work, { recursive: true, force: true })
     process.exit(code)
   }, 300)
 }
-const timer = setTimeout(() => finish(1, "FAIL: the quizzes were not checked within 300 s"), 300000)
+const timer = setTimeout(() => finish(1, "FAIL: the quizzes were not checked within 420 s"), 420000)
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
 // Helpers that run in the page.
@@ -300,7 +317,7 @@ async function connect(chunk) {
 
       // Fill in the blank: marks in words, tolerance and alternatives.
       await evaluate("window.__quiz.type(4, ['50', 'Standard']); window.__quiz.press(4, 'check')")
-      expect("one blank of two says someBlanksRight", (await evaluate("window.__quiz.feedback(4)")) === said("someBlanksRight", { right: 1, count: 2 }))
+      expect("one blank of two right says the contract's feedback.blanks case", (await evaluate("window.__quiz.feedback(4)")) === blanksSay(1, 2))
       const marks = await evaluate("Array.from(window.__quiz.quiz(4).querySelectorAll('.plantoir-quiz-mark')).map((mark) => mark.textContent)")
       expect("each blank is marked in words and a sign", JSON.stringify(marks) === JSON.stringify([said("markWrong"), said("markRight")]), marks)
       const invalid = await evaluate("Array.from(window.__quiz.quiz(4).querySelectorAll('input.plantoir-quiz-blank')).map((box) => box.getAttribute('aria-invalid'))")
@@ -423,6 +440,14 @@ async function connect(chunk) {
       const cleared = await evaluate("({ hidden: document.querySelector('.plantoir-quiz-score').hidden, stored: localStorage.getItem('plantoir:quiz:/:Quiz-Playground'), feedback: window.__quiz.feedback(2), ticked: window.__quiz.quiz(2).querySelectorAll('input:checked').length })")
       expect("Start again clears the score and the answers", cleared.hidden && cleared.stored === null && cleared.feedback === "" && cleared.ticked === 0, cleared)
 
+      // A question with one blank (#588): wrong, then right, as the contract says.
+      if (!(await open(base + "/Quiz-One-Blank.html"))) return finish(1, "FAIL: Quiz One Blank did not load")
+      await evaluate("window.__quiz.type(1, ['Lyon']); window.__quiz.press(1, 'check')")
+      const oneBlankWrong = await evaluate("window.__quiz.feedback(1)")
+      expect("one blank, wrong, says the contract's feedback.blanks case", oneBlankWrong === blanksSay(0, 1), oneBlankWrong)
+      await evaluate("window.__quiz.type(1, ['Paris']); window.__quiz.press(1, 'check')")
+      expect("one blank, right, says right", (await evaluate("window.__quiz.feedback(1)")) === blanksSay(1, 1))
+
       // 6. Five changes of page, then back.
       await open(playground)
       const before = await listenersOn("window")
@@ -469,6 +494,43 @@ async function connect(chunk) {
                  score: document.querySelector(".plantoir-quiz-score-line")?.textContent }
       })()`)
       expect("a quiz shown twice has ids of its own and is counted once", twice.copies === 2 && twice.duplicateIds === 0 && twice.score === said("score", { right: 1, total: 1 }), twice)
+
+      // 9. Live input inside a quiz (#583).
+      isolatedServer = await serve(true)
+      await open(`http://127.0.0.1:${isolatedServer.port}/Quiz-Playground.html`)
+      expect("served with the headers, the quiz page is cross-origin isolated", (await evaluate("self.crossOriginIsolated === true")) === true)
+      const waitingWords = (RUNNER_WORDS.waitingForInput ?? "")
+      const askIn = async (selector) => {
+        const asked = await evaluate(`(async () => {
+          const block = ${selector}
+          const editor = block.querySelector("textarea.plantoir-runner-editor")
+          editor.value = 'print(input("A? "))'
+          editor.dispatchEvent(new Event("input", { bubbles: true }))
+          block.querySelector(".plantoir-runner-run").click()
+          const until = Date.now() + 60000
+          while (Date.now() < until && block.querySelector(".plantoir-runner-status").textContent !== ${JSON.stringify(waitingWords)}) {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+          return { waiting: block.querySelector(".plantoir-runner-status").textContent === ${JSON.stringify(waitingWords)},
+            focused: document.activeElement === block.querySelector("input.plantoir-runner-answer") }
+        })()`)
+        await send("Input.insertText", { text: "x" })
+        await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 })
+        await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 })
+        await pause(1500)
+        return { ...asked, output: await evaluate(`(${selector}).querySelector(".plantoir-runner-output").textContent`) }
+      }
+      const inChoice = await askIn("window.__quiz.quiz(7).querySelector('.plantoir-quiz-choice[data-choice=\"0\"] .plantoir-runner')")
+      const afterChoice = await evaluate("({ ticked: window.__quiz.quiz(7).querySelector('.plantoir-quiz-choice[data-choice=\"0\"] input.plantoir-quiz-input').checked, feedback: window.__quiz.feedback(7) })")
+      expect("code in a choice asks live, and Return in its field ticks nothing and checks nothing",
+        inChoice.waiting && inChoice.focused && inChoice.output === "A? x\nx\n" && afterChoice.ticked === false && !afterChoice.feedback, { inChoice, afterChoice })
+      await evaluate("window.__quiz.choose(7, [0]); window.__quiz.press(7, 'check')")
+      await evaluate("window.__quiz.quiz(7).querySelector('.plantoir-quiz-explain').scrollIntoView()")
+      const feedbackBefore = await evaluate("window.__quiz.feedback(7)")
+      const inExplain = await askIn("window.__quiz.quiz(7).querySelector('.plantoir-quiz-explain .plantoir-runner')")
+      const afterExplain = await evaluate("(() => { const explain = window.__quiz.quiz(7).querySelector('.plantoir-quiz-explain'); return { hidden: explain.hidden, collapsed: explain.classList.contains('is-collapsed'), feedback: window.__quiz.feedback(7) } })()")
+      expect("code in an explanation asks live, and Return in its field folds nothing and checks nothing again",
+        inExplain.waiting && inExplain.output === "A? x\nx\n" && !afterExplain.hidden && !afterExplain.collapsed && afterExplain.feedback === feedbackBefore, { inExplain, afterExplain, feedbackBefore })
 
       // 5b. Storage refused.
       await send("Page.addScriptToEvaluateOnNewDocument", {

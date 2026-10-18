@@ -311,9 +311,12 @@ enum SectionAdder {
         while position > block.openIndex {
             let line: String = allLines[position]
             if isRootIndex && line.hasPrefix("title:") {
+                // Quoted when written plain it would not read back (#575):
+                // a course name holding ": " gave a front page the build
+                // could not read.
                 let newTitle: String = sectionTitle(for: course, sectionNumber: sectionNumber)
                 closeIndex -= PageFrontmatter.replacingKeyLine(
-                    at: position, key: "title", with: "title: \(newTitle)",
+                    at: position, key: "title", with: "title: \(FolderScaffold.frontmatterTitle(newTitle))",
                     in: &allLines, closeIndex: closeIndex
                 )
             } else if (isRootIndex || isTopLevelPerSectionFile) && line.hasPrefix("created:") {
@@ -664,8 +667,9 @@ enum SectionAdder {
                         in: &result, closeIndex: result.count
                     )
                 } else if line.hasPrefix("title:"), let newTitle {
+                    // Quoted by the same rule as the fallback below (#575).
                     PageFrontmatter.replacingKeyLine(
-                        at: position, key: "title", with: "title: \(newTitle)",
+                        at: position, key: "title", with: "title: \(FolderScaffold.frontmatterTitle(newTitle))",
                         in: &result, closeIndex: result.count
                     )
                 }
@@ -710,7 +714,8 @@ enum SectionAdder {
         return ""
     }
 
-    /// The new section's landing-page title. A sibling section's title with
+    /// The new section's landing-page title, as PLAIN text — its writers
+    /// quote it when it needs quoting (#575). A sibling section's title with
     /// the section number swapped is the most faithful source — it keeps
     /// whatever wording the teacher chose. Failing that, the wizard's form,
     /// without doubling the grade when the course name already leads with it
@@ -722,7 +727,15 @@ enum SectionAdder {
                 if line.hasPrefix("title:") {
                     // `.whitespacesAndNewlines`, so the carriage return at the
                     // end of a Windows-saved line is not carried into the title.
-                    let siblingTitle: String = String(line.dropFirst("title:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let siblingValue: String = String(line.dropFirst("title:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    // A quoted sibling — which is what setup and this file
+                    // write since #575 for a name holding ": " — is unwrapped
+                    // first, or the trailing quote hides "Section 1" from the
+                    // swap below and the form's wording silently replaces the
+                    // teacher's.
+                    guard let siblingTitle = plainTitle(fromValue: siblingValue) else {
+                        break
+                    }
                     if let range = siblingTitle.range(of: #"Section \d+$"#, options: .regularExpression) {
                         return siblingTitle.replacingCharacters(in: range, with: "Section \(sectionNumber)")
                     }
@@ -739,6 +752,36 @@ enum SectionAdder {
             titlePrefix = "\(gradeLabel) "
         }
         return "\(titlePrefix)\(courseName), Section \(sectionNumber)"
+    }
+
+    /// The text a `title:` line's value stands for, or nil when this reader
+    /// does not take its form.
+    ///
+    /// Wrapped in double quotes: decoded as a JSON string, which is exactly
+    /// what `FolderScaffold.frontmatterTitle` writes; YAML's double-quoted
+    /// escapes are a superset of JSON's (`\x41`, `\e`), so a value only YAML
+    /// can decode is nil, and nil sends `sectionTitle` to the wizard's form —
+    /// what an unreadable sibling has always given. Wrapped in single quotes:
+    /// the quotes stripped and `''` read as `'`. Anything else, including a
+    /// quote that never closes (`'Tis the Season, Section 1`, which the build
+    /// cannot read either), is taken as written, so the teacher's wording is
+    /// kept and the new title is quoted readably; a comment after a closing
+    /// quote then hides "Section 1" from the swap, which gives the form too.
+    static func plainTitle(fromValue value: String) -> String? {
+        if value.count >= 2 && value.hasPrefix("\"") && value.hasSuffix("\"") {
+            let wrapped: String = "[" + value + "]"
+            guard let data = wrapped.data(using: .utf8),
+                  let decoded = try? JSONSerialization.jsonObject(with: data) as? [String],
+                  decoded.count == 1 else {
+                return nil
+            }
+            return decoded[0]
+        }
+        if value.count >= 2 && value.hasPrefix("'") && value.hasSuffix("'") {
+            let inside: String = String(value.dropFirst().dropLast())
+            return inside.replacingOccurrences(of: "''", with: "'")
+        }
+        return value
     }
 
     /// The grade named by the course code, matching the wizard:

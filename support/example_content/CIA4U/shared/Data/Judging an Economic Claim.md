@@ -20,8 +20,9 @@ Six questions do most of the work. Copy them somewhere you will see them.
 - [ ] Is the claim causal? If so, what is the comparison group?
 - [ ] What would have to be true for this claim to be wrong?
 
-Those are questions to work through on paper, not boxes to tick — nothing
-on this site records what you click.
+Those are questions to work through on paper. Tick each one here as you
+answer it, if that helps: your browser keeps the ticks, and nobody else
+sees them.
 
 ## The two failures worth naming
 

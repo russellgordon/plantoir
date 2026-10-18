@@ -403,14 +403,20 @@ def add_how_i_teach(course_dir: Path, report: Report, source: Path = HOW_I_TEACH
                     f"{course_dir.name}/{HOW_I_TEACH_NAME}")
 
 
-def add_code_pages(folder: Path, report: Report) -> None:
-    """Plant CODE_PAGES, each written only where missing (#562)."""
+def add_code_pages(folder: Path, report: Report, earlier_versions=None) -> None:
+    """Plant CODE_PAGES (#562): each written where missing, and brought up
+    to date while it is still an earlier committed version of its source
+    (#587: Check Your Loops gained a fifth question, and a folder made before
+    that kept the four-question page). A page somebody changed is left as
+    they changed it and named (`demo_folders.plant_page`)."""
+    if earlier_versions is None:
+        earlier_versions = git_versions
     for code, place, source in CODE_PAGES:
         course_dir = folder / "courses" / code
         if read_config(course_dir) is None:
             report.skip(f"{code} — the course has not been made yet (the app makes it first)")
             continue
-        write_if_absent(course_dir / place, source.read_text(encoding="utf-8"), report, f"{code}/{place}")
+        demo_folders.plant_page(course_dir / place, source, report, f"{code}/{place}", earlier_versions)
 
 
 # ---------- Bringing in what the ready-made course has gained (#562) ----------
@@ -471,25 +477,9 @@ def without_embeds_of(body: str, codes: list[str]) -> str:
     return "\n".join(result)
 
 
-def git_versions(path: Path) -> list[str]:
-    """Every committed version of a payload page, newest first; empty when
-    git cannot say (then no kept page is ever taken for an earlier one)."""
-    import subprocess
-    try:
-        relative = path.resolve().relative_to(REPO)
-    except ValueError:
-        return []
-    listed = subprocess.run(["git", "-C", str(REPO), "rev-list", "HEAD", "--", str(relative)],
-                            capture_output=True, text=True)
-    if listed.returncode != 0:
-        return []
-    versions: list[str] = []
-    for revision in listed.stdout.split():
-        shown = subprocess.run(["git", "-C", str(REPO), "show", f"{revision}:{relative}"],
-                               capture_output=True, text=True)
-        if shown.returncode == 0:
-            versions.append(shown.stdout)
-    return versions
+# Every committed version of a file, newest first (demo_folders keeps it,
+# for the planted pages of both folders).
+git_versions = demo_folders.git_versions
 
 
 def has_code_runner(head: list[str]) -> bool:
@@ -534,12 +524,12 @@ def refresh_runnable_pages(course_dir: Path, payload_shared: Path, codes_by_page
         codes = codes_by_page.get(place[:-3], [])
         kept_core = without_curriculum_markers(without_embeds_of(kept_body, codes))
         wanted_core = without_curriculum_markers(payload_body)
-        if has_code_runner(kept_head):
-            if kept_core == wanted_core:
-                report.note("already there", label)
-            else:
-                report.note("left as you changed it", label)
+        if has_code_runner(kept_head) and kept_core == wanted_core:
+            report.note("already there", label)
             continue
+        # Already runnable but the payload has moved on since (#583 reworded
+        # its input sentences): brought up to date by the same rule - only
+        # when the kept page is still exactly what an earlier payload made.
         made_earlier = False
         for version in earlier_versions(source):
             _, earlier_body = split_frontmatter(version)
@@ -549,7 +539,7 @@ def refresh_runnable_pages(course_dir: Path, payload_shared: Path, codes_by_page
         if not made_earlier:
             report.note("left as you changed it", label)
             continue
-        head = with_code_runner(kept_head)
+        head = kept_head if has_code_runner(kept_head) else with_code_runner(kept_head)
         kept_path.write_text("---\n" + "\n".join(head) + "\n---" + wanted_core, encoding="utf-8")
         report.note("made", label)
 
@@ -573,7 +563,7 @@ def apply_code_steps(folder: Path, report: Report, earlier_versions=git_versions
         link_activities(course_dir, rows, report)
     else:
         report.skip(f"{RUNNABLE_COURSE} — the course has not been made yet (the app makes it first)")
-    add_code_pages(folder, report)
+    add_code_pages(folder, report, earlier_versions)
 
 
 # The start-of-year scene is "the week before school starts" for section 2,

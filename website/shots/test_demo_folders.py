@@ -277,6 +277,25 @@ class SceneNeeds:
         profile = json.loads((self.demo / "courses" / ".internal" / "profile.json").read_text(encoding="utf-8"))
         self.assertEqual(profile["teacher_last_name"], SPEC["teacherLastName"])
 
+    # the Quizzes page (#587): one planted quiz page in each demo course
+    def test_the_quiz_pages_are_planted_in_every_demo_course(self):
+        planted = demo_folders.planted_pages(SPEC)
+        demo_codes: list[str] = []
+        for course in demo_folders.demo_courses(SPEC):
+            demo_codes.append(course["code"])
+        planted_codes: list[str] = []
+        for page in planted:
+            planted_codes.append(page["course"])
+            kept = self.demo / "courses" / page["course"] / page["place"]
+            self.assertTrue(kept.is_file(), f"{page['course']}/{page['place']} should be planted")
+            self.assertEqual(kept.read_text(encoding="utf-8"), (HERE / page["source"]).read_text(encoding="utf-8"))
+            self.assertIn("> [!quiz", kept.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(planted_codes), sorted(demo_codes))
+        self.assertEqual(demo_folders.planted_page_problems(self.demo, SPEC), [])
+        again = marketing_folder.Report()
+        demo_folders.apply_planted_pages(self.demo, again, SPEC)
+        self.assertEqual(again.made, 0, again.lines)
+
     # the hero and the class sites: what the app is asked to do
     def test_each_front_page_is_asked_for_the_latest_class_on_or_before_january_15(self):
         limit = demo_folders.day_in_school_year(self.school_year(), SPEC["demo"]["frontPage"]["latestClassOnOrBefore"])

@@ -470,6 +470,13 @@ else
   cat /tmp/verify_sidebar_page_marker_test.log
 fi
 
+if (cd scripts && python3 test_code_lines_style.py) >/tmp/verify_code_lines_style_test.log 2>&1; then
+  pass "every code block's line numbers: one gutter style with its hairline for static and runnable blocks, no ligatures in code, the editor's colour categories the contract's, and a handout's wrapped line hung under its code (scripts/test_code_lines_style.py, #585)"
+else
+  fail "every code block's line numbers or the editor's colours are not as the contract and each other say (scripts/test_code_lines_style.py, #585)"
+  cat /tmp/verify_code_lines_style_test.log
+fi
+
 if (cd scripts && python3 test_folder_spelling.py) >/tmp/verify_folder_spelling_test.log 2>&1; then
   pass "one working folder, one spelling: every spelling of a folder names one website builder and one builds folder (scripts/test_folder_spelling.py, #189)"
 else
@@ -498,6 +505,18 @@ else
   cat /tmp/verify_page_features_test.log
 fi
 
+# Live input (#583): which built pages a publish isolates (a block that can
+# ask, and nothing from another website the headers would break), each
+# host's MEASURED spelling of a page's path, the marked _headers block -
+# replaced, never appended, beside the badge rule - Cloudflare's 100 rules,
+# and the note lines. Reads the contract; stdlib only.
+if (cd scripts && python3 test_isolation_headers.py) >/tmp/verify_isolation_headers_test.log 2>&1; then
+  pass "live input: which pages a publish lets ask for input as the program runs, each host's spelling of their paths, the _headers block replaced beside the badge rule, Cloudflare's 100 rules and the note lines (scripts/test_isolation_headers.py, #583)"
+else
+  fail "live input: which pages a publish lets ask for input as the program runs, each host's spelling of their paths, the _headers block replaced beside the badge rule, Cloudflare's 100 rules and the note lines (scripts/test_isolation_headers.py, #583)"
+  cat /tmp/verify_isolation_headers_test.log
+fi
+
 # Runnable Swift (#493): the key a block is cached by, the toolchain id, what
 # the launcher's plan writes and what the build's prepare gives the site and
 # says, and that the Swift image's recipe holds every pin and flag the
@@ -523,6 +542,16 @@ if (cd scripts && python3 test_quartz_additions_wiring.py) >/tmp/verify_quartz_w
 else
   fail "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
   cat /tmp/verify_quartz_wiring_test.log
+fi
+
+# Task boxes students tick (#519): the box's edge, its tick and a ticked
+# item's words stand out in every colour scheme, light and dark, and the dark
+# theme's paper ink on white. Stdlib only.
+if (cd scripts && python3 test_task_box_contrast.py) >/tmp/verify_task_box_contrast_test.log 2>&1; then
+  pass "task boxes: the edge and the tick at least 3:1, a ticked item's words at least 4.5:1, in every colour scheme, light and dark, with no fill, and the dark theme's paper ink (scripts/test_task_box_contrast.py, #519)"
+else
+  fail "task boxes: a colour too faint in a colour scheme, a fill on a ticked box, or no paper ink for the dark theme (scripts/test_task_box_contrast.py, #519)"
+  cat /tmp/verify_task_box_contrast_test.log
 fi
 
 # Self-check quizzes (#563): every recognise and answers.parse case through
@@ -641,6 +670,15 @@ if (cd scripts && python3 test_overall_backlinks.py) >/tmp/verify_overall_backli
 else
   fail "build_site.py: an overall expectation's page lists the pages of its specific expectations, once each (scripts/test_overall_backlinks.py)"
   sed 's/^/     /' /tmp/verify_overall_backlinks_test.log | tail -40
+fi
+
+# Issue #520: folder pages (a curriculum folder's index among them) get the
+# table of contents, wired through wire_quartz_additions.
+if (cd scripts && python3 test_folder_page_toc.py) >/tmp/verify_folder_page_toc_test.log 2>&1; then
+  pass "build_site.py: folder pages get the table of contents, once, and the page layout keeps its own (scripts/test_folder_page_toc.py)"
+else
+  fail "build_site.py: folder pages get the table of contents, once, and the page layout keeps its own (scripts/test_folder_page_toc.py)"
+  sed 's/^/     /' /tmp/verify_folder_page_toc_test.log | tail -40
 fi
 
 if (cd scripts && python3 test_setup_curriculum_folders.py) >/tmp/verify_setup_curriculum_folders_test.log 2>&1; then
@@ -1115,9 +1153,11 @@ echo ""
 echo "🔎 Checking the runnable-code rules against what the site and the build run…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/check_runner_rules_against_the_site.py" /opt/scripts/check_runner_rules_against_the_site.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/fixtures/runner-colour" /opt/scripts/fixtures/runner-colour),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/swift-gate" /opt/swift-gate),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/check_runner_rules_against_the_site.py \
   >/tmp/verify_runner_rules_site.log 2>&1; then
-  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
+  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, every codeRunner: line reads as the contract says, and the editor's colours agree with the image's own Shiki case for case, colour for colour and over the example content - $(grep '^codeRunnerColour.ts' /tmp/verify_runner_rules_site.log | sed 's/^codeRunnerColour.ts: //') (scripts/check_runner_rules_against_the_site.py, #455, #585)"
 else
   fail "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
   cat /tmp/verify_runner_rules_site.log
@@ -1140,6 +1180,24 @@ if docker run --rm \
 else
   fail "every quizCallouts answer, check and shuffle case holds in the site's own code, the text hook leaves pages without a quiz untouched, and every word the site shows is the contract's (scripts/check_quiz_rules_against_the_site.py, #563)"
   cat /tmp/verify_quiz_rules_site.log
+fi
+
+# ---- Task boxes students tick (#519): the rules, run where they really run ----
+# taskRules.ts and the transformer (plantoirTasks.ts - the only producer of an
+# item's id) are bundled with Quartz's own text transform and parser, and every
+# taskBoxes case is run through them in Node: each case's Markdown reads as
+# Quartz rewrites it, the transformer stamps the case's ids in order, and the
+# key, the id and the read API are the contract's.
+echo ""
+echo "🔎 Checking the task-box rules against what the site runs…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_task_rules_against_the_site.py" /opt/scripts/check_task_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_task_rules_against_the_site.py \
+  >/tmp/verify_task_rules_site.log 2>&1; then
+  pass "every taskBoxes case holds in the site's own code over Quartz's own text transform and parser: the item's text, its id, the key and the read API (scripts/check_task_rules_against_the_site.py, #519)"
+else
+  fail "every taskBoxes case holds in the site's own code over Quartz's own text transform and parser: the item's text, its id, the key and the read API (scripts/check_task_rules_against_the_site.py, #519)"
+  cat /tmp/verify_task_rules_site.log
 fi
 
 # ---- Diagrams and graphs (#485 E1): the rules, run against the real engines ----
@@ -1490,6 +1548,9 @@ check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
 # Self-check quizzes (#563): the folder check. The site's transformer, script
 # and styles are in support/quartz (the loop below).
 check_baked scripts/quizzes.py            /opt/scripts/quizzes.py
+# Live input (#583): which pages a publish isolates. The preview's half is in
+# support/quartz (the loop below).
+check_baked scripts/isolation_headers.py  /opt/scripts/isolation_headers.py
 while IFS= read -r addition; do
   check_baked "$addition" "/opt/$addition"
 done < <(find support/quartz support/agent_guidance support/figures support/gated support/swift -type f ! -name '.*' | sort)
@@ -1795,11 +1856,17 @@ restore_hit_fixture() {
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
         "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
+        "$HIT_COURSE/Live Plain Link.md" "$HIT_COURSE/Live Framed.md" "$HIT_COURSE/Live Autorun.md" "$HIT_COURSE/Live Box.md" \
         "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
+        "$HIT_COURSE/Curriculum/Z1. Planted 100% Overall.md" "$HIT_COURSE/Curriculum/Z1.1.md" \
         "$HIT_COURSE/Quiz Fixture.md" "$HIT_COURSE/Quiz CRLF.md" "$HIT_COURSE/Quiz Lookalikes.md" \
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
         "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
+        "$HIT_COURSE/Quiz One Blank.md" \
+        "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
+        "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
+        "$HIT_COURSE/Task Raw Box.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2075,6 +2142,12 @@ n = 107  # CODE-107
 n = 108  # CODE-108
 n = 109  # CODE-109
 n = 110  # CODE-110
+```
+
+And a line too long for the paper, which wraps (plantoir-wrap-7f3a):
+
+```python
+print("WRAP-7f3a: a line of code much longer than a printed page is wide, in portrait or in landscape, so that it wraps onto a second row and then onto a third, whichever way the paper is turned")
 ```
 
 > [!SOLUTION]-
@@ -2515,7 +2588,9 @@ for info, code in fences:
 (course / "Runner Playground.md").write_text(
     "---\ntitle: Runner Playground\ncodeRunner: true\n---\nThree blocks to run (plantoir-runner-playground-7f3a).\n\n"
     "```python run\nprint(\"one\")\n```\n\n```python run\nprint(\"two\")\n```\n\n"
-    "> [!example]- In a folded callout\n> ```python run\n> print(\"three\")\n> ```\n", encoding="utf-8")
+    "> [!example]- In a folded callout\n> ```python run\n> print(\"three\")\n> ```\n\n"
+    # #585: a plain block, whose numbers the editor's gutter must match.
+    "A plain block (plantoir-runner-static-7f3a), and `a != b` written inline:\n\n```python\nprint(\"static\")\n```\n", encoding="utf-8")
 (course / "Discussions" / "Runner Printable.md").write_text(
     "---\ntitle: Runner Printable\nprintable: true\ncodeRunner: true\n---\n"
     "A printable page with code (plantoir-runner-printable-7f3a), and a formula $\\frac{a}{b} = c^2$.\n\n"
@@ -2541,10 +2616,33 @@ playground += "```swift run\n#if canImport(WASILibc)\nimport WASILibc\n#endif\np
 playground += "Some words before the block that does not compile.\n\n"
 playground += "```swift run\nlet name = readLine() ?? \"\"\nprint(nmae)\n```\n\n"
 playground += "```swift run stdin\n" + (gate / "05-arrays.swift").read_text(encoding="utf-8") + "```\n"
+# #583: a prompt on the answer's line (terminator: ""), for live input.
+playground += "\n```swift run\n" + (gate / "13-prompt.swift").read_text(encoding="utf-8") + "```\n"
 (course / "Swift Playground.md").write_text(playground, encoding="utf-8")
 (course / "Swift Hidden.md").write_text(
     "---\ntitle: Swift Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-swift-hidden-7f3a).\n\n"
     "```swift run\nprint(\"hidden swift\")\n```\n", encoding="utf-8")
+# #583: live input. Live Plain Link: a plain page linking to the Runner
+# Playground (the site's own link across the isolation line, one way); Live
+# Autorun: two autoruns, the first asks, then a link to Live Framed (across
+# the line the other way), a plain page with a frame from this site, which
+# must load; Live Box: code that reads input beside a frame - never isolated,
+# so the box and the build's note line.
+(course / "Live Plain Link.md").write_text(
+    "---\ntitle: Live Plain Link\n---\nA plain page (plantoir-live-plain-7f3a) that links to [[Runner Playground]].\n", encoding="utf-8")
+(course / "Live Framed.md").write_text(
+    "---\ntitle: Live Framed\n---\nA plain page with a frame from this site (plantoir-live-framed-7f3a).\n\n"
+    "<iframe class=\"plantoir-live-frame\" src=\"Help-Sessions\" title=\"Help Sessions\"></iframe>\n", encoding="utf-8")
+(course / "Live Autorun.md").write_text(
+    "---\ntitle: Live Autorun\ncodeRunner: true\n---\nTwo blocks that run by themselves, and the first asks (plantoir-live-autorun-7f3a). Then [[Live Framed]].\n\n"
+    "```python run autorun\nname = input(\"Name? \")\nprint(\"Hi\", name)\n```\n\n"
+    # Far enough down that the second autorun comes into view only when the
+    # check scrolls to it - after the first is already waiting.
+    + "".join(f"Filler paragraph {n} keeps the second block out of view.\n\n" for n in range(1, 61))
+    + "```python run autorun\nprint(\"second\")\n```\n", encoding="utf-8")
+(course / "Live Box.md").write_text(
+    "---\ntitle: Live Box\ncodeRunner: true\n---\nCode that reads input beside a frame (plantoir-live-box-7f3a).\n\n"
+    "<iframe src=\"Help-Sessions\" title=\"Help Sessions\"></iframe>\n\n```python run\nprint(input(\"Name? \"))\n```\n", encoding="utf-8")
 RUNNERPLANTS
 
 # ---- #505: an overall expectation's backlinks, planted for the same build ----
@@ -2560,6 +2658,16 @@ printf -- '---\ntitle: Overall Fixture plantoir-overall-both-7f3a\n---\nA page p
   > "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md"
 printf -- '---\ntitle: Overall Specific plantoir-overall-specific-7f3a\n---\nA page planted by verify.sh that connects to one specific expectation only.\n\n![[A2.1]]\n' \
   > "$HIT_COURSE/Discussions/Overall Backlinks Specific.md"
+# ---- #569: a % in an expectation's name, planted for the same build ----
+# An overall expectation whose file name holds "%", and one specific
+# expectation under it so the coverage map draws its chip. Before #569 the
+# chip's href kept the raw "%" and Quartz stopped the whole build with "URI
+# malformed" on the coverage map (measured on the #569 plan). Strand Z, so no
+# real expectation's cell or chip moves. Removed by restore_hit_fixture.
+printf -- '---\ntitle: Z1. Planted 100%% Overall\n---\nAn overall expectation planted by verify.sh (#569).\n' \
+  > "$HIT_COURSE/Curriculum/Z1. Planted 100% Overall.md"
+printf -- '---\ntitle: Z1.1\n---\nA specific expectation planted by verify.sh under Z1 (#569).\n' \
+  > "$HIT_COURSE/Curriculum/Z1.1.md"
 # ---- #563: self-check quizzes, planted for the same build ----
 # Quiz Fixture: every contracts/shared-rules.json -> quizCallouts.recognise
 # case in order, each after a "Case n" line (6k reads each quiz's kind or
@@ -2612,6 +2720,11 @@ crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]
 (course / "Quiz Summary.md").write_text(
     "---\ntitle: Quiz Summary\n---\n> [!quiz] Fill `____` and `____`.\n> > [!answer]-\n> > summary-answer-7f3a\n> > b\n",
     encoding="utf-8")
+# #588: a fill-in-the-blank question with ONE blank, on a page of its own so
+# Quiz Playground's quizzes and score are not moved.
+(course / "Quiz One Blank.md").write_text(
+    "---\ntitle: Quiz One Blank\n---\nOne blank (plantoir-quiz-one-blank-7f3a).\n\n"
+    "> [!quiz] The capital of France is `____`.\n> > [!answer]-\n> > Paris\n", encoding="utf-8")
 (course / "Quiz Hidden.md").write_text(
     "---\ntitle: Quiz Hidden\npublish: false\n---\nHidden (plantoir-quiz-hidden-7f3a).\n\n> [!quiz] Broken.\n> - [ ] a\n> - [ ] b\n",
     encoding="utf-8")
@@ -2649,6 +2762,50 @@ def png(width, height):
     "> - [ ] 23\n>\n> > [!explain]- Why\n> > `*` multiplies. Run it:\n> > " + F + "swift run\n> > let n = 2\n> > print(n * 3)\n> > " + F + "\n",
     encoding="utf-8")
 QUIZPLANTS
+# ---- #519: task boxes students tick, planted for the same build ----
+# Task Fixture: every contracts/shared-rules.json -> taskBoxes.itemText case
+# in order, each after a "Case n" line (6l reads each box's id back), then a
+# Checklist section of its own; Task CRLF: the CR LF case on a page saved with
+# CR LF; Task Host: the Checklist transcluded twice, and an item of its own
+# (a transcluded box keeps its source page's name, and two copies stay in
+# step); Task Twin A and B: two pages alike in every element but their items'
+# words, so Quartz's router reuses one's boxes for the other (review F3 - the
+# browser check proves the reuse happened before it trusts what it reads);
+# Task Printable: a printable page with a task list (what paper shows); Task
+# Raw Box: a checkbox the page writes in HTML, which is no task item and is
+# left alone (6l must not count it - review F5).
+# Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE" <<'TASKPLANTS'
+import json, sys
+from pathlib import Path
+course = Path(sys.argv[1])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["taskBoxes"]
+body = "Task boxes planted by verify.sh (plantoir-task-sentinel-7f3a).\n\n## Cases\n\n"
+for number, case in enumerate(rules["itemText"]["cases"], start=1):
+    if case.get("crlf"):
+        continue
+    body += f"Case {number}: {case['name']}.\n\n{case['markdown']}\n\n"
+body += ("## Checklist\n\n- [ ] Sharpen your pencil\n- [x] Find your notebook\n"
+         "- [ ] Read [[Task Host]] before class\n")
+(course / "Task Fixture.md").write_text("---\ntitle: Task Fixture\n---\n" + body, encoding="utf-8")
+crlf = [case for case in rules["itemText"]["cases"] if case.get("crlf")][0]
+(course / "Task CRLF.md").write_bytes(("---\r\ntitle: Task CRLF\r\n---\r\nSaved with CR LF (plantoir-task-crlf-7f3a).\r\n\r\n"
+                                       + crlf["markdown"]).encode("utf-8"))
+(course / "Task Host.md").write_text(
+    "---\ntitle: Task Host\n---\nAnother page's checklist, twice (plantoir-task-host-7f3a).\n\n"
+    "- [ ] An item of the host's own\n\n![[Task Fixture#Checklist]]\n\n![[Task Fixture#Checklist]]\n", encoding="utf-8")
+for twin in ("A", "B"):
+    (course / f"Task Twin {twin}.md").write_text(
+        f"---\ntitle: Task Twin {twin}\n---\nA twin page planted by verify.sh.\n\n"
+        f"- [ ] Twin {twin} first item\n- [ ] Twin {twin} second item\n", encoding="utf-8")
+(course / "Task Raw Box.md").write_text(
+    "---\ntitle: Task Raw Box\n---\nA checkbox the page writes itself, not a task item (plantoir-task-raw-7f3a):\n\n"
+    "<label><input type=\"checkbox\"> a box of the page's own</label>\n", encoding="utf-8")
+(course / "Task Printable.md").write_text(
+    "---\ntitle: Task Printable\nprintable: true\n---\nA printable checklist (plantoir-task-printable-7f3a).\n\n"
+    "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
+    encoding="utf-8")
+TASKPLANTS
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -2811,6 +2968,46 @@ then
   pass "An overall expectation's page lists the pages of its specific expectations, a page linking both is listed once, and the specific expectation's page is unchanged (#505)"
 else
   fail "An overall expectation's \"When did we do this?\" panel is wrong (#505) - see the lines above"
+fi
+
+# ---- 6h, continued: a % in an expectation's name (#569) ----
+# The build above passed with the planted "Z1. Planted 100% Overall" page in
+# the curriculum folder; before #569 it stopped there. The coverage map's chip
+# must link Quartz's own slug, and that page must be in the site.
+if [[ -f "$SITE_PUBLIC/Curriculum-Coverage.html" ]] \
+   && grep -Fq 'Curriculum/Z1.-Planted-100-percent-Overall"' "$SITE_PUBLIC/Curriculum-Coverage.html" \
+   && [[ -f "$SITE_PUBLIC/Curriculum/Z1.-Planted-100-percent-Overall.html" ]]; then
+  pass "A % in an expectation's file name builds, and the coverage map links the page Quartz serves (#569)"
+else
+  fail "The coverage map's link to a page named with % is wrong, or the page is missing (#569): $SITE_PUBLIC/Curriculum-Coverage.html, $SITE_PUBLIC/Curriculum/Z1.-Planted-100-percent-Overall.html"
+fi
+
+# ---- 6h, continued: a folder page's table of contents (#520) ----
+# EXC2O's own Curriculum/index.md says enableToc: true and has headings of its
+# own; Quartz renders a folder's index with the folder-page layout, whose
+# right column was empty, so it showed no table of contents. Counted inside
+# the table of contents only: two entries or more.
+if python3 - "$SITE_PUBLIC/Curriculum/index.html" <<'TOCCHECK'
+import re, sys
+try:
+    html = open(sys.argv[1], encoding="utf-8").read()
+except OSError as error:
+    print(f"   no built page: {error}")
+    sys.exit(1)
+start = html.find('class="toc')
+if start < 0:
+    print(f"   no table of contents on {sys.argv[1]}")
+    sys.exit(1)
+end = html.find("</ul>", start)
+# One <li class="depth-N"> per heading; Quartz adds an empty "overflow-end" item.
+entries = len(re.findall(r'<li class="depth-', html[start:end if end > start else len(html)]))
+print(f"   table of contents entries: {entries}")
+sys.exit(0 if entries >= 2 else 1)
+TOCCHECK
+then
+  pass "A curriculum folder's index page shows its table of contents (#520)"
+else
+  fail "A curriculum folder's index page shows no table of contents, or one with fewer than two entries (#520) - see the line above"
 fi
 
 # ---- 6h, continued: printable pages (#454) ----
@@ -3054,8 +3251,8 @@ if re.search(r"plantoir: error: [^\n]*Runner", said):
 # one more page for each engine.
 if not re.search(r"This site carries what runs Swift for 3 pages\.", said):
     problems.append("the build did not say the site carries Swift for the three pages students can see with Swift (Runner Fixture, Swift Playground, Quiz Playground)")
-if not re.search(r"This site carries what runs Python for 5 pages\.", said):
-    problems.append("the build did not say the site carries Python for the five pages students can see (not the hidden one; Quiz Playground is the fifth)")
+if not re.search(r"This site carries what runs Python for 7 pages\.", said):
+    problems.append("the build did not say the site carries Python for the seven pages students can see (not the hidden one; Quiz Playground is the fifth, #583's Live Autorun and Live Box the sixth and seventh)")
 engine = public / "static" / "pyodide"
 carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
 if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
@@ -3135,8 +3332,8 @@ def attribute(text, name):
     return html.unescape(found.group(1)) if found else None
 source = (course / "Swift Playground.md").read_text(encoding="utf-8")
 bodies = [block["body"] for block in swift_blocks.swift_fences(source, True)]
-if len(wrappers) != 6 or len(bodies) != 6:
-    problems.append(f"Swift Playground has {len(wrappers)} runnable blocks on the site and {len(bodies)} in the page, not 6")
+if len(wrappers) != 7 or len(bodies) != 7:
+    problems.append(f"Swift Playground has {len(wrappers)} runnable blocks on the site and {len(bodies)} in the page, not 7 (#583 added a prompt on the answer's line)")
 for index, (attributes, body) in enumerate(zip(wrappers, bodies), start=1):
     key = swift_blocks.key_of(body)
     if attribute(attributes, "data-runner-language") != "swift" or attribute(attributes, "data-runner-id") != f"Swift-Playground-swift-{index}":
@@ -3193,6 +3390,71 @@ then
   pass "runnable Swift: each block names its program (or compileError), static/swift-wasm holds exactly the programs visible pages use, static/swift is the overlay, and the block that does not compile is named at its line in the teacher's file with the compiler's first error, as a folder problem too (#493)"
 else
   fail "runnable Swift: one of the checks above failed (#493)"
+fi
+
+# ---- 6j, continued: live input (#583), as the build left it ----
+# Which built pages a host would isolate, read from the REAL built HTML (with
+# Quartz's own head) by both halves of the rule: the publish's
+# (isolation_headers.py) and the preview's (support/quartz/cli/
+# plantoirIsolation.mjs, the headers the preview's server would send). The
+# Live Box page (code that reads input beside a frame) keeps the box and is
+# named on a note line; the router's patch reached the site's script.
+if python3 - "$SITE_PUBLIC" <<'LIVEPY'
+import json, subprocess, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+sys.path.insert(0, "scripts")
+import contracts, toolchain_paths
+toolchain_paths.CONTRACTS_DIR = Path("contracts")
+contracts.reset_cache()
+import isolation_headers
+public = Path(sys.argv[1])
+problems = []
+verdicts = {item["file"]: item for item in isolation_headers.scan_site(public)}
+want = {"Runner-Playground.html": ("live", False), "Live-Autorun.html": ("live", True), "Swift-Playground.html": ("live", True),
+        "Discussions/Runner-Printable.html": ("live", False), "Live-Box.html": ("frame", True)}
+for name, (verdict, reads) in want.items():
+    got = verdicts.get(name)
+    if got is None or got["verdict"] != verdict or got["readsInput"] != reads:
+        problems.append(f"{name}: the publish's rule says {got}, not {verdict} (reads input: {reads})")
+for name in ("Help-Sessions.html", "Live-Framed.html", "Live-Plain-Link.html", "Runner-Not-Opted.html"):
+    if name in verdicts:
+        problems.append(f"{name} has no code that can ask, yet the publish's rule says {verdicts[name]}")
+outcome = {"live": [], "notLive": [verdicts["Live-Box.html"]] if "Live-Box.html" in verdicts else [], "capped": []}
+notes = isolation_headers.note_lines(public, outcome)
+if notes != [f"plantoir: note: Live Box.md: " + contracts.section("shared-rules", "codeRunnerBlocks", "words")["notLiveBecause"].replace("{what}", contracts.section("shared-rules", "codeRunnerBlocks", "words")["notLiveFrame"])]:
+    problems.append(f"the note line for Live Box is {notes}")
+script = """
+import { headersFor, PAGE_HEADERS, ENGINE_HEADERS } from "./support/quartz/cli/plantoirIsolation.mjs"
+const pub = process.argv[1]
+const cases = [["/Runner-Playground", PAGE_HEADERS], ["/Live-Autorun", PAGE_HEADERS], ["/Swift-Playground", PAGE_HEADERS],
+  ["/Live-Box", {}], ["/Live-Framed", {}], ["/Help-Sessions", {}], ["/", {}],
+  ["/static/pyodide/pyodide.mjs", ENGINE_HEADERS], ["/static/swift/plantoir-swift-worker.js", ENGINE_HEADERS], ["/index.css", {}]]
+const wrong = []
+for (const [address, want] of cases) {
+  const got = headersFor(pub, address)
+  if (JSON.stringify(got) !== JSON.stringify(want)) wrong.push(address + " " + JSON.stringify(got))
+}
+console.log(JSON.stringify(wrong))
+"""
+said = subprocess.run(["node", "--input-type=module", "-e", script, str(public)], capture_output=True, text=True)
+try:
+    wrong = json.loads(said.stdout.strip().splitlines()[-1])
+except Exception:
+    wrong = [f"the preview's rule did not run: {said.stderr.strip()[:300]}"]
+for item in wrong:
+    problems.append(f"the preview's headers: {item}")
+postscript = (public / "postscript.js").read_text(encoding="utf-8", errors="ignore") if (public / "postscript.js").is_file() else ""
+if "cross-origin-embedder-policy" not in postscript:
+    problems.append("the site's script does not carry the router's isolation check (PLANTOIR-ISOLATION-NAV)")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+LIVEPY
+then
+  pass "live input: the publish's rule and the preview's agree on the built pages - code that can ask is isolated (Python, Swift, a printable page), a page with a frame keeps the box and is named on a note line, plain pages get nothing, the engine folders get their own header - and the site's router carries the isolation check (#583)"
+else
+  fail "live input: the built pages are not isolated as codeRunnerBlocks.isolation says (#583)"
 fi
 
 # ---- 6k. Self-check quizzes (#563), as the build left them ----
@@ -3336,6 +3598,123 @@ else
   fail "self-check quizzes: one of the checks above failed (#563)"
 fi
 
+# ---- 6l. Task boxes students tick (#519), as the build left them ----
+# Every task box outside a quiz, on every page of the site, lost `disabled`,
+# carries plantoir-task, the page it was written on and an id, and sits first
+# in a plantoir-task-label; Task Fixture's and Task CRLF's ids are the
+# contract's itemText ids in order (so the real build - Quartz's text
+# transform, a callout's inserted line, a page saved with CR LF - stamps what
+# the contract says); Task Host's transcluded copies carry Task-Fixture; every
+# box inside a quiz (a not-ready quiz's choices) is still disabled and
+# unstamped; the script and the styles are in every page's postscript.js and
+# index.css.
+if python3 - "$SITE_PUBLIC" <<'TASKPY'
+import json, sys
+from html.parser import HTMLParser
+from pathlib import Path
+public = Path(sys.argv[1])
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["taskBoxes"]
+problems = []
+class Boxes(HTMLParser):
+    """Each checkbox in a task item: its attributes, whether a quiz holds it,
+    and whether it opens a plantoir-task-label."""
+    def __init__(self):
+        super().__init__()
+        self.quiz_depth, self.stack, self.boxes, self.last_start = 0, [], [], None
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        classes = (attributes.get("class") or "").split()
+        if tag == "input" and attributes.get("type") == "checkbox":
+            in_task_item = any(item == "li-task" for item in self.stack[-2:])
+            first_in_label = self.last_start is not None and self.last_start[0] == "label" \
+                and "plantoir-task-label" in self.last_start[1]
+            self.boxes.append({"attributes": attributes, "in_quiz": self.quiz_depth > 0,
+                               "first_in_label": first_in_label, "task_item": in_task_item or first_in_label})
+        if tag not in ("input", "img", "br", "hr", "meta", "link", "wbr", "source"):
+            marker = "li-task" if tag == "li" and "task-list-item" in classes else tag
+            quiz = tag == "blockquote" and "plantoir-quiz" in classes
+            self.stack.append(marker)
+            if quiz or (self.quiz_depth > 0):
+                self.quiz_depth += 1
+        self.last_start = (tag, classes)
+    def handle_endtag(self, tag):
+        if tag in ("input", "img", "br", "hr", "meta", "link", "wbr", "source"):
+            return
+        if self.stack:
+            self.stack.pop()
+            if self.quiz_depth > 0:
+                self.quiz_depth -= 1
+        self.last_start = None
+def boxes_in(path):
+    reader = Boxes()
+    reader.feed(path.read_text(encoding="utf-8", errors="replace"))
+    return reader.boxes
+tickable, kept, pages = 0, 0, 0  # boxes outside quizzes, inside them, pages holding either
+for path in sorted(public.rglob("*.html")):
+    found = boxes_in(path)
+    if found:
+        pages += 1
+    for box in found:
+        attributes = box["attributes"]
+        if not box["task_item"]:
+            continue  # a checkbox a page wrote itself is not a task item (review F5)
+        stamped = "plantoir-task" in (attributes.get("class") or "").split()
+        if box["in_quiz"]:
+            if attributes.get("class") and "plantoir-quiz-input" in attributes["class"]:
+                continue
+            kept += 1
+            if stamped or "data-task-item" in attributes or "disabled" not in attributes:
+                problems.append(f"{path.relative_to(public)}: a box inside a quiz was changed: {attributes}")
+            continue
+        tickable += 1
+        if not stamped or "disabled" in attributes or not attributes.get("data-task-page") \
+                or len(attributes.get("data-task-item") or "") != 8 or not box["first_in_label"]:
+            problems.append(f"{path.relative_to(public)}: a task box outside a quiz was not made tickable: {attributes}")
+def ids_on(name):
+    path = public / name
+    return [box["attributes"].get("data-task-item") for box in boxes_in(path)] if path.is_file() else None
+def pages_on(name):
+    path = public / name
+    return [box["attributes"].get("data-task-page") for box in boxes_in(path)] if path.is_file() else None
+expected = []
+for case in rules["itemText"]["cases"]:
+    if not case.get("crlf"):
+        expected += [item["id"] for item in case["items"]]
+fixture = ids_on("Task-Fixture.html")
+if fixture is None or fixture[:len(expected)] != expected or len(fixture) != len(expected) + 3:
+    problems.append(f"Task Fixture's ids are not the contract's: got {fixture}, expected {expected} and the Checklist's three")
+crlf = [case for case in rules["itemText"]["cases"] if case.get("crlf")][0]
+if ids_on("Task-CRLF.html") != [item["id"] for item in crlf["items"]]:
+    problems.append(f"the page saved with CR LF reads {ids_on('Task-CRLF.html')}")
+if set(pages_on("Task-Fixture.html") or ["none"]) != {"Task-Fixture"}:
+    problems.append(f"Task Fixture's boxes name {set(pages_on('Task-Fixture.html') or [])}")
+host = pages_on("Task-Host.html")
+if host != ["Task-Host"] + ["Task-Fixture"] * 6:
+    problems.append(f"the transcluded boxes did not keep their source page's name: {host}")
+if (ids_on("Task-Host.html") or [None])[1:4] != (fixture or [None, None, None])[-3:]:
+    problems.append("a transcluded box's id is not its source's")
+raw = boxes_in(public / "Task-Raw-Box.html") if (public / "Task-Raw-Box.html").is_file() else []
+if len(raw) != 1 or raw[0]["task_item"] or "plantoir-task" in (raw[0]["attributes"].get("class") or ""):
+    problems.append(f"Task Raw Box's own checkbox was read as a task item or changed: {raw}")
+if kept == 0:
+    problems.append("no box inside a quiz was found to check (the not-ready quizzes on Quiz Fixture have some)")
+script = (public / "postscript.js").read_text(encoding="utf-8") if (public / "postscript.js").is_file() else ""
+style = (public / "index.css").read_text(encoding="utf-8") if (public / "index.css").is_file() else ""
+if "plantoir:task:" not in script:
+    problems.append("the site's script does not carry the task boxes'")
+if "plantoir-task-label" not in style:
+    problems.append("the site's styles do not carry the task boxes'")
+for problem in problems[:20]:
+    print("   " + problem)
+print(f"   {tickable} task boxes outside quizzes on {pages} pages; {kept} inside quizzes")
+sys.exit(1 if problems else 0)
+TASKPY
+then
+  pass "task boxes: every box outside a quiz on every page is tickable, labelled and stamped with its page and the contract's id (a callout, a rewritten link and CR LF included), a transcluded box keeps its source page, and a quiz's boxes are left as they were (#519)"
+else
+  fail "task boxes: one of the checks above failed (#519)"
+fi
+
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
 # The rule is in the one index.css every page links, as the site's minifier
 # writes it, and the page rows it relies on are still Quartz's: a page row's
@@ -3445,14 +3824,14 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # starts itself so it can also play the hosts that break it.
   if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \
        >/tmp/verify_code_runner.log 2>&1; then
-    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
+    pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; live input on an isolated page (#583: the field focused at Run, the prompt before it, the transcript byte for byte the box's, Ctrl-D and the end button, a two-line paste, IME and Escape, Stop and another block while it waits, echoes counted, an autorun that asks takes no focus and holds the queue, whole loads across the isolation line both ways, the handout's KaTeX), and the box's line where the page is not isolated; the editor's colours and line numbers (#585: Shiki's own lines untouched, the tokenizer's typed, the copy in step through undo, an input method, a saved edit, Reset and scrolling, 0 pixels off the typed letters, the frame's focus ring, one gutter style, no ligatures, an edited block printed coloured and numbered); a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
   else
     fail "runnable code did not run in a browser as the contract says (browser-checks/code_runner.mjs, #455)"
     cat /tmp/verify_code_runner.log
   fi
   if node browser-checks/swift_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Swift-Playground.html \
        >/tmp/verify_swift_runner.log 2>&1; then
-    pass "runnable Swift in a browser: nothing fetched on load; read-only with its note; Run with input echoes it after each prompt, changed input changes the output, Stop ends a loop and Run works again, an index out of range shows its Fatal error line and the crash words, exit(3) its exit code, a block that did not compile says it is not ready - $(head -1 /tmp/verify_swift_runner.log | sed 's/^OK: //') (#493, browser-checks/swift_runner.mjs)"
+    pass "runnable Swift in a browser: nothing fetched on load; read-only with its note; Run with input echoes it after each prompt, changed input changes the output, Stop ends a loop and Run works again, an index out of range shows its Fatal error line and the crash words, exit(3) its exit code, a block that did not compile says it is not ready; live input on an isolated page with the box's transcript, Embedded, full library and a prompt on the answer's line, Ctrl-D as nil, Stop while it waits (#583) - $(head -1 /tmp/verify_swift_runner.log | sed 's/^OK: //') (#493, browser-checks/swift_runner.mjs)"
   else
     fail "runnable Swift did not run in a browser as the contract says (browser-checks/swift_runner.mjs, #493)"
     cat /tmp/verify_swift_runner.log
@@ -3460,14 +3839,21 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # #563: the self-check quizzes as a student answers them, against a server
   # the check starts itself.
   if node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
-    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, and paper and the handout questions only - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
+    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, code in a choice and an explanation asking live with Return ticking, checking and folding nothing (#583), and paper and the handout questions only - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
   else
     fail "self-check quizzes did not answer in a browser as the contract says (browser-checks/quiz_check.mjs, #563)"
     cat /tmp/verify_quiz_check.log
   fi
+  # #519: task boxes ticked in a browser, by mouse and keyboard, and on paper.
+  if node browser-checks/task_boxes.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_task_boxes.log 2>&1; then
+    pass "task boxes in a browser: the Markdown's state until a box is changed and nothing written on load, the contract's key written and kept across a reload, the words, a link inside them, Tab and Space, a transcluded copy setting its source's tick in step, five page changes and one listener, a page the router built from the last one's elements showing its own ticks, a tick under old words ignored, a not-ready quiz left alone, storage refused, and ink for a tick on paper in both themes - $(head -1 /tmp/verify_task_boxes.log | sed 's/^OK: //') (#519, browser-checks/task_boxes.mjs)"
+  else
+    fail "task boxes did not tick in a browser as the contract says (browser-checks/task_boxes.mjs, #519)"
+    cat /tmp/verify_task_boxes.log
+  fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), and self-check quizzes in a browser (#563): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), and self-check quizzes in a browser (#563): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul

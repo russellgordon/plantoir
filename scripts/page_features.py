@@ -61,10 +61,12 @@ import toolchain_paths
 RUNNER_LANGUAGES = {
     "python": {"idPrefix": "py", "displayName": "Python", "runtime": "pyodide", "engine": "pyodide",
                "worker": "plantoir-worker.js", "editable": True, "flags": ("readonly", "stdin", "autorun"),
-               "inputCall": "input()", "inputPattern": r"\binput\s*\(", "prebuilt": False},
+               "inputCall": "input()", "inputPattern": r"\binput\s*\(", "prebuilt": False,
+               "colour": "python"},
     "swift": {"idPrefix": "swift", "displayName": "Swift", "runtime": "swift-wasm", "engine": "swift",
               "worker": "plantoir-swift-worker.js", "editable": False, "flags": ("stdin", "autorun"),
-              "inputCall": "readLine()", "inputPattern": r"\breadLine\s*\(", "prebuilt": True},
+              "inputCall": "readLine()", "inputPattern": r"\breadLine\s*\(", "prebuilt": True,
+              "colour": "swift"},
 }
 
 # Engines whose overlay in SUPPORT_DIR/gated/<engine> IS the engine (#493): a
@@ -425,6 +427,7 @@ def runner_words() -> dict:
             "debounceMilliseconds": rules["storage"]["debounceMilliseconds"],
             "editorLines": rules["editor"]["maxLines"],
             "indent": rules["editor"]["indent"],
+            "answerCharacters": rules["liveInput"]["answerCharacters"],
         },
     }
 

@@ -77,6 +77,21 @@ final class SiteHealthRepairTests: XCTestCase {
         XCTAssertTrue(written.contains("title: Introduction to Computer Science"), written)
     }
 
+    /// #575: a course name holding ": " is quoted, or the page put back is
+    /// one the build cannot read either.
+    func testAFrontPagePutBackQuotesACourseNameThatNeedsIt() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+        course.configuration.courseName = "Physics: Mechanics"
+
+        XCTAssertTrue(SiteHealthRepair.restoreSectionIndex(forSection: 1, in: course))
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        let written: String = try String(contentsOf: index, encoding: .utf8)
+        XCTAssertEqual(written, "---\ntitle: \"Physics: Mechanics\"\n---\n", written.debugDescription)
+    }
+
     /// Two findings of the same KIND keep separate answers.
     ///
     /// The shape claim, made directly against `repair` rather than through the

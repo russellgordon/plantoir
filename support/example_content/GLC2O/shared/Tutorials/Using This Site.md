@@ -42,11 +42,12 @@ you click it — usually a question with an answer underneath. Try
 answering before you open it; reading an answer feels like learning and
 is not.
 
-> [!warning] The checkboxes here do not save
-> Several pages have lists that look like `- [ ]`. They are printed, not
-> interactive: clicking does nothing, nothing is recorded, and the site
-> has no idea who you are. Copy any list you want to work through into
-> your own notebook or document.
+> [!note] The checkboxes here are yours
+> Several pages have lists that look like `- [ ]`. Tick them as you work
+> through them: your browser keeps the ticks on this computer, nothing is
+> sent anywhere, and the site has no idea who you are. On another computer
+> they start again, so copy a list you need everywhere into your own
+> notebook or document.
 
 ## If a page is missing
 

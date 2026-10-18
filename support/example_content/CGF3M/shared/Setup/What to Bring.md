@@ -31,9 +31,9 @@ that matters and it is the one people forget.
   not reliably do either.
 - Any medication you might need, on you, not in a bag left somewhere.
 
-> [!warning] The list above is not a form
-> These boxes are printed, not interactive — nothing here is saved and
-> clicking does nothing. Read it down the night before and pack from it.
+> [!note] The list above is not a form
+> Nothing on it is sent to anyone. Tick the boxes as you pack the night
+> before, and your browser keeps the ticks on this computer.
 
 ## What you do not need to buy
 

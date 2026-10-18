@@ -18,6 +18,14 @@
 // Before EVERY run the interpreter is put back (codeRunnerBlocks.harness,
 // review S3): builtins from a copy taken at load, the three streams, the
 // recursion limit, and a fresh empty folder to start in.
+//
+// Live input (#583, codeRunnerBlocks.liveInput): when the page is
+// cross-origin isolated it sends a SharedArrayBuffer with the run (`line`).
+// Each input() past the box's lines (there are none on a live page) then
+// posts {type: "ask"} and WAITS in Atomics.wait until the page has written
+// the student's answer; the answer is echoed through the same `out` path as
+// a box line, so the transcript is byte for byte the box's. Stop is still
+// terminate(), which ends a thread that is waiting (measured, #583 §0a).
 
 import { loadPyodide } from "./pyodide.mjs"
 
@@ -80,6 +88,49 @@ def _plantoir_run(source):
 
 let run = null
 let lines = []
+// The live line for this run (#583), or null on a page that is not isolated.
+let ask = null
+// End of input is sticky for the rest of a run, as past the box's last line.
+let ended = false
+
+// The worker's half of a live line (codeRunnerBlocks.liveInput.buffer): Int32
+// [0] is the state (0 waiting, 1 a line is there, 2 end of input), Int32 [1]
+// the line's length in bytes, and its UTF-8 bytes start at byte 8. The bytes
+// are COPIED (slice) before they are decoded: Chrome's TextDecoder refuses a
+// view of shared memory (#583 gotcha 1, measured in Chrome 155).
+function liveReader(buffer) {
+  const control = new Int32Array(buffer, 0, 2)
+  const data = new Uint8Array(buffer, 8)
+  return () => {
+    Atomics.store(control, 0, 0)
+    self.postMessage({ type: "ask" })
+    while (Atomics.load(control, 0) === 0) {
+      Atomics.wait(control, 0, 0)
+    }
+    if (Atomics.load(control, 0) !== 1) {
+      return null
+    }
+    const length = Atomics.load(control, 1)
+    return new TextDecoder().decode(data.slice(0, length))
+  }
+}
+
+// The next line for input(): the box's first, then (live) the student's
+// answer; null is the end of input.
+function nextLine() {
+  const line = lines.shift()
+  if (line !== undefined) {
+    return line
+  }
+  if (ask === null || ended) {
+    return null
+  }
+  const answer = ask()
+  if (answer === null) {
+    ended = true
+  }
+  return answer
+}
 
 function writer(err) {
   const decoder = new TextDecoder()
@@ -108,10 +159,11 @@ async function start() {
     pyodide.setStderr(writer(true))
     pyodide.setStdin({
       // One line for each input(), echoed after its prompt (Q4); past the
-      // last one, input() raises EOFError, as at the end of a file.
+      // last one, input() raises EOFError, as at the end of a file. On a live
+      // page the line is the student's answer, asked for at that moment.
       stdin: () => {
-        const line = lines.shift()
-        if (line === undefined) {
+        const line = nextLine()
+        if (line === null) {
           return null
         }
         self.postMessage({ type: "out", text: line + "\n", err: false })
@@ -139,6 +191,8 @@ self.onmessage = async (event) => {
     return
   }
   lines = Array.isArray(message.stdin) ? message.stdin.slice() : []
+  ask = typeof SharedArrayBuffer === "function" && message.line instanceof SharedArrayBuffer ? liveReader(message.line) : null
+  ended = false
   let error = false
   try {
     error = Boolean(run(String(message.source ?? "")))

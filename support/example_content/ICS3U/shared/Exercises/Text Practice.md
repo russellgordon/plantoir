@@ -87,8 +87,8 @@ version of a bug that has genuinely broken somebody's program.
 > back from a file becomes usable data.
 
 > [!success]- Answer 6
-> Type a name in the input box — two spaces, then PRIYA, then a space,
-> works — then press Run.
+> When it asks, type a name — two spaces, then PRIYA, then a space,
+> works.
 > ```python run
 > typed = input("Name: ")
 > name = typed.strip().lower()

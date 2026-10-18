@@ -146,9 +146,10 @@ summary table can then be navigation rather than a dead end.
 - [ ] Power off before the gel lid comes off
 - [x] Controlled variables listed
 
-On the site they are read-only — the boxes show what the page says, and
-clicking does nothing. Copied into a notebook, they are useful for keeping
-your place during a lab.
+On the site each student can tick them; the ticks stay in their own
+browser, nobody else sees them, and changing a line's words clears its
+tick. Ticked as you go, they are useful for keeping your place during a
+lab.
 
 ---
 

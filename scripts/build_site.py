@@ -1508,13 +1508,45 @@ def _wire_content_layout(layout_ts: Path) -> None:
     layout_ts.write_text(text[:start] + block + text[end:], encoding="utf-8")
 
 
+def _wire_list_page_toc(layout_ts: Path) -> None:
+    """Give folder pages the table of contents every other page has (#520).
+
+    Quartz renders every `folder/index.md` — a curriculum folder's index
+    among them — with `defaultListPageLayout`, whose right column is `[]` in
+    v4.5.0: the table of contents is computed for the page and then placed
+    nowhere, so `enableToc: true` and five headings showed nothing. This puts
+    the content layout's own `Component.DesktopOnly(Component.TableOfContents())`
+    there, in the list layout ONLY. Quartz's own rule then decides, as on any
+    page: shown by default, hidden by `enableToc: false`, and only with two or
+    more headings of depth 3 or less on the page itself — so a tag page or a
+    folder page with no headings of its own is unchanged. Idempotent; a
+    layout that has changed shape warns and is left alone."""
+    text = layout_ts.read_text(encoding="utf-8")
+    start = text.find("export const defaultListPageLayout")
+    if start < 0:
+        print("⚠️ Could not add the table of contents to folder pages: the page layout has changed shape.")
+        return
+    end = text.find("export const", start + 1)
+    if end < 0:
+        end = len(text)
+    block = text[start:end]
+    if "Component.TableOfContents(" in block:
+        return
+    if block.count("right: []") != 1:
+        print("⚠️ Could not add the table of contents to folder pages: the page layout has changed shape.")
+        return
+    block = block.replace("right: []", "right: [Component.DesktopOnly(Component.TableOfContents())]", 1)
+    layout_ts.write_text(text[:start] + block + text[end:], encoding="utf-8")
+
+
 def _wire_transformers_index(index_ts: Path) -> None:
-    """Export the figures transformer (#485 E1), the runnable code's (#455)
-    and the self-check quizzes' (#563) beside Quartz's own."""
+    """Export the figures transformer (#485 E1), the runnable code's (#455),
+    the self-check quizzes' (#563) and the task boxes' (#519) beside
+    Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
-                         ("PlantoirQuizzes", "./plantoirQuizzes")):
+                         ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1607,15 +1639,100 @@ def _wire_quizzes_transformer(config_ts: Path) -> None:
     config_ts.write_text(text, encoding="utf-8")
 
 
+def _wire_tasks_transformer(config_ts: Path) -> None:
+    """Put the task boxes' transformer (#519) straight AFTER the self-check
+    quizzes': it works at the html stage, and must find every quiz already
+    decided and carrying its class, so the boxes inside a quiz stay as the
+    quiz left them. Anchored on PlantoirQuizzes, so a section wired before
+    #519 gets it in the same place as a fresh one."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirTasks(" in text:
+        return
+    anchor = "Plugin.PlantoirQuizzes(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not make the site's task boxes tickable: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not make the site's task boxes tickable: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirTasks()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+# Live input (#583): the two edits to Quartz itself that cross-origin
+# isolation needs (contracts/shared-rules.json -> codeRunnerBlocks.isolation).
+ISOLATION_SERVE_MARKER = "PLANTOIR-ISOLATION-SERVE"
+ISOLATION_NAV_MARKER = "PLANTOIR-ISOLATION-NAV"
+
+_ISOLATION_SERVE_ANCHOR = "        const release = await buildMutex.acquire()\n"
+_ISOLATION_SERVE_LINE = (
+    "        /* " + ISOLATION_SERVE_MARKER + " (#583): the headers that isolate a page whose code asks for input "
+    "(quartz/cli/plantoirIsolation.mjs, fails open) */ try { const isolation = await import(\"./plantoirIsolation.mjs\"); "
+    "for (const [name, value] of Object.entries(isolation.headersFor(argv.output, req.url ?? \"/\"))) res.setHeader(name, value) } "
+    "catch (_plantoirIsolationError) {}\n"
+)
+
+
+def _wire_isolation_serve(handlers_js: Path) -> None:
+    """The preview's server sends the isolation headers (#583,
+    isolation.hosts.preview): one line in Quartz's serve(), after it takes
+    the build's lock, asks quartz/cli/plantoirIsolation.mjs which headers the
+    file gets - so a teacher previews what students get on a host. Fails
+    open: the import or the rule throwing serves the file as before."""
+    text = handlers_js.read_text(encoding="utf-8")
+    if ISOLATION_SERVE_MARKER in text:
+        return
+    if text.count(_ISOLATION_SERVE_ANCHOR) != 1:
+        print("⚠️ Could not let the preview ask for input as code runs: the preview's server has changed shape.")
+        return
+    at = text.index(_ISOLATION_SERVE_ANCHOR) + len(_ISOLATION_SERVE_ANCHOR)
+    handlers_js.write_text(text[:at] + _ISOLATION_SERVE_LINE + text[at:], encoding="utf-8")
+
+
+_ISOLATION_NAV_ANCHOR = "  const contents = await fetchCanonical(url)\n    .then((res) => {\n"
+_ISOLATION_NAV_LINES = (
+    "      // " + ISOLATION_NAV_MARKER + " (#583, codeRunnerBlocks.isolation.spa): a document's isolation is\n"
+    "      // fixed when it is made, so a page whose headers would isolate it, reached from one\n"
+    "      // that is not (or the other way round), is loaded whole rather than morphed in.\n"
+    "      const wantsIsolation = (res.headers.get(\"cross-origin-embedder-policy\") ?? \"\").toLowerCase().includes(\"require-corp\")\n"
+    "      if (wantsIsolation !== (self.crossOriginIsolated === true)) {\n"
+    "        window.location.assign(url)\n"
+    "        return\n"
+    "      }\n"
+)
+
+
+def _wire_isolation_nav(spa_ts: Path) -> None:
+    """Quartz's router loads a page whole when it crosses the isolation line
+    (#583, isolation.spa): checked on the page it fetched, before it morphs
+    the page in. Never fires where no host sends the headers."""
+    text = spa_ts.read_text(encoding="utf-8")
+    if ISOLATION_NAV_MARKER in text:
+        return
+    if text.count(_ISOLATION_NAV_ANCHOR) != 1:
+        print("⚠️ Could not let pages whose code asks for input open from the site's links: the page router has changed shape.")
+        return
+    at = text.index(_ISOLATION_NAV_ANCHOR) + len(_ISOLATION_NAV_ANCHOR)
+    spa_ts.write_text(text[:at] + _ISOLATION_NAV_LINES + text[at:], encoding="utf-8")
+
+
 def wire_quartz_additions(output_dir: Path) -> None:
     """The edits that connect support/quartz to Quartz: the Print button's two
     (#454), the figures transformer's two (#485 E1), the runnable code's
     two more (#455: its transformer before SyntaxHighlighting, its component
-    in afterBody; its exports ride the two index edits), and the self-check
+    in afterBody; its exports ride the two index edits), the self-check
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
-    button's component). Idempotent; an
-    anchor that has moved warns and leaves the file alone.
+    button's component), the task boxes' one (#519: its transformer after
+    the quizzes'; export, script and styles ride as the quizzes' do), the
+    folder pages' table of contents (#520), and
+    live input's two (#583: the preview's server sends the isolation
+    headers, and Quartz's router loads a page whole across the isolation
+    line).
+    Idempotent; an anchor that has moved warns and leaves the file alone.
 
     Deliberately NOT a third edit to mermaid.inline.ts (an event saying the
     diagrams are drawn), which an earlier draft made: that script is inlined
@@ -1627,8 +1744,12 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz" / "plugins" / "transformers" / "index.ts", _wire_transformers_index),
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
+        (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz.layout.ts", _wire_code_runner_component),
+        (output_dir / "quartz.layout.ts", _wire_list_page_toc),
+        (output_dir / "quartz" / "cli" / "handlers.js", _wire_isolation_serve),
+        (output_dir / "quartz" / "components" / "scripts" / "spa.inline.ts", _wire_isolation_nav),
     ):
         try:
             wire(path)
@@ -6534,13 +6655,6 @@ def _strand_sort_key(strand: str):
     return (0, 0, strand)
 
 
-def _quartz_slug(relative: Path) -> str:
-    """The URL Quartz gives a page: spaces become hyphens, no extension."""
-    parts = list(relative.parts)
-    parts[-1] = relative.stem
-    return "/".join(part.replace(" ", "-") for part in parts)
-
-
 def _is_single_folder_name(name: str) -> bool:
     """
     Whether a configured folder name is just that — a name, not a path.
@@ -7257,7 +7371,7 @@ def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assess
     nothing.
     """
     level = min(count, 4)
-    href = _quartz_slug(page.relative_to(content_root))
+    href = _quartz_page_slug(page.relative_to(content_root))
     marker = ' data-assessed="true"' if assessed else ""
     label = f"{code}, {COVERAGE_WORDS[level]}"
     if assessed:
@@ -7378,7 +7492,7 @@ def _coverage_page(content_root: Path, course_code: str, title: str, folder: str
             page = overall.get(overall_code)
             state = "yes" if evaluated else "no"
             if page:
-                href = _quartz_slug(page.relative_to(content_root))
+                href = _quartz_page_slug(page.relative_to(content_root))
                 chips.append(f'<a class="internal coverage-chip coverage-chip-{state}" '
                              f'href="{href}">{overall_code}</a>')
             else:
@@ -7506,18 +7620,23 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
         return
     plan = plan or []
     # Both forms: the folder is matched by name, but a page is matched by
-    # its SLUG, and Quartz slugs replace spaces with hyphens. Writing only
-    # the title left the coverage map in the panel it was meant to leave.
+    # its SLUG. Writing only the title left the coverage map in the panel it
+    # was meant to leave; writing a slug with only its spaces replaced left a
+    # folder named "Q&A Curriculum" in it, because Quartz's slug for that is
+    # `Q-and-A-Curriculum` (#569). A name with nothing to slug is written
+    # twice, as it always was: de-duplicating would change the component's
+    # bytes for every course, which test_coverage_maps.py's goldens (taken
+    # before #128) hold still.
     titles = [title for _, title in plan] or [COVERAGE_PAGE_TITLE]
     if COVERAGE_PAGE_TITLE not in titles:
         titles.append(COVERAGE_PAGE_TITLE)
     names = []
     for title in titles:
         names.append(title)
-        names.append(title.replace(" ", "-"))
+        names.append(_quartz_segment_slug(title))
     for folder, _ in plan:
         names.append(folder.name)
-        names.append(folder.name.replace(" ", "-"))
+        names.append(_quartz_segment_slug(folder.name))
     formatted = ", ".join(json.dumps(name, ensure_ascii=False) for name in names)
     text = backlinks_tsx_path.read_text(encoding="utf-8")
     pattern = re.compile(
@@ -7538,24 +7657,40 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
 
 
 
+def _quartz_segment_slug(segment: str) -> str:
+    """
+    Quartz v4.5.0's `sluggify` on ONE path segment — a folder's name, a page's
+    name without its extension, or a coverage map's title: white space becomes
+    a hyphen, `&` becomes `-and-`, `%` becomes `-percent`, and `?` and `#` are
+    dropped. Whole segment, never `Path.stem`: a folder "Gr. 9 Curriculum"
+    would lose ". 9 Curriculum" as a stem.
+    """
+    slug = re.sub(r"\s", "-", segment)
+    slug = slug.replace("&", "-and-").replace("%", "-percent")
+    slug = slug.replace("?", "").replace("#", "")
+    return slug
+
+
 def _quartz_page_slug(relative: Path) -> str:
     """
-    The slug Quartz gives a page, as its backlinks index spells it.
+    The slug Quartz gives a page — the address it serves the page at, and how
+    its backlinks index spells it.
 
-    Quartz v4.5.0's `sluggify`, segment by segment: white space becomes a
-    hyphen, `&` becomes `-and-`, `%` becomes `-percent`, and `?` and `#` are
-    dropped. `_quartz_slug` handles only the spaces, which is enough for the
-    coverage map's own links; the backlinks panel compares slugs exactly, so
-    a name with `&` in it would match nothing (#505 review, N8).
+    `_quartz_segment_slug` on each folder and on the page's name. The coverage
+    map's cells and chips link with it too (#569): they used an older helper
+    that replaced only spaces, so a page named "A3. Subprograms 100% Done"
+    put a raw `%` in an href and Quartz's `decodeURI` stopped the build with
+    "URI malformed", and a `#` ("A3. C# Basics") made the rest of the href a
+    fragment. Quartz already serves such a page at `…-100-percent-Done`; only
+    our href was wrong, so the build escapes the name rather than refusing it.
+    The backlinks panel compares slugs exactly, so a name with `&` in it would
+    otherwise match nothing (#505 review, N8).
     """
     parts = list(relative.parts)
     parts[-1] = relative.stem
     slugged = []
     for part in parts:
-        segment = re.sub(r"\s", "-", part)
-        segment = segment.replace("&", "-and-").replace("%", "-percent")
-        segment = segment.replace("?", "").replace("#", "")
-        slugged.append(segment)
+        slugged.append(_quartz_segment_slug(part))
     return "/".join(slugged)
 
 

@@ -2077,7 +2077,10 @@ would misread the name plain (`Unit: One`, `'Tis the Season`, `& Friends` were
 measured unreadable by the build), by the rule `contracts/course-management.json`
 → `foldersAddedLater.titleQuoting` pins and setup's `frontmatter_title` shares
 — doc 04 "5. Content structure" has it. `SectionAdder.scaffoldFrontmatter`'s
-fallback (no sibling page to copy) uses the same function.
+fallback (no sibling page to copy) uses the same function, and since #575 so
+does every front-page title `SectionAdder` swaps in and
+`SiteHealthRepair.restoreSectionIndex` writes (`titleQuoting.frontPages`;
+doc 04 has why).
 
 The trail's `folder created` line now ends ", with its index page and a page
 to duplicate", or names the one that was written (", with its index page" if
@@ -2939,6 +2942,7 @@ the second calling `input()`):
 |---|---|---|---|
 | `claude -p` (2.1.302, `--permission-mode acceptEdits`) | working folder root | `Make the examples on the page "courses/ICS3U/Unit 2/Loops.md" runnable, so students can try them.` | PASS — `codeRunner: true` added to the settings, both fences ` ```python run ` (no flag, so the sum stays editable for the page's "Try it" task), and a sentence before the input example telling students to type a number in the input box before pressing Run; read by `page_features.runner_fences` as two runnable blocks. It ended by saying to preview and press Run on each block, as the skill's last section says |
 | `claude -p` (2.1.302, `--permission-mode acceptEdits`), #493 | working folder root, `courses/ICS4U/Unit 1/Reading Input.md` holding one plain ` ```swift ` example that reads a name and an age | `Make this Swift example runnable: courses/ICS4U/Unit 1/Reading Input.md` | PASS — `codeRunner: true` added, the fence ` ```swift run ` (no flag: every Swift block is read-only already), a sentence before it telling students to type their name and age on two lines of the input box, and "Try it" rewritten around running it again with a different age. The block compiled Embedded (49,370 bytes) and ran through the site's WASI shim with `Ada` and `16`. It said it could not check the compile itself (no compiler it was allowed to run), as the skill's section 4 asks |
+| `claude -p` (2.1.302, `--permission-mode acceptEdits`), #583 | scratch working folder root (the skill as the app mirrors it, both root files), `courses/ICS3U/Unit 2/Greetings.md` holding one plain ` ```python ` example with two `input()` calls | `Make the example on the page "courses/ICS3U/Unit 2/Greetings.md" runnable, so students can try it.` | PASS - `codeRunner: true`, the fence ` ```python run `, and the sentence "When it asks, type your name, then your age.", which it said works whether the program pauses to ask or the page shows the box; it never wrote "type in the input box". It ended with preview, press Run and answer the two prompts |
 
 **Why Codex fails inside a course, measured.** Codex reads `AGENTS.md`
 files from its PROJECT ROOT down to where it was started, and finds the root
@@ -3821,25 +3825,37 @@ reference copy already leaves `plugins/` behind (#255, below);
 sheet does not tell a teacher "your add-ons were left behind" about add-ons
 they never chose, and the trail still names them.
 
-**The live check (L1–L8) was NOT run by an agent** (director ruling B1 on the
-plan review): an isolated Obsidian started from the Bash sandbox can reach
-Russell's real one through `~/.obsidian-cli.sock` (1.13.7 unlinks and
-re-listens on it at every start, at `os.homedir()`), and System Events
-keystrokes go to whichever Obsidian is in front. A prepared script, with a
-`HOME` preflight, PID-set checks and no keystrokes, is for Russell to run.
-Until it has run, three things are ASSUMED from Obsidian 1.13.7's code rather
-than measured: the trust question appears with no directory step when the
-files are on disk before the first load (L1); functionplot 1.2.1 still draws
-on 1.13.x (L2 — if it does not, ship TikZJax only, ruling Q7); and a vault
-already trusted loads an add-on added later with no new question (L6).
+**The live check (L1–L8) was run on 2026-10-17**, by a prepared script on
+an isolated Obsidian 1.13.7 (installer 1.12.7) — not by an agent driving the
+interface (director ruling B1 on the plan review): an isolated Obsidian started
+from the Bash sandbox can reach Russell's real one through
+`~/.obsidian-cli.sock` (1.13.7 unlinks and re-listens on it at every start, at
+`os.homedir()`), and System Events keystrokes go to whichever Obsidian is in
+front, so the script had a short isolated `HOME` (a Unix socket path is at
+most 104 bytes on macOS), `--use-mock-keychain`, PID-set checks and no
+keystrokes. Results, in [#495's comment](https://github.com/russellgordon/plantoir/issues/495#issuecomment-6238148700):
+the trust question appears with no directory step when the files are on disk
+before the first load, with its focus on "Browse vault in Restricted Mode"
+(L1); functionplot 1.2.1 draws on 1.13.7, and a note already open redraws
+after Trust without being reopened (L2); files written while the course is
+open bring no question and draw nothing until a relaunch, which asks (L3,
+L4); a vault already trusted loads an add-on added later with no new question,
+and TikZ draws (L6); and Russell's own Obsidian, its registry and its socket
+were untouched (L8). Until that run, L1, L2 and L6 were ASSUMED from
+Obsidian's code; they are measured now.
 
 **Teacher words** (`wording`, rule 1 with Obsidian's own quoted labels taken
 out first, `testTheWordsNeverNameTheMachinery`): Obsidian's English labels
 from 1.13.7's `i18n.js` — "Trust author and enable plugins", "Browse vault in
 Restricted Mode", "Community plugins", "Exit Restricted mode". The trust
 question puts its focus on "Browse vault in Restricted Mode", so the offer
-says Return chooses the other button; after Trust, Obsidian opens Settings ▸
-Community plugins by itself, so the offer says that too (review S9). The
+says Return chooses the other button. After Trust, Obsidian switches the
+add-ons on and goes straight on: it does NOT open Settings ▸ Community plugins
+(the live check counted `.modal.mod-settings` at 0, with the open note
+redrawing at once). The offer used to say it did — review S9 had read that
+from Obsidian's code — and told the teacher to close the settings; #582 took
+that sentence out of `offerMessage` (both platforms) and corrected
+`wording.note`. The
 key is per vault, so six courses with figures mean six trust clicks.
 
 **The trail** — four events (`activityTrail.mustRecord`): "obsidian add-ons
