@@ -26,6 +26,8 @@
 //  8. with storage refused, boxes still tick and the console stays clean;
 //  1b. on screen the box's edge and tick, and a ticked item's words, are the
 //     page's dark grey, with no fill (taskBoxes.look);
+// 10. the handout (Print > Questions only) carries the student's ticks
+//     (taskBoxes.print, ruling Q1);
 //  9. on paper (⌘P, background graphics off) a ticked box is inked and an
 //     unticked one is an empty box, in the light and the dark theme - read
 //     from the PDF's pixels with poppler's pdftoppm, as
@@ -396,6 +398,34 @@ async function connect(chunk) {
         }
       }
       await send("Emulation.setEmulatedMedia", { media: "", features: [{ name: "prefers-color-scheme", value: "light" }] })
+
+      // 10. The handout carries the student's ticks (taskBoxes.print, ruling
+      // Q1): a tick on the first item and an untick of the teacher's [x] on
+      // the second, then Print > Questions only, read from the handout's
+      // frame at the moment it prints.
+      await send("Emulation.setEmulatedMedia", { media: "", features: [{ name: "prefers-color-scheme", value: "light" }] })
+      await evaluate("localStorage.clear()")
+      await open(base + "/Task-Printable.html")
+      await click("window.__task.boxes()[0]")
+      await click("window.__task.boxes()[1]")
+      const onScreen = await evaluate("window.__task.state()")
+      await send("Page.addScriptToEvaluateOnNewDocument", {
+        source: `new MutationObserver((changes) => { for (const change of changes) for (const node of change.addedNodes) {
+          if (node.tagName === "IFRAME") node.contentWindow.print = () => {
+            window.__handoutBoxes = Array.from(node.contentDocument.querySelectorAll("input.plantoir-task")).map((box) => (box.checked ? "x" : "_")).join("")
+          } } }).observe(document, { childList: true, subtree: true })`,
+      })
+      // From another page, so the address with the print request is a new
+      // document (the same page with only a new #fragment is not).
+      await open(base + "/Task-Twin-B.html")
+      await send("Page.navigate", { url: base + "/Task-Printable.html#plantoir-print=questionsOnly&paper=portrait" })
+      let handoutBoxes = null
+      for (let tries = 0; tries < 240 && handoutBoxes === null; tries += 1) {
+        await pause(250)
+        handoutBoxes = (await evaluate("window.__handoutBoxes ?? null").catch(() => null)) ?? null
+      }
+      expect("the handout shows the student's ticks, as the page did", onScreen === "x__" && handoutBoxes === onScreen, { onScreen, handoutBoxes })
+      measured.push(`handout boxes ${handoutBoxes} (the page showed ${onScreen})`)
 
       // 8. Storage refused: boxes still tick, and the task boxes add no error
       // to the console. Quartz's own scripts already report a refused store

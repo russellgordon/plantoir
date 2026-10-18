@@ -64,7 +64,8 @@ document.addEventListener("change", (event) => {
   }
 })
 
-document.addEventListener("nav", () => {
+// Every box on the page, from its tick or the Markdown's own state.
+function restoreTicks() {
   const boxes = boxesOnThePage()
   if (boxes.length === 0) {
     return
@@ -86,4 +87,20 @@ document.addEventListener("nav", () => {
     const tick = ticksByPage[box.dataset.taskPage ?? ""][box.dataset.taskItem ?? ""]
     box.checked = tick ?? box.defaultChecked
   }
-})
+}
+
+document.addEventListener("nav", restoreTicks)
+
+// Paper shows the student's ticks (taskBoxes.print, ruling Q1, the default
+// pending Russell): the handout copies the live page (print.inline.ts), so
+// the boxes are restored once more just before it is made - opened from
+// Plantoir's preview with a print request, the handout can start in the
+// same page load, before this script's own `nav` listener has run.
+const printHooks = window as unknown as { plantoirPrint?: { prepare: Array<() => Promise<void>> }; plantoirTasksHooked?: boolean }
+if (!printHooks.plantoirPrint) {
+  printHooks.plantoirPrint = { prepare: [] }
+}
+if (!printHooks.plantoirTasksHooked) {
+  printHooks.plantoirTasksHooked = true
+  printHooks.plantoirPrint.prepare.push(async () => restoreTicks())
+}
