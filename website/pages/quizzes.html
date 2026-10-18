@@ -6,7 +6,7 @@ nav_label: Quizzes
 
 <div class="page-head">
   <h1>Quizzes</h1>
-  <p class="standfirst">Questions students check for themselves, in any subject. They answer on the class website, see at once whether they were right and why, and try again. Their answers are never recorded or sent anywhere.</p>
+  <p class="standfirst">Questions students check for themselves, in any subject. They answer on the class website, see at once whether they were right and why, and try again. Their answers are never recorded or sent anywhere. Type a quiz yourself in a few lines, or <a href="#ask">ask Claude or Codex</a> to write one: Plantoir teaches them how.</p>
 </div>
 
 <hr class="rule">
@@ -15,8 +15,16 @@ nav_label: Quizzes
   <h2>Assessment as learning</h2>
   <p>Growing Success describes assessment <em>as</em> learning: students monitor their own learning, use feedback to decide their next step, and set their own goals. A quiz on a Plantoir page gives students that feedback, and only to them. A student answers, presses <strong>Check</strong>, reads your explanation — right or wrong — and tries again. Each page keeps a score in the student's own browser, with <strong>Start again</strong>.</p>
   <p>Nothing a student answers leaves their browser. You don't see it, Plantoir doesn't keep it, and it is never a mark.</p>
-  <p>Each example below is a page from a sample course, shown as students see it after they press Check. For mathematics and chemistry, the text you type is shown above the picture.</p>
   {{availability:quizzes}}
+</section>
+
+<hr class="rule">
+
+<section id="two-ways">
+  <h2>Type it, or ask for it</h2>
+  <p>A quiz is a few lines of plain text on the page: a <code>[!quiz]</code> callout holding the question, its choices or its answer, and your explanation. You can type one yourself in Obsidian, as the examples below show, with nothing to set up.</p>
+  <p>Or ask. Plantoir writes its guidance for quizzes into your working folder as a skill, and keeps it up to date, so Claude Code or Codex started there already knows every kind of question, how answers are checked, and what a good explanation says. Asked for "a 5-question check on this page", it writes the quiz, answers and all, and Plantoir checks every question when the site builds. <a href="#ask">How that went, below.</a></p>
+  <p>Each example that follows is a page from a sample course, shown as students see it after they press Check. For mathematics and chemistry, the text you type is shown above the picture.</p>
 </section>
 
 <hr class="rule">
@@ -105,8 +113,8 @@ nav_label: Quizzes
 <hr class="rule">
 
 <section id="ask">
-  <h2>Or ask Claude or Codex</h2>
-  <p>Plantoir writes its guidance for quizzes into your working folder, and keeps it up to date, so Claude Code or Codex started there already knows every kind of question and how answers are checked. There is nothing to install or paste.</p>
+  <h2>Asking Claude or Codex</h2>
+  <p>The quiz skill Plantoir keeps in your working folder is what Claude Code or Codex reads. There is nothing to install or paste.</p>
   <p>Asked, in a working folder holding an MCV4U course, something like:</p>
   <pre class="fence ask"><code>Add a 5-question check to the page "courses/MCV4U/Concepts/Curve Sketching.md".</code></pre>
   <p>Claude Code, asked exactly that in a copy of the demo folder, read its quiz guidance and wrote five <code>[!quiz]</code> callouts of different kinds — multiple choice, select all that apply, short answer, two blanks to fill, and a choice between three graphs, shuffled — each with its answer and an explanation. Plantoir found nothing to fix in any of them.</p>
