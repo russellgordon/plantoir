@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 17 October 2026. The current release is **1.8.0** on the Mac and **1.7.2** on Windows.*
+*Last updated: 18 October 2026. The current release is **1.8.1** on the Mac and **1.7.2** on Windows.*
 
 A few things to know before you read on:
 
@@ -28,7 +28,7 @@ need to read those to use Plantoir.
 
 ## Next: Windows catches up to 1.8
 
-Plantoir 1.8 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
+Plantoir 1.8.1 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
 download joins the release, with:
 
 - **Runnable Python, self-check quizzes, maths served by your own site and
@@ -53,6 +53,13 @@ download joins the release, with:
   - an honest answer to what happens to a scheduled publish when the computer
     is asleep at that time
     ([#554](https://github.com/russellgordon/plantoir/issues/554)).
+- **Then what 1.8.1 brought the Mac:** programs that stop and ask for input
+  as they run, a coloured editor with line numbers, checklists students can
+  tick, the one-blank quiz wording, and a course name with a colon
+  ([#591](https://github.com/russellgordon/plantoir/issues/591),
+  [#592](https://github.com/russellgordon/plantoir/issues/592),
+  [#593](https://github.com/russellgordon/plantoir/issues/593),
+  [#586](https://github.com/russellgordon/plantoir/issues/586)).
 
 ---
 
@@ -61,11 +68,8 @@ download joins the release, with:
 - **Open in Obsidian goes to the page you're looking at.** While previewing a
   page, Open in Obsidian will open the note that page came from, not just the
   course — wherever it can tell which note that is. ([#518](https://github.com/russellgordon/plantoir/issues/518))
-- **Students can tick checklists.** A checklist on a class page becomes
-  clickable, and each student's ticks are remembered in their own browser.
-  Your notes are never changed.
-  ([#519](https://github.com/russellgordon/plantoir/issues/519))
-- **A "My progress" page for each student**, built from those ticks: what
+- **A "My progress" page for each student**, built from the ticks students
+  make on checklists (tickable since 1.8.1): what
   they've checked off under each page's success criteria, grouped by class.
   It counts ticks under headings such as "Success criteria" (you can set
   which headings in Course Settings). Only the student sees it, and this page
@@ -80,10 +84,6 @@ download joins the release, with:
   plan is to decide whether to combine them into one place for every kept
   copy of a course, or to give archives the same browsing that backups have.
   ([#573](https://github.com/russellgordon/plantoir/issues/573))
-- **Curriculum page fixes:** a table of contents appears when you ask for one
-  ([#520](https://github.com/russellgordon/plantoir/issues/520)), and an
-  unusual character in a file name no longer stops the site from building
-  ([#569](https://github.com/russellgordon/plantoir/issues/569)).
 - **Problems with runnable code are shown in the app**, alongside the other
   things Plantoir tells you about a folder, rather than only on the page.
   ([#567](https://github.com/russellgordon/plantoir/issues/567))
@@ -97,9 +97,6 @@ download joins the release, with:
   ([#576](https://github.com/russellgordon/plantoir/issues/576)), and a
   handout printed on Windows should look the same as one printed on a Mac
   ([#577](https://github.com/russellgordon/plantoir/issues/577)).
-- **A course name with a colon works.** Naming a course "Physics: Mechanics"
-  no longer stops its front page from being built.
-  ([#575](https://github.com/russellgordon/plantoir/issues/575))
 - **Diagrams and fonts served by your own site**, as maths already is in 1.8,
   so pages look right without reaching other websites.
   ([#566](https://github.com/russellgordon/plantoir/issues/566))
