@@ -37,10 +37,10 @@ the words inside pages, not only titles.
 you click it — usually a check-your-understanding, or a worked answer.
 Try to answer first; reading the answer feels like learning and is not.
 
-> [!warning] Checkboxes here do not save
-> The `- [ ]` lists on class pages are lists to read down or copy into
-> your own notebook. Clicking them does nothing and nothing is recorded —
-> the site has no idea who you are.
+> [!note] Checkboxes here are yours
+> The `- [ ]` lists on class pages can be ticked as you work through them.
+> Your browser keeps the ticks on this computer; nothing is sent anywhere
+> and the site has no idea who you are.
 
 ## If something is missing
 

@@ -14,8 +14,8 @@ Short list.
 - [ ] Your school device, charged, on the days the class page says so.
 - [ ] Whatever the current class text is, on paper or on screen.
 
-That list is for copying into your own notebook rather than ticking here
-— the boxes on this site are printed, not clickable.
+Tick that list here as you pack (your browser keeps the ticks on this
+computer), or copy it into your own notebook.
 
 ## Why the first drafting is by hand
 

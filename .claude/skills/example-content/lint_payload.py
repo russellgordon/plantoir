@@ -279,22 +279,25 @@ def lint(course_code: str) -> int:
                 f"polarity is inverted (draft: true is publish: false)"
             )
 
-        # A checklist on the site cannot be ticked — nothing is saved and
-        # clicking does nothing. A page that says otherwise lies about the
-        # software to the student reading it.
+        # A checklist on the site CAN be ticked, since #519: each student's
+        # ticks are kept in their own browser. A page that says the boxes
+        # are read-only, do nothing or save nothing lies about the software
+        # to the student reading it. (Until #519 this rule pointed the other
+        # way and failed any page that said a box could be ticked.)
         lowered = text.lower()
-        for phrase in ("click to check", "clicking checks", "check them off",
-                       "tick them off", "tick these off", "checkboxes are clickable",
-                       "clickable checklist", "click each box", "tick each box"):
+        said_unticked = False
+        for phrase in ("read-only — the boxes", "are read-only", "read-only box", "printed, not interactive",
+                       "printed, not clickable", "not clickable", "boxes do not tick", "do not tick on this site",
+                       "checkboxes here do not save", "these do not save", "boxes save nothing",
+                       "clicking one does nothing", "clicking does nothing", "clicking them does nothing"):
             at = lowered.find(phrase)
-            while at >= 0:
-                # Ticking a printed copy is honest and worth saying, so the
-                # sentence around the phrase decides.
-                sentence = lowered[max(0, at - 120):at + 160]
-                if not any(word in sentence for word in
-                           ("paper", "notebook", "printed", "print it", "your own copy")):
-                    problems.append(f"{rel}: says a checklist can be ticked — it is read-only")
-                    break
+            while at >= 0 and not said_unticked:
+                # The sentence around the phrase decides: only one about a
+                # box or a checklist is wrong.
+                sentence = lowered[max(0, at - 160):at + 160]
+                if any(word in sentence for word in ("box", "checklist", "- [ ]", "tick")):
+                    problems.append(f"{rel}: says a checklist cannot be ticked — on the site each student can tick it")
+                    said_unticked = True
                 at = lowered.find(phrase, at + 1)
 
         # Mermaid prints each pie percentage at its slice's mid-angle with

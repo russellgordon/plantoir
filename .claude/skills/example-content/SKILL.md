@@ -606,12 +606,15 @@ from Phase 5 apply here too.
   quoting it — describe the WORK, never the worker (Phase 2). A task with
   no success criteria cannot support assessment *as* learning, because
   there is nothing for a student to judge their own work against.
-- **Checklists on the site are READ-ONLY.** `- [ ]` renders a box that
-  cannot be ticked: nothing is saved, and clicking does nothing. Never
-  write "click to check off", "tick these as you go", or any wording that
-  implies otherwise — a page that lies about the software is worse than a
-  page that omits it. Say what they are for instead: a list to copy into a
-  notebook, or to read down before handing something in.
+- **Checklists on the site can be ticked** (since #519, v1.8.1). `- [ ]`
+  outside a `[!quiz]` renders a box each student can tick for themselves;
+  the ticks are kept in that student's own browser, on that computer, and
+  nobody else sees them. Never write that the boxes are read-only, do
+  nothing or save nothing — a page that lies about the software is worse
+  than a page that omits it, and `lint_payload.py` fails it. Nor promise
+  more than is true: ticks are not sent to the teacher, and on another
+  computer the boxes start again. Changing an item's words later clears
+  every student's tick on it, so word a list as you mean to keep it.
 - Piped wikilinks inside table cells escape the pipe: `[[Page\|words]]`.
 - **Mathematics that must render** (KaTeX is strict about markdown's
   seams): display math is a SINGLE physical line, or an unindented

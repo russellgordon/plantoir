@@ -76,9 +76,11 @@ course wants a source, a year, and its uncertainty.
 - [ ] Notebook, pencil, closed shoes
 - [ ] Read [[Fieldwork Safety]] before we go
 
-> [!warning] These do not save
-> A checkbox here is printed, not interactive. Nothing is recorded and
-> the site does not know who you are. Copy the list into your notebook.
+> [!note] Ticks stay in this browser
+> Tick a box here and your browser keeps it for you. Nothing is sent
+> anywhere, the site does not know who you are, and on another computer
+> the boxes start again. Copy the list into your notebook if you want it
+> everywhere.
 
 ## Numbers and money
 

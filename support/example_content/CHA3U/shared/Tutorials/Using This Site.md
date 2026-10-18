@@ -45,9 +45,9 @@ reading an answer feels like learning and is not.
 Those blocks are the Ministry's wording, not mine, and
 [[Learning Goals]] explains how they are used.
 
-> [!warning] Checkboxes here do not save
-> The `- [ ]` lists on these pages are for reading down or copying into your
-> notebook. Clicking one does nothing, nothing is recorded, and the site
+> [!note] Checkboxes here are yours
+> The `- [ ]` lists on these pages can be ticked as you go. Your browser
+> keeps the ticks on this computer; nothing is sent anywhere, and the site
 > does not know who you are.
 
 ## If a link does not work yet

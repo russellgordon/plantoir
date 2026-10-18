@@ -230,9 +230,10 @@ more than it sounds.
 - [ ] Answer sentence written
 - [ ] Someone else could follow this page
 
-On the site they are read-only — the boxes show what the page says, and
-clicking one does nothing. Copied into your own notes, they are how
-[[Showing Your Thinking]] turns from advice into habit.
+On the site each student can tick them; the ticks stay in their own
+browser, nobody else sees them, and changing a line's words clears its
+tick. Ticked as you go, they are how [[Showing Your Thinking]] turns from
+advice into habit.
 
 ---
 
