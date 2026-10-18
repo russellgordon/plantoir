@@ -241,7 +241,7 @@
         "scene": "code",
         "prepare": "code-quiz.js"
       },
-      "alt": "A self-check question on a class website asking what a three-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it.",
+      "alt": "A self-check question on a class website asking what a two-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it.",
       "caption": "A question students check for themselves, with your explanation once they have.",
       "windows": false,
       "expectText": [

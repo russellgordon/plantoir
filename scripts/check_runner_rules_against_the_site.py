@@ -42,9 +42,24 @@ Three halves:
    patches to Quartz itself (the preview's server, the router) made on the
    image's own files, ONCE however often the build runs, leaving each file
    still valid.
+5. The editor's colours (#585, codeRunnerBlocks.editor.colour):
+   `support/quartz/components/scripts/codeRunnerColour.ts` is bundled and run
+   beside the image's OWN Shiki, with the site's two themes read from the
+   image's quartz.config.ts. Every `cases` case must come out exactly as
+   written from BOTH; every Shiki colour met must be one of `categories`,
+   each category met with exactly its pair, and codeRunner.scss must give
+   each category's class exactly the table's pair (three copies, pinned to
+   each other); every `reuseCases` plan must be the tokenizer's, and every
+   line it reuses coloured by Shiki as the current code's line is; every
+   `knownDifferences` case must still differ; and the tokenizer must agree
+   with Shiki on at least `agreement` per cent of the non-space characters
+   of every ```python and ```swift block in support/example_content,
+   scripts/fixtures/runner-colour and the Swift gate's programs (verify.sh
+   mounts both folders).
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -60,6 +75,14 @@ import toolchain_paths  # noqa: E402
 RULE_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunnerRule.ts"
 TRANSFORMER_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunner.ts"
 ISOLATION_MJS = toolchain_paths.SUPPORT_DIR / "quartz" / "cli" / "plantoirIsolation.mjs"
+COLOUR_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "components" / "scripts" / "codeRunnerColour.ts"
+RUNNER_SCSS = toolchain_paths.SUPPORT_DIR / "quartz" / "components" / "styles" / "codeRunner.scss"
+EXAMPLE_CONTENT = toolchain_paths.SUPPORT_DIR / "example_content"
+COLOUR_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "runner-colour"
+# The Swift gate's programs (#493): mounted at /opt/swift-gate by verify.sh,
+# beside the repository's scripts/ otherwise. The example content has no Swift.
+SWIFT_GATE = next((folder for folder in (Path("/opt/swift-gate"), Path(__file__).resolve().parent.parent / "swift-gate")
+                   if folder.is_dir()), None)
 NODE_MODULES = toolchain_paths.QUARTZ_DIR / "node_modules"
 ESBUILD = NODE_MODULES / "esbuild" / "bin" / "esbuild"
 
@@ -270,6 +293,215 @@ def run_the_rules_in_node(folder: Path) -> list:
     return result["failures"]
 
 
+COLOUR_RUNNER = r"""
+import { readFileSync } from "fs"
+import { colourLines, reusePlan } from "COLOUR_TS"
+
+const input = JSON.parse(readFileSync(process.argv[2], "utf-8"))
+const { codeToTokens } = await import(input.shiki)
+const rules = input.colour
+const failures = []
+let count = 0
+const SPACE = /\s/
+const byPair = new Map()
+for (const [category, pair] of Object.entries(rules.categories)) {
+  byPair.set(pair[0].toUpperCase() + "/" + pair[1].toUpperCase(), category === "plain" ? "." : category)
+}
+const met = new Map()
+const unknown = new Set()
+// Each line as one character per character of the code: its category,
+// "." for plain, " " for any space.
+const shiki = async (language, code) => {
+  const result = await codeToTokens(code, { lang: language, themes: { light: input.themes.light, dark: input.themes.dark } })
+  const lines = []
+  for (const line of result.tokens) {
+    let text = ""
+    for (const token of line) {
+      const light = String(token.htmlStyle?.color ?? token.color ?? "").toUpperCase()
+      const dark = String(token.htmlStyle?.["--shiki-dark"] ?? "").toUpperCase()
+      const pair = light + "/" + dark
+      let category = byPair.get(pair)
+      if (category === undefined) {
+        unknown.add(pair)
+        category = "?"
+      }
+      for (const character of token.content) {
+        if (SPACE.test(character)) {
+          text += " "
+          continue
+        }
+        text += category
+        if (!met.has(category)) met.set(category, new Set())
+        met.get(category).add(pair)
+      }
+    }
+    lines.push(text)
+  }
+  return lines
+}
+const ours = (language, code) => {
+  const lines = []
+  for (const line of colourLines(language, code) ?? []) {
+    let text = ""
+    for (const [piece, category] of line.tokens) {
+      for (const character of piece) text += SPACE.test(character) ? " " : category === "" ? "." : category
+    }
+    lines.push(text)
+  }
+  return lines
+}
+const differ = (a, b) => JSON.stringify(a) !== JSON.stringify(b)
+
+for (const c of rules.cases) {
+  count += 1
+  const tokenizer = ours(c.language, c.code)
+  const theirs = await shiki(c.language, c.code)
+  if (differ(tokenizer, c.lines)) failures.push(`colour.cases ${c.language} "${c.name}": the tokenizer gives ${JSON.stringify(tokenizer)}`)
+  if (differ(theirs, c.lines)) failures.push(`colour.cases ${c.language} "${c.name}": the image's Shiki gives ${JSON.stringify(theirs)}`)
+}
+for (const [category] of Object.entries(rules.categories)) {
+  count += 1
+  const key = category === "plain" ? "." : category
+  if (!met.has(key)) failures.push(`colour.categories ${category}: no case shows it through the image's Shiki`)
+}
+if (unknown.size > 0) failures.push(`colour.categories: the image's Shiki uses colours the table lacks: ${JSON.stringify(Array.from(unknown))}`)
+
+for (const c of rules.knownDifferences) {
+  count += 1
+  if (!differ(ours(c.language, c.code), await shiki(c.language, c.code))) {
+    failures.push(`colour.knownDifferences "${c.name}": the tokenizer now agrees with Shiki - take it out of the list`)
+  }
+}
+
+let reused = 0
+for (const c of rules.reuseCases) {
+  count += 1
+  const original = colourLines(c.language, c.original)
+  const current = colourLines(c.language, c.current)
+  const originalShiki = await shiki(c.language, c.original)
+  const currentShiki = await shiki(c.language, c.current)
+  const plan = reusePlan(original, current, (first, second) => originalShiki[first] === originalShiki[second])
+  if (differ(plan, c.plan)) failures.push(`colour.reuseCases "${c.name}": the plan is ${JSON.stringify(plan)}`)
+  plan.forEach((from, index) => {
+    if (from === null) return
+    reused += 1
+    if (originalShiki[from] !== currentShiki[index]) {
+      failures.push(`colour.reuseCases "${c.name}": line ${index + 1} shows original line ${from + 1}, which Shiki colours differently`)
+    }
+  })
+}
+
+const agreement = {}
+for (const [language, blocks] of Object.entries(input.corpus)) {
+  let same = 0
+  let total = 0
+  let lines = 0
+  for (const code of blocks) {
+    const theirs = await shiki(language, code)
+    const tokenizer = ours(language, code)
+    theirs.forEach((line, index) => {
+      lines += 1
+      const mine = tokenizer[index] ?? ""
+      for (let at = 0; at < line.length; at += 1) {
+        if (line[at] === " ") continue
+        total += 1
+        if (mine[at] === line[at]) same += 1
+      }
+    })
+  }
+  count += 1
+  const share = total === 0 ? 0 : (100 * same) / total
+  agreement[language] = { blocks: blocks.length, lines, same, total, share: Math.floor(share * 100) / 100 }
+  const floor = rules.agreement[language]
+  if (floor === undefined || total === 0 || share < floor) {
+    failures.push(`colour.agreement ${language}: ${same} of ${total} characters (${share.toFixed(2)} %) against a floor of ${floor}`)
+  }
+}
+console.log(JSON.stringify({ count, failures, agreement, reused }))
+"""
+
+
+def site_themes() -> dict:
+    """The site's two Shiki themes, as the image's quartz.config.ts names them."""
+    text = (toolchain_paths.QUARTZ_DIR / "quartz.config.ts").read_text(encoding="utf-8")
+    found = re.search(r'SyntaxHighlighting\(\{\s*theme:\s*\{\s*light:\s*"([^"]+)",\s*dark:\s*"([^"]+)"', text)
+    if found is None:
+        raise SystemExit("FAIL the image's quartz.config.ts names no light and dark theme")
+    return {"light": found.group(1), "dark": found.group(2)}
+
+
+def colour_corpus() -> dict:
+    """Every ```python and ```swift block in the example content, once each,
+    then the committed fixtures."""
+    import markdown_code
+    corpus = {"python": [], "swift": []}
+    seen = set()
+    for page in sorted(EXAMPLE_CONTENT.rglob("*.md")):
+        for block in markdown_code.fenced_blocks(page.read_text(encoding="utf-8")):
+            language = block["lang"]
+            if language in corpus and block["body"] not in seen:
+                seen.add(block["body"])
+                corpus[language].append(block["body"])
+    # Plain text, not .py: the Python one holds what a student might type,
+    # some of it no longer valid Python 3 (`<>`), so no tool takes it for a script.
+    for language in corpus:
+        fixture = COLOUR_FIXTURES / f"{language}.txt"
+        if fixture.is_file():
+            corpus[language].append(fixture.read_text(encoding="utf-8").rstrip("\n"))
+    if SWIFT_GATE is not None:
+        for program in sorted(SWIFT_GATE.glob("*.swift")):
+            corpus["swift"].append(program.read_text(encoding="utf-8").rstrip("\n"))
+    return corpus
+
+
+def the_stylesheets_categories() -> list:
+    """codeRunner.scss's .plantoir-tok-<category> values, and its plain
+    default, against the contract's table."""
+    failures = []
+    table = contracts.section("shared-rules", "codeRunnerBlocks", "editor", "colour", "categories")
+    text = RUNNER_SCSS.read_text(encoding="utf-8")
+    for category, (light, dark) in table.items():
+        if category == "plain":
+            pattern = r"pre\.plantoir-runner-colour > code \{[^}]*?--shiki-light:\s*(#[0-9a-fA-F]{6});\s*--shiki-dark:\s*(#[0-9a-fA-F]{6});"
+        else:
+            pattern = r"\.plantoir-tok-" + category + r" \{\s*--shiki-light:\s*(#[0-9a-fA-F]{6});\s*--shiki-dark:\s*(#[0-9a-fA-F]{6});\s*\}"
+        found = re.search(pattern, text, re.S)
+        if found is None:
+            failures.append(f"codeRunner.scss gives the {category} category no colours")
+        elif (found.group(1).upper(), found.group(2).upper()) != (light.upper(), dark.upper()):
+            failures.append(f"codeRunner.scss gives {category} {found.group(1)}/{found.group(2)}, the contract {light}/{dark}")
+    classes = set(re.findall(r"\.plantoir-tok-([a-z]+) \{", text))
+    extra = classes - set(table)
+    if extra:
+        failures.append(f"codeRunner.scss colours categories the contract lacks: {sorted(extra)}")
+    print(f"codeRunner.scss: {len(table)} categories' colours are the contract's")
+    return failures
+
+
+def run_the_colours(folder: Path) -> list:
+    entry = folder / "colour.mjs"
+    entry.write_text(COLOUR_RUNNER.replace("COLOUR_TS", str(COLOUR_TS)), encoding="utf-8")
+    bundle = folder / "colour.bundle.mjs"
+    subprocess.run([str(ESBUILD), str(entry), "--bundle", "--format=esm", "--platform=node",
+                    f"--outfile={bundle}", "--log-level=warning"], check=True)
+    package = json.loads((NODE_MODULES / "shiki" / "package.json").read_text(encoding="utf-8"))
+    shiki = NODE_MODULES / "shiki" / package["exports"]["."]["default"]
+    data = folder / "colour.json"
+    data.write_text(json.dumps({
+        "shiki": str(shiki),
+        "themes": site_themes(),
+        "colour": contracts.section("shared-rules", "codeRunnerBlocks", "editor", "colour"),
+        "corpus": colour_corpus(),
+    }), encoding="utf-8")
+    output = subprocess.run(["node", str(bundle), str(data)], check=True, capture_output=True, text=True).stdout
+    result = json.loads(output.strip().splitlines()[-1])
+    agreement = "; ".join(f"{language} {row['share']} % of {row['total']} characters in {row['blocks']} blocks"
+                          for language, row in result["agreement"].items())
+    print(f"codeRunnerColour.ts: {result['count']} colour checks beside the image's Shiki "
+          f"({result['reused']} lines reused); agreement {agreement}")
+    return result["failures"] + the_stylesheets_categories()
+
+
 def run_the_shapes_through_the_build() -> list:
     failures = []
     cases = contracts.section("shared-rules", "codeRunnerBlocks", "fences", "pageShapes", "cases")
@@ -347,7 +579,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as name:
         folder = Path(name)
         failures = (run_the_rules_in_node(folder) + run_the_shapes_through_the_build() + run_the_typed_lines(folder)
-                    + run_the_isolation_cases_through_the_publish() + run_the_quartz_patches(folder))
+                    + run_the_isolation_cases_through_the_publish() + run_the_quartz_patches(folder)
+                    + run_the_colours(folder))
     for failure in failures:
         print("FAIL " + failure)
     if failures:

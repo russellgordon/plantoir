@@ -38,6 +38,18 @@
 //     loads KaTeX's stylesheet and faces in its print frame. Served
 //     without the headers, the box shows its words.inputAhead line;
 //
+//  6. the editor's colours and line numbers (#585): an editable block is a
+//     frame - gutter, coloured copy, textarea; an unedited block's copy is
+//     the highlighted copy's own lines byte for byte and its text the
+//     editor's; typed lines are the tokenizer's while the line above stays
+//     Shiki's; undo, an input method, a saved edit and Reset keep the copy
+//     in step; a scrolled editor's copy and gutter follow it; the coloured
+//     letters sit exactly under the typed ones (0 strong pixels, light
+//     theme, colour spans out - with a half-pixel control that must show);
+//     the focus ring is the frame's; a plain block's numbers and the gutter
+//     wear one style; no ligatures anywhere in code; and an edited block
+//     prints coloured and numbered (⌘P, read back with pdftotext);
+//
 // then, against the same files served three wrong ways, that the student is
 // told rather than left on "Loading…": the worker missing (engineMissing),
 // .wasm sent as application/octet-stream and a CSP that allows no wasm
@@ -51,7 +63,8 @@
 import { spawn } from "node:child_process"
 import { headersFor } from "../support/quartz/cli/plantoirIsolation.mjs"
 import { createServer } from "node:http"
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
 
@@ -175,7 +188,9 @@ window.__runner = {
       })(),
       endShown: !(block.querySelector(".plantoir-runner-end")?.hidden ?? true),
       ahead: block.querySelector(".plantoir-runner-input-ahead")?.textContent ?? null,
-      printCopy: block.querySelector(".plantoir-runner-print").textContent,
+      // The print copy's lines (#585: pre > code > span[data-line], a blank
+      // line holding a space as a static block's does).
+      printLines: Array.from(block.querySelectorAll(".plantoir-runner-print > code > [data-line]")).map((line) => line.textContent.replace(/ +$/, "")),
       edited: block.classList.contains("plantoir-runner-edited"),
     }
   },
@@ -188,6 +203,29 @@ window.__runner = {
     window.__runner.block(index).querySelector(".plantoir-runner-input-lines").value = text
   },
   press: (index, name) => window.__runner.block(index).querySelector(".plantoir-runner-" + name).click(),
+  // #585: the editor's frame - its coloured copy, its gutter, the textarea.
+  frame: (index) => {
+    const block = window.__runner.block(index)
+    const area = block.querySelector("textarea.plantoir-runner-editor")
+    const copy = block.querySelector("pre.plantoir-runner-colour")
+    const code = copy ? copy.querySelector(":scope > code") : null
+    const gutter = block.querySelector("pre.plantoir-runner-gutter")
+    const frame = block.querySelector(".plantoir-runner-frame")
+    const shiki = Array.from(block.querySelectorAll(".plantoir-runner-original pre > code > [data-line]"))
+    return {
+      framed: !!frame && !!copy && !!gutter && !!area && frame.contains(area),
+      value: area ? area.value : null,
+      copyText: code ? code.textContent : null,
+      copyLines: code ? Array.from(code.children).map((line) => line.innerHTML.replace(/\\n$/, "")) : [],
+      shikiLines: shiki.map((line) => (line.textContent.trim() === "" ? "" : line.innerHTML)),
+      tokenizerSpans: code ? code.querySelectorAll("[class^='plantoir-tok-']").length : 0,
+      numbers: gutter ? gutter.textContent.split("\\n") : [],
+      scroll: area ? [area.scrollLeft, area.scrollTop] : null,
+      copyScroll: copy ? [copy.scrollLeft, copy.scrollTop] : null,
+      numbersMoved: gutter ? gutter.firstElementChild.style.transform : null,
+      composing: block.classList.contains("plantoir-runner-composing"),
+    }
+  },
   answer: (index) => window.__runner.block(index).querySelector("input.plantoir-runner-answer"),
   paste: (index, text) => {
     const data = new DataTransfer()
@@ -349,7 +387,11 @@ async function connect(chunk) {
       const key = await evaluate(`Object.keys(localStorage).filter((name) => name.startsWith("plantoir:runner:") && name.endsWith(window.__runner.state(2).id))[0] ?? null`)
       expect("an edit is saved under plantoir:runner:<base>:<id>", key !== null && /^plantoir:runner:\/.*:/.test(key), key)
       state = await evaluate("window.__runner.state(2)")
-      expect("an edit is what prints", state.edited && state.printCopy === "print('my edit')\n", state)
+      // The print copy is brought up to date when the page may be printed
+      // (#585 plan review S2), so the check prints first.
+      await evaluate(`(() => { window.dispatchEvent(new Event("beforeprint")); return 1 })()`)
+      state = await evaluate("window.__runner.state(2)")
+      expect("an edit is what prints", state.edited && JSON.stringify(state.printLines) === JSON.stringify(["print('my edit')", ""]), state)
       await open(base + pagePath)
       state = await evaluate("window.__runner.state(2)")
       expect("a saved edit is there after a reload", state.code === "print('my edit')\n", state)
@@ -390,6 +432,146 @@ async function connect(chunk) {
       expect("Tab indents by four spaces and keeps the focus", tabbed.value === "    print(1)\n" && tabbed.focused, tabbed)
       expect("Shift-Tab takes the indent off", untabbed.value === "print(1)\n" && untabbed.focused, untabbed)
       expect("Escape then Tab leaves the editor, and not for the search button", !left.focused && !/search/.test(String(left.active)), left)
+
+      // 6. The editor's colours and line numbers (#585: codeRunnerBlocks.
+      // editor.colour, editor.lineNumbers). Block 0 is edited throughout;
+      // block 1 is left as the teacher wrote it; the page's last block is a
+      // plain ```python block.
+      await evaluate(`(() => { for (const name of Object.keys(localStorage)) if (name.startsWith("plantoir:runner:")) localStorage.removeItem(name); return 1 })()`)
+      await open(base + pagePath)
+      const frameOf = (index) => evaluate(`window.__runner.frame(${index})`)
+      const settle = () => evaluate("new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(1))))")
+      let frame = await frameOf(1)
+      expect("an editable block is a frame: the gutter, then the coloured copy under the textarea", frame.framed, frame)
+      expect("an unedited block's coloured copy is the highlighted copy's own lines, byte for byte, and its text the editor's",
+        frame.copyText === frame.value && frame.copyLines.length > 0 && JSON.stringify(frame.copyLines) === JSON.stringify(frame.shikiLines)
+        && frame.tokenizerSpans === 0, frame)
+      expect("the gutter numbers every line of the editor from 1", JSON.stringify(frame.numbers) === JSON.stringify(frame.value.split("\n").map((line, at) => String(at + 1))), frame)
+      // Typing: the line typed is the tokenizer's, the line above Shiki's own.
+      await evaluate(`(() => { const area = window.__runner.block(0).querySelector("textarea.plantoir-runner-editor"); area.focus(); area.setSelectionRange(area.value.length, area.value.length); return 1 })()`)
+      const shikiFirst = (await frameOf(0)).shikiLines[0]
+      await send("Input.insertText", { text: "\nfor n in range(3):\n" })
+      await press("Tab", 9)
+      await send("Input.insertText", { text: 'print(f"{n:>3}", end="")' })
+      await settle()
+      frame = await frameOf(0)
+      expect("typed code: the copy's text is the editor's, the new lines coloured by the tokenizer and the untouched line still Shiki's",
+        frame.copyText === frame.value && frame.tokenizerSpans > 0 && frame.copyLines[0] === shikiFirst && frame.numbers.length === 3, frame)
+      await evaluate(`(() => { document.execCommand("undo"); return 1 })()`)
+      await settle()
+      frame = await frameOf(0)
+      expect("undo: the copy follows the editor", frame.copyText === frame.value, frame)
+      // An input method's text is the textarea's own until it is done.
+      await send("Input.imeSetComposition", { text: "かな", selectionStart: 2, selectionEnd: 2 })
+      await settle()
+      const composed = await frameOf(0)
+      await send("Input.insertText", { text: "かな" })
+      await settle()
+      frame = await frameOf(0)
+      expect("while an input method composes the copy waits, and catches up when it is done",
+        composed.composing && !frame.composing && frame.copyText === frame.value && frame.value.includes("かな"), { composed, frame })
+      // A saved edit, loaded with the page, is coloured and numbered.
+      await pause(800)
+      await open(base + pagePath)
+      frame = await frameOf(0)
+      expect("a saved edit loads coloured and numbered", frame.value.includes("かな") && frame.copyText === frame.value
+        && frame.numbers.length === frame.value.split("\n").length, frame)
+      await evaluate(`window.__runner.press(0, "reset")`)
+      await settle()
+      frame = await frameOf(0)
+      expect("Reset: the copy is the highlighted copy's own lines again", frame.copyText === frame.value
+        && JSON.stringify(frame.copyLines) === JSON.stringify(frame.shikiLines), frame)
+      // Scrolling: the copy and the gutter follow the editor.
+      const LONG = 'print("' + "a long line that runs well past the right edge of the editor, ".repeat(3) + '")'
+      // Forty lines, every one long, so the rows in view after scrolling are
+      // full of letters for the alignment measure below (#585 review F6e).
+      const forty = Array.from({ length: 40 }, (_, at) => `line_${at + 1} = "every row of this program is long enough to still show letters after scrolling sideways"`).join("\n") + "\n" + LONG
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify(forty)})`)
+      await settle()
+      await evaluate(`(() => { const area = window.__runner.block(0).querySelector("textarea.plantoir-runner-editor"); area.scrollTop = area.scrollHeight; area.scrollLeft = 150; area.dispatchEvent(new Event("scroll")); return 1 })()`)
+      await settle()
+      frame = await frameOf(0)
+      expect("a scrolled editor: the copy scrolled to the same place, the gutter moved with it, 41 numbers",
+        frame.scroll[1] > 0 && frame.scroll[0] > 0 && JSON.stringify(frame.copyScroll) === JSON.stringify(frame.scroll)
+        && frame.numbersMoved === `translateY(${-frame.scroll[1]}px)` && frame.numbers.length === 41, frame)
+      // The coloured letters sit exactly under the typed ones (#585 plan
+      // review F2's recipe): light theme; A is the textarea's own text in
+      // black, B the copy's text in black with its colour spans taken out;
+      // a pixel more than 40/255 apart in any channel is strong. A copy
+      // half a pixel off must show (the control), or the measure is blind.
+      await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false })
+      await evaluate(`(() => {
+        document.documentElement.setAttribute("saved-theme", "light")
+        const style = document.createElement("style")
+        style.id = "plantoir-align-check"
+        style.textContent = ".al-a .plantoir-runner-colour { visibility: hidden !important } .al-a .plantoir-runner-cell > .plantoir-runner-editor { color: #000 !important; -webkit-text-fill-color: #000 !important; caret-color: transparent !important }"
+          + " .al-b .plantoir-runner-colour code, .al-b .plantoir-runner-colour code * { color: #000 !important } .al-b .plantoir-runner-cell > .plantoir-runner-editor { caret-color: transparent !important }"
+        document.head.appendChild(style)
+        window.__diff = async (first, second) => {
+          const load = async (data) => { const bitmap = await createImageBitmap(await (await fetch("data:image/png;base64," + data)).blob()); const canvas = new OffscreenCanvas(bitmap.width, bitmap.height); const paint = canvas.getContext("2d"); paint.drawImage(bitmap, 0, 0); return paint.getImageData(0, 0, bitmap.width, bitmap.height) }
+          const a = await load(first)
+          const b = await load(second)
+          if (a.width !== b.width || a.height !== b.height) return -1
+          let strong = 0
+          for (let at = 0; at < a.data.length; at += 4) {
+            if (Math.max(Math.abs(a.data[at] - b.data[at]), Math.abs(a.data[at + 1] - b.data[at + 1]), Math.abs(a.data[at + 2] - b.data[at + 2])) > 40) strong += 1
+          }
+          return strong
+        }
+        return 1
+      })()`)
+      const aligned = async (index) => {
+        await evaluate(`(() => { window.__runner.block(${index}).scrollIntoView({ block: "center" }); window.__runner.block(${index}).querySelector("textarea.plantoir-runner-editor").dispatchEvent(new Event("scroll")); return 1 })()`)
+        await settle()
+        const clip = await evaluate(`(() => { const box = window.__runner.block(${index}).querySelector(".plantoir-runner-cell").getBoundingClientRect(); return { x: box.x + scrollX, y: box.y + scrollY, width: box.width, height: box.height, scale: 1 } })()`)
+        const shot = async () => (await send("Page.captureScreenshot", { format: "png", clip, captureBeyondViewport: true })).data
+        await evaluate(`(() => { document.documentElement.classList.add("al-a"); return 1 })()`)
+        await settle()
+        const typed = await shot()
+        await evaluate(`(() => { for (const line of window.__runner.block(${index}).querySelectorAll(".plantoir-runner-colour code > span")) line.textContent = line.textContent; document.documentElement.classList.remove("al-a"); document.documentElement.classList.add("al-b"); return 1 })()`)
+        await settle()
+        const copied = await shot()
+        await evaluate(`(() => { window.__runner.block(${index}).querySelector(".plantoir-runner-colour code").style.transform = "translate(0.5px, 0)"; return 1 })()`)
+        await settle()
+        const off = await shot()
+        await evaluate(`(() => { const block = window.__runner.block(${index}); block.querySelector(".plantoir-runner-colour code").style.transform = ""; document.documentElement.classList.remove("al-b"); block.querySelector("textarea.plantoir-runner-editor").dispatchEvent(new Event("input", { bubbles: true })); return 1 })()`)
+        await settle()
+        return { strong: await evaluate(`window.__diff(${JSON.stringify(typed)}, ${JSON.stringify(copied)})`), control: await evaluate(`window.__diff(${JSON.stringify(typed)}, ${JSON.stringify(off)})`) }
+      }
+      const alignedShort = await aligned(1)
+      const alignedLong = await aligned(0)
+      await evaluate(`(() => { document.getElementById("plantoir-align-check").remove(); return 1 })()`)
+      await send("Emulation.clearDeviceMetricsOverride")
+      expect("the coloured letters sit exactly under the typed ones, a short block and a long line scrolled both ways (0 strong pixels), and half a pixel off shows (10,000 pixels at least on the 24-row block)",
+        alignedShort.strong === 0 && alignedLong.strong === 0 && alignedShort.control > 300 && alignedLong.control >= 10000, { alignedShort, alignedLong })
+      // The focus ring is the frame's (#585 plan review F3).
+      const ring = await evaluate(`(() => { const block = window.__runner.block(1); const area = block.querySelector("textarea.plantoir-runner-editor"); area.focus(); const frame = getComputedStyle(block.querySelector(".plantoir-runner-frame")); return { frame: frame.outlineStyle + " " + frame.outlineWidth, area: getComputedStyle(area).outlineStyle } })()`)
+      expect("the editor's focus ring is drawn on its frame, uncut by the frame's corner", ring.frame === "solid 2px" && ring.area === "none", ring)
+      // One gutter style for a static block's numbers and the editor's.
+      const styles = await evaluate(`(() => {
+        const pick = (style) => ({ color: style.color, font: style.fontFamily, align: style.textAlign, line: style.borderRightWidth + " " + style.borderRightStyle + " " + style.borderRightColor })
+        const statics = Array.from(document.querySelectorAll("pre > code > [data-line]")).filter((line) => !line.closest(".plantoir-runner"))
+        const gutter = window.__runner.block(1).querySelector("pre.plantoir-runner-gutter")
+        const ligatures = [document.querySelector("pre > code"), document.querySelector("article p > code"), window.__runner.block(1).querySelector("textarea.plantoir-runner-editor"), window.__runner.block(1).querySelector("pre.plantoir-runner-colour > code"), window.__runner.block(1).querySelector("pre.plantoir-runner-output")].map((element) => getComputedStyle(element).fontVariantLigatures)
+        return { staticLine: statics.length > 0 ? pick(getComputedStyle(statics[0], "::before")) : null, gutter: pick(getComputedStyle(gutter)), ligatures }
+      })()`)
+      expect("a static block's numbers and the editor's gutter wear one style: colour, font, alignment and a 1 px hairline",
+        styles.staticLine !== null && JSON.stringify(styles.staticLine) === JSON.stringify(styles.gutter) && /^1px solid/.test(styles.gutter.line), styles)
+      expect("no ligatures in a static block, inline code in prose, the editor, its copy or the output", styles.ligatures.every((value) => value === "none"), styles.ligatures)
+      // An edited block prints coloured and numbered, as a static block does.
+      const WRAPPED = 'print("edited-585-b: a line a student made much longer than the printed page is wide, so that on paper it has to wrap WRAPTAIL-585")'
+      await evaluate(`window.__runner.setCode(0, ${JSON.stringify('print("edited-585-a")\n')} + ${JSON.stringify(WRAPPED)})`)
+      await evaluate(`(() => { window.dispatchEvent(new Event("beforeprint")); return 1 })()`)
+      state = await evaluate("window.__runner.state(0)")
+      const printedSpans = await evaluate(`window.__runner.block(0).querySelectorAll(".plantoir-runner-print > code > [data-line] [style*='--shiki-light'], .plantoir-runner-print > code > [data-line] [class^='plantoir-tok-']").length`)
+      const pdf = await send("Page.printToPDF", { printBackground: false, preferCSSPageSize: false })
+      const pdfFile = join(work, "edited.pdf")
+      writeFileSync(pdfFile, Buffer.from(pdf.data, "base64"))
+      const printedText = execFileSync("pdftotext", ["-layout", pdfFile, "-"], { encoding: "utf-8" })
+      expect("an edited block prints its lines coloured and numbered as a static block's, a long one wrapped whole (⌘P)",
+        JSON.stringify(state.printLines) === JSON.stringify(['print("edited-585-a")', WRAPPED]) && printedSpans > 0
+        && /\b1\s+print\("edited-585-a"\)/.test(printedText) && /\b2\s+print\("edited-585-b:/.test(printedText) && printedText.includes("WRAPTAIL-585"), { lines: state.printLines, printedSpans, printed: printedText.slice(0, 600) })
+      await evaluate(`window.__runner.press(0, "reset")`)
 
       // 4. Page changes leave at most one thread.
       await runBlock(0, 'print("warm")')
@@ -677,7 +859,7 @@ async function connect(chunk) {
       clearTimeout(timer)
       const ok = problems.length === 0
       finish(ok ? 0 : 1, (ok ? "OK: " : "FAIL: " + problems.join("\n  ") + "\n")
-        + JSON.stringify({ firstRunMs, secondRunMs, engineFiles: new Set(good.engineRequests).size, wrong }))
+        + JSON.stringify({ firstRunMs, secondRunMs, engineFiles: new Set(good.engineRequests).size, wrong, aligned: { short: alignedShort, long: alignedLong } }))
     } catch (error) {
       finish(1, "FAIL: " + (problems.length > 0 ? problems.join("\n  ") + "\n  and then: " : "") + (error?.stack ?? error))
     }
