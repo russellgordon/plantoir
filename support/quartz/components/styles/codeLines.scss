@@ -71,11 +71,16 @@
   :root pre > code:not(.mermaid) > [data-line] {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    background-color: transparent;
     background-image: linear-gradient(var(--lightgray), var(--lightgray));
     background-repeat: no-repeat;
     background-size: 1px 100%;
     background-position: calc(0.25rem + var(--plantoir-digits, 2) * 1ch + 0.75ch) 0;
+  }
+
+  // Only an unhighlighted line gives up its fill: a highlighted one (`{n}`)
+  // keeps Quartz's tint where the page prints backgrounds (#585 fixes review N1).
+  :root pre > code:not(.mermaid) > [data-line]:not([data-highlighted-line]) {
+    background-color: transparent;
   }
 
   :root pre > code:not(.mermaid) > [data-line]::before {
