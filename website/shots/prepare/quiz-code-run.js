@@ -6,11 +6,11 @@
 // webwindow.swift --prepare; `timeoutMs` is its bound. Returns "ready" or
 // the reason it is not. The words are the contracts'
 // (contracts/shared-rules.json → quizCallouts.words.site: right,
-// someBlanksRight with right 0 and count 1 — the third question is a
-// one-blank fill, and a v1.9.0 issue asks for notRight there instead —
-// score with right 4 and total 5; codeRunnerBlocks.words.finished).
+// notRight — the third question is a one-blank fill, which says what a short
+// answer says when it is wrong (feedback.blanks, #588) — score with right 4
+// and total 5; codeRunnerBlocks.words.finished).
 const RIGHT = "Right!"
-const NOT_RIGHT = "0 of 1 blanks are right. Try again, or show the answer."
+const NOT_RIGHT = "Not quite. Try again, or show the answer."
 const SCORE = "4 of 5 right on the first try"
 const FINISHED = "Finished."
 const until = Date.now() + timeoutMs

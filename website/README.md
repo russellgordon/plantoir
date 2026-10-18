@@ -479,7 +479,7 @@ committed recipe into each folder and photographs each page in
 the quiz to be built (and, for `quiz-math`, its graph drawn and its
 mathematics set; for `quiz-chemistry`, typeset with no `.katex-error`),
 answers, presses Check, waits for the contract's words (`right`,
-`someBlanksRight`, `score`, `finished`), then scrolls only as far as it takes
+`notRight`, `oneBlankRight`, `score`, `finished`), then scrolls only as far as it takes
 to bring the quiz's bottom (the score, for `quiz-code-run`) 56 points inside
 the window — and FAILS, naming the height, when that pushes the question's
 top (the passage's, for `quiz-english`) under the title bar, so a cut-off

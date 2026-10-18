@@ -2150,6 +2150,24 @@ ruling Q7); `A ± T` only as a number ± a number not negative, so `±3` and
 compared inside; NFKC then `toLowerCase()` with no locale (STRASSE is not
 straße - pinned), curly quotes made straight (iOS Smart Punctuation).
 
+**What a fill-in-the-blank question says (#588, v1.8.1):** one rule,
+`quizRules.blanksFeedback(right, count)`, pinned by
+`quizCallouts.feedback.blanks.cases` and run by the quiz checker. Every
+blank right says `right`. Otherwise - wording A, the default pending
+Russell - ONE blank says `notRight`, what a short answer says: "0 of 1
+blanks are right" read oddly, and the blank's own ✗ Not right already says
+which; exactly one right of two or more says `oneBlankRight`, "1 of 2
+blanks is right"; any other count keeps `someBlanksRight`. Only `fill` is
+affected; the score line ("1 of 1 right on the first try") reads fine and is
+unchanged. Rejected: wording B, a sentence of its own for the one wrong
+blank ("Your blank isn't right yet") with "1 of 2 blanks are right" left as
+it was. "1 of 1 blanks is right" is not a reachable string (one of one is
+right). The quiz checker's word audit reads quizRules.ts's `key: "..."`
+literals as well as the script's `word("...")` calls, since the script shows
+these through `word(feedback.key)` (review F4). Measured: `Quiz One Blank`
+(planted by verify.sh) wrong says `notRight`; on the code before this, it
+said "0 of 1 blanks are right" and the browser check failed.
+
 The shuffle moves the choices (reading and Tab order follow what is seen;
 CSS `order` was rejected, WCAG 1.3.2) with `shuffledOrder(n, Math.random)`
 on every load; `beforeprint` puts Markdown order back for ⌘P and
