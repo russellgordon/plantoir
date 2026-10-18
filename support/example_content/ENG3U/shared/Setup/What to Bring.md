@@ -11,8 +11,7 @@ tags:
 - [ ] Your independent-study text, once chosen.
 - [ ] Your school device on the days the class page says so.
 
-Copy the list into your notebook — the boxes here are printed, not
-clickable.
+Tick the boxes as you pack, or copy the list into your notebook.
 
 ## The annotated copy
 

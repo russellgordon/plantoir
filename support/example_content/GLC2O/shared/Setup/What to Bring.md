@@ -10,8 +10,9 @@ things. The list below is small on purpose, and most of it is once-only.
 
 ## Every day
 
-Copy this into your own notes — the boxes here are printed, not
-clickable, and nothing on this site is recorded.
+Tick the boxes here as you pack; your browser keeps the ticks on this
+computer, and nobody else sees them. Copy the list into your own notes if
+you want it everywhere.
 
 - [ ] Somewhere to write that is not loose paper. A notebook or a single
       document you keep adding to.

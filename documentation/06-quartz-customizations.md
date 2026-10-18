@@ -2598,7 +2598,16 @@ stored shows Twin A's tick on Twin B, and the check fails.
 Nothing is written when a page loads. Storage refused (a private window, a
 blocked site): every box still ticks, and nothing is kept; the task boxes add
 nothing to the console (Quartz's own scripts already report the refused
-store on every page).
+store on every page). A handout printed with storage refused keeps the ticks
+made on the page: the print hook (K6) applies only STORED ticks and never
+falls back to the Markdown's state - the implementation review (F1) measured
+the first version, which did fall back, putting every box back to `_x_` on
+the handout and on screen; task_boxes.mjs now prints that case, and it fails
+on that version.
+
+Ticking a parent item strikes its nested items through as well, ticked or
+not: the strike is on the `li`, as Quartz's own `li:has(> input:checked)`
+rule always did. Kept as Quartz's behaviour, and a known limit.
 
 ### K4. The label, and what a screen reader hears
 
@@ -2657,7 +2666,9 @@ edits (DECISIONS 8). Both copy the live page, so the ticks travel for free
 restores the ticks once more just before the handout is built, because a
 handout opened from Plantoir's preview (`#plantoir-print=`) starts inside
 the same `nav` as the page and, with no other hook awaited first, would copy
-the boxes before tasks.inline's own `nav` listener had run. Measured: tick
+the boxes before tasks.inline's own `nav` listener had run. The hook applies
+only stored ticks (a first load already shows the Markdown's state), so with
+storage refused it changes nothing (review F1). Measured: tick
 the first item and untick the teacher's `[x]` on the second of `Task
 Printable`, then Questions only - the handout's boxes read `x__`, as the
 page did (the Markdown's state is `_x_`). Rejected for now: the Markdown's
@@ -2675,9 +2686,11 @@ pages byte-identical once Quartz's own build-to-build variance is set aside
 (the random `<ul class="overflow">` ids, build-time `<time datetime>`, and the
 order of tag-list entries sharing a date); the 120 pages that hold a task item
 changed (+33,411 bytes in all, +6,255 gzipped); the other 6 differ only in
-that variance. Every site's two shared bundles grow: `postscript.js` 143,564 →
-145,260 bytes (+1,696; gzip 47,510 → 48,045) and `index.css` 66,571 → 68,097
-(+1,526; gzip 11,984 → 12,171), #588's few bytes included. A page with no
+that variance. Every site's two shared bundles grow, measured again at the branch's head
+against `origin/dev` 0c755ce97 (after #585): `postscript.js` 163,996 →
+165,912 bytes (+1,916; gzip 55,947 → 56,528) and `index.css` 71,601 → 73,127
+(+1,526; gzip 12,772 → 12,952), #588's few bytes included. (The first
+measurement, +1,696, was taken before the print hook.) A page with no
 task item outside a quiz is untouched by the transformer, which returns
 without changing the tree.
 
@@ -2702,6 +2715,17 @@ re-derived from the raw Markdown by Python (F1); a per-page JSON of ids now
 bundled separately, their order is not a contract); a `storage` event
 listener for another open tab (its cost against a rare case - that tab
 catches up on its next load).
+
+**The guidance, and its lint.** Every page that said the boxes cannot be
+ticked was rewritten (the 90 showcase pages, 33 other paragraphs), and
+`.claude/skills/example-content/lint_payload.py` fails a payload that says
+so: a phrase list (read-only, printed/not interactive, not clickable, do not
+save, does nothing...) within reach of a box, and a rule for paraphrases - a
+sentence naming a box, checklist, tick or click that says nothing is
+recorded, saved or stored, or that the site records nothing - read with the
+lines joined, so a wrapped phrase is found. Still missed: a claim worded with
+none of those words ("the boxes are only for show"), or one that says
+nothing carries over between visits.
 
 **Teacher note.** A checklist on a class site is one each student ticks for
 themselves; the ticks stay in that student's browser and nobody else sees
