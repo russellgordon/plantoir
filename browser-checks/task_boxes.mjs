@@ -24,6 +24,8 @@
 //  7. a not-ready quiz's boxes stay disabled and unstamped, and clicking them
 //     writes nothing (which);
 //  8. with storage refused, boxes still tick and the console stays clean;
+//  1b. on screen the box's edge and tick, and a ticked item's words, are the
+//     page's dark grey, with no fill (taskBoxes.look);
 //  9. on paper (⌘P, background graphics off) a ticked box is inked and an
 //     unticked one is an empty box, in the light and the dark theme - read
 //     from the PDF's pixels with poppler's pdftoppm, as
@@ -240,6 +242,29 @@ async function connect(chunk) {
       const first = await evaluate("({ state: window.__task.state(), defaults: window.__task.defaults(), stored: window.__task.stored() })")
       expect("every box shows the Markdown's own state", first.state === first.defaults && first.state.includes("x") && first.state.includes("_"), first)
       expect("nothing is written when a page loads", first.stored.length === 0, first.stored)
+
+      // 1b. The look on screen (taskBoxes.look): edge and tick in the
+      // page's dark grey, no fill, a ticked item's words in it too.
+      const look = await evaluate(`(() => {
+        const probe = document.createElement("span")
+        probe.style.color = "var(--darkgray)"
+        document.body.appendChild(probe)
+        const darkgray = getComputedStyle(probe).color
+        probe.remove()
+        const ticked = window.__task.boxes().find((box) => box.checked)
+        const unticked = window.__task.boxes().find((box) => !box.checked)
+        return {
+          darkgray,
+          untickedEdge: getComputedStyle(unticked).borderTopColor,
+          tickedEdge: getComputedStyle(ticked).borderTopColor,
+          tickedFill: getComputedStyle(ticked).backgroundColor,
+          tick: getComputedStyle(ticked, "::after").borderRightColor,
+          words: getComputedStyle(ticked.closest("li")).color,
+        }
+      })()`)
+      expect("on screen the edges, the tick and a ticked item's words are the page's dark grey, with no fill",
+        look.untickedEdge === look.darkgray && look.tickedEdge === look.darkgray && look.tick === look.darkgray &&
+        look.words === look.darkgray && look.tickedFill === "rgba(0, 0, 0, 0)", look)
 
       // 2. A click writes the contract's key; unticking an [x] writes "0".
       await click(`window.__task.box(${JSON.stringify(PENCIL.id)})`)

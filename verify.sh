@@ -537,6 +537,16 @@ else
   cat /tmp/verify_quartz_wiring_test.log
 fi
 
+# Task boxes students tick (#519): the box's edge, its tick and a ticked
+# item's words stand out in every colour scheme, light and dark, and the dark
+# theme's paper ink on white. Stdlib only.
+if (cd scripts && python3 test_task_box_contrast.py) >/tmp/verify_task_box_contrast_test.log 2>&1; then
+  pass "task boxes: the edge and the tick at least 3:1, a ticked item's words at least 4.5:1, in every colour scheme, light and dark, with no fill, and the dark theme's paper ink (scripts/test_task_box_contrast.py, #519)"
+else
+  fail "task boxes: a colour too faint in a colour scheme, a fill on a ticked box, or no paper ink for the dark theme (scripts/test_task_box_contrast.py, #519)"
+  cat /tmp/verify_task_box_contrast_test.log
+fi
+
 # Self-check quizzes (#563): every recognise and answers.parse case through
 # the folder check's mirror, the line in the teacher's file, the
 # quizzesNotReady finding, the words and pages files the site reads, and the

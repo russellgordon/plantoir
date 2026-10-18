@@ -28668,6 +28668,7 @@
         }
       ]
     },
+    "look": "The box's look (ruling Q3, the default pending Russell): on screen an unticked box's edge, a ticked box's edge and its tick are --darkgray, a ticked box has NO fill, and a ticked item's words and the line through them are --darkgray - at least 6.06:1 against --light in every colour scheme, light and dark (scripts/test_task_box_contrast.py; text needs 4.5:1, a control's mark 3:1). Quartz's own look was rejected: its unticked edge (--lightgray) is 1.18-1.52:1 in all 43 schemes, its fill (--secondary) with the tick in --light falls to 1.06:1, and its ticked words (--gray) are 1.76:1 in the default light scheme. On paper the same outline and tick in ink, with no fill, so a tick prints with the browser's background graphics off (its default); in the dark theme in a fixed ink, #4e4e4e, since the dark theme's --darkgray is light and vanished on white paper (measured).",
     "knownLimits": [
       "Per browser and per site: a student's ticks on another computer, in another browser, or on the teacher's preview of the same site are separate.",
       "Only an item's first line makes its id; a change further down the item keeps the tick.",
