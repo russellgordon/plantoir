@@ -93,6 +93,10 @@ RESULTS=()
 FAILED="false"
 pass() { RESULTS+=("✅ PASS  $1"); echo "✅ PASS  $1"; }
 fail() { RESULTS+=("❌ FAIL  $1"); echo "❌ FAIL  $1"; FAILED="true"; }
+# A check that could not run here (it needs the network, say) is a SKIP:
+# listed and printed like a failure so it is seen, but it does not fail the
+# run - and it is never a pass (#594).
+skip() { RESULTS+=("⏭️  SKIP  $1"); echo "⏭️  SKIP  $1"; }
 
 # -------------------- 0. A real terminal is required --------------------
 # The launchers run the toolchain with `docker exec -it`, which refuses to
@@ -335,8 +339,14 @@ else
   cat /tmp/verify_deploy_headers_test.log
 fi
 
+if (cd scripts && python3 test_quartz_analytics_off.py) >/tmp/verify_analytics_off_test.log 2>&1; then
+  pass "build_site.py: Quartz's own page-view counter, which nobody set up, is switched off in every build (#594, scripts/test_quartz_analytics_off.py)"
+else
+  fail "build_site.py: Quartz's own page-view counter is not switched off (scripts/test_quartz_analytics_off.py, #594)"
+  cat /tmp/verify_analytics_off_test.log
+fi
 if (cd scripts && python3 test_netlify_badge.py) >/tmp/verify_netlify_badge_test.log 2>&1; then
-  pass "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+  pass "netlify_badge.py: shared ad-badge suppression module, and the hosts a page's scripts import code from allowed - Mermaid from cdnjs, never a fetch target (#594, scripts/test_netlify_badge.py)"
 else
   fail "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
   cat /tmp/verify_netlify_badge_test.log
@@ -563,6 +573,18 @@ if (cd scripts && python3 test_quizzes.py) >/tmp/verify_quizzes_test.log 2>&1; t
 else
   fail "self-check quizzes: every quiz shape the contract names read by the folder check, its lines in the teacher's file, the quizzesNotReady finding, and the files the site reads (scripts/test_quizzes.py, #563)"
   cat /tmp/verify_quizzes_test.log
+fi
+
+# My Progress (#545): the two settings (read as include_curriculum_coverage
+# is), the headings, the build's gate over every sections and gate case, the
+# tables' labels, Key Links first, the words, the marker lines, and the
+# build's own steps - the page, the plan, the sidebar pin and the emitter's
+# wiring - over temporary folders. Stdlib only.
+if (cd scripts && python3 test_my_progress.py) >/tmp/verify_my_progress_test.log 2>&1; then
+  pass "My Progress: the settings, the headings, the build's gate over every contract case, the labels, Key Links first, the words, the marker, the page, the plan, the sidebar pin and the emitter's wiring (scripts/test_my_progress.py, #545)"
+else
+  fail "My Progress: the settings, the headings, the build's gate over every contract case, the labels, Key Links first, the words, the marker, the page, the plan, the sidebar pin and the emitter's wiring (scripts/test_my_progress.py, #545)"
+  cat /tmp/verify_my_progress_test.log
 fi
 
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
@@ -1200,6 +1222,25 @@ else
   cat /tmp/verify_task_rules_site.log
 fi
 
+# ---- My Progress (#545): the rules, run where they really run ----
+# progressRules.ts and the emitter are bundled with Quartz's own FrontMatter,
+# ObsidianFlavoredMarkdown and GitHubFlavoredMarkdown, PlantoirQuizzes and
+# PlantoirTasks, and every site-side myProgress case is run through them in
+# Node - the same sections and gate cases the build's gate reads in
+# test_my_progress.py (#545 plan review F3) - with the grouping cases through
+# the build's own date pass and plan, and the emitter over a plan on disk.
+echo ""
+echo "🔎 Checking the My Progress rules against what the site runs…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_progress_rules_against_the_site.py" /opt/scripts/check_progress_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_progress_rules_against_the_site.py \
+  >/tmp/verify_progress_rules_site.log 2>&1; then
+  pass "every myProgress case holds in the site's own code over Quartz's own transformers: the headings, the sections, the gate, the roll-up, the sidebar, the grouping through the build's date pass, and the emitter's notes (scripts/check_progress_rules_against_the_site.py, #545)"
+else
+  fail "every myProgress case holds in the site's own code over Quartz's own transformers: the headings, the sections, the gate, the roll-up, the sidebar, the grouping through the build's date pass, and the emitter's notes (scripts/check_progress_rules_against_the_site.py, #545)"
+  cat /tmp/verify_progress_rules_site.log
+fi
+
 # ---- Diagrams and graphs (#485 E1): the rules, run against the real engines ----
 # figureRules.js (the file the site's transformer and the build's helper both
 # import) runs every tidy and cacheKey case in Node; the helper, driven as a
@@ -1548,6 +1589,9 @@ check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
 # Self-check quizzes (#563): the folder check. The site's transformer, script
 # and styles are in support/quartz (the loop below).
 check_baked scripts/quizzes.py            /opt/scripts/quizzes.py
+# My Progress (#545): the gate, the page and its Key Links entry. The site's
+# emitter, rules, script and styles are in support/quartz (the loop below).
+check_baked scripts/my_progress.py        /opt/scripts/my_progress.py
 # Live input (#583): which pages a publish isolates. The preview's half is in
 # support/quartz (the loop below).
 check_baked scripts/isolation_headers.py  /opt/scripts/isolation_headers.py
@@ -1866,10 +1910,21 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz One Blank.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
-        "$HIT_COURSE/Task Raw Box.md" \
+        "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Progress Fixture.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
+  if [[ -n "${PROGRESS_CLASS_BACKUP:-}" && -f "$PROGRESS_CLASS_BACKUP" ]]; then
+    cp "$PROGRESS_CLASS_BACKUP" "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md"
+    rm -f "$PROGRESS_CLASS_BACKUP"
+  fi
+  # #596: what the page-authoring skill's examples planted, by the list they left.
+  if [[ -f /tmp/verify_authoring_planted.txt ]]; then
+    while IFS= read -r planted; do
+      [[ -n "$planted" ]] && rm -f "$HIT_COURSE/$planted"
+    done < /tmp/verify_authoring_planted.txt
+    rm -f /tmp/verify_authoring_planted.txt
+  fi
   cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
   if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
     cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
@@ -2806,6 +2861,117 @@ for twin in ("A", "B"):
     "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
     encoding="utf-8")
 TASKPLANTS
+# ---- #596: every example in the page-authoring skill, planted for the same build ----
+# The skill's examples are read from the skill ITSELF, so an example edited
+# there is the example built here: every ```markdown / ````markdown fence and
+# every top-level ```mermaid one becomes a page, "Authoring Example NN" (an
+# example that starts with its own settings block keeps it, its title prefixed
+# so a class page's or Key Links' title cannot pass for the real thing), plus
+# "Authoring Claims" for what the skill's prose claims about maths, money,
+# links and callout kinds. Pages the examples link to and the Media files they
+# show are planted only when the course has none of that name. Every path is
+# listed in /tmp/verify_authoring_planted.txt, which restore_hit_fixture reads.
+# 6n reads each back.
+python3 - "$HIT_COURSE" support/agent_guidance/skills/plantoir-page-authoring/SKILL.md /tmp/verify_authoring_planted.txt <<'AUTHORPLANTS'
+import re, struct, sys, zlib
+from pathlib import Path
+course, skill_path, record = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+lines = skill_path.read_text(encoding="utf-8").split("\n")
+examples, index = [], 0
+while index < len(lines):
+    opening = re.match(r"^(`{3,})(markdown|mermaid)\s*$", lines[index])
+    if not opening:
+        index += 1
+        continue
+    fence, kind, body = opening.group(1), opening.group(2), []
+    index += 1
+    while index < len(lines) and lines[index] != fence:
+        body.append(lines[index])
+        index += 1
+    index += 1
+    text = "\n".join(body)
+    examples.append("```mermaid\n" + text + "\n```" if kind == "mermaid" else text)
+planted = []
+def plant(relative, data):
+    path = course / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(data, bytes):
+        path.write_bytes(data)
+    else:
+        path.write_text(data, encoding="utf-8")
+    planted.append(relative)
+for number, text in enumerate(examples, start=1):
+    name = f"Authoring Example {number:02d}"
+    if text.startswith("---\n"):
+        page = re.sub(r"^title: (.*)$", lambda m: f"title: {name} - {m.group(1)}", text, count=1, flags=re.M)
+        if page == text:
+            page = text.replace("---\n", f"---\ntitle: {name}\n", 1)
+    else:
+        page = f"---\ntitle: {name}\n---\n{text}"
+    plant(f"{name}.md", page + "\n")
+plant("Authoring Claims.md",
+      "---\ntitle: Authoring Claims\n---\n"
+      "> [!definition] Slope\n> plantoir-authoring-unknown-kind-7f3a\n\n"
+      "Money: it costs $5 and $10 today (plantoir-authoring-money-7f3a).\n\n"
+      "Escaped: it costs \\$5 and \\$10 today (plantoir-authoring-escaped-7f3a).\n\n"
+      "Spaced: $ x + 1 $ (plantoir-authoring-spaced-7f3a).\n\n"
+      "Markdown link: [practice](Slope Practice.md) (plantoir-authoring-mdlink-7f3a).\n")
+existing = {path.stem.lower() for path in course.rglob("*.md")}
+stubs = {"Slope": "The slope stub (plantoir-authoring-slope-7f3a).\n\n## Finding the slope from two points\n\nRise over run.\n"}
+for name in ("Rate of Change", "Slope Warm-Up", "Slope Practice", "How This Class Works", "How Marks Work", "Getting Help"):
+    stubs[name] = "A page the page-authoring skill's examples link to.\n"
+for name, body in stubs.items():
+    if name.lower() not in existing:
+        plant(f"{name}.md", f"---\ntitle: {name}\n---\n{body}")
+def png(width, height):
+    raw = b"".join(b"\x00" + b"\x20\x60\xc0" * width for _ in range(height))
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + \
+        chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+if not (course / "Media" / "cell-diagram.png").exists():
+    plant("Media/cell-diagram.png", png(40, 20))
+if not (course / "Media" / "Unit 2 Review.pdf").exists():
+    plant("Media/Unit 2 Review.pdf",
+          b"%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj "
+          b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
+record.write_text("\n".join(planted) + "\n", encoding="utf-8")
+print(f"   planted {len(examples)} examples from the page-authoring skill")
+AUTHORPLANTS
+
+# ---- #545: My Progress, planted for the same build ----
+# Progress Fixture: four items under its success criteria (one the teacher
+# wrote ticked, `[x]`, which counts as done until a student unticks it - Q5;
+# one under a deeper `### Tests of success:`), one before any heading and one after the
+# section - which do not count - linked from Unit 1, Day 2, whose file is
+# put back by restore_hit_fixture. Other pages of the section may have
+# success criteria too (a real course does), so 6m and the browser check
+# assert on this page's own row and work every total out from the manifest.
+PROGRESS_CLASS_BACKUP="$(mktemp -t plantoir-progress-class)"
+cp "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md" "$PROGRESS_CLASS_BACKUP"
+cat > "$HIT_COURSE/Progress Fixture.md" <<'PROGRESSFIXTURE'
+---
+title: Progress Fixture
+---
+A page planted for the My Progress check (plantoir-progress-sentinel-545).
+
+- [ ] Not counted: before any heading
+
+## Success criteria
+
+- [ ] I can name a variable
+- [ ] I can print a value
+- [x] I can comment my code
+
+### Tests of success:
+
+- [ ] I can read an error message
+
+## Practice
+
+- [ ] Not counted: after the section
+PROGRESSFIXTURE
+printf '\n- [[Progress Fixture]]\n' >> "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md"
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -3715,6 +3881,226 @@ else
   fail "task boxes: one of the checks above failed (#519)"
 fi
 
+# ---- 6m. My Progress (#545), as the build left it ----
+# The page and the manifest are there; Progress Fixture's row is in the
+# manifest under Unit 1, Day 2 in the Unit 1 table with exactly its four
+# counted items, the contract's ids of their words, the teacher's [x] ticked;
+# the page draws no date line (no content-meta: Q6); the two items
+# outside the section are not; Key Links' first bullet links the page, once;
+# the page has no Backlinks list; the sidebar's pin carries the page's slug
+# and All Classes; and the build said so on its PLANTOIR_MY_PROGRESS: line.
+if python3 - "$SITE_PUBLIC" <<'PROGRESSPY'
+import json, re, sys
+from pathlib import Path
+sys.path.insert(0, "scripts")
+site = Path(sys.argv[1])
+problems = []
+def fnv1a(text):
+    value = 0x811c9dc5
+    data = text.encode("utf-16-le")
+    for index in range(0, len(data), 2):
+        value ^= data[index] | (data[index + 1] << 8)
+        value = (value * 0x01000193) & 0xffffffff
+    return format(value, "08x")
+rules_words = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["myProgress"]["words"]
+manifest_path = site / "progress-manifest.json"
+page_path = site / "My-Progress.html"
+if not manifest_path.is_file() or not page_path.is_file():
+    problems.append("My-Progress.html or progress-manifest.json is missing")
+else:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = []
+    for unit in manifest["units"]:
+        for known in unit["classes"]:
+            for page in known["pages"]:
+                rows.append((unit["label"], known["label"], page))
+    for page in manifest["other"]["pages"]:
+        rows.append((manifest["other"]["label"], None, page))
+    mine = [row for row in rows if row[2]["title"] == "Progress Fixture"]
+    want = [{"id": fnv1a(text), "checked": False} for text in
+            ("I can name a variable", "I can print a value", "I can comment my code", "I can read an error message")]
+    want[2]["checked"] = True
+    if len(mine) != 1:
+        problems.append(f"Progress Fixture is in the manifest {len(mine)} times")
+    else:
+        unit, label, page = mine[0]
+        if (unit, label, page["slug"]) != ("Unit 1", "Unit 1, Day 2", "Progress-Fixture"):
+            problems.append(f"Progress Fixture is under {unit} / {label} at {page['slug']}")
+        if page["items"] != want:
+            problems.append(f"Progress Fixture counts {page['items']}, expected {want}")
+    html = page_path.read_text(encoding="utf-8")
+    if "data-plantoir-progress" not in html:
+        problems.append("My-Progress.html has no placeholder for the page's script")
+    if 'class="backlinks"' in html:
+        problems.append("My-Progress.html carries a Backlinks list")
+    if "content-meta" in html:
+        problems.append("My-Progress.html shows a date line")
+    if 'name="description" content="' + rules_words["description"] + '"' not in html:
+        problems.append("My-Progress.html's meta description is not words.description")
+key_links = (site / "Key-Links.html").read_text(encoding="utf-8")
+article = key_links.split("<article", 1)[-1].split("</article>", 1)[0]
+links = re.findall(r'<li><a href="([^"]*)"', article)
+if not links or not links[0].endswith("My-Progress"):
+    problems.append(f"Key Links' first bullet is {links[:1]}, not My Progress")
+if sum(1 for link in re.findall(r'href="([^"]*)"', article) if link.endswith("My-Progress")) != 1:
+    problems.append("Key Links does not link My Progress exactly once")
+script = (site / "postscript.js").read_text(encoding="utf-8")
+if '{slug:"My-Progress",after:["All-Classes"]}' not in script:
+    problems.append("the sidebar's pin does not carry the page's slug and All Classes")
+if "progress-manifest.json" not in script:
+    problems.append("the page's script is not in postscript.js")
+log = Path("/tmp/verify_main_build.log").read_text(encoding="utf-8", errors="replace")
+if 'PLANTOIR_MY_PROGRESS: {"course": "EXC2O", "section": 1, "built": true' not in log:
+    problems.append("the build printed no PLANTOIR_MY_PROGRESS: line saying it made the page")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+PROGRESSPY
+then
+  pass "My Progress: the page and the manifest built, Progress Fixture's four counted items under Unit 1, Day 2 with the contract's ids and the teacher's [x], Key Links' first bullet, no date line and no Backlinks list, the sidebar's pin, and the build's marker line (#545)"
+else
+  fail "My Progress: one of the checks above failed (#545)"
+fi
+
+# ---- 6n. Every example in the page-authoring skill, as the build left it (#596) ----
+# Each example the skill gives (planted above as "Authoring Example NN") is
+# read back from the built site as the feature the skill says it is: every
+# example must match exactly ONE claim below and every claim exactly one
+# example, so an example added to the skill without a claim here fails, as
+# does a claim whose example was edited away. "Authoring Claims" carries what
+# the prose says: two prices in a paragraph are read as maths and `\$` is
+# not, a spaced `$ x $` is typeset, a [words](Page Name.md) link is not a
+# link, and an unknown callout kind is still a callout with its own title.
+if python3 - "$SITE_PUBLIC" support/agent_guidance/skills/plantoir-page-authoring/SKILL.md <<'AUTHORPY'
+import re, sys
+from pathlib import Path
+public, skill_path = Path(sys.argv[1]), Path(sys.argv[2])
+lines = skill_path.read_text(encoding="utf-8").split("\n")
+examples, index = [], 0
+while index < len(lines):
+    opening = re.match(r"^(`{3,})(markdown|mermaid)\s*$", lines[index])
+    if not opening:
+        index += 1
+        continue
+    fence, kind, body = opening.group(1), opening.group(2), []
+    index += 1
+    while index < len(lines) and lines[index] != fence:
+        body.append(lines[index])
+        index += 1
+    index += 1
+    text = "\n".join(body)
+    examples.append("```mermaid\n" + text + "\n```" if kind == "mermaid" else text)
+def article(page):
+    path = public / f"{page}.html"
+    if not path.is_file():
+        return None
+    html = path.read_text(encoding="utf-8", errors="replace")
+    found = re.search(r"<article[^>]*>(.*?)</article>", html, re.S)
+    return found.group(1) if found else ""
+def tasks(html):
+    return len(re.findall(r'<input type="checkbox"[^>]*class="plantoir-task"', html))
+def has_file(href):
+    return (public / href.lstrip("./")).is_file()
+# (a text only that example holds, what it must build as, the check)
+claims = [
+    ("title: Slope as a Rate of Change", "settings: the title, tags and maths",
+     lambda a, p: "Slope as a Rate of Change" in p["full"] and 'class="katex"' in a and "tags/unit-2" in p["full"]),
+    ("==highlighted==", "text: bold, italic, struck, highlighted, arrows, keys",
+     lambda a, p: all(s in a for s in ("<strong>bold</strong>", "<em>italic</em>", "<del>", 'class="text-highlight"', "→", "⇒", "<kbd>Ctrl</kbd>"))),
+    ("> [!warning] Where people usually go wrong", "callouts: a titled warning and an untitled tip",
+     lambda a, p: 'data-callout="warning"' in a and "Where people usually go wrong" in a and re.search(r'data-callout="tip".*?<p>Tip</p>', a, re.S)),
+    ("> [!success]- Worked answer", "foldable callouts: one folded shut, one open",
+     lambda a, p: re.search(r'class="callout success is-collapsible is-collapsed"', a) and re.search(r'class="callout example is-collapsible"(?! is-collapsed)', a)),
+    ("graph LR", "a Mermaid flowchart",
+     lambda a, p: '<code class="mermaid"' in a and "Read the problem" in a),
+    ("pie title How a class period is spent", "a Mermaid pie chart",
+     lambda a, p: '<code class="mermaid"' in a and "pie title" in a),
+    ("| Representation | Shows best | Hides |", "a table with maths in a cell",
+     lambda a, p: "<table>" in a and re.search(r"<td>Equation <span class=\"katex\"", a)),
+    ("Chemistry works too", "inline, display and chemistry maths",
+     lambda a, p: 'class="katex-display"' in a and "\\ce" not in re.sub(r"<annotation.*?</annotation>", "", a, flags=re.S) and "katex-error" not in a),
+    ("def slope(x1, y1, x2, y2):", "a coloured code block with line numbers, and code in a sentence",
+     lambda a, p: 'data-language="python"' in a and a.count("data-line") >= 4 and "<code>print()</code>" in a
+     and "font-variant-ligatures" in (public / "index.css").read_text(encoding="utf-8")),
+    ("- [ ] Estimate before calculating", "a checklist students tick, one box ticked to start",
+     lambda a, p: tasks(a) == 3 and len(re.findall(r'<input type="checkbox" checked class="plantoir-task"', a)) == 1),
+    ("## Success criteria", "a page with three success criteria (one ticked) and a checklist under another heading",
+     lambda a, p: 'id="success-criteria"' in a and 'id="practice"' in a and tasks(a) == 4
+     and len(re.findall(r'<input type="checkbox" checked class="plantoir-task"', a)) == 1 and 'class="katex"' in a),
+    ("See [[Slope]] before class.", "links: a page, other words, a heading, a website",
+     lambda a, p: 'href="./Slope"' in a and ">what slope means<" in a and 'href="./Slope#finding-the-slope-from-two-points"' in a and 'class="external"' in a),
+    ("![[Slope]]", "one page shown inside another, whole and by a heading",
+     lambda a, p: a.count('class="transclude"') == 2 and "plantoir-authoring-slope-7f3a" in a and "Rise over run" in a),
+    ("[^1]: From *al-jabr*", "a footnote listed at the bottom",
+     lambda a, p: "data-footnote-ref" in a and 'class="footnotes"' in a and "al-jabr" in a),
+    ("title: Practice - Two-Step Equations", "tags: shown on the page and listed on each tag's page",
+     lambda a, p: 'class="internal tag-link"' in p["full"] and (public / "tags" / "unit-2.html").is_file()
+     and p["slug"] in (public / "tags" / "unit-2.html").read_text(encoding="utf-8")),
+    ("![[cell-diagram.png]]", "pictures and PDFs from Media",
+     lambda a, p: len(re.findall(r'<img src="\./Media/cell-diagram\.png"', a)) == 3 and 'width="300"' in a
+     and 'alt="A plant cell with the nucleus labelled"' in a and '<iframe src="./Media/Unit-2-Review.pdf" class="pdf">' in a
+     and 'href="./Media/Unit-2-Review.pdf"' in a and has_file("Media/cell-diagram.png") and has_file("Media/Unit-2-Review.pdf")),
+    ("![](https://www.youtube.com/watch?v=", "YouTube, Vimeo, GeoGebra and PhET players",
+     lambda a, p: 'src="https://www.youtube.com/embed/' in a and '<iframe src="https://player.vimeo.com/video/' in a
+     and '<iframe src="https://www.geogebra.org/' in a and '<iframe src="https://phet.colorado.edu/' in a),
+    ("%% Tomorrow:", "a note only the teacher sees",
+     lambda a, p: "Students see only this sentence." in a and "Tomorrow" not in p["full"]),
+    ("title: Unit 3 Test Review", "publish: false keeps the page off the site",
+     lambda a, p: a is None),
+    ("title: Concepts", "a folder's front page with its list",
+     lambda a, p: "The clean statement of each idea" in a and 'href="./Rate-of-Change"' in a),
+    ("title: Unit 2, Day 3", "a class page: an agenda and a checklist",
+     lambda a, p: 'id="agenda"' in a and "Slope-Practice" in a and tasks(a) == 1),
+    ("title: Key Links", "Key Links: a list of links",
+     lambda a, p: a.count('class="internal') >= 3 and "How Marks Work" in a),
+]
+problems, used = [], set()
+for number, text in enumerate(examples, start=1):
+    slug = f"Authoring-Example-{number:02d}"
+    matching = [claim for claim in claims if claim[0] in text]
+    if len(matching) != 1:
+        problems.append(f"example {number} matches {len(matching)} claims here (it must match one): {text[:60]!r}")
+        continue
+    marker, what, check = matching[0]
+    if marker in used:
+        problems.append(f"two examples match the claim {marker!r}")
+    used.add(marker)
+    body = article(slug)
+    full = (public / f"{slug}.html").read_text(encoding="utf-8", errors="replace") if body is not None else ""
+    if body is None and marker != "title: Unit 3 Test Review":
+        problems.append(f"example {number} ({what}): {slug}.html was not built")
+        continue
+    try:
+        ok = check(body, {"full": full, "slug": slug})
+    except Exception as error:  # a check that cannot read the page is a failure, said
+        ok, what = False, f"{what} ({error})"
+    if not ok:
+        problems.append(f"example {number} did not build as {what}")
+for marker, what, _ in claims:
+    if marker not in used:
+        problems.append(f"no example in the skill holds {marker!r} ({what})")
+claims_page = article("Authoring-Claims") or ""
+prose = {
+    "two prices in a paragraph are typeset as maths": re.search(r"Money: it costs <span class=\"katex\"", claims_page),
+    "\\$ keeps a price a price": "Escaped: it costs $5 and $10 today" in claims_page,
+    "a spaced $ x + 1 $ is typeset on the site": re.search(r"Spaced: <span class=\"katex\"", claims_page),
+    "[words](Page Name.md) is not a link": "[practice](Slope Practice.md)" in claims_page,
+    "an unknown kind is a callout titled as written": re.search(r'data-callout="definition".*?<p>Slope', claims_page, re.S),
+}
+for said, held in prose.items():
+    if not held:
+        problems.append(f"the skill says {said}, and the built Authoring Claims page does not show it")
+for problem in problems[:30]:
+    print("   " + problem)
+print(f"   {len(examples)} examples, {len(claims)} claims")
+sys.exit(1 if problems else 0)
+AUTHORPY
+then
+  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/GeoGebra/PhET, comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
+else
+  fail "page-authoring skill: an example did not build as the feature it claims, or an example has no claim (#596)"
+fi
+
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
 # The rule is in the one index.css every page links, as the site's minifier
 # writes it, and the page rows it relies on are still Quartz's: a page row's
@@ -3748,6 +4134,17 @@ then
   pass "the sidebar's page dot is in the site's one stylesheet, and the sidebar's row templates are still the ones it tells apart (#515)"
 else
   fail "the sidebar's page dot is missing from index.css, or the sidebar's row templates changed under it (#515)"
+fi
+
+# ---- #594: no page-view counter in the built site ----
+# Quartz's default config loaded plausible.io's script on every page and
+# sent each student's page view there; nobody set it up. The real build of
+# the fixture site must carry it nowhere: no page and no script names it.
+PLAUSIBLE_HITS="$(grep -rl --include='*.html' --include='*.js' --include='*.mjs' 'plausible\.io' "$SITE_PUBLIC" 2>/dev/null | head -5 || true)"
+if [[ -n "$(find "$SITE_PUBLIC" -name 'postscript.js' -print -quit 2>/dev/null)" && -z "$PLAUSIBLE_HITS" ]]; then
+  pass "the built site sends no page views anywhere: no page and no script in it names plausible.io, Quartz's default counter (#594)"
+else
+  fail "the built site still loads Quartz's page-view counter, or has no postscript.js to read (#594): ${PLAUSIBLE_HITS:-no postscript.js}"
 fi
 
 # ---- 6h, continued: the handout as a browser prints it (#454 review B1) ----
@@ -3800,6 +4197,26 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "graphs were not drawn on a page whose own ids answer the names the graph engine reads, or on a page visited after it (browser-checks/graphs_draw.mjs, #502)"
     cat /tmp/verify_graphs_draw.log
   fi
+  # #594: the Mermaid diagram on the Printable Fixture drawn under the very
+  # policy a Netlify publish would send. The site is cloned, the publish's
+  # own two _headers writers run on the clone in deploy.py's order, and the
+  # check serves the clone with the policy line it reads from that file. The
+  # engine comes from cdnjs, so with no network it is a SKIP, never a pass.
+  MERMAID_SITE="$(mktemp -d /tmp/plantoir-verify-mermaid.XXXXXX)"
+  cp -Rc "$SITE_PUBLIC/." "$MERMAID_SITE/" 2>/dev/null || cp -R "$SITE_PUBLIC/." "$MERMAID_SITE/"
+  rm -f "$MERMAID_SITE/_headers"
+  (cd scripts && python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$MERMAID_SITE") >/tmp/verify_mermaid_draws.log 2>&1 || true
+  MERMAID_STATUS=0
+  node browser-checks/mermaid_draws.mjs "$PRINT_CHROME" "$MERMAID_SITE" /Printable-Fixture.html >>/tmp/verify_mermaid_draws.log 2>&1 || MERMAID_STATUS=$?
+  if [[ "$MERMAID_STATUS" == "0" ]]; then
+    pass "Mermaid diagrams drawn under the policy a Netlify publish sends to keep its ad badge off, read from the _headers the publish writes: the engine imported from cdnjs, no request refused by the policy - $(grep '^OK: ' /tmp/verify_mermaid_draws.log | head -1 | sed 's/^OK: //') (#594, browser-checks/mermaid_draws.mjs)"
+  elif [[ "$MERMAID_STATUS" == "3" ]]; then
+    skip "Mermaid diagrams under the Netlify ad-badge policy (#594): $(grep '^SKIPPED: ' /tmp/verify_mermaid_draws.log | head -1 | sed 's/^SKIPPED: //') - the diagram engine comes from cdnjs (browser-checks/mermaid_draws.mjs)"
+  else
+    fail "Mermaid diagrams were not drawn under the policy a Netlify publish sends, or the policy refused a request (browser-checks/mermaid_draws.mjs, #594)"
+    cat /tmp/verify_mermaid_draws.log
+  fi
+  rm -rf "$MERMAID_SITE"
   # #515: the sidebar's page dot, on the rows the browser draws.
   if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
@@ -3851,9 +4268,16 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "task boxes did not tick in a browser as the contract says (browser-checks/task_boxes.mjs, #519)"
     cat /tmp/verify_task_boxes.log
   fi
+  # #545: My Progress in a browser - Progress Fixture's own row, by name.
+  if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
+    pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, the fixture's row at 1 / 4 on a fresh profile (the teacher's [x]), every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
+  else
+    fail "My Progress did not count a student's ticks in a browser as the contract says (browser-checks/my_progress.mjs, #545)"
+    cat /tmp/verify_my_progress.log
+  fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), and My Progress in a browser (#545): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), and My Progress in a browser (#545): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul

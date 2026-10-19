@@ -90,6 +90,18 @@ class InlineScriptPolicyTests(unittest.TestCase):
             self.assertEqual(hashes, [_digest(body)])
 
 
+    def test_a_dynamic_import_from_another_host_is_allow_listed_through_deploy(self):
+        # #594, through deploy.py's re-export: Quartz's Mermaid loader.
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text(
+                '<script type="module">H||=await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/'
+                '11.4.0/mermaid.esm.min.mjs");</script>', encoding="utf-8")
+            hashes, hosts = deploy._collect_inline_script_policy(public_dir)
+            self.assertEqual(len(hashes), 1)
+            self.assertEqual(hosts, ["https://cdnjs.cloudflare.com"])
+
+
 class WriteHeadersFileTests(unittest.TestCase):
 
     def test_writes_a_headers_file_with_only_script_src(self):
