@@ -27,8 +27,10 @@
 // and opacity (and weight), in light and in dark (`saved-theme`), and the
 // same colour under the mouse; another top-level page keeps Quartz's page
 // look (0.75 opacity), so nothing else in the sidebar changed.
-// #603 (v1.8.3): every page row's list of items is closed whenever the page
-// is drawn; opened with the mouse on its marker, the fixture's row lists its
+// #603 (v1.8.3): every level - unit, class, page row - is closed whenever
+// the page is drawn, and each class's count is the sum of its pages'; a
+// plain click on a unit opens it alone, Option-click opens it and every
+// class and page beneath it (and closes them all again); opened with the mouse on its marker, the fixture's row lists its
 // four items in page order, the ticked ones marked - exactly as many as its
 // count, each the manifest's own reading of this browser's ticks - each a
 // link to the fixture at its success-criteria heading; a click on one lands
@@ -149,12 +151,27 @@ const READ = `(async () => {
                    href: itemLink ? new URL(itemLink.href).pathname + new URL(itemLink.href).hash : null,
                    shown: itemLink ? itemLink.getBoundingClientRect().height > 0 : false })
     }
-    let classRow = line.previousElementSibling
-    while (classRow && !classRow.classList.contains("plantoir-progress-class")) classRow = classRow.previousElementSibling
-    const unit = line.closest("details")?.querySelector(":scope > summary > span")?.textContent
-    row = { count: line.querySelector(".plantoir-progress-count")?.textContent, under: classRow?.textContent ?? null,
+    const unit = line.closest("details.plantoir-progress-unit")?.querySelector(":scope > summary > span")?.textContent
+    const under = line.closest("details.plantoir-progress-day")?.querySelector(":scope > summary > span")?.textContent ?? null
+    row = { count: line.querySelector("td.plantoir-progress-count")?.textContent, under,
             unit, href: new URL(link.href).pathname, open: link.closest("details")?.open, items }
   }
+  // #603: every class's level, its count beside its name, and its pages'
+  // counts added up; and how many of each level are open.
+  const days = []
+  for (const day of holder.querySelectorAll("details.plantoir-progress-day")) {
+    const spans = day.querySelectorAll(":scope > summary > span")
+    let done = 0
+    let total = 0
+    for (const cell of day.querySelectorAll("td.plantoir-progress-count")) {
+      const [a, b] = cell.textContent.split("/")
+      done += Number(a)
+      total += Number(b)
+    }
+    days.push({ label: spans[0]?.textContent, count: spans[1]?.textContent, sum: [done, total], open: day.open })
+  }
+  const openCount = (selector) => { let open = 0; let all = 0; for (const d of holder.querySelectorAll(selector)) { all += 1; if (d.open) open += 1 } return [open, all] }
+  const levels = { units: openCount("details.plantoir-progress-unit"), days: openCount("details.plantoir-progress-day"), rows: openCount("details.plantoir-progress-items") }
   const totals = []
   for (const item of holder.querySelectorAll(".plantoir-progress-totals li")) {
     const spans = item.querySelectorAll("span")
@@ -181,7 +198,7 @@ const READ = `(async () => {
   }
   for (const unit of manifest.units) for (const known of unit.classes) for (const page of known.pages) add(unit.label, page)
   for (const page of manifest.other.pages) add(manifest.other.label, page)
-  return { holder: true, tables, row, lists, fixtureItems, totals, expected, boxes: holder.querySelectorAll("input").length,
+  return { holder: true, tables, row, days, levels, lists, fixtureItems, totals, expected, boxes: holder.querySelectorAll("input").length,
            hint: holder.querySelector(".plantoir-progress-hint") !== null }
 })()`
 
@@ -284,14 +301,19 @@ async function connect(chunk) {
     expect(`${when}: every table is closed`, seen.tables.length > 0 && seen.tables.every((table) => table.open === false), seen.tables)
     expect(`${when}: no box can be ticked here`, seen.boxes === 0, seen.boxes)
     expect(`${when}: every page's list of items is closed`, seen.lists.length > 0 && seen.lists.every((open) => open === false), seen.lists)
+    expect(`${when}: every class is closed`, seen.days.length > 0 && seen.days.every((day) => day.open === false), seen.days)
+    for (const day of seen.days) {
+      expect(`${when}: ${day.label}'s count is the sum of its pages'`, day.count === countOf(...day.sum), day)
+    }
     return seen
   }
   // #603: open the fixture's unit and its row with the mouse - on the row's
   // marker, beside its name, never on the link - and read its list.
-  const clickAt = async (point) => {
-    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y })
+  // `modifiers` 1 is Option (Alt), as Chrome's DevTools protocol numbers it.
+  const clickAt = async (point, modifiers = 0) => {
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y, modifiers })
     for (const type of ["mousePressed", "mouseReleased"]) {
-      await send("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: "left", clickCount: 1 })
+      await send("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: "left", clickCount: 1, modifiers })
     }
     await pause(200)
   }
@@ -310,6 +332,12 @@ async function connect(chunk) {
       return null
     }
     await clickAt(unitPoint)
+    const dayPoint = await markerOf(`${FIXTURE_ROW_SUMMARY}?.closest("details.plantoir-progress-day")?.querySelector(":scope > summary")`)
+    if (dayPoint === null) {
+      expect(`${when}: the fixture's class was found`, false)
+      return null
+    }
+    await clickAt(dayPoint)
     const rowPoint = await markerOf(FIXTURE_ROW_SUMMARY)
     if (rowPoint === null) {
       expect(`${when}: the fixture's row was found`, false)
@@ -385,7 +413,7 @@ async function connect(chunk) {
         expect(`${theme}: another top-level page keeps the page look (0.75)`, look.otherPage !== null && look.otherPage.opacity === "0.75", look.otherPage)
         const hovered = []
         for (const words of ["All Classes", WORDS.title]) {
-          const point = await evaluate(`(() => { for (const item of document.querySelectorAll(".explorer .explorer-ul > li")) { const link = item.querySelector(".folder-title, a"); if (link && link.textContent.trim() === ${JSON.stringify(words)}) { const area = link.getBoundingClientRect(); return { x: area.left + area.width / 2, y: area.top + area.height / 2 } } } return null })()`)
+          const point = await evaluate(`(() => { for (const item of document.querySelectorAll(".explorer .explorer-ul > li")) { const link = item.querySelector(".folder-title, a"); if (link && link.textContent.trim() === ${JSON.stringify(words)}) { link.scrollIntoView({ block: "center", behavior: "instant" }); const area = link.getBoundingClientRect(); return { x: area.left + area.width / 2, y: area.top + area.height / 2 } } } return null })()`)
           if (point === null) { hovered.push(null); continue }
           await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y })
           await pause(800)
@@ -400,6 +428,34 @@ async function connect(chunk) {
       await go(progress)
       const fresh = await checkPage("a fresh profile", TEACHER_TICKED)
       expect("a fresh profile: the hint line is shown", fresh?.hint === true)
+      // #603: a plain click opens the unit alone; Option-click opens it and
+      // every class and page beneath it, items shown; Option-click again
+      // closes them all.
+      const UNIT_SUMMARY = `${FIXTURE_ROW_SUMMARY}?.closest("details.plantoir-progress-unit")?.querySelector(":scope > summary")`
+      const levelsInside = `(() => {
+        const unit = ${FIXTURE_ROW_SUMMARY}?.closest("details.plantoir-progress-unit")
+        const count = (selector) => { let open = 0; let all = 0; for (const d of unit.querySelectorAll(selector)) { all += 1; if (d.open) open += 1 } return [open, all] }
+        let shown = 0
+        for (const link of unit.querySelectorAll("li.plantoir-progress-item a")) if (link.getBoundingClientRect().height > 0) shown += 1
+        return { unit: unit.open, days: count("details.plantoir-progress-day"), rows: count("details.plantoir-progress-items"),
+                 items: unit.querySelectorAll("li.plantoir-progress-item").length, shown }
+      })()`
+      const unitPoint = await markerOf(UNIT_SUMMARY)
+      if (unitPoint !== null) {
+        await clickAt(unitPoint)
+        const plain = await evaluate(levelsInside)
+        expect("a plain click opens the unit alone", plain.unit === true && plain.days[0] === 0 && plain.rows[0] === 0 && plain.days[1] > 0, plain)
+        await clickAt(unitPoint)
+        await clickAt(unitPoint, 1)
+        const all = await evaluate(levelsInside)
+        expect("Option-click opens the unit, every class and every page beneath it, their items shown",
+          all.unit === true && all.days[0] === all.days[1] && all.rows[0] === all.rows[1] && all.rows[1] > 0 && all.items > 0 && all.shown === all.items, all)
+        await clickAt(unitPoint, 1)
+        const none = await evaluate(levelsInside)
+        expect("Option-click again closes them all", none.unit === false && none.days[0] === 0 && none.rows[0] === 0, none)
+      } else {
+        expect("the fixture's unit was found for the Option-click", false)
+      }
       await expandFixture("a fresh profile", TEACHER_TICKED)
       expect("no date line under the title", (await evaluate("document.querySelector('.content-meta') === null")) === true)
 
@@ -450,7 +506,7 @@ async function connect(chunk) {
       if (problems.length > 0) {
         return finish(1, "FAIL: " + problems.join("\nFAIL: "))
       }
-      finish(0, `OK: My Progress second in the sidebar and first in Key Links; ${FIXTURE}'s row under ${FIXTURE_CLASS} read 1 / 4 fresh (the teacher's [x]), 3 / 4 after two ticks and after a reload, 2 / 4 after an untick and Back, 1 / 4 with the site's data cleared; every total agreed with the manifest (${fresh?.totals?.length ?? 0} totals); read-only, every table closed; #602 the pinned link All Classes' colour, opacity and weight in light and dark and under the mouse, another top-level page still 0.75; #603 every row's list closed on each drawing, the fixture's row opened by its marker listing its 4 items with 1, 3 and 2 marked as its count says, each linking to its heading, one click landing there`)
+      finish(0, `OK: My Progress second in the sidebar and first in Key Links; ${FIXTURE}'s row under ${FIXTURE_CLASS} read 1 / 4 fresh (the teacher's [x]), 3 / 4 after two ticks and after a reload, 2 / 4 after an untick and Back, 1 / 4 with the site's data cleared; every total agreed with the manifest (${fresh?.totals?.length ?? 0} totals); read-only, every table closed; #602 the pinned link All Classes' colour, opacity and weight in light and dark and under the mouse, another top-level page still 0.75; #603 every level - unit, class, page - closed on each drawing, each class's count the sum of its pages', a plain click opening the unit alone and Option-click it and everything beneath (Option-click again closing all), the fixture's row opened by its marker listing its 4 items with 1, 3 and 2 marked as its count says, each linking to its heading, one click landing there`)
     } catch (error) {
       finish(1, "FAIL: " + (error?.stack ?? error))
     }

@@ -2909,6 +2909,75 @@ re-derived from the Markdown; a transformer that stamps counted items; a
 hiding the page from the sidebar (Russell put it second); one table per
 meeting; a fixed-name structural check.
 
+### L6. The sidebar link's look, and each row's items (#602, #603, v1.8.3)
+
+**#602.** The pin (L3) puts My Progress among the top-level FOLDERS, but
+Quartz draws a page as a page: `--dark` at 0.75 opacity, grey beside All
+Classes and Concepts (`--secondary`, opacity 1 — measured on the 1.8.2
+preview of ICS3U). One rule at the end of `progress.scss` gives that one
+link the folder titles' look (explorer.scss's `.folder-container div > a`:
+colour, face, size, weight 600, line height, `--tertiary` on hover) and
+keeps Quartz's `--tertiary` for its own page. It is scoped by selector —
+the TOP-LEVEL link whose `data-for` (set by the sidebar on every link) is
+`My-Progress` — and wins by specificity over `.explorer-content ul li > a`
+and its `.active`, since this file comes first in `index.css`. Known limit
+(`myProgress.sidebar.look`): a teacher's own top-level page named exactly
+My Progress, which nothing pins, takes the same look. Rejected: a class
+added by the pin (the pin's line is written by `build_site.py`, which this
+change leaves alone, and `patches/explorer.inline.ts` stays unedited, L3).
+
+**#603.** Every level folds, and every level is closed on load (Russell: no
+exception): a unit's table, then one level per class — its name and the sum
+of its pages' counts, as a unit's summary carries the unit's — then each
+page's row, whose name is the summary of a list of its items: a box-like
+mark (ticked or not, with `words.itemTicked` / `words.itemNotTicked` for a
+screen reader; no box to tick), then the item's words as a link to the page
+at its success-criteria heading. All are `<details>`, so a plain click on a
+marker, or Enter or Space, opens one level; a click on a page's name still
+follows its link (an interactive element in a summary does not toggle it).
+**Option-click** on any marker, as in the Finder, opens or closes that
+level and every level inside it (one `onclick` on the placeholder).
+
+The words come from the BUILT page, in the emitter, never from the
+Markdown: the `<label>` PlantoirTasks wraps around each stamped box,
+spaces collapsed (`myProgress.sections`, `shown`). Maths is the one
+exception, measured: Quartz's KaTeX writes HTML only (`output: "html"`),
+every glyph `aria-hidden` and in drawing order (x² reads "x2", a fraction
+its denominator first), with no copy of the TeX — so each maths element is
+listed as the TeX between its `$` signs, taken from the item's own line in
+`file.value` (the line PlantoirTasks made the id from), and only when that
+line hashes to the box's own stamp and holds as many maths spans as the
+label draws; otherwise the glyphs. The anchor is the heading's id as the
+built page has it (`anchors`). `rollUp` now also answers each item
+(`ticked`), so the list and the count are one reading. Rejected: a new
+stamp on every box (more bytes on every page with a task item, and an
+edit to #519's transformer), reading MathML annotations (none are built),
+carrying HTML in the manifest (the page draws with `textContent` only),
+a fetch of each page (the manifest already holds what is needed).
+
+Measured 2026-10-19 (M4 Pro, macOS 26.6, Chrome for Testing 155), EXC2O
+with the verify fixture planted, `origin/dev` b49cb7b8f against this
+branch: `postscript.js` 169,936 → 171,139 bytes (+1,203; gzip +339),
+`index.css` 74,461 → 76,070 (+1,609; gzip +212), `progress-manifest.json`
+1,094 → 1,385 for two pages (+291); `My-Progress.html` unchanged; no other
+page's HTML changes once Quartz's random list ids, `<time>` and its
+time-ordered tag and folder lists are set aside. `browser-checks/
+my_progress.mjs` adds: the link's computed colour, opacity, weight and face
+equal All Classes' in light and dark (`saved-theme`) and under the mouse,
+another top-level page still at 0.75; every level closed on each drawing;
+each class's count the sum of its pages'; a plain click opening a unit
+alone, Option-click opening it and everything beneath with the items
+shown, and closing them all again; the fixture's row listing its four
+items with as many marked as its count (1, 3, 2 across the run), each
+the manifest's words and tick and a link to its heading, and one click
+landing there. Must-fail by copy and restore: the old `progressRules.ts`
+under the new contract cases (32 failures in the image's check); in a
+built site, the rule's slug changed (the look fails in both themes), the
+selector unscoped (another page's 0.75 fails), the manifest's anchors
+emptied (the item links fail), and Option ignored in `postscript.js` (the
+Option-click fails); the check against the old build fails every new
+assertion.
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,

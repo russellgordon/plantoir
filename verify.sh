@@ -3917,7 +3917,9 @@ else:
     for page in manifest["other"]["pages"]:
         rows.append((manifest["other"]["label"], None, page))
     mine = [row for row in rows if row[2]["title"] == "Progress Fixture"]
-    want = [{"id": fnv1a(text), "checked": False} for text in
+    # #603: each item also carries its words, read off the built page's
+    # label, and its success-criteria heading's anchor.
+    want = [{"id": fnv1a(text), "checked": False, "text": text, "anchor": "success-criteria"} for text in
             ("I can name a variable", "I can print a value", "I can comment my code", "I can read an error message")]
     want[2]["checked"] = True
     if len(mine) != 1:
