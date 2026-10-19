@@ -1982,8 +1982,11 @@ nothing COEP would break: any `iframe`/`frame`/`embed`/`object` (YouTube,
 GeoGebra, PhET and Media PDF frames - Safari blocks a same-origin PDF frame
 unless the PDF has COEP itself), or a cross-origin picture, `srcset`, poster,
 script, stylesheet/preload or CSS `url()` outside cdnjs and Google Fonts
-(which send CORP `cross-origin`). Quartz's own Plausible script is added at
-run time and sends CORP `cross-origin` (curl), so it loads. Such a page keeps
+(which send CORP `cross-origin`). (This said Quartz's own page-view script
+from plausible.io is added at run time and loads; since #594, 2026-10-19,
+`build_site.py` sets Quartz's `analytics: null`, so no site carries it at
+all - nobody had set that counter up, and it sent students' page views
+away. Neither copy of the rule ever special-cased it.) Such a page keeps
 the box, and the publish and the preview name it on a `plantoir: note:` line
 when a block reads input (ruling Q1). The rule exists twice -
 `scripts/isolation_headers.py` (publish) and
