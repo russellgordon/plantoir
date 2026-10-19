@@ -228,30 +228,74 @@ a line's words clears that line's tick** for every student, so fix typos
 before students start. Boxes inside a `[!quiz]` callout are quiz choices,
 not a checklist.
 
-## 10. Success criteria that roll up to My Progress
+## 10. My Progress: success criteria students tick
 
-From Plantoir 1.8.2, the items of a checklist under a heading called
-**Success criteria**, **Test of success** or **Tests of success** (any
-heading level, any capitals) also count on the section's **My Progress**
-page, where each student sees - for their eyes only - how many they have
-ticked on each page, grouped by the class that first linked the page.
-Nothing is sent anywhere.
+From Plantoir 1.8.2, each section's site can have a page called **My
+Progress**, where a student sees how many of the success criteria they have
+ticked on each page of the course - for their eyes only.
+
+**What the student sees.** One My Progress page per section, listed second
+in the sidebar (directly under All Classes) and as the first bullet of Key
+Links. It lists every page that has success criteria, each row reading
+done / total ("2 / 5") with a link back to the page, so a student ticks
+boxes only on the page itself, with the lesson in view - My Progress has no
+boxes of its own. Rows are grouped by the class page that first linked
+each page (the earliest class that links it directly), one closed table per
+unit with totals at the top; pages no class links directly come last, under
+**Other pages**. The ticks live in the student's own browser - nothing is
+sent anywhere, and a different browser or device starts at 0. Until a
+student ticks something, every row reads "0 / n".
+
+**My Progress appears only when there is something to show**: Plantoir adds
+the page, its sidebar entry and its Key Links bullet only once at least one
+page students can see has a checklist under a success-criteria heading. Do
+not write a My Progress page or link yourself - Plantoir does both.
+
+**How to write a page so its items count** - a complete page:
 
 ```markdown
+---
+title: Finding Slope
+tags:
+  - concepts
+---
+The slope of a line is $m = \frac{\Delta y}{\Delta x}$.
+
 ## Success criteria
 
 - [ ] I can find the slope from two points
 - [ ] I can say what the slope means in the situation
-- [ ] I can tell a positive slope from a negative one on a graph
+- [x] I can tell a positive slope from a negative one on a graph
+
+## Practice
+
+- [ ] Questions 1 to 5 (a checklist, but not a success criterion)
 ```
 
-- Use one of those three heading words exactly - "Learning goals" or "I can
-  statements" will not count.
-- The items counted run from that heading to the next heading of the same
-  or a higher level.
+- **The heading** is one of `Success criteria`, `Test of success` or `Tests
+  of success`, at any level (`##`, `###`, ...). Capitals and a trailing
+  colon or full stop do not matter (`### Tests of success:` counts). A
+  course can use its own list of headings instead - the
+  `success_criteria_headings` list in `courses/<CODE>/course_config.json`,
+  which REPLACES the three; if it is there, use one of its headings.
+- **The items** are task lines, `- [ ] I can ...`, each with words after
+  the box, from that heading down to the next heading of the same or a
+  higher level. A checklist under any other heading (the Practice list
+  above) does not count.
+- **The heading must be on the page itself, at the left edge** - not
+  inside a callout, a quote or a list. Items inside a callout under the
+  heading do count; boxes inside a `[!quiz]` never do.
+- **Items are counted on the page they are written on.** A checklist shown
+  on another page with `![[Page#Success criteria]]` is still the first
+  page's: it is counted once, under that page.
+- **A teacher's `[x]` counts as done** until the student unticks it.
+- **Changing an item's words** clears every student's tick on that item
+  (section 9) and the old tick is no longer counted.
+- **Does not count:** a table under the heading (only checklist boxes are
+  counted), items under another heading, a page held back with
+  `publish: false`, and every page of a course whose `include_my_progress`
+  is `false` in `course_config.json` (the page is then not built at all).
 - Write each item as something a student can honestly tick: "I can ...".
-- My Progress appears only once at least one page has such a heading with
-  items under it.
 
 ## 11. Links between pages
 
@@ -495,8 +539,9 @@ coverage map, and My Progress from 1.8.2) - do not add those by hand.
   survey service; use the feature skills.
 - Do not link to a page by its folder path (`[[Concepts/Slope]]`) unless two
   pages share the name.
-- Do not edit `course_config.json` (Plantoir's Course Settings write it), or
-  anything in a folder whose name starts with a dot.
+- Do not edit `course_config.json` unless the teacher asks you to (Plantoir's
+  Course Settings write it), or anything in a folder whose name starts with
+  a dot.
 
 ## 22. Check it
 
