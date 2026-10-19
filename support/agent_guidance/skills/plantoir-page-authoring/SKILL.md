@@ -268,8 +268,8 @@ done / total ("2 / 5") with a link back to the page, so a student ticks
 boxes only on the page itself, with the lesson in view - My Progress has no
 boxes of its own. Rows are grouped by the class page that first linked
 each page (the earliest class that links it directly), one closed table per
-unit with totals at the top; pages no class links directly come last, under
-**Other pages**. The ticks live in the student's own browser - nothing is
+unit with totals at the top; pages no class links directly (or only a
+hidden or undated class does) come last, under **Other pages**. The ticks live in the student's own browser - nothing is
 sent anywhere, and a different browser or device starts again. Until a
 student ticks something, each row counts only the items the teacher wrote
 already ticked (`[x]`): a page with none reads "0 / n".
@@ -277,7 +277,8 @@ already ticked (`[x]`): a page with none reads "0 / n".
 **My Progress appears only when there is something to show**: Plantoir adds
 the page, its sidebar entry and its Key Links bullet only once at least one
 page students can see has a checklist under a success-criteria heading. Do
-not write a My Progress page or link yourself - Plantoir does both.
+not write a My Progress page or link yourself - Plantoir does both, and a
+page of the course's own called My Progress stops Plantoir writing its own.
 
 **How to write a page so its items count** - a complete page:
 
@@ -308,8 +309,9 @@ The slope of a line is $m = \frac{\Delta y}{\Delta x}$.
   which REPLACES the three; if it is there, use one of its headings.
 - **The items** are task lines, `- [ ] I can ...`, each with words after
   the box, from that heading down to the next heading of the same or a
-  higher level. A checklist under any other heading (the Practice list
-  above) does not count.
+  higher level; a deeper heading stays inside it. The same words twice on
+  one page count once. A checklist under any other heading (the Practice
+  list above) does not count.
 - **The heading must be on the page itself, at the left edge** - not
   inside a callout, a quote or a list. Items inside a callout under the
   heading do count; boxes inside a `[!quiz]` never do.
