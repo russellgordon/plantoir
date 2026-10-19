@@ -7,6 +7,15 @@ course has its own website built from it.
 Guidance for writing pages lives in skills beside this file. Read the one
 that matches the task before writing:
 
+- **Any page at all** - writing, revising or reorganising a lesson, a
+  concept page, a class page, a folder's front page or Key Links: every way
+  content can be written for the site (callouts, diagrams, tables, maths,
+  checklists, success criteria, links, embedding one page in another,
+  pictures and PDFs in Media, videos, GeoGebra and PhET, hidden pages and
+  `publish:`, folders, class pages and their dates) is in
+  `.agents/skills/plantoir-page-authoring/SKILL.md` (the same file is at
+  `.claude/skills/plantoir-page-authoring/SKILL.md`). Read it first; it
+  says which of the skills below to read as well.
 - **Printable pages** - worksheets, handouts, practice sets, answer keys, or
   any page "students will print", or a page that should hand out an existing
   PDF: `.agents/skills/plantoir-printing/SKILL.md` (the same file is at
