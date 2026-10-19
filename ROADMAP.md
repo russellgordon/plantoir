@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 18 October 2026. The current release is **1.8.1** on the Mac and **1.7.2** on Windows.*
+*Last updated: 19 October 2026. The current release is **1.8.2** on the Mac and **1.7.2** on Windows.*
 
 A few things to know before you read on:
 
@@ -28,7 +28,7 @@ need to read those to use Plantoir.
 
 ## Next: Windows catches up to 1.8
 
-Plantoir 1.8.1 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
+Plantoir 1.8.2 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
 download joins the release, with:
 
 - **Runnable Python, self-check quizzes, maths served by your own site and
@@ -60,6 +60,12 @@ download joins the release, with:
   [#592](https://github.com/russellgordon/plantoir/issues/592),
   [#593](https://github.com/russellgordon/plantoir/issues/593),
   [#586](https://github.com/russellgordon/plantoir/issues/586)).
+- **And what 1.8.2 brought the Mac:** Mermaid diagrams drawn again on sites
+  deployed to Netlify, a My Progress page for each section, and the guide
+  that tells Claude and Codex every way a page can be written
+  ([#598](https://github.com/russellgordon/plantoir/issues/598),
+  [#599](https://github.com/russellgordon/plantoir/issues/599),
+  [#600](https://github.com/russellgordon/plantoir/issues/600)).
 
 ---
 
@@ -68,13 +74,11 @@ download joins the release, with:
 - **Open in Obsidian goes to the page you're looking at.** While previewing a
   page, Open in Obsidian will open the note that page came from, not just the
   course — wherever it can tell which note that is. ([#518](https://github.com/russellgordon/plantoir/issues/518))
-- **A "My progress" page for each student**, built from the ticks students
-  make on checklists (tickable since 1.8.1): what
-  they've checked off under each page's success criteria, grouped by class.
-  It counts ticks under headings such as "Success criteria" (you can set
-  which headings in Course Settings). Only the student sees it, and this page
-  is added to every section automatically.
-  ([#545](https://github.com/russellgordon/plantoir/issues/545))
+- **My Progress, settings and more.** The My Progress page arrived on the
+  Mac in 1.8.2. Next: a switch and the list of success-criteria headings in
+  Course Settings, a way for students to narrow the page to a date or a unit,
+  and a check that it prints well.
+  ([#595](https://github.com/russellgordon/plantoir/issues/595))
 - **Reference courses, more flexible.** Add a ready-made course straight to
   your reference shelf — even for a course code you're already teaching —
   arrange the shelf in groups you make yourself, and replace a reference

@@ -325,6 +325,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-26 | **KaTeX from the site itself (#494)** | `quartz/plugins/transformers/latex.ts`; `quartz/static/katex/` | Quartz v4.5.0's `externalResources` linked `cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css` and `contrib/copy-tex.min.js` on EVERY page (400 links each on a built ICS3U site), while its own lockfile installs **0.16.21** and rehype-katex renders every formula with that at build time — so sites were rendered with one version and styled with another, and the maths depended on a third party and a network. `patch_katex_local` (marker `PLANTOIR-KATEX-LOCAL`, idempotent, independent of C2-20's import) replaces that block with two `additionalHead` functions: `<link rel=stylesheet href="<pathToRoot>/static/katex/katex.min.css" spa-preserve>` and `<script src=".../static/katex/contrib/copy-tex.min.js" defer spa-preserve>`, relative to each page so a site served under a folder finds them, kept across the site's page changes like `index.css`; the 404 page, served at any depth, links from the `baseUrl`'s path (review N6, Head.tsx's own rule). `install_katex_assets` copies the files from Quartz's own `node_modules/katex` every build (05 → Runnable code, step 4): the stylesheet (23,352 bytes), copy-tex (1,673), the **20 woff2 faces** (259,792) and the MIT licence — 284,817 bytes on EVERY site, woff2 only because every browser that can run a site's code takes woff2 first. Netlify's CSP loses `https://cdn.jsdelivr.net` by itself (07). **Rejected:** gating it per site on maths (Python cannot tell maths the way remark-math does — `$` in prose, currency — and a wrong guess breaks every formula silently; the cost is about 2% of Pyodide, uploaded once by content hash); all three font formats (1.10 MB); inlining the CSS into index.css (a generated SCSS file from node_modules every build); absolute `/static/katex/` (breaks a folder published under a subpath). **The print path had to follow** (#455 review S1): a link kept across page changes keeps its RELATIVE href, which then resolves against the new page — one folder off. print.inline.ts now takes every stylesheet for the print frame from the address the sheet was really fetched from (`link.sheet.href`), which fixed the same latent fault in its `index.css` lookup; measured by `browser-checks/maths_offline.mjs`: with the old code a handout printed after a page change from the top of the site to a page one folder down got a 404 KaTeX stylesheet (0 rules), now 249 rules. **The regression the plan expected did not happen:** a folder publish OPENED AS A FILE was expected to lose KaTeX's faces in Chrome (an opaque origin); measured 2026-10-17, Chrome for Testing 155 and Safari 26.6 both loaded `KaTeX_Main` and `KaTeX_Math` from `static/katex/fonts/` beside a page opened from disk, so the maths keeps its look offline from a file too (it used to need the network for the CDN). |
 | C2-27 | **A folder page's table of contents (#520)** | `quartz.layout.ts` | `_wire_list_page_toc`, one of `wire_quartz_additions`' edits, puts `Component.DesktopOnly(Component.TableOfContents())` — the content layout's own — in `defaultListPageLayout`'s right column, which is `[]` in v4.5.0, and touches nothing else. Quartz renders every `folder/index.md` with that layout (and the tag pages), so a curriculum folder's index with `enableToc: true` and five headings of its own showed no table of contents: the data was computed and placed nowhere. Quartz's own rule then decides, as on any page — shown by default, `enableToc: false` hides it, and only with two or more headings of depth 3 or less on the page itself — so tag pages and folder pages with no headings of their own are unchanged. Measured on the #520 plan by editing a built layout and re-running Quartz: the curriculum index showed "Navigate this page" with its strand headings, while `Concepts/index`, `tags/A1` and the front page stayed at 0; expectation pages had shown a table of contents all along. Idempotent, every build; a list layout of another shape warns and is left alone. **Chosen** (ruling Q2 on the plan): on every folder page with the headings, as Quartz does on every other page — 49 of 1,009 folder index pages across `support/` show one, 9 of them without having asked. **Rejected:** only on folder pages that say `enableToc: true` (a wrapper component of our own, and a rule unlike every other page's). `scripts/test_folder_page_toc.py` drives it through `wire_quartz_additions`; verify.sh 6h reads EXC2O's built `Curriculum/index.html`. |
 | C2-28 | **Every code block's line numbers, hairline and no ligatures (#585)** | `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, carried into `index.css` by `codeRunner.scss`) | Quartz numbers every highlighted line in a 1rem box with no separator. One gutter style for static blocks and the runnable editor: Quartz's own dimmed colour, the code font, a box `--plantoir-digits` wide (3 from line 100, 4 from line 1000, by CSS), a 1 px hairline in `var(--lightgray)`, no fill; no programming ligatures in any code element, inline code in prose included. On paper the hairline runs down each line past wrapped rows, printed even with a browser's background graphics off. Every site, every page with code - I12 says why and what was measured. |
+| C2-29 | **My Progress under the class folder in the sidebar, and its emitter (#545)** | `quartz/components/scripts/explorer.inline.ts`, `quartz.config.ts`, `quartz/plugins/emitters/index.ts` | `pin_my_progress_in_sidebar` adds, once, an import of `progressRules.pinnedOrder` and one data line rewritten on every build (`{slug, after}`: the page's slug, or `""` when this build made none, and the class folders' slug segments), and loops over `pinnedOrder(orderedTopLevel, …)` — `orderedTopLevel` is a `const` (plan review F1). `_wire_emitters_index` exports `PlantoirProgress`; `_wire_progress_emitter` puts it straight before `Plugin.Assets()`. Every build, idempotent; a script or settings file of another shape warns and is left alone (the page then sorts last, or no manifest is written). Section L. |
 
 ### C3. Content-level transformations (every build)
 
@@ -1982,8 +1983,11 @@ nothing COEP would break: any `iframe`/`frame`/`embed`/`object` (YouTube,
 GeoGebra, PhET and Media PDF frames - Safari blocks a same-origin PDF frame
 unless the PDF has COEP itself), or a cross-origin picture, `srcset`, poster,
 script, stylesheet/preload or CSS `url()` outside cdnjs and Google Fonts
-(which send CORP `cross-origin`). Quartz's own Plausible script is added at
-run time and sends CORP `cross-origin` (curl), so it loads. Such a page keeps
+(which send CORP `cross-origin`). (This said Quartz's own page-view script
+from plausible.io is added at run time and loads; since #594, 2026-10-19,
+`build_site.py` sets Quartz's `analytics: null`, so no site carries it at
+all - nobody had set that counter up, and it sent students' page views
+away. Neither copy of the rule ever special-cased it.) Such a page keeps
 the box, and the publish and the preview name it on a `plantoir: note:` line
 when a block reads input (ruling Q1). The rule exists twice -
 `scripts/isolation_headers.py` (publish) and
@@ -2734,6 +2738,176 @@ that says so should phrase it another way (#519 fixes review R2).
 themselves; the ticks stay in that student's browser and nobody else sees
 them. Change an item's words and every student's tick on it clears; ticking
 `[x]` in the file only changes what an untouched box shows.
+
+## L. My Progress (#545, v1.8.2)
+
+One page per section, **My Progress**, for the student alone: how many of the
+task boxes under each page's success-criteria heading they have ticked (#519
+keeps each tick in their own browser), page by page, grouped by the class that
+first linked the page directly. Nothing is sent anywhere. The rules are
+`contracts/shared-rules.json` → `myProgress` (and `myProgressBuilt` for the
+trail line); this section says how it is built and why. Left for #595
+(v1.9.0): the Course Settings switch and heading list in both apps, the date
+and unit filter, the print check, the skill notes.
+
+### L1. The files
+
+| File | Runs | Does |
+|---|---|---|
+| `scripts/my_progress.py` | the build, BEFORE Quartz | the gate, the page, Key Links, the plan, the marker line |
+| `support/quartz/plugins/emitters/progressRules.ts` | three bundles | `normalisedHeading`, `countedItems`, `buildManifest`, `rollUp`, `pinnedOrder` — pure, no DOM, no Node |
+| `support/quartz/plugins/emitters/plantoirProgress.ts` | Quartz, as an emitter | `public/progress-manifest.json` from the built trees |
+| `support/quartz/components/scripts/progress.inline.ts`, `styles/progress.scss` | the student's browser | the totals and the tables, riding `PlantoirMetaLine` as the task boxes do |
+
+`build_site.py` wires the emitter (`_wire_emitters_index`,
+`_wire_progress_emitter`: straight before `Plugin.Assets()`), calls
+`_prepare_my_progress` right after `_visible_places`, and pins the page in the
+sidebar (`pin_my_progress_in_sidebar`) — all in the ALWAYS section, so an
+existing section gets it on its next build. `Dockerfile` bakes
+`my_progress.py`.
+
+### L2. Gate → plan → emitter → script, and why four steps
+
+- **The gate (Python, before Quartz).** `include_my_progress` (read EXACTLY as
+  `include_curriculum_coverage`, through the same `_resolve_section_switch`:
+  a boolean or a per-section map — ruling F4), no page of the teacher's own
+  called My Progress at the top of the site (in any case — on a file system
+  that ignores case ours would replace theirs; F5), and at least one page
+  students can see with a task item in a success-criteria section. Read line
+  by line from the build's copy, code and `%%` masked; it never makes an item
+  id. Otherwise: no page, no Key Links entry, no manifest.
+- **The plan** (`quartz/plantoir_progress.json`, every build, sorted keys):
+  the normalised headings, the words, the visible dated classes in the date
+  pass's order, `firstClassOf` (page → class), and the pages the gate read as
+  qualifying. Written even when the page is off, so a page switched off or no
+  longer earned is gone on the next build.
+- **The emitter.** A preview is ONE `quartz build --serve` process, so a
+  Python pass after the build would never run there; Quartz 4.5.0 re-runs an
+  emitter with no `partialEmit` with every page on each rebuild, so the
+  manifest follows the teacher's edits. It reads the trees after every
+  transformer — each box already carries `PlantoirTasks`' stamp, the ONLY
+  producer of item ids (#519 review F1) — and before rendering, so a
+  transcluded checklist is still a placeholder: a tick counts on the page the
+  item is written on. It skips `publish: false` pages itself (a rebuild hands
+  it every page — F8). Where its reading and the gate's disagree it prints a
+  `plantoir: note:` line (`myProgress.notes`, F3): a page the gate expected
+  and the site found nothing on is not listed (`gateSaidYes`); a page the site
+  found items on that the gate missed is listed and says so (`gateSaidNo`),
+  or — when the gate found nothing anywhere, so there is no page — says the
+  section has no page because of it (`gateSaidNoNoPage`), so a dropped tick
+  is never silent. **Where the two readings must agree**, the contract has a
+  case both run (since the fixes round: a list four spaces in is code, an
+  HTML comment counts nothing, `&nbsp;` in a heading is a space, a box whose
+  words begin on the next line counts once); the three shapes they still
+  read differently — a heading written in HTML, a task line inside `$$`, a
+  callout whose title holds `[!quiz]` — are `myProgress.knownLimits`, and
+  the note fires on each (#545 implementation review 3, measured). The
+  in-image check runs Quartz's Latex too, so "the site's reading" is the
+  site's whole pipeline. The plan is
+  read afresh on every emit (once per build, not per page): a cache keyed on
+  the file's time missed a plan written twice in one millisecond, measured in
+  the check.
+- **The script.** On every `nav`, on the page holding
+  `[data-plantoir-progress]` and never in a preview popover: fetch the
+  manifest (`no-cache`), read ticks with `taskRules.readTicks` (imported, not
+  a `window` global), draw with `textContent` only. An item is done when
+  ticked, or untouched and written `[x]` (Q5). A generation counter drops a
+  late fetch. A manifest that cannot be read (a folder site opened from disk)
+  shows `words.unreadable`.
+
+**Grouping is the date pass's own claim rule.** `_first_linking_classes` is
+now ONE function for the date pass, the links checklist's `datedByTheBuild`
+and My Progress (each carried its own copy of the loop until #545): visible
+dated classes earliest first, direct links only. A class page's own items go
+under itself; everything else under Other pages, last. Tables are
+`<unit word> N`; a club (numbered scheme) gets ONE table named after its class
+folder (ruling F6 — one table per meeting would be tables of one row each).
+The words "Meetings" in the ruling's example would need English plurals of
+the teacher's word; the folder's name is the teacher's own and is already in
+the sidebar above the page.
+
+**The page is written after every link reader.** `_prepare_my_progress`
+runs after `_visible_places`, the date passes, the coverage map and the links
+checklist, and the content folder is made afresh on every build, so none of
+them ever meets the page and the app never lists it as the teacher's. That is
+why there is no `_is_progress_page_name` structural check: the plan's version
+of one would have dropped a teacher's own page called My Progress from every
+link reader (F5). The page has `publish: true`, `excludeBacklinks: true`, no
+link of any kind — and **no text**: its one element is empty, carrying the
+placeholder and the unreadable sentence as attributes (the styles show the
+placeholder until the script draws, `:empty::before`). Quartz's ContentMeta
+draws its date line and reading time only for a page with text, so the page
+shows no date (Russell's Q6, #545 implementation review 5; the coverage map,
+by contrast, does show one). Removing `created:` would not have done it, by
+the site's settings rather than measured: `CreatedModifiedDate` falls back
+to the file's own time (its `filesystem` priority). Measured: no `content-meta` in
+the built My-Progress.html.
+
+### L3. The sidebar pin
+
+The sidebar is drawn in the browser (`explorer.inline.ts`: folders that do not
+expand, then those that do, then files), so My Progress would come last. The pin puts it directly after the class
+folder: the SECOND entry on a site whose class folder sorts first (All
+Classes does), third in a club whose `Resources` sorts before `All
+Meetings` — accepted as measured (#545 implementation review 7).
+`pin_my_progress_in_sidebar` adds, once, an import of `pinnedOrder` and one
+data line (`const PLANTOIR_MY_PROGRESS_PIN = {"slug": …, "after": […]}`,
+rewritten on every build), and loops over
+`pinnedOrder(orderedTopLevel, PLANTOIR_MY_PROGRESS_PIN)` — NOT a reassignment:
+`orderedTopLevel` is a `const`, and esbuild rejects assigning it (review F1;
+the real build of the preview compiles the pinned script). An empty slug
+moves nothing. A script of another shape is said and left alone; the page
+then sorts last. `patches/explorer.inline.ts` is unchanged: an every-build
+edit reaches every existing section without a new image patch.
+
+### L4. Byte identity
+
+Measured 2026-10-19 on EXC2O, `origin/dev` a70c5e7e8 against this branch, both
+builds from the same planted course (Progress Fixture plus one Other page):
+every site's `postscript.js` 165,233 → 170,037 bytes (+4,804; gzip 56,312 →
+57,872, +1,560) — the page's script, `pinnedOrder` and the pin's data line —
+and `index.css` 73,127 → 74,376 (+1,249; gzip 12,962 → 13,195, +233). A
+section that qualifies gains `My-Progress.html` (24,436 bytes) and
+`progress-manifest.json` (1,089 bytes for two pages), and of 301 other pages
+only **`Key-Links.html` and `index.html`** change — the front page transcludes
+Key Links — once Quartz's own build-to-build variance is set aside (the
+random `<ul>` ids, `<time datetime>`, and tag and folder lists ordered by
+file time), plus `contentIndex.json` and `sitemap.xml`. A section that does
+not qualify gets neither the entry nor the page, so — by the same diff —
+no page's HTML changes at all: the sidebar is drawn in the browser (not
+built separately; the two shared bundles above are the whole difference). The coverage-map goldens, `PAYLOAD_CONTENT_HASH`, check_baked's
+other files and the section fingerprint do not move.
+
+### L5. Measured, and rejected
+
+Measured (2026-10-19, M4 Pro, macOS 26.6, Chrome for Testing 155, a copy of
+the example course built by `preview.sh --build-only`):
+`browser-checks/my_progress.mjs` — My Progress second in the sidebar, directly
+under All Classes, and Key Links' first bullet; the fixture's row (four
+items, one the teacher wrote `[x]`) 1 / 4 on a fresh profile under "Unit 1,
+Day 2" in the Unit 1 table, every table closed, the hint shown, no box and
+no date line on the page; 3 / 4 after two ticks by mouse and the site's own
+navigation; 3 / 4 after a reload; 2 / 4 after an untick and Back; 1 / 4 with
+the site's storage cleared; every total equal to the manifest's
+with the browser's ticks, with another qualifying page (a teacher's `[x]`
+under Other pages) beside it; nothing on the console. Must-fail, by copy and
+restore: the pin's slug emptied in the built `postscript.js` (the sidebar
+check fails), the script's `nav` listener renamed (My Progress never draws);
+in the rules, the section's closing rule, the dedupe, the `[x]` default and
+the pin each fail their contract cases in the image's check; in Python, the
+Key Links guard, the gate's quiz guard, a case-sensitive own-page check and
+the `const` reassignment each fail `test_my_progress.py`; in the fixes round,
+the Key Links guard matching `[[My Progress Journal]]`, the gate's
+indented-code, HTML-comment, `&nbsp;` and next-line-words rules, a console
+line saying "script", and the check run without Latex each fail their test. None of the 39
+example payloads qualifies (104 headings match, all over tables), so no
+shipped course builds the page until its pages say so.
+
+Rejected (`myProgress.rejected`): a Python pass over `public/*.html`; ids
+re-derived from the Markdown; a transformer that stamps counted items; a
+`window.*` read API; a `storage` listener; editing `patches/explorer.inline.ts`;
+hiding the page from the sidebar (Russell put it second); one table per
+meeting; a fixed-name structural check.
 
 ## E. Summary: what is *not* customized
 
