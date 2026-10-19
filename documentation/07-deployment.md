@@ -561,12 +561,16 @@ So the policy now allows every host a page's scripts load code FROM, not
 only the hosts it links: in addition to `<script src>` hosts,
 `_collect_inline_script_policy` takes the `scheme://host` of every absolute
 `https://` URL that is the argument of a dynamic `import(…)` — in single or
-double quotes, or in backticks with no `${` in them — found in every inline
+double quotes, or in backticks with no `${` in them — and of every quoted
+`https://` specifier of a STATIC module import or re-export (`import x from
+"https://…"`, `import { a } from "https://…"`, the bare `import "https://…"`
+and `export … from "https://…"`, the same fault class, found on review) —
+found in every inline
 `<script>` body of every built page AND in every `.js` / `.mjs` file under
 `public/` (Quartz's `postscript.js` and `prescript.js`, and anything a
 teacher put in `static/`). `import(` must not follow a letter, digit, `_`,
 `$` or `.`, so a method named `import` (Quartz's search index has one) is not
-read as one. A same-origin import (`./x.mjs`, `/static/x.mjs`) gives no host,
+read as one, and `import.meta` never matches. A same-origin import (`./x.mjs`, `/static/x.mjs`) gives no host,
 since `'self'` covers it; `node:` imports in the bundled Pyodide give none
 either. Mermaid's own chunks load from the same cdnjs host, so the one host
 is all it needs. The hosts go into the same sorted, de-duplicated list the
@@ -574,7 +578,7 @@ is all it needs. The hosts go into the same sorted, de-duplicated list the
 call it unchanged. `'unsafe-inline'` stays out and the hash approach is
 untouched — the badge is still kept off.
 
-Only `import(` arguments are collected. A `fetch("https://…")` is a network
+Only module specifiers are collected. A `fetch("https://…")` is a network
 request, not a script source, and `script-src` does not govern it; reading
 every `https://` string in a script would widen the policy to every address
 a script happens to mention.
@@ -582,10 +586,11 @@ a script happens to mention.
 Pinned by `ScriptsThatLoadCodeAreAllowedTheirHostsTests` in
 `scripts/test_netlify_badge.py` (the exact minified Quartz loader copied
 from a real built page, the same import in `postscript.js` and in a
-teacher's `.mjs` in `static/`; a `fetch`, same-origin imports, a template
-with `${…}` and a method named `import` allowing nothing) and one case
+teacher's `.mjs` in `static/`, a static import, a bare import and a
+re-export; a `fetch`, same-origin imports, `import.meta`, a template with
+`${…}` and a method named `import` allowing nothing) and one case
 through `deploy.py`'s re-export in `scripts/test_deploy_netlify_headers.py`;
-seven of them fail on the old module. And by a browser:
+ten of them fail on the module from before #594. And by a browser:
 `browser-checks/mermaid_draws.mjs` serves a built site over a local server
 that sends, on every response, the exact `Content-Security-Policy` line
 `write_netlify_headers_file` wrote into that site's `_headers` (read from
@@ -635,6 +640,13 @@ Rejected:
 - **Allowing the host of every `https://` string found in a script.** It
   widens `script-src` to fetch targets, links and anything else a script
   mentions — every one of them a place code could then be loaded from.
+- **Collecting `http://` imports.** A browser refuses an `http://` module
+  on an `https://` page as mixed content before the policy is consulted, so
+  allowing its host would change nothing a student sees.
+- **Collecting `importScripts(…)` URLs.** No Plantoir worker loads
+  cross-origin code, and `worker-src` falls back to `script-src`, so a
+  same-origin worker and what it loads are already covered by `'self'`; a
+  teacher's cross-origin worker script is not a case anybody has.
 - **A fixed allow-list naming cdnjs.** It goes stale the day Quartz moves
   Mermaid (or its version path), and it misses a teacher's own import. The
   whole module exists to read what the built site really does instead.
