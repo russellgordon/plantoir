@@ -150,6 +150,28 @@ class ScriptsThatLoadCodeAreAllowedTheirHostsTests(unittest.TestCase):
         hosts = self.hosts_for({"postscript.js": 'this.index[t].import("https://not.a.script/x")'})
         self.assertEqual(hosts, [])
 
+    def test_a_static_import_from_another_host_allows_it(self):
+        hosts = self.hosts_for({"index.html":
+                                '<script type="module">import confetti from "https://esm.sh/canvas-confetti@1";'
+                                "import { a, b } from 'https://unpkg.com/lib@2/x.mjs'</script>"})
+        self.assertEqual(hosts, ["https://esm.sh", "https://unpkg.com"])
+
+    def test_a_bare_import_of_another_host_allows_it(self):
+        hosts = self.hosts_for({"postscript.js": 'import "https://side.example/effects.mjs";'})
+        self.assertEqual(hosts, ["https://side.example"])
+
+    def test_a_re_export_from_another_host_allows_it(self):
+        hosts = self.hosts_for({"static/demo/index.mjs":
+                                'export { x } from "https://re.example/x.mjs";export * from "https://re2.example/y.mjs"'})
+        self.assertEqual(hosts, ["https://re.example", "https://re2.example"])
+
+    def test_same_origin_static_imports_and_import_meta_give_nothing(self):
+        hosts = self.hosts_for({"index.html": '<script type="module">import x from "./local.mjs";'
+                                'import "/static/y.mjs";const here = import.meta.url;'
+                                'new URL("https://not.a.script/x", import.meta.url)</script>',
+                                "postscript.js": 'export { z } from "./z.mjs"'})
+        self.assertEqual(hosts, [])
+
     def test_import_hosts_and_script_src_hosts_are_one_sorted_list(self):
         hosts = self.hosts_for({
             "a.html": '<script src="https://cdn.jsdelivr.net/npm/x.js"></script>'

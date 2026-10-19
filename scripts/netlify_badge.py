@@ -40,8 +40,8 @@ fine; the break was in vendored Quartz code this policy never touched
 directly, which is why hash-checking each inline script's content missed
 it — the violation was a *capability* (eval), not a script identity.
 
-The policy covers the code a page's scripts LOAD, not only the code it
-links (#594). `script-src` governs a dynamic `import()` exactly as it
+The policy covers the code a page's scripts load or import, not only the
+code it links (#594). `script-src` governs a dynamic `import()` exactly as it
 governs a `<script src>`, and Quartz draws Mermaid diagrams from an inline
 module script that does
 `await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs")`.
@@ -49,9 +49,11 @@ Until 2026-10-19 only `<script src>` hosts were collected, so cdnjs was
 never allowed and every Netlify site showed its diagrams as source text
 since the policy existed (Cloudflare, with no policy, drew them). So the
 host of every absolute https:// URL that is the argument of an `import(...)`
-is collected too — from every inline script on every page, and from every
+is collected too, and so is the https:// specifier of a static `import …
+from`, a bare `import "…"` and an `export … from` — from every inline script
+on every page, and from every
 .js / .mjs file in the built site (Quartz's postscript.js and prescript.js,
-and anything a teacher put in static/). Only `import(` arguments: a
+and anything a teacher put in static/). Only module specifiers: a
 `fetch("https://...")` is a network request, not a script source, and
 must not widen script-src.
 
@@ -78,6 +80,15 @@ _SCRIPT_SRC_RE = re.compile(r'<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']', re
 _DYNAMIC_IMPORT_RE = re.compile(
     r"""(?<![\w$.])import\s*\(\s*(["'`])(https://[^"'`\s]+)\1""", re.IGNORECASE
 )
+# The specifier of a STATIC module import or re-export: `import x from
+# "https://…"`, `import {a, b} from "https://…"`, `import * as m from
+# "https://…"`, the bare `import "https://…"`, and `export … from "https://…"`.
+# A quoted specifier that starts with https:// after `from`, or straight
+# after a bare `import`; nothing else. `import.meta` and same-origin
+# specifiers ("./x.mjs") never match.
+_STATIC_IMPORT_RE = re.compile(
+    r"""(?:(?<![\w$.])import\s*|\bfrom\s*)(["'])(https://[^"'\s]+)\1"""
+)
 
 
 def _origin_of(url: str) -> str | None:
@@ -89,9 +100,11 @@ def _origin_of(url: str) -> str | None:
 
 
 def _imported_origins(script_text: str) -> set[str]:
-    """The `scheme://host` of every absolute https:// URL that `script_text`
-    passes to a dynamic import(). A same-origin import ("./x.mjs",
-    "/static/x.mjs") is covered by 'self' and gives nothing."""
+    """The `scheme://host` of every absolute https:// module `script_text`
+    loads or imports: the argument of a dynamic import(), and the specifier
+    of a static `import … from`, a bare `import "…"` or an `export … from`.
+    A same-origin import ("./x.mjs", "/static/x.mjs") is covered by 'self'
+    and gives nothing."""
     origins: set[str] = set()
     for match in _DYNAMIC_IMPORT_RE.finditer(script_text):
         quote = match.group(1)
@@ -99,6 +112,10 @@ def _imported_origins(script_text: str) -> set[str]:
         if quote == "`" and "${" in url:
             continue
         origin = _origin_of(url)
+        if origin is not None:
+            origins.add(origin)
+    for match in _STATIC_IMPORT_RE.finditer(script_text):
+        origin = _origin_of(match.group(2))
         if origin is not None:
             origins.add(origin)
     return origins
@@ -110,7 +127,8 @@ def _collect_inline_script_policy(public_dir: Path) -> tuple[list[str], list[str
       - sorted 'sha256-<base64>' entries, one per unique inline <script> body
       - sorted "scheme://host" entries for every cross-origin place a page
         loads script from: the src of a <script src="https://...">, and the
-        absolute https:// argument of a dynamic import(...) in an inline
+        absolute https:// argument of a dynamic import(...), or specifier of
+        a static import / export … from, in an inline
         script or in one of the site's own .js / .mjs files (#594 — Quartz
         imports Mermaid from cdnjs that way). Same-origin scripts and
         imports are covered by 'self' and need no entry.
@@ -229,7 +247,7 @@ def write_netlify_headers_file(public_dir: Path) -> int:
     suppresses Netlify's own badge script without touching anything a
     student would notice.
 
-    The hosts it allows are every host a page's scripts LOAD code from, not
+    The hosts it allows are every host a page's scripts load or import code from, not
     only the hosts it links with <script src> (#594): Quartz's Mermaid
     loader is an inline module that does
     `await import("https://cdnjs.cloudflare.com/.../mermaid.esm.min.mjs")`,
