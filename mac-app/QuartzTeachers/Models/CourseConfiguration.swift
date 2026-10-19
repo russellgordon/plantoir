@@ -971,6 +971,83 @@ class CourseConfiguration {
         }
     }
 
+    /// Whether this course gets the My Progress page (#545), read for the
+    /// first section the way the build reads it for each one: a boolean, or
+    /// a per-section map (`sections`, then `section<N>`, then `default`);
+    /// absent, or a map that says nothing, is on. Read-only until #595 gives
+    /// it a switch in Course Settings — the build honours it when present.
+    /// `contracts/shared-rules.json` → `myProgress.config`.
+    var includesMyProgress: Bool {
+        return includesMyProgress(inSection: 1)
+    }
+
+    /// The same, for one section (`build_site.resolve_include_my_progress`,
+    /// which reads `include_curriculum_coverage` the same way).
+    func includesMyProgress(inSection section: Int) -> Bool {
+        guard let stored = storedValue(forKey: "include_my_progress") else {
+            return true
+        }
+        guard stored is [String: Any] else {
+            return CourseConfiguration.truthValue(of: stored)
+        }
+        let map: [String: Any] = flatDictionary(forKey: "include_my_progress")
+        let sectionKey: String = "section\(section)"
+        if let sections = map["sections"] as? [String: Any], let entry = sections[sectionKey] {
+            return CourseConfiguration.truthValue(of: entry)
+        }
+        if let entry = map[sectionKey] {
+            return CourseConfiguration.truthValue(of: entry)
+        }
+        if let entry = map["default"] {
+            return CourseConfiguration.truthValue(of: entry)
+        }
+        return true
+    }
+
+    /// A stored value read as the build's Python reads one with `bool(...)`:
+    /// false, zero, an empty string or list, and null are false; anything
+    /// else is true.
+    static func truthValue(of value: Any) -> Bool {
+        if value is NSNull {
+            return false
+        }
+        if let number = value as? NSNumber {
+            return number.doubleValue != 0
+        }
+        if let text = value as? String {
+            return !text.isEmpty
+        }
+        if let list = value as? [Any] {
+            return !list.isEmpty
+        }
+        if let map = value as? [String: Any] {
+            return !map.isEmpty
+        }
+        return true
+    }
+
+    /// The headings whose task items My Progress counts (#545): the
+    /// teacher's own list when it holds at least one heading that is not
+    /// blank — it replaces the defaults — and an empty list otherwise, which
+    /// means the build's three defaults
+    /// (`contracts/shared-rules.json` → `myProgress.headings.defaults`).
+    /// Read-only until #595's list in Course Settings.
+    var successCriteriaHeadings: [String] {
+        guard let stored = storedValue(forKey: "success_criteria_headings") as? [Any] else {
+            return []
+        }
+        var headings: [String] = []
+        for entry in stored {
+            guard let heading = entry as? String else {
+                continue
+            }
+            if !heading.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                headings.append(heading)
+            }
+        }
+        return headings
+    }
+
     /// Whether the coverage page carries its two explanatory sections.
     var includesCoverageNotes: Bool {
         get {
@@ -1702,6 +1779,13 @@ class CourseConfiguration {
             return false
         }
         return (stored as? NSNumber)?.boolValue == true
+    }
+
+    /// Whatever the file holds under `key`, or nil when it holds nothing.
+    /// Read through `forKey:` so the file-formats contract's key count sees
+    /// the key.
+    private func storedValue(forKey key: String) -> Any? {
+        return values[key]
     }
 
     private func boolValue(forKey key: String, fallback: Bool) -> Bool {
