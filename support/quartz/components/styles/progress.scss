@@ -40,7 +40,8 @@
     color: var(--darkgray);
   }
 
-  & details.plantoir-progress-unit {
+  & details.plantoir-progress-unit,
+  & details.plantoir-progress-day {
     margin: 0.75rem 0;
 
     & > summary {
@@ -74,10 +75,12 @@
       vertical-align: top;
     }
 
-    & tr.plantoir-progress-class > th {
-      padding-top: 0.75rem;
-      font-weight: 600;
-    }
+  }
+
+  // A class inside its unit (#603): its own closed level, set in under the
+  // unit's name.
+  & details.plantoir-progress-day {
+    margin: 0.5rem 0 0.5rem 1rem;
   }
 
   // A page row's list of items (#603): closed on load, opened from the

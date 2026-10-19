@@ -83,7 +83,7 @@ function pageCell(words: Record<string, string>, root: string, row: Row): HTMLEl
   return cell
 }
 
-function tableOf(words: Record<string, string>, root: string, groups: { label: string | null; rows: Row[] }[]): HTMLElement {
+function tableOf(words: Record<string, string>, root: string, rows: Row[]): HTMLElement {
   const table = element("table", "plantoir-progress-table")
   const head = element("thead", "")
   const headRow = element("tr", "")
@@ -95,24 +95,40 @@ function tableOf(words: Record<string, string>, root: string, groups: { label: s
   head.append(headRow)
   table.append(head)
   const body = element("tbody", "")
-  for (const group of groups) {
-    if (group.label !== null) {
-      const classRow = element("tr", "plantoir-progress-class")
-      const classCell = element("th", "", group.label)
-      classCell.setAttribute("colspan", "2")
-      classCell.setAttribute("scope", "colgroup")
-      classRow.append(classCell)
-      body.append(classRow)
-    }
-    for (const row of group.rows) {
-      const line = element("tr", "plantoir-progress-page")
-      const doneCell = element("td", "plantoir-progress-count", count(words, row.done, row.total))
-      line.append(pageCell(words, root, row), doneCell)
-      body.append(line)
-    }
+  for (const row of rows) {
+    const line = element("tr", "plantoir-progress-page")
+    const doneCell = element("td", "plantoir-progress-count", count(words, row.done, row.total))
+    line.append(pageCell(words, root, row), doneCell)
+    body.append(line)
   }
   table.append(body)
   return table
+}
+
+// What a unit opens to (#603): each class its own CLOSED <details> - the
+// class's name and its count (the sum of its pages), as the unit's summary
+// carries the unit's - holding the table of its pages; Other pages, which
+// have no class, the table alone.
+function unitContent(words: Record<string, string>, root: string, groups: { label: string | null; rows: Row[] }[]): HTMLElement[] {
+  const made: HTMLElement[] = []
+  for (const group of groups) {
+    if (group.label === null) {
+      made.push(tableOf(words, root, group.rows))
+      continue
+    }
+    let done = 0
+    let total = 0
+    for (const row of group.rows) {
+      done += row.done
+      total += row.total
+    }
+    const day = element("details", "plantoir-progress-day") as HTMLDetailsElement
+    const summary = element("summary", "")
+    summary.append(element("span", "", group.label), element("span", "plantoir-progress-count", count(words, done, total)))
+    day.append(summary, tableOf(words, root, group.rows))
+    made.push(day)
+  }
+  return made
 }
 
 function rowsOf(root: string, pages: ManifestPage[], totals: { done: number; total: number; touched: number }): Row[] {
@@ -176,10 +192,35 @@ function draw(holder: HTMLElement, manifest: Manifest, root: string) {
     const details = element("details", "plantoir-progress-unit") as HTMLDetailsElement
     const summary = element("summary", "")
     summary.append(element("span", "", section.label), element("span", "plantoir-progress-count", count(words, section.done, section.total)))
-    details.append(summary, tableOf(words, root, section.groups))
+    details.append(summary, ...unitContent(words, root, section.groups))
     drawn.push(details)
   }
   holder.replaceChildren(...drawn)
+}
+
+// Option-click (Alt) on any marker, as in the Finder (#603): that level and
+// every level inside it open, or all close, together. A plain click - and
+// Enter or Space on a focused summary - opens or closes that level alone,
+// the browser's own behaviour. A click on a page's name follows its link.
+function openOrCloseEverythingInside(event: MouseEvent) {
+  if (!event.altKey) {
+    return
+  }
+  const target = event.target as Element | null
+  const summary = target?.closest("summary")
+  if (!summary || target?.closest("a") !== null) {
+    return
+  }
+  const details = summary.parentElement
+  if (!(details instanceof HTMLDetailsElement)) {
+    return
+  }
+  event.preventDefault()
+  const opening = !details.open
+  details.open = opening
+  for (const inside of details.querySelectorAll("details")) {
+    inside.open = opening
+  }
 }
 
 function holderOnThePage(): HTMLElement | null {
@@ -218,6 +259,9 @@ document.addEventListener("nav", async () => {
   }
   try {
     draw(holder, manifest, root)
+    // A property, not addEventListener: drawn again on every page shown,
+    // the holder still has exactly one.
+    holder.onclick = openOrCloseEverythingInside
   } catch {
     holder.replaceChildren(element("p", "plantoir-progress-empty", unreadable))
   }
