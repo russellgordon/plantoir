@@ -600,16 +600,29 @@ cdnjs, so with cdnjs out of reach the check prints `SKIPPED: no network`
 and exits 3, and `verify.sh` lists a `⏭️  SKIP` — never a pass — without
 failing the run (its `skip` verb, added for this).
 
-**Measured alongside, NOT fixed here:** Quartz's own analytics loader in
-`postscript.js` does `document.createElement("script")` with
-`src = "https://plausible.io/js/script.manual.js"` — it is in the
-`postscript.js` of every built site checked (ICS3U, ADA1O and verify.sh's
-EXC2O fixture) — and the same policy blocks it on Netlify (one `blocked=csp`
-request per page load on the ICS3U test site, before and after this fix). It draws nothing a student sees, and an injected
-`<script>` element's `src` is not an `import(` argument, so the rule above
-does not collect it — whether a class site should load Plausible at all is
-its own question. The browser check names it and reports it on its OK line
-rather than failing on it.
+**Quartz's page-view counter: REMOVED, not allowed (#594).** The same
+probe found one more `blocked=csp` request on every Netlify page, before
+and after the fix: `https://plausible.io/js/script.manual.js`, a `<script>`
+that Quartz's analytics component injects from `postscript.js`
+(`createElement("script")`, then `.src = "https://plausible.io/…"`), so no
+`<script src>` in the HTML names it. Nobody set it up. Plantoir has no
+analytics setting; this is Quartz v4.5.0's DEFAULT `analytics: { provider:
+"plausible" }` in `quartz.config.ts`, which `build_site.py` edited for
+locale and `baseUrl` and never touched for analytics. So every Cloudflare,
+folder and Preview site has been sending each student's page view to
+plausible.io for a domain nobody registered, and Netlify sites were spared
+only by accident — this policy happened to block it. That is a privacy
+fault, not a script source to allow, so the policy does NOT collect script
+URLs written inside scripts (a first draft of #594 did, for this), and
+`build_site.patch_quartz_analytics_off` sets `analytics: null` in every
+build, in the section every build runs, beside the locale and `baseUrl`
+edits (any other provider block a future Quartz default carries goes the
+same way). Preview builds through the same `build_site.py`, so it stopped
+too. `scripts/test_quartz_analytics_off.py` pins the edit (red on the old
+`build_site.py`), and `verify.sh` requires that no page and no script of
+the fixture site's real build names `plausible.io`. A teacher-facing
+sentence about it, where one is needed, says "a page-view counter from the
+site-building tool that nobody had set up" — never the product's name.
 
 Rejected:
 
@@ -715,8 +728,7 @@ runnable blocks show as plain code there.
 **Still third-party, deliberately out of #494's scope:** Quartz's Mermaid
 (`cdnjs.cloudflare.com`, and its `preconnect` — allowed by the Netlify
 policy since #594, above), Google Fonts (a site's own font choice), and
-plausible (in every built site's `postscript.js` as of 2026-10-19, and
-blocked by the Netlify policy, as measured above). A separate toolchain issue owns them.
+plausible — removed from every build since #594, above. A separate toolchain issue owns them.
 
 **The block is marked and REPLACED, never appended again (#462).** Lines
 somebody else put in `_headers` are kept, and until 2026-10-08 the function
