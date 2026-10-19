@@ -29772,7 +29772,7 @@
       ]
     },
     "sections": {
-      "rule": "A section opens at a heading that is a CHILD OF THE PAGE ITSELF (not one inside a callout, a quote or a list) whose words count (headings.rule), and runs to the next such heading of the same or a higher level; a deeper heading stays inside it. Every task box inside it that the site stamped (taskBoxes.rule) counts, at any depth - inside a callout or a nested list too. A quiz's boxes carry no stamp, so they never count. The same words twice are one id and count once, from the first. Code and %% comments are not read. A transcluded checklist counts on the page it is written on, not on the page that shows it. `items` are the counted items' words, in page order (their ids are taskBoxes.itemId's); `checked` is the Markdown's own state of each, where a case says.",
+      "rule": "A section opens at a heading that is a CHILD OF THE PAGE ITSELF (not one inside a callout, a quote or a list) whose words count (headings.rule), and runs to the next such heading of the same or a higher level; a deeper heading stays inside it. Every task box inside it that the site stamped (taskBoxes.rule) counts, at any depth - inside a callout or a nested list too. A quiz's boxes carry no stamp, so they never count. The same words twice are one id and count once, from the first. Code and %% comments are not read. A transcluded checklist counts on the page it is written on, not on the page that shows it. `items` are the counted items' words, in page order (their ids are taskBoxes.itemId's); `checked` is the Markdown's own state of each, where a case says. Each counted item also carries `text` (#603, v1.8.3): the words a student reads beside the box, read off the built page - the <label> the site wraps around the box and its words (taskBoxes.rule), white space made single spaces and trimmed, maths as the TeX the teacher wrote - never re-derived from the Markdown; it equals the item's `items` words unless the case's `shown` says otherwise. And `anchor`: the id the built page gives the success-criteria heading the item sits under (`anchors`, where a case says), so My Progress links each listed item to that part of the page.",
       "readers": "Both readings run every case: the site's (scripts/check_progress_rules_against_the_site.py: Quartz's own ObsidianFlavoredMarkdown and GitHubFlavoredMarkdown, PlantoirQuizzes and PlantoirTasks, then progressRules.countedItems - exactly these items) and the build's gate (scripts/test_my_progress.py: my_progress.page_has_counted_items - true exactly when `items` is not empty). When the two readings of a real page disagree, the emitter says so on a `plantoir: note:` line (notes) - #545 plan review F3.",
       "cases": [
         {
@@ -29831,7 +29831,32 @@
           "items": [
             "I can add fractions",
             "I can check my answer"
-          ]
+          ],
+          "anchors": [
+            "success-criteria",
+            "tests-of-success"
+          ],
+          "why": "#603: each listed item links to the heading it sits under on its page"
+        },
+        {
+          "name": "an item's words as a student reads them, not as typed",
+          "markdown": "## Success criteria\n\n- [ ] I can read [the notes](https://example.com) and **bold** words\n- [ ] I can square $x^2$\n  - [ ] I can cube $x^3$\n",
+          "items": [
+            "I can read [the notes](https://example.com) and **bold** words",
+            "I can square $x^2$",
+            "I can cube $x^3$"
+          ],
+          "shown": [
+            "I can read the notes and bold words",
+            "I can square x^2",
+            "I can cube x^3"
+          ],
+          "anchors": [
+            "success-criteria",
+            "success-criteria",
+            "success-criteria"
+          ],
+          "why": "#603: the text the row lists is the built page's label - a link's words, no Markdown marks, maths as the TeX the teacher wrote - and a nested item's words are its own, not its parent's"
         },
         {
           "name": "items before any heading do not count",
@@ -29953,7 +29978,10 @@
           "items": [
             "Read [[Fractions]] first"
           ],
-          "why": "the id the transformer stamps (taskBoxes.itemText) - never re-derived here"
+          "shown": [
+            "Read Fractions first"
+          ],
+          "why": "the id the transformer stamps (taskBoxes.itemText) - never re-derived here; the words listed are the link's, as the page shows them (#603)"
         },
         {
           "name": "a list indented four spaces is code",
@@ -29987,7 +30015,10 @@
           "items": [
             ""
           ],
-          "why": "measured: the site's parser makes a task item of a box whose words begin on the next line, and its id is that of its FIRST line's words - none (taskBoxes.itemText) - so it counts once; every such item on a page shares that one id. A box with nothing after it at all is still no item (an empty box is no item)"
+          "shown": [
+            "I can add fractions"
+          ],
+          "why": "#603: the words listed are the label's, the next line's included, though the id is the first line's. Measured: the site's parser makes a task item of a box whose words begin on the next line, and its id is that of its FIRST line's words - none (taskBoxes.itemText) - so it counts once; every such item on a page shares that one id. A box with nothing after it at all is still no item (an empty box is no item)"
         }
       ]
     },
@@ -30197,7 +30228,7 @@
       ]
     },
     "rollUp": {
-      "rule": "progressRules.rollUp(siteRoot, page, store) -> {done, total}: an item is done when the student ticked it (\"1\"), or never touched it and the teacher wrote it ticked ([x], ruling Q5); a student's untick (\"0\") is not done. Ticks are read through taskRules.readTicks with the manifest's own ids only, so a tick kept under words that are no longer on the page (taskBoxes.textChange) is never counted, and a store that throws reads as nothing touched.",
+      "rule": "progressRules.rollUp(siteRoot, page, store) -> {done, total, ticked}, `ticked` each item's own answer in the manifest's order (#603: the row's list of items reads it, so the list and the count are one reading and cannot disagree; `ticked` where a case says): an item is done when the student ticked it (\"1\"), or never touched it and the teacher wrote it ticked ([x], ruling Q5); a student's untick (\"0\") is not done. Ticks are read through taskRules.readTicks with the manifest's own ids only, so a tick kept under words that are no longer on the page (taskBoxes.textChange) is never counted, and a store that throws reads as nothing touched.",
       "cases": [
         {
           "name": "nothing ticked",
@@ -30250,7 +30281,12 @@
             "plantoir:task:/:Tasks/Fractions:5613c0aa": "1"
           },
           "done": 2,
-          "total": 3
+          "total": 3,
+          "ticked": [
+            true,
+            false,
+            true
+          ]
         },
         {
           "name": "a stale tick is not counted",
@@ -30341,12 +30377,12 @@
     },
     "manifest": {
       "plan": "quartz/plantoir_progress.json, written by the build on EVERY build (sorted keys, the same bytes for the same input): {version, page (whether the section gets the page), reason (built | switchedOff | noSuccessCriteria | teachersOwnPage), slug, headings (normalised), words, notes, classes: [{path, title, date, unit, unitOrder}] in the date pass's order, firstClassOf: {page path: class path}, gate: [page paths the build read as having counted items]}. Paths are the page's place in the site's content with forward slashes, in Unicode's composed form - the name Quartz knows the file by (relativePath).",
-      "file": "public/progress-manifest.json, written by the emitter only when `page` is true: {version, words, units: [{label, classes: [{label, date, pages: [{title, slug, items: [{id, checked}]}]}]}], other: {label, pages}}. Only pages with at least one counted item; a class with no such page, and a unit with no class left, are left out. Hidden pages (publish: false) are skipped by the emitter itself, since a rebuild in a preview hands it every page (#545 plan review F8). The dates are carried for #595's filter and not shown in v1.8.2 (ruling Q6).",
+      "file": "public/progress-manifest.json, written by the emitter only when `page` is true: {version, words, units: [{label, classes: [{label, date, pages: [{title, slug, items: [{id, checked, text, anchor}]}]}]}], other: {label, pages}}; `text` and `anchor` are sections.rule's (#603), read off the built page, so the page lists each page's items with no fetch beyond the manifest's own. Only pages with at least one counted item; a class with no such page, and a unit with no class left, are left out. Hidden pages (publish: false) are skipped by the emitter itself, since a rebuild in a preview hands it every page (#545 plan review F8). The dates are carried for #595's filter and not shown in v1.8.2 (ruling Q6).",
       "why": "A preview is ONE `quartz build --serve` process, so a Python pass after the build would never run there: the manifest is an emitter's, re-run with every page on each rebuild. Ids come from the built pages' stamps, never the Markdown (#519's comment on #545, review F1)."
     },
     "page": {
       "rule": "`My Progress.md` at the top of the build's content, written AFTER the page list the app reads and after every pass that reads links, so the app never lists it as the teacher's and no date pass, coverage map or links checklist meets it: title My Progress (Russell, 2026-10-19, wherever the words appear), the first class's date as every build-written page carries, words.description as its `description:` (the meta description and search summary, #545 fixes review 4 - not page text, so still no date line), `publish: true`, `excludeBacklinks: true`, and one EMPTY element (`data-plantoir-progress`) carrying words.placeholder and words.unreadable as attributes (dateLine). No link of any kind. Read-only: no box on it can be ticked; each row links back to its page.",
-      "shown": "The intro (words.intro), then the totals - words.overall then each table's - then words.noTicksYet while nothing on the page has been touched, then one CLOSED table per unit and Other pages last, each summary its label and count; inside, a heading row per class, then a row per page: its title linking back to it and words.count. Drawn again, every table closed, on every page shown (Back included). A manifest that cannot be read (a site opened from a folder on disk) shows words.unreadable.",
+      "shown": "The intro (words.intro), then the totals - words.overall then each table's - then words.noTicksYet while nothing on the page has been touched, then one CLOSED table per unit and Other pages last, each summary its label and count; inside, a heading row per class, then a row per page: its title linking back to it and words.count. Each page's title is the summary of its own CLOSED list (#603, v1.8.3: the browser's open-and-close marker, as each table's), which opens to that page's items in page order: a box-like mark, ticked or not - words.itemTicked or words.itemNotTicked for a screen reader - from rollUp's `ticked`, then the item's words as a link to the page at its success-criteria heading (the page's top when the heading has no id). Read-only: the mark is no box to tick. A click on the title still follows its link. Drawn again, every table and every list closed, on every page shown (Back included). A manifest that cannot be read (a site opened from a folder on disk) shows words.unreadable.",
       "dateLine": "The page shows NO date line and no reading time (Russell's Q6: no dates on the page). Quartz's ContentMeta draws its line only for a page with text, so the page carries none: the placeholder sentence is the element's `data-placeholder`, shown by the page's styles until the script draws (`:empty::before`), never page text. Measured in a real build: no `content-meta` in My-Progress.html.",
       "printing": "Not checked in v1.8.2: #595 owns the print check. #519's ruling Q1 (paper shows the student's ticks) means this page is no exception."
     },
@@ -30391,6 +30427,7 @@
       ]
     },
     "sidebar": {
+      "look": "#602 (v1.8.3, Russell on the 1.8.2 preview): the pinned link sits among the top-level FOLDERS, so it takes their look - the folder titles' colour (--secondary), face, size, weight and line height, full opacity, --tertiary on hover and on its own page - where Quartz would draw a page (--dark at 0.75 opacity, grey beside its neighbours). One rule in progress.scss, scoped to the top-level link whose `data-for` is the page's slug, so no other link in the sidebar changes. Measured by browser-checks/my_progress.mjs: the link's computed colour and opacity equal All Classes' in light and in dark. Known limit: a teacher's OWN top-level page named exactly `My Progress` (myProgress.page: it wins and nothing is pinned) takes the same look, as it carries the same slug.",
       "rule": "The sidebar is drawn in the browser (explorer.inline.ts: folders that do not expand, then those that do, then files), so the build adds one import of progressRules.pinnedOrder and one line of data, rewritten on every build: {slug: the page's slug, or \"\" when this build made none; after: the class folders' slug segments}. pinnedOrder moves the top-level file with that slug to directly after the first class folder - All Classes, or a club's own folder - or to the top when there is none: directly after the class folder (Russell, 2026-10-19: under All Classes) - the SECOND entry on a site whose class folder sorts first, as All Classes does; a club's `Resources` sorts before `All Meetings`, so there it is third (#545 implementation review 7, accepted as measured). Nothing moves when the slug is empty or the page is not in the sidebar. The `hidden` list still applies. A script whose shape has changed is said and left alone: the page then sorts last.",
       "cases": [
         {
@@ -30571,6 +30608,8 @@
       "nothingYet": "No page has boxes to tick under its success criteria yet.",
       "unreadable": "Your progress can’t be shown on this copy of the site. Open the site from its web address to see it.",
       "placeholder": "Counting the boxes you’ve ticked…",
+      "itemTicked": "Ticked",
+      "itemNotTicked": "Not ticked",
       "description": "Your own progress on this section’s success criteria, kept in your browser only."
     },
     "notes": {

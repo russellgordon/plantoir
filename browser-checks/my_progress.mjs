@@ -23,6 +23,17 @@
 //  6. the site's data cleared (a fresh profile for this site): 1 / 4;
 //  7. nothing reported to the console.
 //
+// #602 (v1.8.3): the pinned My Progress link has All Classes' computed colour
+// and opacity (and weight), in light and in dark (`saved-theme`), and the
+// same colour under the mouse; another top-level page keeps Quartz's page
+// look (0.75 opacity), so nothing else in the sidebar changed.
+// #603 (v1.8.3): every page row's list of items is closed whenever the page
+// is drawn; opened with the mouse on its marker, the fixture's row lists its
+// four items in page order, the ticked ones marked - exactly as many as its
+// count, each the manifest's own reading of this browser's ticks - each a
+// link to the fixture at its success-criteria heading; a click on one lands
+// there.
+//
 // Kept OUT of scripts/ for the reason task_boxes.mjs is: it needs a browser
 // on the Mac, not the image. No packages: Node 22's own WebSocket.
 //
@@ -126,14 +137,23 @@ const READ = `(async () => {
     tables.push({ label: spans[0]?.textContent, count: spans[1]?.textContent, open: details.open })
   }
   let row = null
-  for (const link of holder.querySelectorAll("tr.plantoir-progress-page a")) {
+  const lists = []
+  for (const details of holder.querySelectorAll("details.plantoir-progress-items")) lists.push(details.open)
+  for (const link of holder.querySelectorAll("tr.plantoir-progress-page summary > a")) {
     if (link.textContent !== ${JSON.stringify(FIXTURE)}) continue
     const line = link.closest("tr")
+    const items = []
+    for (const item of line.querySelectorAll("li.plantoir-progress-item")) {
+      const itemLink = item.querySelector("a")
+      items.push({ text: itemLink?.textContent, ticked: item.dataset.ticked, state: item.querySelector(".plantoir-progress-state")?.textContent,
+                   href: itemLink ? new URL(itemLink.href).pathname + new URL(itemLink.href).hash : null,
+                   shown: itemLink ? itemLink.getBoundingClientRect().height > 0 : false })
+    }
     let classRow = line.previousElementSibling
     while (classRow && !classRow.classList.contains("plantoir-progress-class")) classRow = classRow.previousElementSibling
     const unit = line.closest("details")?.querySelector(":scope > summary > span")?.textContent
     row = { count: line.querySelector(".plantoir-progress-count")?.textContent, under: classRow?.textContent ?? null,
-            unit, href: new URL(link.href).pathname }
+            unit, href: new URL(link.href).pathname, open: link.closest("details")?.open, items }
   }
   const totals = []
   for (const item of holder.querySelectorAll(".plantoir-progress-totals li")) {
@@ -142,12 +162,17 @@ const READ = `(async () => {
   }
   const manifest = await (await fetch("/progress-manifest.json", { cache: "no-cache" })).json()
   const expected = { overall: [0, 0] }
+  let fixtureItems = null
   const add = (label, page) => {
     let done = 0
+    const answers = []
     for (const item of page.items) {
       const value = localStorage.getItem("plantoir:task:/:" + page.slug + ":" + item.id)
-      if (value === "1" || (value === null && item.checked)) done += 1
+      const isDone = value === "1" || (value === null && item.checked)
+      if (isDone) done += 1
+      answers.push({ text: item.text, ticked: isDone ? "true" : "false", anchor: item.anchor })
     }
+    if (page.slug === ${JSON.stringify(FIXTURE_SLUG)}) fixtureItems = answers
     expected[label] = expected[label] ?? [0, 0]
     expected[label][0] += done
     expected[label][1] += page.items.length
@@ -156,7 +181,7 @@ const READ = `(async () => {
   }
   for (const unit of manifest.units) for (const known of unit.classes) for (const page of known.pages) add(unit.label, page)
   for (const page of manifest.other.pages) add(manifest.other.label, page)
-  return { holder: true, tables, row, totals, expected, boxes: holder.querySelectorAll("input").length,
+  return { holder: true, tables, row, lists, fixtureItems, totals, expected, boxes: holder.querySelectorAll("input").length,
            hint: holder.querySelector(".plantoir-progress-hint") !== null }
 })()`
 
@@ -258,6 +283,59 @@ async function connect(chunk) {
     }
     expect(`${when}: every table is closed`, seen.tables.length > 0 && seen.tables.every((table) => table.open === false), seen.tables)
     expect(`${when}: no box can be ticked here`, seen.boxes === 0, seen.boxes)
+    expect(`${when}: every page's list of items is closed`, seen.lists.length > 0 && seen.lists.every((open) => open === false), seen.lists)
+    return seen
+  }
+  // #603: open the fixture's unit and its row with the mouse - on the row's
+  // marker, beside its name, never on the link - and read its list.
+  const clickAt = async (point) => {
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y })
+    for (const type of ["mousePressed", "mouseReleased"]) {
+      await send("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: "left", clickCount: 1 })
+    }
+    await pause(200)
+  }
+  const markerOf = (selector) => evaluate(`(() => {
+    const summary = ${selector}
+    if (!summary) return null
+    summary.scrollIntoView({ block: "center", behavior: "instant" })
+    const area = summary.getBoundingClientRect()
+    return { x: area.left + 4, y: area.top + area.height / 2 }
+  })()`)
+  const FIXTURE_ROW_SUMMARY = `Array.from(document.querySelectorAll("[data-plantoir-progress] tr.plantoir-progress-page summary")).find((summary) => summary.querySelector("a")?.textContent === ${JSON.stringify(FIXTURE)})`
+  const expandFixture = async (when, done) => {
+    const unitPoint = await markerOf(`document.querySelector("[data-plantoir-progress] tr.plantoir-progress-page summary")?.closest("details.plantoir-progress-unit") && ${FIXTURE_ROW_SUMMARY}?.closest("details.plantoir-progress-unit")?.querySelector(":scope > summary")`)
+    if (unitPoint === null) {
+      expect(`${when}: the fixture's unit table was found`, false)
+      return null
+    }
+    await clickAt(unitPoint)
+    const rowPoint = await markerOf(FIXTURE_ROW_SUMMARY)
+    if (rowPoint === null) {
+      expect(`${when}: the fixture's row was found`, false)
+      return null
+    }
+    await clickAt(rowPoint)
+    const seen = await evaluate(READ)
+    const row = seen.row
+    expect(`${when}: the marker opened the fixture's row and did not follow its link`,
+      row !== null && row.open === true && (await evaluate("location.pathname")) === "/My-Progress", row)
+    const items = row?.items ?? []
+    let markedCount = 0
+    for (const item of items) if (item.ticked === "true") markedCount += 1
+    expect(`${when}: the row lists its ${TOTAL} items, ${done} marked ticked - its count`,
+      items.length === TOTAL && markedCount === done && row.count === countOf(markedCount, items.length), { count: row?.count, items })
+    const want = seen.fixtureItems ?? []
+    let agrees = items.length === want.length
+    for (let index = 0; agrees && index < items.length; index += 1) {
+      const anchor = want[index].anchor ? "#" + want[index].anchor : ""
+      agrees = items[index].text === want[index].text && items[index].ticked === want[index].ticked && items[index].shown
+        && items[index].state === (want[index].ticked === "true" ? WORDS.itemTicked : WORDS.itemNotTicked)
+        && items[index].href === "/" + FIXTURE_SLUG + anchor && anchor !== ""
+    }
+    expect(`${when}: each listed item is the manifest's - its words, this browser's tick, a link to its heading`, agrees, { items, want })
+    expect(`${when}: the listed words are the fixture's own`, items[0]?.text === "I can name a variable" && items[3]?.text === "I can read an error message",
+      items.map((item) => item.text))
     return seen
   }
 
@@ -284,11 +362,45 @@ async function connect(chunk) {
         return { links: links.length, first: first ? new URL(first.href).pathname : null }
       })()`)
       expect("Key Links links My Progress once, as its first bullet", keyLinks.links === 1 && keyLinks.first === "/My-Progress", keyLinks)
+      // #602: the pinned link looks like All Classes beside it, in both
+      // themes and under the mouse; a top-level page keeps the page look.
+      // Read on Key Links, where neither it nor the fixture (a top-level
+      // page) is the current page, which Quartz marks in its own colour.
+      const LOOK = `(() => {
+        const read = (link) => { if (!link) return null; const style = getComputedStyle(link); return { color: style.color, opacity: style.opacity, weight: style.fontWeight, family: style.fontFamily } }
+        const top = Array.from(document.querySelectorAll(".explorer .explorer-ul > li"))
+        const find = (words) => { for (const item of top) { const link = item.querySelector(".folder-title, a"); if (link && link.textContent.trim() === words) return link } return null }
+        let page = null
+        for (const item of top) { const link = item.querySelector(":scope > a:not(.active)"); if (link && link.textContent.trim() !== ${JSON.stringify(WORDS.title)}) { page = link; break } }
+        return { classes: read(find("All Classes")), progress: read(find(${JSON.stringify(WORDS.title)})), otherPage: page ? { name: page.textContent.trim(), ...read(page) } : null }
+      })()`
+      for (const theme of ["light", "dark"]) {
+        await evaluate(`document.documentElement.setAttribute("saved-theme", ${JSON.stringify(theme)})`)
+        // Quartz eases a link's colour (base.scss `transition`): read after it.
+        await pause(800)
+        const look = await evaluate(LOOK)
+        expect(`${theme}: My Progress in the sidebar has All Classes' colour, opacity, weight and face`,
+          look.classes !== null && look.progress !== null && look.progress.color === look.classes.color && look.progress.opacity === look.classes.opacity
+            && look.progress.weight === look.classes.weight && look.progress.family === look.classes.family, look)
+        expect(`${theme}: another top-level page keeps the page look (0.75)`, look.otherPage !== null && look.otherPage.opacity === "0.75", look.otherPage)
+        const hovered = []
+        for (const words of ["All Classes", WORDS.title]) {
+          const point = await evaluate(`(() => { for (const item of document.querySelectorAll(".explorer .explorer-ul > li")) { const link = item.querySelector(".folder-title, a"); if (link && link.textContent.trim() === ${JSON.stringify(words)}) { const area = link.getBoundingClientRect(); return { x: area.left + area.width / 2, y: area.top + area.height / 2 } } } return null })()`)
+          if (point === null) { hovered.push(null); continue }
+          await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y })
+          await pause(800)
+          hovered.push(await evaluate(`(() => { const link = document.elementFromPoint(${point.x}, ${point.y})?.closest("a"); return link ? getComputedStyle(link).color : null })()`))
+        }
+        await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1270, y: 890 })
+        expect(`${theme}: under the mouse, My Progress turns All Classes' colour`, hovered[0] !== null && hovered[0] === hovered[1], hovered)
+      }
+      await evaluate(`document.documentElement.setAttribute("saved-theme", "light")`)
 
       // 2. A fresh profile.
       await go(progress)
       const fresh = await checkPage("a fresh profile", TEACHER_TICKED)
       expect("a fresh profile: the hint line is shown", fresh?.hint === true)
+      await expandFixture("a fresh profile", TEACHER_TICKED)
       expect("no date line under the title", (await evaluate("document.querySelector('.content-meta') === null")) === true)
 
       // 3. Two ticks on the fixture (its second and third boxes are the
@@ -301,6 +413,21 @@ async function connect(chunk) {
       await go(progress)
       const ticked = await checkPage("after two ticks", TEACHER_TICKED + 2)
       expect("after two ticks: no hint line", ticked?.hint === false)
+      const opened = await expandFixture("after two ticks", TEACHER_TICKED + 2)
+      // A listed item is a link to the fixture at its heading.
+      const target = opened?.row?.items?.[0]?.href ?? ""
+      const itemPoint = await evaluate(`(() => {
+        const link = ${FIXTURE_ROW_SUMMARY}?.closest("td")?.querySelector("li.plantoir-progress-item a")
+        if (!link) return null
+        link.scrollIntoView({ block: "center", behavior: "instant" })
+        const area = link.getBoundingClientRect()
+        return { x: area.left + Math.min(20, area.width / 2), y: area.top + area.height / 2 }
+      })()`)
+      if (itemPoint !== null) await clickAt(itemPoint)
+      await pause(700)
+      const landed = await evaluate(`({ at: location.pathname + location.hash, heading: location.hash !== "" && document.getElementById(decodeURIComponent(location.hash.slice(1)))?.tagName })`)
+      expect("a listed item's link lands on the fixture at its success-criteria heading",
+        target !== "" && landed.at === target && /^H[1-6]$/.test(landed.heading ?? ""), { target, landed })
 
       // 4. A reload.
       await open(progress)
@@ -312,6 +439,7 @@ async function connect(chunk) {
       await evaluate("history.back()")
       await pause(900)
       await checkPage("after an untick and Back", TEACHER_TICKED + 1)
+      await expandFixture("after an untick and Back", TEACHER_TICKED + 1)
 
       // 6. The site's data cleared: a fresh profile for this site.
       await send("Storage.clearDataForOrigin", { origin: base, storageTypes: "local_storage" })
@@ -322,7 +450,7 @@ async function connect(chunk) {
       if (problems.length > 0) {
         return finish(1, "FAIL: " + problems.join("\nFAIL: "))
       }
-      finish(0, `OK: My Progress second in the sidebar and first in Key Links; ${FIXTURE}'s row under ${FIXTURE_CLASS} read 1 / 4 fresh (the teacher's [x]), 3 / 4 after two ticks and after a reload, 2 / 4 after an untick and Back, 1 / 4 with the site's data cleared; every total agreed with the manifest (${fresh?.totals?.length ?? 0} totals); read-only, every table closed`)
+      finish(0, `OK: My Progress second in the sidebar and first in Key Links; ${FIXTURE}'s row under ${FIXTURE_CLASS} read 1 / 4 fresh (the teacher's [x]), 3 / 4 after two ticks and after a reload, 2 / 4 after an untick and Back, 1 / 4 with the site's data cleared; every total agreed with the manifest (${fresh?.totals?.length ?? 0} totals); read-only, every table closed; #602 the pinned link All Classes' colour, opacity and weight in light and dark and under the mouse, another top-level page still 0.75; #603 every row's list closed on each drawing, the fixture's row opened by its marker listing its 4 items with 1, 3 and 2 marked as its count says, each linking to its heading, one click landing there`)
     } catch (error) {
       finish(1, "FAIL: " + (error?.stack ?? error))
     }
