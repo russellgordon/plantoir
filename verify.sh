@@ -4021,8 +4021,9 @@ claims = [
      lambda a, p: 'class="katex-display"' in a and "\\ce" not in re.sub(r"<annotation.*?</annotation>", "", a, flags=re.S) and "katex-error" not in a),
     ("- [ ] Estimate before calculating", "a checklist students tick, one box ticked to start",
      lambda a, p: tasks(a) == 3 and len(re.findall(r'<input type="checkbox" checked class="plantoir-task"', a)) == 1),
-    ("## Success criteria", "a success-criteria heading over three tickable items",
-     lambda a, p: 'id="success-criteria"' in a and tasks(a) == 3),
+    ("## Success criteria", "a page with three success criteria (one ticked) and a checklist under another heading",
+     lambda a, p: 'id="success-criteria"' in a and 'id="practice"' in a and tasks(a) == 4
+     and len(re.findall(r'<input type="checkbox" checked class="plantoir-task"', a)) == 1 and 'class="katex"' in a),
     ("See [[Slope]] before class.", "links: a page, other words, a heading, a website",
      lambda a, p: 'href="./Slope"' in a and ">what slope means<" in a and 'href="./Slope#finding-the-slope-from-two-points"' in a and 'class="external"' in a),
     ("![[Slope]]", "one page shown inside another, whole and by a heading",
