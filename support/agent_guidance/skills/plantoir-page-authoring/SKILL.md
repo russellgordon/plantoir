@@ -53,10 +53,10 @@ courses/<CODE>/
   pages with the same name in different folders make links ambiguous - pick
   a different name.
 - **A new folder** beside the others becomes a new entry in the sidebar on
-  the next preview. Give it an `index.md` (section 18).
+  the next preview. Give it an `index.md` (section 19).
 - **Per-section pages** live under `section<N>/` - the class pages and Key
   Links. Everything else is shared by every section; whether each section
-  shows it is the page's own setting (section 17).
+  shows it is the page's own setting (section 18).
 - Follow the folder's existing pages: open two neighbours and copy their
   settings block and headings, so the new page reads like the rest of the
   course.
@@ -82,11 +82,11 @@ The **slope** of a line is how much $y$ changes for each step in $x$.
 - `enableToc: false` turns off **Navigate this page**, the list of the
   page's headings shown beside it. Leave it out on a long page: every `##`
   heading is listed there automatically.
-- A page with no `publish:` line is on the site. Section 17 says how to
+- A page with no `publish:` line is on the site. Section 18 says how to
   hold one back.
-- Leave `created:` as the neighbouring pages have it, or leave it out: a
-  page a class page links to takes that class's date when the site is
-  built (section 19).
+- Leave `created:` (and any `createdSection1:`, `createdSection2:` ...) as
+  the neighbouring pages have it, or leave it out: a page a class page
+  links to takes that class's date when the site is built (section 20).
 
 ## 4. Text
 
@@ -210,10 +210,36 @@ Chemistry works too: $\ce{2H2 + O2 -> 2H2O}$.
   them. Write `\$5` for a price.
 - No space just inside a single dollar sign: `$x + 1$`, not `$ x + 1 $`,
   which the site typesets but Obsidian shows as plain text.
-- Never write `%%` anywhere on a page, maths included (section 16). Use one
+- Never write `%%` anywhere on a page, maths included (section 17). Use one
   `%` only inside maths where LaTeX needs it, written `\%`.
 
-## 9. Checklists students tick
+## 9. Code
+
+A fenced block with the language named after the three backticks is shown
+exactly as written, coloured, with line numbers down the left:
+
+````markdown
+```python
+def slope(x1, y1, x2, y2):
+    return (y2 - y1) / (x2 - x1)
+
+print(slope(2, 5, 6, 17))   # 3.0
+```
+
+In a sentence, `print()` in single backticks is code too.
+````
+
+- Name the language (`python`, `java`, `javascript`, `html`, `css`, `swift`,
+  `cpp`, `sql`, `bash` ...) so it is coloured; a block with no language is
+  plain.
+- The site never joins characters into one symbol, so `!=`, `->` and `<=`
+  show as typed, in blocks and in sentences alike.
+- Never write `%%` in code (section 17): it is taken off the page.
+- Code that students RUN in the browser - "make this runnable", "try it
+  yourself" - is the `plantoir-runnable-code` skill's ` ```python run `
+  block, not this one.
+
+## 10. Checklists students tick
 
 ```markdown
 - [ ] Estimate before calculating
@@ -228,7 +254,7 @@ a line's words clears that line's tick** for every student, so fix typos
 before students start. Boxes inside a `[!quiz]` callout are quiz choices,
 not a checklist.
 
-## 10. My Progress: success criteria students tick
+## 11. My Progress: success criteria students tick
 
 From Plantoir 1.8.2, each section's site can have a page called **My
 Progress**, where a student sees how many of the success criteria they have
@@ -243,8 +269,9 @@ boxes of its own. Rows are grouped by the class page that first linked
 each page (the earliest class that links it directly), one closed table per
 unit with totals at the top; pages no class links directly come last, under
 **Other pages**. The ticks live in the student's own browser - nothing is
-sent anywhere, and a different browser or device starts at 0. Until a
-student ticks something, every row reads "0 / n".
+sent anywhere, and a different browser or device starts again. Until a
+student ticks something, each row counts only the items the teacher wrote
+already ticked (`[x]`): a page with none reads "0 / n".
 
 **My Progress appears only when there is something to show**: Plantoir adds
 the page, its sidebar entry and its Key Links bullet only once at least one
@@ -288,16 +315,24 @@ The slope of a line is $m = \frac{\Delta y}{\Delta x}$.
 - **Items are counted on the page they are written on.** A checklist shown
   on another page with `![[Page#Success criteria]]` is still the first
   page's: it is counted once, under that page.
-- **A teacher's `[x]` counts as done** until the student unticks it.
+- **A teacher's `[x]` counts as done** from the start, until the student
+  unticks it. So the example page above reads **1 / 3** before a student
+  ticks anything; write `[ ]` for every item unless one really is done.
 - **Changing an item's words** clears every student's tick on that item
-  (section 9) and the old tick is no longer counted.
+  (section 10) and the old tick is no longer counted.
 - **Does not count:** a table under the heading (only checklist boxes are
   counted), items under another heading, a page held back with
-  `publish: false`, and every page of a course whose `include_my_progress`
-  is `false` in `course_config.json` (the page is then not built at all).
+  `publish: false`, and every page of a section where My Progress is
+  switched off (the page is then not built at all). That switch is
+  `include_my_progress` in `courses/<CODE>/course_config.json`, read the
+  same way as `include_curriculum_coverage`: `false` turns it off for every
+  section, or a map turns it off for one section - `{"sections": {"section2":
+  false}}` (or `{"section2": false}`, or `{"default": false}` for every
+  section the map does not name). No key, or a map that does not name the
+  section, means on. Change it only if the teacher asks.
 - Write each item as something a student can honestly tick: "I can ...".
 
-## 11. Links between pages
+## 12. Links between pages
 
 Link to another page of the course with double square brackets around its
 name - not its folder, and without `.md`:
@@ -319,11 +354,11 @@ A website: [the Desmos calculator](https://www.desmos.com/calculator).
   without losing their place. Nothing to write - every `[[...]]` does it.
 - **Backlinks**: at the bottom of every page the site lists every page that
   links to it, by itself. Nothing to write.
-- A link to a page held back from students (section 17) leads nowhere on
+- A link to a page held back from students (section 18) leads nowhere on
   the site; Plantoir lists such links in its check of the site after a
   preview.
 
-## 12. Showing one page inside another
+## 13. Showing one page inside another
 
 An exclamation mark in front of a link shows that page (or one heading of
 it) in place, kept up to date - change the source and every page showing it
@@ -339,7 +374,7 @@ Use it for something many pages need - a curriculum expectation, a
 shared set of instructions, a checklist - instead of copying it. A page
 shown this way is a quoted block with a link back to its own page.
 
-## 13. Footnotes
+## 14. Footnotes
 
 ```markdown
 The word "algebra" comes from Arabic.[^1]
@@ -350,7 +385,7 @@ The word "algebra" comes from Arabic.[^1]
 The `[^1]:` line can go anywhere on the page; the footnote is listed at the
 bottom. Each footnote needs its own label (`[^1]`, `[^2]`, `[^source]`).
 
-## 14. Tags
+## 15. Tags
 
 Tags go in the page's settings, one per line, with no `#` and no spaces
 (use hyphens):
@@ -369,7 +404,7 @@ Every tag becomes a page on the site listing everything carrying it, and
 the tags show at the top of the page. Follow the tags the course's other
 pages already use.
 
-## 15. Pictures, PDFs, videos and applets
+## 16. Pictures, PDFs, videos and applets
 
 **Pictures and files go in the course's `Media` folder** (`courses/<CODE>/Media/`,
 beside the course's other folders, made if it is not there). The site
@@ -424,7 +459,7 @@ and do not print:
   `plantoir-runnable-code` - a video, PDF frame or applet on the page
   changes how students type their input.
 
-## 16. Notes only the teacher sees
+## 17. Notes only the teacher sees
 
 Text between `%%` marks is kept in Obsidian and never reaches the site:
 
@@ -436,7 +471,7 @@ Students see only this sentence.
 Because of this, never write `%%` for any other reason on a page - not in
 maths, code or a percentage.
 
-## 17. Hidden pages and `publish:`
+## 18. Hidden pages and `publish:`
 
 ```markdown
 ---
@@ -457,7 +492,7 @@ Not on the site until `publish: false` is removed or set to `true`.
   folder or page can be left out of the sidebar in Plantoir's Course
   Settings and still be on the site, reached by links and search.
 
-## 18. Folders, the sidebar and a folder's front page
+## 19. Folders, the sidebar and a folder's front page
 
 Each folder of the course is an entry in the site's sidebar, and its
 `index.md` is the page that opens when a student chooses it:
@@ -480,7 +515,7 @@ The clean statement of each idea, in the order the course needs them.
 - A page with no folder (straight in `courses/<CODE>/`) is listed at the
   bottom of the sidebar.
 
-## 19. Class pages, and the dates they give
+## 20. Class pages, and the dates they give
 
 Each section's class pages are in its class folder (usually
 `section<N>/All Classes/`), named in the course's own words: `Unit 2, Day 3`
@@ -506,12 +541,16 @@ enableToc: false
 
 - **A page a class page links to directly takes that class's date** when
   the site is built (the earliest class, if several link it), and the date
-  is written into the page's own `created:` line. That date orders the page
-  in its folder. A date typed by hand on such a page is replaced.
+  is written into the page's own settings: on a page every section shares
+  (anything outside `section<N>/`) as `createdSection<N>:` for that section
+  only - which the site reads instead of `created:` - and on a section's
+  own page as `created:` (or its `createdSection<N>:`, if it has one). That
+  date orders the page in its folder. A date typed by hand on such a page is
+  replaced; another section's date is never touched.
 - Add new class pages with Plantoir (or the assistant in it), which numbers
   them and moves later ones along; do not renumber class pages by hand.
 
-## 20. Key Links
+## 21. Key Links
 
 Each section's `section<N>/Key Links.md` is the short list of pages
 students need all year - how the class works, how marks work, getting
@@ -530,7 +569,7 @@ Add a bullet for a page that belongs there; leave the others alone.
 Plantoir adds its own entries when it builds the site (the curriculum
 coverage map, and My Progress from 1.8.2) - do not add those by hand.
 
-## 21. Do not
+## 22. Do not
 
 - Do not write raw HTML for something Markdown already does (headings,
   lists, bold, tables, pictures): the site's styles and printing rely on
@@ -543,7 +582,7 @@ coverage map, and My Progress from 1.8.2) - do not add those by hand.
   Course Settings write it), or anything in a folder whose name starts with
   a dot.
 
-## 22. Check it
+## 23. Check it
 
 Preview the section in Plantoir and open the page: every callout should be
 a coloured box, every diagram drawn, every formula typeset, and every link
