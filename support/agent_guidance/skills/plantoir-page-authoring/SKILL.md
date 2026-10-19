@@ -260,9 +260,10 @@ From Plantoir 1.8.2, each section's site can have a page called **My
 Progress**, where a student sees how many of the success criteria they have
 ticked on each page of the course - for their eyes only.
 
-**What the student sees.** One My Progress page per section, listed second
-in the sidebar (directly under All Classes) and as the first bullet of Key
-Links. It lists every page that has success criteria, each row reading
+**What the student sees.** One My Progress page per section, listed in the
+sidebar directly after the class folder (All Classes in a course), so second
+on most sites, and as the first bullet of Key Links. The page itself shows
+no date. It lists every page that has success criteria, each row reading
 done / total ("2 / 5") with a link back to the page, so a student ticks
 boxes only on the page itself, with the lesson in view - My Progress has no
 boxes of its own. Rows are grouped by the class page that first linked
