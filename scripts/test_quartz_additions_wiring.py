@@ -7,7 +7,9 @@ straight before SyntaxHighlighting and its component at the head of the
 shared afterBody list - since #563 the self-check quizzes' transformer,
 straight after the figures transformer, and since #519 the task boxes'
 transformer, straight after the quizzes' (its script and styles ride the
-Print button's component, PlantoirMetaLine.tsx).
+Print button's component, PlantoirMetaLine.tsx), and since #545 My
+Progress's emitter, straight before Assets (its script and styles ride the
+same component).
 
 Run against embedded copies of Quartz v4.5.0's own files (measured in
 quartz-teacher:dev-test, 2026-10-17): wired once, a second build changes
@@ -58,6 +60,17 @@ CONFIG = '''  plugins: {
       Plugin.Description(),
       Plugin.Latex({ renderEngine: "katex" }),
     ],
+    filters: [Plugin.RemoveDrafts()],
+    emitters: [
+      Plugin.AliasRedirects(),
+      Plugin.ContentPage(),
+      Plugin.Assets(),
+      Plugin.Static(),
+    ],
+'''
+
+EMITTERS_INDEX = '''export { ContentPage } from "./contentPage"
+export { Assets } from "./assets"
 '''
 
 LAYOUT = '''import { PageLayout, SharedLayout } from "./quartz/cfg"
@@ -86,14 +99,17 @@ class WiringTests(unittest.TestCase):
         self.output = Path(tempfile.mkdtemp(prefix="plantoir-wiring-"))
         (self.output / "quartz" / "components").mkdir(parents=True)
         (self.output / "quartz" / "plugins" / "transformers").mkdir(parents=True)
+        (self.output / "quartz" / "plugins" / "emitters").mkdir(parents=True)
         self.files = {
             "components": self.output / "quartz" / "components" / "index.ts",
             "transformers": self.output / "quartz" / "plugins" / "transformers" / "index.ts",
+            "emitters": self.output / "quartz" / "plugins" / "emitters" / "index.ts",
             "config": self.output / "quartz.config.ts",
             "layout": self.output / "quartz.layout.ts",
         }
         self.files["components"].write_text(COMPONENTS_INDEX, encoding="utf-8")
         self.files["transformers"].write_text(TRANSFORMERS_INDEX, encoding="utf-8")
+        self.files["emitters"].write_text(EMITTERS_INDEX, encoding="utf-8")
         self.files["config"].write_text(CONFIG, encoding="utf-8")
         self.files["layout"].write_text(LAYOUT, encoding="utf-8")
 
@@ -122,6 +138,10 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(config.count("Plugin.PlantoirTasks(),"), 1)
         self.assertIn("      Plugin.PlantoirQuizzes(),\n      Plugin.PlantoirTasks(),\n      Plugin.Latex(", config,
                       "the task boxes' transformer goes straight after the quizzes', at its indent")
+        self.assertEqual(self.text("emitters").count('export { PlantoirProgress } from "./plantoirProgress"'), 1)
+        self.assertEqual(config.count("Plugin.PlantoirProgress(),"), 1)
+        self.assertIn("      Plugin.ContentPage(),\n      Plugin.PlantoirProgress(),\n      Plugin.Assets(),", config,
+                      "My Progress's emitter (#545) goes straight before Assets, at its indent")
         layout = self.text("layout")
         self.assertIn("afterBody: [Component.CodeRunner()],", layout)
         self.assertIn("Component.PlantoirMetaLine(Component.ContentMeta())", layout)
@@ -187,8 +207,14 @@ class WiringTests(unittest.TestCase):
                      / "PlantoirMetaLine.tsx").read_text(encoding="utf-8")
         self.assertIn('import tasksStyle from "./styles/tasks.scss"', component)
         self.assertIn('import tasksScript from "./scripts/tasks.inline"', component)
-        self.assertIn("quizStyle, tasksStyle)", component)
-        self.assertIn("quizScript, tasksScript)", component)
+        self.assertIn("quizStyle, tasksStyle, progressStyle)", component)
+        self.assertIn("quizScript, tasksScript, progressScript)", component)
+
+    def test_the_print_buttons_component_carries_my_progress(self):
+        component = (Path(build_site.__file__).resolve().parent.parent / "support" / "quartz" / "components"
+                     / "PlantoirMetaLine.tsx").read_text(encoding="utf-8")
+        self.assertIn('import progressStyle from "./styles/progress.scss"', component)
+        self.assertIn('import progressScript from "./scripts/progress.inline"', component)
 
     def test_quizzes_without_the_figures_anchor_are_said_and_left_out(self):
         changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")

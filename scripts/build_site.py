@@ -11,6 +11,7 @@ import subprocess
 import signal
 import json
 import re
+import unicodedata
 import urllib.parse
 from pathlib import Path
 
@@ -30,6 +31,7 @@ import figures
 import swift_blocks
 import print_settings
 import quizzes
+import my_progress
 import reference_course
 import stop_preview
 import toolchain_paths
@@ -1719,6 +1721,157 @@ def _wire_isolation_nav(spa_ts: Path) -> None:
     spa_ts.write_text(text[:at] + _ISOLATION_NAV_LINES + text[at:], encoding="utf-8")
 
 
+def _wire_emitters_index(index_ts: Path) -> None:
+    """Export My Progress's emitter (#545) beside Quartz's own."""
+    text = index_ts.read_text(encoding="utf-8")
+    if "export { PlantoirProgress }" in text:
+        return
+    if not text.endswith("\n"):
+        text += "\n"
+    text += f'export {{ PlantoirProgress }} from "./plantoirProgress" // {QUARTZ_ADDITIONS_MARKER}\n'
+    index_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_progress_emitter(config_ts: Path) -> None:
+    """Put My Progress's emitter (#545) straight BEFORE Assets: an emitter
+    runs after every transformer, so the trees it reads already carry the
+    task boxes' stamps; its place among the emitters changes nothing else."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirProgress(" in text:
+        return
+    anchor = "Plugin.Assets(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the My Progress page: the site's settings have changed shape.")
+        return
+    at = text.index(anchor)
+    line_start = text.rfind("\n", 0, at) + 1
+    indent = text[line_start:at]
+    if indent.strip():
+        print("⚠️ Could not add the My Progress page: the site's settings have changed shape.")
+        return
+    text = text[:line_start] + indent + "Plugin.PlantoirProgress(),\n" + text[line_start:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+# My Progress (#545) in the sidebar: directly under the class folder. The
+# sidebar is drawn in the BROWSER (explorer.inline.ts), files after every
+# folder, so the page would otherwise come last. One import and one line of
+# data, added once; the data line is rewritten on every build, so a section
+# whose page comes or goes is right on its next build, and a section with no
+# page carries an empty slug and nothing moves (progressRules.pinnedOrder).
+MY_PROGRESS_PIN_MARKER = "PLANTOIR-MY-PROGRESS-PIN"
+_PIN_IMPORT_ANCHOR = 'import { FileTrieNode } from "../../util/fileTrie"\n'
+_PIN_IMPORT = ('import { pinnedOrder } from "../../plugins/emitters/progressRules" // '
+               + MY_PROGRESS_PIN_MARKER + "\n")
+_PIN_LOOP_ANCHOR = "for (const child of orderedTopLevel) {"
+_PIN_LOOP = "for (const child of pinnedOrder(orderedTopLevel, PLANTOIR_MY_PROGRESS_PIN)) {"
+_PIN_DATA = re.compile(r"^const PLANTOIR_MY_PROGRESS_PIN = .*$", re.MULTILINE)
+
+
+def _pin_data_line(slug: str, class_folder_slugs: list) -> str:
+    data = json.dumps({"slug": slug, "after": list(class_folder_slugs)}, ensure_ascii=False)
+    return f"const PLANTOIR_MY_PROGRESS_PIN = {data} // {MY_PROGRESS_PIN_MARKER}"
+
+
+def pin_my_progress_in_sidebar(inline_path: Path, slug: str, class_folder_slugs: list) -> bool:
+    """
+    The sidebar's script puts My Progress directly after the class folder
+    (#545, `myProgress.sidebar`): ALWAYS section, idempotent. `slug` is the
+    page's ("" when this build made none); `class_folder_slugs` are the class
+    folders' names as Quartz spells them in a slug. A script whose shape has
+    changed is said and left alone - the page then sorts last, as any page
+    does. Answers whether the file changed.
+    """
+    try:
+        text = inline_path.read_text(encoding="utf-8")
+    except OSError:
+        print("⚠️ Could not put My Progress under the classes in the sidebar: the sidebar's script was not found.")
+        return False
+    data_line = _pin_data_line(slug, class_folder_slugs)
+    updated = text
+    if MY_PROGRESS_PIN_MARKER not in updated:
+        if updated.count(_PIN_IMPORT_ANCHOR) != 1 or updated.count(_PIN_LOOP_ANCHOR) != 1:
+            print("⚠️ Could not put My Progress under the classes in the sidebar: the sidebar's script has changed shape.")
+            return False
+        at = updated.index(_PIN_IMPORT_ANCHOR) + len(_PIN_IMPORT_ANCHOR)
+        updated = updated[:at] + _PIN_IMPORT + data_line + "\n" + updated[at:]
+        updated = updated.replace(_PIN_LOOP_ANCHOR, _PIN_LOOP, 1)
+    elif _PIN_LOOP not in updated or len(_PIN_DATA.findall(updated)) != 1:
+        print("⚠️ Could not put My Progress under the classes in the sidebar: the sidebar's script has changed shape.")
+        return False
+    else:
+        updated = _PIN_DATA.sub(lambda match: data_line, updated, count=1)
+    if updated == text:
+        return False
+    inline_path.write_text(updated, encoding="utf-8")
+    return True
+
+
+def _prepare_my_progress(content_root: Path, output_dir: Path, config: dict, section_number: int,
+                         course_code: str, dating: dict, created) -> str:
+    """
+    My Progress (#545; scripts/my_progress.py), ALWAYS: whether this section
+    gets the page, the plan the site's emitter reads (written on every build,
+    so a page switched off or no longer earned is gone on the next), the page
+    itself and its Key Links entry, and the lines for the teacher and the
+    trail. Answers the page's slug, or "" when this build made none. Never
+    stops a build.
+    """
+    try:
+        headings = my_progress.headings_from(config)
+        reason = my_progress.BUILT
+        gate = []
+        if not resolve_include_my_progress(config, section_number):
+            reason = my_progress.SWITCHED_OFF
+        elif my_progress.teachers_own_page(content_root) is not None:
+            reason = my_progress.TEACHERS_OWN_PAGE
+        else:
+            pages = figures.pages_students_see(
+                content_root, _is_draft,
+                lambda page: _place_in_the_course(page, content_root),
+                lambda page: None, skip=_is_media_name, must_contain="[")
+            gate = my_progress.pages_with_counted_items(pages, headings)
+            if not gate:
+                reason = my_progress.NO_SUCCESS_CRITERIA
+
+        def path_of(page: Path) -> str:
+            return unicodedata.normalize("NFC", page.relative_to(content_root).as_posix())
+
+        numbered = _class_page_scheme == class_pages.NUMBERED_SCHEME
+        pattern = class_page_pattern()
+        club_table = class_folder_name(config)
+        classes = []
+        for known in (dating or {}).get("classes", []):
+            page = known["page"]
+            title = known["title"]
+            label, order = my_progress.unit_label(title, pattern, _unit_word, numbered, club_table)
+            if order == 0 and not numbered:
+                label, order = my_progress.unit_label(page.stem, pattern, _unit_word, numbered, club_table)
+            classes.append({"path": path_of(page), "title": title, "date": str(known["created"]),
+                            "unit": label, "unitOrder": order})
+        first_class_of = {}
+        for linked, class_page in (dating or {}).get("first_class_of", {}).items():
+            first_class_of[path_of(linked)] = path_of(class_page)
+
+        title = my_progress.words()["title"]
+        slug = _quartz_segment_slug(title) if reason == my_progress.BUILT else ""
+        my_progress.write_plan(output_dir, my_progress.plan(
+            reason == my_progress.BUILT, reason, _quartz_segment_slug(title), headings,
+            classes, first_class_of, gate))
+        if reason == my_progress.BUILT:
+            (content_root / my_progress.PAGE_FILE).write_text(my_progress.page_text(created), encoding="utf-8")
+            my_progress.link_from_key_links(content_root)
+        my_progress.announce(course_code, section_number, reason, len(gate))
+        return slug
+    except Exception as error:
+        print(f"⚠️ Could not set up the My Progress page: {error}")
+        try:
+            (Path(output_dir) / "quartz" / my_progress.PLAN_FILE).unlink()
+        except OSError:
+            pass
+        return ""
+
+
 def wire_quartz_additions(output_dir: Path) -> None:
     """The edits that connect support/quartz to Quartz: the Print button's two
     (#454), the figures transformer's two (#485 E1), the runnable code's
@@ -1727,7 +1880,9 @@ def wire_quartz_additions(output_dir: Path) -> None:
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
     button's component), the task boxes' one (#519: its transformer after
-    the quizzes'; export, script and styles ride as the quizzes' do), the
+    the quizzes'; export, script and styles ride as the quizzes' do), My
+    Progress's two (#545: its emitter exported beside Quartz's and put
+    before Assets; its script and styles ride as the quizzes' do), the
     folder pages' table of contents (#520), and
     live input's two (#583: the preview's server sends the isolation
     headers, and Quartz's router loads a page whole across the isolation
@@ -1746,6 +1901,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
+        (output_dir / "quartz" / "plugins" / "emitters" / "index.ts", _wire_emitters_index),
+        (output_dir / "quartz.config.ts", _wire_progress_emitter),
         (output_dir / "quartz.layout.ts", _wire_code_runner_component),
         (output_dir / "quartz.layout.ts", _wire_list_page_toc),
         (output_dir / "quartz" / "cli" / "handlers.js", _wire_isolation_serve),
@@ -2751,11 +2908,8 @@ def _links_checklist_offer(content_root: Path, section_number: int,
     hidden_classes.sort(key=lambda entry: (entry[0] or far_future, entry[1]))
 
     # What the BUILD's date pass dates: its own link reader, its own claim.
-    dated_by_the_build = {}
-    for _, _, class_page, _ in dated_classes:
-        post = all_pages[class_page]
-        for linked in _pages_a_page_links_to(post, pages_by_stem, pages_by_rel):
-            dated_by_the_build.setdefault(linked, class_page)
+    dated_by_the_build = _first_linking_classes(
+        all_pages, pages_by_stem, pages_by_rel, [entry[2] for entry in dated_classes])
 
     # 1–2: the two-step walk.
     direct_claim = {}
@@ -3729,16 +3883,46 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
     # 39 payloads took an EARLIER class than the first one linking them
     # directly (reviews of 2026-09-25). Russell's words were "the first
     # Unit x, Day y page that linked to them".
-    claimed: set[Path] = set()
+    created_of = {}
+    in_order = []
     for class_dt, class_title, class_fp, class_created in dated_classes:
+        created_of[class_fp] = class_created
+        in_order.append(class_fp)
+    first_class_of = _first_linking_classes(all_pages, pages_by_stem, pages_by_rel, in_order)
+    for linked_fp, class_fp in first_class_of.items():
+        if give_date(linked_fp, created_of[class_fp]):
+            result["site_pages"] += 1
+
+    # For My Progress (#545), which groups pages the same way: the visible,
+    # dated classes in this order, and the class that claimed each page.
+    result["first_class_of"] = first_class_of
+    result["classes"] = []
+    for class_fp in in_order:
+        title = str(all_pages[class_fp].get("title") or "").strip() or class_fp.stem.strip()
+        result["classes"].append({"page": class_fp, "title": title, "created": created_of[class_fp]})
+    return result
+
+
+def _first_linking_classes(all_pages, pages_by_stem, pages_by_rel, classes_in_order) -> dict:
+    """
+    The class that first links each page DIRECTLY: {page: class page}, in the
+    order the claims are made. `classes_in_order` is the visible, dated
+    classes, earliest first (ties by title); a page goes to the first of them
+    whose own links reach it, by the build's one link reader
+    (`_pages_a_page_links_to` - never a class page, never a structural page).
+
+    ONE claim rule for three readers, which until #545 each carried a copy:
+    the date pass (`_date_pages_from_their_classes`), the links checklist's
+    `datedByTheBuild` (`_links_checklist_offer`), and My Progress's grouping
+    (#545, `myProgress.grouping`).
+    """
+    claimed: dict = {}
+    for class_fp in classes_in_order:
         for linked_fp in _pages_a_page_links_to(all_pages[class_fp], pages_by_stem, pages_by_rel):
             if linked_fp in claimed:
                 continue
-            claimed.add(linked_fp)
-            if give_date(linked_fp, class_created):
-                result["site_pages"] += 1
-
-    return result
+            claimed[linked_fp] = class_fp
+    return claimed
 
 
 def _name_in_the_course(source: Path) -> str:
@@ -7167,7 +7351,25 @@ def resolve_include_curriculum_coverage(config: dict, section_number: int) -> bo
     Follows resolve_show_section_marker's shape, which has been reading this
     kind of key correctly for a long time.
     """
-    value = config.get("include_curriculum_coverage", True)
+    return _resolve_section_switch(config, "include_curriculum_coverage", section_number)
+
+
+def resolve_include_my_progress(config: dict, section_number: int) -> bool:
+    """
+    Whether this SECTION gets the My Progress page (#545):
+    `include_my_progress`, read EXACTLY as `include_curriculum_coverage` is
+    (#545 plan review F4, the director's ruling) - a boolean, or a
+    per-section map (`{"sections": {"section2": false}}`, `{"section2":
+    false}`, `{"default": false}`), the section's own entry first. Absent, or
+    a map that says nothing about this section, is ON. Both apps' switch
+    (#595) can then write it the way Windows already writes its sibling.
+    """
+    return _resolve_section_switch(config, "include_my_progress", section_number)
+
+
+def _resolve_section_switch(config: dict, key: str, section_number: int) -> bool:
+    """A course setting that is on unless it says otherwise, for one section."""
+    value = config.get(key, True)
     if isinstance(value, dict):
         sec_key = f"section{section_number}"
         sections = value.get("sections")
@@ -8342,6 +8544,16 @@ def build_section_site(
     visible_places_here = _visible_places(content_root)
     # ===========================================================================
 
+    # === #545: My Progress =======================================================
+    # AFTER the page list the app reads (visible_places_here), so the page is
+    # never listed as one of the teacher's, and after every pass that reads
+    # links - both date passes, the coverage map, the links checklist - so
+    # none of them ever meets it (the content folder is made afresh on every
+    # build). The groups come from the date pass just above: one claim rule.
+    my_progress_slug = _prepare_my_progress(content_root, output_dir, config, section_number,
+                                            course_code, dating, first_class_stamp)
+    # ===========================================================================
+
     # Copy course config into output root (back-compat)
     shutil.copy2(config_file, output_dir / "course_config.json")
     print("✅ Copied course_config.json to output directory (root copy)")
@@ -8440,6 +8652,9 @@ def build_section_site(
         # copy) must not stop a build over the corners of a handout.
         print(f"⚠️ Could not set up the printed page's corners: {error}")
     wire_quartz_additions(output_dir)
+    # My Progress (#545) directly under the class folder in the sidebar.
+    pin_my_progress_in_sidebar(explorer_inline, my_progress_slug,
+                               [_quartz_segment_slug(name) for name in class_folders_here])
 
     # Ensure patched Head.tsx is present in output_dir so social cards never point to quartz.jzhao.xyz
     head_src = toolchain_paths.QUARTZ_DIR / "quartz" / "components" / "Head.tsx"
