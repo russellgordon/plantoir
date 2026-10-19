@@ -2951,16 +2951,18 @@ every way a page is written for a site, each with the smallest correct
 Markdown and the mistake that trips people up - page settings, text,
 callouts (every kind, folding with `-` and `+`), Mermaid (labels quoted),
 tables (`\|` in a cell), maths (`$$` on lines of their own, two prices in a
-paragraph read as maths, `\$`), checklists students tick, a full section on My Progress
+paragraph read as maths, `\$`), code (a fenced block with its language, line
+numbers, no ligatures, inline code; code students run is routed to
+`plantoir-runnable-code`), checklists students tick, a full section on My Progress
 ("from Plantoir 1.8.2", Russell's ruling of 2026-10-19: what the student
 sees, when the page appears, and a complete page whose items count - the
 three default headings or the course's `success_criteria_headings`, task
 items to the next heading of the same or higher level, counted on the page
 they are written on, a teacher's `[x]` done until unticked, and what does
-not count: a table, another heading, `publish: false`,
-`include_my_progress: false`; written from #545's plan and its
-`scripts/my_progress.py` as it stood on `issue/545-my-progress`, to be
-re-read against the landed code), wikilinks versus Markdown links
+not count: a table, another heading, `publish: false`, a
+section where `include_my_progress` is off - `false`, or a per-section map
+read as `include_curriculum_coverage` is; checked against #545 as merged),
+wikilinks versus Markdown links
 (`[words](Page Name.md)` is not a link), `![[page]]`, footnotes, tags,
 Media pictures and PDFs, YouTube (`![](watch address)`), Vimeo, GeoGebra and
 PhET (the site's own `<iframe>` on one line), `%%` notes, `publish:` and
@@ -2973,10 +2975,10 @@ measured failing with the bullet taken out of `CLAUDE.md`). Changing the
 section's words means a teacher who said Not Now to an earlier section is
 asked again, as with every skill before it.
 
-**Every example is built** (verify.sh 6m): the skill's ` ```markdown `,
+**Every example is built** (verify.sh 6n, after #545's 6m): the skill's ` ```markdown `,
 ` ````markdown ` and top-level ` ```mermaid ` fences are read from the skill
 ITSELF and planted as `Authoring Example NN` pages in the fixture build, with
-the pages they link to and the Media files they show; 6m reads each back as
+the pages they link to and the Media files they show; 6n reads each back as
 the feature it claims (a callout's `data-callout`, a folded one's
 `is-collapsed`, the YouTube `embed/` frame, the Media `<img>` and PDF frame
 resolving to files in `public/`, `publish: false` absent, ...). Every example
@@ -2988,8 +2990,8 @@ against a real build of a copy of the ICS3U working folder (image
 `teaching-quartz:src-39d2a0a0`): 21 examples, 21 claims, pass (22 and 22 after the review added a Code section, 2026-10-19); with the
 YouTube address cut to a short id it failed on that example alone. **Not
 built, said instead:** whether a Mermaid diagram actually DRAWS (it draws in
-the browser; 6m checks the fence reached the page as a diagram), and My
-Progress itself, which #545 adds.
+the browser; 6n checks the fence reached the page as a diagram), and My
+Progress itself, which #545's 6m checks.
 
 **Measured with Claude Code, 2026-10-19.** A copy of the ICS3U working folder
 with the guidance as the app mirrors it (both root files' managed sections,
