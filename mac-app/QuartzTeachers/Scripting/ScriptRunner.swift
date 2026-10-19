@@ -823,6 +823,8 @@ class ScriptRunner {
         }
         // Which curriculum maps the build wrote (#128), read the same way.
         CoverageMapsBuilt.noteOnTheTrail(from: text)
+        // What the build did about My Progress (#545), read the same way.
+        MyProgressBuilt.noteOnTheTrail(from: text)
         // A launcher that waited for, or refused on, something running in
         // the folder's workspace before remaking it (#94).
         WorkspaceInUseReport.noteOnTheTrail(from: text)
