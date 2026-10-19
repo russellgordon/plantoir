@@ -1548,6 +1548,9 @@ check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
 # Self-check quizzes (#563): the folder check. The site's transformer, script
 # and styles are in support/quartz (the loop below).
 check_baked scripts/quizzes.py            /opt/scripts/quizzes.py
+# My Progress (#545): the gate, the page and its Key Links entry. The site's
+# emitter, rules, script and styles are in support/quartz (the loop below).
+check_baked scripts/my_progress.py        /opt/scripts/my_progress.py
 # Live input (#583): which pages a publish isolates. The preview's half is in
 # support/quartz (the loop below).
 check_baked scripts/isolation_headers.py  /opt/scripts/isolation_headers.py
