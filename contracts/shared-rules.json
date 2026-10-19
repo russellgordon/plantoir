@@ -29971,6 +29971,11 @@
           "counts": true
         },
         {
+          "name": "a quiz's boxes alone are nothing to count",
+          "markdown": "## Success criteria\n\n> [!quiz] Which is a third?\n> - [x] 1/3\n> - [ ] 3\n",
+          "counts": false
+        },
+        {
           "name": "a page saved with CR LF",
           "markdown": "## Success criteria\r\n\r\n- [ ] I can add fractions\r\n",
           "counts": true
