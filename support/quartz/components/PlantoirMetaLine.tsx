@@ -57,6 +57,12 @@ import quizScript from "./scripts/quiz.inline"
 import tasksStyle from "./styles/tasks.scss"
 // @ts-ignore
 import tasksScript from "./scripts/tasks.inline"
+// My Progress (#545) rides along for the same reason, so no layout edit is
+// needed: every style is under .plantoir-progress and the script returns at
+// once on any page without the My Progress placeholder.
+import progressStyle from "./styles/progress.scss"
+// @ts-ignore
+import progressScript from "./scripts/progress.inline"
 
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
 type PrintSettings = {
@@ -225,8 +231,8 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, quizStyle, tasksStyle)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, quizStyle, tasksStyle, progressStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
-  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript, tasksScript)
+  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript, tasksScript, progressScript)
   return PlantoirMetaLine
 }) satisfies QuartzComponentConstructor<QuartzComponent>
