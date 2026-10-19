@@ -40,6 +40,21 @@ fine; the break was in vendored Quartz code this policy never touched
 directly, which is why hash-checking each inline script's content missed
 it — the violation was a *capability* (eval), not a script identity.
 
+The policy covers the code a page's scripts LOAD, not only the code it
+links (#594). `script-src` governs a dynamic `import()` exactly as it
+governs a `<script src>`, and Quartz draws Mermaid diagrams from an inline
+module script that does
+`await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs")`.
+Until 2026-10-19 only `<script src>` hosts were collected, so cdnjs was
+never allowed and every Netlify site showed its diagrams as source text
+since the policy existed (Cloudflare, with no policy, drew them). So the
+host of every absolute https:// URL that is the argument of an `import(...)`
+is collected too — from every inline script on every page, and from every
+.js / .mjs file in the built site (Quartz's postscript.js and prescript.js,
+and anything a teacher put in static/). Only `import(` arguments: a
+`fetch("https://...")` is a network request, not a script source, and
+must not widen script-src.
+
 Extracted from scripts/deploy.py so both it and website/netlify_deploy.py
 (the plantoir.app marketing site's own Netlify deploy, which is exposed to
 the identical badge) can share one implementation instead of two copies
@@ -56,14 +71,49 @@ _INLINE_SCRIPT_RE = re.compile(
     r"<script\b(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script>", re.IGNORECASE | re.DOTALL
 )
 _SCRIPT_SRC_RE = re.compile(r'<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+# The argument of a dynamic import(): an absolute https:// URL in single or
+# double quotes, or in backticks with no ${ in it (a template with a
+# substitution names no fixed host). `import(` must not follow a letter, a
+# digit, `_`, `$` or `.`, so `index.import(` and `reimport(` are not it.
+_DYNAMIC_IMPORT_RE = re.compile(
+    r"""(?<![\w$.])import\s*\(\s*(["'`])(https://[^"'`\s]+)\1""", re.IGNORECASE
+)
+
+
+def _origin_of(url: str) -> str | None:
+    """`scheme://host` of an absolute http(s) URL, or None."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme in ("http", "https") and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return None
+
+
+def _imported_origins(script_text: str) -> set[str]:
+    """The `scheme://host` of every absolute https:// URL that `script_text`
+    passes to a dynamic import(). A same-origin import ("./x.mjs",
+    "/static/x.mjs") is covered by 'self' and gives nothing."""
+    origins: set[str] = set()
+    for match in _DYNAMIC_IMPORT_RE.finditer(script_text):
+        quote = match.group(1)
+        url = match.group(2)
+        if quote == "`" and "${" in url:
+            continue
+        origin = _origin_of(url)
+        if origin is not None:
+            origins.add(origin)
+    return origins
 
 
 def _collect_inline_script_policy(public_dir: Path) -> tuple[list[str], list[str]]:
     """
-    Walk every built HTML page and return:
+    Walk every built HTML page and every .js / .mjs file, and return:
       - sorted 'sha256-<base64>' entries, one per unique inline <script> body
-      - sorted "scheme://host" entries for any cross-origin <script src="...">
-        (same-origin scripts are covered by 'self' and need no entry)
+      - sorted "scheme://host" entries for every cross-origin place a page
+        loads script from: the src of a <script src="https://...">, and the
+        absolute https:// argument of a dynamic import(...) in an inline
+        script or in one of the site's own .js / .mjs files (#594 — Quartz
+        imports Mermaid from cdnjs that way). Same-origin scripts and
+        imports are covered by 'self' and need no entry.
     Returns ([], []) rather than raising if public_dir has no HTML yet — the
     CSP is a nice-to-have, never a reason to fail a deploy.
     """
@@ -80,11 +130,19 @@ def _collect_inline_script_policy(public_dir: Path) -> tuple[list[str], list[str
                 continue
             digest = hashlib.sha256(body.encode("utf-8")).digest()
             hashes.add(base64.b64encode(digest).decode("ascii"))
+            hosts.update(_imported_origins(body))
         for src in _SCRIPT_SRC_RE.findall(text):
             if src.startswith("http://") or src.startswith("https://"):
-                parsed = urllib.parse.urlparse(src)
-                if parsed.scheme and parsed.netloc:
-                    hosts.add(f"{parsed.scheme}://{parsed.netloc}")
+                origin = _origin_of(src)
+                if origin is not None:
+                    hosts.add(origin)
+    for pattern in ("*.js", "*.mjs"):
+        for script_file in public_dir.rglob(pattern):
+            try:
+                text = script_file.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            hosts.update(_imported_origins(text))
     return sorted(f"'sha256-{h}'" for h in hashes), sorted(hosts)
 
 
@@ -170,6 +228,13 @@ def write_netlify_headers_file(public_dir: Path) -> int:
     which inline JavaScript is allowed to run, which is exactly what
     suppresses Netlify's own badge script without touching anything a
     student would notice.
+
+    The hosts it allows are every host a page's scripts LOAD code from, not
+    only the hosts it links with <script src> (#594): Quartz's Mermaid
+    loader is an inline module that does
+    `await import("https://cdnjs.cloudflare.com/.../mermaid.esm.min.mjs")`,
+    and script-src governs that import, so without cdnjs in the policy every
+    diagram on a Netlify site stayed as its source text.
 
     Lines somebody else put in an existing _headers are kept. The block this
     function writes is MARKED and REPLACED on every call, never appended

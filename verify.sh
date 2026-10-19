@@ -336,7 +336,7 @@ else
 fi
 
 if (cd scripts && python3 test_netlify_badge.py) >/tmp/verify_netlify_badge_test.log 2>&1; then
-  pass "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+  pass "netlify_badge.py: shared ad-badge suppression module, and the hosts a page's scripts import code from allowed - Mermaid from cdnjs, never a fetch target (#594, scripts/test_netlify_badge.py)"
 else
   fail "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
   cat /tmp/verify_netlify_badge_test.log
