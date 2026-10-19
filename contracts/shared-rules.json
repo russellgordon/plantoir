@@ -781,6 +781,11 @@
         "why": "#128: a course can have a map per curriculum folder, and 'my second map is missing' or 'the map shows the wrong folder' is answerable only if the trail says which maps each build made. Read from the build's PLANTOIR_MAPS: line - coverageMapsBuilt - by the console reader for a run the app starts and by the scheduled publish's log reader, so the build nobody watches leaves it too."
       },
       {
+        "carries": "the course and section, whether the build made the My Progress page, how many pages students can see have success criteria to tick, and - when it made none - why (no such page, or the course's own page by that name). NEVER anything written on a page.",
+        "event": "my progress page built",
+        "why": "#545: the build adds a page students see, and 'my students have no My Progress page' or 'it counts the wrong pages' is answerable only if the trail says what each build did. Read from the build's PLANTOIR_MY_PROGRESS: line - myProgressBuilt - by the console reader for a run the app starts and by the scheduled publish's log reader."
+      },
+      {
         "carries": "the course, the section the copy is named for, the backup's FILE NAME (a course code, a moment and who made it - never anything written on a page), its size in MB and how long it took in seconds, one decimal each; or, when it failed, that it could not and why.",
         "event": "assistant backed up a course",
         "why": "#351: approving an assistant change held the mac's window for up to two minutes while the course was zipped on the main thread, and until then no line recorded an assistant backup at all - so 'the window hung after I approved' and 'where did this zip come from, why is my disk full' were unanswerable. The seconds answer the first, the name the second. One line per REAL zip: the once-per-conversation copy reused by a later write makes no zip and writes nothing, so it is not noisy. No threshold for 'slow' - a guessed number; whoever reads the trail can tell 0.4 s from 120 s. Written for the conversation's first copy and for the back_up_course tool alike. No appliesOn: Windows's assistant backs up too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from bundle C.",
@@ -17765,7 +17770,7 @@
     ],
     "matching": "Whole word and case-insensitive: “description” does not contain “script”. A plural is a different word to a whole-word match, so the plurals are LISTED (“scripts”, “containers”, …) rather than inferred — data both platforms read, not a matcher rule each must reimplement (#369 implementation review, N5; measured 2026-09-30 over all of the mac app: zero hits for any of them). Comments are not labels and are skipped, and so is code interpolated into a label (Swift's `\\(…)`): the sidebar's “No course or club matches “\\(workspace.filterText)”.” names a variable, not the machinery (found when “workspace” joined the list, 2026-09-30).",
     "scope": "On the mac: every string literal passed straight to a call that puts words on screen, in QuartzTeachers/Views — Text, Picker, Toggle, Button, LabeledContent, TextField, SecureField, Label, DisclosureGroup, ExampleCaption, FormSectionHeader, Section, .help, .navigationTitle, .alert, .confirmationDialog. Wording held in a named key is pinned by that key's own contract instead.",
-    "data": "support/colour_schemes.json → every scheme's `name`, held against `forbidden` (whole word, as `matching` says) by scripts/test_colour_scheme_names.py, which is pure Python and so runs on both platforms — nothing for either app to implement. #383: the catalog shipped “Quartz Standard Colours” from v1.0.0 to v1.4.1, invisible to the mac's label scan because it is data rather than a label literal; it is “Standard Colours” since v1.4.2, and its id `quartz-standard` did not change. Only `forbidden` applies here; `exceptions` is the About credit and has no data.",
+    "data": "support/colour_schemes.json → every scheme's `name`, held against `forbidden` (whole word, as `matching` says) by scripts/test_colour_scheme_names.py, which is pure Python and so runs on both platforms — nothing for either app to implement. #383: the catalog shipped “Quartz Standard Colours” from v1.0.0 to v1.4.1, invisible to the mac's label scan because it is data rather than a label literal; it is “Standard Colours” since v1.4.2, and its id `quartz-standard` did not change. Only `forbidden` applies here; `exceptions` is the About credit and has no data. #545: the My Progress page's words (myProgress.words) are data of the same kind, read by students on every site, and are held against `forbidden` the same way by scripts/test_my_progress.py.",
     "exceptions": [
       {
         "what": "the About window's credit to Quartz, by name",
@@ -29424,5 +29429,1187 @@
       "Re-deriving ids from the teacher's raw file (a build manifest written by Python): it disagrees with what Quartz parses for links to headings, links to websites and comments (review F1).",
       "A `window.*` read API: scripts are bundled separately and their order in postscript.js is not a contract."
     ]
+  },
+  "myProgress": {
+    "note": "My Progress (#545, v1.8.2): one page per section, for the student alone, counting the task boxes they have ticked (#519) under each page's success-criteria heading, by page and by the class that first linked the page directly. Nothing is sent anywhere. Three halves: scripts/my_progress.py (before Quartz runs: whether the section gets the page, the page, its Key Links entry, quartz/plantoir_progress.json), support/quartz/plugins/emitters/plantoirProgress.ts with progressRules.ts (the manifest, from the built pages' stamps) and support/quartz/components/scripts/progress.inline.ts (the student's ticks added up in the browser). All in the shared toolchain, so Windows inherits the page with the build; scripts/test_my_progress.py runs the Python cases on both platforms and scripts/check_progress_rules_against_the_site.py runs the site's cases in the image. Left for #595 (v1.9.0): the Course Settings switch and heading list in both apps, the date and unit filter, the print check and the skill notes. documentation/06-quartz-customizations.md -> L.",
+    "why": "Russell, 2026-10-16: a student who ticks the items under a page's success criteria should see, in one place and for their eyes only, how they are doing across every page they have worked through.",
+    "config": {
+      "keys": {
+        "include_my_progress": "Whether a section gets the page. Read EXACTLY as include_curriculum_coverage is (#545 plan review F4, the director's ruling): a boolean, or a per-section map - {\"sections\": {\"section2\": false}}, then {\"section2\": false}, then {\"default\": false} - the section's own entry first. Absent, or a map that says nothing about the section, is ON. No app writes it yet (#595); both builds honour it when present.",
+        "success_criteria_headings": "The headings that count, as a list of strings. A list with at least one heading that is not blank REPLACES the defaults; absent, not a list, or nothing but blanks gives the defaults. Entries that are not strings are left out. Compared normalised (headings.rule). No app writes it yet (#595)."
+      },
+      "cases": [
+        {
+          "name": "absent is on, with the defaults",
+          "config": {},
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "false is off",
+          "config": {
+            "include_my_progress": false
+          },
+          "section": 1,
+          "wanted": false,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "true is on",
+          "config": {
+            "include_my_progress": true
+          },
+          "section": 2,
+          "wanted": true,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "a per-section map, its sections entry first",
+          "config": {
+            "include_my_progress": {
+              "sections": {
+                "section2": false
+              },
+              "section2": true,
+              "default": true
+            }
+          },
+          "section": 2,
+          "wanted": false,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "a per-section map, another section's entry is not this one's",
+          "config": {
+            "include_my_progress": {
+              "sections": {
+                "section2": false
+              }
+            }
+          },
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "a flat per-section map",
+          "config": {
+            "include_my_progress": {
+              "section1": false
+            }
+          },
+          "section": 1,
+          "wanted": false,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "a map's default",
+          "config": {
+            "include_my_progress": {
+              "default": false
+            }
+          },
+          "section": 3,
+          "wanted": false,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "a map that says nothing about the section is on",
+          "config": {
+            "include_my_progress": {}
+          },
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "the string \"false\" reads as include_curriculum_coverage reads it: on",
+          "config": {
+            "include_my_progress": "false"
+          },
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ],
+          "why": "Mirrors include_curriculum_coverage exactly (ruling F4): any value that is not a map reads as its truth value, and a non-empty string is true. An app writes a boolean."
+        },
+        {
+          "name": "a teacher's list replaces the defaults",
+          "config": {
+            "success_criteria_headings": [
+              "I can",
+              "Learning goals"
+            ]
+          },
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "I can",
+            "Learning goals"
+          ]
+        },
+        {
+          "name": "an empty list gives the defaults",
+          "config": {
+            "success_criteria_headings": []
+          },
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "a list of blanks gives the defaults",
+          "config": {
+            "success_criteria_headings": [
+              "",
+              "  "
+            ]
+          },
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "not a list gives the defaults",
+          "config": {
+            "success_criteria_headings": "I can"
+          },
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "Test of success",
+            "Tests of success",
+            "Success criteria"
+          ]
+        },
+        {
+          "name": "entries that are not strings, and blanks, are left out",
+          "config": {
+            "success_criteria_headings": [
+              3,
+              "I can",
+              null,
+              " "
+            ]
+          },
+          "section": 1,
+          "wanted": true,
+          "headings": [
+            "I can"
+          ]
+        }
+      ]
+    },
+    "headings": {
+      "defaults": [
+        "Test of success",
+        "Tests of success",
+        "Success criteria"
+      ],
+      "rule": "A heading counts when its words, normalised, are one of the course's headings, normalised: Unicode's composed form (NFC); curly quotes (U+2018, U+2019, U+201C, U+201D) made straight, because the site's parser curls a teacher's ' and \" and the build reads them as typed; every run of white space one space; trimmed; every trailing punctuation mark (Unicode category P) and space taken off; lower-cased. Its words are the heading as a student reads it: link and emphasis marks gone, a %% comment gone, the anchor the site appends to every heading not read. progressRules.normalisedHeading and my_progress.normalised_heading.",
+      "cases": [
+        {
+          "heading": "Success criteria",
+          "counts": true
+        },
+        {
+          "heading": "Test of success",
+          "counts": true
+        },
+        {
+          "heading": "Tests of success",
+          "counts": true
+        },
+        {
+          "heading": "SUCCESS CRITERIA",
+          "counts": true,
+          "why": "case"
+        },
+        {
+          "heading": "Success criteria:",
+          "counts": true,
+          "why": "trailing punctuation"
+        },
+        {
+          "heading": "Tests of success?!",
+          "counts": true,
+          "why": "several trailing marks"
+        },
+        {
+          "heading": "  Success   criteria  ",
+          "counts": true,
+          "why": "white space"
+        },
+        {
+          "heading": "Success criteria for today",
+          "counts": false,
+          "why": "more words: not the heading"
+        },
+        {
+          "heading": "Criteria for success",
+          "counts": false
+        },
+        {
+          "heading": "Success: criteria",
+          "counts": false,
+          "why": "only TRAILING punctuation is ignored"
+        },
+        {
+          "heading": "Teacher’s checklist",
+          "headings": [
+            "Teacher's checklist"
+          ],
+          "counts": true,
+          "why": "the site curls the apostrophe the teacher typed in the list"
+        },
+        {
+          "heading": "Success criteria",
+          "headings": [
+            "I can"
+          ],
+          "counts": false,
+          "why": "a teacher's list replaces the defaults"
+        },
+        {
+          "heading": "I can:",
+          "headings": [
+            "I can"
+          ],
+          "counts": true
+        }
+      ],
+      "markupCases": [
+        {
+          "markdown": "## **Success** criteria",
+          "rendered": "Success criteria",
+          "counts": true,
+          "why": "emphasis marks are not words"
+        },
+        {
+          "markdown": "## `Success criteria`",
+          "rendered": "Success criteria",
+          "counts": true,
+          "why": "inline code's words are the heading's"
+        },
+        {
+          "markdown": "## Success criteria %%mine%%",
+          "rendered": "Success criteria",
+          "counts": true,
+          "why": "a %% comment is not on the page"
+        },
+        {
+          "markdown": "## [[Success criteria]]",
+          "rendered": "Success criteria",
+          "counts": true,
+          "why": "a link reads as the words it shows"
+        },
+        {
+          "markdown": "## [[Rubric|Success criteria]]",
+          "rendered": "Success criteria",
+          "counts": true,
+          "why": "an aliased link reads as its alias"
+        },
+        {
+          "markdown": "## ==Success criteria==",
+          "rendered": "Success criteria",
+          "counts": true,
+          "why": "a highlight's marks are not words"
+        }
+      ]
+    },
+    "sections": {
+      "rule": "A section opens at a heading that is a CHILD OF THE PAGE ITSELF (not one inside a callout, a quote or a list) whose words count (headings.rule), and runs to the next such heading of the same or a higher level; a deeper heading stays inside it. Every task box inside it that the site stamped (taskBoxes.rule) counts, at any depth - inside a callout or a nested list too. A quiz's boxes carry no stamp, so they never count. The same words twice are one id and count once, from the first. Code and %% comments are not read. A transcluded checklist counts on the page it is written on, not on the page that shows it. `items` are the counted items' words, in page order (their ids are taskBoxes.itemId's); `checked` is the Markdown's own state of each, where a case says.",
+      "readers": "Both readings run every case: the site's (scripts/check_progress_rules_against_the_site.py: Quartz's own ObsidianFlavoredMarkdown and GitHubFlavoredMarkdown, PlantoirQuizzes and PlantoirTasks, then progressRules.countedItems - exactly these items) and the build's gate (scripts/test_my_progress.py: my_progress.page_has_counted_items - true exactly when `items` is not empty). When the two readings of a real page disagree, the emitter says so on a `plantoir: note:` line (notes) - #545 plan review F3.",
+      "cases": [
+        {
+          "name": "a heading and its items",
+          "markdown": "## Success criteria\n\n- [ ] I can add fractions\n- [ ] I can subtract fractions\n",
+          "items": [
+            "I can add fractions",
+            "I can subtract fractions"
+          ]
+        },
+        {
+          "name": "a teacher's [x] is counted, ticked",
+          "markdown": "## Success criteria\n\n- [x] I can add fractions\n- [ ] I can subtract fractions\n",
+          "items": [
+            "I can add fractions",
+            "I can subtract fractions"
+          ],
+          "checked": [
+            true,
+            false
+          ],
+          "why": "ruling Q5: counts as done until the student unticks it (rollUp)"
+        },
+        {
+          "name": "the section ends at the next heading of the same level",
+          "markdown": "## Success criteria\n\n- [ ] I can add fractions\n\n## Practice\n\n- [ ] Question 1\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "a deeper heading stays inside it",
+          "markdown": "## Success criteria\n\n- [ ] I can add fractions\n\n### Going further\n\n- [ ] I can add mixed numbers\n\n## Practice\n\n- [ ] Question 1\n",
+          "items": [
+            "I can add fractions",
+            "I can add mixed numbers"
+          ]
+        },
+        {
+          "name": "a higher heading ends it",
+          "markdown": "### Tests of success\n\n- [ ] I can add fractions\n\n## Practice\n\n- [ ] Question 1\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "any level",
+          "markdown": "###### Test of success\n\n- [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "two sections on one page",
+          "markdown": "## Success criteria\n\n- [ ] I can add fractions\n\n## Practice\n\n- [ ] Question 1\n\n## Tests of success\n\n- [ ] I can check my answer\n",
+          "items": [
+            "I can add fractions",
+            "I can check my answer"
+          ]
+        },
+        {
+          "name": "items before any heading do not count",
+          "markdown": "- [ ] Bring a pencil\n\n## Notes\n\n- [ ] Read the chapter\n",
+          "items": []
+        },
+        {
+          "name": "a heading inside a callout opens nothing",
+          "markdown": "> [!note] Today\n> ## Success criteria\n> - [ ] I can add fractions\n\n- [ ] Bring a pencil\n",
+          "items": [],
+          "why": "only a heading that is a child of the page itself opens a section"
+        },
+        {
+          "name": "a callout's items under the heading count",
+          "markdown": "## Success criteria\n\n> [!tip] Check yourself\n> - [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "a heading inside a list opens nothing",
+          "markdown": "- Step one\n\n  ## Success criteria\n\n  - [ ] I can add fractions\n",
+          "items": []
+        },
+        {
+          "name": "a quiz's boxes never count",
+          "markdown": "## Success criteria\n\n- [ ] I can add fractions\n\n> [!quiz] Which is a third?\n> - [x] 1/3\n> - [ ] 3\n",
+          "items": [
+            "I can add fractions"
+          ],
+          "why": "a quiz's boxes carry no stamp (taskBoxes.which)"
+        },
+        {
+          "name": "code is no heading and no item",
+          "markdown": "```\n## Success criteria\n- [ ] I can add fractions\n```\n",
+          "items": []
+        },
+        {
+          "name": "a %% comment is not read",
+          "markdown": "%%\n## Success criteria\n- [ ] I can add fractions\n%%\n",
+          "items": []
+        },
+        {
+          "name": "the same words twice count once",
+          "markdown": "## Success criteria\n\n- [ ] I can add fractions\n- [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ],
+          "why": "one id, one tick (taskBoxes.itemId, ruling Q5)"
+        },
+        {
+          "name": "nested items count",
+          "markdown": "## Success criteria\n\n- [ ] I can add fractions\n  - [ ] with like denominators\n",
+          "items": [
+            "I can add fractions",
+            "with like denominators"
+          ]
+        },
+        {
+          "name": "a numbered task list",
+          "markdown": "## Success criteria\n\n1. [ ] I can add fractions\n2. [x] I can subtract fractions\n",
+          "items": [
+            "I can add fractions",
+            "I can subtract fractions"
+          ],
+          "checked": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "an empty box is no item",
+          "markdown": "## Success criteria\n\n- [ ]\n- [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ],
+          "why": "a box with nothing after it is plain text to the parser"
+        },
+        {
+          "name": "a setext heading",
+          "markdown": "Success criteria\n----------------\n\n- [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "a heading with emphasis",
+          "markdown": "## **Success** criteria\n\n- [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "a heading with a comment",
+          "markdown": "## Success criteria %%for me%%\n\n- [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "a transcluded checklist counts on its own page, not here",
+          "markdown": "## Success criteria\n\n![[Fractions#Checklist]]\n",
+          "items": [],
+          "why": "ticks are kept under the page an item is WRITTEN on (taskBoxes.transclusion)"
+        },
+        {
+          "name": "a teacher's list",
+          "markdown": "## I can\n\n- [ ] add fractions\n\n## Success criteria\n\n- [ ] subtract fractions\n",
+          "items": [
+            "add fractions"
+          ],
+          "headings": [
+            "I can"
+          ]
+        },
+        {
+          "name": "an item's id is its own words'",
+          "markdown": "## Success criteria\n\n- [ ] Read [[Fractions]] first\n",
+          "items": [
+            "Read [[Fractions]] first"
+          ],
+          "why": "the id the transformer stamps (taskBoxes.itemText) - never re-derived here"
+        },
+        {
+          "name": "a list indented four spaces is code",
+          "markdown": "## Success criteria\n\n    - [ ] I can add fractions\n",
+          "items": [],
+          "why": "four spaces at the page's own level make an indented code block, not a list (#545 implementation review 3)"
+        },
+        {
+          "name": "an HTML comment counts nothing",
+          "markdown": "## Success criteria\n\n<!--\n- [ ] I can add fractions\n-->\n",
+          "items": []
+        },
+        {
+          "name": "a comment's marks in inline code hide nothing",
+          "markdown": "Start with `<!--` to begin a comment.\n\n## Success criteria\n\n- [ ] I can add fractions\n\nEnd with `-->` to close it.\n",
+          "items": [
+            "I can add fractions"
+          ],
+          "why": "an HTML comment is read only outside code: `<!--` and `-->` written as code start and end nothing (#545 fixes review 1)"
+        },
+        {
+          "name": "a no-break space in a heading is a space",
+          "markdown": "## Success&nbsp;criteria\n\n- [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "an item whose words begin on the next line",
+          "markdown": "## Success criteria\n\n- [ ]\n  I can add fractions\n",
+          "items": [
+            ""
+          ],
+          "why": "measured: the site's parser makes a task item of a box whose words begin on the next line, and its id is that of its FIRST line's words - none (taskBoxes.itemText) - so it counts once; every such item on a page shares that one id. A box with nothing after it at all is still no item (an empty box is no item)"
+        }
+      ]
+    },
+    "gate": {
+      "rule": "Before Quartz runs, the build decides whether the section gets the page: include_my_progress is on for the section, the course has no page of its own called My Progress at the top of the site (any case - it wins, and nothing is written over it; #545 plan review F5), and at least one page students can see (the build's own visibility rule) has an item that counts. Read line by line from the build's copy of each page, so it cannot make an item id and does not try. Otherwise no page, no Key Links entry, no manifest - and the sidebar pin carries an empty slug.",
+      "cases": [
+        {
+          "name": "a page that is all settings",
+          "markdown": "---\ntitle: Settings only\n---\n",
+          "counts": false
+        },
+        {
+          "name": "settings that look like a heading",
+          "markdown": "---\ntitle: \"## Success criteria\"\n---\n- [ ] I can add fractions\n",
+          "counts": false
+        },
+        {
+          "name": "a fence that is never closed",
+          "markdown": "```\n## Success criteria\n- [ ] I can add fractions\n",
+          "counts": false
+        },
+        {
+          "name": "a tilde fence",
+          "markdown": "~~~\n## Success criteria\n- [ ] I can add fractions\n~~~\n\n## Success criteria\n\n- [ ] I can subtract fractions\n",
+          "counts": true
+        },
+        {
+          "name": "a quiz's boxes alone are nothing to count",
+          "markdown": "## Success criteria\n\n> [!quiz] Which is a third?\n> - [x] 1/3\n> - [ ] 3\n",
+          "counts": false
+        },
+        {
+          "name": "a page saved with CR LF",
+          "markdown": "## Success criteria\r\n\r\n- [ ] I can add fractions\r\n",
+          "counts": true
+        }
+      ]
+    },
+    "grouping": {
+      "readers": "Each case is a section's pages (every page has one counted item) and its classes; `expect` names the class whose table a page is listed under, null for Other pages. scripts/check_progress_rules_against_the_site.py writes them as files, runs the build's own date pass and plan over them and the site's progressRules.buildManifest over the plan.",
+      "rule": "Pages are grouped by the class that first links them DIRECTLY - the rule the build already dates pages by (datingPagesAClassBrings, #275/#276; build_site._first_linking_classes, now one function for the date pass, the links checklist and this): the visible, dated classes, earliest first (ties by title), and the first whose own links reach a page claims it; a page reached only through another page, or only from a hidden or undated class, is not claimed. A class page's own items go under itself. Everything else is under Other pages, last, by title. Within a class: the class page first, then the pages it brings by title.",
+      "cases": [
+        {
+          "name": "the earliest class that links directly",
+          "classes": [
+            {
+              "title": "Unit 1, Day 2",
+              "created": "2026-09-04T09:00:00.000-0400",
+              "links": [
+                "Fractions"
+              ]
+            },
+            {
+              "title": "Unit 1, Day 1",
+              "created": "2026-09-03T09:00:00.000-0400",
+              "links": [
+                "Fractions"
+              ]
+            }
+          ],
+          "pages": [
+            "Fractions"
+          ],
+          "expect": {
+            "Fractions": "Unit 1, Day 1"
+          }
+        },
+        {
+          "name": "through a hub is Other",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "created": "2026-09-03T09:00:00.000-0400",
+              "links": [
+                "How Marks Work"
+              ]
+            }
+          ],
+          "pages": [
+            "How Marks Work",
+            "Fractions"
+          ],
+          "pageLinks": {
+            "How Marks Work": [
+              "Fractions"
+            ]
+          },
+          "expect": {
+            "How Marks Work": "Unit 1, Day 1",
+            "Fractions": null
+          }
+        },
+        {
+          "name": "a hidden class claims nothing",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "created": "2026-09-03T09:00:00.000-0400",
+              "links": [
+                "Fractions"
+              ],
+              "hidden": true
+            }
+          ],
+          "pages": [
+            "Fractions"
+          ],
+          "expect": {
+            "Fractions": null
+          }
+        },
+        {
+          "name": "an undated class claims nothing",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "created": null,
+              "links": [
+                "Fractions"
+              ]
+            }
+          ],
+          "pages": [
+            "Fractions"
+          ],
+          "expect": {
+            "Fractions": null
+          }
+        },
+        {
+          "name": "a class does not claim another class",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "created": "2026-09-03T09:00:00.000-0400",
+              "links": [
+                "Unit 1, Day 2"
+              ]
+            },
+            {
+              "title": "Unit 1, Day 2",
+              "created": "2026-09-04T09:00:00.000-0400",
+              "links": []
+            }
+          ],
+          "pages": [],
+          "expect": {
+            "Unit 1, Day 2": "Unit 1, Day 2"
+          },
+          "why": "a class page's own items go under itself, never under the class that links it"
+        },
+        {
+          "name": "an undated class's own items are Other",
+          "classes": [
+            {
+              "title": "Unit 1, Day 1",
+              "created": null,
+              "links": []
+            }
+          ],
+          "pages": [],
+          "expect": {
+            "Unit 1, Day 1": null
+          }
+        }
+      ]
+    },
+    "labels": {
+      "rule": "Each class's row is its title. Its table is \"<unit word> N\", N read from the class page's name by the course's own pattern (class_page_pattern, group 1), the tables in order of N; Other pages comes last. A club (class_page_scheme \"numbered\": one number per page) gets ONE table, named after the folder its meetings are in (class_folder) - the director's ruling on #545 plan review F6, over the plan's one table per meeting, which would be tables of one row each.",
+      "cases": [
+        {
+          "name": "units and days",
+          "unitWord": "Unit",
+          "scheme": "unit_day",
+          "classFolder": "All Classes",
+          "title": "Unit 3, Day 4",
+          "table": "Unit 3",
+          "order": 3
+        },
+        {
+          "name": "the course's own word",
+          "unitWord": "Thread",
+          "scheme": "unit_day",
+          "classFolder": "All Classes",
+          "title": "Thread 2, Day 1",
+          "table": "Thread 2",
+          "order": 2
+        },
+        {
+          "name": "a leading zero",
+          "unitWord": "Unit",
+          "scheme": "unit_day",
+          "classFolder": "All Classes",
+          "title": "Unit 02, Day 1",
+          "table": "Unit 2",
+          "order": 2
+        },
+        {
+          "name": "a club",
+          "unitWord": "Week",
+          "scheme": "numbered",
+          "classFolder": "All Meetings",
+          "title": "Week 3",
+          "table": "All Meetings",
+          "order": 0
+        }
+      ]
+    },
+    "rollUp": {
+      "rule": "progressRules.rollUp(siteRoot, page, store) -> {done, total}: an item is done when the student ticked it (\"1\"), or never touched it and the teacher wrote it ticked ([x], ruling Q5); a student's untick (\"0\") is not done. Ticks are read through taskRules.readTicks with the manifest's own ids only, so a tick kept under words that are no longer on the page (taskBoxes.textChange) is never counted, and a store that throws reads as nothing touched.",
+      "cases": [
+        {
+          "name": "nothing ticked",
+          "siteRoot": "/",
+          "page": {
+            "title": "Fractions",
+            "slug": "Tasks/Fractions",
+            "items": [
+              {
+                "id": "b4ee941a",
+                "checked": false
+              },
+              {
+                "id": "9f0dcb19",
+                "checked": false
+              },
+              {
+                "id": "5613c0aa",
+                "checked": false
+              }
+            ]
+          },
+          "stored": {},
+          "done": 0,
+          "total": 3
+        },
+        {
+          "name": "two ticked",
+          "siteRoot": "/",
+          "page": {
+            "title": "Fractions",
+            "slug": "Tasks/Fractions",
+            "items": [
+              {
+                "id": "b4ee941a",
+                "checked": false
+              },
+              {
+                "id": "9f0dcb19",
+                "checked": false
+              },
+              {
+                "id": "5613c0aa",
+                "checked": false
+              }
+            ]
+          },
+          "stored": {
+            "plantoir:task:/:Tasks/Fractions:b4ee941a": "1",
+            "plantoir:task:/:Tasks/Fractions:5613c0aa": "1"
+          },
+          "done": 2,
+          "total": 3
+        },
+        {
+          "name": "a stale tick is not counted",
+          "siteRoot": "/",
+          "page": {
+            "title": "Fractions",
+            "slug": "Tasks/Fractions",
+            "items": [
+              {
+                "id": "b4ee941a",
+                "checked": false
+              }
+            ]
+          },
+          "stored": {
+            "plantoir:task:/:Tasks/Fractions:eaed8984": "1"
+          },
+          "done": 0,
+          "total": 1,
+          "why": "the words changed, so the id did"
+        },
+        {
+          "name": "a teacher's [x] counts until the student unticks it",
+          "siteRoot": "/",
+          "page": {
+            "title": "Fractions",
+            "slug": "Tasks/Fractions",
+            "items": [
+              {
+                "id": "b4ee941a",
+                "checked": true
+              },
+              {
+                "id": "9f0dcb19",
+                "checked": true
+              }
+            ]
+          },
+          "stored": {
+            "plantoir:task:/:Tasks/Fractions:9f0dcb19": "0"
+          },
+          "done": 1,
+          "total": 2
+        },
+        {
+          "name": "another page's tick is not this page's",
+          "siteRoot": "/",
+          "page": {
+            "title": "Fractions",
+            "slug": "Tasks/Fractions",
+            "items": [
+              {
+                "id": "b4ee941a",
+                "checked": false
+              }
+            ]
+          },
+          "stored": {
+            "plantoir:task:/:Tasks/Other:b4ee941a": "1"
+          },
+          "done": 0,
+          "total": 1
+        },
+        {
+          "name": "a store that throws",
+          "siteRoot": "/",
+          "page": {
+            "title": "Fractions",
+            "slug": "Tasks/Fractions",
+            "items": [
+              {
+                "id": "b4ee941a",
+                "checked": true
+              },
+              {
+                "id": "9f0dcb19",
+                "checked": false
+              }
+            ]
+          },
+          "stored": {},
+          "done": 1,
+          "total": 2,
+          "throws": true,
+          "why": "nothing touched: the Markdown's own state"
+        }
+      ]
+    },
+    "manifest": {
+      "plan": "quartz/plantoir_progress.json, written by the build on EVERY build (sorted keys, the same bytes for the same input): {version, page (whether the section gets the page), reason (built | switchedOff | noSuccessCriteria | teachersOwnPage), slug, headings (normalised), words, notes, classes: [{path, title, date, unit, unitOrder}] in the date pass's order, firstClassOf: {page path: class path}, gate: [page paths the build read as having counted items]}. Paths are the page's place in the site's content with forward slashes, in Unicode's composed form - the name Quartz knows the file by (relativePath).",
+      "file": "public/progress-manifest.json, written by the emitter only when `page` is true: {version, words, units: [{label, classes: [{label, date, pages: [{title, slug, items: [{id, checked}]}]}]}], other: {label, pages}}. Only pages with at least one counted item; a class with no such page, and a unit with no class left, are left out. Hidden pages (publish: false) are skipped by the emitter itself, since a rebuild in a preview hands it every page (#545 plan review F8). The dates are carried for #595's filter and not shown in v1.8.2 (ruling Q6).",
+      "why": "A preview is ONE `quartz build --serve` process, so a Python pass after the build would never run there: the manifest is an emitter's, re-run with every page on each rebuild. Ids come from the built pages' stamps, never the Markdown (#519's comment on #545, review F1)."
+    },
+    "page": {
+      "rule": "`My Progress.md` at the top of the build's content, written AFTER the page list the app reads and after every pass that reads links, so the app never lists it as the teacher's and no date pass, coverage map or links checklist meets it: title My Progress (Russell, 2026-10-19, wherever the words appear), the first class's date as every build-written page carries, words.description as its `description:` (the meta description and search summary, #545 fixes review 4 - not page text, so still no date line), `publish: true`, `excludeBacklinks: true`, and one EMPTY element (`data-plantoir-progress`) carrying words.placeholder and words.unreadable as attributes (dateLine). No link of any kind. Read-only: no box on it can be ticked; each row links back to its page.",
+      "shown": "The intro (words.intro), then the totals - words.overall then each table's - then words.noTicksYet while nothing on the page has been touched, then one CLOSED table per unit and Other pages last, each summary its label and count; inside, a heading row per class, then a row per page: its title linking back to it and words.count. Drawn again, every table closed, on every page shown (Back included). A manifest that cannot be read (a site opened from a folder on disk) shows words.unreadable.",
+      "dateLine": "The page shows NO date line and no reading time (Russell's Q6: no dates on the page). Quartz's ContentMeta draws its line only for a page with text, so the page carries none: the placeholder sentence is the element's `data-placeholder`, shown by the page's styles until the script draws (`:empty::before`), never page text. Measured in a real build: no `content-meta` in My-Progress.html.",
+      "printing": "Not checked in v1.8.2: #595 owns the print check. #519's ruling Q1 (paper shows the student's ticks) means this page is no exception."
+    },
+    "keyLinks": {
+      "rule": "In the BUILD's copy of Key Links only (the teacher's page is never touched): `- [[My Progress]]` as the FIRST bullet (Russell, 2026-10-19), with that bullet's indent; a page with no bullet gets it as a line of its own at the end. A copy that already links My Progress - `[[My Progress]]`, `[[My Progress|…]]` or `[[My Progress#…]]`, in any case; never a page whose name only begins with those words (#545 implementation review 1) - is left exactly as it is. Only when the section gets the page. The coverage map keeps its place after the last bullet.",
+      "cases": [
+        {
+          "name": "first bullet",
+          "before": "---\ntitle: Key Links\n---\n- [[Course Outline]]\n- [[How Marks Work]]\n",
+          "after": "---\ntitle: Key Links\n---\n- [[My Progress]]\n- [[Course Outline]]\n- [[How Marks Work]]\n"
+        },
+        {
+          "name": "a heading and prose first",
+          "before": "# Key Links\n\nThe links you will use most.\n\n- [[Course Outline]]\n",
+          "after": "# Key Links\n\nThe links you will use most.\n\n- [[My Progress]]\n- [[Course Outline]]\n"
+        },
+        {
+          "name": "already linked, any case",
+          "before": "- [[Course Outline]]\n- [[my progress|Your progress]]\n",
+          "after": "- [[Course Outline]]\n- [[my progress|Your progress]]\n"
+        },
+        {
+          "name": "no bullets",
+          "before": "See the course outline.",
+          "after": "See the course outline.\n\n- [[My Progress]]\n"
+        },
+        {
+          "name": "a page whose name only begins with the same words is not this one",
+          "before": "- [[My Progress Journal]]\n",
+          "after": "- [[My Progress]]\n- [[My Progress Journal]]\n"
+        },
+        {
+          "name": "a link to a heading of the page is a link to it",
+          "before": "- [[My Progress#Unit 1]]\n",
+          "after": "- [[My Progress#Unit 1]]\n"
+        },
+        {
+          "name": "CR LF kept",
+          "before": "- [[Course Outline]]\r\n",
+          "after": "- [[My Progress]]\r\n- [[Course Outline]]\r\n"
+        }
+      ]
+    },
+    "sidebar": {
+      "rule": "The sidebar is drawn in the browser (explorer.inline.ts: folders that do not expand, then those that do, then files), so the build adds one import of progressRules.pinnedOrder and one line of data, rewritten on every build: {slug: the page's slug, or \"\" when this build made none; after: the class folders' slug segments}. pinnedOrder moves the top-level file with that slug to directly after the first class folder - All Classes, or a club's own folder - or to the top when there is none: directly after the class folder (Russell, 2026-10-19: under All Classes) - the SECOND entry on a site whose class folder sorts first, as All Classes does; a club's `Resources` sorts before `All Meetings`, so there it is third (#545 implementation review 7, accepted as measured). Nothing moves when the slug is empty or the page is not in the sidebar. The `hidden` list still applies. A script whose shape has changed is said and left alone: the page then sorts last.",
+      "cases": [
+        {
+          "name": "directly under All Classes",
+          "nodes": [
+            [
+              "All-Classes",
+              true
+            ],
+            [
+              "Concepts",
+              true
+            ],
+            [
+              "Tasks",
+              true
+            ],
+            [
+              "Key-Links",
+              false
+            ],
+            [
+              "My-Progress",
+              false
+            ]
+          ],
+          "pin": {
+            "slug": "My-Progress",
+            "after": [
+              "All-Classes"
+            ]
+          },
+          "expect": [
+            "All-Classes",
+            "My-Progress",
+            "Concepts",
+            "Tasks",
+            "Key-Links"
+          ]
+        },
+        {
+          "name": "a club's folder",
+          "nodes": [
+            [
+              "Resources",
+              true
+            ],
+            [
+              "All-Meetings",
+              true
+            ],
+            [
+              "My-Progress",
+              false
+            ]
+          ],
+          "pin": {
+            "slug": "My-Progress",
+            "after": [
+              "All-Meetings"
+            ]
+          },
+          "expect": [
+            "Resources",
+            "All-Meetings",
+            "My-Progress"
+          ]
+        },
+        {
+          "name": "no class folder in the sidebar: the top",
+          "nodes": [
+            [
+              "Concepts",
+              true
+            ],
+            [
+              "Key-Links",
+              false
+            ],
+            [
+              "My-Progress",
+              false
+            ]
+          ],
+          "pin": {
+            "slug": "My-Progress",
+            "after": [
+              "All-Classes"
+            ]
+          },
+          "expect": [
+            "My-Progress",
+            "Concepts",
+            "Key-Links"
+          ]
+        },
+        {
+          "name": "no page this build: nothing moves",
+          "nodes": [
+            [
+              "All-Classes",
+              true
+            ],
+            [
+              "Key-Links",
+              false
+            ]
+          ],
+          "pin": {
+            "slug": "",
+            "after": [
+              "All-Classes"
+            ]
+          },
+          "expect": [
+            "All-Classes",
+            "Key-Links"
+          ]
+        },
+        {
+          "name": "the page hidden from the sidebar: nothing moves",
+          "nodes": [
+            [
+              "All-Classes",
+              true
+            ],
+            [
+              "Key-Links",
+              false
+            ]
+          ],
+          "pin": {
+            "slug": "My-Progress",
+            "after": [
+              "All-Classes"
+            ]
+          },
+          "expect": [
+            "All-Classes",
+            "Key-Links"
+          ]
+        },
+        {
+          "name": "a folder called My Progress is not the page",
+          "nodes": [
+            [
+              "All-Classes",
+              true
+            ],
+            [
+              "My-Progress",
+              true
+            ]
+          ],
+          "pin": {
+            "slug": "My-Progress",
+            "after": [
+              "All-Classes"
+            ]
+          },
+          "expect": [
+            "All-Classes",
+            "My-Progress"
+          ]
+        }
+      ]
+    },
+    "words": {
+      "note": "What a student reads on the page, held against userFacingLabelWords.forbidden by scripts/test_my_progress.py. {done} and {total} are filled in.",
+      "title": "My Progress",
+      "intro": "The boxes you’ve ticked under each page’s success criteria, counted. Only this browser knows them; nothing is sent anywhere.",
+      "overall": "Overall",
+      "otherPages": "Other pages",
+      "pageColumn": "Page",
+      "doneColumn": "Ticked",
+      "count": "{done} / {total}",
+      "noTicksYet": "Tick the boxes under a page’s success criteria and they’re counted here.",
+      "nothingYet": "No page has boxes to tick under its success criteria yet.",
+      "unreadable": "Your progress can’t be shown on this copy of the site. Open the site from its web address to see it.",
+      "placeholder": "Counting the boxes you’ve ticked…",
+      "description": "Your own progress on this section’s success criteria, kept in your browser only."
+    },
+    "notes": {
+      "note": "What a teacher reads on a `plantoir: note:` line from the emitter, after the page's place in the site, when the build's gate and the site's own reading of a page disagree (#545 plan review F3): a tick is never dropped without a word.",
+      "gateSaidYes": "the build expected boxes to count under a success-criteria heading here, and the site found none, so this page is not on My Progress",
+      "gateSaidNo": "the site found boxes to count under a success-criteria heading here that the build's reading of the page did not; they are counted on My Progress",
+      "gateSaidNoNoPage": "the site found boxes to count under a success-criteria heading here, but the build's reading of the pages found none anywhere in this section, so the section has no My Progress page"
+    },
+    "knownLimits": [
+      "Per browser and per site, as the ticks are (taskBoxes.knownLimits): another computer, another browser, or the teacher's preview of the same site counts separately.",
+      "Only a heading that is a child of the page itself opens a section; a success-criteria heading inside a callout or a list does not.",
+      "A dash the site's parser turns into a typographic one (-- into –) in a heading is a different word to the course's list.",
+      "A page reached only through another page, or only from a hidden or undated class, is under Other pages, not under a class (the date pass's own rule).",
+      "None of the 39 example courses has a task item under one of the default headings (104 headings match, all over tables; measured on #545's plan review), so no example course gets the page until its pages say so.",
+      "Class dates are in the manifest and not on the page (ruling Q6); the date and unit filter is #595's.",
+      "Three shapes the two readings still read differently, each said on a `plantoir: note:` line (notes) when a real page has it (#545 implementation review 3, measured): a heading written in HTML (`<h2>Success criteria</h2>`) - the site counts its section, the build's gate does not; a task line inside a `$$` maths block - the gate counts it, the site draws maths; a callout whose TITLE holds `[!quiz]` - the gate reads it as a quiz, the site does not."
+    ],
+    "rejected": [
+      "A Python pass over public/*.html after the build: a preview is one `quartz build --serve` process and the pass would never run there.",
+      "Ids re-derived from the teacher's Markdown: they disagree with what Quartz parses for links to headings, links to websites and comments (#519 review F1).",
+      "A transformer that stamps the counted items: an emitter is still needed to write the one manifest, and the stamps PlantoirTasks writes are already enough.",
+      "A `window.*` read API from the task boxes' script: scripts are bundled separately and their order is not a contract; the page imports taskRules.ts.",
+      "A `storage` listener: another tab's tick shows on the next page shown, as on every other page.",
+      "Editing patches/explorer.inline.ts: an every-build edit reaches every existing section on its next build and leaves the image's patch alone.",
+      "Hiding the page from the sidebar (the issue's first shape): Russell, 2026-10-19, put it second, under All Classes.",
+      "One table per meeting in a club (the plan's Q2): tables of one row each (#545 plan review F6).",
+      "A fixed-name structural check (`_is_progress_page_name`): it would have dropped a teacher's own page called My Progress from every link reader (#545 plan review F5). The page is written after every pass that reads links instead, so none of them meets it."
+    ]
+  },
+  "myProgressBuilt": {
+    "note": "How the build tells the app what it did about My Progress (#545), so the app can put one line on the activity trail per build - the coverageMapsBuilt pattern. Which pages count is myProgress; this is only the line that reports it.",
+    "marker": {
+      "prefix": "PLANTOIR_MY_PROGRESS:",
+      "rule": "One line on stdout on EVERY build whose section wants the page (include_my_progress), including one that made none: the prefix and a single-line JSON object carrying course, section (a number), built (a boolean), pages (how many pages students can see have items that count, by the build's reading) and reason (built, noSuccessCriteria or teachersOwnPage). Nothing when the page is switched off for the section: the console says so, and the trail would only repeat the setting. A plain sentence for the console comes first. The apps keep the marker out of the console a teacher reads, as they do every PLANTOIR_ line (transcriptStripping.machineLines).",
+      "examples": [
+        "PLANTOIR_MY_PROGRESS: {\"course\": \"ICS3U\", \"section\": 1, \"built\": true, \"pages\": 12, \"reason\": \"built\"}",
+        "PLANTOIR_MY_PROGRESS: {\"course\": \"ICS3U\", \"section\": 2, \"built\": false, \"pages\": 0, \"reason\": \"noSuccessCriteria\"}",
+        "PLANTOIR_MY_PROGRESS: {\"course\": \"ICS3U\", \"section\": 1, \"built\": false, \"pages\": 0, \"reason\": \"teachersOwnPage\"}"
+      ],
+      "why": "Rule 5: a page a student can see, added by the build, leaves a line - and 'my students have no My Progress page' is the report it has to answer, which is why a build that made none prints one too, with its reason. Counts and reasons are course structure, never anything written on a page."
+    },
+    "trailLine": {
+      "event": "my progress page built",
+      "shapes": {
+        "built": "the build made the My Progress page: N page(s) with success criteria to tick",
+        "noSuccessCriteria": "the build made no My Progress page: no page students can see has boxes to tick under a success-criteria heading",
+        "teachersOwnPage": "the build made no My Progress page: the course has its own page called My Progress"
+      },
+      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_MAPS:)."
+    }
   }
 }

@@ -1,0 +1,76 @@
+// My Progress (#545). Rides on PlantoirMetaLine.tsx, as tasks.scss does, so it
+// reaches the site's one index.css with no layout edit. Every rule is under
+// .plantoir-progress, the element only the My Progress page carries, so no
+// other page is styled differently.
+
+.plantoir-progress {
+  // The page carries no text of its own, so Quartz draws no date line on it
+  // (myProgress.page.dateLine): the placeholder sentence is an attribute,
+  // shown here until the script draws into the element.
+  &:empty::before {
+    content: attr(data-placeholder);
+    color: var(--darkgray);
+  }
+
+  & .plantoir-progress-totals {
+    list-style: none;
+    padding-left: 0;
+
+    & li {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      max-width: 28rem;
+    }
+
+    & .plantoir-progress-overall {
+      font-weight: 600;
+    }
+  }
+
+  & .plantoir-progress-count {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  & .plantoir-progress-hint,
+  & .plantoir-progress-empty {
+    color: var(--darkgray);
+  }
+
+  & details.plantoir-progress-unit {
+    margin: 0.75rem 0;
+
+    & > summary {
+      cursor: pointer;
+      font-weight: 600;
+
+      & > span + span {
+        margin-left: 0.5rem;
+        font-weight: normal;
+      }
+    }
+  }
+
+  & table.plantoir-progress-table {
+    width: 100%;
+    margin: 0.5rem 0;
+
+    & th,
+    & td {
+      text-align: left;
+    }
+
+    & th.plantoir-progress-count,
+    & td.plantoir-progress-count {
+      text-align: right;
+      width: 6rem;
+    }
+
+    & tr.plantoir-progress-class > th {
+      padding-top: 0.75rem;
+      font-weight: 600;
+    }
+  }
+}

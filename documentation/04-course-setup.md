@@ -795,7 +795,8 @@ that is not there simply contributes nothing.
 | The folders that count for marks | `graded_folders`, or — for a course never asked — every folder whose name contains "task". An ABSENT key and an EMPTY list are different answers; see [`08-course-config-reference.md`](08-course-config-reference.md). |
 | `Media` | Managed by the build and kept out of the sidebar. |
 | `index.md` | The page a folder opens on, in every section and every folder. |
-| `Key Links.md` | The sidebar's shortcut list. The build adds the curriculum map to it and leaves the teacher's own entries alone. |
+| `Key Links.md` | The sidebar's shortcut list. The build adds the curriculum map to it (after the last bullet) and, in a section that gets the My Progress page (#545), `[[My Progress]]` as the FIRST bullet — in the build's copy only, leaving the teacher's own entries alone. |
+| `My Progress` | Written by the build at the top of a section's site (#545) when `include_my_progress` is on and a page students can see has a task item under a success-criteria heading, with `progress-manifest.json` beside it in the built site; listed directly after the class folder in the sidebar (second on a site whose class folder sorts first, as All Classes does). A teacher's OWN top-level page of that name (any case) wins: the build then writes neither the page nor the Key Links entry, and says so. [`06`](06-quartz-customizations.md) → L. |
 | `Curriculum Coverage` (and `<Folder> Coverage` for each further curriculum folder) | Written by the build on every run. A teacher's own page of that name would be replaced. |
 
 **Both apps can show a teacher this list for their own course**, from Course

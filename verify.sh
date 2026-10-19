@@ -575,6 +575,18 @@ else
   cat /tmp/verify_quizzes_test.log
 fi
 
+# My Progress (#545): the two settings (read as include_curriculum_coverage
+# is), the headings, the build's gate over every sections and gate case, the
+# tables' labels, Key Links first, the words, the marker lines, and the
+# build's own steps - the page, the plan, the sidebar pin and the emitter's
+# wiring - over temporary folders. Stdlib only.
+if (cd scripts && python3 test_my_progress.py) >/tmp/verify_my_progress_test.log 2>&1; then
+  pass "My Progress: the settings, the headings, the build's gate over every contract case, the labels, Key Links first, the words, the marker, the page, the plan, the sidebar pin and the emitter's wiring (scripts/test_my_progress.py, #545)"
+else
+  fail "My Progress: the settings, the headings, the build's gate over every contract case, the labels, Key Links first, the words, the marker, the page, the plan, the sidebar pin and the emitter's wiring (scripts/test_my_progress.py, #545)"
+  cat /tmp/verify_my_progress_test.log
+fi
+
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
 else
@@ -1210,6 +1222,25 @@ else
   cat /tmp/verify_task_rules_site.log
 fi
 
+# ---- My Progress (#545): the rules, run where they really run ----
+# progressRules.ts and the emitter are bundled with Quartz's own FrontMatter,
+# ObsidianFlavoredMarkdown and GitHubFlavoredMarkdown, PlantoirQuizzes and
+# PlantoirTasks, and every site-side myProgress case is run through them in
+# Node - the same sections and gate cases the build's gate reads in
+# test_my_progress.py (#545 plan review F3) - with the grouping cases through
+# the build's own date pass and plan, and the emitter over a plan on disk.
+echo ""
+echo "🔎 Checking the My Progress rules against what the site runs…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_progress_rules_against_the_site.py" /opt/scripts/check_progress_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_progress_rules_against_the_site.py \
+  >/tmp/verify_progress_rules_site.log 2>&1; then
+  pass "every myProgress case holds in the site's own code over Quartz's own transformers: the headings, the sections, the gate, the roll-up, the sidebar, the grouping through the build's date pass, and the emitter's notes (scripts/check_progress_rules_against_the_site.py, #545)"
+else
+  fail "every myProgress case holds in the site's own code over Quartz's own transformers: the headings, the sections, the gate, the roll-up, the sidebar, the grouping through the build's date pass, and the emitter's notes (scripts/check_progress_rules_against_the_site.py, #545)"
+  cat /tmp/verify_progress_rules_site.log
+fi
+
 # ---- Diagrams and graphs (#485 E1): the rules, run against the real engines ----
 # figureRules.js (the file the site's transformer and the build's helper both
 # import) runs every tidy and cacheKey case in Node; the helper, driven as a
@@ -1558,6 +1589,9 @@ check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
 # Self-check quizzes (#563): the folder check. The site's transformer, script
 # and styles are in support/quartz (the loop below).
 check_baked scripts/quizzes.py            /opt/scripts/quizzes.py
+# My Progress (#545): the gate, the page and its Key Links entry. The site's
+# emitter, rules, script and styles are in support/quartz (the loop below).
+check_baked scripts/my_progress.py        /opt/scripts/my_progress.py
 # Live input (#583): which pages a publish isolates. The preview's half is in
 # support/quartz (the loop below).
 check_baked scripts/isolation_headers.py  /opt/scripts/isolation_headers.py
@@ -1876,10 +1910,14 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz One Blank.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
-        "$HIT_COURSE/Task Raw Box.md" \
+        "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Progress Fixture.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
+  if [[ -n "${PROGRESS_CLASS_BACKUP:-}" && -f "$PROGRESS_CLASS_BACKUP" ]]; then
+    cp "$PROGRESS_CLASS_BACKUP" "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md"
+    rm -f "$PROGRESS_CLASS_BACKUP"
+  fi
   cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
   if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
     cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
@@ -2817,6 +2855,40 @@ for twin in ("A", "B"):
     encoding="utf-8")
 TASKPLANTS
 
+# ---- #545: My Progress, planted for the same build ----
+# Progress Fixture: four items under its success criteria (one the teacher
+# wrote ticked, `[x]`, which counts as done until a student unticks it - Q5;
+# one under a deeper `### Tests of success:`), one before any heading and one after the
+# section - which do not count - linked from Unit 1, Day 2, whose file is
+# put back by restore_hit_fixture. Other pages of the section may have
+# success criteria too (a real course does), so 6m and the browser check
+# assert on this page's own row and work every total out from the manifest.
+PROGRESS_CLASS_BACKUP="$(mktemp -t plantoir-progress-class)"
+cp "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md" "$PROGRESS_CLASS_BACKUP"
+cat > "$HIT_COURSE/Progress Fixture.md" <<'PROGRESSFIXTURE'
+---
+title: Progress Fixture
+---
+A page planted for the My Progress check (plantoir-progress-sentinel-545).
+
+- [ ] Not counted: before any heading
+
+## Success criteria
+
+- [ ] I can name a variable
+- [ ] I can print a value
+- [x] I can comment my code
+
+### Tests of success:
+
+- [ ] I can read an error message
+
+## Practice
+
+- [ ] Not counted: after the section
+PROGRESSFIXTURE
+printf '\n- [[Progress Fixture]]\n' >> "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md"
+
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
 echo "🚦 Running: ./preview.sh EXC2O 1 --image $DEV_TEST_IMAGE --full-rebuild --build-only"
@@ -3725,6 +3797,87 @@ else
   fail "task boxes: one of the checks above failed (#519)"
 fi
 
+# ---- 6m. My Progress (#545), as the build left it ----
+# The page and the manifest are there; Progress Fixture's row is in the
+# manifest under Unit 1, Day 2 in the Unit 1 table with exactly its four
+# counted items, the contract's ids of their words, the teacher's [x] ticked;
+# the page draws no date line (no content-meta: Q6); the two items
+# outside the section are not; Key Links' first bullet links the page, once;
+# the page has no Backlinks list; the sidebar's pin carries the page's slug
+# and All Classes; and the build said so on its PLANTOIR_MY_PROGRESS: line.
+if python3 - "$SITE_PUBLIC" <<'PROGRESSPY'
+import json, re, sys
+from pathlib import Path
+sys.path.insert(0, "scripts")
+site = Path(sys.argv[1])
+problems = []
+def fnv1a(text):
+    value = 0x811c9dc5
+    data = text.encode("utf-16-le")
+    for index in range(0, len(data), 2):
+        value ^= data[index] | (data[index + 1] << 8)
+        value = (value * 0x01000193) & 0xffffffff
+    return format(value, "08x")
+rules_words = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["myProgress"]["words"]
+manifest_path = site / "progress-manifest.json"
+page_path = site / "My-Progress.html"
+if not manifest_path.is_file() or not page_path.is_file():
+    problems.append("My-Progress.html or progress-manifest.json is missing")
+else:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = []
+    for unit in manifest["units"]:
+        for known in unit["classes"]:
+            for page in known["pages"]:
+                rows.append((unit["label"], known["label"], page))
+    for page in manifest["other"]["pages"]:
+        rows.append((manifest["other"]["label"], None, page))
+    mine = [row for row in rows if row[2]["title"] == "Progress Fixture"]
+    want = [{"id": fnv1a(text), "checked": False} for text in
+            ("I can name a variable", "I can print a value", "I can comment my code", "I can read an error message")]
+    want[2]["checked"] = True
+    if len(mine) != 1:
+        problems.append(f"Progress Fixture is in the manifest {len(mine)} times")
+    else:
+        unit, label, page = mine[0]
+        if (unit, label, page["slug"]) != ("Unit 1", "Unit 1, Day 2", "Progress-Fixture"):
+            problems.append(f"Progress Fixture is under {unit} / {label} at {page['slug']}")
+        if page["items"] != want:
+            problems.append(f"Progress Fixture counts {page['items']}, expected {want}")
+    html = page_path.read_text(encoding="utf-8")
+    if "data-plantoir-progress" not in html:
+        problems.append("My-Progress.html has no placeholder for the page's script")
+    if 'class="backlinks"' in html:
+        problems.append("My-Progress.html carries a Backlinks list")
+    if "content-meta" in html:
+        problems.append("My-Progress.html shows a date line")
+    if 'name="description" content="' + rules_words["description"] + '"' not in html:
+        problems.append("My-Progress.html's meta description is not words.description")
+key_links = (site / "Key-Links.html").read_text(encoding="utf-8")
+article = key_links.split("<article", 1)[-1].split("</article>", 1)[0]
+links = re.findall(r'<li><a href="([^"]*)"', article)
+if not links or not links[0].endswith("My-Progress"):
+    problems.append(f"Key Links' first bullet is {links[:1]}, not My Progress")
+if sum(1 for link in re.findall(r'href="([^"]*)"', article) if link.endswith("My-Progress")) != 1:
+    problems.append("Key Links does not link My Progress exactly once")
+script = (site / "postscript.js").read_text(encoding="utf-8")
+if '{slug:"My-Progress",after:["All-Classes"]}' not in script:
+    problems.append("the sidebar's pin does not carry the page's slug and All Classes")
+if "progress-manifest.json" not in script:
+    problems.append("the page's script is not in postscript.js")
+log = Path("/tmp/verify_main_build.log").read_text(encoding="utf-8", errors="replace")
+if 'PLANTOIR_MY_PROGRESS: {"course": "EXC2O", "section": 1, "built": true' not in log:
+    problems.append("the build printed no PLANTOIR_MY_PROGRESS: line saying it made the page")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+PROGRESSPY
+then
+  pass "My Progress: the page and the manifest built, Progress Fixture's four counted items under Unit 1, Day 2 with the contract's ids and the teacher's [x], Key Links' first bullet, no date line and no Backlinks list, the sidebar's pin, and the build's marker line (#545)"
+else
+  fail "My Progress: one of the checks above failed (#545)"
+fi
+
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
 # The rule is in the one index.css every page links, as the site's minifier
 # writes it, and the page rows it relies on are still Quartz's: a page row's
@@ -3892,9 +4045,16 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "task boxes did not tick in a browser as the contract says (browser-checks/task_boxes.mjs, #519)"
     cat /tmp/verify_task_boxes.log
   fi
+  # #545: My Progress in a browser - Progress Fixture's own row, by name.
+  if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
+    pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, the fixture's row at 1 / 4 on a fresh profile (the teacher's [x]), every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
+  else
+    fail "My Progress did not count a student's ticks in a browser as the contract says (browser-checks/my_progress.mjs, #545)"
+    cat /tmp/verify_my_progress.log
+  fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), and My Progress in a browser (#545): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), and My Progress in a browser (#545): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul

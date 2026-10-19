@@ -214,6 +214,10 @@ COPY scripts/swift_blocks.py /opt/scripts/swift_blocks.py
 # the site's own rules and writes the words the site's quizzes use. Imported
 # by build_site.py by bare name (test_baked_modules.py).
 COPY scripts/quizzes.py /opt/scripts/quizzes.py
+# My Progress (#545): whether a section gets the page, the page, its Key
+# Links entry and the plan the site's emitter reads. Imported by build_site.py
+# by bare name (test_baked_modules.py).
+COPY scripts/my_progress.py /opt/scripts/my_progress.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).

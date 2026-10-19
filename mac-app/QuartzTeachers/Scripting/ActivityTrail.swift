@@ -305,6 +305,16 @@ nonisolated enum ActivityTrail {
         /// structure only, never anything written on a page.
         case coverageMapsBuilt = "curriculum maps built"
 
+        /// What a build did about the My Progress page (#545): that it made
+        /// it, and how many pages students can see have success criteria to
+        /// tick — or that it made none, and why (no such page, or the
+        /// course's own page by that name). Read from the build's
+        /// `PLANTOIR_MY_PROGRESS:` line (`MyProgressBuilt`), printed on every
+        /// build whose section wants the page, so "my students have no My
+        /// Progress page" has an answer. Course structure only, never
+        /// anything written on a page.
+        case myProgressBuilt = "my progress page built"
+
         /// A teacher asked for a class to be duplicated, the room for it was
         /// made, and then no copy appeared.
         ///
