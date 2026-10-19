@@ -488,13 +488,16 @@ handler, a Mermaid pan/zoom script), and a hardcoded allow-list would go
 stale on a Quartz upgrade or silently break a teacher's own embedded
 `<script>`. So `write_netlify_headers_file()` scans the actual built
 `public/` folder at deploy time — every `.html` file, every unique inline
-`<script>` body, SHA-256-hashed — and writes `public/_headers` with a policy
-built from what is really there:
+`<script>` body, SHA-256-hashed, plus the host of every place the site's
+scripts load code from (a `<script src="https://…">`, and since #594 the
+`https://` argument of a dynamic `import(…)` — see "Code a page's scripts
+LOAD is a script source too" below) — and writes `public/_headers` with a
+policy built from what is really there:
 
 ```
 # Plantoir: keeps Netlify's own ad badge off. Rewritten on every deploy; edit the lines outside this block, not these.
 /*
-  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-…' 'sha256-…' …;
+  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-…' 'sha256-…' … https://cdnjs.cloudflare.com;
 ```
 
 Only `script-src` is set, never `default-src` — nothing else about a page
@@ -523,7 +526,112 @@ linked KaTeX's copy-tex script from there on every page. Since every site
 serves KaTeX itself (06 → C2-26), that script is `'self'` and the host falls
 out of the list by itself — `write_netlify_headers_file` builds the list
 from the scripts the built pages really name. verify-deploy.sh checks a
-published Netlify page's CSP names no CDN.)
+published Netlify page's CSP no longer names jsdelivr; since #594 it does
+name `https://cdnjs.cloudflare.com`, for Mermaid, below.)
+
+**Code a page's scripts LOAD is a script source too (#594, v1.8.2).** From
+the day this policy was written (2026-08-21) until 2026-10-19, every Mermaid
+diagram on every Netlify site showed as its source text (`graph TD …`)
+instead of a drawn diagram, and nothing failed at deploy time. Quartz draws
+Mermaid from an inline `<script type="module">` that does, minified,
+`H||=await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs")`.
+`script-src` governs a dynamic `import()` exactly as it governs a
+`<script src>`, the inline script itself was hash-allowed, and the policy
+collected hosts from `<script src="https://…">` tags only — so cdnjs was
+never in it, and the browser refused the import (`Failed to fetch
+dynamically imported module`, the request `blocked=csp`). Measured on
+2026-10-19 with a headless Chrome for Testing CDP probe (Chrome 153 for the
+first four rows, 155 for the last two), counting `code.mermaid` against the
+`svg`s drawn under it:
+
+| Site | Host | `code.mermaid` | drawn `svg` | What the browser said |
+|---|---|---|---|---|
+| ics3u-s1-2026-27.russellgordon.ca/Concepts/Making-Decisions | Netlify | 2 | 0 | import of mermaid.esm.min.mjs `blocked=csp` |
+| ics3u-s1-2026-testing.netlify.app/Style/What-This-Site-Can-Do (1.8.0 build) | Netlify | 2 | 0 | same |
+| ada1o-s1-2026-testing.netlify.app/Style/What-This-Site-Can-Do (1.8.1 build) | Netlify | 4 | 0 | same |
+| ada1o-s1-2026-testing.pages.dev/Style/What-This-Site-Can-Do | Cloudflare | 4 | 4 | module 200, chunks 200 (no policy) |
+| ics3u-s1-2026-testing.netlify.app/Style/What-This-Site-Can-Do, before the fix | Netlify | 2 | 0 | `blocked=csp`; served policy ends with the five hashes |
+| the same page, rebuilt and deployed with the fix | Netlify | 2 | 2 | module 200, every chunk 200; served policy ends `… https://cdnjs.cloudflare.com;` |
+
+No isolation header (#583) was involved: the ICS3U page blocked whether or
+not it was isolated, and cdnjs answers `Access-Control-Allow-Origin: *` with
+`Cross-Origin-Resource-Policy: cross-origin`.
+
+So the policy now allows every host a page's scripts load code FROM, not
+only the hosts it links: in addition to `<script src>` hosts,
+`_collect_inline_script_policy` takes the `scheme://host` of every absolute
+`https://` URL that is the argument of a dynamic `import(…)` — in single or
+double quotes, or in backticks with no `${` in them — found in every inline
+`<script>` body of every built page AND in every `.js` / `.mjs` file under
+`public/` (Quartz's `postscript.js` and `prescript.js`, and anything a
+teacher put in `static/`). `import(` must not follow a letter, digit, `_`,
+`$` or `.`, so a method named `import` (Quartz's search index has one) is not
+read as one. A same-origin import (`./x.mjs`, `/static/x.mjs`) gives no host,
+since `'self'` covers it; `node:` imports in the bundled Pyodide give none
+either. Mermaid's own chunks load from the same cdnjs host, so the one host
+is all it needs. The hosts go into the same sorted, de-duplicated list the
+`<script src>` hosts are in, so `deploy.py` and `website/netlify_deploy.py`
+call it unchanged. `'unsafe-inline'` stays out and the hash approach is
+untouched — the badge is still kept off.
+
+Only `import(` arguments are collected. A `fetch("https://…")` is a network
+request, not a script source, and `script-src` does not govern it; reading
+every `https://` string in a script would widen the policy to every address
+a script happens to mention.
+
+Pinned by `ScriptsThatLoadCodeAreAllowedTheirHostsTests` in
+`scripts/test_netlify_badge.py` (the exact minified Quartz loader copied
+from a real built page, the same import in `postscript.js` and in a
+teacher's `.mjs` in `static/`; a `fetch`, same-origin imports, a template
+with `${…}` and a method named `import` allowing nothing) and one case
+through `deploy.py`'s re-export in `scripts/test_deploy_netlify_headers.py`;
+seven of them fail on the old module. And by a browser:
+`browser-checks/mermaid_draws.mjs` serves a built site over a local server
+that sends, on every response, the exact `Content-Security-Policy` line
+`write_netlify_headers_file` wrote into that site's `_headers` (read from
+the file, so it tests what the deploy would send), opens a page with
+diagrams, and requires every `code.mermaid` to get a drawn `svg` and no
+request to be refused by the policy. `verify.sh` clones the fixture site,
+runs the publish's two `_headers` writers on the clone in `deploy.py`'s
+order (#583's isolation block, then this one) and checks the Printable
+Fixture's diagram. On the old module it reads `0 of 2 diagrams drawn`, the
+mermaid import `blocked=csp`; on the new, `2 of 2`. The engine comes from
+cdnjs, so with cdnjs out of reach the check prints `SKIPPED: no network`
+and exits 3, and `verify.sh` lists a `⏭️  SKIP` — never a pass — without
+failing the run (its `skip` verb, added for this).
+
+**Measured alongside, NOT fixed here:** Quartz's own analytics loader in
+`postscript.js` does `document.createElement("script")` with
+`src = "https://plausible.io/js/script.manual.js"` — it is in the
+`postscript.js` of every built site checked (ICS3U, ADA1O and verify.sh's
+EXC2O fixture) — and the same policy blocks it on Netlify (one `blocked=csp`
+request per page load on the ICS3U test site, before and after this fix). It draws nothing a student sees, and an injected
+`<script>` element's `src` is not an `import(` argument, so the rule above
+does not collect it — whether a class site should load Plausible at all is
+its own question. The browser check names it and reports it on its OK line
+rather than failing on it.
+
+Rejected:
+
+- **`'strict-dynamic'`.** It would trust whatever a hash-allowed script
+  imports, Mermaid included, with no host list — but it makes the browser
+  IGNORE `'self'` and every host in the policy, so `postscript.js`,
+  `prescript.js` and every `<script src>` would then need a hash of its own,
+  and hashes for EXTERNAL scripts are not honoured by every browser. Fragile
+  where the current policy is not.
+- **Allowing the host of every `https://` string found in a script.** It
+  widens `script-src` to fetch targets, links and anything else a script
+  mentions — every one of them a place code could then be loaded from.
+- **A fixed allow-list naming cdnjs.** It goes stale the day Quartz moves
+  Mermaid (or its version path), and it misses a teacher's own import. The
+  whole module exists to read what the built site really does instead.
+
+**The trail (rule 5): no new event.** A teacher does nothing new and sees no
+new words: the deploy still writes "That rule also checked the N
+script(s)…", and the deploy itself is already on the trail (`task
+finished`, `deploy used the saved settings`). What changed is what a
+published page's browser is allowed to load, and the trail never records a
+page's content. The closing comment on #594 says the same.
 
 ### Runnable code and KaTeX on each host (#455, #494, v1.8.0)
 
@@ -605,9 +713,10 @@ OPENED AS FILES runs none of its scripts (measured, Safari and Chrome), so
 runnable blocks show as plain code there.
 
 **Still third-party, deliberately out of #494's scope:** Quartz's Mermaid
-(`cdnjs.cloudflare.com`, and its `preconnect`), Google Fonts (a site's own
-font choice), and plausible where a teacher turned it on. A separate
-toolchain issue owns them.
+(`cdnjs.cloudflare.com`, and its `preconnect` — allowed by the Netlify
+policy since #594, above), Google Fonts (a site's own font choice), and
+plausible (in every built site's `postscript.js` as of 2026-10-19, and
+blocked by the Netlify policy, as measured above). A separate toolchain issue owns them.
 
 **The block is marked and REPLACED, never appended again (#462).** Lines
 somebody else put in `_headers` are kept, and until 2026-10-08 the function
