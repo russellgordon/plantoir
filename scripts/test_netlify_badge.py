@@ -74,6 +74,92 @@ class NetlifyBadgeModuleTests(unittest.TestCase):
             self.assertNotIn("'unsafe-inline'", text)
 
 
+# Copied from the inline <script type="module"> of a real built page
+# (ICS3U section 1, Style/What-This-Site-Can-Do.html, 2026-10-19): Quartz's
+# Mermaid loader, minified, as the browser receives it.
+QUARTZ_MERMAID_LOADER = (
+    'document.addEventListener("nav",async()=>{let t=document.querySelector(".center")'
+    '.querySelectorAll("code.mermaid");if(t.length===0)return;'
+    'H||=await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs");'
+    'let a=H.default,i=new WeakMap;});'
+)
+
+
+class ScriptsThatLoadCodeAreAllowedTheirHostsTests(unittest.TestCase):
+    """#594: script-src governs a dynamic import() as it governs a
+    <script src>. The policy collected only <script src> hosts, so Quartz's
+    Mermaid loader - an inline module importing from cdnjs - was blocked on
+    every Netlify site and every diagram stayed as source text."""
+
+    def hosts_for(self, files: dict) -> list:
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            for name, text in files.items():
+                path = public_dir / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding="utf-8")
+            hashes, hosts = netlify_badge._collect_inline_script_policy(public_dir)
+            return hosts
+
+    def test_quartzs_own_mermaid_loader_allows_cdnjs(self):
+        hosts = self.hosts_for({"Style/What-This-Site-Can-Do.html":
+                                f'<script type="module">{QUARTZ_MERMAID_LOADER}</script>'})
+        # Mermaid's own chunks load from the same host, so nothing else.
+        self.assertEqual(hosts, ["https://cdnjs.cloudflare.com"])
+
+    def test_the_policy_written_to_headers_names_cdnjs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text(
+                f'<script type="module">{QUARTZ_MERMAID_LOADER}</script>', encoding="utf-8")
+            netlify_badge.write_netlify_headers_file(public_dir)
+            text = (public_dir / "_headers").read_text(encoding="utf-8")
+            self.assertIn(" https://cdnjs.cloudflare.com;", text)
+            self.assertNotIn("'unsafe-inline'", text)
+
+    def test_an_inline_module_importing_from_cdnjs_allows_it(self):
+        hosts = self.hosts_for({"index.html":
+                                "<script type=\"module\">const m = await import('https://cdnjs.cloudflare.com/x/y.mjs')</script>"})
+        self.assertEqual(hosts, ["https://cdnjs.cloudflare.com"])
+
+    def test_the_same_import_inside_postscript_js_allows_it(self):
+        hosts = self.hosts_for({"index.html": '<script src="./postscript.js" type="module"></script>',
+                                "postscript.js": QUARTZ_MERMAID_LOADER})
+        self.assertEqual(hosts, ["https://cdnjs.cloudflare.com"])
+
+    def test_an_import_in_a_teachers_own_mjs_in_static_allows_its_host(self):
+        hosts = self.hosts_for({"index.html": "<p>Hello</p>",
+                                "static/demo/widget.mjs": "export const w = () => import(`https://esm.sh/canvas-confetti@1`)"})
+        self.assertEqual(hosts, ["https://esm.sh"])
+
+    def test_a_fetch_is_not_a_script_source_and_allows_nothing(self):
+        hosts = self.hosts_for({"index.html": '<script>fetch("https://api.example/data.json")</script>',
+                                "postscript.js": 'fetch("https://api.example/other");const u="https://api.example/x.mjs"'})
+        self.assertEqual(hosts, [])
+
+    def test_same_origin_imports_need_no_host(self):
+        hosts = self.hosts_for({"index.html": '<script type="module">import("./x.mjs");import("/static/x.mjs")</script>',
+                                "postscript.js": 'await import("./chunk.mjs")'})
+        self.assertEqual(hosts, [])
+
+    def test_a_template_with_a_substitution_names_no_fixed_host(self):
+        hosts = self.hosts_for({"postscript.js": "await import(`https://${cdn}/x.mjs`)"})
+        self.assertEqual(hosts, [])
+
+    def test_a_method_named_import_is_not_a_dynamic_import(self):
+        hosts = self.hosts_for({"postscript.js": 'this.index[t].import("https://not.a.script/x")'})
+        self.assertEqual(hosts, [])
+
+    def test_import_hosts_and_script_src_hosts_are_one_sorted_list(self):
+        hosts = self.hosts_for({
+            "a.html": '<script src="https://cdn.jsdelivr.net/npm/x.js"></script>'
+                      f'<script type="module">{QUARTZ_MERMAID_LOADER}</script>',
+            "b.html": f'<script type="module">{QUARTZ_MERMAID_LOADER}</script>',
+            "postscript.js": QUARTZ_MERMAID_LOADER,
+        })
+        self.assertEqual(hosts, ["https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"])
+
+
 class DeployPyReExportsTheSameFunctionsTests(unittest.TestCase):
     """
     deploy.py imports these two functions from netlify_badge rather than
