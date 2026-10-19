@@ -88,7 +88,9 @@ export const PlantoirProgress: QuartzEmitterPlugin = () => ({
       if (slug === plan.slug) {
         continue
       }
-      const items = countedItems(tree as never, plan.headings)
+      // The page's text as the site parsed it - the lines PlantoirTasks made
+      // each id from - read only for the TeX of an item's maths (#603).
+      const items = countedItems(tree as never, plan.headings, String(file.value ?? "").split("\n"))
       if (items.length === 0) {
         if (gate.has(path)) {
           note(path, plan.notes.gateSaidYes ?? "")

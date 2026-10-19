@@ -7,6 +7,9 @@
 // student's own ticks (#519's keys, through taskRules.readTicks) and draws the
 // totals and one closed table per unit. Read-only: no box here can be ticked;
 // each row links back to its page, so ticking happens with the page in view.
+// Each row also opens (#603), closed on load, to list that page's items -
+// their words, whether each is ticked (the same reading as the count), each
+// a link to the part of the page it is on.
 // Nothing is sent anywhere and nothing is written.
 //
 // * On every page shown (Quartz's `nav`, which also fires on the first load
@@ -46,7 +49,39 @@ function count(words: Record<string, string>, done: number, total: number): stri
   return (words.count ?? "{done} / {total}").replace("{done}", String(done)).replace("{total}", String(total))
 }
 
-type Row = { page: ManifestPage; done: number; total: number }
+type Row = { page: ManifestPage; done: number; total: number; ticked: boolean[] }
+
+// One page's cell: the page's name, a link back to it, as the summary of a
+// CLOSED <details> - the same open-and-close as each unit's table - whose
+// body lists the page's items. A click on the name follows the link (an
+// interactive element in a summary does not toggle it); a click beside it,
+// or on the marker, opens the list.
+function pageCell(words: Record<string, string>, root: string, row: Row): HTMLElement {
+  const cell = element("td", "")
+  const details = element("details", "plantoir-progress-items") as HTMLDetailsElement
+  const summary = element("summary", "")
+  const link = element("a", "internal", row.page.title) as HTMLAnchorElement
+  link.href = root + row.page.slug
+  summary.append(link)
+  const list = element("ul", "plantoir-progress-item-list")
+  for (let index = 0; index < row.page.items.length; index += 1) {
+    const item = row.page.items[index]
+    const ticked = row.ticked[index] === true
+    const line = element("li", "plantoir-progress-item")
+    line.dataset.ticked = ticked ? "true" : "false"
+    const mark = element("span", "plantoir-progress-mark")
+    mark.setAttribute("aria-hidden", "true")
+    const state = element("span", "plantoir-progress-state", ticked ? (words.itemTicked ?? "") : (words.itemNotTicked ?? ""))
+    const anchor = typeof item.anchor === "string" && item.anchor !== "" ? "#" + item.anchor : ""
+    const itemLink = element("a", "internal", item.text ?? "") as HTMLAnchorElement
+    itemLink.href = root + row.page.slug + anchor
+    line.append(mark, state, itemLink)
+    list.append(line)
+  }
+  details.append(summary, list)
+  cell.append(details)
+  return cell
+}
 
 function tableOf(words: Record<string, string>, root: string, groups: { label: string | null; rows: Row[] }[]): HTMLElement {
   const table = element("table", "plantoir-progress-table")
@@ -71,12 +106,8 @@ function tableOf(words: Record<string, string>, root: string, groups: { label: s
     }
     for (const row of group.rows) {
       const line = element("tr", "plantoir-progress-page")
-      const pageCell = element("td", "")
-      const link = element("a", "internal", row.page.title) as HTMLAnchorElement
-      link.href = root + row.page.slug
-      pageCell.append(link)
       const doneCell = element("td", "plantoir-progress-count", count(words, row.done, row.total))
-      line.append(pageCell, doneCell)
+      line.append(pageCell(words, root, row), doneCell)
       body.append(line)
     }
   }
@@ -91,7 +122,7 @@ function rowsOf(root: string, pages: ManifestPage[], totals: { done: number; tot
     totals.done += sum.done
     totals.total += sum.total
     totals.touched += sum.touched
-    rows.push({ page, done: sum.done, total: sum.total })
+    rows.push({ page, done: sum.done, total: sum.total, ticked: sum.ticked })
   }
   return rows
 }

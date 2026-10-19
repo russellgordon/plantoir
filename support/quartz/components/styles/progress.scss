@@ -1,7 +1,8 @@
 // My Progress (#545). Rides on PlantoirMetaLine.tsx, as tasks.scss does, so it
 // reaches the site's one index.css with no layout edit. Every rule is under
 // .plantoir-progress, the element only the My Progress page carries, so no
-// other page is styled differently.
+// other page is styled differently - except the one sidebar rule at the end
+// (#602), scoped to My Progress's own link.
 
 .plantoir-progress {
   // The page carries no text of its own, so Quartz draws no date line on it
@@ -68,9 +69,100 @@
       width: 6rem;
     }
 
+    // A row whose list is open keeps its count beside the page's name.
+    & tr.plantoir-progress-page > td {
+      vertical-align: top;
+    }
+
     & tr.plantoir-progress-class > th {
       padding-top: 0.75rem;
       font-weight: 600;
     }
+  }
+
+  // A page row's list of items (#603): closed on load, opened from the
+  // browser's own marker beside the page's name, as each unit's table is.
+  & details.plantoir-progress-items {
+    & > summary {
+      cursor: pointer;
+    }
+
+    & > ul.plantoir-progress-item-list {
+      list-style: none;
+      margin: 0.25rem 0 0.5rem 0;
+      padding-left: 1.25rem;
+    }
+  }
+
+  & li.plantoir-progress-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0.15rem 0;
+  }
+
+  // The item's state, drawn as the page's own boxes are (tasks.scss: the
+  // edge and the tick in --darkgray, no fill), never a box that can be
+  // ticked here. The words for a screen reader are in .plantoir-progress-state.
+  & .plantoir-progress-mark {
+    flex: none;
+    box-sizing: border-box;
+    width: 0.9em;
+    height: 0.9em;
+    border: 1.5px solid var(--darkgray);
+    border-radius: 3px;
+    position: relative;
+    top: 0.1em;
+  }
+
+  & li.plantoir-progress-item[data-ticked="true"] > .plantoir-progress-mark::after {
+    content: "\2713";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+    line-height: 1;
+    color: var(--darkgray);
+  }
+
+  & li.plantoir-progress-item[data-ticked="true"] > a {
+    text-decoration: line-through;
+    text-decoration-color: var(--darkgray);
+  }
+
+  & .plantoir-progress-state {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+// #602: the pin (#545) puts My Progress among the top-level FOLDERS of the
+// sidebar, but Quartz draws a page as a page - --dark at 0.75 opacity, where
+// All Classes and Concepts beside it are folder titles in --secondary. This
+// gives that one link the folder titles' look (explorer.scss's
+// `.folder-container div > a`: colour, face, size, weight 600 =
+// $semiBoldWeight, line height, --tertiary on hover) at full opacity, and
+// keeps Quartz's --tertiary for the current page. Scoped to the TOP-LEVEL
+// link whose slug is the page's (`data-for`, which the sidebar sets on every
+// link), so no other link in the sidebar changes. This file comes before
+// explorer.scss in index.css, so the selector wins by SPECIFICITY alone over
+// `.explorer-content ul li > a` and its `.active` - do not shorten it.
+.explorer .explorer-content > ul > li > a[data-for="My-Progress"] {
+  color: var(--secondary);
+  opacity: 1;
+  font-family: var(--headerFont);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+
+  &:hover,
+  &.active {
+    color: var(--tertiary);
   }
 }
