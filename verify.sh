@@ -1918,6 +1918,13 @@ restore_hit_fixture() {
     cp "$PROGRESS_CLASS_BACKUP" "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md"
     rm -f "$PROGRESS_CLASS_BACKUP"
   fi
+  # #596: what the page-authoring skill's examples planted, by the list they left.
+  if [[ -f /tmp/verify_authoring_planted.txt ]]; then
+    while IFS= read -r planted; do
+      [[ -n "$planted" ]] && rm -f "$HIT_COURSE/$planted"
+    done < /tmp/verify_authoring_planted.txt
+    rm -f /tmp/verify_authoring_planted.txt
+  fi
   cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
   if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
     cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
@@ -2854,6 +2861,83 @@ for twin in ("A", "B"):
     "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
     encoding="utf-8")
 TASKPLANTS
+# ---- #596: every example in the page-authoring skill, planted for the same build ----
+# The skill's examples are read from the skill ITSELF, so an example edited
+# there is the example built here: every ```markdown / ````markdown fence and
+# every top-level ```mermaid one becomes a page, "Authoring Example NN" (an
+# example that starts with its own settings block keeps it, its title prefixed
+# so a class page's or Key Links' title cannot pass for the real thing), plus
+# "Authoring Claims" for what the skill's prose claims about maths, money,
+# links and callout kinds. Pages the examples link to and the Media files they
+# show are planted only when the course has none of that name. Every path is
+# listed in /tmp/verify_authoring_planted.txt, which restore_hit_fixture reads.
+# 6n reads each back.
+python3 - "$HIT_COURSE" support/agent_guidance/skills/plantoir-page-authoring/SKILL.md /tmp/verify_authoring_planted.txt <<'AUTHORPLANTS'
+import re, struct, sys, zlib
+from pathlib import Path
+course, skill_path, record = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+lines = skill_path.read_text(encoding="utf-8").split("\n")
+examples, index = [], 0
+while index < len(lines):
+    opening = re.match(r"^(`{3,})(markdown|mermaid)\s*$", lines[index])
+    if not opening:
+        index += 1
+        continue
+    fence, kind, body = opening.group(1), opening.group(2), []
+    index += 1
+    while index < len(lines) and lines[index] != fence:
+        body.append(lines[index])
+        index += 1
+    index += 1
+    text = "\n".join(body)
+    examples.append("```mermaid\n" + text + "\n```" if kind == "mermaid" else text)
+planted = []
+def plant(relative, data):
+    path = course / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(data, bytes):
+        path.write_bytes(data)
+    else:
+        path.write_text(data, encoding="utf-8")
+    planted.append(relative)
+for number, text in enumerate(examples, start=1):
+    name = f"Authoring Example {number:02d}"
+    if text.startswith("---\n"):
+        page = re.sub(r"^title: (.*)$", lambda m: f"title: {name} - {m.group(1)}", text, count=1, flags=re.M)
+        if page == text:
+            page = text.replace("---\n", f"---\ntitle: {name}\n", 1)
+    else:
+        page = f"---\ntitle: {name}\n---\n{text}"
+    plant(f"{name}.md", page + "\n")
+plant("Authoring Claims.md",
+      "---\ntitle: Authoring Claims\n---\n"
+      "> [!definition] Slope\n> plantoir-authoring-unknown-kind-7f3a\n\n"
+      "Money: it costs $5 and $10 today (plantoir-authoring-money-7f3a).\n\n"
+      "Escaped: it costs \\$5 and \\$10 today (plantoir-authoring-escaped-7f3a).\n\n"
+      "Spaced: $ x + 1 $ (plantoir-authoring-spaced-7f3a).\n\n"
+      "Markdown link: [practice](Slope Practice.md) (plantoir-authoring-mdlink-7f3a).\n")
+existing = {path.stem.lower() for path in course.rglob("*.md")}
+stubs = {"Slope": "The slope stub (plantoir-authoring-slope-7f3a).\n\n## Finding the slope from two points\n\nRise over run.\n"}
+for name in ("Rate of Change", "Slope Warm-Up", "Slope Practice", "How This Class Works", "How Marks Work", "Getting Help"):
+    stubs[name] = "A page the page-authoring skill's examples link to.\n"
+for name, body in stubs.items():
+    if name.lower() not in existing:
+        plant(f"{name}.md", f"---\ntitle: {name}\n---\n{body}")
+def png(width, height):
+    raw = b"".join(b"\x00" + b"\x20\x60\xc0" * width for _ in range(height))
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + \
+        chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+if not (course / "Media" / "cell-diagram.png").exists():
+    plant("Media/cell-diagram.png", png(40, 20))
+if not (course / "Media" / "Unit 2 Review.pdf").exists():
+    plant("Media/Unit 2 Review.pdf",
+          b"%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj "
+          b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
+record.write_text("\n".join(planted) + "\n", encoding="utf-8")
+print(f"   planted {len(examples)} examples from the page-authoring skill")
+AUTHORPLANTS
 
 # ---- #545: My Progress, planted for the same build ----
 # Progress Fixture: four items under its success criteria (one the teacher
@@ -3876,6 +3960,141 @@ then
   pass "My Progress: the page and the manifest built, Progress Fixture's four counted items under Unit 1, Day 2 with the contract's ids and the teacher's [x], Key Links' first bullet, no date line and no Backlinks list, the sidebar's pin, and the build's marker line (#545)"
 else
   fail "My Progress: one of the checks above failed (#545)"
+fi
+
+# ---- 6n. Every example in the page-authoring skill, as the build left it (#596) ----
+# Each example the skill gives (planted above as "Authoring Example NN") is
+# read back from the built site as the feature the skill says it is: every
+# example must match exactly ONE claim below and every claim exactly one
+# example, so an example added to the skill without a claim here fails, as
+# does a claim whose example was edited away. "Authoring Claims" carries what
+# the prose says: two prices in a paragraph are read as maths and `\$` is
+# not, a spaced `$ x $` is typeset, a [words](Page Name.md) link is not a
+# link, and an unknown callout kind is still a callout with its own title.
+if python3 - "$SITE_PUBLIC" support/agent_guidance/skills/plantoir-page-authoring/SKILL.md <<'AUTHORPY'
+import re, sys
+from pathlib import Path
+public, skill_path = Path(sys.argv[1]), Path(sys.argv[2])
+lines = skill_path.read_text(encoding="utf-8").split("\n")
+examples, index = [], 0
+while index < len(lines):
+    opening = re.match(r"^(`{3,})(markdown|mermaid)\s*$", lines[index])
+    if not opening:
+        index += 1
+        continue
+    fence, kind, body = opening.group(1), opening.group(2), []
+    index += 1
+    while index < len(lines) and lines[index] != fence:
+        body.append(lines[index])
+        index += 1
+    index += 1
+    text = "\n".join(body)
+    examples.append("```mermaid\n" + text + "\n```" if kind == "mermaid" else text)
+def article(page):
+    path = public / f"{page}.html"
+    if not path.is_file():
+        return None
+    html = path.read_text(encoding="utf-8", errors="replace")
+    found = re.search(r"<article[^>]*>(.*?)</article>", html, re.S)
+    return found.group(1) if found else ""
+def tasks(html):
+    return len(re.findall(r'<input type="checkbox"[^>]*class="plantoir-task"', html))
+def has_file(href):
+    return (public / href.lstrip("./")).is_file()
+# (a text only that example holds, what it must build as, the check)
+claims = [
+    ("title: Slope as a Rate of Change", "settings: the title, tags and maths",
+     lambda a, p: "Slope as a Rate of Change" in p["full"] and 'class="katex"' in a and "tags/unit-2" in p["full"]),
+    ("==highlighted==", "text: bold, italic, struck, highlighted, arrows, keys",
+     lambda a, p: all(s in a for s in ("<strong>bold</strong>", "<em>italic</em>", "<del>", 'class="text-highlight"', "→", "⇒", "<kbd>Ctrl</kbd>"))),
+    ("> [!warning] Where people usually go wrong", "callouts: a titled warning and an untitled tip",
+     lambda a, p: 'data-callout="warning"' in a and "Where people usually go wrong" in a and re.search(r'data-callout="tip".*?<p>Tip</p>', a, re.S)),
+    ("> [!success]- Worked answer", "foldable callouts: one folded shut, one open",
+     lambda a, p: re.search(r'class="callout success is-collapsible is-collapsed"', a) and re.search(r'class="callout example is-collapsible"(?! is-collapsed)', a)),
+    ("graph LR", "a Mermaid flowchart",
+     lambda a, p: '<code class="mermaid"' in a and "Read the problem" in a),
+    ("pie title How a class period is spent", "a Mermaid pie chart",
+     lambda a, p: '<code class="mermaid"' in a and "pie title" in a),
+    ("| Representation | Shows best | Hides |", "a table with maths in a cell",
+     lambda a, p: "<table>" in a and re.search(r"<td>Equation <span class=\"katex\"", a)),
+    ("Chemistry works too", "inline, display and chemistry maths",
+     lambda a, p: 'class="katex-display"' in a and "\\ce" not in re.sub(r"<annotation.*?</annotation>", "", a, flags=re.S) and "katex-error" not in a),
+    ("- [ ] Estimate before calculating", "a checklist students tick, one box ticked to start",
+     lambda a, p: tasks(a) == 3 and len(re.findall(r'<input type="checkbox" checked class="plantoir-task"', a)) == 1),
+    ("## Success criteria", "a success-criteria heading over three tickable items",
+     lambda a, p: 'id="success-criteria"' in a and tasks(a) == 3),
+    ("See [[Slope]] before class.", "links: a page, other words, a heading, a website",
+     lambda a, p: 'href="./Slope"' in a and ">what slope means<" in a and 'href="./Slope#finding-the-slope-from-two-points"' in a and 'class="external"' in a),
+    ("![[Slope]]", "one page shown inside another, whole and by a heading",
+     lambda a, p: a.count('class="transclude"') == 2 and "plantoir-authoring-slope-7f3a" in a and "Rise over run" in a),
+    ("[^1]: From *al-jabr*", "a footnote listed at the bottom",
+     lambda a, p: "data-footnote-ref" in a and 'class="footnotes"' in a and "al-jabr" in a),
+    ("title: Practice - Two-Step Equations", "tags: shown on the page and listed on each tag's page",
+     lambda a, p: 'class="internal tag-link"' in p["full"] and (public / "tags" / "unit-2.html").is_file()
+     and p["slug"] in (public / "tags" / "unit-2.html").read_text(encoding="utf-8")),
+    ("![[cell-diagram.png]]", "pictures and PDFs from Media",
+     lambda a, p: len(re.findall(r'<img src="\./Media/cell-diagram\.png"', a)) == 3 and 'width="300"' in a
+     and 'alt="A plant cell with the nucleus labelled"' in a and '<iframe src="./Media/Unit-2-Review.pdf" class="pdf">' in a
+     and 'href="./Media/Unit-2-Review.pdf"' in a and has_file("Media/cell-diagram.png") and has_file("Media/Unit-2-Review.pdf")),
+    ("![](https://www.youtube.com/watch?v=", "YouTube, Vimeo, GeoGebra and PhET players",
+     lambda a, p: 'src="https://www.youtube.com/embed/' in a and '<iframe src="https://player.vimeo.com/video/' in a
+     and '<iframe src="https://www.geogebra.org/' in a and '<iframe src="https://phet.colorado.edu/' in a),
+    ("%% Tomorrow:", "a note only the teacher sees",
+     lambda a, p: "Students see only this sentence." in a and "Tomorrow" not in p["full"]),
+    ("title: Unit 3 Test Review", "publish: false keeps the page off the site",
+     lambda a, p: a is None),
+    ("title: Concepts", "a folder's front page with its list",
+     lambda a, p: "The clean statement of each idea" in a and 'href="./Rate-of-Change"' in a),
+    ("title: Unit 2, Day 3", "a class page: an agenda and a checklist",
+     lambda a, p: 'id="agenda"' in a and "Slope-Practice" in a and tasks(a) == 1),
+    ("title: Key Links", "Key Links: a list of links",
+     lambda a, p: a.count('class="internal') >= 3 and "How Marks Work" in a),
+]
+problems, used = [], set()
+for number, text in enumerate(examples, start=1):
+    slug = f"Authoring-Example-{number:02d}"
+    matching = [claim for claim in claims if claim[0] in text]
+    if len(matching) != 1:
+        problems.append(f"example {number} matches {len(matching)} claims here (it must match one): {text[:60]!r}")
+        continue
+    marker, what, check = matching[0]
+    if marker in used:
+        problems.append(f"two examples match the claim {marker!r}")
+    used.add(marker)
+    body = article(slug)
+    full = (public / f"{slug}.html").read_text(encoding="utf-8", errors="replace") if body is not None else ""
+    if body is None and marker != "title: Unit 3 Test Review":
+        problems.append(f"example {number} ({what}): {slug}.html was not built")
+        continue
+    try:
+        ok = check(body, {"full": full, "slug": slug})
+    except Exception as error:  # a check that cannot read the page is a failure, said
+        ok, what = False, f"{what} ({error})"
+    if not ok:
+        problems.append(f"example {number} did not build as {what}")
+for marker, what, _ in claims:
+    if marker not in used:
+        problems.append(f"no example in the skill holds {marker!r} ({what})")
+claims_page = article("Authoring-Claims") or ""
+prose = {
+    "two prices in a paragraph are typeset as maths": re.search(r"Money: it costs <span class=\"katex\"", claims_page),
+    "\\$ keeps a price a price": "Escaped: it costs $5 and $10 today" in claims_page,
+    "a spaced $ x + 1 $ is typeset on the site": re.search(r"Spaced: <span class=\"katex\"", claims_page),
+    "[words](Page Name.md) is not a link": "[practice](Slope Practice.md)" in claims_page,
+    "an unknown kind is a callout titled as written": re.search(r'data-callout="definition".*?<p>Slope', claims_page, re.S),
+}
+for said, held in prose.items():
+    if not held:
+        problems.append(f"the skill says {said}, and the built Authoring Claims page does not show it")
+for problem in problems[:30]:
+    print("   " + problem)
+print(f"   {len(examples)} examples, {len(claims)} claims")
+sys.exit(1 if problems else 0)
+AUTHORPY
+then
+  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/GeoGebra/PhET, comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
+else
+  fail "page-authoring skill: an example did not build as the feature it claims, or an example has no claim (#596)"
 fi
 
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----

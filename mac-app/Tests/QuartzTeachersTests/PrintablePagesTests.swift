@@ -583,6 +583,44 @@ final class PrintablePagesTests: XCTestCase {
         }
     }
 
+    /// #596: the page-authoring skill travels the same way, names every
+    /// feature skill it routes to, and both root files name it in their FIRST
+    /// bullet - so an assistant asked for "a page explaining X with a diagram
+    /// and a checklist" reads it before writing anything.
+    func testThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst() throws {
+        let guidance: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["pageAuthoringSkill"] as? [String: Any])
+        let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        let routesTo: [String] = try XCTUnwrap(guidance["routesTo"] as? [String])
+        XCTAssertEqual(routesTo.count, 4)
+        let fileManager: FileManager = FileManager.default
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        for home in [".claude", ".agents"] {
+            let skill: String = try String(
+                contentsOf: folder.appendingPathComponent("\(home)/skills/\(skillName)/SKILL.md"), encoding: .utf8)
+            XCTAssertTrue(skill.contains("name: \(skillName)"), home)
+            for routed in routesTo {
+                XCTAssertTrue(skill.contains("`\(routed)`"), "\(home): the skill must route to \(routed)")
+                XCTAssertTrue(fileManager.fileExists(
+                    atPath: folder.appendingPathComponent("\(home)/skills/\(routed)/SKILL.md").path),
+                              "\(home): \(routed) must be written beside it")
+            }
+            XCTAssertTrue(skill.contains("```mermaid"), home)
+            XCTAssertTrue(skill.contains("> [!"), home)
+            XCTAssertTrue(skill.contains("Success criteria"), home)
+            XCTAssertTrue(skill.contains("My Progress"), home)
+            XCTAssertTrue(skill.contains("publish: false"), home)
+            XCTAssertTrue(skill.contains("Media"), home)
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            let firstBullet: String = try XCTUnwrap(
+                text.components(separatedBy: "\n- ").dropFirst().first, "\(name) must have a bullet")
+            XCTAssertTrue(firstBullet.contains(skillName), "\(name) must name the \(skillName) skill first")
+        }
+    }
+
     func testATeachersOwnFileIsAskedAboutNotWrittenAndTheirSkillsAreLeftAlone() throws {
         let fileManager: FileManager = FileManager.default
         let own: String = "# My own notes for Claude\n\nAlways use British spelling.\n"
