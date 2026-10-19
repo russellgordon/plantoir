@@ -31,6 +31,7 @@ Stdlib only, no frontmatter: Windows' PythonToolchainTests discovers
 test_my_progress.py and runs it without python-frontmatter.
 """
 
+import html
 import json
 import re
 import unicodedata
@@ -121,9 +122,12 @@ def headings_from(config: dict) -> list:
 
 # A task item's first line, as the site's parser reads one: any quote markers,
 # the indent, one or more list markers, the box, then a space and more on the
-# line - a box with nothing after it is plain text to the parser (quizzes.py
-# measured `- [ ]` and `- [ ] ` alone).
+# line. A box with nothing after it on its line (_BOX_ONLY) is an item only
+# when its words go on in the next line (measured for #545's fixes round):
+# alone, `- [ ]` and `- [ ] ` are plain text to the parser (quizzes.py).
 _TASK_LINE = re.compile(r"^(?:[ \t]*>)*[ \t]*(?:(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)+\[[ xX]\][ \t]+\S")
+_BOX_ONLY = re.compile(r"^(?:[ \t]*>)*[ \t]*(?:(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)+\[[ xX]\][ \t]*$")
+_HTML_COMMENT = re.compile(r"<!--[\s\S]*?-->")
 _ATX = re.compile(r"^( {0,3})(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
 _SETEXT = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
 _LIST_ITEM = re.compile(r"^[ \t]*(?:[-*+]|[0-9]{1,9}[.)])(?:[ \t]+|$)")
@@ -156,7 +160,22 @@ def _heading_words(raw: str) -> str:
     text = text.replace("**", "").replace("__", "")
     text = re.sub(r"(?<![\w*])\*|\*(?![\w*])", "", text)
     text = re.sub(r"(?<!\w)_|_(?!\w)", "", text)
-    return text
+    # `&nbsp;` and its kind read as the characters they are, as on the page.
+    return html.unescape(text)
+
+
+def _indent(line: str) -> int:
+    """The columns of white space a line starts with, a tab to the next
+    multiple of four, as CommonMark counts them."""
+    columns = 0
+    for character in line:
+        if character == " ":
+            columns += 1
+        elif character == "\t":
+            columns += 4 - columns % 4
+        else:
+            break
+    return columns
 
 
 def _body_of(text: str) -> str:
@@ -176,10 +195,14 @@ def _body_of(text: str) -> str:
 
 
 def _masked(text: str) -> str:
-    """Code and %% comments replaced by spaces, line breaks kept, so a
-    heading or a task line written as an example is no heading or task."""
+    """Code, %% comments and HTML comments replaced by spaces, line breaks
+    kept, so a heading or a task line written as an example is no heading or
+    task."""
     characters = list(text)
-    for start, end in markdown_code.not_a_link_ranges(text):
+    ranges = list(markdown_code.not_a_link_ranges(text))
+    for match in _HTML_COMMENT.finditer(text):
+        ranges.append((match.start(), match.end()))
+    for start, end in ranges:
         for index in range(start, min(end, len(characters))):
             if characters[index] != "\n":
                 characters[index] = " "
@@ -233,8 +256,19 @@ def page_has_counted_items(text: str, headings: list) -> bool:
             paragraph = []
             in_list = False
             continue
-        if open_level and not quiz_depth and _TASK_LINE.match(line):
-            return True
+        # Four columns in at the page's own level, outside a list, is an
+        # indented code block (or a paragraph's continuation): never an item.
+        code_line = depth == 0 and not in_list and _indent(line) >= 4
+        if open_level and not quiz_depth and not code_line:
+            if _TASK_LINE.match(line):
+                return True
+            if _BOX_ONLY.match(line) and number + 1 < len(lines):
+                after = lines[number + 1]
+                if (after.strip() != "" and _quote_depth(after) == depth and not _LIST_ITEM.match(after)
+                        and not _ATX.match(after) and not _FENCE.match(after)):
+                    return True
+        if code_line and not paragraph:
+            continue
         if blank:
             paragraph = []
             continue
@@ -341,18 +375,17 @@ def _html_attribute(text: str) -> str:
             .replace("<", "&lt;").replace(">", "&gt;"))
 
 
-def _html_text(text: str) -> str:
-    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
 def page_text(created: str | None) -> str:
     """
     The page the build writes (myProgress.page): its title, the first class's
-    date (the date every other build-written page carries), on the site and
-    with no Backlinks panel, and one element the page's script draws into -
-    holding, until it has, the placeholder sentence, and the sentence for a
-    copy of the site the manifest cannot be read from. No link of any kind,
-    so no other page's Backlinks or the coverage map changes.
+    date (the date every other build-written page carries, for the feeds),
+    on the site and with no Backlinks panel, and one EMPTY element the page's
+    script draws into, carrying the placeholder sentence (shown by the
+    page's styles until the script draws) and the sentence for a copy of the
+    site the manifest cannot be read from as attributes. No text on the page
+    means Quartz draws no date line and no reading time
+    (myProgress.page.dateLine; Russell's Q6). No link of any kind, so no
+    other page's Backlinks or the coverage map changes.
     """
     said = words()
     lines = ["---", f"title: {said['title']}"]
@@ -361,8 +394,8 @@ def page_text(created: str | None) -> str:
     lines += ["publish: true", "excludeBacklinks: true", "---", ""]
     lines.append(
         f'<div class="plantoir-progress" data-plantoir-progress '
-        f'data-unreadable="{_html_attribute(said["unreadable"])}">'
-        f'<p>{_html_text(said["placeholder"])}</p></div>'
+        f'data-placeholder="{_html_attribute(said["placeholder"])}" '
+        f'data-unreadable="{_html_attribute(said["unreadable"])}"></div>'
     )
     return "\n".join(lines) + "\n"
 
@@ -385,7 +418,12 @@ def link_from_key_links(content_root) -> bool:
     # CR LF into LF, and the build's copy would change every line.
     text = key_links.read_bytes().decode("utf-8")
     title = words()["title"]
-    if f"[[{title.lower()}" in text.lower():
+    # [[My Progress]], [[My Progress|...]] (or the `\|` a table writes) and
+    # [[My Progress#...]], in any case - never a page whose name only begins
+    # with the same words, such as [[My Progress Journal]] (#545
+    # implementation review 1).
+    already = re.compile(r"\[\[" + re.escape(title) + r"[ \t]*(?:\]\]|\\?\||#)", re.IGNORECASE)
+    if already.search(text):
         return False
     entry = f"- [[{title}]]"
     newline = "\r\n" if "\r\n" in text else "\n"
@@ -422,7 +460,7 @@ def announce(course: str, section_number: int, reason: str, pages: int, printer=
     the setting.
     """
     if reason == SWITCHED_OFF:
-        printer("ℹ️ The My Progress page is switched off for this course.")
+        printer(f"ℹ️ The My Progress page is switched off for {course} Section {section_number}.")
         return
     if reason == BUILT:
         printer(f"📈 My Progress: counted the success criteria on {pages} page(s).")

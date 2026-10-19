@@ -22,6 +22,7 @@ discovers this file.
 
     python3 scripts/test_my_progress.py
 """
+import ast
 import io
 import json
 import re
@@ -75,6 +76,28 @@ CONFIG = '''    emitters: [
       Plugin.Static(),
     ],
 '''
+
+
+def printed_sentences(path: Path, with_function: bool = False) -> list:
+    """(function, line, words) for every print(...) or printer(...) call in a
+    file: the string parts of its arguments, f-strings included."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    found = []
+
+    def visit(node, function):
+        for child in ast.iter_child_nodes(node):
+            name = child.name if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else function
+            if isinstance(child, ast.Call) and getattr(child.func, "id", None) in ("print", "printer"):
+                parts = []
+                for argument in child.args:
+                    for piece in ast.walk(argument):
+                        if isinstance(piece, ast.Constant) and isinstance(piece.value, str):
+                            parts.append(piece.value)
+                found.append((function, child.lineno, " ".join(parts)))
+            visit(child, name)
+
+    visit(tree, "")
+    return found
 
 
 def quietly(function, *arguments, **keywords):
@@ -187,6 +210,39 @@ class TheWords(unittest.TestCase):
             for word in re.findall(r"[A-Za-z]+", text):
                 with self.subTest(key=key, word=word):
                     self.assertNotIn(word.lower(), forbidden)
+
+    def test_no_console_line_of_my_progress_names_the_machinery(self):
+        """Every sentence My Progress prints, in my_progress.py and in
+        build_site.py's My Progress functions, against the whole list
+        (#545 implementation review 2)."""
+        forbidden = contracts.section("shared-rules", "userFacingLabelWords", "forbidden")
+        mine = {"_wire_emitters_index", "_wire_progress_emitter", "pin_my_progress_in_sidebar",
+                "_prepare_my_progress"}
+        sentences = printed_sentences(Path(my_progress.__file__))
+        for name, line, text in printed_sentences(Path(build_site.__file__), with_function=True):
+            if name in mine:
+                sentences.append((name, line, text))
+        self.assertGreater(len(sentences), 8)
+        for name, line, text in sentences:
+            for word in re.findall(r"[A-Za-z]+", text):
+                with self.subTest(line=line, word=word):
+                    self.assertNotIn(word.lower(), forbidden, f"{name}:{line} {text}")
+
+    def test_no_build_line_adds_a_machinery_word_it_did_not_already_use(self):
+        """The rest of build_site.py's console lines, held to the forbidden
+        words none of them used when #545 landed (measured 2026-10-19: about
+        seventy lines name quartz.config.ts, course_config.json or the
+        transclusion styles, and none says "script" or "docker"). A ratchet,
+        not the whole rule: the file names its own files to whoever reads a
+        build log."""
+        forbidden = set(contracts.section("shared-rules", "userFacingLabelWords", "forbidden"))
+        already = {"quartz", "json", "transclusion"}
+        for name, line, text in printed_sentences(Path(build_site.__file__), with_function=True):
+            for word in re.findall(r"[A-Za-z]+", text):
+                if word.lower() in already:
+                    continue
+                with self.subTest(line=line, word=word):
+                    self.assertNotIn(word.lower(), forbidden, f"{name}:{line} {text}")
 
     def test_the_title_is_my_progress_everywhere(self):
         self.assertEqual(my_progress.words()["title"], "My Progress")

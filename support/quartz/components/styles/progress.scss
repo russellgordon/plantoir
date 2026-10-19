@@ -4,6 +4,14 @@
 // other page is styled differently.
 
 .plantoir-progress {
+  // The page carries no text of its own, so Quartz draws no date line on it
+  // (myProgress.page.dateLine): the placeholder sentence is an attribute,
+  // shown here until the script draws into the element.
+  &:empty::before {
+    content: attr(data-placeholder);
+    color: var(--darkgray);
+  }
+
   & .plantoir-progress-totals {
     list-style: none;
     padding-left: 0;

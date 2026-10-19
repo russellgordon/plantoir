@@ -29944,6 +29944,32 @@
             "Read [[Fractions]] first"
           ],
           "why": "the id the transformer stamps (taskBoxes.itemText) - never re-derived here"
+        },
+        {
+          "name": "a list indented four spaces is code",
+          "markdown": "## Success criteria\n\n    - [ ] I can add fractions\n",
+          "items": [],
+          "why": "four spaces at the page's own level make an indented code block, not a list (#545 implementation review 3)"
+        },
+        {
+          "name": "an HTML comment counts nothing",
+          "markdown": "## Success criteria\n\n<!--\n- [ ] I can add fractions\n-->\n",
+          "items": []
+        },
+        {
+          "name": "a no-break space in a heading is a space",
+          "markdown": "## Success&nbsp;criteria\n\n- [ ] I can add fractions\n",
+          "items": [
+            "I can add fractions"
+          ]
+        },
+        {
+          "name": "an item whose words begin on the next line",
+          "markdown": "## Success criteria\n\n- [ ]\n  I can add fractions\n",
+          "items": [
+            ""
+          ],
+          "why": "measured: the site's parser makes a task item of a box whose words begin on the next line, and its id is that of its FIRST line's words - none (taskBoxes.itemText) - so it counts once; every such item on a page shares that one id. A box with nothing after it at all is still no item (an empty box is no item)"
         }
       ]
     },
@@ -30301,12 +30327,13 @@
       "why": "A preview is ONE `quartz build --serve` process, so a Python pass after the build would never run there: the manifest is an emitter's, re-run with every page on each rebuild. Ids come from the built pages' stamps, never the Markdown (#519's comment on #545, review F1)."
     },
     "page": {
-      "rule": "`My Progress.md` at the top of the build's content, written AFTER the page list the app reads and after every pass that reads links, so the app never lists it as the teacher's and no date pass, coverage map or links checklist meets it: title My Progress (Russell, 2026-10-19, wherever the words appear), the first class's date as every build-written page carries, `publish: true`, `excludeBacklinks: true`, and one element (`data-plantoir-progress`) holding words.placeholder, with words.unreadable for the script. No link of any kind. Read-only: no box on it can be ticked; each row links back to its page.",
+      "rule": "`My Progress.md` at the top of the build's content, written AFTER the page list the app reads and after every pass that reads links, so the app never lists it as the teacher's and no date pass, coverage map or links checklist meets it: title My Progress (Russell, 2026-10-19, wherever the words appear), the first class's date as every build-written page carries, `publish: true`, `excludeBacklinks: true`, and one EMPTY element (`data-plantoir-progress`) carrying words.placeholder and words.unreadable as attributes (dateLine). No link of any kind. Read-only: no box on it can be ticked; each row links back to its page.",
       "shown": "The intro (words.intro), then the totals - words.overall then each table's - then words.noTicksYet while nothing on the page has been touched, then one CLOSED table per unit and Other pages last, each summary its label and count; inside, a heading row per class, then a row per page: its title linking back to it and words.count. Drawn again, every table closed, on every page shown (Back included). A manifest that cannot be read (a site opened from a folder on disk) shows words.unreadable.",
+      "dateLine": "The page shows NO date line and no reading time (Russell's Q6: no dates on the page). Quartz's ContentMeta draws its line only for a page with text, so the page carries none: the placeholder sentence is the element's `data-placeholder`, shown by the page's styles until the script draws (`:empty::before`), never page text. Measured in a real build: no `content-meta` in My-Progress.html.",
       "printing": "Not checked in v1.8.2: #595 owns the print check. #519's ruling Q1 (paper shows the student's ticks) means this page is no exception."
     },
     "keyLinks": {
-      "rule": "In the BUILD's copy of Key Links only (the teacher's page is never touched): `- [[My Progress]]` as the FIRST bullet (Russell, 2026-10-19), with that bullet's indent; a page with no bullet gets it as a line of its own at the end. A copy that already links My Progress, in any case, is left exactly as it is. Only when the section gets the page. The coverage map keeps its place after the last bullet.",
+      "rule": "In the BUILD's copy of Key Links only (the teacher's page is never touched): `- [[My Progress]]` as the FIRST bullet (Russell, 2026-10-19), with that bullet's indent; a page with no bullet gets it as a line of its own at the end. A copy that already links My Progress - `[[My Progress]]`, `[[My Progress|…]]` or `[[My Progress#…]]`, in any case; never a page whose name only begins with those words (#545 implementation review 1) - is left exactly as it is. Only when the section gets the page. The coverage map keeps its place after the last bullet.",
       "cases": [
         {
           "name": "first bullet",
@@ -30329,6 +30356,16 @@
           "after": "See the course outline.\n\n- [[My Progress]]\n"
         },
         {
+          "name": "a page whose name only begins with the same words is not this one",
+          "before": "- [[My Progress Journal]]\n",
+          "after": "- [[My Progress]]\n- [[My Progress Journal]]\n"
+        },
+        {
+          "name": "a link to a heading of the page is a link to it",
+          "before": "- [[My Progress#Unit 1]]\n",
+          "after": "- [[My Progress#Unit 1]]\n"
+        },
+        {
           "name": "CR LF kept",
           "before": "- [[Course Outline]]\r\n",
           "after": "- [[My Progress]]\r\n- [[Course Outline]]\r\n"
@@ -30336,7 +30373,7 @@
       ]
     },
     "sidebar": {
-      "rule": "The sidebar is drawn in the browser (explorer.inline.ts: folders that do not expand, then those that do, then files), so the build adds one import of progressRules.pinnedOrder and one line of data, rewritten on every build: {slug: the page's slug, or \"\" when this build made none; after: the class folders' slug segments}. pinnedOrder moves the top-level file with that slug to directly after the first class folder - All Classes, or a club's own folder - or to the top when there is none: the SECOND entry, directly under All Classes (Russell, 2026-10-19). Nothing moves when the slug is empty or the page is not in the sidebar. The `hidden` list still applies. A script whose shape has changed is said and left alone: the page then sorts last.",
+      "rule": "The sidebar is drawn in the browser (explorer.inline.ts: folders that do not expand, then those that do, then files), so the build adds one import of progressRules.pinnedOrder and one line of data, rewritten on every build: {slug: the page's slug, or \"\" when this build made none; after: the class folders' slug segments}. pinnedOrder moves the top-level file with that slug to directly after the first class folder - All Classes, or a club's own folder - or to the top when there is none: directly after the class folder (Russell, 2026-10-19: under All Classes) - the SECOND entry on a site whose class folder sorts first, as All Classes does; a club's `Resources` sorts before `All Meetings`, so there it is third (#545 implementation review 7, accepted as measured). Nothing moves when the slug is empty or the page is not in the sidebar. The `hidden` list still applies. A script whose shape has changed is said and left alone: the page then sorts last.",
       "cases": [
         {
           "name": "directly under All Classes",
@@ -30520,7 +30557,8 @@
     "notes": {
       "note": "What a teacher reads on a `plantoir: note:` line from the emitter, after the page's place in the site, when the build's gate and the site's own reading of a page disagree (#545 plan review F3): a tick is never dropped without a word.",
       "gateSaidYes": "the build expected boxes to count under a success-criteria heading here, and the site found none, so this page is not on My Progress",
-      "gateSaidNo": "the site found boxes to count under a success-criteria heading here that the build did not expect, so they may be missing from My Progress"
+      "gateSaidNo": "the site found boxes to count under a success-criteria heading here that the build's reading of the page did not; they are counted on My Progress",
+      "gateSaidNoNoPage": "the site found boxes to count under a success-criteria heading here, but the build's reading of the pages found none anywhere in this section, so the section has no My Progress page"
     },
     "knownLimits": [
       "Per browser and per site, as the ticks are (taskBoxes.knownLimits): another computer, another browser, or the teacher's preview of the same site counts separately.",
@@ -30528,7 +30566,8 @@
       "A dash the site's parser turns into a typographic one (-- into –) in a heading is a different word to the course's list.",
       "A page reached only through another page, or only from a hidden or undated class, is under Other pages, not under a class (the date pass's own rule).",
       "None of the 39 example courses has a task item under one of the default headings (104 headings match, all over tables; measured on #545's plan review), so no example course gets the page until its pages say so.",
-      "Class dates are in the manifest and not on the page (ruling Q6); the date and unit filter is #595's."
+      "Class dates are in the manifest and not on the page (ruling Q6); the date and unit filter is #595's.",
+      "Three shapes the two readings still read differently, each said on a `plantoir: note:` line (notes) when a real page has it (#545 implementation review 3, measured): a heading written in HTML (`<h2>Success criteria</h2>`) - the site counts its section, the build's gate does not; a task line inside a `$$` maths block - the gate counts it, the site draws maths; a callout whose TITLE holds `[!quiz]` - the gate reads it as a quiz, the site does not."
     ],
     "rejected": [
       "A Python pass over public/*.html after the build: a preview is one `quartz build --serve` process and the pass would never run there.",

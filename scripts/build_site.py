@@ -1785,19 +1785,19 @@ def pin_my_progress_in_sidebar(inline_path: Path, slug: str, class_folder_slugs:
     try:
         text = inline_path.read_text(encoding="utf-8")
     except OSError:
-        print("⚠️ Could not put My Progress under the classes in the sidebar: the sidebar's script was not found.")
+        print("⚠️ Could not put My Progress under the classes in the sidebar: the site's sidebar was not found.")
         return False
     data_line = _pin_data_line(slug, class_folder_slugs)
     updated = text
     if MY_PROGRESS_PIN_MARKER not in updated:
         if updated.count(_PIN_IMPORT_ANCHOR) != 1 or updated.count(_PIN_LOOP_ANCHOR) != 1:
-            print("⚠️ Could not put My Progress under the classes in the sidebar: the sidebar's script has changed shape.")
+            print("⚠️ Could not put My Progress under the classes in the sidebar: the site's sidebar has changed shape.")
             return False
         at = updated.index(_PIN_IMPORT_ANCHOR) + len(_PIN_IMPORT_ANCHOR)
         updated = updated[:at] + _PIN_IMPORT + data_line + "\n" + updated[at:]
         updated = updated.replace(_PIN_LOOP_ANCHOR, _PIN_LOOP, 1)
     elif _PIN_LOOP not in updated or len(_PIN_DATA.findall(updated)) != 1:
-        print("⚠️ Could not put My Progress under the classes in the sidebar: the sidebar's script has changed shape.")
+        print("⚠️ Could not put My Progress under the classes in the sidebar: the site's sidebar has changed shape.")
         return False
     else:
         updated = _PIN_DATA.sub(lambda match: data_line, updated, count=1)

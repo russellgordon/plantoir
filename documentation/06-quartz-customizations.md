@@ -2788,9 +2788,19 @@ existing section gets it on its next build. `Dockerfile` bakes
   item is written on. It skips `publish: false` pages itself (a rebuild hands
   it every page — F8). Where its reading and the gate's disagree it prints a
   `plantoir: note:` line (`myProgress.notes`, F3): a page the gate expected
-  and the site found nothing on is not listed; a page the site found items on
-  that the gate missed is listed, or — when the gate found nothing at all, so
-  there is no page — named, so a dropped tick is never silent. The plan is
+  and the site found nothing on is not listed (`gateSaidYes`); a page the site
+  found items on that the gate missed is listed and says so (`gateSaidNo`),
+  or — when the gate found nothing anywhere, so there is no page — says the
+  section has no page because of it (`gateSaidNoNoPage`), so a dropped tick
+  is never silent. **Where the two readings must agree**, the contract has a
+  case both run (since the fixes round: a list four spaces in is code, an
+  HTML comment counts nothing, `&nbsp;` in a heading is a space, a box whose
+  words begin on the next line counts once); the three shapes they still
+  read differently — a heading written in HTML, a task line inside `$$`, a
+  callout whose title holds `[!quiz]` — are `myProgress.knownLimits`, and
+  the note fires on each (#545 implementation review 3, measured). The
+  in-image check runs Quartz's Latex too, so "the site's reading" is the
+  site's whole pipeline. The plan is
   read afresh on every emit (once per build, not per page): a cache keyed on
   the file's time missed a plan written twice in one millisecond, measured in
   the check.
@@ -2820,12 +2830,23 @@ them ever meets the page and the app never lists it as the teacher's. That is
 why there is no `_is_progress_page_name` structural check: the plan's version
 of one would have dropped a teacher's own page called My Progress from every
 link reader (F5). The page has `publish: true`, `excludeBacklinks: true`, no
-link of any kind.
+link of any kind — and **no text**: its one element is empty, carrying the
+placeholder and the unreadable sentence as attributes (the styles show the
+placeholder until the script draws, `:empty::before`). Quartz's ContentMeta
+draws its date line and reading time only for a page with text, so the page
+shows no date (Russell's Q6, #545 implementation review 5; the coverage map,
+by contrast, does show one). Removing `created:` would not have done it, by
+the site's settings rather than measured: `CreatedModifiedDate` falls back
+to the file's own time (its `filesystem` priority). Measured: no `content-meta` in
+the built My-Progress.html.
 
 ### L3. The sidebar pin
 
 The sidebar is drawn in the browser (`explorer.inline.ts`: folders that do not
-expand, then those that do, then files), so My Progress would come last.
+expand, then those that do, then files), so My Progress would come last. The pin puts it directly after the class
+folder: the SECOND entry on a site whose class folder sorts first (All
+Classes does), third in a club whose `Resources` sorts before `All
+Meetings` — accepted as measured (#545 implementation review 7).
 `pin_my_progress_in_sidebar` adds, once, an import of `pinnedOrder` and one
 data line (`const PLANTOIR_MY_PROGRESS_PIN = {"slug": …, "after": […]}`,
 rewritten on every build), and loops over
@@ -2859,11 +2880,12 @@ other files and the section fingerprint do not move.
 Measured (2026-10-19, M4 Pro, macOS 26.6, Chrome for Testing 155, a copy of
 the example course built by `preview.sh --build-only`):
 `browser-checks/my_progress.mjs` — My Progress second in the sidebar, directly
-under All Classes, and Key Links' first bullet; the fixture's row 0 / 3 on a
-fresh profile under "Unit 1, Day 2" in the Unit 1 table, every table closed,
-the hint shown, no box on the page; 2 / 3 after two ticks by mouse and the
-site's own navigation; 2 / 3 after a reload; 1 / 3 after an untick and Back;
-0 / 3 with the site's storage cleared; every total equal to the manifest's
+under All Classes, and Key Links' first bullet; the fixture's row (four
+items, one the teacher wrote `[x]`) 1 / 4 on a fresh profile under "Unit 1,
+Day 2" in the Unit 1 table, every table closed, the hint shown, no box and
+no date line on the page; 3 / 4 after two ticks by mouse and the site's own
+navigation; 3 / 4 after a reload; 2 / 4 after an untick and Back; 1 / 4 with
+the site's storage cleared; every total equal to the manifest's
 with the browser's ticks, with another qualifying page (a teacher's `[x]`
 under Other pages) beside it; nothing on the console. Must-fail, by copy and
 restore: the pin's slug emptied in the built `postscript.js` (the sidebar
@@ -2871,7 +2893,10 @@ check fails), the script's `nav` listener renamed (My Progress never draws);
 in the rules, the section's closing rule, the dedupe, the `[x]` default and
 the pin each fail their contract cases in the image's check; in Python, the
 Key Links guard, the gate's quiz guard, a case-sensitive own-page check and
-the `const` reassignment each fail `test_my_progress.py`. None of the 39
+the `const` reassignment each fail `test_my_progress.py`; in the fixes round,
+the Key Links guard matching `[[My Progress Journal]]`, the gate's
+indented-code, HTML-comment, `&nbsp;` and next-line-words rules, a console
+line saying "script", and the check run without Latex each fail their test. None of the 39
 example payloads qualifies (104 headings match, all over tables), so no
 shipped course builds the page until its pages say so.
 

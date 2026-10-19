@@ -11,15 +11,16 @@
 //
 //  1. the sidebar's second entry is My Progress, directly under All Classes;
 //     Key Links links it once, as its first bullet;
-//  2. on a fresh profile the fixture's row reads 0 / 3 under "Unit 1, Day 2",
+//  2. on a fresh profile the fixture's row reads 1 / 4 under "Unit 1, Day 2"
+//     (the teacher's [x] counts as done until unticked - Q5),
 //     in the "Unit 1" table, every table closed, the hint line shown, no
 //     box anywhere on the page (read-only), and the totals agree with the
-//     manifest;
+//     manifest; no date line under the title (Q6);
 //  3. tick two of the fixture's boxes with the mouse, go to My Progress by
-//     the site's own navigation: 2 / 3, totals agreeing;
-//  4. reload: still 2 / 3;
-//  5. untick one on the fixture, go Back: 1 / 3;
-//  6. the site's data cleared (a fresh profile for this site): 0 / 3;
+//     the site's own navigation: 3 / 4, totals agreeing;
+//  4. reload: still 3 / 4;
+//  5. untick one on the fixture, go Back: 2 / 4;
+//  6. the site's data cleared (a fresh profile for this site): 1 / 4;
 //  7. nothing reported to the console.
 //
 // Kept OUT of scripts/ for the reason task_boxes.mjs is: it needs a browser
@@ -45,6 +46,10 @@ const FIXTURE = "Progress Fixture"
 const FIXTURE_SLUG = "Progress-Fixture"
 const FIXTURE_CLASS = "Unit 1, Day 2"
 const FIXTURE_UNIT = "Unit 1"
+// Four items count; the teacher wrote the third ticked ([x]), which counts as
+// done until the student unticks it (ruling Q5).
+const TOTAL = 4
+const TEACHER_TICKED = 1
 const countOf = (done, total) => WORDS.count.replace("{done}", String(done)).replace("{total}", String(total))
 
 const TYPES = {
@@ -241,8 +246,8 @@ async function connect(chunk) {
       return null
     }
     const seen = await evaluate(READ)
-    expect(`${when}: the fixture's row reads ${countOf(done, 3)} under ${FIXTURE_CLASS} in ${FIXTURE_UNIT}`,
-      seen.row !== null && seen.row.count === countOf(done, 3) && seen.row.under === FIXTURE_CLASS && seen.row.unit === FIXTURE_UNIT
+    expect(`${when}: the fixture's row reads ${countOf(done, TOTAL)} under ${FIXTURE_CLASS} in ${FIXTURE_UNIT}`,
+      seen.row !== null && seen.row.count === countOf(done, TOTAL) && seen.row.under === FIXTURE_CLASS && seen.row.unit === FIXTURE_UNIT
         && seen.row.href === "/" + FIXTURE_SLUG, seen.row)
     const overall = seen.totals[0]
     expect(`${when}: the overall total is the manifest's with this browser's ticks`,
@@ -271,7 +276,7 @@ async function connect(chunk) {
         .map((item) => (item.querySelector(".folder-title, a")?.textContent ?? "").trim())`)
       expect("the sidebar's second entry is My Progress, directly under All Classes",
         sidebar[0] === "All Classes" && sidebar[1] === WORDS.title, sidebar)
-      expect("the fixture's boxes are tickable", (await evaluate("document.querySelectorAll('input.plantoir-task').length")) === 5)
+      expect("the fixture's boxes are tickable", (await evaluate("document.querySelectorAll('input.plantoir-task').length")) === 6)
       await go(`${base}/Key-Links`)
       const keyLinks = await evaluate(`(() => {
         const links = Array.from(document.querySelectorAll("article a.internal")).filter((a) => new URL(a.href).pathname === "/My-Progress")
@@ -282,8 +287,9 @@ async function connect(chunk) {
 
       // 2. A fresh profile.
       await go(progress)
-      const fresh = await checkPage("a fresh profile", 0)
+      const fresh = await checkPage("a fresh profile", TEACHER_TICKED)
       expect("a fresh profile: the hint line is shown", fresh?.hint === true)
+      expect("no date line under the title", (await evaluate("document.querySelector('.content-meta') === null")) === true)
 
       // 3. Two ticks on the fixture (its second and third boxes are the
       // first two counted ones: the first box is before any heading).
@@ -293,30 +299,30 @@ async function connect(chunk) {
       const stored = await evaluate(`Object.keys(localStorage).filter((key) => key.startsWith("plantoir:task:/:${FIXTURE_SLUG}:")).length`)
       expect("two ticks were kept", stored === 2, stored)
       await go(progress)
-      const ticked = await checkPage("after two ticks", 2)
+      const ticked = await checkPage("after two ticks", TEACHER_TICKED + 2)
       expect("after two ticks: no hint line", ticked?.hint === false)
 
       // 4. A reload.
       await open(progress)
-      await checkPage("after a reload", 2)
+      await checkPage("after a reload", TEACHER_TICKED + 2)
 
       // 5. Untick one, then Back.
       await go(fixture)
       await clickBox(2)
       await evaluate("history.back()")
       await pause(900)
-      await checkPage("after an untick and Back", 1)
+      await checkPage("after an untick and Back", TEACHER_TICKED + 1)
 
       // 6. The site's data cleared: a fresh profile for this site.
       await send("Storage.clearDataForOrigin", { origin: base, storageTypes: "local_storage" })
       await open(progress)
-      await checkPage("after the site's data was cleared", 0)
+      await checkPage("after the site's data was cleared", TEACHER_TICKED)
 
       expect("nothing was reported to the console", consoleErrors.length === 0, consoleErrors)
       if (problems.length > 0) {
         return finish(1, "FAIL: " + problems.join("\nFAIL: "))
       }
-      finish(0, `OK: My Progress second in the sidebar and first in Key Links; ${FIXTURE}'s row under ${FIXTURE_CLASS} read 0 / 3 fresh, 2 / 3 after two ticks and after a reload, 1 / 3 after an untick and Back, 0 / 3 with the site's data cleared; every total agreed with the manifest (${fresh?.totals?.length ?? 0} totals); read-only, every table closed`)
+      finish(0, `OK: My Progress second in the sidebar and first in Key Links; ${FIXTURE}'s row under ${FIXTURE_CLASS} read 1 / 4 fresh (the teacher's [x]), 3 / 4 after two ticks and after a reload, 2 / 4 after an untick and Back, 1 / 4 with the site's data cleared; every total agreed with the manifest (${fresh?.totals?.length ?? 0} totals); read-only, every table closed`)
     } catch (error) {
       finish(1, "FAIL: " + (error?.stack ?? error))
     }

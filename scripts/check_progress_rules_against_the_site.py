@@ -16,7 +16,8 @@ Windows' `PythonToolchainTests` discovers every `scripts/test_*.py`.
 `plantoirProgress.ts` (the emitter) are bundled with esbuild, together with
 the transformers a page goes through on the site - Quartz's own FrontMatter,
 ObsidianFlavoredMarkdown and GitHubFlavoredMarkdown, then PlantoirQuizzes and
-PlantoirTasks (the only producer of an item's id) - and every case in
+PlantoirTasks (the only producer of an item's id), then Quartz's Latex (since
+#545's fixes round: a `$$` block is maths there) - and every case in
 `contracts/shared-rules.json` -> `myProgress` the site reads is run through
 them in Node:
 
@@ -73,7 +74,7 @@ const require = createRequire("NODE_MODULES/")
 const { build } = require("esbuild")
 await build({
   entryPoints: [process.argv[2]], outfile: process.argv[3], bundle: true, platform: "node", format: "esm",
-  logLevel: "error", nodePaths: ["NODE_MODULES"], loader: { ".scss": "text" }, external: ["lightningcss"],
+  logLevel: "error", nodePaths: ["NODE_MODULES"], loader: { ".scss": "text", ".node": "empty" }, external: ["lightningcss"],
   banner: { js: 'import { createRequire } from "module"; const require = createRequire(import.meta.url);' },
   plugins: [{ name: "stub", setup(builder) {
     builder.onResolve({ filter: /\.inline(\.ts)?$/ }, (args) => ({ path: args.path, namespace: "stub" }))
@@ -92,6 +93,7 @@ import { VFile } from "vfile"
 import { FrontMatter } from "QUARTZ_TRANSFORMERS/frontmatter"
 import { ObsidianFlavoredMarkdown } from "QUARTZ_TRANSFORMERS/ofm"
 import { GitHubFlavoredMarkdown } from "QUARTZ_TRANSFORMERS/gfm"
+import { Latex } from "QUARTZ_TRANSFORMERS/latex"
 import { PlantoirQuizzes } from "QUIZZES_TS"
 import { PlantoirTasks } from "TASKS_TS"
 import { taskItemId } from "TASK_RULES_TS"
@@ -104,7 +106,9 @@ const work = process.argv[4]
 const failures = []
 let count = 0
 const ctx = { cfg: { configuration: { locale: "en-US" } }, allSlugs: [], argv: { output: join(work, "public") } }
-const transformers = [FrontMatter(), ObsidianFlavoredMarkdown({ enableInHtmlEmbed: false }), GitHubFlavoredMarkdown(), PlantoirQuizzes(), PlantoirTasks()]
+// In the order a section's quartz.config.ts has them, Latex included: a
+// `$$` block is maths to the site, not a list (#545 implementation review 3).
+const transformers = [FrontMatter(), ObsidianFlavoredMarkdown({ enableInHtmlEmbed: false }), GitHubFlavoredMarkdown(), PlantoirQuizzes(), PlantoirTasks(), Latex({ renderEngine: "katex" })]
 
 // A page as the site builds it (quartz/processors/parse.ts): the file
 // trimmed, every text transform in order, the markdown stage, then the html
@@ -154,6 +158,15 @@ for (const c of rules.gate.cases) {
   if ((items.length > 0) !== c.counts) failures.push(`gate ${c.name}: the site counted ${items.length}, the case says counts ${c.counts}`)
 }
 
+// The pipeline is the site's, Latex included: a task line inside a `$$`
+// block is maths there, never an item (myProgress.knownLimits - the build's
+// gate reads it as one, and the emitter's note says so).
+count += 1
+{
+  const [tree] = built("## Success criteria\n\n$$\n- [ ] x = 1\n$$\n", "Tasks/Maths.md")
+  if (countedItems(tree, DEFAULTS).length !== 0) failures.push("the check's pipeline has no maths: a task line inside $$ was counted")
+}
+
 for (const c of rules.rollUp.cases) {
   count += 1
   const store = c.throws
@@ -198,7 +211,7 @@ const content = [
   built("---\npublish: false\n---\n## Success criteria\n\n- [ ] I can hide\n", "Tasks/Hidden.md"),
 ]
 const basePlan = { version: 1, slug: "My-Progress", headings: DEFAULTS.map(normalisedHeading), words: { otherPages: "Other pages" },
-  notes: { gateSaidYes: "said yes", gateSaidNo: "said no" }, classes: [], firstClassOf: {} }
+  notes: { gateSaidYes: "said yes", gateSaidNo: "said no", gateSaidNoNoPage: "said no, no page" }, classes: [], firstClassOf: {} }
 const manifestFile = join(work, "public", "progress-manifest.json")
 const emitWith = async (plan) => {
   mkdirSync(join(work, "quartz"), { recursive: true })
@@ -213,7 +226,7 @@ if (emitted.length !== 0 || existsSync(manifestFile) || said.length !== 0) failu
 count += 1
 emitted = await emitWith({ ...basePlan, page: false, reason: "noSuccessCriteria", gate: [] })
 if (emitted.length !== 0 || existsSync(manifestFile)) failures.push(`emitter, nothing qualified: wrote ${JSON.stringify(emitted)}`)
-if (!same(said, ["plantoir: note: Tasks/Fractions.md: said no"])) failures.push(`emitter, nothing qualified: said ${JSON.stringify(said)}, expected one note for the page the build missed`)
+if (!same(said, ["plantoir: note: Tasks/Fractions.md: said no, no page"])) failures.push(`emitter, nothing qualified: said ${JSON.stringify(said)}, expected one note for the page the build missed`)
 count += 1
 emitted = await emitWith({ ...basePlan, page: true, reason: "built", gate: ["Tasks/Fractions.md", "Tasks/Table.md"] })
 const first = existsSync(manifestFile) ? readFileSync(manifestFile, "utf-8") : ""
@@ -225,6 +238,11 @@ if (emitted.length !== 1 || !same(manifest, expected)) failures.push(`emitter, b
 if (!same(said, ["plantoir: note: Tasks/Table.md: said yes"])) failures.push(`emitter, built: said ${JSON.stringify(said)}, expected one note for the page the build expected and the site found nothing on`)
 await emitWith({ ...basePlan, page: true, reason: "built", gate: ["Tasks/Fractions.md", "Tasks/Table.md"] })
 if (!existsSync(manifestFile) || readFileSync(manifestFile, "utf-8") !== first) failures.push("emitter, built twice: the manifest's bytes changed")
+count += 1
+emitted = await emitWith({ ...basePlan, page: true, reason: "built", gate: ["Tasks/Table.md"] })
+const listed = existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile, "utf-8")) : null
+if (listed === null || listed.other.pages.length !== 1 || listed.other.pages[0].slug !== "Tasks/Fractions") failures.push(`emitter, a page the build missed: not listed (${JSON.stringify(listed)})`)
+if (!same(said, ["plantoir: note: Tasks/Fractions.md: said no"])) failures.push(`emitter, a page the build missed: said ${JSON.stringify(said)}, expected the note that it is listed`)
 console.log = log
 
 console.log(JSON.stringify({ count, failures }))
@@ -308,7 +326,7 @@ def run_the_rules_in_node(folder: Path) -> list:
                             capture_output=True, text=True).stdout
     result = json.loads(output.strip().splitlines()[-1])
     print(f"progressRules.ts and plantoirProgress.ts: {result['count']} contract cases and emitter checks run in Node "
-          f"over Quartz's own transformers, PlantoirQuizzes and PlantoirTasks")
+          f"over Quartz's own transformers, PlantoirQuizzes, PlantoirTasks and Latex")
     return result["failures"]
 
 
