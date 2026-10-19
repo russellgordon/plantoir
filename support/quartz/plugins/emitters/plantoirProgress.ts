@@ -96,7 +96,9 @@ export const PlantoirProgress: QuartzEmitterPlugin = () => ({
         continue
       }
       if (!gate.has(path)) {
-        note(path, plan.notes.gateSaidNo ?? "")
+        // Listed when the section has the page; when the build found nothing
+        // anywhere, there is no page to list them on (#545 review 4).
+        note(path, (plan.page === true ? plan.notes.gateSaidNo : plan.notes.gateSaidNoNoPage) ?? "")
       }
       const title = typeof frontmatter?.title === "string" && frontmatter.title.trim() !== "" ? frontmatter.title.trim() : slug
       pages.push({ path, slug, title, items })

@@ -2846,8 +2846,9 @@ for twin in ("A", "B"):
 TASKPLANTS
 
 # ---- #545: My Progress, planted for the same build ----
-# Progress Fixture: three items under its success criteria (one under a
-# deeper `### Tests of success:`), one before any heading and one after the
+# Progress Fixture: four items under its success criteria (one the teacher
+# wrote ticked, `[x]`, which counts as done until a student unticks it - Q5;
+# one under a deeper `### Tests of success:`), one before any heading and one after the
 # section - which do not count - linked from Unit 1, Day 2, whose file is
 # put back by restore_hit_fixture. Other pages of the section may have
 # success criteria too (a real course does), so 6m and the browser check
@@ -2866,6 +2867,7 @@ A page planted for the My Progress check (plantoir-progress-sentinel-545).
 
 - [ ] I can name a variable
 - [ ] I can print a value
+- [x] I can comment my code
 
 ### Tests of success:
 
@@ -3787,8 +3789,9 @@ fi
 
 # ---- 6m. My Progress (#545), as the build left it ----
 # The page and the manifest are there; Progress Fixture's row is in the
-# manifest under Unit 1, Day 2 in the Unit 1 table with exactly its three
-# counted items, the contract's ids of their words, unticked; the two items
+# manifest under Unit 1, Day 2 in the Unit 1 table with exactly its four
+# counted items, the contract's ids of their words, the teacher's [x] ticked;
+# the page draws no date line (no content-meta: Q6); the two items
 # outside the section are not; Key Links' first bullet links the page, once;
 # the page has no Backlinks list; the sidebar's pin carries the page's slug
 # and All Classes; and the build said so on its PLANTOIR_MY_PROGRESS: line.
@@ -3820,7 +3823,8 @@ else:
         rows.append((manifest["other"]["label"], None, page))
     mine = [row for row in rows if row[2]["title"] == "Progress Fixture"]
     want = [{"id": fnv1a(text), "checked": False} for text in
-            ("I can name a variable", "I can print a value", "I can read an error message")]
+            ("I can name a variable", "I can print a value", "I can comment my code", "I can read an error message")]
+    want[2]["checked"] = True
     if len(mine) != 1:
         problems.append(f"Progress Fixture is in the manifest {len(mine)} times")
     else:
@@ -3834,6 +3838,8 @@ else:
         problems.append("My-Progress.html has no placeholder for the page's script")
     if 'class="backlinks"' in html:
         problems.append("My-Progress.html carries a Backlinks list")
+    if "content-meta" in html:
+        problems.append("My-Progress.html shows a date line")
 key_links = (site / "Key-Links.html").read_text(encoding="utf-8")
 article = key_links.split("<article", 1)[-1].split("</article>", 1)[0]
 links = re.findall(r'<li><a href="([^"]*)"', article)
@@ -3854,7 +3860,7 @@ for problem in problems:
 sys.exit(1 if problems else 0)
 PROGRESSPY
 then
-  pass "My Progress: the page and the manifest built, Progress Fixture's three counted items under Unit 1, Day 2 with the contract's ids, Key Links' first bullet, no Backlinks list, the sidebar's pin, and the build's marker line (#545)"
+  pass "My Progress: the page and the manifest built, Progress Fixture's four counted items under Unit 1, Day 2 with the contract's ids and the teacher's [x], Key Links' first bullet, no date line and no Backlinks list, the sidebar's pin, and the build's marker line (#545)"
 else
   fail "My Progress: one of the checks above failed (#545)"
 fi
