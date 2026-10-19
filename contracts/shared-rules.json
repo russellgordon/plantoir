@@ -23536,6 +23536,16 @@
       "sectionStart": "<!-- BEGIN PLANTOIR: Plantoir writes and replaces everything between this line and END PLANTOIR. Your own text goes above or below. -->",
       "sectionEnd": "<!-- END PLANTOIR -->",
       "source": "support/agent_guidance",
+      "pageAuthoringSkill": {
+        "rule": "The skill `plantoir-page-authoring` (#596) sits beside the four feature skills in support/agent_guidance/skills and reaches a working folder the same way: the one an assistant reads FIRST for any page, listing every way content is written for a site - settings, text, callouts and folding, Mermaid, tables, maths, checklists, success-criteria headings and My Progress (from 1.8.2), links, embedding, footnotes, tags, Media pictures and PDFs, YouTube, Vimeo, GeoGebra and PhET, %% notes, publish:, folders and index pages, class pages and their dates, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and a routing table naming each skill in routesTo rather than repeating it. The root AGENTS.md and CLAUDE.md sections name it in their FIRST bullet. Every example in it is built and read back as the feature it claims by verify.sh 6m (the skill's fences are read from the skill itself).",
+        "skill": "plantoir-page-authoring",
+        "routesTo": [
+          "plantoir-printing",
+          "plantoir-math-graphs",
+          "plantoir-quizzes",
+          "plantoir-runnable-code"
+        ]
+      },
       "rootFileCases": {
         "rule": "`existing` is the file as found (null: no file), with {start} and {end} standing for sectionStart and sectionEnd; the section's words are \"NEW\". `declined` is the Not Now on record for this file: \"thisSection\" (for these very words), \"earlierSection\" (for words that have since changed) or null. `expect` is write, replace, unchanged, ask or leave; `result` is the file afterwards - for ask, the file after the teacher says Add.",
         "cases": [
