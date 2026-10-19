@@ -2985,7 +2985,7 @@ without a claim fails. An `Authoring Claims` page pins what the prose says
 (the prices, `\$`, a spaced `$ x $` typeset on the site though not in
 Obsidian, the Markdown link, an unknown callout kind). Measured 2026-10-19
 against a real build of a copy of the ICS3U working folder (image
-`teaching-quartz:src-39d2a0a0`): 21 examples, 21 claims, pass; with the
+`teaching-quartz:src-39d2a0a0`): 21 examples, 21 claims, pass (22 and 22 after the review added a Code section, 2026-10-19); with the
 YouTube address cut to a short id it failed on that example alone. **Not
 built, said instead:** whether a Mermaid diagram actually DRAWS (it draws in
 the browser; 6m checks the fence reached the page as a diagram), and My
