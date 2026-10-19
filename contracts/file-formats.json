@@ -138,6 +138,12 @@
         "type": "per-section map of booleans"
       },
       {
+        "default": true,
+        "key": "include_my_progress",
+        "type": "boolean, or a per-section map of booleans",
+        "why": "#545: whether a section gets the My Progress page (and its Key Links entry). Read EXACTLY as include_curriculum_coverage is (build_site._resolve_section_switch): a boolean, or a map whose `sections` entry, then whose `section<N>` entry, then whose `default` decides; absent, or a map that says nothing about the section, is TRUE. No app writes it yet - the Course Settings switch in both apps is #595 - and both builds honour it when present. shared-rules.json → myProgress.config."
+      },
+      {
         "default": "en-US",
         "key": "locale",
         "type": "string"
@@ -180,6 +186,11 @@
         "key": "show_section_marker",
         "type": "per-section map of booleans",
         "why": "Absent means TRUE — the 'S1' marker shows unless a teacher turns it off."
+      },
+      {
+        "key": "success_criteria_headings",
+        "type": "array of strings",
+        "why": "#545: the headings whose task items My Progress counts. A list with at least one heading that is not blank REPLACES the three defaults (shared-rules.json → myProgress.headings.defaults); absent, not a list, or nothing but blanks means the defaults. Compared case-insensitively, trailing punctuation ignored (myProgress.headings.rule). No app writes it yet - the list in Course Settings is #595 - and both builds honour it when present."
       },
       {
         "default": false,
