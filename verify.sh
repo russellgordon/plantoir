@@ -93,6 +93,10 @@ RESULTS=()
 FAILED="false"
 pass() { RESULTS+=("✅ PASS  $1"); echo "✅ PASS  $1"; }
 fail() { RESULTS+=("❌ FAIL  $1"); echo "❌ FAIL  $1"; FAILED="true"; }
+# A check that could not run here (it needs the network, say) is a SKIP:
+# listed and printed like a failure so it is seen, but it does not fail the
+# run - and it is never a pass (#594).
+skip() { RESULTS+=("⏭️  SKIP  $1"); echo "⏭️  SKIP  $1"; }
 
 # -------------------- 0. A real terminal is required --------------------
 # The launchers run the toolchain with `docker exec -it`, which refuses to
@@ -335,8 +339,14 @@ else
   cat /tmp/verify_deploy_headers_test.log
 fi
 
+if (cd scripts && python3 test_quartz_analytics_off.py) >/tmp/verify_analytics_off_test.log 2>&1; then
+  pass "build_site.py: Quartz's own page-view counter, which nobody set up, is switched off in every build (#594, scripts/test_quartz_analytics_off.py)"
+else
+  fail "build_site.py: Quartz's own page-view counter is not switched off (scripts/test_quartz_analytics_off.py, #594)"
+  cat /tmp/verify_analytics_off_test.log
+fi
 if (cd scripts && python3 test_netlify_badge.py) >/tmp/verify_netlify_badge_test.log 2>&1; then
-  pass "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+  pass "netlify_badge.py: shared ad-badge suppression module, and the hosts a page's scripts import code from allowed - Mermaid from cdnjs, never a fetch target (#594, scripts/test_netlify_badge.py)"
 else
   fail "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
   cat /tmp/verify_netlify_badge_test.log
@@ -3750,6 +3760,17 @@ else
   fail "the sidebar's page dot is missing from index.css, or the sidebar's row templates changed under it (#515)"
 fi
 
+# ---- #594: no page-view counter in the built site ----
+# Quartz's default config loaded plausible.io's script on every page and
+# sent each student's page view there; nobody set it up. The real build of
+# the fixture site must carry it nowhere: no page and no script names it.
+PLAUSIBLE_HITS="$(grep -rl --include='*.html' --include='*.js' --include='*.mjs' 'plausible\.io' "$SITE_PUBLIC" 2>/dev/null | head -5 || true)"
+if [[ -n "$(find "$SITE_PUBLIC" -name 'postscript.js' -print -quit 2>/dev/null)" && -z "$PLAUSIBLE_HITS" ]]; then
+  pass "the built site sends no page views anywhere: no page and no script in it names plausible.io, Quartz's default counter (#594)"
+else
+  fail "the built site still loads Quartz's page-view counter, or has no postscript.js to read (#594): ${PLAUSIBLE_HITS:-no postscript.js}"
+fi
+
 # ---- 6h, continued: the handout as a browser prints it (#454 review B1) ----
 # Opened from Plantoir's preview, Print starts at the first page load. In a
 # LIGHT page nothing used to wait for Quartz to draw the diagrams, so the
@@ -3800,6 +3821,26 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "graphs were not drawn on a page whose own ids answer the names the graph engine reads, or on a page visited after it (browser-checks/graphs_draw.mjs, #502)"
     cat /tmp/verify_graphs_draw.log
   fi
+  # #594: the Mermaid diagram on the Printable Fixture drawn under the very
+  # policy a Netlify publish would send. The site is cloned, the publish's
+  # own two _headers writers run on the clone in deploy.py's order, and the
+  # check serves the clone with the policy line it reads from that file. The
+  # engine comes from cdnjs, so with no network it is a SKIP, never a pass.
+  MERMAID_SITE="$(mktemp -d /tmp/plantoir-verify-mermaid.XXXXXX)"
+  cp -Rc "$SITE_PUBLIC/." "$MERMAID_SITE/" 2>/dev/null || cp -R "$SITE_PUBLIC/." "$MERMAID_SITE/"
+  rm -f "$MERMAID_SITE/_headers"
+  (cd scripts && python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$MERMAID_SITE") >/tmp/verify_mermaid_draws.log 2>&1 || true
+  MERMAID_STATUS=0
+  node browser-checks/mermaid_draws.mjs "$PRINT_CHROME" "$MERMAID_SITE" /Printable-Fixture.html >>/tmp/verify_mermaid_draws.log 2>&1 || MERMAID_STATUS=$?
+  if [[ "$MERMAID_STATUS" == "0" ]]; then
+    pass "Mermaid diagrams drawn under the policy a Netlify publish sends to keep its ad badge off, read from the _headers the publish writes: the engine imported from cdnjs, no request refused by the policy - $(grep '^OK: ' /tmp/verify_mermaid_draws.log | head -1 | sed 's/^OK: //') (#594, browser-checks/mermaid_draws.mjs)"
+  elif [[ "$MERMAID_STATUS" == "3" ]]; then
+    skip "Mermaid diagrams under the Netlify ad-badge policy (#594): $(grep '^SKIPPED: ' /tmp/verify_mermaid_draws.log | head -1 | sed 's/^SKIPPED: //') - the diagram engine comes from cdnjs (browser-checks/mermaid_draws.mjs)"
+  else
+    fail "Mermaid diagrams were not drawn under the policy a Netlify publish sends, or the policy refused a request (browser-checks/mermaid_draws.mjs, #594)"
+    cat /tmp/verify_mermaid_draws.log
+  fi
+  rm -rf "$MERMAID_SITE"
   # #515: the sidebar's page dot, on the rows the browser draws.
   if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
@@ -3852,8 +3893,8 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_task_boxes.log
   fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), and task boxes in a browser (#519): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
