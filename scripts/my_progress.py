@@ -199,11 +199,15 @@ def _masked(text: str) -> str:
     kept, so a heading or a task line written as an example is no heading or
     task."""
     characters = list(text)
-    ranges = list(markdown_code.not_a_link_ranges(text))
-    for match in _HTML_COMMENT.finditer(text):
-        ranges.append((match.start(), match.end()))
-    for start, end in ranges:
+    for start, end in markdown_code.not_a_link_ranges(text):
         for index in range(start, min(end, len(characters))):
+            if characters[index] != "\n":
+                characters[index] = " "
+    # HTML comments only AFTER code is masked: a `<!--` or `-->` written as
+    # code starts or ends nothing (#545 fixes review 1).
+    masked = "".join(characters)
+    for match in _HTML_COMMENT.finditer(masked):
+        for index in range(match.start(), match.end()):
             if characters[index] != "\n":
                 characters[index] = " "
     return "".join(characters)
@@ -388,7 +392,7 @@ def page_text(created: str | None) -> str:
     other page's Backlinks or the coverage map changes.
     """
     said = words()
-    lines = ["---", f"title: {said['title']}"]
+    lines = ["---", f"title: {said['title']}", f"description: {json.dumps(said['description'], ensure_ascii=False)}"]
     if created:
         lines.append(f"created: {created}")
     lines += ["publish: true", "excludeBacklinks: true", "---", ""]

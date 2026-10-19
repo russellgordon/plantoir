@@ -29957,6 +29957,14 @@
           "items": []
         },
         {
+          "name": "a comment's marks in inline code hide nothing",
+          "markdown": "Start with `<!--` to begin a comment.\n\n## Success criteria\n\n- [ ] I can add fractions\n\nEnd with `-->` to close it.\n",
+          "items": [
+            "I can add fractions"
+          ],
+          "why": "an HTML comment is read only outside code: `<!--` and `-->` written as code start and end nothing (#545 fixes review 1)"
+        },
+        {
           "name": "a no-break space in a heading is a space",
           "markdown": "## Success&nbsp;criteria\n\n- [ ] I can add fractions\n",
           "items": [
@@ -30327,7 +30335,7 @@
       "why": "A preview is ONE `quartz build --serve` process, so a Python pass after the build would never run there: the manifest is an emitter's, re-run with every page on each rebuild. Ids come from the built pages' stamps, never the Markdown (#519's comment on #545, review F1)."
     },
     "page": {
-      "rule": "`My Progress.md` at the top of the build's content, written AFTER the page list the app reads and after every pass that reads links, so the app never lists it as the teacher's and no date pass, coverage map or links checklist meets it: title My Progress (Russell, 2026-10-19, wherever the words appear), the first class's date as every build-written page carries, `publish: true`, `excludeBacklinks: true`, and one EMPTY element (`data-plantoir-progress`) carrying words.placeholder and words.unreadable as attributes (dateLine). No link of any kind. Read-only: no box on it can be ticked; each row links back to its page.",
+      "rule": "`My Progress.md` at the top of the build's content, written AFTER the page list the app reads and after every pass that reads links, so the app never lists it as the teacher's and no date pass, coverage map or links checklist meets it: title My Progress (Russell, 2026-10-19, wherever the words appear), the first class's date as every build-written page carries, words.description as its `description:` (the meta description and search summary, #545 fixes review 4 - not page text, so still no date line), `publish: true`, `excludeBacklinks: true`, and one EMPTY element (`data-plantoir-progress`) carrying words.placeholder and words.unreadable as attributes (dateLine). No link of any kind. Read-only: no box on it can be ticked; each row links back to its page.",
       "shown": "The intro (words.intro), then the totals - words.overall then each table's - then words.noTicksYet while nothing on the page has been touched, then one CLOSED table per unit and Other pages last, each summary its label and count; inside, a heading row per class, then a row per page: its title linking back to it and words.count. Drawn again, every table closed, on every page shown (Back included). A manifest that cannot be read (a site opened from a folder on disk) shows words.unreadable.",
       "dateLine": "The page shows NO date line and no reading time (Russell's Q6: no dates on the page). Quartz's ContentMeta draws its line only for a page with text, so the page carries none: the placeholder sentence is the element's `data-placeholder`, shown by the page's styles until the script draws (`:empty::before`), never page text. Measured in a real build: no `content-meta` in My-Progress.html.",
       "printing": "Not checked in v1.8.2: #595 owns the print check. #519's ruling Q1 (paper shows the student's ticks) means this page is no exception."
@@ -30552,7 +30560,8 @@
       "noTicksYet": "Tick the boxes under a page’s success criteria and they’re counted here.",
       "nothingYet": "No page has boxes to tick under its success criteria yet.",
       "unreadable": "Your progress can’t be shown on this copy of the site. Open the site from its web address to see it.",
-      "placeholder": "Counting the boxes you’ve ticked…"
+      "placeholder": "Counting the boxes you’ve ticked…",
+      "description": "Your own progress on this section’s success criteria, kept in your browser only."
     },
     "notes": {
       "note": "What a teacher reads on a `plantoir: note:` line from the emitter, after the page's place in the site, when the build's gate and the site's own reading of a page disagree (#545 plan review F3): a tick is never dropped without a word.",

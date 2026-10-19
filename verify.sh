@@ -3808,6 +3808,7 @@ def fnv1a(text):
         value ^= data[index] | (data[index + 1] << 8)
         value = (value * 0x01000193) & 0xffffffff
     return format(value, "08x")
+rules_words = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["myProgress"]["words"]
 manifest_path = site / "progress-manifest.json"
 page_path = site / "My-Progress.html"
 if not manifest_path.is_file() or not page_path.is_file():
@@ -3840,6 +3841,8 @@ else:
         problems.append("My-Progress.html carries a Backlinks list")
     if "content-meta" in html:
         problems.append("My-Progress.html shows a date line")
+    if 'name="description" content="' + rules_words["description"] + '"' not in html:
+        problems.append("My-Progress.html's meta description is not words.description")
 key_links = (site / "Key-Links.html").read_text(encoding="utf-8")
 article = key_links.split("<article", 1)[-1].split("</article>", 1)[0]
 links = re.findall(r'<li><a href="([^"]*)"', article)
@@ -4003,7 +4006,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.
   if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
-    pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, nothing on a fresh profile, every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
+    pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, the fixture's row at 1 / 4 on a fresh profile (the teacher's [x]), every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
   else
     fail "My Progress did not count a student's ticks in a browser as the contract says (browser-checks/my_progress.mjs, #545)"
     cat /tmp/verify_my_progress.log

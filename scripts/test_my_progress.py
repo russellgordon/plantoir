@@ -254,6 +254,7 @@ class TheWords(unittest.TestCase):
         self.assertNotIn("](", text)
         self.assertNotIn("<a", text)
         self.assertIn("title: My Progress\n", text)
+        self.assertIn('description: "' + my_progress.words()["description"] + '"\n', text)
         self.assertIn("publish: true\n", text)
         self.assertIn("excludeBacklinks: true\n", text)
         self.assertIn("created: 2026-09-03T09:00:00.000-0400\n", text)
