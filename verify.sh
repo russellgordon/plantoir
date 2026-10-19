@@ -339,6 +339,12 @@ else
   cat /tmp/verify_deploy_headers_test.log
 fi
 
+if (cd scripts && python3 test_quartz_analytics_off.py) >/tmp/verify_analytics_off_test.log 2>&1; then
+  pass "build_site.py: Quartz's own page-view counter, which nobody set up, is switched off in every build (#594, scripts/test_quartz_analytics_off.py)"
+else
+  fail "build_site.py: Quartz's own page-view counter is not switched off (scripts/test_quartz_analytics_off.py, #594)"
+  cat /tmp/verify_analytics_off_test.log
+fi
 if (cd scripts && python3 test_netlify_badge.py) >/tmp/verify_netlify_badge_test.log 2>&1; then
   pass "netlify_badge.py: shared ad-badge suppression module, and the hosts a page's scripts import code from allowed - Mermaid from cdnjs, never a fetch target (#594, scripts/test_netlify_badge.py)"
 else
@@ -3752,6 +3758,17 @@ then
   pass "the sidebar's page dot is in the site's one stylesheet, and the sidebar's row templates are still the ones it tells apart (#515)"
 else
   fail "the sidebar's page dot is missing from index.css, or the sidebar's row templates changed under it (#515)"
+fi
+
+# ---- #594: no page-view counter in the built site ----
+# Quartz's default config loaded plausible.io's script on every page and
+# sent each student's page view there; nobody set it up. The real build of
+# the fixture site must carry it nowhere: no page and no script names it.
+PLAUSIBLE_HITS="$(grep -rl --include='*.html' --include='*.js' --include='*.mjs' 'plausible\.io' "$SITE_PUBLIC" 2>/dev/null | head -5 || true)"
+if [[ -n "$(find "$SITE_PUBLIC" -name 'postscript.js' -print -quit 2>/dev/null)" && -z "$PLAUSIBLE_HITS" ]]; then
+  pass "the built site sends no page views anywhere: no page and no script in it names plausible.io, Quartz's default counter (#594)"
+else
+  fail "the built site still loads Quartz's page-view counter, or has no postscript.js to read (#594): ${PLAUSIBLE_HITS:-no postscript.js}"
 fi
 
 # ---- 6h, continued: the handout as a browser prints it (#454 review B1) ----

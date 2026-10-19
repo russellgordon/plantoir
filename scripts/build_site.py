@@ -217,6 +217,37 @@ def patch_quartz_base_url(quartz_config_path: Path, base_url: str):
     except Exception as e:
         print(f"⚠️ Error updating baseUrl in quartz.config.ts: {e}")
 
+def patch_quartz_analytics_off(quartz_config_path: Path):
+    """
+    Ensure quartz.config.ts says `analytics: null`, idempotently (#594).
+
+    Quartz v4.5.0's own default is `analytics: { provider: "plausible" }`,
+    and Plantoir has no analytics setting and never set one up — so until
+    2026-10-19 every site it built (Cloudflare, a folder, Preview) loaded
+    https://plausible.io/js/script.manual.js on every page and sent each
+    student's page view to plausible.io for a domain nobody had registered.
+    Netlify sites were spared only by accident: the ad-badge policy
+    (netlify_badge.py) happened to block the injected script. A page-view
+    counter nobody set up is a privacy fault, not a feature, so it is
+    switched off here rather than allowed through the policy. Any other
+    provider block a future Quartz default carries is switched off the same
+    way.
+    """
+    if not quartz_config_path.exists():
+        print(f"⚠️ quartz.config.ts not found at {quartz_config_path}")
+        return
+    try:
+        src = quartz_config_path.read_text(encoding="utf-8")
+        # `analytics: { ... },` — Quartz's provider objects hold no nested braces.
+        pattern = re.compile(r'(analytics\s*:\s*)\{[^{}]*\}')
+        new_src, n = pattern.subn(r'\1null', src, count=1)
+        if n > 0 and new_src != src:
+            result = toolchain_paths.write_file(str(quartz_config_path), new_src.encode("utf-8"))
+            if result.returncode != 0:
+                print("❌ Failed to turn Quartz's page-view counter off:", result.stderr.decode())
+    except Exception as e:
+        print(f"⚠️ Error turning Quartz's page-view counter off: {e}")
+
 # --- ADD: Patch typography fonts in quartz.config.ts -------------------------
 def _escape_font(val: str) -> str:
     # Guard against stray quotes in family names
@@ -8407,6 +8438,11 @@ def build_section_site(
     section_domain = resolve_section_domain(course_dir, config, section_number)
     patch_quartz_base_url(config_path, section_domain)
     # --------------------------------------------------------------------------
+
+    # #594, ALWAYS: no page-view counter on any site (Quartz's default
+    # plausible one was never set up by anybody). In the ALWAYS section so a
+    # folder whose workspace was copied before the fix stops sending too.
+    patch_quartz_analytics_off(config_path)
 
     # Printing (#454), ALWAYS: the print engine only when a page students can
     # see asks for it, the corners and words from this course's settings, and

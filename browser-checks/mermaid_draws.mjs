@@ -40,15 +40,6 @@ if (!chromePath || !siteFolder || !pagePath) {
 
 const NO_NETWORK = 3
 
-// One block this check knows about and does not fail on, named rather than
-// ignored: Quartz's own analytics loader in postscript.js does
-// `document.createElement("script").src = "https://plausible.io/js/script.manual.js"`,
-// which script-src blocks under the same policy (measured 2026-10-19 on
-// ICS3U section 1). It draws no diagram, and whether a class site should
-// load it at all is a separate question (#594's closing comment), so it is
-// reported on the OK line and never makes this check pass or fail.
-const KNOWN_NOT_A_DIAGRAMS = ["https://plausible.io/"]
-
 // The policy line from the block write_netlify_headers_file writes: `/*`,
 // then `  Content-Security-Policy: script-src 'self' 'unsafe-eval' ...`.
 function policyFromHeadersFile() {
@@ -227,19 +218,8 @@ async function connect(chunk) {
     if (documentPolicy !== POLICY) problems.push(`the page was not served under the policy from _headers (it carried ${JSON.stringify(documentPolicy)}) - the check would prove nothing`)
     if (seen.diagrams === 0) problems.push("no code.mermaid on the page - the check would prove nothing")
     else if (seen.drawn < seen.diagrams) problems.push(`${seen.drawn} of ${seen.diagrams} diagrams drawn`)
-    const known = []
-    const unknown = []
-    for (const url of blocked) {
-      let isKnown = false
-      for (const prefix of KNOWN_NOT_A_DIAGRAMS) {
-        if (String(url).startsWith(prefix)) isKnown = true
-      }
-      if (isKnown) known.push(url)
-      else unknown.push(url)
-    }
-    for (const url of unknown) problems.push(`the policy blocked ${url} (blocked=csp)`)
-    const summary = `${seen.drawn} of ${seen.diagrams} diagrams drawn, ${unknown.length} requests blocked by the policy`
-      + (known.length > 0 ? ` (and ${known.join(", ")}, which draws no diagram)` : "")
+    for (const url of blocked) problems.push(`the policy blocked ${url} (blocked=csp)`)
+    const summary = `${seen.drawn} of ${seen.diagrams} diagrams drawn, ${blocked.length} requests blocked by the policy`
     if (problems.length > 0) return finish(1, "FAIL: " + summary + "\n" + problems.join("\n"))
     finish(0, `OK: ${summary}, under the policy _headers carries`)
   }
