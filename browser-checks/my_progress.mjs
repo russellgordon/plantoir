@@ -27,8 +27,10 @@
 // and opacity (and weight), in light and in dark (`saved-theme`), and the
 // same colour under the mouse; another top-level page keeps Quartz's page
 // look (0.75 opacity), so nothing else in the sidebar changed.
-// #603 (v1.8.3): every level - unit, class, page row - is closed whenever
-// the page is drawn, and each class's count is the sum of its pages'; a
+// #603 (v1.8.3): every level - unit, class, page row - is closed on a first
+// visit and with the site's data cleared, and as the student left it on a
+// return by the sidebar's link or a reload; every count sits in a pill;
+// an item reads as body text; each class's count is the sum of its pages'; a
 // plain click on a unit opens it alone, Option-click opens it and every
 // class and page beneath it (and closes them all again); opened with the mouse on its marker, the fixture's row lists its
 // four items in page order, the ticked ones marked - exactly as many as its
@@ -149,7 +151,8 @@ const READ = `(async () => {
       const itemLink = item.querySelector("a")
       items.push({ text: itemLink?.textContent, ticked: item.dataset.ticked, state: item.querySelector(".plantoir-progress-state")?.textContent,
                    href: itemLink ? new URL(itemLink.href).pathname + new URL(itemLink.href).hash : null,
-                   shown: itemLink ? itemLink.checkVisibility() : false })
+                   shown: itemLink ? itemLink.checkVisibility() : false,
+                   weight: itemLink ? getComputedStyle(itemLink).fontWeight : null, color: itemLink ? getComputedStyle(itemLink).color : null })
     }
     const unit = line.closest("details.plantoir-progress-unit")?.querySelector(":scope > summary > span")?.textContent
     const under = line.closest("details.plantoir-progress-day")?.querySelector(":scope > summary > span")?.textContent ?? null
@@ -198,7 +201,18 @@ const READ = `(async () => {
   }
   for (const unit of manifest.units) for (const known of unit.classes) for (const page of known.pages) add(unit.label, page)
   for (const page of manifest.other.pages) add(manifest.other.label, page)
-  return { holder: true, tables, row, days, levels, lists, fixtureItems, totals, expected, boxes: holder.querySelectorAll("input").length,
+  // Every count in a pill: a summary's or a total's count span is one, a
+  // page's Ticked cell holds one.
+  let counts = 0
+  let inPills = 0
+  for (const found of holder.querySelectorAll(".plantoir-progress-count")) {
+    if (found.tagName === "TH") continue
+    counts += 1
+    const pill = found.tagName === "TD" ? found.querySelector(":scope > .plantoir-progress-pill") : (found.classList.contains("plantoir-progress-pill") ? found : null)
+    if (pill && pill.textContent === found.textContent && getComputedStyle(pill).fontWeight === "400") inPills += 1
+  }
+  const bodyColor = getComputedStyle(holder.querySelector(".plantoir-progress-intro")).color
+  return { holder: true, tables, row, days, levels, lists, counts, inPills, bodyColor, fixtureItems, totals, expected, boxes: holder.querySelectorAll("input").length,
            hint: holder.querySelector(".plantoir-progress-hint") !== null }
 })()`
 
@@ -282,7 +296,10 @@ async function connect(chunk) {
     if (!ok) problems.push(`${what}${detail === undefined ? "" : ": " + JSON.stringify(detail).slice(0, 500)}`)
   }
   // The fixture's row, and every total the page shows against the manifest.
-  const checkPage = async (when, done) => {
+  // `folded`: whether this drawing should find every level closed - a first
+  // visit, or the site's data cleared. Otherwise the levels are as the
+  // student left them (#603), checked where the run opened them.
+  const checkPage = async (when, done, folded = true) => {
     if (!(await waitForTable())) {
       expect(`${when}: My Progress drew its totals`, false)
       return null
@@ -298,10 +315,13 @@ async function connect(chunk) {
       const want = seen.expected[line.label]
       expect(`${when}: ${line.label}'s total is the manifest's`, want !== undefined && line.count === countOf(...want), { line, want })
     }
-    expect(`${when}: every table is closed`, seen.tables.length > 0 && seen.tables.every((table) => table.open === false), seen.tables)
+    if (folded) expect(`${when}: every table is closed`, seen.tables.length > 0 && seen.tables.every((table) => table.open === false), seen.tables)
+    expect(`${when}: every count is in a pill, in regular weight`, seen.counts > 0 && seen.inPills === seen.counts, { counts: seen.counts, inPills: seen.inPills })
     expect(`${when}: no box can be ticked here`, seen.boxes === 0, seen.boxes)
-    expect(`${when}: every page's list of items is closed`, seen.lists.length > 0 && seen.lists.every((open) => open === false), seen.lists)
-    expect(`${when}: every class is closed`, seen.days.length > 0 && seen.days.every((day) => day.open === false), seen.days)
+    if (folded) {
+      expect(`${when}: every page's list of items is closed`, seen.lists.length > 0 && seen.lists.every((open) => open === false), seen.lists)
+      expect(`${when}: every class is closed`, seen.days.length > 0 && seen.days.every((day) => day.open === false), seen.days)
+    }
     for (const day of seen.days) {
       expect(`${when}: ${day.label}'s count is the sum of its pages'`, day.count === countOf(...day.sum), day)
     }
@@ -322,7 +342,7 @@ async function connect(chunk) {
     if (!summary) return null
     summary.scrollIntoView({ block: "center", behavior: "instant" })
     const area = summary.getBoundingClientRect()
-    return { x: area.left + 4, y: area.top + area.height / 2 }
+    return { x: area.left + 4, y: area.top + area.height / 2, open: summary.parentElement.open }
   })()`)
   const FIXTURE_ROW_SUMMARY = `Array.from(document.querySelectorAll("[data-plantoir-progress] tr.plantoir-progress-page summary")).find((summary) => summary.querySelector("a")?.textContent === ${JSON.stringify(FIXTURE)})`
   const expandFixture = async (when, done) => {
@@ -331,19 +351,19 @@ async function connect(chunk) {
       expect(`${when}: the fixture's unit table was found`, false)
       return null
     }
-    await clickAt(unitPoint)
+    if (!unitPoint.open) await clickAt(unitPoint)
     const dayPoint = await markerOf(`${FIXTURE_ROW_SUMMARY}?.closest("details.plantoir-progress-day")?.querySelector(":scope > summary")`)
     if (dayPoint === null) {
       expect(`${when}: the fixture's class was found`, false)
       return null
     }
-    await clickAt(dayPoint)
+    if (!dayPoint.open) await clickAt(dayPoint)
     const rowPoint = await markerOf(FIXTURE_ROW_SUMMARY)
     if (rowPoint === null) {
       expect(`${when}: the fixture's row was found`, false)
       return null
     }
-    await clickAt(rowPoint)
+    if (!rowPoint.open) await clickAt(rowPoint)
     const seen = await evaluate(READ)
     const row = seen.row
     expect(`${when}: the marker opened the fixture's row and did not follow its link`,
@@ -362,10 +382,19 @@ async function connect(chunk) {
         && items[index].href === "/" + FIXTURE_SLUG + anchor && anchor !== ""
     }
     expect(`${when}: each listed item is the manifest's - its words, this browser's tick, a link to its heading`, agrees, { items, want })
+    expect(`${when}: an item reads as body text - regular weight, the page's text colour`,
+      items.length > 0 && items.every((item) => item.weight === "400" && item.color === seen.bodyColor), { bodyColor: seen.bodyColor, items })
     expect(`${when}: the listed words are the fixture's own`, items[0]?.text === "I can name a variable" && items[3]?.text === "I can read an error message",
       items.map((item) => item.text))
     return seen
   }
+
+  // #603: whether the fixture's unit, class and row are open.
+  const fixtureLevels = () => evaluate(`(() => {
+    const row = ${FIXTURE_ROW_SUMMARY}?.parentElement
+    return { unit: row?.closest("details.plantoir-progress-unit")?.open ?? null, day: row?.closest("details.plantoir-progress-day")?.open ?? null, row: row?.open ?? null }
+  })()`)
+  const allOpen = (levels) => levels.unit === true && levels.day === true && levels.row === true
 
   socket.onopen = async () => {
     try {
@@ -469,7 +498,7 @@ async function connect(chunk) {
       const stored = await evaluate(`Object.keys(localStorage).filter((key) => key.startsWith("plantoir:task:/:${FIXTURE_SLUG}:")).length`)
       expect("two ticks were kept", stored === 2, stored)
       await go(progress)
-      const ticked = await checkPage("after two ticks", TEACHER_TICKED + 2)
+      const ticked = await checkPage("after two ticks", TEACHER_TICKED + 2, false)
       expect("after two ticks: no hint line", ticked?.hint === false)
       const opened = await expandFixture("after two ticks", TEACHER_TICKED + 2)
       // A listed item is a link to the fixture at its heading.
@@ -486,17 +515,37 @@ async function connect(chunk) {
       const landed = await evaluate(`({ at: location.pathname + location.hash, heading: location.hash !== "" && document.getElementById(decodeURIComponent(location.hash.slice(1)))?.tagName })`)
       expect("a listed item's link lands on the fixture at its success-criteria heading",
         target !== "" && landed.at === target && /^H[1-6]$/.test(landed.heading ?? ""), { target, landed })
+      // Back to My Progress by the site's own link (the sidebar's): the
+      // unit, class and row the student opened are still open (#603).
+      const sidebarPoint = await evaluate(`(() => {
+        for (const item of document.querySelectorAll(".explorer .explorer-ul > li")) {
+          const link = item.querySelector(":scope > a")
+          if (link && link.textContent.trim() === ${JSON.stringify(WORDS.title)}) {
+            link.scrollIntoView({ block: "center", behavior: "instant" })
+            const area = link.getBoundingClientRect()
+            return { x: area.left + area.width / 2, y: area.top + area.height / 2 }
+          }
+        }
+        return null
+      })()`)
+      if (sidebarPoint !== null) await clickAt(sidebarPoint)
+      await pause(700)
+      await checkPage("back by the sidebar's link", TEACHER_TICKED + 2, false)
+      const cameBack = await fixtureLevels()
+      expect("back by the sidebar's link: the unit, class and row opened are still open", allOpen(cameBack) && (await evaluate("location.pathname")) === "/My-Progress", cameBack)
 
       // 4. A reload.
       await open(progress)
-      await checkPage("after a reload", TEACHER_TICKED + 2)
+      await checkPage("after a reload", TEACHER_TICKED + 2, false)
+      const reloaded = await fixtureLevels()
+      expect("after a reload: the unit, class and row opened are still open", allOpen(reloaded), reloaded)
 
       // 5. Untick one, then Back.
       await go(fixture)
       await clickBox(2)
       await evaluate("history.back()")
       await pause(900)
-      await checkPage("after an untick and Back", TEACHER_TICKED + 1)
+      await checkPage("after an untick and Back", TEACHER_TICKED + 1, false)
       await expandFixture("after an untick and Back", TEACHER_TICKED + 1)
 
       // 6. The site's data cleared: a fresh profile for this site.
@@ -508,7 +557,7 @@ async function connect(chunk) {
       if (problems.length > 0) {
         return finish(1, "FAIL: " + problems.join("\nFAIL: "))
       }
-      finish(0, `OK: My Progress second in the sidebar and first in Key Links; ${FIXTURE}'s row under ${FIXTURE_CLASS} read 1 / 4 fresh (the teacher's [x]), 3 / 4 after two ticks and after a reload, 2 / 4 after an untick and Back, 1 / 4 with the site's data cleared; every total agreed with the manifest (${fresh?.totals?.length ?? 0} totals); read-only, every table closed; #602 the pinned link All Classes' colour, opacity and weight in light and dark and under the mouse, another top-level page still 0.75; #603 every level - unit, class, page - closed on each drawing, each class's count the sum of its pages', a plain click opening the unit alone and Option-click it and everything beneath (Option-click again closing all), the fixture's row opened by its marker listing its 4 items with 1, 3 and 2 marked as its count says, each linking to its heading, one click landing there`)
+      finish(0, `OK: My Progress second in the sidebar and first in Key Links; ${FIXTURE}'s row under ${FIXTURE_CLASS} read 1 / 4 fresh (the teacher's [x]), 3 / 4 after two ticks and after a reload, 2 / 4 after an untick and Back, 1 / 4 with the site's data cleared; every total agreed with the manifest (${fresh?.totals?.length ?? 0} totals); read-only, every table closed; #602 the pinned link All Classes' colour, opacity and weight in light and dark and under the mouse, another top-level page still 0.75; #603 every level - unit, class, page - closed on a first visit and with the site's data cleared, and as the student left them back by the sidebar's link and after a reload; every count in a pill; items as body text; each class's count the sum of its pages', a plain click opening the unit alone and Option-click it and everything beneath (Option-click again closing all), the fixture's row opened by its marker listing its 4 items with 1, 3 and 2 marked as its count says, each linking to its heading, one click landing there`)
     } catch (error) {
       finish(1, "FAIL: " + (error?.stack ?? error))
     }
