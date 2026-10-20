@@ -29772,7 +29772,7 @@
       ]
     },
     "sections": {
-      "rule": "A section opens at a heading that is a CHILD OF THE PAGE ITSELF (not one inside a callout, a quote or a list) whose words count (headings.rule), and runs to the next such heading of the same or a higher level; a deeper heading stays inside it. Every task box inside it that the site stamped (taskBoxes.rule) counts, at any depth - inside a callout or a nested list too. A quiz's boxes carry no stamp, so they never count. The same words twice are one id and count once, from the first. Code and %% comments are not read. A transcluded checklist counts on the page it is written on, not on the page that shows it. `items` are the counted items' words, in page order (their ids are taskBoxes.itemId's); `checked` is the Markdown's own state of each, where a case says. Each counted item also carries `text` (#603, v1.8.3): the words a student reads beside the box, read off the built page - the <label> the site wraps around the box and its words (taskBoxes.rule), white space made single spaces and trimmed, maths as the TeX the teacher wrote - never re-derived from the Markdown; it equals the item's `items` words unless the case's `shown` says otherwise. And `anchor`: the id the built page gives the success-criteria heading the item sits under (`anchors`, where a case says), so My Progress links each listed item to that part of the page.",
+      "rule": "A section opens at a heading that is a CHILD OF THE PAGE ITSELF (not one inside a callout, a quote or a list) whose words count (headings.rule), and runs to the next such heading of the same or a higher level; a deeper heading stays inside it. Every task box inside it that the site stamped (taskBoxes.rule) counts, at any depth - inside a callout or a nested list too. A quiz's boxes carry no stamp, so they never count. The same words twice are one id and count once, from the first. Code and %% comments are not read. A transcluded checklist counts on the page it is written on, not on the page that shows it. `items` are the counted items' words, in page order (their ids are taskBoxes.itemId's); `checked` is the Markdown's own state of each, where a case says. Each counted item also carries `text` (#603, v1.8.3): the words a student reads beside the box, read off the built page - the <label> the site wraps around the box and its words (taskBoxes.rule), white space made single spaces and trimmed, maths as the TeX the teacher wrote - never re-derived from the Markdown; it equals the item's `items` words unless the case's `shown` says otherwise. And `anchor`: the id the built page gives the success-criteria heading the item sits under (`anchors`, where a case says), so My Progress links each listed item to that part of the page. And `group` (Russell, #603): the words of the nearest deeper heading INSIDE the section above the item (a sub-heading such as \"Knowledge and Understanding\" under \"Success criteria\"), read off the built page, left out before the first sub-heading (`groups`, where a case says, with \"\" for none); the row lists it once, bold, above its items. The count is unchanged.",
       "readers": "Both readings run every case: the site's (scripts/check_progress_rules_against_the_site.py: Quartz's own ObsidianFlavoredMarkdown and GitHubFlavoredMarkdown, PlantoirQuizzes and PlantoirTasks, then progressRules.countedItems - exactly these items) and the build's gate (scripts/test_my_progress.py: my_progress.page_has_counted_items - true exactly when `items` is not empty). When the two readings of a real page disagree, the emitter says so on a `plantoir: note:` line (notes) - #545 plan review F3.",
       "cases": [
         {
@@ -29857,6 +29857,23 @@
             "success-criteria"
           ],
           "why": "#603: the text the row lists is the built page's label - a link's words, no Markdown marks, maths as the TeX the teacher wrote - and a nested item's words are its own, not its parent's"
+        },
+        {
+          "name": "sub-headings inside the section group its items",
+          "markdown": "## Success criteria\n\n- [ ] I can say what a loop is\n\n### Knowledge and Understanding\n\n- [ ] I can trace a loop\n- [ ] I can name its parts\n\n### Thinking\n\n- [ ] I can choose a loop\n\n## Practice\n\n- [ ] Question 1\n",
+          "items": [
+            "I can say what a loop is",
+            "I can trace a loop",
+            "I can name its parts",
+            "I can choose a loop"
+          ],
+          "groups": [
+            "",
+            "Knowledge and Understanding",
+            "Knowledge and Understanding",
+            "Thinking"
+          ],
+          "why": "#603 (Russell, from ICS3U's Make It Yours): the expanded row carries each sub-heading once above its items; an item before the first has none; the next same-level heading still ends the section"
         },
         {
           "name": "code beside maths, and a footnote's mark",
@@ -30390,7 +30407,7 @@
     },
     "manifest": {
       "plan": "quartz/plantoir_progress.json, written by the build on EVERY build (sorted keys, the same bytes for the same input): {version, page (whether the section gets the page), reason (built | switchedOff | noSuccessCriteria | teachersOwnPage), slug, headings (normalised), words, notes, classes: [{path, title, date, unit, unitOrder}] in the date pass's order, firstClassOf: {page path: class path}, gate: [page paths the build read as having counted items]}. Paths are the page's place in the site's content with forward slashes, in Unicode's composed form - the name Quartz knows the file by (relativePath).",
-      "file": "public/progress-manifest.json, written by the emitter only when `page` is true: {version, words, units: [{label, classes: [{label, date, pages: [{title, slug, items: [{id, checked, text, anchor}]}]}]}], other: {label, pages}}; `text` and `anchor` are sections.rule's (#603), read off the built page, so the page lists each page's items with no fetch beyond the manifest's own. Only pages with at least one counted item; a class with no such page, and a unit with no class left, are left out. Hidden pages (publish: false) are skipped by the emitter itself, since a rebuild in a preview hands it every page (#545 plan review F8). The dates are carried for #595's filter and not shown in v1.8.2 (ruling Q6).",
+      "file": "public/progress-manifest.json, written by the emitter only when `page` is true: {version, words, units: [{label, classes: [{label, date, pages: [{title, slug, items: [{id, checked, text, anchor, group?}]}]}]}], other: {label, pages}}; `text` and `anchor` are sections.rule's (#603), read off the built page, so the page lists each page's items with no fetch beyond the manifest's own. Only pages with at least one counted item; a class with no such page, and a unit with no class left, are left out. Hidden pages (publish: false) are skipped by the emitter itself, since a rebuild in a preview hands it every page (#545 plan review F8). The dates are carried for #595's filter and not shown in v1.8.2 (ruling Q6).",
       "why": "A preview is ONE `quartz build --serve` process, so a Python pass after the build would never run there: the manifest is an emitter's, re-run with every page on each rebuild. Ids come from the built pages' stamps, never the Markdown (#519's comment on #545, review F1)."
     },
     "page": {

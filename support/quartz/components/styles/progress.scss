@@ -20,8 +20,11 @@
     & li {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       gap: 1rem;
       max-width: 28rem;
+      // The pills are chips of their own, never touching the next row's.
+      margin: 0.3rem 0;
     }
 
     & .plantoir-progress-overall {
@@ -109,6 +112,14 @@
       margin: 0.25rem 0 0.5rem 0;
       padding-left: 1.25rem;
     }
+  }
+
+  // A sub-heading of the section above its items (#603, Russell): bold, in
+  // the page's text colour, nothing else.
+  & li.plantoir-progress-group {
+    font-weight: 600;
+    color: var(--darkgray);
+    margin: 0.4rem 0 0.15rem 0;
   }
 
   & li.plantoir-progress-item {

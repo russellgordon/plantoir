@@ -63,6 +63,10 @@ import tasksScript from "./scripts/tasks.inline"
 import progressStyle from "./styles/progress.scss"
 // @ts-ignore
 import progressScript from "./scripts/progress.inline"
+// A link to a heading lands on it once the page's late content has taken
+// its size (#604, site-wide): rides along for the same reason.
+// @ts-ignore
+import headingAnchorScript from "./scripts/headingAnchor.inline"
 
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
 type PrintSettings = {
@@ -233,6 +237,6 @@ export default ((inner: QuartzComponent) => {
   // if a layout one day wraps every ContentMeta.
   PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, quizStyle, tasksStyle, progressStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
-  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript, tasksScript, progressScript)
+  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript, tasksScript, progressScript, headingAnchorScript)
   return PlantoirMetaLine
 }) satisfies QuartzComponentConstructor<QuartzComponent>

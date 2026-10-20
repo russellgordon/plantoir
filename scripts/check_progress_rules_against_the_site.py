@@ -154,6 +154,7 @@ for (const c of rules.sections.cases) {
   // own words unless it says how they are shown - and the heading's anchor.
   const shown = c.shown ?? c.items
   if (!same(items.map((item) => item.text), shown)) failures.push(`sections ${c.name}: listed ${JSON.stringify(items.map((item) => item.text))}, expected ${JSON.stringify(shown)}`)
+  if (c.groups && !same(items.map((item) => item.group ?? ""), c.groups)) failures.push(`sections ${c.name}: groups ${JSON.stringify(items.map((item) => item.group ?? ""))}, expected ${JSON.stringify(c.groups)}`)
   if (c.anchors && !same(items.map((item) => item.anchor), c.anchors)) failures.push(`sections ${c.name}: anchors ${JSON.stringify(items.map((item) => item.anchor))}, expected ${JSON.stringify(c.anchors)}`)
 }
 for (const c of rules.gate.cases) {

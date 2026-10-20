@@ -147,6 +147,12 @@ const READ = `(async () => {
     if (link.textContent !== ${JSON.stringify(FIXTURE)}) continue
     const line = link.closest("tr")
     const items = []
+    const groups = []
+    for (const label of line.querySelectorAll("li.plantoir-progress-group")) {
+      const next = label.nextElementSibling?.querySelector("a")?.textContent ?? null
+      const style = getComputedStyle(label)
+      groups.push({ text: label.textContent, before: next, weight: style.fontWeight, color: style.color })
+    }
     for (const item of line.querySelectorAll("li.plantoir-progress-item")) {
       const itemLink = item.querySelector("a")
       items.push({ text: itemLink?.textContent, ticked: item.dataset.ticked, state: item.querySelector(".plantoir-progress-state")?.textContent,
@@ -157,7 +163,7 @@ const READ = `(async () => {
     const unit = line.closest("details.plantoir-progress-unit")?.querySelector(":scope > summary > span")?.textContent
     const under = line.closest("details.plantoir-progress-day")?.querySelector(":scope > summary > span")?.textContent ?? null
     row = { count: line.querySelector("td.plantoir-progress-count")?.textContent, under,
-            unit, href: new URL(link.href).pathname, open: link.closest("details")?.open, items }
+            unit, href: new URL(link.href).pathname, open: link.closest("details")?.open, items, groups }
   }
   // #603: every class's level, its count beside its name, and its pages'
   // counts added up; and how many of each level are open.
@@ -190,7 +196,7 @@ const READ = `(async () => {
       const value = localStorage.getItem("plantoir:task:/:" + page.slug + ":" + item.id)
       const isDone = value === "1" || (value === null && item.checked)
       if (isDone) done += 1
-      answers.push({ text: item.text, ticked: isDone ? "true" : "false", anchor: item.anchor })
+      answers.push({ text: item.text, ticked: isDone ? "true" : "false", anchor: item.anchor, group: item.group ?? "" })
     }
     if (page.slug === ${JSON.stringify(FIXTURE_SLUG)}) fixtureItems = answers
     expected[label] = expected[label] ?? [0, 0]
@@ -384,6 +390,21 @@ async function connect(chunk) {
     expect(`${when}: each listed item is the manifest's - its words, this browser's tick, a link to its heading`, agrees, { items, want })
     expect(`${when}: an item reads as body text - regular weight, the page's text colour`,
       items.length > 0 && items.every((item) => item.weight === "400" && item.color === seen.bodyColor), { bodyColor: seen.bodyColor, items })
+    // #603: the section's two sub-headings, each once, bold in the text
+    // colour, directly above the first item under it in the manifest.
+    const wantGroups = []
+    let lastGroup = ""
+    for (const item of want) {
+      if (item.group !== "" && item.group !== lastGroup) wantGroups.push({ text: item.group, before: item.text })
+      lastGroup = item.group
+    }
+    const groups = row?.groups ?? []
+    let groupsAgree = wantGroups.length === 2 && groups.length === wantGroups.length
+    for (let index = 0; groupsAgree && index < groups.length; index += 1) {
+      groupsAgree = groups[index].text === wantGroups[index].text && groups[index].before === wantGroups[index].before
+        && Number(groups[index].weight) >= 600 && groups[index].color === seen.bodyColor
+    }
+    expect(`${when}: the two sub-headings label their items, bold in the page's text colour`, groupsAgree, { groups, wantGroups })
     expect(`${when}: the listed words are the fixture's own`, items[0]?.text === "I can name a variable" && items[3]?.text === "I can read an error message",
       items.map((item) => item.text))
     return seen
@@ -533,6 +554,37 @@ async function connect(chunk) {
       await checkPage("back by the sidebar's link", TEACHER_TICKED + 2, false)
       const cameBack = await fixtureLevels()
       expect("back by the sidebar's link: the unit, class and row opened are still open", allOpen(cameBack) && (await evaluate("location.pathname")) === "/My-Progress", cameBack)
+      // #602 (Russell, build 2): away from My Progress by the sidebar, the
+      // entry is back to All Classes' look - no current-page colour left on
+      // it - with the mouse away from the sidebar.
+      const fixturePoint = await evaluate(`(() => {
+        for (const item of document.querySelectorAll(".explorer .explorer-ul > li")) {
+          const link = item.querySelector(":scope > a")
+          if (link && link.textContent.trim() === ${JSON.stringify(FIXTURE)}) {
+            link.scrollIntoView({ block: "center", behavior: "instant" })
+            const area = link.getBoundingClientRect()
+            return { x: area.left + Math.min(20, area.width / 2), y: area.top + area.height / 2 }
+          }
+        }
+        return null
+      })()`)
+      if (fixturePoint !== null) await clickAt(fixturePoint)
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1270, y: 890 })
+      await pause(900)
+      const away = await evaluate(`(() => {
+        const look = {}
+        for (const item of document.querySelectorAll(".explorer .explorer-ul > li")) {
+          const link = item.querySelector(".folder-title, a")
+          const words = link?.textContent.trim()
+          if (words === "All Classes" || words === ${JSON.stringify(WORDS.title)}) look[words] = { color: getComputedStyle(link).color, opacity: getComputedStyle(link).opacity, active: link.classList.contains("active") }
+        }
+        return { at: location.pathname, look }
+      })()`)
+      const classesLook = away.look["All Classes"]
+      const progressLook = away.look[WORDS.title]
+      expect("away from My Progress by the sidebar: the entry looks like All Classes again",
+        away.at === "/" + FIXTURE_SLUG && classesLook !== undefined && progressLook !== undefined && progressLook.active === false
+          && progressLook.color === classesLook.color && progressLook.opacity === classesLook.opacity, away)
 
       // 4. A reload.
       await open(progress)

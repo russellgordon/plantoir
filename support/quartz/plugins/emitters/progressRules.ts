@@ -70,7 +70,12 @@ function textOf(node: Node): string {
 // with no fetch (#603); `anchor`, the id the built page gives the
 // success-criteria heading the item sits under ("" when it has none), so the
 // list links to that part of the page.
-export type CountedItem = { id: string; checked: boolean; text: string; anchor: string }
+//
+// `group` (#603, Russell): the words of the nearest SUB-heading inside the
+// section above the item ("Knowledge and Understanding" under "Success
+// criteria"), so the listed items do not run together; left out when the
+// item comes before any sub-heading.
+export type CountedItem = { id: string; checked: boolean; text: string; anchor: string; group?: string }
 
 function classesOf(node: Node): string[] {
   const value = node.properties?.className
@@ -235,6 +240,7 @@ export function countedItems(root: Node, headings: string[], lines: string[] = [
   const seen = new Set<string>()
   let openLevel = 0
   let anchor = ""
+  let group = ""
   for (const child of root.children ?? []) {
     const match = child.type === "element" ? HEADING.exec(child.tagName ?? "") : null
     if (match !== null) {
@@ -246,6 +252,10 @@ export function countedItems(root: Node, headings: string[], lines: string[] = [
         openLevel = level
         const id = child.properties?.id
         anchor = typeof id === "string" ? id : ""
+        group = ""
+      } else if (openLevel !== 0) {
+        // A deeper heading inside the section: the group its items sit in.
+        group = textOf(child).replace(/\s+/gu, " ").trim().normalize("NFC")
       }
       continue
     }
@@ -257,6 +267,9 @@ export function countedItems(root: Node, headings: string[], lines: string[] = [
     for (const item of found) {
       if (!seen.has(item.id)) {
         seen.add(item.id)
+        if (group !== "") {
+          item.group = group
+        }
         items.push(item)
       }
     }

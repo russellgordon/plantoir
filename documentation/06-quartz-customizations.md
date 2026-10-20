@@ -3007,6 +3007,46 @@ emptied (the item links fail), and Option ignored in `postscript.js` (the
 Option-click fails); the check against the old build fails every new
 assertion.
 
+Russell's later rounds on the branch: an item under a SUB-heading inside
+the section carries that sub-heading's words as `group` (the nearest deeper
+heading at the page's top level, read off the built tree in `countedItems`;
+the count is unchanged), and the row shows each group once, bold in the
+page's text colour, above its items — measured on the fixture's two
+sub-headings, must-fail with the old rules (contract case) and with the
+labels drawn as items (browser check). The totals' rows are spaced so their
+pills do not touch. Bold words and code inside an item's text are NOT kept:
+that would carry formatting runs beside every such item's words in the
+manifest for a small gain — left as plain words, on purpose. "The sidebar
+entry stays highlighted after leaving My Progress" was measured and NOT
+reproduced in Chrome for Testing 155 or WebKit (Playwright's build 2359):
+after leaving by the sidebar, an item link, Back and Forward, the entry has
+no `.active` class and All Classes' colour and opacity; the browser check
+now holds that after leaving by the sidebar.
+
+### L7. A link to a heading lands on it (#604, site-wide)
+
+Not a My Progress rule: any link with a `#heading`. The browser scrolls to
+the heading as soon as the page is laid out, before the runnable code's
+editors, diagrams, maths faces and pictures above it take their size;
+Chrome re-anchors later, Safari and Arc do not (ICS3U: 1,706 px short at
++1 s). And the sidebar smooth-scrolls its current entry into view, which
+on a long sidebar drags the window too (measured in the check: without the
+fix the heading ended 4,291 px below the window's top). `headingAnchor.inline.ts`
+(riding `PlantoirMetaLine` with the other scripts) scrolls to the heading
+again, at once rather than smoothly, whenever the page's column changes size
+(a ResizeObserver — the one settle signal every late piece shares), when the
+faces are ready, and whenever something other than the reader moves the
+window off it; it stops at the reader's first wheel, touch, key or press, at
+the next page, or after an 8-second cap, and does nothing with no hash.
+Rejected: a fixed delay; waiting on each engine's own signal (the code
+runner, diagrams and maths each signal differently, and pictures not at
+all). `browser-checks/heading_anchor.mjs`, on verify.sh's Anchor Fixture
+(eight runnable blocks above the heading), with Chrome's own re-anchoring
+off (`overflow-anchor: none`, which Safari never had): the heading at the
+window's top once settled, five runs out of five; a reader who scrolls up
+at once is left there. Must-fail: the script's listener disabled in the
+built bundle.
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
