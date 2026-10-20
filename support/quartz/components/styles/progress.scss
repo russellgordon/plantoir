@@ -1,8 +1,8 @@
 // My Progress (#545). Rides on PlantoirMetaLine.tsx, as tasks.scss does, so it
 // reaches the site's one index.css with no layout edit. Every rule is under
 // .plantoir-progress, the element only the My Progress page carries, so no
-// other page is styled differently - except the one sidebar rule at the end
-// (#602), scoped to My Progress's own link.
+// other page is styled differently. The sidebar entry has no rule here: the
+// pin draws it as a folder title (progressRules.pinnedOrder, #602).
 
 .plantoir-progress {
   // The page carries no text of its own, so Quartz draws no date line on it
@@ -182,30 +182,5 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-}
-
-// #602: the pin (#545) puts My Progress among the top-level FOLDERS of the
-// sidebar, but Quartz draws a page as a page - --dark at 0.75 opacity, where
-// All Classes and Concepts beside it are folder titles in --secondary. This
-// gives that one link the folder titles' look (explorer.scss's
-// `.folder-container div > a`: colour, face, size, weight 600 =
-// $semiBoldWeight, line height, --tertiary on hover) at full opacity, and
-// keeps Quartz's --tertiary for the current page. Scoped to the TOP-LEVEL
-// link whose slug is the page's (`data-for`, which the sidebar sets on every
-// link), so no other link in the sidebar changes. This file comes before
-// explorer.scss in index.css, so the selector wins by SPECIFICITY alone over
-// `.explorer-content ul li > a` and its `.active` - do not shorten it.
-.explorer .explorer-content > ul > li > a[data-for="My-Progress"] {
-  color: var(--secondary);
-  opacity: 1;
-  font-family: var(--headerFont);
-  font-size: 0.95rem;
-  font-weight: 600;
-  line-height: 1.5rem;
-
-  &:hover,
-  &.active {
-    color: var(--tertiary);
   }
 }

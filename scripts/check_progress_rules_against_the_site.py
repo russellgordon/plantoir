@@ -193,6 +193,16 @@ for (const c of rules.sidebar.cases) {
   const nodes = c.nodes.map(([name, isFolder]) => ({ isFolder, slugSegment: name, slug: isFolder ? name + "/index" : name }))
   const got = pinnedOrder(nodes, c.pin).map((node) => node.slugSegment)
   if (!same(got, c.expect)) failures.push(`sidebar ${c.name}: ${JSON.stringify(got)}, expected ${JSON.stringify(c.expect)}`)
+  // #602: the moved entry comes back dressed as a folder, so the sidebar
+  // draws it as one; every other entry is handed back as it was.
+  if (c.drawnAsFolder) {
+    const ordered = pinnedOrder(nodes, c.pin)
+    for (const node of ordered) {
+      const original = nodes.find((entry) => entry.slugSegment === node.slugSegment)
+      const want = node.slugSegment === c.pin.slug ? true : original.isFolder
+      if (node.isFolder !== want || node.slug !== original.slug) failures.push(`sidebar ${c.name}: ${node.slugSegment} handed back as isFolder ${node.isFolder}, slug ${node.slug}`)
+    }
+  }
 }
 
 for (const c of rules.grouping.cases) {

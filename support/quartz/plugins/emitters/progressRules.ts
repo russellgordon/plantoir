@@ -422,6 +422,24 @@ type SidebarNode = { isFolder: boolean; slugSegment: string; slug: string }
 // class folder (myProgress.sidebar) - "All Classes", or a club's own folder -
 // or to the top when there is none. Nothing moves when the build made no page
 // (an empty slug) or the page is not in the sidebar (hidden).
+//
+// The moved entry is handed back DRESSED AS A FOLDER (#602, Russell and the
+// director, build 3): the sidebar then draws it with createFolderNode - the
+// same wrapper and `a.folder-title` as All Classes, with no chevron and no
+// fold since its name is not one that expands - so Quartz's own rules decide
+// its colour at rest, under the mouse and on its page, exactly as they do
+// All Classes'. Nothing of ours styles it. It is the page itself underneath
+// (its slug, its name), so the link goes to the page.
+function dressedAsFolder<T extends SidebarNode>(node: T): T {
+  const dressed = Object.create(node) as T
+  // The page's own slug, kept: Quartz's node works its slug out from
+  // isFolder (a folder's ends in /index), which would send the link to a
+  // folder page that does not exist (measured: /My-Progress/, not found).
+  Object.defineProperty(dressed, "slug", { value: node.slug })
+  Object.defineProperty(dressed, "isFolder", { value: true })
+  Object.defineProperty(dressed, "children", { value: [] })
+  return dressed
+}
 export function pinnedOrder<T extends SidebarNode>(nodes: T[], pin: Pin): T[] {
   if (pin.slug === "") {
     return nodes
@@ -449,6 +467,6 @@ export function pinnedOrder<T extends SidebarNode>(nodes: T[], pin: Pin): T[] {
       break
     }
   }
-  rest.splice(place, 0, nodes[pinned])
+  rest.splice(place, 0, dressedAsFolder(nodes[pinned]))
   return rest
 }
