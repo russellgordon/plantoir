@@ -145,11 +145,17 @@ for (const c of rules.headings.markupCases) {
 
 for (const c of rules.sections.cases) {
   count += 1
-  const [tree] = built(c.markdown, "Tasks/Fractions.md")
-  const items = countedItems(tree, c.headings ?? DEFAULTS)
+  const [tree, file] = built(c.markdown, "Tasks/Fractions.md")
+  const items = countedItems(tree, c.headings ?? DEFAULTS, String(file.value).split("\n"))
   const want = c.items.map((text) => taskItemId(text))
   if (!same(items.map((item) => item.id), want)) failures.push(`sections ${c.name}: counted ${JSON.stringify(items)}, expected the ids of ${JSON.stringify(c.items)} ${JSON.stringify(want)}`)
   if (c.checked && !same(items.map((item) => item.checked), c.checked)) failures.push(`sections ${c.name}: ticks ${JSON.stringify(items.map((item) => item.checked))}, expected ${JSON.stringify(c.checked)}`)
+  // #603: the words the row lists, off the built page's label - the case's
+  // own words unless it says how they are shown - and the heading's anchor.
+  const shown = c.shown ?? c.items
+  if (!same(items.map((item) => item.text), shown)) failures.push(`sections ${c.name}: listed ${JSON.stringify(items.map((item) => item.text))}, expected ${JSON.stringify(shown)}`)
+  if (c.groups && !same(items.map((item) => item.group ?? ""), c.groups)) failures.push(`sections ${c.name}: groups ${JSON.stringify(items.map((item) => item.group ?? ""))}, expected ${JSON.stringify(c.groups)}`)
+  if (c.anchors && !same(items.map((item) => item.anchor), c.anchors)) failures.push(`sections ${c.name}: anchors ${JSON.stringify(items.map((item) => item.anchor))}, expected ${JSON.stringify(c.anchors)}`)
 }
 for (const c of rules.gate.cases) {
   count += 1
@@ -174,6 +180,12 @@ for (const c of rules.rollUp.cases) {
     : { getItem: (key) => (key in c.stored ? c.stored[key] : null) }
   const got = rollUp(c.siteRoot, c.page, store)
   if (got.done !== c.done || got.total !== c.total) failures.push(`rollUp ${c.name}: ${got.done} / ${got.total}, expected ${c.done} / ${c.total}`)
+  // #603: one reading for the list and the count.
+  const ticked = Array.isArray(got.ticked) ? got.ticked : []
+  let tickedCount = 0
+  for (const answer of ticked) if (answer === true) tickedCount += 1
+  if (ticked.length !== c.total || tickedCount !== got.done) failures.push(`rollUp ${c.name}: ticked ${JSON.stringify(got.ticked)} disagrees with ${got.done} / ${got.total}`)
+  if (c.ticked && !same(ticked, c.ticked)) failures.push(`rollUp ${c.name}: ticked ${JSON.stringify(got.ticked)}, expected ${JSON.stringify(c.ticked)}`)
 }
 
 for (const c of rules.sidebar.cases) {
@@ -181,6 +193,16 @@ for (const c of rules.sidebar.cases) {
   const nodes = c.nodes.map(([name, isFolder]) => ({ isFolder, slugSegment: name, slug: isFolder ? name + "/index" : name }))
   const got = pinnedOrder(nodes, c.pin).map((node) => node.slugSegment)
   if (!same(got, c.expect)) failures.push(`sidebar ${c.name}: ${JSON.stringify(got)}, expected ${JSON.stringify(c.expect)}`)
+  // #602: the moved entry comes back dressed as a folder, so the sidebar
+  // draws it as one; every other entry is handed back as it was.
+  if (c.drawnAsFolder) {
+    const ordered = pinnedOrder(nodes, c.pin)
+    for (const node of ordered) {
+      const original = nodes.find((entry) => entry.slugSegment === node.slugSegment)
+      const want = node.slugSegment === c.pin.slug ? true : original.isFolder
+      if (node.isFolder !== want || node.slug !== original.slug) failures.push(`sidebar ${c.name}: ${node.slugSegment} handed back as isFolder ${node.isFolder}, slug ${node.slug}`)
+    }
+  }
 }
 
 for (const c of rules.grouping.cases) {
@@ -232,7 +254,10 @@ emitted = await emitWith({ ...basePlan, page: true, reason: "built", gate: ["Tas
 const first = existsSync(manifestFile) ? readFileSync(manifestFile, "utf-8") : ""
 const manifest = first === "" ? null : JSON.parse(first)
 const expected = { version: 1, words: { otherPages: "Other pages" }, units: [], other: { label: "Other pages", pages: [
-  { title: "Fractions", slug: "Tasks/Fractions", items: [{ id: taskItemId("I can add fractions"), checked: false }, { id: taskItemId("I can subtract fractions"), checked: true }] },
+  { title: "Fractions", slug: "Tasks/Fractions", items: [
+    { id: taskItemId("I can add fractions"), checked: false, text: "I can add fractions", anchor: "success-criteria" },
+    { id: taskItemId("I can subtract fractions"), checked: true, text: "I can subtract fractions", anchor: "success-criteria" },
+  ] },
 ] } }
 if (emitted.length !== 1 || !same(manifest, expected)) failures.push(`emitter, built: wrote ${first}, expected ${JSON.stringify(expected)}`)
 if (!same(said, ["plantoir: note: Tasks/Table.md: said yes"])) failures.push(`emitter, built: said ${JSON.stringify(said)}, expected one note for the page the build expected and the site found nothing on`)

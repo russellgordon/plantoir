@@ -1898,6 +1898,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
+        "$HIT_COURSE/Anchor Fixture.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
         "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
         "$HIT_COURSE/Live Plain Link.md" "$HIT_COURSE/Live Framed.md" "$HIT_COURSE/Live Autorun.md" "$HIT_COURSE/Live Box.md" \
@@ -2654,6 +2655,16 @@ for info, code in fences:
     "---\ntitle: Runner Autorun\ncodeRunner: true\n---\nTwo blocks that run by themselves (plantoir-runner-autorun-7f3a).\n\n"
     "```python run autorun\nimport time\ntime.sleep(4)\nprint(\"first\")\n```\n\n"
     "```python run autorun\nimport time\ntime.sleep(3)\nprint(\"second\")\n```\n", encoding="utf-8")
+# #604: Anchor Fixture - eight runnable blocks ABOVE a heading, then enough
+# text below it for the heading to reach the top of the window; the
+# heading-anchor browser check loads it with the heading's hash.
+anchor_blocks = ""
+for block in range(1, 9):
+    anchor_blocks += "```python run\n" + "".join(f"print({block}, {line})\n" for line in range(1, 21)) + "```\n\n"
+(course / "Anchor Fixture.md").write_text(
+    "---\ntitle: Anchor Fixture\ncodeRunner: true\n---\nEight blocks above the heading (plantoir-anchor-fixture-604).\n\n"
+    + anchor_blocks + "## Test of success\n\nThe heading a link lands on.\n\n"
+    + "".join(f"Line {n} below the heading.\n\n" for n in range(1, 61)), encoding="utf-8")
 (course / "Runner Hidden.md").write_text(
     "---\ntitle: Runner Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-runner-hidden-7f3a).\n\n"
     "```python run\nprint(\"hidden\")\n```\n", encoding="utf-8")
@@ -2942,7 +2953,8 @@ AUTHORPLANTS
 # ---- #545: My Progress, planted for the same build ----
 # Progress Fixture: four items under its success criteria (one the teacher
 # wrote ticked, `[x]`, which counts as done until a student unticks it - Q5;
-# one under a deeper `### Tests of success:`), one before any heading and one after the
+# one under a deeper `### Tests of success:`, and - #603 - the teacher's `[x]`
+# under `### Knowledge and Understanding`), one before any heading and one after the
 # section - which do not count - linked from Unit 1, Day 2, whose file is
 # put back by restore_hit_fixture. Other pages of the section may have
 # success criteria too (a real course does), so 6m and the browser check
@@ -2961,6 +2973,9 @@ A page planted for the My Progress check (plantoir-progress-sentinel-545).
 
 - [ ] I can name a variable
 - [ ] I can print a value
+
+### Knowledge and Understanding
+
 - [x] I can comment my code
 
 ### Tests of success:
@@ -3417,8 +3432,8 @@ if re.search(r"plantoir: error: [^\n]*Runner", said):
 # one more page for each engine.
 if not re.search(r"This site carries what runs Swift for 3 pages\.", said):
     problems.append("the build did not say the site carries Swift for the three pages students can see with Swift (Runner Fixture, Swift Playground, Quiz Playground)")
-if not re.search(r"This site carries what runs Python for 7 pages\.", said):
-    problems.append("the build did not say the site carries Python for the seven pages students can see (not the hidden one; Quiz Playground is the fifth, #583's Live Autorun and Live Box the sixth and seventh)")
+if not re.search(r"This site carries what runs Python for 8 pages\.", said):
+    problems.append("the build did not say the site carries Python for the eight pages students can see (not the hidden one; Quiz Playground is the fifth, #583's Live Autorun and Live Box the sixth and seventh, #604's Anchor Fixture the eighth)")
 engine = public / "static" / "pyodide"
 carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
 if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
@@ -3917,9 +3932,14 @@ else:
     for page in manifest["other"]["pages"]:
         rows.append((manifest["other"]["label"], None, page))
     mine = [row for row in rows if row[2]["title"] == "Progress Fixture"]
-    want = [{"id": fnv1a(text), "checked": False} for text in
+    # #603: each item also carries its words, read off the built page's
+    # label, and its success-criteria heading's anchor.
+    want = [{"id": fnv1a(text), "checked": False, "text": text, "anchor": "success-criteria"} for text in
             ("I can name a variable", "I can print a value", "I can comment my code", "I can read an error message")]
     want[2]["checked"] = True
+    # #603: the third and fourth items sit under the section's two sub-headings.
+    want[2]["group"] = "Knowledge and Understanding"
+    want[3]["group"] = "Tests of success:"
     if len(mine) != 1:
         problems.append(f"Progress Fixture is in the manifest {len(mine)} times")
     else:
@@ -4267,6 +4287,13 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   else
     fail "task boxes did not tick in a browser as the contract says (browser-checks/task_boxes.mjs, #519)"
     cat /tmp/verify_task_boxes.log
+  fi
+  # #604: a link to a heading lands on it once the late content has its size.
+  if node browser-checks/heading_anchor.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_heading_anchor.log 2>&1; then
+    pass "a link to a heading lands on it: Anchor Fixture loaded with its heading's hash, eight runnable blocks above it, with Chrome's own re-anchoring off as Safari and Arc have none - $(head -1 /tmp/verify_heading_anchor.log | sed 's/^OK: //') (#604, browser-checks/heading_anchor.mjs)"
+  else
+    fail "a link to a heading did not land on it once the page settled (browser-checks/heading_anchor.mjs, #604)"
+    cat /tmp/verify_heading_anchor.log
   fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.
   if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then

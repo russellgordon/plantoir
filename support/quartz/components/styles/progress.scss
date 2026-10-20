@@ -1,7 +1,8 @@
 // My Progress (#545). Rides on PlantoirMetaLine.tsx, as tasks.scss does, so it
 // reaches the site's one index.css with no layout edit. Every rule is under
 // .plantoir-progress, the element only the My Progress page carries, so no
-// other page is styled differently.
+// other page is styled differently. The sidebar entry has no rule here: the
+// pin draws it as a folder title (progressRules.pinnedOrder, #602).
 
 .plantoir-progress {
   // The page carries no text of its own, so Quartz draws no date line on it
@@ -19,8 +20,11 @@
     & li {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       gap: 1rem;
       max-width: 28rem;
+      // The pills are chips of their own, never touching the next row's.
+      margin: 0.3rem 0;
     }
 
     & .plantoir-progress-overall {
@@ -34,12 +38,27 @@
     text-align: right;
   }
 
+  // Every count in a pill (#603, Russell's smoke test): Quartz's own tag-chip
+  // look (search.scss's tags: --highlight behind, 8px corners), the count in
+  // regular weight and the page's text colour, so it reads apart from the
+  // bold title beside it in every colour scheme.
+  & .plantoir-progress-pill {
+    display: inline-block;
+    padding: 0 0.45rem;
+    border-radius: 8px;
+    background-color: var(--highlight);
+    color: var(--darkgray);
+    font-weight: normal;
+    line-height: 1.5;
+  }
+
   & .plantoir-progress-hint,
   & .plantoir-progress-empty {
     color: var(--darkgray);
   }
 
-  & details.plantoir-progress-unit {
+  & details.plantoir-progress-unit,
+  & details.plantoir-progress-day {
     margin: 0.75rem 0;
 
     & > summary {
@@ -68,9 +87,100 @@
       width: 6rem;
     }
 
-    & tr.plantoir-progress-class > th {
-      padding-top: 0.75rem;
-      font-weight: 600;
+    // A row whose list is open keeps its count beside the page's name.
+    & tr.plantoir-progress-page > td {
+      vertical-align: top;
     }
+
+  }
+
+  // A class inside its unit (#603): its own closed level, set in under the
+  // unit's name.
+  & details.plantoir-progress-day {
+    margin: 0.5rem 0 0.5rem 1rem;
+  }
+
+  // A page row's list of items (#603): closed on load, opened from the
+  // browser's own marker beside the page's name, as each unit's table is.
+  & details.plantoir-progress-items {
+    & > summary {
+      cursor: pointer;
+    }
+
+    & > ul.plantoir-progress-item-list {
+      list-style: none;
+      margin: 0.25rem 0 0.5rem 0;
+      padding-left: 1.25rem;
+    }
+  }
+
+  // A sub-heading of the section above its items (#603, Russell): bold, in
+  // the page's text colour, nothing else.
+  & li.plantoir-progress-group {
+    font-weight: 600;
+    color: var(--darkgray);
+    margin: 0.4rem 0 0.15rem 0;
+  }
+
+  & li.plantoir-progress-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0.15rem 0;
+  }
+
+  // The item's state, drawn as the page's own boxes are (tasks.scss: the
+  // edge and the tick in --darkgray, no fill), never a box that can be
+  // ticked here. The words for a screen reader are in .plantoir-progress-state.
+  & .plantoir-progress-mark {
+    flex: none;
+    box-sizing: border-box;
+    width: 0.9em;
+    height: 0.9em;
+    border: 1.5px solid var(--darkgray);
+    border-radius: 3px;
+    position: relative;
+    top: 0.1em;
+  }
+
+  & li.plantoir-progress-item[data-ticked="true"] > .plantoir-progress-mark::after {
+    content: "\2713";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+    line-height: 1;
+    color: var(--darkgray);
+  }
+
+  // An item reads as body text (#603, Russell: readability over the link
+  // look the page's name keeps) - regular weight, the page's text colour, no
+  // chip behind it - and is still a link to its heading.
+  & li.plantoir-progress-item > a.plantoir-progress-item-link {
+    color: var(--darkgray);
+    font-weight: normal;
+    background-color: transparent;
+    padding: 0;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  & li.plantoir-progress-item[data-ticked="true"] > a {
+    text-decoration: line-through;
+    text-decoration-color: var(--darkgray);
+  }
+
+  & .plantoir-progress-state {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
