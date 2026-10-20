@@ -208,7 +208,8 @@ class WiringTests(unittest.TestCase):
         self.assertIn('import tasksStyle from "./styles/tasks.scss"', component)
         self.assertIn('import tasksScript from "./scripts/tasks.inline"', component)
         self.assertIn("quizStyle, tasksStyle, progressStyle)", component)
-        self.assertIn("quizScript, tasksScript, progressScript)", component)
+        self.assertIn("quizScript, tasksScript, progressScript, headingAnchorScript)", component)
+        self.assertIn('import headingAnchorScript from "./scripts/headingAnchor.inline"', component)
 
     def test_the_print_buttons_component_carries_my_progress(self):
         component = (Path(build_site.__file__).resolve().parent.parent / "support" / "quartz" / "components"

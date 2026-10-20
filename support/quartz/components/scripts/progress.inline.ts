@@ -114,8 +114,15 @@ function pageCell(words: Record<string, string>, root: string, row: Row): HTMLEl
   link.href = root + row.page.slug
   summary.append(link)
   const list = element("ul", "plantoir-progress-item-list")
+  let groupShown = ""
   for (let index = 0; index < row.page.items.length; index += 1) {
     const item = row.page.items[index]
+    // The section's sub-heading above the items under it (#603), once.
+    const group = typeof item.group === "string" ? item.group : ""
+    if (group !== "" && group !== groupShown) {
+      list.append(element("li", "plantoir-progress-group", group))
+    }
+    groupShown = group
     const ticked = row.ticked[index] === true
     const line = element("li", "plantoir-progress-item")
     line.dataset.ticked = ticked ? "true" : "false"
