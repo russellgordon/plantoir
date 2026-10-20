@@ -3432,8 +3432,8 @@ if re.search(r"plantoir: error: [^\n]*Runner", said):
 # one more page for each engine.
 if not re.search(r"This site carries what runs Swift for 3 pages\.", said):
     problems.append("the build did not say the site carries Swift for the three pages students can see with Swift (Runner Fixture, Swift Playground, Quiz Playground)")
-if not re.search(r"This site carries what runs Python for 7 pages\.", said):
-    problems.append("the build did not say the site carries Python for the seven pages students can see (not the hidden one; Quiz Playground is the fifth, #583's Live Autorun and Live Box the sixth and seventh)")
+if not re.search(r"This site carries what runs Python for 8 pages\.", said):
+    problems.append("the build did not say the site carries Python for the eight pages students can see (not the hidden one; Quiz Playground is the fifth, #583's Live Autorun and Live Box the sixth and seventh, #604's Anchor Fixture the eighth)")
 engine = public / "static" / "pyodide"
 carried = sorted(path.name for path in engine.iterdir()) if engine.is_dir() else []
 if carried != sorted(list(pins["pyodide"]["files"]) + ["README.txt", "plantoir-worker.js"]):
