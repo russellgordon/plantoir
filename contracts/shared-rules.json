@@ -29859,6 +29859,19 @@
           "why": "#603: the text the row lists is the built page's label - a link's words, no Markdown marks, maths as the TeX the teacher wrote - and a nested item's words are its own, not its parent's"
         },
         {
+          "name": "code beside maths, and a footnote's mark",
+          "markdown": "## Success criteria\n\n- [ ] I can run `echo $HOME` and solve $x+1=2$\n- [ ] I can cite a source[^1]\n\n[^1]: A note.\n",
+          "items": [
+            "I can run `echo $HOME` and solve $x+1=2$",
+            "I can cite a source[^1]"
+          ],
+          "shown": [
+            "I can run echo $HOME and solve x+1=2",
+            "I can cite a source"
+          ],
+          "why": "#603 review 1 and 2: a dollar sign inside code is not maths, so the maths is matched with code spans taken out; a footnote's mark is a number to click, not a word of the item"
+        },
+        {
           "name": "items before any heading do not count",
           "markdown": "- [ ] Bring a pencil\n\n## Notes\n\n- [ ] Read the chapter\n",
           "items": []

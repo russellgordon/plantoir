@@ -2937,17 +2937,26 @@ marker, or Enter or Space, opens one level; a click on a page's name still
 follows its link (an interactive element in a summary does not toggle it).
 **Option-click** on any marker, as in the Finder, opens or closes that
 level and every level inside it (one `onclick` on the placeholder).
+Option-click on a page's NAME is left to the browser, which may download
+the page (Safari does): the name is a link, and a link behaves as one
+everywhere else on the site — reviewed and left on purpose (#603 review 4).
 
 The words come from the BUILT page, in the emitter, never from the
 Markdown: the `<label>` PlantoirTasks wraps around each stamped box,
-spaces collapsed (`myProgress.sections`, `shown`). Maths is the one
+spaces collapsed, a footnote's mark left out ("a source[^1]" lists as "a
+source", #603 review 2) (`myProgress.sections`, `shown`). Maths is the one
 exception, measured: Quartz's KaTeX writes HTML only (`output: "html"`),
 every glyph `aria-hidden` and in drawing order (x² reads "x2", a fraction
 its denominator first), with no copy of the TeX — so each maths element is
 listed as the TeX between its `$` signs, taken from the item's own line in
-`file.value` (the line PlantoirTasks made the id from), and only when that
+`file.value` (the line PlantoirTasks made the id from, its code spans
+taken out first so `` `echo $HOME` `` is never read as maths — #603
+review 1, its contract case and must-fail), and only when that
 line hashes to the box's own stamp and holds as many maths spans as the
-label draws; otherwise the glyphs. The anchor is the heading's id as the
+label draws; otherwise the glyphs (a box whose words begin on its next
+line has no maths on its first line, so its maths shows as glyphs — a
+note, accepted on review). Listing maths as the TeX the teacher wrote,
+rather than drawn, was accepted on review. The anchor is the heading's id as the
 built page has it (`anchors`). `rollUp` now also answers each item
 (`ticked`), so the list and the count are one reading. Rejected: a new
 stamp on every box (more bytes on every page with a task item, and an
@@ -2963,11 +2972,13 @@ branch: `postscript.js` 169,936 → 171,139 bytes (+1,203; gzip +339),
 page's HTML changes once Quartz's random list ids, `<time>` and its
 time-ordered tag and folder lists are set aside. `browser-checks/
 my_progress.mjs` adds: the link's computed colour, opacity, weight and face
-equal All Classes' in light and dark (`saved-theme`) and under the mouse,
+equal All Classes' in light and dark (`saved-theme`), and colour and
+opacity under the mouse (a broken slug fails both — re-proved on review),
 another top-level page still at 0.75; every level closed on each drawing;
 each class's count the sum of its pages'; a plain click opening a unit
 alone, Option-click opening it and everything beneath with the items
-shown, and closing them all again; the fixture's row listing its four
+shown (`checkVisibility()`: rows opened inside closed classes read 0
+shown, proved by copy and restore), and closing them all again; the fixture's row listing its four
 items with as many marked as its count (1, 3, 2 across the run), each
 the manifest's words and tick and a link to its heading, and one click
 landing there. Must-fail by copy and restore: the old `progressRules.ts`

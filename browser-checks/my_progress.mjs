@@ -149,7 +149,7 @@ const READ = `(async () => {
       const itemLink = item.querySelector("a")
       items.push({ text: itemLink?.textContent, ticked: item.dataset.ticked, state: item.querySelector(".plantoir-progress-state")?.textContent,
                    href: itemLink ? new URL(itemLink.href).pathname + new URL(itemLink.href).hash : null,
-                   shown: itemLink ? itemLink.getBoundingClientRect().height > 0 : false })
+                   shown: itemLink ? itemLink.checkVisibility() : false })
     }
     const unit = line.closest("details.plantoir-progress-unit")?.querySelector(":scope > summary > span")?.textContent
     const under = line.closest("details.plantoir-progress-day")?.querySelector(":scope > summary > span")?.textContent ?? null
@@ -417,10 +417,12 @@ async function connect(chunk) {
           if (point === null) { hovered.push(null); continue }
           await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y })
           await pause(800)
-          hovered.push(await evaluate(`(() => { const link = document.elementFromPoint(${point.x}, ${point.y})?.closest("a"); return link ? getComputedStyle(link).color : null })()`))
+          // Colour AND opacity: a page link turns the same colour under the
+          // mouse but stays at 0.75 (#603 review 3).
+          hovered.push(await evaluate(`(() => { const link = document.elementFromPoint(${point.x}, ${point.y})?.closest("a"); if (!link) return null; const style = getComputedStyle(link); return style.color + " @ " + style.opacity })()`))
         }
         await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1270, y: 890 })
-        expect(`${theme}: under the mouse, My Progress turns All Classes' colour`, hovered[0] !== null && hovered[0] === hovered[1], hovered)
+        expect(`${theme}: under the mouse, My Progress has All Classes' colour and opacity`, hovered[0] !== null && hovered[0] === hovered[1], hovered)
       }
       await evaluate(`document.documentElement.setAttribute("saved-theme", "light")`)
 
@@ -436,7 +438,7 @@ async function connect(chunk) {
         const unit = ${FIXTURE_ROW_SUMMARY}?.closest("details.plantoir-progress-unit")
         const count = (selector) => { let open = 0; let all = 0; for (const d of unit.querySelectorAll(selector)) { all += 1; if (d.open) open += 1 } return [open, all] }
         let shown = 0
-        for (const link of unit.querySelectorAll("li.plantoir-progress-item a")) if (link.getBoundingClientRect().height > 0) shown += 1
+        for (const link of unit.querySelectorAll("li.plantoir-progress-item a")) if (link.checkVisibility()) shown += 1
         return { unit: unit.open, days: count("details.plantoir-progress-day"), rows: count("details.plantoir-progress-items"),
                  items: unit.querySelectorAll("li.plantoir-progress-item").length, shown }
       })()`

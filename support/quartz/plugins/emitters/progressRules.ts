@@ -120,6 +120,12 @@ function shownText(node: Node, maths: string[] | null): string {
   if (hidden === true || hidden === "true") {
     return ""
   }
+  // A footnote's mark (GitHub's `<a data-footnote-ref>`, inside a <sup>) is
+  // a number to click, not a word of the item: "a source[^1]" lists as "a
+  // source", not "a source1".
+  if (node.properties?.dataFootnoteRef !== undefined) {
+    return ""
+  }
   let text = ""
   for (const child of node.children ?? []) {
     text += shownText(child, maths)
@@ -139,12 +145,14 @@ function countMaths(node: Node): number {
 }
 
 // The TeX of each `$...$` (or `$$...$$`) on a line, in order; a `\$` is a
-// dollar sign, not maths.
+// dollar sign, not maths, and nothing inside a code span is maths (`echo
+// $HOME` is code - #603 review 1), so code spans are taken out first.
 const INLINE_MATHS = /(?<!\\)\$\$?((?:\\.|[^$\\])+?)\$\$?/g
+const CODE_SPAN = /(`+)[\s\S]*?\1/g
 
 function mathsOnLine(line: string): string[] {
   const found: string[] = []
-  for (const match of line.matchAll(INLINE_MATHS)) {
+  for (const match of line.replace(CODE_SPAN, " ").matchAll(INLINE_MATHS)) {
     found.push(match[1].trim())
   }
   return found
