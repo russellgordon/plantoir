@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 19 October 2026. The current release is **1.8.2** on the Mac and **1.7.2** on Windows.*
+*Last updated: 19 October 2026. The current release is **1.8.3** on the Mac and **1.7.2** on Windows.*
 
 A few things to know before you read on:
 
@@ -28,7 +28,7 @@ need to read those to use Plantoir.
 
 ## Next: Windows catches up to 1.8
 
-Plantoir 1.8.2 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
+Plantoir 1.8.3 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
 download joins the release, with:
 
 - **Runnable Python, self-check quizzes, maths served by your own site and
@@ -66,6 +66,10 @@ download joins the release, with:
   ([#598](https://github.com/russellgordon/plantoir/issues/598),
   [#599](https://github.com/russellgordon/plantoir/issues/599),
   [#600](https://github.com/russellgordon/plantoir/issues/600)).
+- **And what 1.8.3 brought the Mac:** My Progress looking like the sidebar
+  entries beside it, each page on it opening to show its checklist, and links
+  to a heading landing on it in Safari and Arc
+  ([#605](https://github.com/russellgordon/plantoir/issues/605)).
 
 ---
 
