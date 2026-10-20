@@ -2912,19 +2912,24 @@ meeting; a fixed-name structural check.
 ### L6. The sidebar link's look, and each row's items (#602, #603, v1.8.3)
 
 **#602.** The pin (L3) puts My Progress among the top-level FOLDERS, but
-Quartz draws a page as a page: `--dark` at 0.75 opacity, grey beside All
-Classes and Concepts (`--secondary`, opacity 1 — measured on the 1.8.2
-preview of ICS3U). One rule at the end of `progress.scss` gives that one
-link the folder titles' look (explorer.scss's `.folder-container div > a`:
-colour, face, size, weight 600, line height, `--tertiary` on hover) and
-keeps Quartz's `--tertiary` for its own page. It is scoped by selector —
-the TOP-LEVEL link whose `data-for` (set by the sidebar on every link) is
-`My-Progress` — and wins by specificity over `.explorer-content ul li > a`
-and its `.active`, since this file comes first in `index.css`. Known limit
-(`myProgress.sidebar.look`): a teacher's own top-level page named exactly
-My Progress, which nothing pins, takes the same look. Rejected: a class
-added by the pin (the pin's line is written by `build_site.py`, which this
-change leaves alone, and `patches/explorer.inline.ts` stays unedited, L3).
+Quartz drew it as a page (`--dark` at 0.75 opacity, grey beside All
+Classes). It is now DRAWN as a folder title: `pinnedOrder` hands the moved
+entry back dressed as a folder (`isFolder` true, no children, the page's own
+slug kept — Quartz's node would otherwise work out a folder's `/index` slug
+and the link would go to `/My-Progress/`, not found, measured), so the
+sidebar's own `createFolderNode` draws it: the same wrapper and
+`a.folder-title` as All Classes, no chevron or fold since its name is not
+one that expands. Quartz's own rules then decide its colour at rest, under
+the mouse and on its page; nothing of ours styles it. REJECTED (build 3, on
+Russell's and the director's ruling): a rule in `progress.scss` imitating
+the folder-title look — Russell saw its colour stick on his Mac after
+leaving the page. Measured before and after, Playwright's WebKit 2359 and
+Chrome for Testing 155, clicking My Progress then All Classes from a fresh
+load and from a page reached by the site's own navigation, at 0 s and 2 s:
+the old rule did NOT stick (no `:focus`, no `:visited`, no lingering
+`.active`; at 0 s Chrome only shows the 0.2 s colour transition); after the
+change the entry carries exactly All Classes' class and attributes. No
+`patches/explorer.inline.ts` or `build_site.py` edit.
 
 **#603.** Every level folds, and every level is closed on load (Russell: no
 exception): a unit's table, then one level per class — its name and the sum
@@ -3016,12 +3021,9 @@ sub-headings, must-fail with the old rules (contract case) and with the
 labels drawn as items (browser check). The totals' rows are spaced so their
 pills do not touch. Bold words and code inside an item's text are NOT kept:
 that would carry formatting runs beside every such item's words in the
-manifest for a small gain — left as plain words, on purpose. "The sidebar
-entry stays highlighted after leaving My Progress" was measured and NOT
-reproduced in Chrome for Testing 155 or WebKit (Playwright's build 2359):
-after leaving by the sidebar, an item link, Back and Forward, the entry has
-no `.active` class and All Classes' colour and opacity; the browser check
-now holds that after leaving by the sidebar.
+manifest for a small gain — left as plain words, on purpose. The browser
+check holds the entry to All Classes' look after leaving My Progress by the
+sidebar, and to All Classes' shape (#602 above).
 
 ### L7. A link to a heading lands on it (#604, site-wide)
 

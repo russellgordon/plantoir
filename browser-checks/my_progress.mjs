@@ -452,6 +452,22 @@ async function connect(chunk) {
         for (const item of top) { const link = item.querySelector(":scope > a:not(.active)"); if (link && link.textContent.trim() !== ${JSON.stringify(WORDS.title)}) { page = link; break } }
         return { classes: read(find("All Classes")), progress: read(find(${JSON.stringify(WORDS.title)})), otherPage: page ? { name: page.textContent.trim(), ...read(page) } : null }
       })()`
+      // Drawn as a folder title, as All Classes is (the pin dresses it; no
+      // rule of ours styles it).
+      const shape = await evaluate(`(() => {
+        const shapeOf = (words) => {
+          for (const item of document.querySelectorAll(".explorer .explorer-ul > li")) {
+            const link = item.querySelector(".folder-title, :scope > a")
+            if (link && link.textContent.trim() === words) {
+              return { tag: link.tagName, cls: link.className, inFolderContainer: link.closest(".folder-container") !== null, chevron: item.querySelector(".folder-icon") !== null, attrs: link.getAttributeNames().sort().join(",") }
+            }
+          }
+          return null
+        }
+        return { classes: shapeOf("All Classes"), progress: shapeOf(${JSON.stringify(WORDS.title)}) }
+      })()`)
+      expect("My Progress in the sidebar is drawn as All Classes is: an a.folder-title in a folder container, no chevron, the same attributes",
+        shape.classes !== null && shape.progress !== null && JSON.stringify(shape.progress) === JSON.stringify(shape.classes) && shape.progress.cls === "folder-title", shape)
       for (const theme of ["light", "dark"]) {
         await evaluate(`document.documentElement.setAttribute("saved-theme", ${JSON.stringify(theme)})`)
         // Quartz eases a link's colour (base.scss `transition`): read after it.
@@ -540,7 +556,7 @@ async function connect(chunk) {
       // unit, class and row the student opened are still open (#603).
       const sidebarPoint = await evaluate(`(() => {
         for (const item of document.querySelectorAll(".explorer .explorer-ul > li")) {
-          const link = item.querySelector(":scope > a")
+          const link = item.querySelector(".folder-title, :scope > a")
           if (link && link.textContent.trim() === ${JSON.stringify(WORDS.title)}) {
             link.scrollIntoView({ block: "center", behavior: "instant" })
             const area = link.getBoundingClientRect()
