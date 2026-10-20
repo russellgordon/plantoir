@@ -35,6 +35,20 @@
     text-align: right;
   }
 
+  // Every count in a pill (#603, Russell's smoke test): Quartz's own tag-chip
+  // look (search.scss's tags: --highlight behind, 8px corners), the count in
+  // regular weight and the page's text colour, so it reads apart from the
+  // bold title beside it in every colour scheme.
+  & .plantoir-progress-pill {
+    display: inline-block;
+    padding: 0 0.45rem;
+    border-radius: 8px;
+    background-color: var(--highlight);
+    color: var(--darkgray);
+    font-weight: normal;
+    line-height: 1.5;
+  }
+
   & .plantoir-progress-hint,
   & .plantoir-progress-empty {
     color: var(--darkgray);
@@ -128,6 +142,21 @@
     font-size: 0.8em;
     line-height: 1;
     color: var(--darkgray);
+  }
+
+  // An item reads as body text (#603, Russell: readability over the link
+  // look the page's name keeps) - regular weight, the page's text colour, no
+  // chip behind it - and is still a link to its heading.
+  & li.plantoir-progress-item > a.plantoir-progress-item-link {
+    color: var(--darkgray);
+    font-weight: normal;
+    background-color: transparent;
+    padding: 0;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 
   & li.plantoir-progress-item[data-ticked="true"] > a {

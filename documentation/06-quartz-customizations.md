@@ -2941,6 +2941,24 @@ Option-click on a page's NAME is left to the browser, which may download
 the page (Safari does): the name is a link, and a link behaves as one
 everywhere else on the site — reviewed and left on purpose (#603 review 4).
 
+After Russell's smoke test of the branch: every count — the totals at the
+top, each unit's, each class's and each page's — sits in a pill (Quartz's
+tag-chip look from search.scss: `--highlight` behind, 8px corners, regular
+weight, `--darkgray`), so a bold title and its count no longer run
+together; an item's words are body text (regular weight, `--darkgray`, no
+chip) while still a link to its heading — readability chosen over
+consistency with the page's name, which keeps the link look, knowingly.
+**Which levels are open is remembered** per site in this browser, beside
+the ticks: `plantoir:progress-open:<site root>`, a JSON list of open levels
+(`unit:`, `class:` and `page:` names), written on every `toggle` (caught on
+the way down, once per placeholder) and read on every drawing, so a return
+by the site's links, Back or a reload finds every level as it was left; a
+first visit, or storage refused, finds them all closed. Never sent anywhere.
+Measured in the browser check: a unit, class and row opened, then the
+sidebar's My Progress link and a reload — all three still open; must-fail by
+copy and restore with the restore line, the pill class and the item rule
+each broken in the built files.
+
 The words come from the BUILT page, in the emitter, never from the
 Markdown: the `<label>` PlantoirTasks wraps around each stamped box,
 spaces collapsed, a footnote's mark left out ("a source[^1]" lists as "a
@@ -2966,8 +2984,8 @@ a fetch of each page (the manifest already holds what is needed).
 
 Measured 2026-10-19 (M4 Pro, macOS 26.6, Chrome for Testing 155), EXC2O
 with the verify fixture planted, `origin/dev` b49cb7b8f against this
-branch: `postscript.js` 169,936 → 171,139 bytes (+1,203; gzip +339),
-`index.css` 74,461 → 76,070 (+1,609; gzip +212), `progress-manifest.json`
+branch: `postscript.js` 169,936 → 171,789 bytes (+1,853; gzip +539),
+`index.css` 74,461 → 76,525 (+2,064; gzip +278), `progress-manifest.json`
 1,094 → 1,385 for two pages (+291); `My-Progress.html` unchanged; no other
 page's HTML changes once Quartz's random list ids, `<time>` and its
 time-ordered tag and folder lists are set aside. `browser-checks/
