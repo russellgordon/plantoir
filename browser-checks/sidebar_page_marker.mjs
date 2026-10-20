@@ -343,13 +343,29 @@ async function connect(chunk) {
       // for the line (planted too) does not leave the dot alone on a line.
       let beside = 0
       for (const row of rows.filter((entry) => entry.kind.startsWith("page in") && entry.box !== null)) {
-        const first = await evaluate(`(() => {
+        // The dot and the line read at the SAME moment: the sidebar may still
+        // be smooth-scrolling its current entry into view (Quartz), and a dot
+        // read before that scroll against a line read after it is one line
+        // off (seen as a ~19 px miss, intermittently). Read the line, the
+        // dot, the line again, and keep the pair only when the line held.
+        const lineNow = `(() => {
           const r = window.__plMarker.rows[${row.index}].querySelector(":scope > a").getClientRects()[0]
           return r ? { left: r.left, top: r.top, bottom: r.bottom } : null
-        })()`)
-        const middle = (row.box.top + row.box.bottom) / 2
+        })()`
+        let first = null
+        let dot = row.box
+        for (let tries = 0; tries < 20; tries += 1) {
+          const before = await evaluate(lineNow)
+          const box = await markerBox(row.index)
+          const after = await evaluate(lineNow)
+          first = after
+          if (box !== null) dot = box
+          if (before && after && before.top === after.top) break
+          await pause(100)
+        }
+        const middle = (dot.top + dot.bottom) / 2
         if (!first) problems.push(`${mode}: "${row.title}" has no line to measure`)
-        else if (middle < first.top || middle > first.bottom || row.box.right > first.left + TOLERANCE) problems.push(`${mode}: the dot of "${row.title}" (middle ${middle.toFixed(1)} px) is not beside its first line (${first.top.toFixed(1)}-${first.bottom.toFixed(1)} px, from ${first.left.toFixed(1)} px)`)
+        else if (middle < first.top || middle > first.bottom || dot.right > first.left + TOLERANCE) problems.push(`${mode}: the dot of "${row.title}" (middle ${middle.toFixed(1)} px) is not beside its first line (${first.top.toFixed(1)}-${first.bottom.toFixed(1)} px, from ${first.left.toFixed(1)} px)`)
         else beside += 1
       }
       seen.dotsBesideFirstLine = beside

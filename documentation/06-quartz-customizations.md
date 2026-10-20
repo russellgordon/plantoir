@@ -2909,6 +2909,146 @@ re-derived from the Markdown; a transformer that stamps counted items; a
 hiding the page from the sidebar (Russell put it second); one table per
 meeting; a fixed-name structural check.
 
+### L6. The sidebar link's look, and each row's items (#602, #603, v1.8.3)
+
+**#602.** The pin (L3) puts My Progress among the top-level FOLDERS, but
+Quartz drew it as a page (`--dark` at 0.75 opacity, grey beside All
+Classes). It is now DRAWN as a folder title: `pinnedOrder` hands the moved
+entry back dressed as a folder (`isFolder` true, no children, the page's own
+slug kept — Quartz's node would otherwise work out a folder's `/index` slug
+and the link would go to `/My-Progress/`, not found, measured), so the
+sidebar's own `createFolderNode` draws it: the same wrapper and
+`a.folder-title` as All Classes, no chevron or fold since its name is not
+one that expands. Quartz's own rules then decide its colour at rest, under
+the mouse and on its page; nothing of ours styles it. REJECTED (build 3, on
+Russell's and the director's ruling): a rule in `progress.scss` imitating
+the folder-title look — Russell saw its colour stick on his Mac after
+leaving the page. Measured before and after, Playwright's WebKit 2359 and
+Chrome for Testing 155, clicking My Progress then All Classes from a fresh
+load and from a page reached by the site's own navigation, at 0 s and 2 s:
+the old rule did NOT stick (no `:focus`, no `:visited`, no lingering
+`.active`; at 0 s Chrome only shows the 0.2 s colour transition); after the
+change the entry carries exactly All Classes' class and attributes. No
+`patches/explorer.inline.ts` or `build_site.py` edit.
+
+**#603.** Every level folds, and every level is closed on load (Russell: no
+exception): a unit's table, then one level per class — its name and the sum
+of its pages' counts, as a unit's summary carries the unit's — then each
+page's row, whose name is the summary of a list of its items: a box-like
+mark (ticked or not, with `words.itemTicked` / `words.itemNotTicked` for a
+screen reader; no box to tick), then the item's words as a link to the page
+at its success-criteria heading. All are `<details>`, so a plain click on a
+marker, or Enter or Space, opens one level; a click on a page's name still
+follows its link (an interactive element in a summary does not toggle it).
+**Option-click** on any marker, as in the Finder, opens or closes that
+level and every level inside it (one `onclick` on the placeholder).
+Option-click on a page's NAME is left to the browser, which may download
+the page (Safari does): the name is a link, and a link behaves as one
+everywhere else on the site — reviewed and left on purpose (#603 review 4).
+
+After Russell's smoke test of the branch: every count — the totals at the
+top, each unit's, each class's and each page's — sits in a pill (Quartz's
+tag-chip look from search.scss: `--highlight` behind, 8px corners, regular
+weight, `--darkgray`), so a bold title and its count no longer run
+together; an item's words are body text (regular weight, `--darkgray`, no
+chip) while still a link to its heading — readability chosen over
+consistency with the page's name, which keeps the link look, knowingly.
+**Which levels are open is remembered** per site in this browser, beside
+the ticks: `plantoir:progress-open:<site root>`, a JSON list of open levels
+(`unit:`, `class:` and `page:` names), written on every `toggle` (caught on
+the way down, once per placeholder) and read on every drawing, so a return
+by the site's links, Back or a reload finds every level as it was left; a
+first visit, or storage refused, finds them all closed. Never sent anywhere.
+Measured in the browser check: a unit, class and row opened, then the
+sidebar's My Progress link and a reload — all three still open; must-fail by
+copy and restore with the restore line, the pill class and the item rule
+each broken in the built files.
+
+The words come from the BUILT page, in the emitter, never from the
+Markdown: the `<label>` PlantoirTasks wraps around each stamped box,
+spaces collapsed, a footnote's mark left out ("a source[^1]" lists as "a
+source", #603 review 2) (`myProgress.sections`, `shown`). Maths is the one
+exception, measured: Quartz's KaTeX writes HTML only (`output: "html"`),
+every glyph `aria-hidden` and in drawing order (x² reads "x2", a fraction
+its denominator first), with no copy of the TeX — so each maths element is
+listed as the TeX between its `$` signs, taken from the item's own line in
+`file.value` (the line PlantoirTasks made the id from, its code spans
+taken out first so `` `echo $HOME` `` is never read as maths — #603
+review 1, its contract case and must-fail), and only when that
+line hashes to the box's own stamp and holds as many maths spans as the
+label draws; otherwise the glyphs (a box whose words begin on its next
+line has no maths on its first line, so its maths shows as glyphs — a
+note, accepted on review). Listing maths as the TeX the teacher wrote,
+rather than drawn, was accepted on review. The anchor is the heading's id as the
+built page has it (`anchors`). `rollUp` now also answers each item
+(`ticked`), so the list and the count are one reading. Rejected: a new
+stamp on every box (more bytes on every page with a task item, and an
+edit to #519's transformer), reading MathML annotations (none are built),
+carrying HTML in the manifest (the page draws with `textContent` only),
+a fetch of each page (the manifest already holds what is needed).
+
+Measured 2026-10-19 (M4 Pro, macOS 26.6, Chrome for Testing 155), EXC2O
+with the verify fixture planted, `origin/dev` b49cb7b8f against this
+branch: `postscript.js` 169,936 → 171,789 bytes (+1,853; gzip +539),
+`index.css` 74,461 → 76,525 (+2,064; gzip +278), `progress-manifest.json`
+1,094 → 1,385 for two pages (+291); `My-Progress.html` unchanged; no other
+page's HTML changes once Quartz's random list ids, `<time>` and its
+time-ordered tag and folder lists are set aside. `browser-checks/
+my_progress.mjs` adds: the link's computed colour, opacity, weight and face
+equal All Classes' in light and dark (`saved-theme`), and colour and
+opacity under the mouse (a broken slug fails both — re-proved on review),
+another top-level page still at 0.75; every level closed on each drawing;
+each class's count the sum of its pages'; a plain click opening a unit
+alone, Option-click opening it and everything beneath with the items
+shown (`checkVisibility()`: rows opened inside closed classes read 0
+shown, proved by copy and restore), and closing them all again; the fixture's row listing its four
+items with as many marked as its count (1, 3, 2 across the run), each
+the manifest's words and tick and a link to its heading, and one click
+landing there. Must-fail by copy and restore: the old `progressRules.ts`
+under the new contract cases (32 failures in the image's check); in a
+built site, the rule's slug changed (the look fails in both themes), the
+selector unscoped (another page's 0.75 fails), the manifest's anchors
+emptied (the item links fail), and Option ignored in `postscript.js` (the
+Option-click fails); the check against the old build fails every new
+assertion.
+
+Russell's later rounds on the branch: an item under a SUB-heading inside
+the section carries that sub-heading's words as `group` (the nearest deeper
+heading at the page's top level, read off the built tree in `countedItems`;
+the count is unchanged), and the row shows each group once, bold in the
+page's text colour, above its items — measured on the fixture's two
+sub-headings, must-fail with the old rules (contract case) and with the
+labels drawn as items (browser check). The totals' rows are spaced so their
+pills do not touch. Bold words and code inside an item's text are NOT kept:
+that would carry formatting runs beside every such item's words in the
+manifest for a small gain — left as plain words, on purpose. The browser
+check holds the entry to All Classes' look after leaving My Progress by the
+sidebar, and to All Classes' shape (#602 above).
+
+### L7. A link to a heading lands on it (#604, site-wide)
+
+Not a My Progress rule: any link with a `#heading`. The browser scrolls to
+the heading as soon as the page is laid out, before the runnable code's
+editors, diagrams, maths faces and pictures above it take their size;
+Chrome re-anchors later, Safari and Arc do not (ICS3U: 1,706 px short at
++1 s). And the sidebar smooth-scrolls its current entry into view, which
+on a long sidebar drags the window too (measured in the check: without the
+fix the heading ended 4,291 px below the window's top). `headingAnchor.inline.ts`
+(riding `PlantoirMetaLine` with the other scripts) scrolls to the heading
+again, at once rather than smoothly, whenever the page's column changes size
+(a ResizeObserver — the one settle signal every late piece shares), when the
+faces are ready, and whenever something other than the reader moves the
+window off it; it stops at the reader's first wheel, touch, key or press, at
+the next page, or after an 8-second cap, and does nothing with no hash.
+Rejected: a fixed delay; waiting on each engine's own signal (the code
+runner, diagrams and maths each signal differently, and pictures not at
+all). `browser-checks/heading_anchor.mjs`, on verify.sh's Anchor Fixture
+(eight runnable blocks above the heading), with Chrome's own re-anchoring
+off (`overflow-anchor: none`, which Safari never had): the heading at the
+window's top once settled, five runs out of five; a reader who scrolls up
+at once is left there. Must-fail: the script's listener disabled in the
+built bundle.
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
