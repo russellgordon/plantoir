@@ -884,22 +884,32 @@ public static class ActivityTrail
     /// because every window hears the end of a session and the last window's
     /// close may follow it.
     /// </summary>
-    /// <param name="lockWait">How long to wait for another writer's lock. Short
-    /// at the end of a session, where Windows ends a process that does not
-    /// answer within a few seconds (#565 plan review, item 5).</param>
+    /// <param name="sessionEndingWait">Given only at the end of a session
+    /// (WM_ENDSESSION), where Windows ends a process that does not answer
+    /// within a few seconds (#565 plan review, item 5): the whole wait — this
+    /// process's own lock and the writers' lock together — is capped at it,
+    /// and the line is tried once, since there is no later moment to retry.
+    /// Without it (the ordinary quit) the line waits for this process's lock
+    /// as every line does, and is counted as written only once it has been.</param>
     /// <returns>True when the line was written by this call.</returns>
-    public static bool NoteClosed(QuitConfirmation.ClosingReason reason, TimeSpan? lockWait = null)
+    public static bool NoteClosed(QuitConfirmation.ClosingReason reason, TimeSpan? sessionEndingWait = null)
     {
         if (System.Threading.Volatile.Read(ref _openedLineWritten) == 0) return false;
-        if (System.Threading.Interlocked.Exchange(ref _closedLineWritten, 1) == 1) return false;
         string line = ClosedLine(reason, Environment.ProcessId);
-        Note(Event.AppClosed, line, lockWait ?? WritersWait);
+        if (sessionEndingWait is { } wait)
+        {
+            if (System.Threading.Interlocked.Exchange(ref _closedLineWritten, 1) == 1) return false;
+            return Note(Event.AppClosed, line, wait, capsThisProcess: true);
+        }
+        if (System.Threading.Volatile.Read(ref _closedLineWritten) == 1) return false;
+        if (!Note(Event.AppClosed, line, WritersWait, capsThisProcess: false)) return false;
+        System.Threading.Volatile.Write(ref _closedLineWritten, 1);
         return true;
     }
 
-    /// <summary>A line written with its own wait for the writers' lock.</summary>
-    private static void Note(Event @event, string what, TimeSpan lockWait) =>
-        Append($"{DateText.Stamp(DateTime.Now)} · {LogRedactor.Redacting(what)}", lockWait);
+    /// <summary>A line written with its own wait for the writers' lock; true when it was written.</summary>
+    private static bool Note(Event @event, string what, TimeSpan lockWait, bool capsThisProcess) =>
+        Append($"{DateText.Stamp(DateTime.Now)} · {LogRedactor.Redacting(what)}", lockWait, capsThisProcess);
 
     /// <summary>The close line's words; the contract's <c>line</c> is this with reason "quit by the teacher".</summary>
     public static string ClosedLine(QuitConfirmation.ClosingReason reason, int processId) =>
@@ -947,10 +957,11 @@ public static class ActivityTrail
 
     private static void Append(string line) => Append(line, WritersWait, capsThisProcess: false);
 
-    /// <param name="capsThisProcess">True for the end-of-session line: the wait
-    /// then caps this process's own lock too. Every other line waits for it as
-    /// long as it takes, as before.</param>
-    private static void Append(string line, TimeSpan wait, bool capsThisProcess = true)
+    /// <param name="capsThisProcess">True for the end-of-session line only: the
+    /// wait then caps this process's own lock too. Every other line waits for
+    /// it as long as it takes, as before. Said by every caller, never defaulted.</param>
+    /// <returns>True when the line reached the file.</returns>
+    private static bool Append(string line, TimeSpan wait, bool capsThisProcess)
     {
         // The wait caps BOTH locks: this process's own (another thread may be
         // inside its own mutex wait) and the writers' mutex across processes,
@@ -958,7 +969,7 @@ public static class ActivityTrail
         // A line that cannot get this process's lock in time is dropped rather
         // than written beside another thread's half-written one.
         var started = System.Diagnostics.Stopwatch.StartNew();
-        if (!System.Threading.Monitor.TryEnter(_lock, capsThisProcess ? wait : System.Threading.Timeout.InfiniteTimeSpan)) return;
+        if (!System.Threading.Monitor.TryEnter(_lock, capsThisProcess ? wait : System.Threading.Timeout.InfiniteTimeSpan)) return false;
         try
         {
             try
@@ -985,6 +996,7 @@ public static class ActivityTrail
                     using var stream = new FileStream(path, FileMode.Append, FileAccess.Write,
                         FileShare.ReadWrite | FileShare.Delete);
                     stream.Write(bytes, 0, bytes.Length);
+                    return true;
                 }
                 finally
                 {
@@ -994,6 +1006,7 @@ public static class ActivityTrail
             catch
             {
                 // Never fail caller if log write fails
+                return false;
             }
         }
         finally

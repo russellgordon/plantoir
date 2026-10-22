@@ -7045,7 +7045,10 @@ at most 500 ms IN ALL — for this process's own trail lock and the writers'
 cross-process lock together (`ActivityTrail.Append` with
 `Monitor.TryEnter`) — instead of the usual 5 s for the cross-process lock,
 which is about Windows' own kill timeout. A line that cannot get the lock in
-that time is dropped rather than holding the session up.
+that time is dropped rather than holding the session up, and is tried only
+once (there is no later moment). The ordinary quit's line waits for the
+locks as every line does, and counts as written only once it has reached the
+file (`Append` returns whether it did).
 
 **Rejected:** reading "install" from the at-quit install (it fires when the
 teacher quits with an update ready — the mac's `willInstallUpdate` trap); a

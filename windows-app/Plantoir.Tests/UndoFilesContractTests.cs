@@ -115,8 +115,9 @@ public sealed class UndoFilesContractTests : IDisposable
                     }
                 }
                 // What this press will find, by the undo's own rule, before it runs.
-                var verdicts = history.Entries.Count == 0 ? new List<UndoVerdict.Kind>()
-                    : history.Entries[^1].Files.Select(f => UndoVerdict.Of(f.Key, f.Value)).ToList();
+                var found = history.Entries.Count == 0 ? new List<(string Path, UndoHistory.FileState State, UndoVerdict.Kind Verdict)>()
+                    : history.Entries[^1].Files.Select(f => (Path: f.Key, State: f.Value, Verdict: UndoVerdict.Of(f.Key, f.Value))).ToList();
+                var verdicts = found.Select(f => f.Verdict).ToList();
                 int entriesBefore = history.Entries.Count;
 
                 var answer = await tools.CallTool("undo_last_change", new JsonObject());
@@ -126,6 +127,14 @@ public sealed class UndoFilesContractTests : IDisposable
                 int leftAlone = verdicts.Count(v => v == UndoVerdict.Kind.LeftAlone);
                 Assert.True(step["expectLeftAlone"]!.GetValue<int>() == leftAlone, $"{label}: left alone");
                 Assert.True(step["expectEntriesLeft"]!.GetValue<int>() == history.Entries.Count, $"{label}: changes left {history.Entries.Count}");
+
+                // On disk: every file to be put back now holds BEFORE (or is
+                // gone), so a tool that answers right without writing fails.
+                foreach (var (path, state, verdict) in found.Where(f => f.Verdict == UndoVerdict.Kind.PutBack))
+                {
+                    if (state.Before is null) Assert.False(File.Exists(path), $"{label}: {Path.GetFileName(path)} not removed");
+                    else Assert.True(File.Exists(path) && File.ReadAllText(path) == state.Before, $"{label}: {Path.GetFileName(path)} not put back");
+                }
 
                 string sentence = step["expectSentence"]!.ToString();
                 string description = entry.Description;
