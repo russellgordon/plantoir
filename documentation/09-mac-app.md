@@ -2063,7 +2063,8 @@ empty and its own template's connection is taken out.
 What was MEASURED before choosing this: there is no shared writer — the
 course creator is `setup_course.py` inside the builder, and each app makes a
 folder added later on its own (mac `createFoldersOnDisk`, Windows
-`SpecialFolderRenamer.CreateFoldersOnDisk`), both EMPTY on purpose
+`SpecialFolderRenamer.CreateFoldersOnDisk`), both EMPTY on purpose then (both
+write the two pages now: the mac since #506, Windows too since #580)
 (`specialNames.addCreatesTheFolder.why`, now rewritten). All 344 skeleton
 `_DUPLICATE ME.md` files are one blob (`c539a22`); the example-content payloads carry
 309 templates in 54 different texts, so a payload course's folder added later gets

@@ -7469,9 +7469,10 @@ calls it after making the folders: it now returns a `FolderScaffold.Outcome`
 only into the folders that call made. `CourseSettingsView.CreateFolderForNewEntry`
 passes the bundled template, the file names at the top of the PRIMARY
 curriculum folder (`CurriculumFolderRule.ForCourse(...).Resolved[0]`, read
-from the disk — just BEFORE the folders are made, where the mac reads just
-after; a folder the click is making is empty either way, so its own
-template's connection is taken out on both), and writes the trail line `FolderScaffold.FolderCreatedTrailLine`
+from the disk AFTER the folders are made, in the mac's order — so a
+"Curriculum" folder added to a course with none is read as empty and its own
+template's connection is taken out; `CreateFoldersOnDisk` takes it as a
+`Func` for that reason), and writes the trail line `FolderScaffold.FolderCreatedTrailLine`
 — the mac's, word for word: ", with its index page and a page to duplicate",
 ", with its index page" or ", with a page to duplicate", or nothing.
 
@@ -7541,4 +7542,8 @@ A trap met on the way, worth knowing: a doc comment reading `support/**`
 turned `ActivityTrailWiringTests` red, naming four events in OTHER files as
 never recorded. Its scan strips `/* … */` across the concatenated product
 source before `//` lines, so a `/*` inside a `///` comment swallows every file
-after it up to the next `*/`. Keep `/*` out of comments.
+after it up to the next `*/`. The scan now strips each FILE on its own, in one
+pass that recognises `//` comments and strings (raw ones included) before a
+`/*` can open, and a `/*` that never closes fails the test naming its file —
+so the next occurrence reports its real cause rather than four innocent events
+(`ActivityTrailWiringTests.TheScanReadsAStarStarInACommentAsAComment`).
