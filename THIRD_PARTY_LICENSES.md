@@ -26,10 +26,11 @@ teacher's site. Fonts a site carries for its own look are described in
 | **KaTeX** — the stylesheet, copy-tex and woff2 faces a site's maths is styled and copied with, on EVERY site (#494) | 0.16.21 | MIT, © 2013-2020 Khan Academy and other contributors | `static/katex/LICENSE` beside the files |
 | **BaKoMa Computer Modern TrueType fonts** — the lettering of a page's ` ```tikz ` diagrams; only the faces the site's diagrams name (#485 E1) | as shipped in node-tikzjax 1.0.5 | BaKoMa Fonts Licence, © 1994, 1995 Basil K. Malyshev: copying and distribution permitted with the notice; embedding in SVG and printing needs no notice | `static/tikz/LICENCE` beside the faces |
 
-## Carried inside the macOS app, written into a course on the teacher's yes
+## Carried inside the app, written into a course on the teacher's yes
 
-Obsidian's add-ons for diagrams and graphs (#495): carried in
-`Plantoir.app/Contents/Resources/obsidian-addons/<id>/`, pinned in
+Obsidian's add-ons for diagrams and graphs (#495; on Windows #581): carried in
+`Plantoir.app/Contents/Resources/obsidian-addons/<id>/` on the mac and in
+`obsidian-addons\<id>\` beside `Plantoir.exe` on Windows, pinned in
 `contracts/shared-rules.json` → `obsidianAddOnsForFigures.addOns`, and copied
 unchanged into a course's `.obsidian/plugins/<id>/` only when the teacher has
 said yes. Never in a class website (the build skips `.obsidian`).

@@ -3758,7 +3758,16 @@ platform-neutral until Windows ships this): on the Mac, Plantoir offers to add
 TikZJax and Functionplot when a course with figures is opened in Obsidian from
 Plantoir. The shared skill (`plantoir-math-graphs` §9) and
 `figureFences.knownLimits` do not say so, because a Windows teacher's assistant
-reads them too.
+reads them too. **Windows ships it with #581** (2026-10-22), so that reason has
+gone: the skill and `knownLimits[2]` can now say Plantoir adds them, changed
+together by both sides (#581's item 9). Two things Windows measured that a mac
+reader should know, on Obsidian **1.14.4** (`documentation/12-windows-app.md` →
+"Obsidian's add-ons for diagrams and graphs on Windows (#581)"): Enter on the
+trust question chooses "Browse vault in Restricted Mode", as here; and after
+"Trust author and enable plugins" Obsidian 1.14.4 OPENED Settings ▸ Community
+plugins in a window of its own, first-time trust and after Restricted Mode
+alike — the opposite of #582's measurement on 1.13.7, so either 1.14 changed
+it or Windows differs.
 
 **Where the files come from.** Carried, never downloaded on the yes:
 `mac-app/Vendor/fetch-obsidian-addons.sh` reads every id, version, size,
