@@ -407,6 +407,8 @@ extension SectionDetailView {
                 // The three page plans' rows (#524); nil for Re-date and
                 // Make Room, which keep the card's text.
                 model.planTable = outcome.planTable
+                // A new plan opens with its already-right pages folded (#622).
+                model.showsAlreadyRight = false
                 model.stage = .planned
                 return
             }

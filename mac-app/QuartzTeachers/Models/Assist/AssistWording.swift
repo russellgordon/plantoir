@@ -1167,6 +1167,19 @@ nonisolated enum AssistWording {
     static let menuPlanAlreadyVisible: String = "already visible"
     static let menuPlanAlreadyHidden: String = "already hidden"
 
+    /// The disclosure under the plan table (#622), closed to begin with:
+    /// opening it adds the pages already the way they were asked to be to
+    /// the same table. "Show the 16 pages already visible", "Show the 2
+    /// pages already hidden", "Show the page already visible". The summary
+    /// above the table counts the same pages.
+    static func menuPlanShowAlready(count: Int, publishing: Bool) -> String {
+        let state: String = publishing ? "visible" : "hidden"
+        if count == 1 {
+            return "Show the page already \(state)"
+        }
+        return "Show the \(count) pages already \(state)"
+    }
+
     /// A class a publish followed a link onto and left alone — the row
     /// beside `linkedClassesWereLeftAlone`, which says it for all of them,
     /// and says it as the card does: "stays as it is", never "stays
@@ -2165,6 +2178,12 @@ nonisolated enum AssistWording {
     }
 
     static let menuFindAPage: String = "Find a page"
+
+    /// The picker's and the later-classes list's third column (#608): a
+    /// class's day, as `laterClassesDay` says it. The Page and Folder
+    /// columns are the plan table's own (`menuPlanPageColumn`,
+    /// `menuPlanFolderColumn`), so the two steps of one flow read alike.
+    static let menuPickDateColumn: String = "Date"
 
     static let menuContinueButton: String = "Continue"
     static let menuPublishButton: String = "Publish"
