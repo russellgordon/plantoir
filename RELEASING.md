@@ -127,7 +127,7 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
-| 2026-10-22 (#632) | **Windows:** if you choose Install and Reopen on the offer that appears by itself and Plantoir stays open, choose File ▸ Check for Updates… and install from there. | The fix is IN this release, so it takes effect only from the copy after it: a teacher on 1.8.5 or earlier who accepts the daily offer for this release meets the old fault once. Windows only — not by itself a reason to pass the mac's `--required-warning`; that is the cutter's call. |
+| 2026-10-22 (#632) | **Windows:** if you choose Install and Reopen on the offer that appears by itself and Plantoir stays open, close Plantoir, open it again, then choose File ▸ Check for Updates… and install from there. | The fix is IN this release, so it takes effect only from the copy after it: a teacher on 1.8.5 or earlier who accepts the daily offer for this release meets the old fault once, and the window it leaves open is half shut down. |
 
 ## Trim the roadmap
 
@@ -478,6 +478,10 @@ the release side.
   every release newer than the teacher's own, so skipping a release never
   loses its warning. A later release keeps the earlier one important for
   teachers still below it, by itself.
+  - **Exception: a warning for the OTHER platform only** (the Windows-only
+    row for #632, 2026-10-22, is the first) is not by itself a reason to pass
+    `--required-warning` here: it would take Skip away from every mac
+    teacher for a sentence that does not apply to them.
 
   **The one exception so far was v1.4.0, which carried three warnings and was
   cut WITHOUT the flag.** All three were for a teacher installing v1.4.0 BY
