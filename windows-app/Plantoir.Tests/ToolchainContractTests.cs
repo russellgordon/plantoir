@@ -150,7 +150,7 @@ public class ToolchainContractTests
         var doc = ContractLoader.LoadJson("toolchain.json");
         string recipe = File.ReadAllText(
             Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
-        var vendorPins = new[] { "pagedjs", "latinModern", "functionPlot", "nodeTikzjax" };
+        var vendorPins = new[] { "pagedjs", "latinModern", "functionPlot", "nodeTikzjax", "pyodide" };
 
         foreach (string name in vendorPins)
         {
@@ -168,6 +168,74 @@ public class ToolchainContractTests
                 $"fetch-runtime.ps1 sets {variable} = \"{version}\", but the contract's windowsRuntimeContains " +
                 $"for {name} is \"{contains}\": the two name different versions.");
         }
+    }
+
+    /// <summary>
+    /// #568: Pyodide is the one vendor pin whose contract carries the
+    /// tarball's hash AND the hash of every file kept from it, and the recipe
+    /// checks both, as the Dockerfile does. A contract bump that changed the
+    /// hashes without the recipe would otherwise fetch the old bytes and
+    /// refuse them only on a build PC, at release time. (nodeTikzjax's sha256
+    /// is for the record: npm ci verifies its lockfile's integrity itself.)
+    /// </summary>
+    [Fact]
+    public void TheWindowsRuntimeRecipeChecksPyodidesContractHashes()
+    {
+        var doc = ContractLoader.LoadJson("toolchain.json");
+        string recipe = File.ReadAllText(
+            Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
+        var pin = doc["pins"]!.AsArray().First(p => p?["pin"]?.ToString() == "pyodide")!;
+
+        string tarball = pin["sha256"]!.ToString();
+        Assert.True(recipe.Contains($"\"{tarball}\"", StringComparison.Ordinal),
+            $"fetch-runtime.ps1 does not check the Pyodide tarball against the contract's sha256 {tarball}.");
+        var files = pin["files"]!.AsObject();
+        Assert.Equal(5, files.Count);
+        foreach (var (name, digest) in files)
+        {
+            var line = System.Text.RegularExpressions.Regex.Match(recipe,
+                "\"" + System.Text.RegularExpressions.Regex.Escape(name) + "\"\s*=\s*\"([0-9a-f]{64})\"");
+            Assert.True(line.Success, $"fetch-runtime.ps1 keeps no hash for Pyodide's {name}.");
+            Assert.Equal(digest!.ToString(), line.Groups[1].Value);
+        }
+    }
+
+    /// <summary>
+    /// #568: the runtime on THIS machine, read back. Skipped (and reported
+    /// so) only where there is no runtime at all; a runtime whose manifest
+    /// predates Pyodide FAILS, because the app's build refuses it too
+    /// (Plantoir.csproj → CheckNativeRuntimeManifest), and one that names
+    /// Pyodide must hold the five files at the contract's hashes and the
+    /// Dockerfile's README line, or a teacher's site would carry other bytes
+    /// than every Mac's.
+    /// </summary>
+    [NativeRuntimeFact]
+    public void TheNativeRuntimeCarriesPyodideAtTheContractsHashes()
+    {
+        string runtime = NativeRuntime.Folder!;
+        var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(runtime, "manifest.json")))!.AsObject();
+        var pin = ContractLoader.LoadJson("toolchain.json")["pins"]!.AsArray()
+            .First(p => p?["pin"]?.ToString() == "pyodide")!;
+        string version = pin["value"]!.ToString();
+
+        Assert.True(manifest.ContainsKey("pyodide"),
+            $"{runtime}\manifest.json has no \"pyodide\": this runtime predates #568. Re-run " +
+            "windows-app\Vendor\fetch-runtime.ps1 (it fetches only runtime\vendor).");
+        Assert.Equal(version, manifest["pyodide"]!.ToString());
+
+        string folder = Path.Combine(runtime, "vendor", "pyodide");
+        var expected = pin["files"]!.AsObject().Select(f => f.Key).Append("README.txt").OrderBy(n => n, StringComparer.Ordinal);
+        var present = Directory.GetFiles(folder).Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal);
+        Assert.Equal(expected, present);
+        foreach (var (name, digest) in pin["files"]!.AsObject())
+        {
+            using var stream = File.OpenRead(Path.Combine(folder, name));
+            string got = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)).ToLowerInvariant();
+            Assert.True(got == digest!.ToString(), $"runtime\vendor\pyodide\{name}: SHA-256 {got}, the contract's is {digest}.");
+        }
+        Assert.Equal(
+            $"Pyodide {version} (MPL-2.0). Source: https://github.com/pyodide/pyodide/tree/{version}\n",
+            File.ReadAllText(Path.Combine(folder, "README.txt")));
     }
 
     [Fact]
