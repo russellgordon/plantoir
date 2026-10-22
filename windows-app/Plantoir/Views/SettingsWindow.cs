@@ -12,19 +12,21 @@ using Windows.Graphics;
 
 namespace Plantoir.Views;
 
-/// <summary>The sections of File ▸ Settings…, in the mac's order (Assistant · Preview · Deploying).</summary>
+/// <summary>The sections of File ▸ Settings…, in the mac's order (Assistant · Preview · Obsidian · Deploying).</summary>
 public enum SettingsSection
 {
     Assistant,
     /// <summary>Where Preview opens (#514).</summary>
     Preview,
+    /// <summary>Obsidian's add-ons for diagrams and graphs (#581).</summary>
+    Obsidian,
     Deploying,
 }
 
 /// <summary>
 /// File ▸ Settings… (#491; Russell's ruling of 2026-10-15): ONE Settings
-/// window with a section per subject — Assistant, Preview (#514) and
-/// Deploying — matching the mac's Plantoir ▸ Settings.
+/// window with a section per subject — Assistant, Preview (#514), Obsidian
+/// (#581) and Deploying — matching the mac's Plantoir ▸ Settings.
 /// </summary>
 /// <remarks>
 /// <para><b>A window, not a ContentDialog</b> (what it was until #491, as
@@ -52,9 +54,11 @@ public sealed class SettingsWindow : Window
     private readonly NavigationView _navigation;
     private readonly NavigationViewItem _assistantItem;
     private readonly NavigationViewItem _previewItem;
+    private readonly NavigationViewItem _obsidianItem;
     private readonly NavigationViewItem _deployingItem;
     private readonly AssistantSettingsPane _assistant;
     private readonly PreviewSettingsPane _preview;
+    private readonly ObsidianSettingsPane _obsidian;
     private readonly DeployingSettingsPane _deploying;
     private SettingsSection _shown;
     private bool _shownOnce;
@@ -82,6 +86,7 @@ public sealed class SettingsWindow : Window
     {
         "deploying" => SettingsSection.Deploying,
         "preview" => SettingsSection.Preview,
+        "obsidian" => SettingsSection.Obsidian,
         _ => SettingsSection.Assistant,
     };
 
@@ -107,6 +112,7 @@ public sealed class SettingsWindow : Window
 
         _assistant = new AssistantSettingsPane(App.Settings);
         _preview = new PreviewSettingsPane(App.Settings);
+        _obsidian = new ObsidianSettingsPane(App.Settings);
         _deploying = new DeployingSettingsPane(App.Settings);
 
         _assistantItem = new NavigationViewItem
@@ -123,6 +129,13 @@ public sealed class SettingsWindow : Window
             Tag = SettingsSection.Preview,
         };
         AutomationProperties.SetAutomationId(_previewItem, "settingsPreview");
+        _obsidianItem = new NavigationViewItem
+        {
+            Content = Plantoir.Core.Models.ObsidianFigureAddOnsWording.PaneTitle,
+            Icon = new FontIcon { Glyph = Glyphs.Edit },   // the sidebar's Open in Obsidian glyph
+            Tag = SettingsSection.Obsidian,
+        };
+        AutomationProperties.SetAutomationId(_obsidianItem, "settingsObsidian");
         _deployingItem = new NavigationViewItem
         {
             Content = "Deploying",
@@ -142,6 +155,7 @@ public sealed class SettingsWindow : Window
         };
         _navigation.MenuItems.Add(_assistantItem);
         _navigation.MenuItems.Add(_previewItem);
+        _navigation.MenuItems.Add(_obsidianItem);
         _navigation.MenuItems.Add(_deployingItem);
         _navigation.SelectionChanged += (_, args) =>
         {
@@ -187,6 +201,7 @@ public sealed class SettingsWindow : Window
         {
             SettingsSection.Deploying => _deployingItem,
             SettingsSection.Preview => _previewItem,
+            SettingsSection.Obsidian => _obsidianItem,
             _ => _assistantItem,
         };
         if (!ReferenceEquals(_navigation.SelectedItem, item)) _navigation.SelectedItem = item;
@@ -206,12 +221,14 @@ public sealed class SettingsWindow : Window
         {
             SettingsSection.Deploying => ((object)"Deploying", (object)_deploying.Root),
             SettingsSection.Preview => (Plantoir.Core.Models.PreviewStartPage.PaneTitle, _preview.Root),
+            SettingsSection.Obsidian => (Plantoir.Core.Models.ObsidianFigureAddOnsWording.PaneTitle, _obsidian.Root),
             _ => ("Assistant", _assistant.Root),
         };
         string remembered = section switch
         {
             SettingsSection.Deploying => "deploying",
             SettingsSection.Preview => "preview",
+            SettingsSection.Obsidian => "obsidian",
             _ => "assistant",
         };
         if (App.Settings.LastSettingsSection != remembered)
