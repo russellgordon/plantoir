@@ -33,15 +33,38 @@ public static class PagePaths
     }
 
     /// <summary>
-    /// True when <paramref name="candidate"/> is <paramref name="root"/> or
-    /// sits underneath it. Compared as full paths with a trailing separator,
-    /// so <c>C:\work</c> does not appear to contain <c>C:\workshop</c>.
+    /// True when <paramref name="candidate"/> is a curriculum page of the
+    /// course at <paramref name="courseDirectory"/>: some FOLDER between the
+    /// course and the page has "curriculum" in its name, case-insensitively
+    /// (shared-rules.json → followingLinks.neverTakenDownByFollowingLinks,
+    /// curriculumRules.isCurriculumPage). The file name never counts (#615):
+    /// "Curriculum Coverage.md" in an ordinary folder is an ordinary page, as
+    /// it is on the mac (<c>AssistCurriculumMentions.isCurriculum(pageAt:in:)</c>).
+    ///
+    /// Only folders INSIDE the course are read, so a working folder called
+    /// "Curriculum Work" does not make every page curriculum. A RELATIVE
+    /// candidate is false rather than read against the process's working
+    /// directory — which is what a path relative to the WORKING folder (a
+    /// <c>PlannedPage.RelativePath</c>) would silently be; resolve it with
+    /// <see cref="ResolveInside"/> first. A page outside the course, or a path
+    /// that cannot be read, is false too.
     /// </summary>
-    public static bool IsCurriculum(string root, string candidate)
+    public static bool IsCurriculum(string courseDirectory, string candidate)
     {
-        string relative = Path.GetRelativePath(root, candidate).Replace('\\', '/');
-        return relative.Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Any(segment => segment.Contains("curriculum", StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(courseDirectory) || string.IsNullOrWhiteSpace(candidate)) return false;
+        if (!Path.IsPathFullyQualified(candidate)) return false;
+
+        string relative;
+        try { relative = Path.GetRelativePath(Path.GetFullPath(courseDirectory), Path.GetFullPath(candidate)); }
+        catch { return false; }
+        if (Path.IsPathRooted(relative)) return false;                    // another drive
+
+        var segments = relative.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                                      StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0 || segments[0] == "..") return false;    // outside the course
+        for (int i = 0; i < segments.Length - 1; i++)                     // folders only, never the file name
+            if (segments[i].Contains("curriculum", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 
     /// <summary>
