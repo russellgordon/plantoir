@@ -221,7 +221,12 @@ public sealed class DrivenApp : IDisposable
     /// until the window says its folder is ready (#473): until then Preview,
     /// Deploy and New Course are disabled by design, and a test that pressed
     /// one would be testing the wait rather than what it meant to.</param>
-    public DrivenApp(Action<string> buildCourses, Action<string>? beforeLaunch = null, bool waitUntilReady = true)
+    /// <param name="restoreWindows">Whether to leave "restore windows on launch"
+    /// as <paramref name="beforeLaunch"/> seeded it (#558, which seeds a
+    /// remembered frame). Off by default: the harness turns it off so a run
+    /// opens exactly one window, on the working folder it built.</param>
+    public DrivenApp(Action<string> buildCourses, Action<string>? beforeLaunch = null, bool waitUntilReady = true,
+                     bool restoreWindows = false)
     {
         // Closed rather than refused: two copies would fight over the
         // foreground, and a physical click meant for the sidebar would land in
@@ -272,12 +277,13 @@ public sealed class DrivenApp : IDisposable
         beforeLaunch?.Invoke(WorkspacePath);
 
         // Over whatever beforeLaunch put there (a setting a test seeds, #514):
-        // the folder and the no-restore are always this harness's.
+        // the folder is always this harness's, and so is the no-restore unless
+        // the test asked to restore (#558).
         string settingsPath = Path.Combine(stateDir, "settings.json");
         var settings = File.Exists(settingsPath) && JsonNode.Parse(File.ReadAllText(settingsPath)) is JsonObject seeded
             ? seeded : new JsonObject();
         settings["WorkspacePath"] = WorkspacePath;
-        settings["RestoreWindowsOnLaunch"] = false;
+        if (!restoreWindows) settings["RestoreWindowsOnLaunch"] = false;
         File.WriteAllText(settingsPath, settings.ToJsonString(), new UTF8Encoding(false));
 
         // UseShellExecute = TRUE, and this is not a detail: it is the one line

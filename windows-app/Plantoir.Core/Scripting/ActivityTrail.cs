@@ -9,6 +9,14 @@ public static class ActivityTrail
     public enum Event
     {
         AppOpened,
+
+        /// <summary>
+        /// Plantoir closed (#565, mac #560): why — quit by the teacher, to
+        /// install a new version, or asked to close by Windows — and the pid
+        /// of its own "app opened" line. Written once, and only by a process
+        /// that wrote that line (<see cref="NoteClosed"/>).
+        /// </summary>
+        AppClosed,
         Machine,
         Helpers,
         WorkingFolderOpened,
@@ -669,11 +677,44 @@ public static class ActivityTrail
         /// change, so "Preview opened somewhere odd" can be answered.
         /// </summary>
         PreviewStartPageChosenInSettings,
+
+        /// <summary>
+        /// What a build did about the section's My Progress page (#599, mac
+        /// #545): made it and how many pages count, or made none and why. Read
+        /// from the build's <c>PLANTOIR_MY_PROGRESS:</c> line by the console
+        /// reader and by the scheduled publish's log reader. Never a page's words.
+        /// </summary>
+        MyProgressPageBuilt,
+
+        // ---- Obsidian's add-ons for diagrams and graphs (#581; the mac's #495) ----
+        /// <summary>
+        /// Open in Obsidian asked the one question about the add-ons, and the
+        /// answer (Add Them, Not Now, Not Now and don't ask again) — or did NOT
+        /// ask because Obsidian opens the course inside a larger vault, said
+        /// once per course per run. A teacher who asks "why does Obsidian show
+        /// my graph as code?" is answered by it.
+        /// </summary>
+        ObsidianAddOnsOffered,
+        /// <summary>
+        /// A pass over a course: which add-ons were added, by name and version,
+        /// at Open in Obsidian, after a preview or after reopening — or why
+        /// nothing was (a refusal, the teacher's own copy, a failed write),
+        /// said once per course per run. Never a page's words.
+        /// </summary>
+        ObsidianAddOnsAdded,
+        /// <summary>
+        /// The reopen question was answered: Obsidian was reopened, Later was
+        /// chosen, or Obsidian did not close and so nothing was written.
+        /// </summary>
+        ObsidianReopenedForAddOns,
+        /// <summary>File ▸ Settings ▸ Obsidian turned the add-ons on or off — the only way back from "Don't ask again".</summary>
+        ObsidianAddOnsSettingChanged,
     }
 
     public static string KeyFor(Event @event) => @event switch
     {
         Event.AppOpened => "app opened",
+        Event.AppClosed => "app closed",
         Event.Machine => "machine described",
         Event.Helpers => "helpers described",
         Event.WorkingFolderOpened => "working folder opened",
@@ -795,6 +836,11 @@ public static class ActivityTrail
         Event.GuidanceCouldNotBeWritten => "guidance for assistants could not be written",
         Event.PreviewStartedAtThePageLastViewed => "preview started at the page last viewed",
         Event.PreviewStartPageChosenInSettings => "preview start page chosen in Settings",
+        Event.MyProgressPageBuilt => "my progress page built",
+        Event.ObsidianAddOnsOffered => "obsidian add-ons offered",
+        Event.ObsidianAddOnsAdded => "obsidian add-ons added",
+        Event.ObsidianReopenedForAddOns => "obsidian reopened for add-ons",
+        Event.ObsidianAddOnsSettingChanged => "obsidian add-ons setting changed",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
@@ -851,14 +897,57 @@ public static class ActivityTrail
         Note(Event.AppOpened, "Plantoir opened — " + ProblemReportEnvironment.AppDescription);
         Note(Event.Machine, "running on " + ProblemReportEnvironment.SystemDescription);
         Note(Event.Helpers, "using " + ProblemReportEnvironment.HelperDescription);
+        System.Threading.Interlocked.Exchange(ref _openedLineWritten, 1);
     }
 
-    public static void NoteLaunch(string appVersion, string buildNumber, int processId, string executablePath)
+    // 1 once this process wrote "Plantoir opened"; 1 once it wrote "Plantoir closed".
+    private static int _openedLineWritten;
+    private static int _closedLineWritten;
+
+    /// <summary>
+    /// "Plantoir closed — quit by the teacher · pid 4711" (#565, mac #560;
+    /// <c>mustRecord</c> → "app closed"). On the SAME guard as the opened line:
+    /// only a process that wrote "Plantoir opened" writes it, so a scheduled
+    /// run or a marketing capture leaves no unpaired close; and only ONCE,
+    /// because every window hears the end of a session and the last window's
+    /// close may follow it.
+    /// </summary>
+    /// <param name="sessionEndingWait">Given only at the end of a session
+    /// (WM_ENDSESSION), where Windows ends a process that does not answer
+    /// within a few seconds (#565 plan review, item 5): the whole wait — this
+    /// process's own lock and the writers' lock together — is capped at it,
+    /// and the line is tried once, since there is no later moment to retry.
+    /// Without it (the ordinary quit) the line waits for this process's lock
+    /// as every line does, and is counted as written only once it has been.</param>
+    /// <returns>True when the line was written by this call.</returns>
+    public static bool NoteClosed(QuitConfirmation.ClosingReason reason, TimeSpan? sessionEndingWait = null)
     {
-        string safePath = LogRedactor.Redacting(executablePath);
-        Note(Event.AppOpened, $"Plantoir {appVersion} ({buildNumber}) opened (PID {processId}, {safePath})");
-        Note(Event.Machine, "running on " + ProblemReportEnvironment.SystemDescription);
-        Note(Event.Helpers, "using " + ProblemReportEnvironment.HelperDescription);
+        if (System.Threading.Volatile.Read(ref _openedLineWritten) == 0) return false;
+        string line = ClosedLine(reason, Environment.ProcessId);
+        if (sessionEndingWait is { } wait)
+        {
+            if (System.Threading.Interlocked.Exchange(ref _closedLineWritten, 1) == 1) return false;
+            return Note(Event.AppClosed, line, wait, capsThisProcess: true);
+        }
+        if (System.Threading.Volatile.Read(ref _closedLineWritten) == 1) return false;
+        if (!Note(Event.AppClosed, line, WritersWait, capsThisProcess: false)) return false;
+        System.Threading.Volatile.Write(ref _closedLineWritten, 1);
+        return true;
+    }
+
+    /// <summary>A line written with its own wait for the writers' lock; true when it was written.</summary>
+    private static bool Note(Event @event, string what, TimeSpan lockWait, bool capsThisProcess) =>
+        Append($"{DateText.Stamp(DateTime.Now)} · {LogRedactor.Redacting(what)}", lockWait, capsThisProcess);
+
+    /// <summary>The close line's words; the contract's <c>line</c> is this with reason "quit by the teacher".</summary>
+    public static string ClosedLine(QuitConfirmation.ClosingReason reason, int processId) =>
+        $"Plantoir closed — {QuitConfirmation.Words(reason)} · pid {processId}";
+
+    /// <summary>For tests: forget that this process wrote either line.</summary>
+    internal static void ResetOpenAndCloseForTests(bool opened)
+    {
+        System.Threading.Volatile.Write(ref _openedLineWritten, opened ? 1 : 0);
+        System.Threading.Volatile.Write(ref _closedLineWritten, 0);
     }
 
     /// <summary>
@@ -892,9 +981,24 @@ public static class ActivityTrail
     /// </remarks>
     private const string WritersMutexName = @"Local\PlantoirActivityTrail";
 
-    private static void Append(string line)
+    private static readonly TimeSpan WritersWait = TimeSpan.FromSeconds(5);
+
+    private static void Append(string line) => Append(line, WritersWait, capsThisProcess: false);
+
+    /// <param name="capsThisProcess">True for the end-of-session line only: the
+    /// wait then caps this process's own lock too. Every other line waits for
+    /// it as long as it takes, as before. Said by every caller, never defaulted.</param>
+    /// <returns>True when the line reached the file.</returns>
+    private static bool Append(string line, TimeSpan wait, bool capsThisProcess)
     {
-        lock (_lock)
+        // The wait caps BOTH locks: this process's own (another thread may be
+        // inside its own mutex wait) and the writers' mutex across processes,
+        // so the end-of-session line's 500 ms is the whole wait (#565 review).
+        // A line that cannot get this process's lock in time is dropped rather
+        // than written beside another thread's half-written one.
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        if (!System.Threading.Monitor.TryEnter(_lock, capsThisProcess ? wait : System.Threading.Timeout.InfiniteTimeSpan)) return false;
+        try
         {
             try
             {
@@ -910,7 +1014,8 @@ public static class ActivityTrail
                 bool held = false;
                 try
                 {
-                    try { held = writers.WaitOne(TimeSpan.FromSeconds(5)); }
+                    TimeSpan left = capsThisProcess ? wait - started.Elapsed : wait;
+                    try { held = writers.WaitOne(left > TimeSpan.Zero ? left : TimeSpan.Zero); }
                     catch (System.Threading.AbandonedMutexException) { held = true; }   // a writer died holding it: ours now
 
                     // Written even when the wait timed out: a line that might
@@ -919,6 +1024,7 @@ public static class ActivityTrail
                     using var stream = new FileStream(path, FileMode.Append, FileAccess.Write,
                         FileShare.ReadWrite | FileShare.Delete);
                     stream.Write(bytes, 0, bytes.Length);
+                    return true;
                 }
                 finally
                 {
@@ -928,7 +1034,12 @@ public static class ActivityTrail
             catch
             {
                 // Never fail caller if log write fails
+                return false;
             }
+        }
+        finally
+        {
+            System.Threading.Monitor.Exit(_lock);
         }
     }
 }

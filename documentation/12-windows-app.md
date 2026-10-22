@@ -442,6 +442,7 @@ the build mirrors it beside the executable:
 ```powershell
 cd windows-app
 .\Vendor\fetch-runtime.ps1        # REQUIRED once per clone
+.\Vendor\fetch-obsidian-addons.ps1   # REQUIRED once per clone (#581): the build refuses without it
 dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
@@ -453,7 +454,11 @@ same arrangement for the assistant's engine.) **Re-run it after pulling a
 change to its vendor pins**: since #503 (2026-10-15) a runtime made before
 `runtime\vendor` existed STOPS the app's build ("predates the page
 features … Re-run windows-app\Vendor\fetch-runtime.ps1"), and the re-run
-fetches only that folder — "Diagrams and graphs" below.
+fetches only that folder — "Diagrams and graphs" below. Since #568
+(2026-10-22) the same is true of a runtime made before Pyodide joined that
+folder: its manifest has no `pyodide` key, the build stops with the same
+sentence, and the re-run redoes the whole vendor phase (49 s here) —
+"Runnable code (#455)" below.
 
 **Stop any running copy before building** — a running app holds
 `Plantoir.Core.dll` open and the build fails with `MSB3027 … file is locked
@@ -1469,6 +1474,15 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   the section rewritten at every launch. **Files are read with a strict
   UTF-8 decoder**, so a file saved in another encoding is refused, never
   written over (`addCases` "cannot be read again").
+- **The skills are whatever `support\agent_guidance\skills\` holds**, five
+  today: `plantoir-page-authoring` (#596, the one the root files name FIRST;
+  it routes to the four below, `printablePages.agentGuidance.pageAuthoringSkill`),
+  `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code` and
+  `plantoir-quizzes` (#563). `AgentGuidance.Write` enumerates the folder, so a
+  new skill reaches a Windows working folder with no code. What the quizzes
+  skill teaches — the `> [!quiz]` callout and what the site does with it — is
+  [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and
+  what the build does is 05 → "Self-check quizzes: what the build does".
 - **The question** is a ContentDialog (`MainWindow.Guidance.cs`): title
   `askTitle`, `askFound` as the explanation under it, `askWhat`,
   `askYoursStays`, an Expander (`showWhatIsAdded`) over a read-only
@@ -1633,7 +1647,12 @@ ids, which sat on a Border that UI Automation never sees): see
 Tests: `PrintablePagesTests` (the getters, the corners cases, the 13
 printing words, the settings-saved clause), `AgentGuidanceTests` (the ten
 `rootFileCases` with a second pass each, the three `addCases`, the failure
-line and a path-free notice, the skills, Not Now, the hook),
+line and a path-free notice, the skills, Not Now, the hook — and, by skill,
+`TheGraphsSkillIsWrittenAndBothRootFilesNameIt`,
+`TheQuizzesSkillIsWrittenAndBothRootFilesNameIt` (#571) and
+`ThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst` (#600), each
+reading its skill's name from `shared-rules.json`; the runnable-code skill
+has no Windows test of its own),
 `PreviewBrowserHandoffTests` (modes and papers against the contract, the
 message, the trail words, a link's destination never on the trail, the
 shim's shape against `print.inline.ts`).
@@ -3504,8 +3523,9 @@ to hear about the one they left.
 
 Eleven of the twelve follow a dialog. **The twelfth follows a wait that is not
 a dialog at all**, and it is the widest window in the file: inside the rename,
-`FolderActions.QuitObsidianAndWait` polls for up to five seconds (50 × 100 ms)
-with nothing on screen, so the File menu and Ctrl+O are both fully live — and
+`FolderActions.QuitObsidianAndWait` polls for up to about eight seconds (since
+#581: up to 5 s for Obsidian's windows, then up to 3 s for its processes; it
+was five, 50 × 100 ms) with nothing on screen, so the File menu and Ctrl+O are both fully live — and
 everything after it reads the LIVE workspace, down to setting the selection to
 the renamed code. A check before a wait says nothing about what is true after
 it.
@@ -3867,7 +3887,11 @@ legacy `curriculum_folder` naming the primary.
 publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
 `Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
 reader would never see the line. A wrapper written before this keeps its old
-scan until its schedule is set again.
+scan until its schedule is set again. `PLANTOIR_MY_PROGRESS:` (#599) rides the
+same three places — the console reader, the record reader and the wrapper's
+scan — and a wrapper written before #599 likewise misses it until the
+schedule is set again ("My Progress: the trail line and the two readers
+(#599)" below).
 
 The build prints the line from the contract's own prefix
 (`build_site.announce_coverage_maps` reads `coverageMapsBuilt.marker.prefix`
@@ -5514,8 +5538,9 @@ pinned:
   (`InsertClassesTests.MakeRoomWhoseNewPageCouldNotBeSaved_IsCarriedPastAndNotedAsAChange`,
   `ADuplicateWhoseNewPageCouldNotBeSaved_ThrowsAndIsNotStillTaken`).
 - **A partial undo.** `UndoHistory.Undo` keeps the entry when any file was
-  skipped, so `undo_last_change` notes the change when files were both
-  restored and skipped.
+  left alone (since #564 a file an earlier press already put back no longer
+  counts), so `undo_last_change` notes the change exactly when it answers
+  `undidPartly`: files both put back and left alone.
 - **A publish or hide that wrote and then stopped part way**, both the page
   list (`AssistWorkspace.Apply`) and the whole unit (`ApplyWholeUnit`). The
   recording is abandoned on the throw, so the top entry does not move. Each
@@ -5553,17 +5578,18 @@ outside assistant) is decided in one place.
 **Undo's ending comes from the depth plus `changed`**
 (`SectionVerbs.Ending`). The depth went DOWN means the entry came off: "took
 the last change back". `UndoHistory.Undo` removes the entry exactly when
-nothing was skipped, so a whole undo lowers the depth by one at any depth; the
+nothing was left alone (a file already back does not hold it, #564), so a whole undo lowers the depth by one at any depth; the
 cap of twenty trims only when an entry is added. `changed` with the depth
 unmoved is "took part of the last change back"; anything else is "changed
 nothing". It used to count an answer containing "is put back" as a whole
 undo, and `UndidPartlyFromTheMenu` (the twin the menu shows) contains those words too, so
-a partial undo read as a whole one. A second press after the edit is undone is
-partial AGAIN: the file the first press restored no longer matches what the
-change wrote, so it is skipped and the entry stays. The mac behaves the same,
-and a `decision` issue
-([#555](https://github.com/russellgordon/plantoir/issues/555)) asks whether an entry that blocks the list for good is
-right. Pinned by `SectionVerbsTests.APartialUndo_TookPartOfTheLastChangeBack`,
+a partial undo read as a whole one. Until #564 a second press after the edit
+was undone was partial AGAIN: the file the first press restored no longer
+matched what the change wrote, so it was skipped and the entry stayed for
+good. Russell ruled on mac [#555](https://github.com/russellgordon/plantoir/issues/555)
+(option 2) that a file already holding its BEFORE text is ALREADY BACK, and
+since #564 the second press takes the change off ("took the last change
+back") — see "Undo: three verdicts, not two (#564)" below. Pinned by `SectionVerbsTests.APartialUndo_TookPartOfTheLastChangeBack`,
 `APublishThatStoppedPartWay_IsCarriedOut`,
 `AWholeUnitThatStoppedPartWay_IsCarriedOut`,
 `APublishWhoseFirstWriteFails_SaysNothingWasChanged`,
@@ -5794,16 +5820,36 @@ mac's keyless `planWillBecome(visible:withTheDatesOf:)`, is the one
 `WindowsOnlyWording` entry. No `NamedGapLedger` entry: the ledger is for work
 a later milestone owes, not a permanent mapping.
 
-**A club's table says "meeting"; its card does not, yet.** The table is the
+**A club's table says "meeting" — and since #556, so does its card.** The table is the
 teacher's copy and never the model's, so `Tabulate` takes the course's noun:
 the left-alone cell (`menuPlanStaysAsItIsForAMeeting`), its note
 (`linkedClass…LeftAloneForAMeeting`) and a kept class's reason ("it is a
 meeting of its own", `AssistWorkspace.MeetingOfItsOwn`, rendered with
 `PlanStaysVisibleBecause` to the contract's `linkedClassStaysVisibleForAMeeting`)
-— as the mac's `stayingVisibleLine(noun:)` does. Windows' CARD has never
-spoken the noun for these (the planner records the class form, and
-`Describe()` has no noun); that gap, on the menu's card and the assistant's,
-is a separate `windows` issue, not this piece.
+— as the mac's `stayingVisibleLine(noun:)` does. Until #556 Windows' CARD
+did not, so in a club the table and the card under it said "meeting" and
+"class" for the same page. Now `PublishPlan.Describe(ClassNoun, int)` is the
+teacher's card in the course's noun, and the kept reason goes through
+`PublishPlan.ReasonFor`, the ONE expression the card and the table both use;
+`Describe(int)` is the class form. The planner still RECORDS the class form
+(`AssistWorkspace.ClassOfItsOwn`), because that is what the model reads.
+`plan_publish_pages`, `plan_unpublish_pages` and `plan_publish_class_on` all
+end in `PlantoirTools.Proposing(PublishPlan)`, which now sends
+`Proposing(plan.Describe(), plan.Describe(noun))`: the text content (what the
+model and Claude Code read) is the class form byte for byte, and the club's
+card travels only in `_meta`, as every other club card does (#274). The
+answer for "nothing would change and a name fits no page" can carry the
+left-alone line too, so it is `Answering(card, model copy)` as well — the mac
+nouns that card (`AssistToolRunner.swift` 1007-1010, 1132-1135, 1173-1176).
+Measured rather than assumed: `Describe()` was printed for every branch
+(publish and hide, menu or not, nothing changes, declined only, one and two
+left alone, unknown names, an orphaned date move, more than fifteen changes
+and fifteen kept, a kept page with a folder) before and after the change, and
+the two outputs were identical. Pinned by `ClubNounTests` (the three plan
+tools and the unknown-name answer in `TheNounNeverReachesWhatTheModelReads`,
+and `AClubsPublishCardSaysMeetingForLinkedClasses`) and
+`PlanTableTests.AClubsTableSpeaksOfMeetings`. The table's own output did not
+move. No trail change: no event records a card.
 
 **Two differences from the mac, kept on purpose so neither side "fixes" them.**
 (1) The summary says `planNothingWouldChange` when no page changes, even when
@@ -6502,9 +6548,12 @@ when the scale changes (a monitor move, a display-scale change),
 `EnforceMinimumSize` re-applies the minimum AND grows a window left below it,
 unless it is maximised or minimised — the minimum alone does not grow one. **What holds
 what:** the first-run clamp is held by `WindowMinimumUiTests` (named above), on this one display
-at one scale; the remembered-frame order, the re-apply and the grow on a
-scale change (the multi-monitor cases) are held by reading the code, since
-there is one screen here and no test changes the display scale. **On a 1920-wide screen at 225–250% the work-area clamp can still cut
+at one scale; the re-apply and the grow on a scale change, and the remembered
+frame's move between monitors, are held by reading the code, since there is
+one screen here and no test changes the display scale; where a remembered
+frame is put when its display has gone (#558, below) is held by
+`WindowFrameFitTests` (the geometry) and `WindowOnScreenUiTests` (that the
+constructor applies it). **On a 1920-wide screen at 225–250% the work-area clamp can still cut
 the toolbar**: the window there is narrower than 900 epx (1920 / 2.25 = 853
 epx), which is below the width the long title needs — and so is any screen
 whose work area is under 900 epx wide, a 1280 × 800 laptop at 150% (853 epx)
@@ -6524,6 +6573,56 @@ the remaining option, not taken. The UiFact's
 right-edge check is 8 px × scale inside UI Automation's window rectangle,
 because that rectangle includes Windows 11's invisible resize border (7 px a
 side at 150%: `GetWindowRect` 1350 against the visible frame's 1332).
+
+**A remembered window whose display is gone (#558).** Before #558 the
+constructor moved a remembered frame to where it was and stopped there: #542
+fitted the SIZE to the nearest display, never the position. Measured
+2026-10-22 on the same PC (Lenovo 20QES70500, i5-8365U, one 1920 × 1080
+display at 150%, work area 1920 × 1008) with a frame seeded at X = 5000,
+Y = 200, 1400 × 900 and "restore windows on launch" on: the visible frame
+opened at (5009, 200), wholly beside the work area — a taskbar button and no
+window. A teacher meets this after undocking a laptop, unplugging a second
+screen or a projector, or lowering the resolution.
+
+Now `MainWindow.OnADisplay` hands `WindowFrameFit.Fit` (Plantoir.Core) the
+remembered frame, every display's work area (`DisplayArea.FindAll()`, read by
+`Count` and the indexer — enumerating that projection throws in some Windows
+App SDK versions) and the nearest one (`DisplayArea.GetFromRect(…, Nearest)`).
+The frame is **kept exactly** when its title-bar strip — its top 32 epx —
+overlaps SOME work area by at least 100 epx across and a third of the strip
+down, both converted at the nearest display's scale (one scale,
+`GetDpiForMonitor` of `MonitorFromRect` on the whole remembered rectangle):
+epx, because 100 raster pixels is only 50 epx at 200%. And if any of this
+throws (`FindAll`'s projection has thrown on some Windows App SDK versions,
+and the package floats on 1.*), the frame opens as remembered and
+`startup.log` says so: a frame is re-saved only by a window that opened, so a
+throw that stopped the window would have failed every later launch.
+Otherwise it is shrunk to no larger than the nearest work area and centred
+on it, and centred again after the minimum size has grown it. After the fix
+the same seeded frame opened with its visible frame at (269, 54), 1382 × 891,
+inside the work area. A frame that is kept takes exactly the old path.
+
+The rule asks for SOME overlap, not the whole strip inside one work area, and
+that was a plan-review correction: a window quit maximised is saved a few
+pixels outside its display (about (-11, -11) at 150%), a window can straddle
+two monitors side by side or stacked, and a top taskbar covers part of a
+strip — and each of those is a frame the teacher left on purpose, which a
+whole-strip rule would have shrunk and re-centred. `WindowFrameFitTests` has a
+case for each, and for the X = 5000 frame, a vanished right-hand monitor, a
+frame larger than the work area, a title bar above every display and a
+sliver of title bar too narrow to drag. **REJECTED:** always clamping the
+frame into the nearest work area (moves every one of those deliberate
+frames); clamping only the size (what #542 left, the position still off
+screen). **Known limit:** several windows remembered on one vanished
+monitor all come back centred on the same display, one exactly over another;
+the rule says where a window can be reached, not how to cascade them. A
+`startup.log` line (`MainWindow ctor: remembered frame … is on no display`)
+records a move; there is no trail line, because nothing a teacher did is
+being recorded. Mac: nothing to do — AppKit's frame restore already keeps a
+window on a screen. Pinned in the UI suite by
+`WindowOnScreenUiTests.ARememberedFrameOffEveryDisplayOpensInsideTheWorkArea`
+(opt-in, `DrivenApp(restoreWindows: true)`), red before the fix and green
+after, run alone.
 
 ### Known limits
 
@@ -6798,14 +6897,15 @@ and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170).
 This section is what Windows does differently, and what it measured.
 
 **What the runtime carries, since 2026-10-15 (#503, the catch-up's batch
-5A).** `fetch-runtime.ps1` has a vendor phase that mirrors the Dockerfile's
-`/opt/vendor` into `runtime\vendor`:
+5A), and Pyodide since 2026-10-22 (#568).** `fetch-runtime.ps1` has a vendor
+phase that mirrors the Dockerfile's `/opt/vendor` into `runtime\vendor`:
 
 | Folder | What | How it is checked |
 |---|---|---|
 | `pagedjs\` | Paged.js 0.4.3's `paged.min.js` + `LICENSE.md` (#454) | the tarball's SHA-256, then the file's (`fileSha256`) and its 502,617 bytes |
 | `pagedjs\fonts\` | Latin Modern's six OTFs + `LICENSE-Latin-Modern.txt` (#499) | the `.deb`'s SHA-256, then each font against `latinModern.files` |
 | `function-plot\` | function-plot 1.25.4's `function-plot.js` + `LICENSE` | the tarball's SHA-256, then the file's and its 202,953 bytes |
+| `pyodide\` | Pyodide 314.0.7's five runtime files + `README.txt` naming MPL-2.0 (#455, #568) | the tarball's SHA-256 and its 6,757,104 bytes, then each file against `pyodide.files` — "Runnable code (#455)" below |
 | `tikz-engine\` | node-tikzjax 1.0.5 from `support\figures\package-lock.json` (`npm ci --omit=dev`) | `npm ls node-tikzjax@1.0.5`, then the three `tex\*.gz` against `nodeTikzjax.files` |
 
 Each URL is written out in full in the script, because
@@ -6834,23 +6934,22 @@ licence asks a changed font be renamed).
 fetching ~600 MB again.** What runs is decided from `manifest.json`'s KEYS,
 never from folders (a crashed `npm ci` leaves a `node_modules` that looks
 done): no manifest, everything; a manifest whose vendor keys (`pagedjs`,
-`latinModern`, `functionPlot`, `nodeTikzjax`) are missing or differ from the
-pins, `runtime\vendor` is deleted and only the vendor phase runs, against the
+`latinModern`, `functionPlot`, `nodeTikzjax`, and `pyodide` since #568) are
+missing or differ from the pins, `runtime\vendor` is deleted and only the vendor phase runs, against the
 node and python already there (both paths set before any phase), and the
 manifest is merged. The plan review's M4 found the first draft would have
 called `npm.cmd` with an empty `$nodeDir` on that path.
 
 **A run that dies part-way leaves a runtime the build refuses and the next
 run repairs** (the 5A implementation review's L1 and L3). Before
-`runtime\vendor` is touched, the manifest is rewritten WITHOUT the four vendor
+`runtime\vendor` is touched, the manifest is rewritten WITHOUT the vendor
 keys — on a fresh clone that is the first manifest written, the five base keys
 right after the base phases. So a vendor phase that fails (a download, `npm
 ci`, a hash) leaves base keys only: `CheckNativeRuntimeManifest` stops the
 build, and a re-run takes the vendor-only path instead of trying to move Node
-onto a `runtime
-ode` that is already there. REJECTED: keeping the old
+onto a `runtime\node` that is already there. REJECTED: keeping the old
 manifest until the end, which is what 5A did — after a pin bump a failed
-vendor-only run left all four keys (old values) beside no `vendor` folder, a
+vendor-only run left every vendor key (old values) beside no `vendor` folder, a
 runtime the build accepted and `publish.ps1` shipped without engines; and
 checking for the folder in `CheckNativeRuntimeManifest`, which is the "decide
 from folders" the script exists to avoid. **A version and its address cannot
@@ -6866,9 +6965,14 @@ whatever `Vendor\runtime` holds — so a build PC with a 2026-08-19 runtime
 would have published an installer with no engines, silently.
 `Plantoir.csproj` → `CheckNativeRuntimeManifest` now runs before
 `CopyNativeRuntime` and `PublishNativeRuntime` and fails the build, saying to
-re-run `fetch-runtime.ps1`, when the manifest lacks any of the four keys.
-Must-fail measured: with `nodeTikzjax` removed from the manifest the x64
-Debug build stopped with that error; restored, it built. No runtime at all is
+re-run `fetch-runtime.ps1`, when the manifest lacks any of the vendor keys
+(four from #503, five since #568 added `pyodide`). Must-fail measured: with
+`nodeTikzjax` removed from the manifest the x64 Debug build stopped with that
+error; restored, it built. Measured again for `pyodide` on 2026-10-22: the
+key removed, the x64 Debug build stopped at `Plantoir.csproj(104,5)` with
+"…predates the page features (Paged.js, Latin Modern, function-plot, the
+TikZ engine, Pyodide): its manifest.json lacks their keys…"; restored, it
+built. No runtime at all is
 still allowed, as before (the targets are skipped).
 
 **Installing over an older version.** Inno never removes a file a newer
@@ -6949,25 +7053,252 @@ argument must be a `figureRules.js` inside a `"type": "module"` package (a
 section's Quartz is one); handed the repository's copy directly, Node reads
 it as CommonJS and the helper dies before it says it is ready.
 
-## Runnable code (#455) and KaTeX served by the site (#494), v1.8.0: what the runtime owes
+## Runnable code (#455) and KaTeX served by the site (#494), v1.8.0: the runtime carries Pyodide (#568)
 
 The mac shipped both in v1.8.0; the shared Python, the page's code and the
 skill reach this side unchanged (`page_features.py`, `build_site.py`,
 `support/quartz/**`, `support/gated/pyodide/plantoir-worker.js`, the
-`plantoir-runnable-code` skill). What this runtime owes is in the `windows`
-issue for #455 (milestone v1.8.0): `fetch-runtime.ps1` fetching
-`pyodide-core-314.0.7.tar.bz2` and keeping its five files and a README in
-`runtime\vendor\pyodide` (13,531,207 bytes; whether `tar.exe` reads bzip2 is
-unmeasured — the image uses `python3 -m tarfile`), the katex version this
-runtime's lockfile installs (the mac's gives **0.16.21**; record what
-`npm ls katex` says here), `verify-deploy.ps1`'s engine and KaTeX checks, and
-measurements in Edge, Chrome and the WebView2 preview pane. Until the fetch
-lands, `ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` is
-red on the `pyodide` pin, or held open in `NamedGapLedger` by that issue. The
-manual is [06 → I](06-quartz-customizations.md#i-runnable-code-455-v180),
+`plantoir-runnable-code` skill). The manual is
+[06 → I](06-quartz-customizations.md#i-runnable-code-455-v180),
 [06 → C2-26](06-quartz-customizations.md#c2-applied-on-every-build),
 [05 → Runnable code](05-build-pipeline.md#runnable-code-what-the-build-does-455-v180)
 and [07 → Runnable code and KaTeX on each host](07-deployment.md#runnable-code-and-katex-on-each-host-455-494-v180).
+This section is what Windows does differently, and what it measured
+(2026-10-22, Intel Core i5-8365U @ 1.60 GHz, 16 GB, Intel UHD Graphics 620,
+Windows 11 Pro 26200, wired Ethernet; Node 20.18.1).
+
+**What landed (#568, 2026-10-22).** `fetch-runtime.ps1`'s vendor phase
+fetches `pyodide-core-314.0.7.tar.bz2` from the project's GitHub release,
+checks it against the contract's `sha256` and its 6,757,104 bytes, keeps the
+five files the image keeps — `pyodide.mjs`, `pyodide.asm.mjs`,
+`pyodide.asm.wasm`, `python_stdlib.zip`, `pyodide-lock.json` — each checked
+against `pyodide.files`, and writes the Dockerfile's README line byte for
+byte (`Pyodide 314.0.7 (MPL-2.0). Source: …/tree/314.0.7`, 83 bytes, one
+LF). `pyodide` is the fifth vendor key in `manifest.json`, so a runtime made
+before 2026-10-22 takes the vendor-only path (the whole vendor phase again,
+**49 s** here, downloads 1.05 + 4.32 + 0.19 + 6.44 MB then `npm ci`), and
+`CheckNativeRuntimeManifest` refuses it until then — "Diagrams and graphs"
+above, which also has the must-fail measurement. `build_site.py` finds the
+folder with no new variable (`toolchain_paths.VENDOR_DIR`), and a build of a
+page with a runnable block printed "▶️  This site carries what runs Python
+for 2 pages" and carried the five files plus the worker.
+
+**The runtime grows by 13,531,290 bytes** — the five files, 13,531,207 bytes
+as the contract's `why` says (pyodide.mjs 17,931; pyodide.asm.mjs 1,250,344;
+pyodide.asm.wasm 9,598,218; python_stdlib.zip 2,545,637; pyodide-lock.json
+119,077), plus the 83-byte README. `runtime\vendor` went from 42,185,233 to
+55,716,523 bytes. A site carries them only when a page students can see has a
+runnable block (`codeRunnerBlocks.siteCarriesEngine`).
+
+**Unpacked with the runtime's own Python, not bsdtar.** MEASURED: this PC's
+`%SystemRoot%\System32\tar.exe` is bsdtar 3.8.9 with bz2lib 1.0.8, so it
+does read bzip2. The script still uses the embeddable Python's `tarfile`
+(`r:bz2`; `_bz2.pyd` ships in the embeddable zip), extracting only the five
+names and refusing a tarball that lacks one — the same reason the Latin
+Modern step gives for xz (an older Windows 10's bsdtar is not known to carry
+the library, and the build PC is the only place this runs), and the same
+tool the Dockerfile uses (`python3 -m tarfile`). REJECTED: bsdtar, for that
+reason; holding the pin open in `NamedGapLedger` instead of fetching (the
+fetch was small enough to land with the pin).
+
+**KaTeX: the runtime's lockfile installs 0.16.21, the mac's version.**
+`npm ls katex` in `runtime\quartz` gives `katex@0.16.21` (and
+`micromark-extension-math`'s copy deduped to it). The three files the
+contract pins (`katex.min.css`, `contrib/copy-tex.min.js`, `LICENSE`) match
+`katex.files` byte for byte, and the 20 woff2 faces total 259,792 bytes, the
+mac's number — so a Windows-built site serves exactly the mac's KaTeX.
+
+**`scripts/test_katex_assets.py` was red on Windows, and the runtime was not
+why.** `InstallTests.carried()` listed the copied files with
+`str(path.relative_to(...))`, which is `contrib\copy-tex.min.js` here against
+the expected `contrib/copy-tex.min.js`; it uses `.as_posix()` now, which is
+the same string on the mac. `build_site.install_katex_assets` itself compares
+`Path` objects and was right. (Run by hand from a cp1252 console the file
+also throws two `UnicodeEncodeError`s on build_site's emoji prints;
+`PythonToolchainTests` sets `PYTHONUTF8` and `PYTHONIOENCODING`, so the suite
+never sees them.)
+
+**Tests.** `ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`
+is green on the `pyodide` pin's `windowsRuntimeContains`;
+`TheWindowsRuntimeRecipesVendorVersionsAreTheContracts` holds
+`$PyodideVersion`; `TheWindowsRuntimeRecipeChecksPyodidesContractHashes` holds
+the recipe's tarball hash and five file hashes against the contract (only
+Pyodide's: `nodeTikzjax.sha256` is for the record, `npm ci` checks its own
+lockfile); and `TheNativeRuntimeCarriesPyodideAtTheContractsHashes`
+(`[NativeRuntimeFact]`, skipped with its reason only where there is no
+runtime at all) reads the runtime on the machine back — it FAILS on a
+manifest without `pyodide`, as the build does, and on any file or README
+that is not the contract's.
+
+### The preview's isolation headers (#591, mac #583): inherited
+
+Windows' preview is Quartz's own server, run from the section's copied
+scaffold (`node <builds>\…\section1\quartz\bootstrap-cli.mjs build --serve`,
+`cwd` the section), so `build_site._wire_isolation_serve` patches that copy's
+`quartz\cli\handlers.js` exactly as on the mac. Two things could have stopped
+it and did not: the native-only loopback patch (`fetch-runtime.ps1` rewrites
+`server.listen` and the WebSocket server, not the `serve()` anchor), and line
+endings (the runtime's `handlers.js` has no CR, and the 8-space
+`const release = await buildMutex.acquire()` anchor occurs once). Read back
+from a native preview with curl:
+
+| Address | What came back |
+|---|---|
+| a page with a ```` ```python run ```` block that reads `input()` | `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp` |
+| the same with a YouTube `<iframe>` | neither header, and the preview printed `plantoir: note: Lessons/Video Check.md: students type this page's input in a box before Run, because the page also shows a video, a PDF or another web page in a frame - …` (`words.notLiveBecause` + `notLiveFrame`, once per page) |
+| the front page | neither header |
+| `static/pyodide/*` and `static/swift/*` | `Cross-Origin-Embedder-Policy: require-corp` on every file |
+| `pyodide.asm.wasm` / `.mjs` / the workers | `application/wasm` / `application/javascript; charset=utf-8` |
+| `static/katex/katex.min.css` / a face | `text/css; charset=utf-8` / `font/woff2` |
+
+**The publish inherits it too**: `deploy.py` → `isolation_headers.py` is
+shared, and `verify-deploy.ps1` read the same headers back from Netlify and
+Cloudflare Pages (below). Nothing was changed for #591.
+
+### The editor's colours and line numbers (#592, mac #585): carried
+
+`Plantoir.csproj` ships `scripts\**`, `support\**` and `contracts\**` by glob,
+and `ToolchainMirror.RecipeFolders` mirrors the same folders into a working
+folder's `.toolchain`, so `support\quartz\components\scripts\codeRunnerColour.ts`,
+`support\quartz\components\styles\codeLines.scss` and
+`scripts\fixtures\runner-colour\` (python.txt, swift.txt) are in the x64
+Debug build's `Toolchain\` (checked). Windows does not run
+`scripts/check_runner_rules_against_the_site.py` (it needs the image's
+Shiki), so #592's item 2 does not apply here.
+
+### Measured in Edge (headless), on a native preview
+
+Headless Edge 155.0.4283.60 through Playwright (`channel="msedge"`, a fresh
+profile per context), against the preview above — a section built with
+`preview.ps1` from this runtime, served at `http://localhost:8081`. This
+PC's WebView2 Runtime is 155.0.4283.62, the same Chromium; the preview pane
+itself is measured below ("WebView2"). No Chrome is installed here.
+
+- **Isolation**: `self.crossOriginIsolated` is `true` on the runner page,
+  no input box; `false` on the YouTube page, which shows the box and its
+  `words.inputAhead` line, and its transcript was `Name? Ada` / `Hi Ada`.
+- **Nothing of the engine on load**: 0 requests under `static/pyodide/`
+  before Run; Run fetched the worker, `pyodide.mjs`, `pyodide.asm.mjs`,
+  `pyodide.asm.wasm`, `python_stdlib.zip` and `pyodide-lock.json`.
+- **First Run** (cold, a fresh context each time, empty cache) to the first
+  prompt on the page: **2.29–2.42 s, median 2.38 s** (5 runs); the whole
+  program with both answers 2.36–2.53 s. **A second Run** on the same page:
+  **0.10–0.12 s**.
+- **`input()` with two prompts**: Run focused the answer field
+  (`plantoir-runner-answer`); `Ada` Return, `blue` Return gave the transcript
+  `Name? Ada` / `Colour? blue` / `Hello, Ada who likes blue`, byte for byte
+  the box's shape. **Ctrl-D** at the second prompt: `Colour? ` then the
+  `EOFError: EOF when reading a line` traceback naming line 2, status
+  `Finished with an error.`
+- **Stop then Run**: `while True: time.sleep(0.1)` stopped in **0.03 s**
+  (`Stopped.`); the next Run reached its first prompt in **2.6–2.9 s**,
+  because Stop ends the thread and the next Run starts a new one (a cold
+  start from the browser's cache), and ran correctly.
+- **One thread after page changes**: 1 worker before, 1 after three round
+  trips between the runner page and the YouTube page by the site's own links
+  (each crossing the isolation line, so each a whole load) with a run on each
+  return.
+- **Tab** at the start of a line inserted four spaces; **Shift-Tab** put the
+  code back exactly; **Escape then Tab** left the editor.
+- **Colours (#592)**, light and dark (`saved-theme`): a line typed into the
+  editor (`def f(): return "x" + 42  # note`) was coloured by the tokenizer
+  in the same colours as Shiki's static block for the same kinds — `def`
+  rgb(215, 58, 73) light / rgb(249, 117, 131) dark, a comment
+  rgb(106, 115, 125) in both; the string and number took github-light's and
+  github-dark's (rgb(3, 47, 98) / rgb(158, 203, 255), rgb(0, 92, 197) /
+  rgb(121, 184, 255)). **Gutter**: 6 numbers for 6 editor lines and 6
+  coloured lines, and the copy's text equal to the editor's. **Undo**: each
+  Ctrl+Z took one typed character back (Playwright types key by key) and the
+  copy and gutter stayed in step after every one. **Hairline**: the
+  runnable gutter's `border-right` and a static block's number's
+  (`[data-line]::before`) are the same, `1px solid rgb(229, 229, 229)` light
+  and `1px solid rgb(57, 54, 57)` dark; `font-variant-ligatures: none`.
+- **Maths offline**: with every request not to the preview's own origin
+  aborted (the only one asked for was Google Fonts' stylesheet), both
+  formulas rendered, `KaTeX_Main`, `KaTeX_Math` and `KaTeX_Size1` loaded from
+  `static/katex/fonts/`, and the stylesheet was the site's own.
+
+### WebView2 (the preview pane)
+
+Measured 2026-10-22 on the same PC, unlocked desktop: the x64 Debug app
+with `--state-dir` and `--auto-preview PYT1O 1` (the button's own code
+path), so the pane showed the app's own preview — Quartz's server at
+`http://127.0.0.1:8081`, started by the app from the bundled runtime. The
+pane was driven over WebView2's debugging port
+(`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=…`), so keys
+are Chromium input events, not the OS keyboard. WebView2 Runtime
+155.0.4283.62 (user agent `… Chrome/155.0.0.0 … Edg/155.0.0.0`).
+
+- **Isolation in the pane**: `self.crossOriginIsolated` is `true` on the
+  runner page (no input box), `false` on the YouTube page (the box shows) —
+  the pane is a browser like any other here, and the app adds nothing that
+  breaks the headers.
+- **First Run to the first prompt**, the cache cleared before each
+  (`Network.clearBrowserCache`), 5 runs: **2.17–3.49 s, median 2.27 s** (the
+  3.49 s was the first run after the app opened). **A second Run**:
+  **0.07–0.08 s**.
+- **`input()` with two prompts**: the answer field had the focus at Run; the
+  transcript was `Name? Ada` / `Colour? blue` / `Hello, Ada who likes blue`,
+  as in Edge. **Ctrl-D** at the second prompt: the EOFError traceback,
+  `Finished with an error.`
+- **Stop then Run**: stopped in **0.04 s**; the next Run's first prompt
+  **2.32 s** (a new thread), and it ran correctly.
+- **Tab** inserted four spaces, **Shift-Tab** restored the code exactly,
+  **Escape then Tab** left the editor — WebView2 does not take Tab for the
+  app's own focus ring while the editor has it.
+- **Maths offline**: every request not to the preview's origin aborted —
+  both formulas rendered from the site's own KaTeX stylesheet and faces
+  (`KaTeX_Main`, `KaTeX_Math`, `KaTeX_Size1`); the only addresses refused
+  were Google Fonts' stylesheet and, from the YouTube page being left, one
+  YouTube logging call.
+
+### verify-deploy.ps1
+
+Gained the mac's `check_engine` and `check_engine_folder` (#568): each engine
+file 200 with a runnable type, a worker CSP that allows wasm, the borrowed
+page's runnable block, COOP/COEP on that page and COEP on both engine
+folders, none on the front page, KaTeX's stylesheet as `text/css` and a
+face, no CSP naming jsdelivr, and the folder publishes' engine and KaTeX
+files against the contract's hashes. Swift is checked as far as Windows
+carries it — `static/swift/plantoir-swift-worker.js` and `plantoir-wasi.mjs`
+as JavaScript with COEP, and the overlay byte for byte — and the borrowed
+page's ```` ```swift run ```` fence is EXPECTED to be reported as not ready
+(`swift.reasons.notOnWindows` on a `plantoir: error:` line, and the
+`swiftCouldNotBePrepared` folder problem) by the preview and by the publish
+that rebuilds; and the compiled program, which Windows cannot make (#570),
+is asserted ABSENT — a program found on a Windows-built site fails the run —
+rather than skipped, so a Windows run can be the "nothing skipped" run
+`RELEASING.md` asks for (the #568 implementation review). It also times each Netlify and Cloudflare publish and counts the
+bytes sent on the interface the default route uses (route metric plus
+interface metric: sorting on the route's alone read a Wi-Fi counter that
+never moved beside the wired adapter).
+
+Two runs, 2026-10-22, a scratch course (`PYT1O`: two runnable pages, one
+with a YouTube frame, and the borrowed page). The FIRST, from a fresh state
+folder and onto new sites: Netlify **19 s** for the first publish with the
+engine ("Netlify requires 17 file"), Cloudflare **33 s**; then **11 s**
+("8 file") and **20 s** ("Uploaded 7 files (46 already uploaded)") again.
+Its byte counts read 0 (the Wi-Fi counter; fixed above), so the number of
+bytes a first publish of the engine sends is not measured here. The SECOND
+run, onto the same sites: **140 passed, 0 failed, 8 skipped** (the eight
+were the Swift program, once per host and folder, then reported as skips;
+these totals are from BEFORE the change above, which turns those eight into
+asserted passes, so a clean run should now read 148 passed, 0 failed,
+0 skipped — the next release run re-measures it); publishes of 10–12 s to
+Netlify ("7 file", 182–239 KiB sent) and 20–29 s to Cloudflare ("Uploaded 7
+files (46 already uploaded)", 400–709 KiB) on Ethernet.
+
+**What the first run also found, not fixed here:** on a FIRST publish (no
+saved surname, a new site) two of the harness's answered prompts failed
+`Assert-OnlyExpectedPromptsWereAnswered`, because the line PtyDriver saw
+joined the sentence before it with no line break: "…It is saved on this
+computer and only asked once.First time setup... what is your last name?
+(letters only):" and "…all users across the world.Enter Netlify site name
+[pyt1o-s1-2026-testing]:" (and in the log, "Saved teacher last name for
+future deploys: testingChoose a Website Address."). The answers were the
+right ones and the publishes succeeded; the anchored patterns are what
+refused them. It predates this piece (nothing here touches `deploy.py`'s
+prompts or PtyDriver) and is #623.
 
 ## Runnable Swift (#493), v1.8.0: Windows compiles none of it yet
 
@@ -7002,3 +7333,1011 @@ test reads `codeRunnerBlocks.swift` or `swiftImage` yet, and
 `swiftCouldNotBePrepared` check in `siteHealth.repair.neverOffered`, where
 review S8 put it so this suite and the mac's stay green.
 
+
+## The trail's first and last lines (#565, the mac's #560), v1.8.0
+
+**"Plantoir opened" prints the version a teacher can name.** It was built
+from the assembly version as `Major.Minor (Build)`, so `<Version>1.7.2</Version>`
+read "Plantoir 1.7 (2)" while the update lines on the same trail said "from
+1.7.1 to 1.7.2". `ProblemReportEnvironment.AppVersion` now spells it with
+`AppUpdates.Spell` (the updater's own spelling, #465) and adds a build in
+brackets ONLY when the assembly carries a revision. Windows has no build
+number of its own: `<Version>1.7.2</Version>` makes the assembly 1.7.2.0, so
+the line is "Plantoir opened — Plantoir 1.7.2 · pid N · C:\…\Plantoir.exe".
+An unused second `NoteLaunch(appVersion, buildNumber, …)` overload, which
+printed a third shape, is gone.
+
+**"Plantoir closed — {reason} · pid N"** (`ActivityTrail.Event.AppClosed`,
+`mustRecord` → "app closed") is new on both platforms. The reasons, from
+`QuitConfirmation.ClosingReasonFor`:
+
+| What happened | Reason on the trail |
+|---|---|
+| The teacher closed the last window — including with an update ready, which installs as Plantoir quits (`AtQuitGated`): that quit is still theirs, as the mac rules for Install on Quit | quit by the teacher |
+| `App.QuitForUpdate`, the updater's own exit after starting the installer | to install a new version |
+| `WM_QUERYENDSESSION` / `WM_ENDSESSION` carrying `ENDSESSION_CLOSEAPP` (lParam bit 0x1) — Restart Manager closing this one app, which is how the installer (`installer.iss` `CloseApplications=yes`) closes a running Plantoir | to install a new version |
+| The end-of-session messages WITHOUT that bit: a sign-out (`ENDSESSION_LOGOFF`), restart or shut down | asked to close by Windows |
+
+**Where it is written, and why there.** From `App.QuitTime`, after the
+update-at-quit decision; and from `SessionEnding`'s window subclass on
+`WM_ENDSESSION` with wParam TRUE, BEFORE `DefSubclassProc` returns, because
+at the end of a session Windows may end the process before the last window's
+`Closed` ever runs. Once per process (every subclassed window hears the
+message, and the last window's close may follow it), and only in a process
+that wrote its own "Plantoir opened" — the same guard, so a scheduled run or
+a marketing capture leaves no unpaired close. The end-of-session path waits
+at most 500 ms IN ALL — for this process's own trail lock and the writers'
+cross-process lock together (`ActivityTrail.Append` with
+`Monitor.TryEnter`) — instead of the usual 5 s for the cross-process lock,
+which is about Windows' own kill timeout. A line that cannot get the lock in
+that time is dropped rather than holding the session up, and is tried only
+once (there is no later moment). The ordinary quit's line waits for the
+locks as every line does, and counts as written only once it has reached the
+file (`Append` returns whether it did).
+
+**Rejected:** reading "install" from the at-quit install (it fires when the
+teacher quits with an update ready — the mac's `willInstallUpdate` trap); a
+fourth "asked by another program" reason (a scripted close sends the same
+`WM_CLOSE` as the title bar's X). **Not measured:** a real sign-out, restart
+or installer run. The reason table is pinned by
+`AppOpenedAndClosedTests.TheReasonIsReadFromWhatTheAppKnew`, the once-only
+guard by `TheClosedLineIsWrittenOnceAndOnlyAfterTheOpenedLine`.
+
+## My Progress: the trail line and the two readers (#599, the mac's #545), v1.8.2
+
+The page itself is shared toolchain, and Windows inherits it with the build.
+What Windows owed:
+
+- **`my progress page built`** (`ActivityTrail.Event.MyProgressPageBuilt`),
+  read from the build's `PLANTOIR_MY_PROGRESS:` line by `MyProgressBuilt` —
+  the `CoverageMapsBuilt` pattern — in the console reader
+  (`ScriptRunner.RecordHealthFinding`, and the 8000-character carry guard),
+  the scheduled publish's record reader (`ScheduledHealthFindings`) and the
+  wrapper's marker scan (`TaskScheduling.cs`). A scheduled-deploy wrapper
+  written before this change has no `PLANTOIR_MY_PROGRESS:` in its scan, so a
+  scheduled run's line reaches the trail only once that deploy is scheduled
+  again — the same as for `PLANTOIR_MAPS:`. The sentences are
+  `myProgressBuilt.trailLine.shapes`, "N page(s)" spelled 1 page / N pages.
+- **`include_my_progress` and `success_criteria_headings`**, read-only
+  (`CourseConfiguration.IncludesMyProgress(section)`, `SuccessCriteriaHeadings`;
+  the switch and the list are #595), run against `myProgress.config.cases`.
+  `include_my_progress` is read as the BUILD reads it
+  (`build_site._resolve_section_switch`): a map's `sections` entry, then its
+  `sectionN`, then its `default`, else on; any other value by Python's truth,
+  so the string "false" is on. **A known difference, left alone:**
+  `IncludesCurriculumCoverage` here honours only a boolean or
+  `sections.sectionN`, while the build also honours the flat and `default`
+  forms. Only a hand-edited config can show it — both apps write the
+  `sections` form — and it is noted on #595 rather than changed here.
+
+**Measured** (this PC: i5-8365U, Windows 11 Pro 26200; the bundled runtime's
+Python 3.11.9 and node 20.18.1; Edge 155.0.4283.60 headless; 2026-10-22): a
+native `preview.ps1 EXC2O 1 --build-only` of the example course, with one
+"Success criteria" list of three boxes added to a published class, took 37 s,
+printed `PLANTOIR_MY_PROGRESS: {"course": "EXC2O", "section": 1, "built":
+true, "pages": 1, "reason": "built"}` and wrote `My-Progress.html` (24,405
+bytes; the slug, not "My Progress.html") and `progress-manifest.json` (1,324
+bytes, the three items under "Unit 3, Day 14"); Key Links links it. In Edge,
+on a fresh profile, it read 0 / 3; two ticks on the class made it 2 / 3 under
+Unit 3, Day 14, and a reload kept 2 / 3.
+
+## Undo: three verdicts, not two (#564, the mac's #555), v1.8.0
+
+`UndoHistory.Undo` had two outcomes per file, put back or skipped, and kept
+the entry while anything was skipped. A file an earlier press had already put
+back holds its BEFORE text, so it was skipped too, and a change taken back in
+part never came off the list. Russell's ruling on #555 (option 2): such a
+file is ALREADY BACK. Each saved file now gets ONE verdict,
+`UndoVerdict.Of(path, state)`:
+
+- **alreadyBack** — the disk holds BEFORE: nothing is written, it is not
+  counted as put back, and it does not hold the entry. BEFORE is compared
+  first, so a row the change left as it found it cannot stick.
+- **putBack** — the disk holds AFTER: BEFORE is written back, or the file
+  deleted when BEFORE is null. A write that fails is left alone, as on the mac.
+- **leftAlone** — anything else.
+
+"Null" means NOTHING at the path: a folder, or a file that is not UTF-8, is
+neither copy and is left alone (the old `File.ReadAllText` decoded non-UTF-8
+bytes silently and called a folder "no file"). The strict reader drops ONE
+leading byte-order mark first, because the saved copies came from
+`File.ReadAllText`, which drops it — the mac's `String(contentsOf:encoding:)`
+does the same — so a page saved with a mark still matches its copy.
+
+`UndoResult.Answer` picks the sentence: every file back → `undid` (even when
+this press found them all already back); written and left → `undidPartly`;
+nothing written and something left → `couldNotUndo`; nothing at all →
+`nothingToUndo`. No new AssistWording sentence. `NoteAChangeWithNoUndoEntry`
+fires exactly on `undidPartly`. The start-of-year undo sheet previews by the
+same verdict (`AssistWorkspace.WhatAnUndoWouldDo`): put back under
+`undoIntro`, staying under `undoSkipped`, a page already back in neither, and
+`startOfYear.wording.undoAllAlreadyBack` when both are empty. (Before this it
+listed every written file, with no preview of what stays.)
+
+The preview: `AssistToolRunner` restarts the preview whenever it stopped one
+for an edit tool, whatever the tool wrote, so an undo that writes nothing
+already put the preview back here. It is pinned now
+(`SectionVerbsTests.AnUndoThatFindsEveryPageAlreadyBack_StillRestartsThePreviewItStopped`).
+The rows are `assist-cases.json` → `undoFiles`, run by `UndoFilesContractTests`;
+by copy-and-restore of the old rule, 5 tests went red.
+
+## The Start of Year sheet as a table (#619, the mac's #589), v1.8.4
+
+`StartOfYearSheet.Make` cuts the plan into what the dialog draws, and
+`Views/StartOfYearSheetView` draws it on #548's `PlanTable.Row` and
+`PlanTableOrder`:
+
+- **Above the table**, in a scroller: the warnings first (already taught,
+  the scheduled deploy, the first class in draft), in the caution colour, then
+  the intro.
+- **The summary**: the two list headings, unchanged.
+- **The table**: Page (`AssistWording.MenuPlanPageColumn`), Folder
+  (`MenuPlanFolderColumn`), Why (`StartOfYearWording.ReasonColumn`, the new
+  `startOfYear.wording.reasonColumn`); a row for every page going into draft,
+  classes first and then pages, in plan order, sortable by a header. The
+  title cell has no quotation marks and the folder is always shown. Why is
+  `StartOfYearWording.Reason`, the clause the line always carried, word for
+  word; it takes the rest of the width and wraps to two lines.
+- **Under it**, in a scroller: publishing from now on, the links left
+  pointing at hidden pages, and the pages with no room for a key FIRST; then
+  already in draft and what stays.
+
+**The no-room note is now said BEFORE Go.** Until #619 it appeared only in
+the result. `StartOfYearPagesWithNoRoom` asks the write's own rule
+(`StartOfYearDraftEdit`, shared with `PrepareForStartOfYear`), so the sheet
+names exactly the pages Go will leave as they are. The MCP text
+(`Describe`) is unchanged, and every sentence on the sheet is one it, or the result, says (the no-room note is the result's `AssistWording.PagesWhoseSettingsCannotBeAddedTo`).
+
+**The height rule** (`StartOfYearSheetLayout.For`, pure). The mac's fixed
+620 pt budget cannot be copied: this window's minimum height is 600 epx, and
+a ContentDialog cannot scroll content it clips. So the budget is the window's
+height (at most `ContentDialogMaxHeight`, 756) less the measured chrome, and
+the parts give way in an order, each scrolling inside itself rather than
+being cut:
+
+1. the ROWS, from five down to two (each counted at its own measured height
+   — a Why on two lines makes a taller row than #548's 32 epx pitch);
+2. the notes, never below what must be read before Go, nor below the mac's
+   120 floor when they are that tall;
+3. the intro above, down to the warnings — the warnings are NEVER capped;
+4. on a window too short for all of that, the notes down to two lines.
+
+The dialog measures each part at its width, logs the fit to `startup.log`
+("Start of Year sheet: …"), reads its real chrome from the laid-out dialog
+("Start of Year sheet laid out: …") and refits with it, and refits again
+when the window changes size.
+
+**Measured** (this PC: i5-8365U, Windows 11 Pro 26200, 1920 × 1080 at 150%,
+2026-10-22; the app's own `--stage-scene start-of-year` on a worst-case
+ICS3U section 2: its first class in draft, classes dated before today, a real
+scheduled deploy, a page with no room for a key, 175 rows, the links-left
+list 30-odd pages long):
+
+| Window (XamlRoot) | Warnings | Above shown | Rows shown | Notes: must-read / all / shown | Dialog |
+|---|---|---|---|---|---|
+| 700 epx (the scene's window) | 185 | 185 of 249 | 2 (66) | 349 / 474 / 199 | 699 epx |
+| 563 epx (the 600 epx minimum, less its title bar) | 184 | 184 of 248 | 2 (66) | 348 / 472 / 63 | 563 epx |
+
+- The chrome measured **250–251 epx** against the layout's 250 (now 251);
+  the dialog refits with what it reads.
+- **The three warnings are never cut** (184–185 epx); the intro under them
+  scrolls in its area in this worst case.
+- **Rows are 32 epx on one line and 50 epx when Why wraps to two** (a
+  reason naming a 42-character page title). The Why column is 272 epx wide.
+- **What does NOT hold in this worst case, said rather than hidden:** the
+  must-read notes (348 epx, almost all of it the links-left list) do not fit
+  whole at either height, so the notes area scrolls — 199 epx shown at 700,
+  63 at the minimum. Everything stays reachable by scrolling inside its own
+  area; nothing is clipped out of reach. The mac's 120 pt notes floor cannot
+  be kept at the minimum window once the warnings (never capped) and two
+  rows are placed: 563 − 251 − 184 − 66 = 62. A short plan (no links left,
+  no warnings) shows its notes whole.
+
+**Rejected:** the mac's fixed budget (above); a What-changes column, two
+tables, rows for the staying pages, and a table in the MCP text (the mac's
+rejections, `09-mac-app.md` → "The pages as a table (#589)"). The
+start-of-year picture on plantoir.app is retaken separately.
+
+## One curriculum test, folder segments only (#615), and a linked curriculum page is not "already visible" (#617, the mac's #607)
+
+**The predicate (#615).** The planner asks one question — is this page
+curriculum? — through `PagePaths.IsCurriculum(courseDirectory, fullPath)`, and
+`AssistWorkspace.IsCurriculum` now just calls it. The answer is the contract's
+(`followingLinks.neverTakenDownByFollowingLinks`, `curriculumRules.isCurriculumPage`)
+and the mac's (`AssistCurriculumMentions.isCurriculum(pageAt:in:)`): some
+FOLDER between the course and the page has "curriculum" in its name,
+case-insensitively. Until #615 `PagePaths.IsCurriculum` read the FILE name
+too, so a page called "Curriculum Coverage" (or "Curriculum Notes") in an
+ordinary folder was kept up as a curriculum page when the class linking to it
+was hidden, where the mac took it down. **The Windows hide side therefore
+changes:** a page merely NAMED "Curriculum …" is no longer kept with "it is a
+curriculum page."; it goes down with the class like any other page nothing
+visible still links to. Pages inside a curriculum folder are kept exactly as
+before. The contract case is `followingLinks.unpublishing.cases` → "a page
+only NAMED like curriculum is not kept up as a curriculum page" (added by
+this piece, green on the mac as it stands).
+
+Three edges the predicate now decides on purpose, pinned in
+`CurriculumPredicateTests`:
+
+- **Only folders inside the course count.** A working folder called
+  "Curriculum Work" does not make every page curriculum; a page outside the
+  course (a path that starts `..` from it, or on another drive) is false.
+- **A relative path is false.** `PlannedPage.RelativePath` is relative to the
+  WORKING folder, and `Path.GetRelativePath` reads a relative argument against
+  the PROCESS's working directory. The hide side's `ReasonToKeep` had been
+  passing it raw, which worked only by accident (the `..\..\` path it produced
+  still contained the course's own folders) and would have made every page
+  curriculum under a process directory with the word in it. It now resolves
+  the page with `PagePaths.ResolveInside(_folder, …)` first, through
+  `AssistWorkspace.IsCurriculumPage`, and so does the publish side below.
+  REJECTED: resolving a relative candidate against the course — the callers
+  hold paths relative to the working folder, so that would quietly read the
+  wrong place; false makes a missed resolve visible in a test instead.
+- **The contract's `isCurriculumPage.cases`** are run through it with a course
+  root in front, so the planner and the assistant's list of expectations
+  (`CurriculumRules.IsCurriculumPage`) answer alike.
+
+Not changed here: `LinkGraph.IsCurriculum` and `CurriculumRules.IsCurriculumPage`
+still test the folders of whatever path they are given (they take no course),
+and #614 — a curriculum folder renamed to something without the word, read
+from `course_config.json` — is deferred to v1.9.0.
+
+**The publish plan (#617).** What the mac decided and why, including what was
+rejected, is `10-local-ai-assistant.md` → "A curriculum page the walk reaches
+is not "already visible" (#607)". On Windows it is one line in
+`AssistWorkspace.PlanPublish`'s `linked` loop: when publishing, an
+already-visible linked page that `IsCurriculumPage` says is curriculum is
+skipped rather than added to `AlreadyRight`. `Describe()` (the card, the
+reply and the MCP `plan_publish_pages` text: "N pages are already
+visible."), `Tabulate()` (the Section menu's rows) and its
+`MenuPlanSummary` all read that one list, so they agree by construction. A
+HIDDEN linked curriculum page is still a change and goes up; a NAMED one is in
+`named` and stays listed; `changes`, the walk, the declined pages and the date
+moves are untouched; the hide side's `linked` list is not filtered.
+
+**The harness.** `FollowingLinksContractTests.Lay` now reads the case field
+`folder` (a course-level page, `publishForSection1:` / `createdSection1:`,
+written to `<course>/<folder>/<title>.md`; a class page carrying one fails the
+case) and checks `expectAlreadyRight` against the AlreadyVisible rows of
+`Tabulate()` for the same layout, taken before the publish. Until then the
+#607 case passed VACUOUSLY here: every non-class page went to
+`section1/<title>.md` and nothing read the expected list.
+
+**Measured** (2026-10-22): with the harness changed and the product not, the
+#607 case failed "already visible should be [Glossary], was [A1.4,
+Glossary]" and the new unpublishing case failed "“Curriculum Coverage” should
+be hidden"; with the product fix, both green; with the publishing skip
+removed again (copy-and-restore), the #607 case and two
+`CurriculumPredicateTests` went red, and restored, green. No trail change: the
+trail records what a publish or unpublish WROTE. A publish writes the same
+pages as before (#607's reasoning), and an unpublish that now hides one page
+more still says truthfully how many it hid.
+## A folder added later, and titles YAML can read (#580, #586; the mac's #506, #575), v1.8.0 / v1.8.1
+
+**What a teacher sees.** A folder added in Course Settings ▸ Content Structure
+after the course was made now starts like a folder made with the course: an
+`index.md`, so the site's sidebar shows it, and a `_DUPLICATE ME.md`, so there
+is a page to copy — for a shared folder, and in every section for a
+per-section one. The notice ("Plantoir made the folder … for you") is
+unchanged. And a course whose name holds `: ` ("Physics: Mechanics") gets a
+front page the build can read when a section is added or the front page is put
+back. The shared behaviour, what was measured and what was rejected is in
+`documentation/04-course-setup.md` → "5. Content structure"; this section is
+what is particular to Windows.
+
+**The writer is `Plantoir.Core/Models/FolderScaffold.cs`**, a port of the
+mac's `FolderScaffold.swift`, and `SpecialFolderRenamer.CreateFoldersOnDisk`
+calls it after making the folders: it now returns a `FolderScaffold.Outcome`
+(folders made, index pages, templates) instead of a bool, and writes pages
+only into the folders that call made. `CourseSettingsView.CreateFolderForNewEntry`
+passes the bundled template, the file names at the top of the PRIMARY
+curriculum folder (`CurriculumFolderRule.ForCourse(...).Resolved[0]`, read
+from the disk AFTER the folders are made, in the mac's order — so a
+"Curriculum" folder added to a course with none is read as empty and its own
+template's connection is taken out; `CreateFoldersOnDisk` takes it as a
+`Func` for that reason), and writes the trail line `FolderScaffold.FolderCreatedTrailLine`
+— the mac's, word for word: ", with its index page and a page to duplicate",
+", with its index page" or ", with a page to duplicate", or nothing.
+
+Four things here differ from a straight port, each on purpose:
+
+- **The template is read CRLF → LF** (`FolderScaffold.TemplateFrom`). This
+  PC's checkout has `core.autocrlf=true`, so `support/skeletons/**/_DUPLICATE
+  ME.md` is CRLF in the working tree, and `Plantoir.csproj` copies
+  `support/**` from it into the bundle; the contract's bytes, and every page
+  the mac writes, are LF. Without it an installed app would write CRLF
+  templates beside LF index pages. Pages are written UTF-8 WITHOUT a
+  byte-order mark, with `FileMode.CreateNew` — the mac's `.withoutOverwriting`
+  — so a page that appeared in between is never written over.
+- **The expectation shape is checked by hand, not by a .NET regex**
+  (`IsSpecificExpectationStem`): `\d` there takes every Unicode digit and `$`
+  matches before a trailing newline, both wider than setup's
+  `^[A-Z]\d+\.\d+$` in Python. File names sort ORDINAL, as Python's
+  `sorted(glob)` does, so `B1.10` comes before `B1.2`.
+- **The new folders are compared by `Path.GetFullPath`, ignoring case**, as
+  NTFS does.
+- **The per-section index is not SectionAdder's fallback literal**, which
+  ends without a newline; the contract's bytes carry one.
+
+**The title rule is `FolderScaffold.FrontmatterTitle`** (the contract's
+`foldersAddedLater.titleQuoting`), used by both index writers, SectionAdder
+and SiteHealthRepair. It escapes only C0 control characters, as JSON and the
+mac do; DEL makes a name quoted but is written raw — the known limit the
+contract's note records, the same on both apps.
+
+**#586: three writers.** `SectionAdder.ReplaceTitleAndCreated` quotes the
+title it swaps in — the copied front page and the scaffold from a sibling's
+frontmatter both go through it, so one line covers the mac's two swap sites —
+and `ScaffoldFrontmatter`'s no-sibling fallback quotes too.
+`SectionAdder.SectionTitle` stays PLAIN and first reads a quoted sibling back
+(`SectionAdder.PlainTitle`, the mac's `plainTitle(fromValue:)`): double-quoted
+is decoded strictly as a JSON string by System.Text.Json, so a value only YAML
+could decode (`\x41`) or two strings in one (`"a", "b"`) gives the wizard's
+form; single-quoted is stripped with `''` → `'`; a quote that never closes is
+taken as written. One difference from the mac, kept: Windows reads only the
+FIRST `title:` line of the sibling and stops (the `break`), where the mac's
+loop reads on; they differ only for a front page with two title lines, which
+no Plantoir writer produces. `SiteHealthRepair.RestoreIndex` quotes the course name it
+puts back. Courses already made with a plain colon title are left alone, as on
+the mac (a one-click repair is a v1.9.0 follow-on).
+
+**Not on disk, on purpose.** The contract's seventh folder case is `Unit 1:
+Kinematics`, and NTFS refuses `:` in a name, so every case runs IN MEMORY
+through `FolderScaffold.Pages`; the disk tests use colon-free names that still
+need quoting (`'Tis the Season`). A teacher on Windows can never meet the
+colon case for a folder; a course NAME with a colon is the case that matters
+here, and it is a title, not a path.
+
+**Testing.** `FolderScaffoldContractTests` (all 7 `foldersAddedLater.cases`
+as bytes, the 15 `titleQuoting.cases`, the 6 `frontPages` cases twice each
+through the real `SectionAdder.AddSection`, every skeleton template against
+`templateSource`, and the click's rules on disk) and
+`SiteHealthRepairTests.AFrontPagePutBackQuotesACourseNameThatNeedsIt`.
+`scripts/test_folder_titles.py` runs whole through `PythonToolchainTests`.
+**Must-fail** (copy-and-restore, 2026-10-22): with dev's `SectionAdder.cs` and
+`SiteHealthRepair.cs` and a `CreateFoldersOnDisk` that writes nothing inside,
+13 of the 62 tests in the two classes failed (four of them only because the
+stub `PlainTitle` passed values through); with `FrontmatterTitle` returning
+the name unquoted, 7 failed — the folder cases, the title cases, the front
+pages, both sibling-title tests, the on-disk quoted folder and the repair.
+
+A trap met on the way, worth knowing: a doc comment reading `support/**`
+turned `ActivityTrailWiringTests` red, naming four events in OTHER files as
+never recorded. Its scan strips `/* … */` across the concatenated product
+source before `//` lines, so a `/*` inside a `///` comment swallows every file
+after it up to the next `*/`. The scan now strips each FILE on its own, in one
+pass that recognises `//` comments and strings (raw ones included) before a
+`/*` can open, and a `/*` that never closes fails the test naming its file —
+so the next occurrence reports its real cause rather than four innocent events
+(`ActivityTrailWiringTests.TheScanReadsAStarStarInACommentAsAComment`).
+
+## The 1.8.5 measurement sitting (#593, #571 items 2–3, #618, #620, #598, #605)
+
+Six issues asked Windows to measure or confirm site behaviour it inherits
+from the shared `support/quartz/` and `scripts/`. Nothing was built for them:
+no product code, contract or test changed. This section says what was run,
+what came out, and what is still owed.
+
+**Hardware and versions** (2026-10-22): Lenovo 20QES70500, Intel Core
+i5-8365U @ 1.60 GHz, 16 GB, Intel UHD Graphics 620, Windows 11 Pro 26200.
+Microsoft Edge 155.0.4283.60 (from Playwright's `browser.version` and from
+`msedge.exe`'s file version); WebView2 Runtime 155.0.4283.62. The runtime is
+Node 20.18.1 and Python 3.11.9 (manifest made 2026-10-22, Pyodide 314.0.7).
+The checks' own Python is 3.14.7 with Playwright for Python. Chrome is not
+installed, so every `<chrome>` argument below is `msedge.exe`.
+
+### The site everything was measured on
+
+The course is a scratch working folder:
+
+- `website/shots/print_set_windows.mirror_toolchain` copied the launchers and
+  `.toolchain\` from this tree.
+- `courses\EXC2O` was copied from `support/example_course`.
+- verify.sh's own plant blocks (lines 1957–3034 at dev 0df44a5f2) ran
+  unchanged under Git Bash, with `python3` pointed at `python`. They planted
+  How I Teach, the printable fixtures, Plain Long Page, the marker fixtures,
+  the #499 pictures, `#609: Picture Fixture`, figures, runnable code, #505,
+  #569, QUIZPLANTS, TASKPLANTS, the #596 authoring examples and Progress
+  Fixture.
+- One page was added for #620 item 4 (below).
+
+The build was the launcher the app runs, not the window:
+`preview.ps1 EXC2O 1 --build-only --non-interactive --full-rebuild`, with
+`PLANTOIR_RUNTIME` set to `windows-app\Vendor\runtime`. It read 355 Markdown
+files and wrote 454. The first full rebuild took 129 s and the second 63 s.
+The site lands in `%LOCALAPPDATA%\Plantoir\builds\<folder id>\EXC2O\section1\public`.
+Each browser check below was given a COPY of that `public\` and started its
+own server, as on the mac; none used the native preview's address.
+
+**Every planted page is CR LF on this side, twice over.**
+
+- On Windows, Python's `write_text` writes `\n` as `\r\n`, so the planted
+  sources are CR LF: Quiz Fixture has 335 CRs, Task Fixture 109, Picture
+  Fixture 151.
+- The build copies every page in text mode, so even an LF source becomes
+  CR LF in the build's `content\`. The LF Quiz Fixture's copy has 335 CRs
+  over 335 lines.
+
+For every fixture except the comparison below, this does no harm. It is
+the very case Windows owed, and the text hook and the answer reader
+normalise CR LF before reading.
+
+### #571 item 2: CR LF and LF read alike
+
+**Method.**
+
+1. After planting, `Quiz Fixture.md`, `Quiz Playground.md` and
+   `Quiz Printable.md` were rewritten with `write_bytes`, once as pure LF
+   (every `\r\n` made `\n`) and once as pure CR LF.
+2. Both versions were counted before building, with `tr -cd '\r' | wc -c`
+   and a byte count in PowerShell:
+
+   | Page | LF build: CRs in the source | CR LF build: CRs / LFs in the source |
+   |---|---|---|
+   | Quiz Fixture | 0 | 335 / 335 |
+   | Quiz Playground | 0 | 88 / 88 |
+   | Quiz Printable | 0 | 23 / 23 |
+
+3. Build A used the LF pages and build B the CR LF pages. Both were
+   `--full-rebuild`, and nothing else in the course changed.
+4. verify.sh's 6k check (`QUIZPY`, verbatim) ran against each build's
+   `public\` and that build's own log. The log was passed as a Windows path,
+   and two assertions were put in front of the check: the log exists, and it
+   holds at least one `plantoir: error:` line. Without them, a missing log
+   would pass "no `readDifferently`".
+5. A second reader recorded each quiz's kind, problem, data,
+   `data-quiz-hash` and title text on the four quiz pages.
+
+**Results.**
+
+- **6k passed on both builds.** Each log had 32 `plantoir: error:` lines.
+  Eighteen of them were Quiz Fixture's, as the contract's cases expect,
+  along with one `quizzesNotReady` finding for "18 self-check questions".
+  The other 14 belong to other fixtures and are expected on Windows: 2 are
+  Figures Fixture's deliberately broken drawings (functionplot block 3 and
+  tikz block 6, `\foo`), and 12 are "Swift programs cannot be made ready"
+  lines (Swift Playground 7, Runner Fixture 3, Quiz Playground 2), because
+  Windows compiles no Swift (#570).
+  Neither log contained the `readDifferently` sentence ("the site and the
+  folder check read this question differently…").
+- **The two builds read alike, to the byte.** All four pages gave identical
+  records: Quiz Fixture's 37 quizzes, Quiz Playground's 9, Quiz Printable's 2
+  and Quiz CRLF's 1. Kinds, problems, answers, correct choices and
+  `data-quiz-hash` all matched, and so did the `plantoir: error:` lines,
+  line for line.
+- **A CR LF page renders its nested answer under its title.**
+  `Quiz-CRLF.html` is CR LF at the source (11 CRs). Its title holds only
+  "Simplify 2³ · 2⁴". The answer is a separate hidden `plantoir-quiz-answer`
+  block (`Answer: 2^7`), and the explanation is its own folded `[!explain]`
+  callout. `data-quiz` is `{"answers":["$2^7$"]}`. In both builds, no title
+  on any of the four pages contained `[!answer]`, `[!explain]`, `> >`,
+  "Answer" or "Why".
+
+### #598: no page-view counter, and Mermaid draws under the Netlify policy
+
+**No page-view counter.** `Select-String plausible.io` found nothing in
+`public\postscript.js` (172,710 bytes), and nothing across all 454 files in
+`public\`. The bare word `plausible` matched twice, both in a rubric's text
+("instruments are plausible"): once in `Tasks/Space-Mission-Proposal.html`
+and once in the search index. The build's `quartz.config.ts` says
+`analytics: null,`.
+
+**Mermaid draws.** This followed verify.sh's recipe:
+
+1. Clone `public\`.
+2. On the clone, run `deploy.py`'s own two writers in deploy order:
+   `isolation_headers.publish_headers(site, "netlify")`, then
+   `netlify_badge.write_netlify_headers_file`.
+3. Run
+   `node --experimental-websocket browser-checks/mermaid_draws.mjs <edge> <clone> /Printable-Fixture.html`.
+
+It printed **`OK: 2 of 2 diagrams drawn, 0 requests blocked by the policy,
+under the policy _headers carries`** (3.8 s).
+
+The site does not carry its own Mermaid. The only Mermaid address in the
+built files is Quartz v4.5.0's
+`https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs`,
+and the policy's `script-src` now names `https://cdnjs.cloudflare.com`. That
+is #594's design: allow the host rather than carry the engine. The policy
+was the one a deploy to Netlify writes, but nothing was deployed; checking
+live Netlify is `verify-deploy.ps1`'s job.
+
+Every `.mjs` check in this section ran on the runtime's own Node 20.18.1
+(`windows-app\Vendor\runtime\node\node.exe`) with
+`--experimental-websocket`, because the checks expect Node 22's built-in
+WebSocket. That is the same arrangement as doc 12's earlier browser
+measurements.
+
+On Git Bash, run the check with `MSYS_NO_PATHCONV=1`. Without it the
+`/Printable-Fixture.html` argument becomes
+`C:\Program Files\Git\Printable-Fixture.html`, and the check fails with
+"no such page".
+
+### #605: My Progress
+
+`python scripts/test_my_progress.py` ran 27 tests, OK, in 1.4 s, and
+`PythonToolchainTests` ran the same file green (see Tests below). There was
+nothing to build.
+
+A note for #599's readers: **Alt-click on Windows is the mac's
+Option-click**. Each item's words come from the built label, and maths is
+listed as 06 → L6 describes.
+
+### #618 and #620: pictures sized in the HTML and laid out before they scroll
+
+**The built text.** verify.sh's `SIZESPY` ran verbatim (exit 0), alongside
+a parser over every `<img>`. In `Picture-Fixture.html`:
+
+| Picture | Built `<img>` |
+|---|---|
+| `plantoir-hazard-wide.png` | `width="600" height="200"`, `data-pl-sized` |
+| `plantoir-hazard-tall.png` | `width="400" height="1800"`, `data-pl-sized` |
+| `plantoir-hazard-viewbox.svg` | `width="auto" height="auto"`, no marker |
+
+`index.css` carries both `html body img[data-pl-sized]{height:auto}` (#612)
+and `html body img{content-visibility:visible}` (#609). So the bundle's copy
+of `support/quartz/` carries the transformer, the wiring found its
+`PlantoirTasks` anchor, and Node on Windows resolved the course's POSIX file
+names to the pictures.
+
+**The reader, by hand (#620 item 4).** Four fixtures from
+`scripts/fixtures/picture-sizes/` were copied into `Media\` and embedded
+bare on a page of their own, `Picture Sizes Hand`:
+
+| Picture | Built `<img>` |
+|---|---|
+| `jpeg-hand-II-o6.jpg` | `width="40" height="120"`, `data-pl-sized` |
+| `png-exif-o6.png` | `width="40" height="120"`, `data-pl-sized` |
+| `named-svg-cm.svg` | `width="302" height="151"`, `data-pl-sized` |
+| `named-svg-viewbox-only.svg` | `width="auto" height="auto"`, no marker |
+
+These are the answers the mac's oracle holds the same JavaScript to.
+
+**The browser check.**
+`node --experimental-websocket browser-checks/picture_heights.mjs <edge> <public copy>`
+takes the site FOLDER and serves it itself. It ran three times, 6.8–7.0 s
+each, and printed the same line every time:
+
+> OK: with their bytes held, 600 x 200 and 400 x 1800 px from the page
+> alone and unchanged when they arrived (page 11520 px both ways); 3
+> pictures laid out before any scroll (200 px tall at 3075 px down, 2400 px
+> tall at 4721 px down, 1800 px tall at 8567 px down, window 805 px), the
+> page staying 11520 px tall scrolling to each (11520, 11520, 11520); 358 x
+> 119 and 358 x 1611 px in a 390 px window
+
+Each of the three phases matches #620's numbers:
+
+- A: 600 × 200 and 400 × 1800.
+- B: 3 pictures laid out.
+- C: 358 × 119 and 358 × 1611.
+
+This run covers #618 too. Its own expected "2 pictures" line predates
+#612's third picture, the viewBox-only SVG, which is now the picture that
+proves #609's rule.
+
+`test_quartz_additions_wiring.py` passed 14 tests, OK, both directly and
+through `PythonToolchainTests`. That includes
+`test_the_print_buttons_component_carries_the_picture_rule` and the #612
+wiring cases.
+
+**Not done: the WebKit leg.** It is owed when #597 lands. Edge is Chromium,
+where the shift never showed.
+
+### #593: task boxes, and the one-blank line
+
+**The mac's `browser-checks/task_boxes.mjs`, in headless Edge.** Run
+unchanged, it got through every section before paper, then stopped at
+`pdftotext -bbox`. The only `pdftotext` here is Git for Windows' xpdf 4.06,
+which has no `-bbox`, and poppler's `pdftoppm` is not installed. No system
+software was installed for this. Instead, a scratch copy was run whose only
+change replaced section 9's ink read with "keep the four PDFs". Everything
+else ran as written and printed (29 s):
+
+> OK: 29 boxes on the fixture, ticks kept and restored, words, a link, Tab
+> and Space, a transcluded copy in step, five round trips and one
+> listener, the router's reused box showing its own page, a not-ready quiz
+> left alone, storage refused, twins: Twin B reused Twin A's box yes; …;
+> handout boxes x__ (the page showed x__); storage refused: handout xx_
+> (the page showed xx_)
+
+That covers item 1 — tick, untick, reload, navigation by the site's own
+links with the router reusing a box, and transclusion setting its source's
+tick — and Tab then Space.
+
+**Ink on paper (item 2), read without poppler.** The four PDFs are
+`Page.printToPDF` with `printBackground: false` on US letter: Task Printable
+and Task Twin A, each in light and dark. They were read in headless Edge:
+
+1. pdf.js 4.10.38 (legacy build, from jsdelivr) rendered each sheet to a
+   canvas at 150 dpi.
+2. The canvas was turned to grey with Rec. 601 luma, as `pdftoppm -gray`
+   does.
+3. Word boxes came from pdf.js's text layer (ascent 0.9 and descent 0.25 of
+   the font size). Latin Modern's "fi" ligature has no text there, so
+   "first" was matched as "rst".
+4. Each box was judged by `task_boxes.mjs`'s own `boxInk` and
+   `boxInkThrough`, lifted verbatim from the file, with its own thresholds:
+   at least 20 inked pixels in the ticked box, at most 3 in the unticked
+   one.
+
+| Paper | Ticked box (inked px, w × h px) | Unticked box |
+|---|---|---|
+| printable, light | 47, 26 × 16 | 0, 26 × 17 |
+| printable, dark | 47, 26 × 16 | 0, 26 × 17 |
+| plain (Twin A), light | 62, 25 × 21 | 0, 25 × 20 |
+| plain (Twin A), dark | 62, 25 × 21 | 0, 25 × 20 |
+
+All four pass. This re-implements the mac's pixel read rather than running
+the mac's tool. The only difference is where the word boxes come from
+(pdf.js rather than poppler's `-bbox`); how a box is judged is the same.
+
+**Site data BLOCKED (item 2).** The mac check's "storage refused" replaces
+`localStorage` with a getter that throws. Here the browser itself refused
+storage:
+
+- A persistent headless Edge profile was started whose `Default\Preferences`
+  holds `profile.content_settings.exceptions.cookies` =
+  `{"http://127.0.0.1:8765,*": {"setting": 2}}`, Block for that origin. The
+  setting was still in place after the run.
+- On Task Printable, `localStorage.setItem` threw `SecurityError: Failed to
+  read the 'localStorage' property from 'Window': Access is denied for this
+  document.`
+- Tab reached the first box and Space ticked it: `_x_` became `xx_`.
+- Print ▸ Questions only laid out the handout with `xx_`, and the page still
+  showed `xx_` afterwards.
+
+**Item 4, the one-blank line.**
+
+- On `Quiz One Blank`, typing "London" and pressing Enter says **"Not quite.
+  Try again, or show the answer."** That is exactly what
+  `quizCallouts.feedback.blanks` gives for `{count: 1, right: 0}`, which says
+  `words.site.notRight`. The check read both from the contract and compared
+  them as strings.
+- "Paris" says "Right!".
+- With two blanks and one right, it says "1 of 2 blanks is right. Try again,
+  or show the answer." (case `{2, 1}`).
+
+The same in light and dark, and in `quiz_check.mjs`.
+
+**Item 3 (Narrator): OWED, not passed.** What a screen reader is HANDED was
+read from the DOM (below, under #571). That is a proxy for what Narrator
+says, not a measurement of it. Narrator itself still has to be listened to
+on a desktop.
+
+### #571 item 3: the four kinds in Edge, keyboard only, and paper
+
+**The mac's `browser-checks/quiz_check.mjs`, unchanged** (42 s), printed:
+
+```
+FAIL: Swift run in a choice prints its output: {"status":"This program isn't ready to run yet.","output":""}; Swift run in the revealed explanation prints its output: {"status":"This program isn't ready to run yet.","output":""}
+```
+
+That is its whole problem list: the two Swift lines and nothing else.
+Windows compiles no Swift (#570), and the build reported
+`swiftCouldNotBePrepared` for 12 blocks on 3 pages. A copy whose only change
+expects those two runs to be "not ready" printed:
+
+```
+OK: 9 quizzes, every kind wrong then right, the shuffle in 20 orders over 20 loads, the score kept and cleared, five page changes clean, a transcluded quiz on its own, Swift in a choice and an explanation ("", ""), paper and the handout questions only
+```
+
+(40 s.)
+
+**Keyboard only, light and dark.** A Playwright script drove headless Edge
+at 1280 × 900, with `color_scheme` and `saved-theme` set to each theme, on
+Quiz Playground:
+
+| Kind | Wrong | Right |
+|---|---|---|
+| Single choice (reached by 27 Tabs from the top) | Space on choice 1, Enter on Check: `notRight` | Shift+Tab back, ArrowDown: `right` |
+| Select all | Space on 2 and on 4: `notRight` | Space to tick 5 and untick 4: `right` |
+| Short answer | "2^8", Enter: `notRight` | "2^7", Enter: `right` |
+| Fill in the blank | "100" / "on the moon": "1 of 2 blanks is right…" | "sea level": `right` |
+
+Enter on a folded quiz's title turned its `aria-expanded` from "false" to
+"true", and its content stopped being inert. The feedback text was
+rgb(74, 87, 74) on rgb(247, 250, 245) in light, and rgb(207, 224, 201) on
+rgb(18, 21, 18) in dark.
+
+**What a screen reader is handed (the proxy).** On the page's second quiz,
+the choices are a `FIELDSET` whose `aria-labelledby` resolves to the
+question ("Which graph shows y=(x−3)2+2?"). The blanks are labelled
+"Blank 1 of 2" and "Blank 2 of 2". Feedback is `role="status"`
+`aria-live="polite"`. Real Narrator speech is OWED.
+
+**Ctrl+P's paper and the handout.**
+
+- `page.pdf` of `Quiz Printable` (print media, `print_background=False`,
+  letter) is 1 sheet in both themes. Its text (`pdftotext -enc UTF-8 -raw`)
+  has both questions and neither `printable-answer-7f3a` nor
+  `printable-explain-7f3a`.
+- The handout, questions only, was reached by
+  `#plantoir-print=questionsOnly&paper=portrait` and read from its frame as
+  it printed. In both themes it has the questions and neither sentinel.
+- **No answer was revealed before printing**, in my script or in
+  `quiz_check.mjs`. Its paper step (8a) runs on a page freshly loaded by the
+  twenty shuffle loads before it, and asks that no button, feedback, answer
+  or explanation is displayed under print media. So what paper shows after
+  a student pressed Show answer, or got a question right and opened its
+  explanation, is OWED in Edge as well as in the pane.
+
+**Why 27 Tabs here and 10 in the pane.** The count depends on the window,
+not on the quiz. At 1280 px wide, Quartz lays out both sidebars, and their
+links (search, the explorer, the page's table of contents) come before the
+article in Tab order. In the 984 px pane, Quartz's narrower layout has fewer
+of them. The elements were not counted one by one.
+
+### Tests
+
+`dotnet test Plantoir.Tests/Plantoir.Tests.csproj --filter
+FullyQualifiedName~PythonToolchainTests`: **Passed 77, Failed 0, Skipped 0,
+Total 77** (2 m 49 s). The 77 count FILES, not Python test cases: 75 are the
+discovered `scripts/test_*.py` (one `[Theory]` row each), and 2 are the
+class's own `[Fact]`s. That run includes `test_my_progress.py`,
+`test_quartz_additions_wiring.py`, `test_quizzes.py`,
+`test_task_box_contrast.py` and `test_quartz_analytics_off.py`.
+
+Run directly:
+
+| File | Result |
+|---|---|
+| `test_quizzes.py` | 19 tests, OK |
+| `test_task_box_contrast.py` | 4 tests, OK (the tick at least 6.06:1 light, 12.19:1 dark) |
+| `test_quartz_analytics_off.py` | 6 tests, OK |
+| `test_netlify_badge.py` | 19 tests, OK |
+
+### #571 item 3 in the WebView2 preview pane
+
+Measured 2026-10-22 on the same PC, on an unlocked desktop, in this branch's
+own x64 Debug build. The app was started with `--state-dir` pointing at a
+scratch state folder whose `settings.json` named the scratch working folder,
+plus `--auto-preview EXC2O 1`, which is the Preview button's own code path.
+The pane showed the app's own preview, Quartz's server at
+`http://127.0.0.1:8081` started by the app from its bundled runtime, about
+40 s after launch.
+
+The pane was driven over WebView2's debugging port
+(`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333`,
+Playwright `connect_over_cdp`). Its keys are therefore Chromium input events
+sent to the page, not the OS keyboard. The user agent was
+`… Chrome/155.0.0.0 … Edg/155.0.0.0` (WebView2 Runtime 155.0.4283.62), and
+the pane was 984 × 603 CSS px.
+
+Each theme was set with `prefers-color-scheme` and `saved-theme`, and the
+pane was photographed in both. The same script steps as in Edge above
+passed in light AND dark:
+
+| Quiz | What was done | Feedback |
+|---|---|---|
+| Single choice | 10 Tabs from the top; Space on the wrong choice, then Shift+Tab back and ArrowDown | `notRight`, then `right` |
+| Select all | Space on the boxes | `notRight`, then `right` |
+| Short answer | typed, then Enter | `notRight`, then `right` |
+| Fill in the blank | typed both blanks, then Enter | "1 of 2 blanks is right. Try again, or show the answer.", then `right` |
+| One blank (`Quiz One Blank`) | a wrong answer | exactly `feedback.blanks` {1, 0} = `notRight` |
+
+Other things seen:
+
+- Enter on a folded quiz's title opened it, and its content stopped being
+  inert.
+- The blanks were labelled "Blank 1 of 2" and "Blank 2 of 2".
+- The question labels the choices' `FIELDSET`.
+- Feedback was `role="status"` `aria-live="polite"`.
+- The feedback colours were Edge's to the value: rgb(74, 87, 74) on
+  rgb(247, 250, 245) in light, rgb(207, 224, 201) on rgb(18, 21, 18) in
+  dark.
+
+**Paper and the handout in the pane.**
+
+- **⌘P/Ctrl+P's layout.** `Page.printToPDF` is headless-only, so the paper
+  was read as the pane lays the page out under print media
+  (`Emulation.setEmulatedMedia` print, `body.innerText`). In both themes,
+  `Quiz Printable` showed both questions and neither `printable-answer-7f3a`
+  nor `printable-explain-7f3a`. Two limits on this:
+  - The quizzes were unanswered when it printed; the paper of a quiz whose
+    answer the student revealed was not looked at.
+  - The 2026-10-15 measurement in "Printable pages" above (WebView2
+    155.0.4283.45, a printable page with NO quizzes) shows only that a real
+    Ctrl+P in the pane opens WebView2's own print window. It says nothing
+    about quizzes.
+- **The handout.** The app's print shim was present in the pane
+  (`window.webkit.messageHandlers`), so the app's Print ▸ Questions only
+  hands the handout to the teacher's browser. The browser half is the Edge
+  measurement above. In the pane's own frame, with the shim taken away so
+  `print.inline.ts` takes its own path, Print ▸ Questions only laid out a
+  handout holding the questions and neither sentinel.
+
+**A real OS Ctrl+P was not sent to the pane.** `WScript.Shell.AppActivate`
+reported success but did not bring the app forward on this desktop, so the
+one `SendKeys("^p")` went to the terminal in front instead. Nothing visible
+happened, and no further keys were sent. A real keystroke in the pane needs
+the window brought forward by hand, or by UI Automation as `DrivenApp`
+does.
+
+### Still owed after this sitting
+
+- **Narrator** (#593 item 3, #571 item 3): Tab to a box reads its words,
+  Space ticks it, and a link in an item still navigates; the question is
+  read as the group's label, the blank as "Blank 1 of 2", and feedback is
+  announced. Only the proxy above has been measured, in Edge and in the
+  pane. Someone has to listen to Narrator itself.
+- **A real Ctrl+P in the pane on a quiz page with an answer REVEALED**, and
+  the same in Edge: what paper shows after Show answer, or after a right
+  answer opens its explanation. Not measured anywhere in this sitting. The
+  2026-10-15 measurement covers only that Ctrl+P opens the print window, on
+  a page with no quizzes.
+- **The WebKit leg** of #618 and #620, once #597 lands.
+## Obsidian's add-ons for diagrams and graphs on Windows (#581, the mac's #495)
+
+**What a teacher sees.** The first time Open in Obsidian is pressed on a course
+with a ```` ```tikz ```` or ```` ```functionplot ```` fence, and BEFORE
+Obsidian opens, Plantoir asks `obsidianAddOnsForFigures.wording.offerTitle`:
+Add Them (the default), Not Now, and a "Don't ask again" box that turns Not Now
+into no. One yes covers every course. After it, a course gets the add-ons it
+uses at Open in Obsidian and, silently, when a section's preview has shown a
+fresh build. File ▸ Settings ▸ Obsidian (a section after Preview, as the mac's
+pane is) holds the one toggle. Everything else — the cases, the words, the
+order — is the contract's, and `documentation/09-mac-app.md` → "Obsidian's
+add-ons for diagrams and graphs (#495)" carries the reasoning and what was
+rejected; this section says only what Windows does differently and what it
+measured.
+
+**The files.** `windows-app/Vendor/fetch-obsidian-addons.ps1` reads every id,
+version, size, SHA-256 and address from `obsidianAddOnsForFigures.addOns` (it
+carries no pin of its own — `ObsidianFigureAddOnsTests` fails on any 64-hex run
+in it), caches by SHA-256 in `%LOCALAPPDATA%\Plantoir-dev\obsidian-addons`
+(or `$env:PLANTOIR_ADDONS_CACHE`), installs nothing on one mismatch, and swaps
+`Vendor\obsidian-addons\<id>\<file>` in (4.3 s the first time here, 3.6 s when
+already in place). The contract is 2.09 MB, past Windows PowerShell 5.1's
+`ConvertFrom-Json` limit, so on 5.1 it reads with the serializer that limit
+comes from, raised. **Run it once per clone or worktree.** `Plantoir.csproj`
+ships the folder as Content (`obsidian-addons\` beside Plantoir.exe, and in
+`publish`), and `CheckObsidianAddOns` REFUSES the build when the folder is
+missing, holds other than the pinned 7 files, or holds a file whose (id, name,
+SHA-256) is not a triple in the contract — not merely "a hash that appears
+somewhere": functionplot's licence under tikzjax's name is refused. Each
+refusal was seen (missing, 8 files, a flipped byte, the swapped licence).
+
+**The model is in Plantoir.Core, behind `IObsidianWorld`.** The mac's route
+lives in its `WorkspaceModel`; Windows' Open in Obsidian lives in the WinUI
+project, which the test project does not reference, so the sequence
+(`ObsidianOpenRoute`), the decisions (`ObsidianFigureAddOnsOffer`), the pass
+(`ObsidianFigureAddOns`), the words and the trail are Core, and
+`Plantoir/Views/ObsidianWorld.cs` supplies only FolderActions and the two
+ContentDialogs (through `ShowDialogSafelyAsync`, so DialogGate holds the
+menus). `ObsidianOpenRouteTests` drives sequence steps 1–8 through a fake world
+with no window. The How I Teach row's "open the page" still calls
+FolderActions directly, as the mac's does (it opens a page, not Open in
+Obsidian).
+
+**Windows' own decisions, each a review finding.**
+
+- **The fence reader is a port of `fenced_blocks`**, not `MarkdownCode`
+  (`FigureFenceScan.cs`): lines split on `\n` only, a lone `\r` is text, a
+  byte-order mark is a character (decoded with `Encoding.UTF8.GetString`, as
+  Python's utf-8 reader keeps it). It agrees with the Python on 2,000 generated
+  pages (fixed seed; CR LF, lone CR, BOM, invalid UTF-8, nested containers) and
+  on every `figureFences.fences` case. A lone `\r` inside a line is text here
+  exactly as it is in the mac's `FigureFenceScan.swift` and the Python (all
+  three split on `\n` only) — reviewed, mac-identical, no change.
+- **A link is a reparse point with a `LinkTarget`** (junction or symbolic
+  link). A OneDrive placeholder folder is a reparse point too; it is a folder
+  here, never refused and never skipped. The scan never follows a link (no
+  loop, nothing outside the course read). A page is skipped unread when its
+  attributes say `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS` (0x400000),
+  `RECALL_ON_OPEN` (0x40000) or `Offline` — the mac's `SF_DATALESS`. Measured
+  on this PC's OneDrive (running, Files On-Demand): the one evicted file reads
+  evicted from its attributes without being downloaded; `Documents` and
+  `Pictures` (cloud folders) read as folders. No evicted `.md` was available
+  and none was made (it would upload to the teacher's account).
+- **The list is written by hand** as `JSON.stringify(ids, undefined, 2)` writes
+  it: a general serializer escapes non-ASCII and `+<>&'`, and a second pass
+  would then change bytes Obsidian wrote (tested with a non-ASCII id).
+- **Renames, replaces and deletes retry for about 0.75 s** (Defender, the
+  indexer or OneDrive can hold a 7.8 MB file just written); still refused, the
+  add-on is `couldNotWrite` with the system's reason.
+- **`couldNotWrite` needs a deny-write ACL here**: the read-only attribute does
+  not stop writes into a folder on Windows (a test proves it does not). The
+  test denies Write/Delete to the current user's SID with `DirectorySecurity`,
+  removes it in a `finally`, and sweeps a stale denied folder at start.
+- **One `SemaphoreSlim` for every pass**, every course (the mac's actor); 8
+  passes at once are seen one at a time.
+- **The registry** (`%APPDATA%\obsidian\obsidian.json`) is read with
+  `FileShare.ReadWrite`, and paths are compared with either separator and any
+  case. `RegisterVault` no longer replaces a registry that EXISTS but could not
+  be read with one holding only the new vault (that would have lost every other
+  vault).
+- **The archiver** (`CourseArchiver.ZipFolder`, every backup and archive)
+  leaves out each folder directly under the zipped folder's
+  `.obsidian\plugins` that carries the `.plantoir` marker, partial copies
+  included; the teacher's own add-ons and the list stay (`backups.cases`, a
+  real zip read back).
+
+**"Running" and "quit", changed for every caller.** `FolderActions.ObsidianIsRunning`
+is now: an `Obsidian.exe` in THIS Windows session owns a top-level window,
+shown or not (`ObsidianProcesses`). Before, any process named Obsidian counted
+— another account's, or a crash reporter outliving the windows. And
+`QuitObsidianAndWait` now closes EVERY shown Obsidian window (main windows
+before owned ones), then `CloseMainWindow` on any process still there after
+1.5 s, then waits up to 5 s for the windows — and then up to 3 s more for the
+PROCESSES (measured: windows gone at 0.4 s, processes at 0.66 s; a registry
+or add-on list written in that gap can be overwritten as Obsidian exits). Any
+window left after the wait means "did not close" for all of them: nothing is
+written, and a half-closed set is not reopened. Before #581 it called
+`CloseMainWindow` on each process, which closed ONE window: an Obsidian with
+two vaults open kept running. That was a live fault in the two older callers
+too — vault REGISTRATION (Open in Obsidian on a course Obsidian has never
+seen) and the course RENAME — which then wrote the registry under a running
+Obsidian. **The quit change fixes them only when the quit succeeds**, so
+registration now also checks: if Obsidian is still running after the quit, it
+writes nothing and opens the link as it is (the course stays unregistered;
+nothing false is said). And because Obsidian started by a link does NOT bring
+back the other vaults (measured: closing windows one by one unmarks all but
+the last), registration now notes the vaults open BEFORE quitting and reopens
+them after registering, this course last — the add-ons route's own reopen.
+The rename path's reason for not reopening Obsidian afterwards (the vault to
+reopen is in the folder just left) is unchanged and still holds; and the
+rename now checks too: if Obsidian is still running after the quit, the
+folder is not moved and nothing is registered, and the teacher is told "{code}
+was not renamed, because Obsidian is still open. Close Obsidian, then rename
+the course again." (an inline sentence, like the rename's other words, which
+are in no contract). When the windows close but the processes outlive the
+3 s wait, the quit says so in `startup.log` (never the trail) and goes on. The vaults to reopen are noted BEFORE anything closes: measured,
+closing one vault window of several clears that vault's `"open"` mark in the
+registry (the last window to close keeps its mark). Reopening opens the first
+vault, waits up to 10 s for a window, then the rest 0.4 s apart, this course
+last — rather than racing Electron's single-instance lock.
+
+**Measured live** (2026-10-22, i5-8365U, Windows 11 Pro 26200, 1920 × 1080,
+Obsidian **1.14.4** — not the mac's 1.13.7; a temp working folder through
+`--state-dir`, Obsidian's registry backed up first and restored byte for byte
+after, the temp vaults' window files removed):
+
+- The offer appeared 182 ms after Open in Obsidian, Obsidian not yet started;
+  Add Them added TikZJax (marker, list `["obsidian-tikzjax"]` in Obsidian's own
+  format) and Obsidian opened 2.3 s later through the registration path.
+- **Obsidian's trust question puts focus on "Browse vault in Restricted Mode",
+  and Enter chooses it** (the focus ring was on it; Enter closed the question
+  and the tikz fence then showed as code). `windowsWording.offerMessage`'s
+  "pressing Enter chooses the other button" and `settingFooter`'s Enter
+  sentence are TRUE on Windows.
+- **After "Trust author and enable plugins", Obsidian 1.14.4 opened its
+  Settings ▸ Community plugins in a window of its own** — on a first-time
+  trust (a fresh course) and on a trust after Restricted Mode. The contract's
+  `wording.note` says Obsidian "does not open its settings (measured on
+  1.13.7, #582)", and the offer's sentence telling the teacher to close the
+  settings was removed for that reason. Either 1.14 changed it or Windows
+  differs; this is a decision for the mac and Russell, not a Windows-only
+  wording change, so nothing was changed here.
+- The reopen, with two vaults open, one minimised, a pop-out of the other, and
+  text typed 1.2 s before Reopen was pressed: every window gone in about 0.4 s,
+  every Obsidian process gone at 0.66 s, the add-on written, MCR3U back at
+  1.9 s and MPM2D (this course) last at 2.8 s, both registry marks `"open":
+  true` again, and the typed text saved. Obsidian did not bring the pop-out
+  back (its own restore). On Windows a pop-out is NOT an owned window (no
+  `GW_OWNER`), so "main windows before pop-outs" orders nothing there; it costs
+  nothing, since all of them close within the same 0.4 s. `didNotClose` never
+  fired.
+- The registration path's quit (a two-vault Obsidian, Open in Obsidian on a
+  never-registered course) closed it in about 0.35 s and opened the new course
+  at 2.4 s.
+- Both figures drew once trusted (reading view; the course defaults open pages
+  in source view, where a fence shows as code).
+- Settings ▸ Obsidian: shown as stored (on), off stored `no` and on stored `yes`,
+  one trail line each; the footer reads the Windows Enter sentence.
+- The scan, headless (`ObsidianFigureAddOns.KindsUsed`): the MPM2D example
+  payload, 232 pages, both kinds — 1,872 ms the very first time those files
+  were read on this PC, 38 ms in a fresh process after, 19–27 ms warm; TGJ2O
+  107 pages 902 ms cold, 16–27 ms after. So a first Open in Obsidian on a course
+  never read can wait about 2 s before Obsidian opens (the mac measured 39–63 ms
+  cold). The pass: re-hashing the 7 files 42 ms, a full first pass 74 ms, a
+  second pass (all `alreadyThere`, no byte or date changed) 87 ms.
+
+**Not measured:** the preview trigger on a real preview (unit-tested through
+the route), Obsidian's "Exit Restricted mode" label on 1.14.4 (the footer
+quotes the 1.13.7 label), and a OneDrive-evicted `.md`.
+
+**Shared text left for the joint follow-up** (the issue's item 9): the
+`plantoir-math-graphs` skill §9 and `figureFences.knownLimits[2]` still say
+nothing about Plantoir adding the add-ons; with both platforms adding them now,
+they can say so — together with the mac, not from here.

@@ -68,6 +68,25 @@ public class FollowingLinksContractTests : IDisposable
         string plan = (hiding
             ? tools.PlanUnpublishPages(Course, 1, pages: named)
             : tools.PlanPublishPages(Course, 1, pages: named)).Summary();
+
+        // publishing.casesNote (#607): the titles the PLAN reports as already
+        // visible, read from the rows of the Section menu's table (the surface
+        // the contract describes; the mac reads the same rows). Taken from the
+        // same layout BEFORE the publish, as `plan` above is: a plan writes
+        // nothing.
+        if (c["expectAlreadyRight"] is JsonArray expectedAlready)
+        {
+            var workspace = new AssistWorkspace(_folder, new FakeLauncher());
+            var table = workspace.Tabulate(hiding
+                ? workspace.PlanPublish(Course, 1, named, draft: true, publishes: false)
+                : workspace.PlanPublish(Course, 1, named));
+            var already = table.Rows
+                .Where(r => r.Change is PlanTable.Change.AlreadyVisible or PlanTable.Change.AlreadyHidden)
+                .Select(r => r.Title).OrderBy(t => t, StringComparer.Ordinal).ToList();
+            var expected = expectedAlready.Select(t => t!.ToString()).OrderBy(t => t, StringComparer.Ordinal).ToList();
+            Assert.True(expected.SequenceEqual(already),
+                $"{name}: already visible should be [{string.Join(", ", expected)}], was [{string.Join(", ", already)}].");
+        }
         var result = hiding
             ? await tools.UnpublishPages(Course, 1, progress, default, named, preview: false)
             : await tools.PublishPages(Course, 1, progress, default, named, preview: false);
@@ -218,10 +237,23 @@ public class FollowingLinksContractTests : IDisposable
                 ? given.ToString()
                 : "A sentence.\n" + string.Concat(page["links"]!.AsArray().Select(l => $"\nSee [[{l}]].\n"));
             string date = page["date"]?.ToString() is { Length: > 0 } d ? d : "2026-09-08";
-            string text = $"---\ntitle: {title}\npublish: {(page["visible"]!.GetValue<bool>() ? "true" : "false")}\n" +
-                          $"created: {date}T07:00:00.000-0400\n---\n{body}";
-            string path = Path.Combine(_folder, "courses", Course, "section1",
-                                       isClass ? Path.Combine("All Classes", title + ".md") : title + ".md");
+            string visible = page["visible"]!.GetValue<bool>() ? "true" : "false";
+
+            // publishing.casesNote (#607): a page carrying `folder` is a
+            // COURSE-LEVEL page inside that folder, relative to the course, so
+            // a folder test such as isCurriculum can see it; a class page never
+            // carries one, and the harness must fail rather than ignore it.
+            string? folder = page["folder"]?.ToString();
+            if (folder is not null && isClass)
+                throw new InvalidOperationException($"“{title}” is a class page and carries a folder; the harness must not ignore it.");
+
+            string text = folder is null
+                ? $"---\ntitle: {title}\npublish: {visible}\ncreated: {date}T07:00:00.000-0400\n---\n{body}"
+                : $"---\ntitle: {title}\npublishForSection1: {visible}\ncreatedSection1: {date}T07:00:00.000-0400\n---\n{body}";
+            string path = folder is not null
+                ? Path.Combine(_folder, "courses", Course, folder, title + ".md")
+                : Path.Combine(_folder, "courses", Course, "section1",
+                               isClass ? Path.Combine("All Classes", title + ".md") : title + ".md");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, text);
             paths[title] = path;

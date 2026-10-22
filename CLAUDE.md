@@ -621,6 +621,8 @@ installs no runtime.
 
 ```powershell
 cd windows-app
+.\Vendor\fetch-runtime.ps1            # once per clone (~600 MB, the website builder)
+.\Vendor\fetch-obsidian-addons.ps1    # once per clone (12.9 MB) — the build REFUSES without it (#581)
 dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```

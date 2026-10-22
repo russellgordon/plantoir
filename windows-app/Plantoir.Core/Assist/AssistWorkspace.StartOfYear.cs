@@ -192,16 +192,7 @@ public sealed partial class AssistWorkspace
             {
                 string full = draft.Page.Id;
                 string before = File.ReadAllText(full);
-                bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
-                var (after, edit) = PageFrontmatter.SetDraft(before, PageFrontmatter.PublishKeyFor(section, sectionLocal), true, section);
-                bool noRoom = edit.NoRoomForAKey;
-                // A stray per-section key beside `publish:` is read FIRST by the
-                // build, so writing only `publish: false` would leave the class up.
-                if (!noRoom && !PageFrontmatter.IsDraft(after, section))
-                {
-                    (after, edit) = PageFrontmatter.SetDraft(after, PageFrontmatter.PublishKeyFor(section, false), true, section);
-                    noRoom = edit.NoRoomForAKey;
-                }
+                var (after, noRoom) = StartOfYearDraftEdit(course, section, full, before);
                 // Half a write that still leaves the page up is no write at
                 // all: nothing is saved, and the page is named.
                 if (noRoom)
@@ -266,6 +257,44 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
+    /// The edit Go makes to one page: its own key set to draft, and a stray
+    /// <c>publishForSection&lt;N&gt;</c> too when the build would otherwise
+    /// still read the page as published — or NO ROOM, when the page's settings
+    /// have no column-0 place for a new line (#421). One rule, asked by Go and
+    /// by the sheet before Go (#619), so the sheet names exactly the pages Go
+    /// will leave as they are.
+    /// </summary>
+    private static (string After, bool NoRoom) StartOfYearDraftEdit(Course course, int section, string full, string before)
+    {
+        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+        var (after, edit) = PageFrontmatter.SetDraft(before, PageFrontmatter.PublishKeyFor(section, sectionLocal), true, section);
+        bool noRoom = edit.NoRoomForAKey;
+        // A stray per-section key beside `publish:` is read FIRST by the
+        // build, so writing only `publish: false` would leave the class up.
+        if (!noRoom && !PageFrontmatter.IsDraft(after, section))
+        {
+            (after, edit) = PageFrontmatter.SetDraft(after, PageFrontmatter.PublishKeyFor(section, false), true, section);
+            noRoom = edit.NoRoomForAKey;
+        }
+        return (after, noRoom);
+    }
+
+    /// <summary>The pages Go would leave exactly as they are for want of room for a key, named as the write names them — for the sheet, before Go (#619).</summary>
+    public IReadOnlyList<string> StartOfYearPagesWithNoRoom(string courseCode, int sectionNumber, StartOfYearPlan plan)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+        var names = new List<string>();
+        foreach (var draft in plan.Drafts)
+        {
+            string before;
+            try { before = File.ReadAllText(draft.Page.Id); } catch { continue; }
+            if (StartOfYearDraftEdit(course, section, draft.Page.Id, before).NoRoom) names.Add(draft.Page.Name);
+        }
+        return names;
+    }
+
+    /// <summary>
     /// Writes <c>start of the year change undone</c> when an undo took back a
     /// start-of-year change — the assistant's "undo that" or an outside
     /// assistant's <c>undo_last_change</c>. Recognised by the description the
@@ -295,23 +324,48 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// Put back what a start-of-year write changed: each file still holding
-    /// exactly what was written goes back to what it held before; a file
-    /// changed since is left as it is and named (the assistant's skip rule).
+    /// What an undo of a start-of-year write WOULD do, asked before the
+    /// teacher agrees: the pages it would put back and the ones it would leave
+    /// because they changed since — sorted by the undo's own rule,
+    /// <see cref="UndoVerdict.Of"/> (#564, the mac's <c>whatAnUndoWouldDo</c>),
+    /// so the sheet cannot call a page "left alone" that the undo then treats
+    /// as already back. A page already as it was is in neither list.
     /// </summary>
-    public static (IReadOnlyList<string> PutBack, IReadOnlyList<string> LeftAsTheyAre) UndoStartOfYear(
+    public static (IReadOnlyList<string> PutBack, IReadOnlyList<string> LeftAsTheyAre) WhatAnUndoWouldDo(
         IReadOnlyDictionary<string, (string Before, string After)> written)
     {
         var putBack = new List<string>();
         var left = new List<string>();
         foreach (var (path, (before, after)) in written)
         {
-            string now;
-            try { now = File.ReadAllText(path); } catch { left.Add(path); continue; }
-            if (now != after) { left.Add(path); continue; }
-            File.WriteAllText(path, before);
-            putBack.Add(path);
+            var verdict = UndoVerdict.Of(path, new UndoHistory.FileState(before, after));
+            if (verdict == UndoVerdict.Kind.PutBack) putBack.Add(path);
+            else if (verdict == UndoVerdict.Kind.LeftAlone) left.Add(path);
         }
         return (putBack, left);
+    }
+
+    /// <summary>
+    /// Put back what a start-of-year write changed, by the same verdict: a
+    /// file still holding exactly what was written goes back to what it held
+    /// before; a file already back is left as it is and not counted; a file
+    /// changed since — or one that could not be written — is left and named.
+    /// </summary>
+    public static (IReadOnlyList<string> PutBack, IReadOnlyList<string> LeftAsTheyAre) UndoStartOfYear(
+        IReadOnlyDictionary<string, (string Before, string After)> written)
+    {
+        var (toPutBack, left) = WhatAnUndoWouldDo(written);
+        var putBack = new List<string>();
+        var leftAsTheyAre = new List<string>(left);
+        foreach (string path in toPutBack)
+        {
+            try
+            {
+                File.WriteAllText(path, written[path].Before);
+                putBack.Add(path);
+            }
+            catch { leftAsTheyAre.Add(path); }
+        }
+        return (putBack, leftAsTheyAre);
     }
 }
