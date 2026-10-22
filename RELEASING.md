@@ -112,20 +112,6 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-10-22 | A problem report's trail opens with the version a teacher can name (1.7.2, not "1.7 (2)") and ends with why Plantoir closed: quit by the teacher, to install a new version, or asked to close by Windows | Windows (mac shipped it in v1.8.0, #560) | #565 |
-| 2026-10-22 | Every build's trail says whether it made the section's My Progress page, and why not when it did not; a course's own `include_my_progress` and `success_criteria_headings` are honoured | Windows (mac shipped it in v1.8.2, #545) | #599 |
-| 2026-10-22 | Undo Last Change, pressed again once an edited page is set back, takes the whole change back instead of staying stuck; the start-of-year undo sheet says which pages will go back and which stay | Windows (mac shipped it in v1.8.0, #555) | #564 |
-| 2026-10-22 | Get Ready for the Start of the Year shows the pages going into draft as a table — Page, Folder, Why — with the warnings first and the pages with no room for a key named before Go | Windows (mac shipped it in v1.8.4, #589) | #619 |
-| 2026-10-22 | Runnable Python blocks work in a site built on Windows (the site's own maths fonts were already there; measured to match the mac's KaTeX 0.16.21): the Windows app now carries Pyodide 314.0.7 (a Windows re-run of `fetch-runtime.ps1` is needed on every build PC; the build refuses without it) | Windows (the mac has had #455/#494 since v1.8.0) | #568 |
-| 2026-10-22 | A runnable block on a page with nothing from another website asks for each `input()` line as the program runs, in a Windows preview and a Windows publish (inherited, measured in Edge and the preview pane) | Windows (the mac since v1.8.1, #583) | #591 |
-| 2026-10-22 | The editable block's own syntax colours and line numbers on a Windows-built site (inherited, measured in Edge) | Windows (the mac since v1.8.1, #585) | #592 |
-| 2026-10-22 | Hiding a class no longer keeps up a page just because it is CALLED something like "Curriculum Coverage": only pages inside a curriculum folder stay visible | Windows (the mac always did this) | #615 |
-| 2026-10-22 | Publish Pages… and the assistant's plan no longer list the curriculum expectations a class links to as "already visible", or count them in the summary | Windows (mac shipped it in v1.8.4, #607) | #617 |
-| 2026-10-22 | A folder added in Course Settings starts with its index page, so it appears in the site's sidebar, and a page to duplicate — shared, or in every section | Windows (mac shipped it in v1.8.0, #506) | #580 |
-| 2026-10-22 | A course whose name holds ": " ("Physics: Mechanics") gets a front page the build can read when a section is added or the front page is put back | Windows (mac shipped it in v1.8.1, #575) | #586 |
-| 2026-10-22 | In a club, the publish and unpublish plan says "meeting" for a linked meeting it leaves as it is or keeps visible, matching the table under it | Windows (the mac since #267) | #556 |
-| 2026-10-22 | A window remembered on a screen that has since been unplugged (or a resolution since lowered) reopens on the nearest screen instead of out of sight; a window that can still be grabbed by its title bar reopens exactly where it was | Windows (the mac always did this) | #558 |
-| 2026-10-22 | Open in Obsidian offers, once and before Obsidian opens, to add the add-ons that draw a course's diagrams and graphs (TikZJax, Functionplot), and after the yes adds what a course uses at Open in Obsidian and after a preview — never under an open course, which it offers to reopen; File ▸ Settings ▸ Obsidian holds the toggle; backups leave Plantoir's add-ons out. Every Windows build PC must run `windows-app\Vendor\fetch-obsidian-addons.ps1` once (the build refuses without it). Quitting Obsidian from Plantoir (registering a course, renaming one) now closes every Obsidian window, not one | Windows (mac shipped it in v1.8.0, #495) | #581 |
 
 
 ## Warnings the release notes MUST carry

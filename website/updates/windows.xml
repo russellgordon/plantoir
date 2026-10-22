@@ -5,6 +5,61 @@
     <description>Plantoir for Windows</description>
     <language>en</language>
     <item>
+      <title>Plantoir 1.8.5</title>
+      <description>New in Plantoir 1.8.5
+
+This update brings Windows from 1.7.2 up to date with everything the Mac got in 1.8.0 to 1.8.5.
+
+BEFORE YOU UPDATE
+
+- Deploy each section again to bring the new features to your sites. A site you deployed earlier keeps working exactly as it did. Runnable programs, quizzes, tickable checklists, My Progress, redrawn diagrams and pictures that no longer make the text jump all reach a site the next time you preview and deploy it.
+- Deploy each section again to bring diagrams back. Since late August, a site deployed to Netlify has shown each Mermaid diagram as the text it was written in, instead of drawing it. Deploying again draws them. Sites on Cloudflare or deployed to a folder were never affected, and neither was Preview.
+- Obsidian will ask whether you trust the author. When Plantoir offers to add Obsidian's add-ons for diagrams and graphs and you say yes, Obsidian asks, the first time each course opens with them, whether you trust the author of its pages. That is you. Click "Trust author and enable plugins". Pressing Enter chooses Restricted Mode, and the drawings then stay as text.
+- Rebuild and deploy your sites to size pictures. Every picture's size is now written into the page when the site is built, so the text stops jumping as pictures arrive on a slow first visit. A picture you gave a size yourself in your notes is drawn exactly as before.
+- The ready-made ICS3U course has changed. If you already created an ICS3U course from it, your copy stays as it is; the new version, with programs students can run, is what you get when you create one after updating. The ready-made courses' "What This Site Can Do" pages were also rewritten.
+- A course with a colon in its name that you started empty may not build. If you made it with an earlier version (for example "Physics: Mechanics") and the build says a section's front page cannot be read, open sectionN\index.md in Obsidian and put double quotes around the title on line 2. Courses made from now on are written that way already.
+
+NOT YET ON WINDOWS
+
+- Swift programs that students can run. A Swift code block still shows as code on the page, read-only; it is not run. The Mac can run them.
+
+NEW
+
+- Python programs students can run on the page (on Netlify or Cloudflare, programs that ask for input wait for a typed answer; on a folder or school web space, students type input before pressing Run). Add one line to a page's settings and the word "run" to a Python code block, and students get the program in an editor with Run, Stop and Reset, with nothing to install and no account.
+- Self-check quizzes. Write multiple choice, select all that apply, short answer and fill-in-the-blank questions in your notes; students check their own answers, with your explanation. It is practice, never a grade, and nothing leaves their browser.
+- Students can tick the checklists on your pages, and their ticks are remembered in their own browser.
+- My Progress: a page for each student's own progress, listing each page with a checklist under "Test of success", "Tests of success" or "Success criteria", with how many items are ticked. Units, classes and pages open to show their items.
+- Obsidian shows your diagrams and graphs. Once, before Obsidian opens, Plantoir offers to add the add-ons that draw them. Your answer applies to every course that has them, and Plantoir never changes add-ons you installed yourself. File, Settings, Obsidian holds the switch.
+- Claude Code and Codex know the new features, and every way a page can be written.
+
+IMPROVED
+
+- Get Ready for the Start of the Year shows the pages going into draft as a table (page, folder and why), with the warnings first.
+- Publish Pages and the assistant's plan no longer list curriculum expectation pages as "already visible".
+- Each overall expectation lists "When did we do this?". Maths on your sites no longer depends on another website.
+- Plantoir's activity record (used in problem reports) opens with your version number and says why Plantoir closed.
+
+FIXED
+
+- A folder you add in Course Settings appears on the site, with its own page in the sidebar and a page to copy.
+- Undo, pressed again once a page you edited is set back, takes the change off the list instead of getting stuck.
+- Hiding a class no longer keeps a page visible just because it is called "Curriculum Coverage"; only pages inside a curriculum folder stay visible.
+- In a club, the publish plan says "meeting" for a linked meeting it leaves alone.
+- A window remembered on a screen that has since been unplugged now reopens on a screen you can see.
+- No site loads a page-view counter nobody set up.
+
+DOWNLOADS
+
+File: PlantoirSetup.exe   Size: 248.3 MB (260,328,160 bytes)   SHA-256: 3718cbc3d217bd0601c7d2dd0a726f880fd7a4d13aeee8e6dcecca5eb65080aa
+File: Plantoir-win-x64.zip   Size: 414.5 MB (434,632,904 bytes)   SHA-256: 61bd101590a3a04bcb4ffb19d23a453789614f1617b128611933a59d5f197821
+
+The SHA-256 lets your IT department verify the download is genuine.</description>
+      <pubDate>Thu, 22 Oct 2026 15:41:27 -04:00</pubDate>
+      <sparkle:version>1.8.5</sparkle:version>
+      <sparkle:shortVersionString>1.8.5</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.5/PlantoirSetup.exe" sparkle:version="1.8.5" sparkle:shortVersionString="1.8.5" length="260328160" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="eQWQZSGCTYgq1XKg+cf9VlIdvohNR9uLDLmboE1dyCedeTgFejUICmfrVCR70Y86G2O+P/yhD3xr73a3XTbnBw==" />
+    </item>
+    <item>
       <title>Plantoir 1.7.2</title>
       <description>New in Plantoir 1.7.2
 
@@ -27,7 +82,7 @@ Fixed: Plantoir's activity record (used in problem reports) now says "took part 
       <pubDate>Fri, 16 Oct 2026 21:54:13 -04:00</pubDate>
       <sparkle:version>1.7.2</sparkle:version>
       <sparkle:shortVersionString>1.7.2</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.2/PlantoirSetup.exe" sparkle:version="1.7.2" sparkle:shortVersionString="1.7.2" length="247405192" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="3z5K3cgad2WBRH3LSKHMP8GRdTcKjTZrBN6zJ5G+f8fzsP6Nx/IJ9VpTLQ0XkaLqaw/162gsOLi6edMpeV/UCw==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.7.2/PlantoirSetup.exe" sparkle:version="1.7.2" sparkle:shortVersionString="1.7.2" length="247405192" sparkle:os="windows" type="application/octet-stream" sparkle:criticalUpdate="false" sparkle:signature="3z5K3cgad2WBRH3LSKHMP8GRdTcKjTZrBN6zJ5G+f8fzsP6Nx/IJ9VpTLQ0XkaLqaw/162gsOLi6edMpeV/UCw==" />
     </item>
     <item>
       <title>Plantoir 1.7.1</title>
