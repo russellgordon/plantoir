@@ -24,8 +24,11 @@ public class ObsidianRouteSourceTests
             .Where(pair => pair.Count > 0)
             .ToDictionary(pair => pair.Name, pair => pair.Count);
 
-        // The sidebar's route: the live course (Menus) and the reference course (Reference).
-        Assert.Equal(1, callers.GetValueOrDefault("SidebarPane.Menus.cs"));
+        // The sidebar's route: the live course (Menus, through #581's ObsidianOpenRoute,
+        // whose world is the one place that opens it) and the reference course (Reference).
+        Assert.Equal(0, callers.GetValueOrDefault("SidebarPane.Menus.cs"));
+        Assert.Contains("new ObsidianOpenRoute(new ObsidianWorld(", File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs")));
+        Assert.Equal(1, callers.GetValueOrDefault("ObsidianWorld.cs"));
         Assert.Equal(1, callers.GetValueOrDefault("SidebarPane.Reference.cs"));
         // The named exception: Course Settings' How I Teach row opens a PAGE of
         // a LIVE course (a reference course has no such row), not the course.
