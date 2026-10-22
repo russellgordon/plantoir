@@ -1029,7 +1029,7 @@ final class MarketingScenes: MarketingScreenshotCase {
         // gives each page's reason, so sort by Why, descending: the pages'
         // reasons ("only … links to it", "nothing links to it", "first used
         // in …") come to the top. And CHECK the sort took — a header click
-        // that missed would photograph eight identical rows and still pass
+        // that missed would photograph six identical rows and still pass
         // the OCR (#589's plan review, finding d).
         let table: XCUIElement = startOfYearPlanTable(in: application)
         XCTAssertTrue(table.waitForExistence(timeout: 10), "The plan should be a table (#589)")
