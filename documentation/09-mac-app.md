@@ -10434,10 +10434,15 @@ keyboard. Two classes activate it:
   `activate(ignoringOtherApps:)`.
 
 `ActivationHandBack`, an `XCTestObservation` registered from the bundle's
-principal class, remembers the last other app at the front. When a test
-finishes with the host active, it yields activation to that app and asks it
-forward. If that app has quit or will not come forward, the host deactivates.
-It never calls `hide`, which would order out the window the next tests read.
+principal class, remembers the last other app at the front, and only an
+ordinary app with a Dock tile (`activationPolicy == .regular`): a background
+agent such as `UserNotificationCenter` activates now and then, and was once
+measured as the remembered app. When a test finishes with the host active, it
+yields activation to that app and asks it forward. If that app has quit or will
+not come forward, it yields to the Finder, which is always running, and asks it
+forward instead. `NSApp.deactivate()` is only the last resort: on its own it
+left the host active and frontmost for the whole 5 s it was watched. It never
+calls `hide`, which would order out the window the next tests read.
 Without the hand-back the host stayed frontmost for the remaining **115 s** of
 a 23-class run. With it, an external watcher measured the host frontmost for
 about **2.5 s in total** over 24 classes and 164 tests: one 2.4 s stretch for
@@ -10481,8 +10486,9 @@ has one copy, and `TableHost.offScreenOrigin(for:)` asks it.
 off-screen origin.
 
 **The tests** are `UnitTestHostWindowsTests` and `ActivationHandBackTests`.
-Every live test was red on the old code, and the must-fail proofs are
-recorded in the closing comment.
+Every live test was red on the old code, except the first hand-back test,
+which passes with the install call removed: its must-fail is the observer
+emptied. The must-fail proofs are recorded in the closing comment.
 
 - **The policy test:** the host is an accessory.
 - **The main-window test:** the main window is ordered in, `screen == nil`,

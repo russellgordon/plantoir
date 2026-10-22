@@ -18,9 +18,15 @@ import XCTest
 /// **What it does.** It remembers the last app other than the host that came
 /// to the front — the one frontmost when the bundle loaded, then every one
 /// activated since — and, when a test finishes with the host active, yields
-/// activation to it and asks it forward. If that app has quit, or will not
-/// come forward, the host simply deactivates. Never `hide`: that would order
-/// out the window the next tests read.
+/// activation to it and asks it forward. Only an ordinary app with a Dock tile
+/// is remembered (`activationPolicy == .regular`): a background agent such as
+/// `UserNotificationCenter` activates now and then, and yielding to it would
+/// leave the keyboard nowhere useful. If that app has quit, or will not come
+/// forward, the front goes to the Finder instead, which is always running.
+/// `NSApp.deactivate()` is only the last resort: MEASURED in the implementation
+/// review, on its own it left the host active and frontmost for the whole 5 s
+/// it was watched. Never `hide`: that would order out the window the next tests
+/// read.
 ///
 /// Registered from the bundle's principal class (`PlantoirTestBundleSetup`),
 /// so it is in place before the first test. It never activates the host
@@ -54,12 +60,17 @@ final class ActivationHandBack: NSObject, XCTestObservation {
         XCTestObservationCenter.shared.addTestObserver(made)
     }
 
-    /// `app`, unless it is this test host.
+    /// `app`, unless it is this test host or not an ordinary app with a Dock
+    /// tile. An accessory or a background agent is never worth handing the
+    /// front to.
     static func otherApp(_ app: NSRunningApplication?) -> NSRunningApplication? {
         guard let app else {
             return nil
         }
         if app.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            return nil
+        }
+        if app.activationPolicy != .regular {
             return nil
         }
         return app
@@ -72,6 +83,31 @@ final class ActivationHandBack: NSObject, XCTestObservation {
         }
     }
 
+    /// The Finder, which is always running and always an ordinary app: where
+    /// the front goes when the remembered app cannot take it.
+    static func finder() -> NSRunningApplication? {
+        let running: [NSRunningApplication] = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
+        for app in running {
+            if let usable = otherApp(app), !usable.isTerminated {
+                return usable
+            }
+        }
+        return nil
+    }
+
+    /// Yields the front to `app` and asks it forward. True when it agreed.
+    @MainActor
+    static func handTheFront(to app: NSRunningApplication?) -> Bool {
+        guard let app else {
+            return false
+        }
+        if app.isTerminated {
+            return false
+        }
+        NSApp.yieldActivation(to: app)
+        return app.activate()
+    }
+
     func testCaseDidFinish(_ testCase: XCTestCase) {
         if !Thread.isMainThread {
             return
@@ -82,19 +118,19 @@ final class ActivationHandBack: NSObject, XCTestObservation {
         }
     }
 
-    /// Gives the front to `app`, or simply lets it go when there is no such
-    /// app any more. Does nothing unless the host is active.
+    /// Gives the front to `rememberedApp`, or to the Finder when that app has
+    /// gone or will not come forward, and only then simply deactivates. Does
+    /// nothing unless the host is active.
     @MainActor
     static func giveTheFrontBack(to rememberedApp: NSRunningApplication?) {
         if !NSApp.isActive {
             return
         }
-        if let app = rememberedApp, !app.isTerminated {
-            NSApp.yieldActivation(to: app)
-            let asked: Bool = app.activate()
-            if asked {
-                return
-            }
+        if handTheFront(to: rememberedApp) {
+            return
+        }
+        if handTheFront(to: finder()) {
+            return
         }
         NSApp.deactivate()
     }
