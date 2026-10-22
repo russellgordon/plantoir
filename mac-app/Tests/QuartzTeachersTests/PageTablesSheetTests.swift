@@ -307,6 +307,225 @@ final class PageTablesSheetTests: XCTestCase {
         XCTAssertEqual(plainSheet.drawnPlanRows.count, 21)
     }
 
+    // MARK: - Resizing (#621)
+
+    /// Every one of these sheets, presented for real, is resizable, opens at
+    /// its content's size (`fittingSize(of:)`, 560 wide), and cannot be made
+    /// smaller than that: the size a teacher saw before is both the default
+    /// and the minimum.
+    func testEachSheetIsResizableAndOpensAtItsSmallestSize() async throws {
+        var made: [URL] = []
+        defer {
+            for root in made {
+                try? FileManager.default.removeItem(at: root)
+            }
+        }
+        let plans = try AssistFixture.makeRunner(surface: .menu)
+        made.append(plans.root)
+        let twentyOne: AssistToolOutcome = try await PublishPlanTableTests.planAClassLinkingTwentyPages(in: plans)
+        let folding = try AssistFixture.makeRunner(surface: .menu)
+        made.append(folding.root)
+        let folded: AssistToolOutcome = try await PageTablesSheetTests.planAClassLinking(hidden: 4, visible: 16, in: folding)
+        let models: [(String, SectionVerbSheetModel)] = [
+            ("the picker", PageTablesSheetTests.pickerModel(course: plans.course, classes: 3, pages: 2)),
+            ("the later classes", try PageTablesSheetTests.laterClassesModel(course: plans.course)),
+            ("the plan of twenty-one pages", PageTablesSheetTests.plannedModel(twentyOne, kind: .publishPages, course: plans.course)),
+            ("a plan with pages folded", PageTablesSheetTests.plannedModel(folded, kind: .publishPages, course: folding.course)),
+        ]
+        for (name, model) in models {
+            let expected: NSSize = PageTablesSheetTests.fittingSize(
+                of: SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+            )
+            let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+            defer {
+                host.close()
+            }
+            let sheet: NSWindow = try XCTUnwrap(host.sheet, "\(name): no sheet was presented")
+            XCTAssertTrue(sheet.styleMask.contains(.resizable), "\(name): the sheet cannot be resized")
+            XCTAssertEqual(sheet.frame.width, 560, accuracy: 0.5, name)
+            XCTAssertEqual(sheet.frame.height, expected.height, accuracy: 0.5, "\(name): it opened at another height")
+            XCTAssertEqual(sheet.minSize.width, 560, accuracy: 0.5, "\(name): it can be made narrower than it opens")
+            XCTAssertEqual(sheet.minSize.height, expected.height, accuracy: 0.5, "\(name): its smallest is not the size it opens at")
+            XCTAssertFalse(host.reachedAScreen, "\(name): the sheet reached a display")
+            print("PageTablesSheetTests: \(name) opens at \(sheet.frame.size), smallest \(sheet.minSize)")
+        }
+    }
+
+    /// The plan review's B1: a sheet that opens on a two-row picker and moves
+    /// to a plan of twenty-one rows grows to show it — the window is at
+    /// least its minimum, and the plan's whole content fits — and moving on
+    /// to a shorter stage does not shrink it again.
+    func testASheetThatMovesToATallerStageGrowsToShowIt() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let twentyOne: AssistToolOutcome = try await PublishPlanTableTests.planAClassLinkingTwentyPages(in: made)
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 0, pages: 2)
+        let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+        defer {
+            host.close()
+        }
+        let sheet: NSWindow = try XCTUnwrap(host.sheet, "no sheet was presented")
+        let opened: CGFloat = sheet.frame.height
+        model.body = twentyOne.forTheCard
+        model.planTable = twentyOne.planTable
+        model.stage = .planned
+        await host.settle()
+        let needed: CGFloat = PageTablesSheetTests.fittingSize(
+            of: SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        ).height
+        XCTAssertGreaterThan(needed, opened + 100, "the plan should need far more room than the picker")
+        XCTAssertGreaterThanOrEqual(sheet.frame.height, sheet.minSize.height - 0.5,
+                                    "the sheet stayed \(sheet.frame.height) pt under a minimum of \(sheet.minSize.height)")
+        XCTAssertGreaterThanOrEqual(sheet.contentLayoutRect.height, needed - 0.5,
+                                    "the plan needs \(needed) pt and the sheet has \(sheet.contentLayoutRect.height): the buttons are off its bottom")
+        let grown: CGFloat = sheet.frame.height
+        model.stage = .working
+        await host.settle()
+        XCTAssertEqual(sheet.frame.height, grown, accuracy: 0.5, "the sheet shrank on the way to a shorter stage")
+        XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
+    }
+
+    /// Russell's rulings on R8: opening the disclosure moves neither the
+    /// sheet nor its minimum; the folded rows go into the table, which
+    /// scrolls inside the sheet; the last row can be scrolled to; and the
+    /// table is inside the sheet, not hanging off its edge.
+    func testOpeningTheFoldMovesNeitherTheSheetNorItsSmallestSize() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let folded: AssistToolOutcome = try await PageTablesSheetTests.planAClassLinking(hidden: 4, visible: 16, in: made)
+        let model: SectionVerbSheetModel = PageTablesSheetTests.plannedModel(folded, kind: .publishPages, course: made.course)
+        let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+        defer {
+            host.close()
+        }
+        let sheet: NSWindow = try XCTUnwrap(host.sheet, "no sheet was presented")
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "no table on the plan")
+        XCTAssertEqual(table.numberOfRows, 5)
+        let frame: NSRect = sheet.frame
+        let smallest: NSSize = sheet.minSize
+        let tableHeight: CGFloat? = table.enclosingScrollView?.frame.height
+
+        model.showsAlreadyRight = true
+        await host.settle()
+        XCTAssertEqual(table.numberOfRows, 21, "opening it did not add the folded rows")
+        XCTAssertEqual(sheet.frame.size, frame.size, "the sheet changed size when the disclosure opened")
+        XCTAssertEqual(sheet.minSize, smallest, "the sheet's smallest size rose when the disclosure opened")
+        XCTAssertGreaterThanOrEqual(sheet.frame.height, sheet.minSize.height - 0.5)
+        XCTAssertEqual(table.enclosingScrollView?.frame.height, tableHeight, "the table grew when the disclosure opened")
+
+        let scroll: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
+        let document: CGFloat = scroll.documentView?.frame.height ?? 0
+        XCTAssertGreaterThan(document, scroll.contentView.bounds.height, "twenty-one rows should scroll inside the table")
+        table.scrollRowToVisible(20)
+        host.pump()
+        XCTAssertTrue(table.visibleRect.intersects(table.rect(ofRow: 20)), "the last row cannot be scrolled to")
+        let content: NSView = try XCTUnwrap(sheet.contentView)
+        let inWindow: NSRect = scroll.convert(scroll.bounds, to: nil)
+        XCTAssertTrue(content.bounds.insetBy(dx: -0.5, dy: -0.5).contains(inWindow),
+                      "the table \(inWindow) hangs outside the sheet \(content.bounds)")
+        XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
+    }
+
+    /// The width a teacher adds goes to the Page column: dragged from 560 to
+    /// 900 wide, Page gains more than Folder and What changes together.
+    func testThePageColumnTakesTheWidthAdded() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let twentyOne: AssistToolOutcome = try await PublishPlanTableTests.planAClassLinkingTwentyPages(in: made)
+        let model: SectionVerbSheetModel = PageTablesSheetTests.plannedModel(twentyOne, kind: .publishPages, course: made.course)
+        let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+        defer {
+            host.close()
+        }
+        let sheet: NSWindow = try XCTUnwrap(host.sheet, "no sheet was presented")
+        let table: NSTableView = try XCTUnwrap(host.tables().first)
+        let before: [CGFloat] = PageTablesSheetTests.widths(of: table)
+        host.resizeSheet(to: NSSize(width: 900, height: sheet.contentLayoutRect.height))
+        let after: [CGFloat] = PageTablesSheetTests.widths(of: table)
+        XCTAssertEqual(after.count, 3)
+        XCTAssertEqual(before.count, 3)
+        if after.count == 3 && before.count == 3 {
+            let page: CGFloat = after[0] - before[0]
+            let others: CGFloat = (after[1] - before[1]) + (after[2] - before[2])
+            XCTAssertGreaterThan(page, others, "Page gained \(page) pt and the other two \(others): \(before) to \(after)")
+            print("PageTablesSheetTests: plan columns \(before) at 560, \(after) at 900")
+        }
+        XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
+    }
+
+    /// The height a teacher adds goes to the table: 300 pt more sheet is
+    /// 300 pt more table, on the plan and on the picker.
+    func testTheTableTakesTheHeightAdded() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let twentyOne: AssistToolOutcome = try await PublishPlanTableTests.planAClassLinkingTwentyPages(in: made)
+        let models: [(String, SectionVerbSheetModel)] = [
+            ("the plan", PageTablesSheetTests.plannedModel(twentyOne, kind: .publishPages, course: made.course)),
+            ("the picker", PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 30)),
+        ]
+        for (name, model) in models {
+            let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+            defer {
+                host.close()
+            }
+            let sheet: NSWindow = try XCTUnwrap(host.sheet, "\(name): no sheet was presented")
+            let table: NSTableView = try XCTUnwrap(host.tables().first, name)
+            let before: CGFloat = table.enclosingScrollView?.frame.height ?? 0
+            let opened: NSSize = sheet.contentLayoutRect.size
+            host.resizeSheet(to: NSSize(width: opened.width, height: opened.height + 300))
+            let after: CGFloat = table.enclosingScrollView?.frame.height ?? 0
+            XCTAssertEqual(after - before, 300, accuracy: 1, "\(name): the table grew \(after - before) pt of the 300 added")
+            XCTAssertFalse(host.reachedAScreen, "\(name): the sheet reached a display")
+        }
+    }
+
+    /// The tallest plan stage — twelve rows to read, pages folded under them
+    /// and the notes at their cap — still fits a 13-inch screen
+    /// (`CopyPageChecklist.tallestSheet`) with the disclosure, and every part
+    /// is really there.
+    func testTheTallestPlanStaysOnTheScreen() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        var rows: [AssistPlanTable.Row] = []
+        while rows.count < 20 {
+            let change: AssistPlanTable.Change = rows.count < 14 ? .willBecomeVisible : .alreadyVisible
+            rows.append(AssistPlanTable.Row(
+                position: rows.count, title: "Page \(rows.count)", folder: "Concepts", change: change, whatChanges: ""
+            ))
+        }
+        var notes: [String] = []
+        while notes.count < 8 {
+            notes.append("Note \(notes.count + 1): a sentence long enough to take two lines in the sheet, so that the notes go past their cap and are measured at it.")
+        }
+        let table: AssistPlanTable = AssistPlanTable(
+            summary: AssistWording.menuPlanSummary(changing: 14, already: 6, publishing: true), rows: rows, notes: notes
+        )
+        let model: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .publishPages, course: made.course, sectionNumber: 1,
+            title: AssistWording.menuPublishPagesTitle(course: "ICS3U", section: "1"),
+            item: .publishPages, stage: .planned
+        )
+        model.planTable = table
+        let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        XCTAssertNotNil(sheet.alreadyRightLabel, "the case has no disclosure")
+        let height: CGFloat = PageTablesSheetTests.fittingSize(of: sheet).height
+        XCTAssertLessThanOrEqual(height, CopyPageChecklist.tallestSheet, "the tallest plan is \(height) pt")
+        let parts: CGFloat = ListTableMetrics.height(forRowCount: SectionVerbSheet.mostPlanRowsShown, showsHeader: true)
+            + SectionVerbSheet.tallestPlanNotes + 20
+        XCTAssertGreaterThanOrEqual(height, parts + 120, "only \(height) pt: the table, the disclosure or the notes collapsed")
+        print("PageTablesSheetTests: tallest plan \(height) pt against \(CopyPageChecklist.tallestSheet)")
+    }
+
     // MARK: - The default size
 
     /// Every sheet whose content this piece did not mean to change opens at
@@ -489,6 +708,20 @@ final class PageTablesSheetTests: XCTestCase {
             number += 1
         }
         model.pageRows = rows
+        return model
+    }
+
+    /// The #475 question at Deploy about two classes, both ticked.
+    static func laterClassesModel(course: Course) throws -> SectionVerbSheetModel {
+        let model: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .laterClassesAtDeploy, course: course, sectionNumber: 1, title: "", item: nil
+        )
+        let first: CalendarDay = try XCTUnwrap(CalendarDay(year: 2026, month: 9, day: 11))
+        let second: CalendarDay = try XCTUnwrap(CalendarDay(year: 2026, month: 9, day: 14))
+        model.ask(about: [
+            ClassesDatedLater.Flagged(place: "section1/All Classes/Unit 2, Day 5", title: "Unit 2, Day 5", date: first),
+            ClassesDatedLater.Flagged(place: "section1/All Classes/Unit 2, Day 6", title: "Unit 2, Day 6", date: second),
+        ], nextDay: CalendarDay(year: 2026, month: 9, day: 9))
         return model
     }
 

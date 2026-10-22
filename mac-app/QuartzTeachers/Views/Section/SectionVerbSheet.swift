@@ -501,6 +501,10 @@ struct SectionVerbSheet: View {
 
     static let tallestList: CGFloat = 340
 
+    /// The sheet's width to open with, and the narrowest it can be made
+    /// (#621): what it was before it could be resized.
+    static let width: CGFloat = 560
+
     /// How many rows the picker and the later-classes list show before the
     /// table scrolls inside itself (#608): twelve, as the plan that follows
     /// shows, so the two steps of one flow are the same height — 318 pt,
@@ -521,6 +525,11 @@ struct SectionVerbSheet: View {
     /// one or two changes keeps room for the folded rows to scroll in. Five,
     /// Start of Year's own budget (`StartOfYearSheet.mostPlanRowsShown`).
     static let fewestPlanRowsUnderAFold: Int = 5
+
+    /// The gap between the plan table and the disclosure under it (#622):
+    /// 6 pt, so the disclosure reads as the table's, and so the worst plan
+    /// stays within `CopyPageChecklist.tallestSheet` (`planTable`).
+    static let foldSpacing: CGFloat = 6
 
     // MARK: - Computed properties
 
@@ -623,15 +632,33 @@ struct SectionVerbSheet: View {
         } else {
             // The one sheet title shape (#457's HIG sweep, `SheetTitle`).
             VStack(alignment: .leading, spacing: 12) {
-                content
+                // Every stage stays flexible (#621): the content is wrapped
+                // in ONE stack before the flexible frame — a frame on a
+                // multi-view builder frames each child, which gave the table
+                // 223 of 628 pt and the summary 560 — and the frame takes any
+                // height the teacher adds, at the top, so the buttons stay at
+                // the bottom. Not a `Spacer`: it adds a spacing (12 pt) to
+                // the size every stage opens at.
+                VStack(alignment: .leading, spacing: 12) {
+                    content
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
                 buttons
             }
             .padding([.horizontal, .bottom], 20)
             .sheetTitle(sheetTitle)
-            .frame(width: 560)
-            .fixedSize(horizontal: false, vertical: true)
+            // 560 wide and its content's height to open with, which is also
+            // the smallest the sheet can be made; no largest (#621). A table
+            // takes the height added (`flexibleTableHeight`), its Page column
+            // the width.
+            .frame(minWidth: SectionVerbSheet.width, idealWidth: SectionVerbSheet.width, maxWidth: .infinity)
+            .background(SheetGrowsToItsMinimum().accessibilityHidden(true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("sectionVerbSheet")
+            // `.fitted` is what makes a sheet resizable at all — the default
+            // sizing is not, and snaps back on every change (measured) — and
+            // it opens the sheet at the size above.
+            .presentationSizing(.fitted)
             // #475's question at Deploy, gone without an answer — the window
             // closed under it, say — is a Cancel: nothing deploys.
             .onDisappear {
@@ -684,47 +711,30 @@ struct SectionVerbSheet: View {
             Text(table.summary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("sectionVerbSheetPlanSummary")
-            // No `selection:`: the rows are read, not chosen.
-            Table(sortedPlanRows, sortOrder: $planSortOrder) {
-                TableColumn(AssistWording.menuPlanPageColumn, value: \.title) { (row: AssistPlanTable.Row) in
-                    Text(row.title)
-                        .help(row.title)
+            // The table and the disclosure under it as one part, 6 pt apart
+            // rather than 12: the disclosure belongs to the table, and the
+            // worst plan (twelve rows, the disclosure and the notes at their
+            // cap) is 616 pt that way and 622 with a full spacing, over the
+            // 620 a 13-inch screen allows (`CopyPageChecklist.tallestSheet`).
+            VStack(alignment: .leading, spacing: SectionVerbSheet.foldSpacing) {
+                planRowsTable
+                if let alreadyRightLabel {
+                    // No content of its own: opening it adds the rows to the
+                    // table above (`drawnPlanRows`), one table and one sort,
+                    // as #589 chose one table over two.
+                    DisclosureGroup(
+                        alreadyRightLabel,
+                        isExpanded: Binding(
+                            get: { return model.showsAlreadyRight },
+                            set: { isOpen in model.showsAlreadyRight = isOpen }
+                        )
+                    ) {
+                        EmptyView()
+                    }
+                    .accessibilityIdentifier("sectionVerbSheetPlanAlreadyRight")
                 }
-                .width(min: 90, ideal: 130)
-                TableColumn(AssistWording.menuPlanFolderColumn, value: \.folder) { (row: AssistPlanTable.Row) in
-                    Text(row.folder)
-                        .foregroundStyle(.secondary)
-                        .help(row.folder)
-                }
-                .width(min: 80, ideal: 110)
-                TableColumn(AssistWording.menuPlanChangeColumn, value: \.whatChanges) { (row: AssistPlanTable.Row) in
-                    // A date move or a reason is long; the tooltip has it whole.
-                    Text(row.whatChanges)
-                        .help(row.whatChanges)
-                }
-                // The widest: it carries the longest words (a date move, a
-                // reason). Three equal columns, as first drawn, cut it at
-                // about twenty letters in the real 560-point sheet.
-                .width(min: 180, ideal: 240)
             }
-            .tableStyle(.bordered(alternatesRowBackgrounds: true))
-            .frame(height: planTableHeight)
-            .accessibilityIdentifier("sectionVerbSheetPlanTable")
-            if let alreadyRightLabel {
-                // No content of its own: opening it adds the rows to the
-                // table above (`drawnPlanRows`), one table and one sort, as
-                // #589 chose one table over two.
-                DisclosureGroup(
-                    alreadyRightLabel,
-                    isExpanded: Binding(
-                        get: { return model.showsAlreadyRight },
-                        set: { isOpen in model.showsAlreadyRight = isOpen }
-                    )
-                ) {
-                    EmptyView()
-                }
-                .accessibilityIdentifier("sectionVerbSheetPlanAlreadyRight")
-            }
+            .layoutPriority(1)
             if !table.notes.isEmpty {
                 CappedScrollArea(cap: SectionVerbSheet.tallestPlanNotes) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -741,6 +751,38 @@ struct SectionVerbSheet: View {
                 }
             }
         }
+    }
+
+    /// The plan's rows: Page, Folder and What changes. No `selection:`: the
+    /// rows are read, not chosen. Page has no largest width and the other
+    /// two do, so the width a teacher adds goes to the titles (#621); at 560
+    /// the caps change nothing (131/121/220, as before).
+    var planRowsTable: some View {
+        Table(sortedPlanRows, sortOrder: $planSortOrder) {
+            TableColumn(AssistWording.menuPlanPageColumn, value: \.title) { (row: AssistPlanTable.Row) in
+                Text(row.title)
+                    .help(row.title)
+            }
+            .width(min: 90, ideal: 130)
+            TableColumn(AssistWording.menuPlanFolderColumn, value: \.folder) { (row: AssistPlanTable.Row) in
+                Text(row.folder)
+                    .foregroundStyle(.secondary)
+                    .help(row.folder)
+            }
+            .width(min: 80, ideal: 110, max: 140)
+            TableColumn(AssistWording.menuPlanChangeColumn, value: \.whatChanges) { (row: AssistPlanTable.Row) in
+                // A date move or a reason is long; the tooltip has it whole.
+                Text(row.whatChanges)
+                    .help(row.whatChanges)
+            }
+            // The widest at 560: it carries the longest words (a date move,
+            // a reason). Three equal columns, as first drawn, cut it at about
+            // twenty letters in the real 560-point sheet.
+            .width(min: 180, ideal: 240, max: 320)
+        }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .flexibleTableHeight(planTableHeight)
+        .accessibilityIdentifier("sectionVerbSheetPlanTable")
     }
 
     @ViewBuilder
@@ -818,7 +860,7 @@ struct SectionVerbSheet: View {
             .width(min: 120, ideal: 150, max: 180)
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
-        .frame(height: pickerTableHeight)
+        .flexibleTableHeight(pickerTableHeight)
         .onKeyPress(.space) {
             if pickedRowID == nil {
                 return .ignored
@@ -853,7 +895,7 @@ struct SectionVerbSheet: View {
             .width(min: 120, ideal: 150, max: 180)
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
-        .frame(height: laterClassesTableHeight)
+        .flexibleTableHeight(laterClassesTableHeight)
         .onKeyPress(.space) {
             if pickedLaterClassID == nil {
                 return .ignored
