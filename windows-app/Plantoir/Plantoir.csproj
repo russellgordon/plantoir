@@ -78,6 +78,49 @@
     <Content Include="..\Vendor\llama\**" Link="llama\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- Obsidian's add-ons for diagrams and graphs (#581, the mac's #495):
+       TikZJax 0.5.2 and Functionplot 1.2.1, seven files, 12.9 MB, from
+       Vendor\fetch-obsidian-addons.ps1, carried as obsidian-addons\<id>\<file>
+       beside Plantoir.exe (Content, so publish carries them too, as llama\).
+       Never downloaded on the teacher's yes: contracts/shared-rules.json ->
+       obsidianAddOnsForFigures.carried says why. -->
+  <ItemGroup>
+    <Content Include="..\Vendor\obsidian-addons\**" Link="obsidian-addons\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- REFUSES a build without them, or with a copy that is not the
+       contract's: the folder missing, a file too many or too few, or any
+       file whose SHA-256 is not the pin for THAT add-on's file of that name
+       (each (id, name, sha256) triple is looked for in the contract, not just
+       the hash). Like CheckNativeRuntimeManifest, so a release cannot ship
+       without them by accident. The count is the contract's total; a test
+       (ObsidianFigureAddOnsTests) holds the two equal. -->
+  <PropertyGroup>
+    <_PlantoirAddOnFileCount>7</_PlantoirAddOnFileCount>
+  </PropertyGroup>
+  <Target Name="CheckObsidianAddOns" BeforeTargets="BeforeBuild;Publish">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\..\Vendor\obsidian-addons')"
+           Text="windows-app\Vendor\obsidian-addons is missing: run windows-app\Vendor\fetch-obsidian-addons.ps1 once in this clone (it reads the pins from contracts\shared-rules.json) and build again." />
+    <ItemGroup>
+      <_PlantoirAddOnFile Include="$(MSBuildProjectDirectory)\..\Vendor\obsidian-addons\**" />
+    </ItemGroup>
+    <GetFileHash Files="@(_PlantoirAddOnFile)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_PlantoirAddOnHashed" />
+    </GetFileHash>
+    <PropertyGroup>
+      <_PlantoirContract>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\..\..\contracts\shared-rules.json'))</_PlantoirContract>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PlantoirAddOnChecked Include="@(_PlantoirAddOnHashed)">
+        <AddOnId>$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))</AddOnId>
+        <Pinned>$([System.Text.RegularExpressions.Regex]::IsMatch($(_PlantoirContract), '&quot;id&quot;: &quot;$([System.Text.RegularExpressions.Regex]::Escape($([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))))&quot;,[^\]]*?&quot;name&quot;: &quot;$([System.Text.RegularExpressions.Regex]::Escape('%(Filename)%(Extension)'))&quot;,\s*&quot;bytes&quot;: \d+,\s*&quot;sha256&quot;: &quot;$([System.String]::Copy('%(FileHash)').ToLowerInvariant())&quot;'))</Pinned>
+      </_PlantoirAddOnChecked>
+    </ItemGroup>
+    <Error Condition="'@(_PlantoirAddOnFile->Count())' != '$(_PlantoirAddOnFileCount)'"
+           Text="windows-app\Vendor\obsidian-addons holds @(_PlantoirAddOnFile->Count()) files, not the $(_PlantoirAddOnFileCount) the contract pins: run windows-app\Vendor\fetch-obsidian-addons.ps1 again and build again." />
+    <Error Condition="'%(_PlantoirAddOnChecked.Pinned)' != 'True'"
+           Text="windows-app\Vendor\obsidian-addons\%(_PlantoirAddOnChecked.AddOnId)\%(_PlantoirAddOnChecked.Filename)%(_PlantoirAddOnChecked.Extension) is not the file contracts\shared-rules.json pins: run windows-app\Vendor\fetch-obsidian-addons.ps1 again and build again." />
+  </Target>
+
   <!-- Ensure the MCP server binary is always freshly published beside the app -->
   <Target Name="PublishMcpBesideApp" AfterTargets="Build">
     <MSBuild Projects="..\Plantoir.Mcp\Plantoir.Mcp.csproj" Targets="Publish" Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);PublishDir=$(TargetDir)" />
