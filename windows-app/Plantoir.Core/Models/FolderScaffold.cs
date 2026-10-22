@@ -183,7 +183,7 @@ public static class FolderScaffold
     /// <summary>
     /// The template as read from disk, with CRLF turned into LF. A Windows
     /// checkout with <c>core.autocrlf=true</c> — the bundle copies
-    /// <c>support/**</c> from it — has the file as CRLF, while the contract's
+    /// the whole <c>support</c> folder from it — has the file as CRLF, while the contract's
     /// bytes and every page the mac writes are LF.
     /// </summary>
     public static string TemplateFrom(string text) => text.Replace("\r\n", "\n");

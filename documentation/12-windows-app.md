@@ -7536,3 +7536,9 @@ through the real `SectionAdder.AddSection`, every skeleton template against
 stub `PlainTitle` passed values through); with `FrontmatterTitle` returning
 the name unquoted, 7 failed — the folder cases, the title cases, the front
 pages, both sibling-title tests, the on-disk quoted folder and the repair.
+
+A trap met on the way, worth knowing: a doc comment reading `support/**`
+turned `ActivityTrailWiringTests` red, naming four events in OTHER files as
+never recorded. Its scan strips `/* … */` across the concatenated product
+source before `//` lines, so a `/*` inside a `///` comment swallows every file
+after it up to the next `*/`. Keep `/*` out of comments.
