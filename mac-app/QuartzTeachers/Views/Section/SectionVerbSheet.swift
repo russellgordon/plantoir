@@ -681,7 +681,7 @@ struct SectionVerbSheet: View {
         case .planned where model.planTable != nil:
             planTable
         case .planned, .finished:
-            CappedScrollArea(cap: SectionVerbSheet.tallestList) {
+            CappedScrollArea(cap: SectionVerbSheet.tallestList, growsWithItsSheet: true) {
                 Text(model.body)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)

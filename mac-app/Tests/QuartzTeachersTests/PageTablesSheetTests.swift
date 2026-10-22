@@ -420,9 +420,21 @@ final class PageTablesSheetTests: XCTestCase {
         let scroll: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
         let document: CGFloat = scroll.documentView?.frame.height ?? 0
         XCTAssertGreaterThan(document, scroll.contentView.bounds.height, "twenty-one rows should scroll inside the table")
-        table.scrollRowToVisible(20)
+        // A teacher's scroll wheel, not `scrollRowToVisible`, which scrolls in
+        // code and so reaches the last row even in a table that cannot be
+        // scrolled (the implementation review's B-F1, measured).
+        XCTAssertTrue(scroll.hasVerticalScroller, "the table has no scroll bar")
+        let top: CGFloat = scroll.contentView.bounds.origin.y
+        let wheel: CGEvent = try XCTUnwrap(CGEvent(
+            scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -2000, wheel2: 0, wheel3: 0
+        ), "no scroll-wheel event")
+        let event: NSEvent = try XCTUnwrap(NSEvent(cgEvent: wheel), "no scroll-wheel event")
+        scroll.scrollWheel(with: event)
         host.pump()
-        XCTAssertTrue(table.visibleRect.intersects(table.rect(ofRow: 20)), "the last row cannot be scrolled to")
+        let moved: CGFloat = scroll.contentView.bounds.origin.y - top
+        XCTAssertGreaterThan(moved, 0, "the scroll wheel did not move the table")
+        XCTAssertTrue(table.visibleRect.intersects(table.rect(ofRow: 20)),
+                      "the scroll wheel moved the table \(moved) pt and the last row is not shown")
         let content: NSView = try XCTUnwrap(sheet.contentView)
         let inWindow: NSRect = scroll.convert(scroll.bounds, to: nil)
         XCTAssertTrue(content.bounds.insetBy(dx: -0.5, dy: -0.5).contains(inWindow),
@@ -485,6 +497,39 @@ final class PageTablesSheetTests: XCTestCase {
             XCTAssertEqual(after - before, 300, accuracy: 1, "\(name): the table grew \(after - before) pt of the 300 added")
             XCTAssertFalse(host.reachedAScreen, "\(name): the sheet reached a display")
         }
+    }
+
+    /// A Re-date card's text takes the height a teacher adds, as Start of
+    /// Year's other stages do, instead of leaving a band above the buttons
+    /// (the implementation review's A-F1), and it still opens at dev's size.
+    func testAReDateCardsTextTakesTheHeightAdded() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let twentyOne: AssistToolOutcome = try await PublishPlanTableTests.planAClassLinkingTwentyPages(in: made)
+        let reDate: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .reDateClasses, course: made.course, sectionNumber: 1,
+            title: AssistWording.menuReDateTitle(course: "ICS3U", section: "1"),
+            item: .reDateClasses, stage: .planned
+        )
+        reDate.body = twentyOne.forTheCard
+        let host: SheetHost = SheetHost(SectionVerbSheet(model: reDate, pressDefault: {}, cancel: {}))
+        defer {
+            host.close()
+        }
+        let sheet: NSWindow = try XCTUnwrap(host.sheet, "no sheet was presented")
+        XCTAssertEqual(sheet.frame.height, PageTablesSheetTests.reDateCardHeight, accuracy: 0.5,
+                       "the card opened at another height")
+        let scroll: NSScrollView = try XCTUnwrap(PageTablesSheetTests.firstScrollView(in: sheet.contentView),
+                                                 "the card has no text area")
+        let before: CGFloat = scroll.frame.height
+        let opened: NSSize = sheet.contentLayoutRect.size
+        host.resizeSheet(to: NSSize(width: opened.width, height: opened.height + 300))
+        let after: CGFloat = scroll.frame.height
+        XCTAssertEqual(after - before, 300, accuracy: 1, "the text area grew \(after - before) pt of the 300 added")
+        print("PageTablesSheetTests: Re-date card's text \(before) pt at \(opened.height), \(after) pt at \(opened.height + 300)")
+        XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
     }
 
     /// The tallest plan stage — twelve rows to read, pages folded under them

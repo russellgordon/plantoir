@@ -3506,7 +3506,10 @@ and the least (the picker 338, the later classes 290, the plan of 21 pages
 454, a hide plan of two rows 214, the text stages 124 and 412, all equal to
 dev's). Every table is `flexibleTableHeight(today's height)` — `minHeight =
 idealHeight` = what it was, no maximum, `layoutPriority(1)` — so 300 pt more
-sheet is 300 pt more table. The plan's Folder and What changes are capped at
+sheet is 300 pt more table. The text stages' `CappedScrollArea` takes
+`growsWithItsSheet` likewise (the implementation review's A-F1): a Re-date
+card still opens at 412, and 300 pt more sheet is 300 pt more text, where
+before its 304-pt area stayed put under a band. The plan's Folder and What changes are capped at
 140 and 320 and Page is not, so the width added goes to the titles
 (125/115/215 at 560, unchanged; 335/140/320 at 900). The content is wrapped
 in ONE `VStack` before `.frame(maxHeight: .infinity, alignment: .top)`: a
@@ -9137,7 +9140,7 @@ sortable `Table` — the look #524 gave Publish Pages ("The plan as a table
   students will not see that page"), is about 400 pt; on one line in a
   240-point column it was cut at its useful half (#589's plan review). Page is
   at least 90 pt and Folder 60–100, which leaves Why 254 pt in the 560-point
-  sheet (248.5 with a scroll bar showing). `.help` still carries every cell
+  sheet (248 with a scroll bar showing). `.help` still carries every cell
   whole for a long title.
 - **Resizable since v1.8.6 (#621)**, as Publish Pages… ("The plan as a table
   (#524)" → v1.8.6): the same root frame, `.presentationSizing(.fitted)` and
