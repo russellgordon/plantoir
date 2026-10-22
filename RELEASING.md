@@ -116,6 +116,9 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-22 | Every build's trail says whether it made the section's My Progress page, and why not when it did not; a course's own `include_my_progress` and `success_criteria_headings` are honoured | Windows (mac shipped it in v1.8.2, #545) | #599 |
 | 2026-10-22 | Undo Last Change, pressed again once an edited page is set back, takes the whole change back instead of staying stuck; the start-of-year undo sheet says which pages will go back and which stay | Windows (mac shipped it in v1.8.0, #555) | #564 |
 | 2026-10-22 | Get Ready for the Start of the Year shows the pages going into draft as a table — Page, Folder, Why — with the warnings first and the pages with no room for a key named before Go | Windows (mac shipped it in v1.8.4, #589) | #619 |
+| 2026-10-22 | Runnable Python blocks work in a site built on Windows (the site's own maths fonts were already there; measured to match the mac's KaTeX 0.16.21): the Windows app now carries Pyodide 314.0.7 (a Windows re-run of `fetch-runtime.ps1` is needed on every build PC; the build refuses without it) | Windows (the mac has had #455/#494 since v1.8.0) | #568 |
+| 2026-10-22 | A runnable block on a page with nothing from another website asks for each `input()` line as the program runs, in a Windows preview and a Windows publish (inherited, measured in Edge and the preview pane) | Windows (the mac since v1.8.1, #583) | #591 |
+| 2026-10-22 | The editable block's own syntax colours and line numbers on a Windows-built site (inherited, measured in Edge) | Windows (the mac since v1.8.1, #585) | #592 |
 | 2026-10-22 | Hiding a class no longer keeps up a page just because it is CALLED something like "Curriculum Coverage": only pages inside a curriculum folder stay visible | Windows (the mac always did this) | #615 |
 | 2026-10-22 | Publish Pages… and the assistant's plan no longer list the curriculum expectations a class links to as "already visible", or count them in the summary | Windows (mac shipped it in v1.8.4, #607) | #617 |
 
@@ -171,10 +174,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 3. **Build the signed Windows bundle**: first **re-run
    `windows-app\Vendor\fetch-runtime.ps1`** — it returns at once when the
    runtime is current, and fetches only `runtime\vendor` (Paged.js, Latin
-   Modern, function-plot, the TikZ engine; about 45 MB, under a minute) when
-   the runtime predates them; `publish.ps1` never runs it, and the build now
+   Modern, function-plot, Pyodide, the TikZ engine; about 56 MB, under a
+   minute — 49 s measured on the build PC on 2026-10-22) when the runtime
+   predates any of them; `publish.ps1` never runs it, and the build now
    REFUSES a runtime whose manifest lacks those keys rather than ship one
-   without them (#503). Then `az login`, then
+   without them (#503; `pyodide` joined the keys with #568, so every runtime
+   made before 2026-10-22 is refused until the fetch is re-run). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`). **Then build and sign the Windows update feed

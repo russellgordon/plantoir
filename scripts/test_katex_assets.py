@@ -128,7 +128,7 @@ class InstallTests(unittest.TestCase):
 
     def carried(self):
         target = self.output / "quartz" / "static" / "katex"
-        return sorted(str(path.relative_to(target)) for path in target.rglob("*") if path.is_file())
+        return sorted(path.relative_to(target).as_posix() for path in target.rglob("*") if path.is_file())
 
     def test_exactly_the_stylesheet_copy_tex_the_woff2_faces_and_the_licence(self):
         self.install()
