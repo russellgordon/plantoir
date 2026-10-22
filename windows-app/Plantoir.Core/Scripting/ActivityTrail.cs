@@ -9,6 +9,14 @@ public static class ActivityTrail
     public enum Event
     {
         AppOpened,
+
+        /// <summary>
+        /// Plantoir closed (#565, mac #560): why — quit by the teacher, to
+        /// install a new version, or asked to close by Windows — and the pid
+        /// of its own "app opened" line. Written once, and only by a process
+        /// that wrote that line (<see cref="NoteClosed"/>).
+        /// </summary>
+        AppClosed,
         Machine,
         Helpers,
         WorkingFolderOpened,
@@ -674,6 +682,7 @@ public static class ActivityTrail
     public static string KeyFor(Event @event) => @event switch
     {
         Event.AppOpened => "app opened",
+        Event.AppClosed => "app closed",
         Event.Machine => "machine described",
         Event.Helpers => "helpers described",
         Event.WorkingFolderOpened => "working folder opened",
@@ -851,14 +860,47 @@ public static class ActivityTrail
         Note(Event.AppOpened, "Plantoir opened — " + ProblemReportEnvironment.AppDescription);
         Note(Event.Machine, "running on " + ProblemReportEnvironment.SystemDescription);
         Note(Event.Helpers, "using " + ProblemReportEnvironment.HelperDescription);
+        System.Threading.Interlocked.Exchange(ref _openedLineWritten, 1);
     }
 
-    public static void NoteLaunch(string appVersion, string buildNumber, int processId, string executablePath)
+    // 1 once this process wrote "Plantoir opened"; 1 once it wrote "Plantoir closed".
+    private static int _openedLineWritten;
+    private static int _closedLineWritten;
+
+    /// <summary>
+    /// "Plantoir closed — quit by the teacher · pid 4711" (#565, mac #560;
+    /// <c>mustRecord</c> → "app closed"). On the SAME guard as the opened line:
+    /// only a process that wrote "Plantoir opened" writes it, so a scheduled
+    /// run or a marketing capture leaves no unpaired close; and only ONCE,
+    /// because every window hears the end of a session and the last window's
+    /// close may follow it.
+    /// </summary>
+    /// <param name="lockWait">How long to wait for another writer's lock. Short
+    /// at the end of a session, where Windows ends a process that does not
+    /// answer within a few seconds (#565 plan review, item 5).</param>
+    /// <returns>True when the line was written by this call.</returns>
+    public static bool NoteClosed(QuitConfirmation.ClosingReason reason, TimeSpan? lockWait = null)
     {
-        string safePath = LogRedactor.Redacting(executablePath);
-        Note(Event.AppOpened, $"Plantoir {appVersion} ({buildNumber}) opened (PID {processId}, {safePath})");
-        Note(Event.Machine, "running on " + ProblemReportEnvironment.SystemDescription);
-        Note(Event.Helpers, "using " + ProblemReportEnvironment.HelperDescription);
+        if (System.Threading.Volatile.Read(ref _openedLineWritten) == 0) return false;
+        if (System.Threading.Interlocked.Exchange(ref _closedLineWritten, 1) == 1) return false;
+        string line = ClosedLine(reason, Environment.ProcessId);
+        Note(Event.AppClosed, line, lockWait ?? WritersWait);
+        return true;
+    }
+
+    /// <summary>A line written with its own wait for the writers' lock.</summary>
+    private static void Note(Event @event, string what, TimeSpan lockWait) =>
+        Append($"{DateText.Stamp(DateTime.Now)} · {LogRedactor.Redacting(what)}", lockWait);
+
+    /// <summary>The close line's words; the contract's <c>line</c> is this with reason "quit by the teacher".</summary>
+    public static string ClosedLine(QuitConfirmation.ClosingReason reason, int processId) =>
+        $"Plantoir closed — {QuitConfirmation.Words(reason)} · pid {processId}";
+
+    /// <summary>For tests: forget that this process wrote either line.</summary>
+    internal static void ResetOpenAndCloseForTests(bool opened)
+    {
+        System.Threading.Volatile.Write(ref _openedLineWritten, opened ? 1 : 0);
+        System.Threading.Volatile.Write(ref _closedLineWritten, 0);
     }
 
     /// <summary>
@@ -892,7 +934,11 @@ public static class ActivityTrail
     /// </remarks>
     private const string WritersMutexName = @"Local\PlantoirActivityTrail";
 
-    private static void Append(string line)
+    private static readonly TimeSpan WritersWait = TimeSpan.FromSeconds(5);
+
+    private static void Append(string line) => Append(line, WritersWait);
+
+    private static void Append(string line, TimeSpan wait)
     {
         lock (_lock)
         {
@@ -910,7 +956,7 @@ public static class ActivityTrail
                 bool held = false;
                 try
                 {
-                    try { held = writers.WaitOne(TimeSpan.FromSeconds(5)); }
+                    try { held = writers.WaitOne(wait); }
                     catch (System.Threading.AbandonedMutexException) { held = true; }   // a writer died holding it: ours now
 
                     // Written even when the wait timed out: a line that might

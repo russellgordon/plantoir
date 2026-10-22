@@ -13,27 +13,34 @@ namespace Plantoir.Core.Scripting;
 /// </summary>
 public static class ProblemReportEnvironment
 {
-    /// <summary>"1.2 (3)": the version as the trail and `app updated` write it.</summary>
-    public static string AppVersion
+    /// <summary>
+    /// "1.7.2": the three-part version a teacher sees in About and on the
+    /// update lines (<see cref="Plantoir.Core.Assist.AppUpdates.Spell"/>), then
+    /// the build in brackets when there is one (#565, mac #560). Windows
+    /// carries no build number of its own — <c>&lt;Version&gt;1.7.2&lt;/Version&gt;</c>
+    /// makes the assembly 1.7.2.0 — so a revision of 0 means "none" and no
+    /// brackets are written. Until #565 this printed "1.7 (2)", the patch
+    /// number shown as a build, beside update lines saying "from 1.7.1 to 1.7.2".
+    /// </summary>
+    public static string AppVersion => Spelled(
+        (Assembly.GetEntryAssembly() ?? typeof(ProblemReportEnvironment).Assembly).GetName().Version);
+
+    /// <summary><see cref="AppVersion"/> for a given version; public for its test.</summary>
+    public static string Spelled(Version? version)
     {
-        get
-        {
-            var ver = (Assembly.GetEntryAssembly() ?? typeof(ProblemReportEnvironment).Assembly).GetName().Version;
-            return ver is not null ? $"{ver.Major}.{ver.Minor} ({ver.Build})" : "1.0 (1)";
-        }
+        if (version is null) return "1.0.0";
+        string three = Plantoir.Core.Assist.AppUpdates.Spell(version);
+        return version.Revision > 0 ? $"{three} ({version.Revision})" : three;
     }
 
+    /// <summary>"Plantoir 1.7.2 · pid 4711 · C:\…\Plantoir.exe": the `app opened` line's words after "Plantoir opened — ".</summary>
     public static string AppDescription
     {
         get
         {
-            var assembly = Assembly.GetEntryAssembly() ?? typeof(ProblemReportEnvironment).Assembly;
-            var ver = assembly.GetName().Version;
-            string versionStr = ver is not null ? $"{ver.Major}.{ver.Minor}" : "1.0";
-            string buildNumber = ver is not null ? $"{ver.Build}" : "1";
             int pid = Environment.ProcessId;
             string path = LogRedactor.Redacting(Environment.ProcessPath ?? AppContext.BaseDirectory);
-            return $"Plantoir {versionStr} ({buildNumber}) · pid {pid} · {path}";
+            return $"Plantoir {AppVersion} · pid {pid} · {path}";
         }
     }
 
