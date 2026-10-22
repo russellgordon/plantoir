@@ -39,21 +39,22 @@ public static class StartOfYearDialog
             return proposal.TeacherText;
         }
 
-        // The title is the sheet's own; the body is the plan without its code
-        // line, which is for an outside assistant and means nothing here.
-        string body = string.Join("\n", proposal.Text.Split('\n')
-            .Skip(2).Where(line => !line.StartsWith("Plan code: ", StringComparison.Ordinal)));
-        var text = new TextBlock { Text = body.Trim(), TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
-        AutomationProperties.SetAutomationId(text, "startOfYearPlan");
+        // The sheet in its pieces (#619): the same sentences the plan's text
+        // carries, with the two lists of lines as one table. The code line is
+        // for an outside assistant and means nothing here.
+        DateTime? scheduledFor = null;
+        try { scheduledFor = TaskScheduling.NextRun(folder, course.Code, section); } catch { }
+        var sheet = StartOfYearSheet.Make(proposal.Plan, DateOnly.FromDateTime(DateTime.Now), scheduledFor,
+            workspace.StartOfYearPagesWithNoRoom(course.Code, section, proposal.Plan), course.Configuration.ClassNoun);
         var dialog = new ContentDialog
         {
             Title = StartOfYearWording.Fill(StartOfYearWording.SheetTitle, ("course", course.Code), ("section", section.ToString())),
-            Content = new ScrollViewer { Content = text, MaxHeight = 480 },
             PrimaryButtonText = StartOfYearWording.GoButton,
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
         };
         AutomationProperties.SetAutomationId(dialog, "startOfYearDialog");
+        StartOfYearSheetView.Build(dialog, sheet);
         var choice = await show(dialog);
         if (choice != ContentDialogResult.Primary || folderMovedMeanwhile()) return null;
 
