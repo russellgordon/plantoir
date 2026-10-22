@@ -192,16 +192,7 @@ public sealed partial class AssistWorkspace
             {
                 string full = draft.Page.Id;
                 string before = File.ReadAllText(full);
-                bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
-                var (after, edit) = PageFrontmatter.SetDraft(before, PageFrontmatter.PublishKeyFor(section, sectionLocal), true, section);
-                bool noRoom = edit.NoRoomForAKey;
-                // A stray per-section key beside `publish:` is read FIRST by the
-                // build, so writing only `publish: false` would leave the class up.
-                if (!noRoom && !PageFrontmatter.IsDraft(after, section))
-                {
-                    (after, edit) = PageFrontmatter.SetDraft(after, PageFrontmatter.PublishKeyFor(section, false), true, section);
-                    noRoom = edit.NoRoomForAKey;
-                }
+                var (after, noRoom) = StartOfYearDraftEdit(course, section, full, before);
                 // Half a write that still leaves the page up is no write at
                 // all: nothing is saved, and the page is named.
                 if (noRoom)
@@ -263,6 +254,44 @@ public sealed partial class AssistWorkspace
             : StartOfYearWording.Fill(StartOfYearWording.Done, ("pages", StartOfYearWording.PagesCounted(drafted.Count)))
               + (declinedSentence is null ? "" : " " + declinedSentence);
         return new StartOfYearOutcome(written.Count > 0, message, backup, written);
+    }
+
+    /// <summary>
+    /// The edit Go makes to one page: its own key set to draft, and a stray
+    /// <c>publishForSection&lt;N&gt;</c> too when the build would otherwise
+    /// still read the page as published — or NO ROOM, when the page's settings
+    /// have no column-0 place for a new line (#421). One rule, asked by Go and
+    /// by the sheet before Go (#619), so the sheet names exactly the pages Go
+    /// will leave as they are.
+    /// </summary>
+    private static (string After, bool NoRoom) StartOfYearDraftEdit(Course course, int section, string full, string before)
+    {
+        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+        var (after, edit) = PageFrontmatter.SetDraft(before, PageFrontmatter.PublishKeyFor(section, sectionLocal), true, section);
+        bool noRoom = edit.NoRoomForAKey;
+        // A stray per-section key beside `publish:` is read FIRST by the
+        // build, so writing only `publish: false` would leave the class up.
+        if (!noRoom && !PageFrontmatter.IsDraft(after, section))
+        {
+            (after, edit) = PageFrontmatter.SetDraft(after, PageFrontmatter.PublishKeyFor(section, false), true, section);
+            noRoom = edit.NoRoomForAKey;
+        }
+        return (after, noRoom);
+    }
+
+    /// <summary>The pages Go would leave exactly as they are for want of room for a key, named as the write names them — for the sheet, before Go (#619).</summary>
+    public IReadOnlyList<string> StartOfYearPagesWithNoRoom(string courseCode, int sectionNumber, StartOfYearPlan plan)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+        var names = new List<string>();
+        foreach (var draft in plan.Drafts)
+        {
+            string before;
+            try { before = File.ReadAllText(draft.Page.Id); } catch { continue; }
+            if (StartOfYearDraftEdit(course, section, draft.Page.Id, before).NoRoom) names.Add(draft.Page.Name);
+        }
+        return names;
     }
 
     /// <summary>
