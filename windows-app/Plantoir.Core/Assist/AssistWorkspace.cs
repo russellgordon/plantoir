@@ -396,17 +396,10 @@ public sealed partial class AssistWorkspace
     /// "Ontario Curriculum" and "College Board Curriculum" rather than plain
     /// "Curriculum", which is the normal case outside the example content.
     /// </summary>
-    public static bool IsCurriculum(string courseDirectory, string pagePath)
-    {
-        string relative;
-        try { relative = Path.GetRelativePath(Path.GetFullPath(courseDirectory), Path.GetFullPath(pagePath)); }
-        catch { return false; }
-
-        var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        for (int i = 0; i < segments.Length - 1; i++)          // folders only, never the file name
-            if (segments[i].Contains("curriculum", StringComparison.OrdinalIgnoreCase)) return true;
-        return false;
-    }
+    /// <remarks>One predicate, in <see cref="PagePaths.IsCurriculum"/> (#615):
+    /// it wants a FULL path, and a relative one is false.</remarks>
+    public static bool IsCurriculum(string courseDirectory, string pagePath) =>
+        PagePaths.IsCurriculum(courseDirectory, pagePath);
 
     /// <summary>
     /// Year-round reference pages, which belong to the start of the year
@@ -1038,6 +1031,14 @@ public sealed partial class AssistWorkspace
         {
             if (page.IsVisibleToStudents == isPublish && page.VisibilityIsCertain)
             {
+                // #617 (the mac's #607): an already-visible curriculum page the
+                // walk reached is not listed as "already visible" when
+                // publishing; a class citing six expectations listed six rows
+                // above the ones a teacher needs to read. Only this list: a
+                // HIDDEN curriculum page is still a change below, and a NAMED
+                // one is in `named` and stays listed. documentation/10 → "A
+                // curriculum page the walk reaches is not "already visible" (#607)".
+                if (isPublish && IsCurriculumPage(course, page)) continue;
                 if (!named.Any(n => string.Equals(n.RelativePath, page.RelativePath, StringComparison.OrdinalIgnoreCase)))
                     alreadyRight.Add(page);
             }
@@ -1119,6 +1120,17 @@ public sealed partial class AssistWorkspace
     /// were worked out as if it stayed as it was.
     /// </summary>
     /// <summary>The folder a planned page sits in, from the course folder ("Labs", "section1/All Classes").</summary>
+    /// <summary>
+    /// <see cref="PagePaths.IsCurriculum"/> for a planned page, whose
+    /// <c>RelativePath</c> is from the WORKING folder and so is resolved first
+    /// (#615, #617). A page that cannot be resolved is not curriculum.
+    /// </summary>
+    private bool IsCurriculumPage(Course course, PlannedPage page)
+    {
+        try { return PagePaths.IsCurriculum(course.DirectoryPath, PagePaths.ResolveInside(_folder, page.RelativePath)); }
+        catch (OutsideWorkspaceException) { return false; }
+    }
+
     private string FolderOf(Course course, PlannedPage page)
     {
         string full = Path.GetFullPath(PagePaths.ResolveInside(_folder, page.RelativePath));
@@ -1181,10 +1193,11 @@ public sealed partial class AssistWorkspace
     internal const string ClassOfItsOwn = "it is a class of its own.";
 
     /// <summary>
-    /// <see cref="ClassOfItsOwn"/> in a club, for the Section menu's plan table
-    /// only (#548): the planner records the class form, which is what the model
-    /// reads; <see cref="PublishPlan.Tabulate"/> says it in the course's noun,
-    /// as the mac's <c>finishing(noun:)</c> does.
+    /// <see cref="ClassOfItsOwn"/> in a club, for what the TEACHER reads — the
+    /// Section menu's plan table (#548) and the plan's card (#556): the planner
+    /// records the class form, which is what the model reads;
+    /// <see cref="PublishPlan.ReasonFor"/> says it in the course's noun, as the
+    /// mac's <c>finishing(noun:)</c> does.
     /// </summary>
     internal const string MeetingOfItsOwn = "it is a meeting of its own.";
 
@@ -1192,7 +1205,7 @@ public sealed partial class AssistWorkspace
     internal const string KeptBecauseInKeyLinks = "it is in this section's Key Links.";
 
 
-    private static string? ReasonToKeep(
+    private string? ReasonToKeep(
         PlannedPage page,
         HashSet<string> mustStay,
         Dictionary<string, List<PlannedPage>> referrers,
@@ -1203,7 +1216,11 @@ public sealed partial class AssistWorkspace
             return "it is a folder's landing page, which following links never takes down.";
         if (mustStay.Contains(page.RelativePath))
             return KeptBecauseInKeyLinks;
-        if (PagePaths.IsCurriculum(course.DirectoryPath, page.RelativePath))
+        // RelativePath is from the WORKING folder, so it is resolved first or
+        // the predicate would read it against the process's working directory
+        // (#615). Folder segments only: a page merely CALLED "Curriculum …" in
+        // an ordinary folder goes down like any other.
+        if (IsCurriculumPage(course, page))
             return "it is a curriculum page.";
         // An unpublish never takes a class down by following a link, and does
         // not walk into one (#342 / mac #201, mirroring #173's publish stop).

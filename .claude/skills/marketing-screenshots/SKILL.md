@@ -385,6 +385,20 @@ three it marks both shots `windows: true`, and they come off
 `WINDOWS_PICTURE_OWED` in `website/test_build_data.py` in the same commit.
 `website/SCREENSHOTS.md` → "Windows Capture" has the whole of it.
 
+**The Code and Quizzes pages, on Windows (#590):** `python
+website/shots/capture_windows.py --code --quizzes` takes the eight figures
+that are not Swift from native previews of `~/School Web Space` (ICS3U) and
+`~/Teaching` (MCV4U, SCH3U, ENG2D), each put into its state by the Mac's own
+`shots/prepare/<id>.js` and read back against `expectText`. It backs each
+folder's courses up into its `courses/_backups` first, refuses while
+Plantoir is running, and refuses any scale but 2× (a 4K session at 200%);
+`--dry-run` proves every page at any scale into a scratch folder and writes
+nothing to `site/img`. It promotes nothing: `--promote id,id` marks a shot
+`windows: true` once its pictures pass, and the shot comes off
+`WINDOWS_PICTURE_OWED` by hand in the same (release) commit. The Swift two
+are not taken: Swift stays read-only on Windows until #570 is decided
+(v1.9.0).
+
 On Windows the `--app` pass makes and states `~/Teaching` itself (#459): the
 `provision` scene makes folders.json's courses through the New Course panel,
 then `capture_windows.provision_demo` gives them their state. A `~/Teaching`

@@ -82,14 +82,18 @@ public sealed partial class SidebarPane
     /// (mac #457: <c>WorkspaceModel.openInObsidian(course:sectionNumber:)</c>).
     /// A section reveals the SECTION's folder; the vault is always the course.
     /// A course kept for reference goes through its calm note first, the one
-    /// the toolbar used to skip (the plan's finding 0.9).
+    /// the toolbar used to skip (the plan's finding 0.9). Every other course
+    /// goes through <see cref="ObsidianOpenRoute"/> (#581): sequence steps 2–8
+    /// of <c>obsidianAddOnsForFigures</c>.
     /// </summary>
     public Task OpenInObsidian(Course course, int? section)
     {
         string reveal = section is int number ? course.SectionDirectory(number) : course.DirectoryPath;
         if (ReferenceCourse.IsKeptForReference(course)) return OpenReferenceInObsidian(course, reveal);
-        return FolderActions.OpenInObsidian(reveal, course.DirectoryPath,
-            BundledToolchain.SupportPath("obsidian_defaults/.obsidian"));
+        // Obsidian's add-ons for diagrams and graphs (#581): scanned, offered,
+        // added or asked to reopen BEFORE Obsidian opens — all decided in
+        // Plantoir.Core's route; this window only shows its two questions.
+        return new ObsidianOpenRoute(new ObsidianWorld(ShowDialogSafelyAsync)).OpenAsync(course, reveal);
     }
 
     // ---- What the menu bar reads -------------------------------------------

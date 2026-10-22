@@ -181,6 +181,26 @@ public class ReferenceCopierTests : IDisposable
         Assert.False(found.IsEmpty);
         Assert.Equal("; 1 Obsidian add-on left behind (digitalgarden)", ObsidianAddOns.TrailClause(found));
     }
+
+    /// <summary>
+    /// #581: Plantoir's own add-ons say nothing on the sheet, and the trail
+    /// still names them in the contract's words
+    /// (<c>obsidianAddOnsForFigures.referenceCopies.rule</c>).
+    /// </summary>
+    [Fact]
+    public void PlantoirsOwnAddOnsAreNamedOnTheTrailOnly()
+    {
+        var live = LiveCourse();
+        string folder = Path.Combine(live.DirectoryPath, ".obsidian", "plugins", "obsidian-tikzjax");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, ObsidianFigureAddOns.MarkerName), ObsidianFigureAddOns.MarkerText("0.5.2"));
+        var found = ObsidianAddOns.FoundIn(live.DirectoryPath);
+        Assert.True(found.IsEmpty);
+        string rule = ContractLoader.LoadJson("shared-rules.json")["obsidianAddOnsForFigures"]!["referenceCopies"]!["rule"]!.ToString();
+        string clause = ObsidianAddOns.TrailClause(found);
+        Assert.StartsWith("; ", clause);
+        Assert.Contains("\"" + clause[2..] + "\"", rule);
+    }
 }
 
 /// <summary>The checks every add-on case makes of a made course, whichever route made it.</summary>
@@ -207,6 +227,10 @@ internal static class AddOnCaseChecks
         }
         var expected = c["expectFound"]!;
         Xunit.Assert.Equal(expected["addOnNames"]!.AsArray().Select(n => n!.ToString()).ToList(), found.AddOnNames.ToList());
+        // #581 (the mac's #495): Plantoir's own add-ons are kept apart by their
+        // marker; a case written before them has no key, which means none.
+        Xunit.Assert.Equal((expected["plantoirAddOnNames"]?.AsArray() ?? new JsonArray()).Select(n => n!.ToString()).ToList(),
+                           found.PlantoirAddOnNames.ToList());
         Xunit.Assert.Equal(expected["addOnsFolderIsALink"]!.GetValue<bool>(), found.AddOnsFolderIsALink);
         Xunit.Assert.Equal(expected["settingsFolderIsALink"]!.GetValue<bool>(), found.SettingsFolderIsALink);
         Xunit.Assert.Equal(expected["publishSiteIsSet"]!.GetValue<bool>(), found.PublishSiteIsSet);

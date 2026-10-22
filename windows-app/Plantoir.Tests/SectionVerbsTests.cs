@@ -227,10 +227,11 @@ public class SectionVerbsTests : IDisposable
     /// An undo that put some files back and kept its entry, because another
     /// had been edited since: "took part of the last change back" — it read
     /// "took the last change back" while the ending searched the sentence for
-    /// "is put back". Pressed again after the edit is undone, the undo is
-    /// partial AGAIN: the file the first press restored no longer matches,
-    /// so the entry still stays (the mac behaves the same; a `decision` issue
-    /// asks whether that is right).
+    /// "is put back". Pressed again once the edited page is set back to what
+    /// the change left, the undo puts that page back, finds the first ALREADY
+    /// back, and takes the change off the list (#564, the mac's #555, option 2:
+    /// until then the first page read as edited and the entry never came off).
+    /// A third press has nothing left to undo.
     /// </summary>
     [Fact]
     public async Task APartialUndo_TookPartOfTheLastChangeBack()
@@ -250,12 +251,38 @@ public class SectionVerbsTests : IDisposable
         Assert.DoesNotContain("— took the last change back", File.ReadAllText(_trail));
 
         File.WriteAllText(Page("Unit 1, Day 2"), published);
-        await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+        var second = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
 
         Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 2")));
+        Assert.Contains("publish: false", File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Empty(history.Entries);
+        Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — took the last change back", File.ReadAllText(_trail));
+
+        var third = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+        Assert.Equal(AssistWording.NothingToUndoFromTheMenu, third.Summary);
+        Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — changed nothing", File.ReadAllText(_trail));
+        Assert.NotEqual(third.Summary, second.Summary);
+    }
+
+    /// <summary>
+    /// #564's second press row: the page is STILL edited, so the press writes
+    /// nothing new — the existing couldNotUndo, the change kept, "changed nothing".
+    /// </summary>
+    [Fact]
+    public async Task ARepeatUndoWhileThePageIsStillEdited_ChangesNothing()
+    {
+        var history = new UndoHistory();
+        await using var verbs = Verbs(out _, history);
+        await verbs.Perform(SectionVerbs.PublishPages("ICS3U", 1, BothPages, plan: false),
+                            "Section ▸ Publish Pages…", "ICS3U", 1, "2 pages ticked");
+        File.AppendAllText(Page("Unit 1, Day 2"), "Edited since.\n");
+        await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+
+        var again = await verbs.Perform(SectionVerbs.UndoLastChange(), "Section ▸ Undo Last Change", "ICS3U", 1);
+
         Assert.Single(history.Entries);
-        Assert.Equal(2, File.ReadAllLines(_trail).Count(line =>
-            line.Contains("Section ▸ Undo Last Change — took part of the last change back")));
+        Assert.StartsWith(AssistWording.CouldNotUndoFromTheMenu(history.Entries[0].Description, 1), again.Summary);
+        Assert.Contains("ICS3U/1 · Section ▸ Undo Last Change — changed nothing", File.ReadAllText(_trail));
     }
 
     /// <summary>
@@ -463,6 +490,38 @@ public class SectionVerbsTests : IDisposable
         var (refused, _) = await copying.Run(SectionVerbs.RebuildPreview("ICS3U", 1), default);
         Assert.Equal(AssistWording.CourseIsBeingCopiedFromTheMenu("ICS3U"), refused.Summary);
         Assert.Equal(1, rebuilt);
+    }
+
+    /// <summary>
+    /// #564 item 6: an undo that WRITES nothing — every page already back —
+    /// still puts back the preview it stopped, as any whole undo does, and
+    /// answers "undid" with the change off the list.
+    /// </summary>
+    [Fact]
+    public async Task AnUndoThatFindsEveryPageAlreadyBack_StillRestartsThePreviewItStopped()
+    {
+        var history = new UndoHistory();
+        var tools = new AssistScenarioTests.RealTools(new AssistWorkspace(_folder, new FakeLauncher(), undo: history) { Surface = AssistSurface.Menu });
+        int stopped = 0, shown = 0;
+        var runner = new AssistToolRunner(tools, "ICS3U", 1, AssistSurface.Menu)
+        {
+            PreviewIsShowing = () => true,
+            StopPreviewInApp = () => stopped++,
+            ShowPreviewInApp = () => shown++,
+        };
+        string before = File.ReadAllText(Page("Unit 1, Day 1"));
+        await runner.Run(SectionVerbs.PublishPages("ICS3U", 1, new[] { "Unit 1, Day 1" }, plan: false), default);
+        Assert.Single(history.Entries);
+        File.WriteAllText(Page("Unit 1, Day 1"), before);   // the teacher put it back by hand
+        (stopped, shown) = (0, 0);
+        string description = history.Entries[0].Description;
+
+        var (answer, _) = await runner.Run(SectionVerbs.UndoLastChange(), default);
+
+        Assert.Equal(AssistWording.UndidFromTheMenu(description), answer.Summary);
+        Assert.Empty(history.Entries);
+        Assert.Equal(before, File.ReadAllText(Page("Unit 1, Day 1")));
+        Assert.Equal((1, 1), (stopped, shown));
     }
 
     private sealed class NoModel : IChatModel

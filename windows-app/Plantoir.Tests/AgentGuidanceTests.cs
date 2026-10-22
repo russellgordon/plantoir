@@ -247,6 +247,71 @@ public sealed class AgentGuidanceTests : IDisposable
             Assert.Contains(skillName, File.ReadAllText(Path.Combine(_folder, name)));
     }
 
+    /// <summary>
+    /// #571 (the mac's <c>PrintablePagesTests.testTheQuizzesSkillIsWrittenAndBothRootFilesNameIt</c>):
+    /// the self-check quizzes skill (#563) lands in both homes, holds the
+    /// callout, points at the graphs and runnable-code skills rather than
+    /// repeating them, and both root files name it. The probes are the
+    /// skill's own Markdown, not app wording.
+    /// </summary>
+    [Fact]
+    public void TheQuizzesSkillIsWrittenAndBothRootFilesNameIt()
+    {
+        string skillName = ContractLoader.LoadJson("shared-rules.json")["quizCallouts"]!["agentGuidance"]!["skill"]!.ToString();
+        Assert.Empty(Pass().Failures);
+        foreach (string home in AgentGuidance.SkillHomes)
+        {
+            string skill = File.ReadAllText(Path.Combine(_folder, home, "skills", skillName, "SKILL.md"));
+            Assert.Contains("name: " + skillName, skill);
+            Assert.Contains("> [!quiz]", skill);
+            Assert.Contains("plantoir-math-graphs", skill);
+            Assert.Contains("plantoir-runnable-code", skill);
+        }
+        foreach (string name in AgentGuidance.RootFiles)
+            Assert.Contains(skillName, File.ReadAllText(Path.Combine(_folder, name)));
+    }
+
+    /// <summary>
+    /// #600 (the mac's <c>PrintablePagesTests.testThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst</c>,
+    /// #596): the page-authoring skill travels the same way, names every
+    /// feature skill it routes to in backticks — each written beside it — and
+    /// both root files name it in their FIRST bullet, so an assistant asked for
+    /// any page reads it before writing anything.
+    /// </summary>
+    [Fact]
+    public void ThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst()
+    {
+        var guidance = Contract["pageAuthoringSkill"]!;
+        string skillName = guidance["skill"]!.ToString();
+        var routesTo = guidance["routesTo"]!.AsArray().Select(name => name!.ToString()).ToList();
+        Assert.Equal(4, routesTo.Count);
+        Assert.Empty(Pass().Failures);
+        foreach (string home in AgentGuidance.SkillHomes)
+        {
+            string skills = Path.Combine(_folder, home, "skills");
+            string skill = File.ReadAllText(Path.Combine(skills, skillName, "SKILL.md"));
+            Assert.Contains("name: " + skillName, skill);
+            foreach (string routed in routesTo)
+            {
+                Assert.True(skill.Contains($"`{routed}`"), $"{home}: the skill must route to {routed}");
+                Assert.True(File.Exists(Path.Combine(skills, routed, "SKILL.md")), $"{home}: {routed} must be written beside it");
+            }
+            Assert.Contains("```mermaid", skill);
+            Assert.Contains("> [!", skill);
+            Assert.Contains("Success criteria", skill);
+            Assert.Contains("My Progress", skill);
+            Assert.Contains("publish: false", skill);
+            Assert.Contains("Media", skill);
+        }
+        foreach (string name in AgentGuidance.RootFiles)
+        {
+            string text = File.ReadAllText(Path.Combine(_folder, name));
+            string? firstBullet = text.Split("\n- ").Skip(1).FirstOrDefault();
+            Assert.True(firstBullet is not null, $"{name} must have a bullet");
+            Assert.True(firstBullet!.Contains(skillName), $"{name} must name the {skillName} skill first");
+        }
+    }
+
     [Fact]
     public void ATeachersOwnFileIsAskedAboutNotWrittenAndTheirSkillsAreLeftAlone()
     {

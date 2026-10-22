@@ -2279,7 +2279,10 @@ were:
   curriculum page" rows are left as they are. Start of Year uses
   `planHiding(exactly:)`, which never passes through `plan()`; the links
   checklist's class plans do pass through `plan()`, but never read the
-  already-visible list, so the trim changes nothing they show.
+  already-visible list, so the trim changes nothing they show. (That was the
+  mac. On Windows the hide side DID change, in #615: its curriculum test also
+  matched a page's FILE name, and now reads folder segments only, as here —
+  `12-windows-app.md` → "One curriculum test, folder segments only (#615)".)
 
 **Where, and why there.** `AssistPublishPlan.plan(...)`, after both
 `appendChanges` calls, through `leavingOutLinkedCurriculumPages`. The list is

@@ -1809,6 +1809,33 @@
             "Worksheet"
           ],
           "why": "The referrer test reads the same links publishing follows (folded into #325, 2026-09-26): Study Guide, which students can see, still leads to Worksheet with a Markdown-style link, so taking Worksheet down with the class would leave a dead link on a visible page."
+        },
+        {
+          "name": "a page only NAMED like curriculum is not kept up as a curriculum page",
+          "pages": [
+            {
+              "title": "Unit 2, Day 3",
+              "isClassPage": true,
+              "visible": true,
+              "links": [
+                "Curriculum Coverage"
+              ]
+            },
+            {
+              "title": "Curriculum Coverage",
+              "isClassPage": false,
+              "visible": true,
+              "links": []
+            }
+          ],
+          "unpublish": [
+            "Unit 2, Day 3"
+          ],
+          "expectHidden": [
+            "Unit 2, Day 3",
+            "Curriculum Coverage"
+          ],
+          "why": "#615. neverTakenDownByFollowingLinks keeps a curriculum page up by its FOLDER: any folder segment containing 'curriculum'. The file name is never part of the test (curriculumRules.isCurriculumPage says the same), so a page that is merely CALLED 'Curriculum Coverage', in an ordinary folder and linked only from the class being hidden, goes down with that class like any other page. Windows used to match the file name as well and kept it up, which the mac never did."
         }
       ]
     },
@@ -27758,7 +27785,7 @@
     ]
   },
   "obsidianAddOnsForFigures": {
-    "note": "#495, v1.8.0, mac first. Obsidian draws a ```tikz or ```functionplot fence only with the add-on for it installed and switched on in the course; until #495 a teacher was told to find TikZJax in Obsidian's directory, and functionplot was not in it at all. Plantoir now carries both add-ons, pinned by hash, and adds the ones a course uses on the teacher's one yes (DECISIONS 18; director rulings on #495). Windows owes the whole key (its windows issue). documentation/09-mac-app.md -> \"Obsidian's add-ons for diagrams and graphs (#495)\" says what was measured and rejected.",
+    "note": "#495, v1.8.0, mac first. Obsidian draws a ```tikz or ```functionplot fence only with the add-on for it installed and switched on in the course; until #495 a teacher was told to find TikZJax in Obsidian's directory, and functionplot was not in it at all. Plantoir now carries both add-ons, pinned by hash, and adds the ones a course uses on the teacher's one yes (DECISIONS 18; director rulings on #495). Windows followed with #581 (v1.8.x), implementing the whole key. documentation/09-mac-app.md -> \"Obsidian's add-ons for diagrams and graphs (#495)\" says what was measured and rejected; documentation/12-windows-app.md -> \"Obsidian's add-ons for diagrams and graphs on Windows (#581)\" says what Windows measured.",
     "rule": "Asked ONCE, app-wide, at Open in Obsidian and before Obsidian opens - never at course creation, in Course Settings, after a preview or by an assistant. After the yes, every course that uses a figure fence gets the add-ons it uses, at Open in Obsidian and silently when a section's preview finishes, never into a course that is open in Obsidian (Obsidian holds the list in memory and writes it back whole, so an add-on written under it is dropped - plan review S3) and never into a course kept for reference (#255's line). Obsidian itself then asks once per course whether the teacher trusts its author: Plantoir never answers that for them, and says beforehand which button to click.",
     "addOns": [
       {
@@ -27827,7 +27854,7 @@
     "carried": {
       "rule": "The app carries every file above, licences included, and RE-HASHES the ones it is about to write against these pins before writing anything (a missing or mismatched file is refusedCarriedCopy). Nothing is ever downloaded when the teacher says yes: the functionplot repository is delisted and could disappear, a download fails offline and on school networks that block GitHub, and the cost is about 8 MB in the download. Not in support/: everything there is hashed into the website builder's image and mirrored into every working folder's .toolchain, and editor add-ons belong in neither.",
       "mac": "Plantoir.app/Contents/Resources/obsidian-addons/<id>/<file>, fetched by mac-app/Vendor/fetch-obsidian-addons.sh from THESE pins (it carries none of its own) and required before `xcodegen generate`, like the other three fetches.",
-      "windows": "Owed: the same <id>/<file> folder beside the app, fetched by a Vendor script reading these pins."
+      "windows": "obsidian-addons/<id>/<file> beside Plantoir.exe, fetched by windows-app/Vendor/fetch-obsidian-addons.ps1 from THESE pins (it carries none of its own) and required before building: Plantoir.csproj -> CheckObsidianAddOns refuses a missing folder, a file too many or too few, or any (id, name, sha256) that is not a pin here (#581)."
     },
     "whichPages": {
       "rule": "Which add-ons a course needs: the add-ons whose `kind` is the language of a figure fence on any `.md` page under the course folder - drafts, shared pages and every section, because Obsidian opens the whole course - found exactly as figureFences.fences finds them (a nested fence is not drawn, so it is not needed). Not read: anything inside a folder whose name starts with a dot (.obsidian, .trash, .merged_output), any file that is not `.md`, and a page the cloud has not downloaded (reading it would force the download; an iCloud page is skipped by its dataless flag). `files` is a course as paths relative to its folder; `needs` is in addOns order.",
@@ -28879,7 +28906,7 @@
       "why": "The marker is how Plantoir tells its own add-on from the teacher's: it never writes over a folder without one, never re-lists one switched off, and leaves only folders WITH one out of backups. The same bytes every pass, so a second pass changes nothing. Obsidian reads only manifest.json, main.js and styles.css from the folder, Sync's add-on file list leaves the marker out, and build_site skips .obsidian, so nobody else ever sees it. A folder is written as <id>.plantoir-partial (every file but manifest.json, with the marker), renamed to <id>, and manifest.json goes in last: Obsidian ignores a folder without a manifest, so a pass stopped at any point leaves nothing Obsidian loads half-written, and the next pass replaces it."
     },
     "backups": {
-      "rule": "A backup of a course leaves out every folder under .obsidian/plugins that carries the marker - about 12.9 MB per course - and keeps the teacher's own add-ons and the list. A restored course gets them back at the next pass on a computer whose answer is yes. Every writer that zips a whole course does this: the mac's CourseArchiver (backups and archives), and the setup wizard's own backup (setup_course.backup_existing_course_dir). Windows owes it in its archiver.",
+      "rule": "A backup of a course leaves out every folder under .obsidian/plugins that carries the marker - about 12.9 MB per course - and keeps the teacher's own add-ons and the list. A restored course gets them back at the next pass on a computer whose answer is yes. Every writer that zips a whole course does this: the mac's CourseArchiver (backups and archives), Windows' CourseArchiver.ZipFolder (backups and archives, #581), and the setup wizard's own backup (setup_course.backup_existing_course_dir).",
       "cases": [
         {
           "name": "Plantoir's add-on is left out, the teacher's own is kept",

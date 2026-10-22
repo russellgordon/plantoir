@@ -684,6 +684,11 @@ program running:
    a Blob worker would have been refused (no `worker-src`, so `blob:` is not
    allowed).
 
+On Windows the same checks are `verify-deploy.ps1`'s `Check-Engine` (each
+host and the preview) and `Check-EngineFolder` (a folder publish, against the
+contract's hashes) since #568 — `12-windows-app.md` → "Runnable code (#455)…"
+has what they measured there.
+
 **Measured 2026-10-17** by `verify-deploy.sh` (ADA1O section 1 in
 `~/Desktop/plantoir-overnight`, M4 Pro, home network) — every host passed all
 three:

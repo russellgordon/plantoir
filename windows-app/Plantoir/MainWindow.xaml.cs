@@ -61,9 +61,43 @@ public sealed partial class MainWindow : Window
         // a 225% one), a first run to the primary work area it is sized from
         // (WinUI may have created the window on another monitor), and centred
         // there after the Resize.
+        //
+        // A remembered frame is first put ON a display (#558): kept exactly
+        // where it was when its title bar can still be grabbed on one, and
+        // otherwise — its monitor unplugged, the resolution shrunk — fitted to
+        // and centred on the nearest one (WindowFrameFit says why that rule).
+        // Before #558 it opened wherever it was, off every screen: measured
+        // 2026-10-22, a frame seeded at X = 5000 opened at (5009, 200) beside a
+        // 1920 × 1008 work area, with a taskbar button and no window.
         bool remembered = frame is { X: > -10000, Y: > -10000 };
-        AppWindow.Move(remembered ? new PointInt32((int)frame!.X, (int)frame.Y)
-                                  : new PointInt32(workArea.X, workArea.Y));
+        bool refitted = false;
+        RectInt32 nearestWorkArea = workArea;
+        if (remembered)
+        {
+            var asRemembered = new WindowFrameFit.Frame((int)frame!.X, (int)frame.Y, width, height);
+            // Never let putting the frame on a display stop the window opening:
+            // the frame is only re-saved by a window that opened, so a throw
+            // here would fail every later launch too. On any failure the
+            // remembered frame is used as it is (the path before #558).
+            WindowFrameFit.Frame fitted;
+            try { fitted = OnADisplay(asRemembered, out nearestWorkArea); }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"MainWindow ctor: could not check the remembered frame against the displays ({ex.GetType().Name}: {ex.Message}); opening it as remembered");
+                fitted = asRemembered;
+                nearestWorkArea = workArea;
+            }
+            refitted = fitted != asRemembered;
+            if (refitted)
+                App.LogDiagnostic($"MainWindow ctor: remembered frame {asRemembered} is on no display; opening at {fitted}");
+            width = fitted.Width;
+            height = fitted.Height;
+            AppWindow.Move(new PointInt32(fitted.X, fitted.Y));
+        }
+        else
+        {
+            AppWindow.Move(new PointInt32(workArea.X, workArea.Y));
+        }
         var (minWidth, minHeight) = ApplyMinimumSize(ScaleOfDisplay());
         width = Math.Max(width, minWidth);
         height = Math.Max(height, minHeight);
@@ -72,11 +106,19 @@ public sealed partial class MainWindow : Window
             AppWindow.Move(new PointInt32(
                 workArea.X + (workArea.Width - width) / 2,
                 workArea.Y + (workArea.Height - height) / 2));
+        else if (refitted)   // Centred again at the size the minimum may have grown it to.
+        {
+            var centred = WindowFrameFit.Centred(width, height,
+                new WindowFrameFit.Frame(nearestWorkArea.X, nearestWorkArea.Y, nearestWorkArea.Width, nearestWorkArea.Height));
+            AppWindow.Move(new PointInt32(centred.X, centred.Y));
+        }
         // Once the content has a XamlRoot, and whenever its scale changes (a
         // monitor move, a display-scale change), the minimum is re-applied AND
         // a window left below it is grown to it, since the minimum alone does
-        // not grow one. This path, and the multi-monitor case above, are held
-        // by reading the code: the UiFact runs on one display at one scale.
+        // not grow one. That path and the move between monitors are held by
+        // reading the code (the UiFacts run on one display at one scale); the
+        // geometry of putting a remembered frame on a display is held by
+        // WindowFrameFitTests, and its use here by WindowOnScreenUiTests.
         bool watchingScale = false;
         if (Content is FrameworkElement rootElement)
             rootElement.Loaded += (_, _) =>
@@ -561,6 +603,46 @@ public sealed partial class MainWindow : Window
 
     [System.Runtime.InteropServices.DllImport("shcore.dll")]
     private static extern int GetDpiForMonitor(IntPtr monitor, int dpiType, out uint dpiX, out uint dpiY);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromRect(ref NativeRect rect, uint flags);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativeRect { public int Left, Top, Right, Bottom; }
+
+    /// <summary>
+    /// A remembered frame put on a display (#558, <see cref="WindowFrameFit"/>):
+    /// every display's work area, the one nearest the frame, and that
+    /// display's scale for the title-bar strip (32 epx) and the width a
+    /// teacher needs to grab (100 epx) — epx, since 100 raster pixels is only
+    /// 50 epx at 200%. Several windows from one vanished monitor all come back
+    /// centred on the same display, one over another: the rule says where a
+    /// window can be reached, not how to cascade them.
+    /// </summary>
+    private static WindowFrameFit.Frame OnADisplay(WindowFrameFit.Frame remembered, out RectInt32 nearestWorkArea)
+    {
+        nearestWorkArea = DisplayArea.GetFromRect(
+            new RectInt32(remembered.X, remembered.Y, remembered.Width, remembered.Height),
+            DisplayAreaFallback.Nearest).WorkArea;
+        // Count and the indexer, never foreach: enumerating FindAll's
+        // projection throws in some Windows App SDK versions.
+        var displays = DisplayArea.FindAll();
+        var workAreas = new List<WindowFrameFit.Frame>();
+        for (int i = 0; i < displays.Count; i++)
+        {
+            var work = displays[i].WorkArea;
+            workAreas.Add(new WindowFrameFit.Frame(work.X, work.Y, work.Width, work.Height));
+        }
+        var rect = new NativeRect
+        {
+            Left = remembered.X, Top = remembered.Y, Right = remembered.Right, Bottom = remembered.Bottom,
+        };
+        double scale = GetDpiForMonitor(MonitorFromRect(ref rect, 2 /* nearest */), 0 /* effective */, out uint dpi, out _) == 0 && dpi > 0
+            ? dpi / 96.0 : 1.0;
+        var nearest = new WindowFrameFit.Frame(nearestWorkArea.X, nearestWorkArea.Y, nearestWorkArea.Width, nearestWorkArea.Height);
+        return WindowFrameFit.Fit(remembered, workAreas, nearest,
+                                  titleBarHeight: (int)Math.Round(32 * scale), minimumGrabWidth: (int)Math.Round(100 * scale));
+    }
 
     /// <summary>The scale of the display the window is on NOW, read from the
     /// monitor rather than the window: before the window is shown, a Move to

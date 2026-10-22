@@ -1212,6 +1212,71 @@ public sealed class CourseConfiguration
         }
     }
 
+    /// <summary>
+    /// Whether a section gets the My Progress page (#599, mac #545;
+    /// <c>file-formats.json</c> → <c>include_my_progress</c>, cases in
+    /// <c>shared-rules.json</c> → <c>myProgress.config.cases</c>). Read-only:
+    /// no app writes it yet (#595). Read as the BUILD reads it
+    /// (<c>build_site._resolve_section_switch</c>): a map's <c>sections</c>
+    /// entry, then its <c>sectionN</c>, then its <c>default</c>, else on; any
+    /// other value by its truth, as Python's <c>bool()</c> (so the string
+    /// "false" is on). Absent is on.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately NOT <see cref="IncludesCurriculumCoverage"/>'s reader,
+    /// which honours only a boolean or <c>sections.sectionN</c>: the build
+    /// honours the flat and <c>default</c> forms for both keys, and the
+    /// contract's cases pin those forms for this one. That reader's narrower
+    /// reading is left as it is (reported on #599, for #595).
+    /// </remarks>
+    public bool IncludesMyProgress(int section)
+    {
+        if (_values["include_my_progress"] is not { } stored) return true;
+        if (stored is not JObject map) return PythonTruth(stored);
+        string key = SectionKey(section);
+        if (map["sections"] is JObject sections && sections.TryGetValue(key, out var entry)) return PythonTruth(entry);
+        if (map.TryGetValue(key, out var flat)) return PythonTruth(flat);
+        if (map.TryGetValue("default", out var fallback)) return PythonTruth(fallback);
+        return true;
+    }
+
+    /// <summary>The three headings My Progress counts when a course names none (<c>myProgress.headings.defaults</c>).</summary>
+    public static readonly IReadOnlyList<string> DefaultSuccessCriteriaHeadings =
+        new[] { "Test of success", "Tests of success", "Success criteria" };
+
+    /// <summary>
+    /// The headings whose task items My Progress counts (<c>success_criteria_headings</c>):
+    /// a list with at least one heading that is not blank REPLACES the
+    /// defaults; absent, not a list, or nothing but blanks gives the defaults.
+    /// Entries that are not strings, and blank ones, are left out. Read-only (#595).
+    /// </summary>
+    public IReadOnlyList<string> SuccessCriteriaHeadings
+    {
+        get
+        {
+            if (_values["success_criteria_headings"] is not JArray stored) return DefaultSuccessCriteriaHeadings;
+            var headings = stored.OfType<JValue>()
+                .Where(entry => entry.Type == JTokenType.String)
+                .Select(entry => (string)entry!)
+                .Where(heading => !string.IsNullOrWhiteSpace(heading))
+                .ToList();
+            return headings.Count > 0 ? headings : DefaultSuccessCriteriaHeadings;
+        }
+    }
+
+    /// <summary>A stored value's truth as Python's <c>bool()</c> reads it: false, 0, "", [], {} and null are false.</summary>
+    private static bool PythonTruth(JToken value) => value.Type switch
+    {
+        JTokenType.Null or JTokenType.Undefined => false,
+        JTokenType.Boolean => (bool)value,
+        JTokenType.Integer => (long)value != 0,
+        JTokenType.Float => (double)value != 0,
+        JTokenType.String => ((string?)value ?? "").Length > 0,
+        JTokenType.Array => ((JArray)value).Count > 0,
+        JTokenType.Object => ((JObject)value).Count > 0,
+        _ => true,
+    };
+
     public bool IncludesCoverageNotes(int section)
     {
         if (!IncludesCurriculumCoverage(section)) return false;

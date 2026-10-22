@@ -131,6 +131,7 @@ internal static class NamedGapLedger
     // parity with mac v1.4.0", and the ledger was its burn-down list.)
     private const string V150 = "v1.5.0";
     private const string V171 = "v1.7.1";
+    private const string V180 = "v1.8.0";
 
     /// <summary>
     /// One thing the contract names and this app does not have yet.
@@ -155,12 +156,15 @@ internal static class NamedGapLedger
     // plan-table sentences (mac #524) that #551's piece held open that
     // morning, when the plan table landed. (Empty before that from
     // 2026-10-15, when the catch-up to mac 1.7.1, #481, closed its last two.)
+    // Not empty from 2026-10-22 until #581 landed the same day: its four
+    // Obsidian add-on events.
 
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
-        // ---- activityTrail.mustRecord: none held open. #514's two events
-        // ("preview started at the page last viewed", "preview start page
-        // chosen in Settings") landed with batch 6.
+        // ---- activityTrail.mustRecord. #514's two events ("preview started
+        // at the page last viewed", "preview start page chosen in Settings")
+        // landed with batch 6; #581's four (Obsidian's add-ons for diagrams
+        // and graphs) with #581.
 
         // ---- specialNames.platformWording.keys
 
@@ -169,7 +173,8 @@ internal static class NamedGapLedger
 
         // ---- toolchain.json → pins: none held open. pagedjs, functionPlot
         // and nodeTikzjax (and latinModern, newly watched) landed in
-        // fetch-runtime.ps1 with #503's batch 5A.
+        // fetch-runtime.ps1 with #503's batch 5A; pyodide (#455) with #568,
+        // never ledgered: the fetch landed in the same piece as the pin.
 
         // ---- class-planning.json → sectionIndexPointer.dateCases (pointAt cases)
 
