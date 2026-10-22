@@ -88,6 +88,29 @@ public class AppOpenedAndClosedTests
         }
     }
 
+    /// <summary>The ordinary quit's line: written with no cap on this process's lock, and counted once written.</summary>
+    [Fact]
+    public void TheOrdinaryQuitWritesTheLineAndCountsItOnceWritten()
+    {
+        string scratch = Directory.CreateTempSubdirectory("plantoir-565-quit").FullName;
+        string trail = Path.Combine(scratch, "activity.txt");
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            ActivityTrail.ResetOpenAndCloseForTests(opened: true);
+            Assert.True(ActivityTrail.NoteClosed(QuitConfirmation.ClosingReason.ToInstallANewVersion));
+            Assert.False(ActivityTrail.NoteClosed(QuitConfirmation.ClosingReason.AskedByWindows, TimeSpan.FromMilliseconds(500)));
+            Assert.Single(File.ReadAllLines(trail), line => line.Contains("Plantoir closed — to install a new version"));
+            Assert.DoesNotContain(File.ReadAllLines(trail), line => line.Contains("asked to close by Windows"));
+        }
+        finally
+        {
+            ActivityTrail.ResetOpenAndCloseForTests(opened: false);
+            ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+            try { Directory.Delete(scratch, recursive: true); } catch { }
+        }
+    }
+
     /// <summary>Both places a close can be heard write it: the last window's quit and the end of a session.</summary>
     [Fact]
     public void BothClosingPathsWriteTheLine()
