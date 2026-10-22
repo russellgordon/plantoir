@@ -6,7 +6,8 @@ import XCTest
 ///
 /// **Why this exists.** The unit suite runs against the app's real window, so a
 /// test that sets alert state — `workspace.renameProblem`, say — puts a real
-/// `NSAlert` sheet on screen, and clearing it takes the sheet down again.
+/// `NSAlert` sheet on that window (off every display since #633,
+/// `UnitTestHostWindows`), and clearing it takes the sheet down again.
 /// Between 2026-09-01 and 09-07 that killed the test host 38 times, always with
 /// the same stack. Read outward, it is:
 ///
@@ -118,9 +119,12 @@ final class SheetAnimationSuppressor: NSObject {
     // MARK: - Initializer
 
     /// Named as the test bundle's `NSPrincipalClass`, which is instantiated
-    /// when the bundle loads — before any test class is enumerated.
+    /// when the bundle loads — before any test class is enumerated. It also
+    /// registers the observer that gives the front back after a test leaves
+    /// the host active (`ActivationHandBack`, #633).
     override init() {
         super.init()
+        ActivationHandBack.register()
         SheetAnimationSuppressor.install()
     }
 
