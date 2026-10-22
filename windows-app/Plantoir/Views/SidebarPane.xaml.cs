@@ -2161,7 +2161,9 @@ public sealed partial class SidebarPane : UserControl
             // done, and the teacher is told so.
             if (FolderActions.ObsidianIsRunning)
             {
-                await ShowError("Obsidian didn’t close",
+                // Fired, not waited on: nothing follows it but the return, and a
+                // wait here would be one more the folder guard has to cover.
+                _ = ShowError("Obsidian didn’t close",
                     $"{course.Code} was not renamed, because Obsidian is still open. Close Obsidian, then rename the course again.");
                 return;
             }
