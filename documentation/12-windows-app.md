@@ -453,7 +453,11 @@ same arrangement for the assistant's engine.) **Re-run it after pulling a
 change to its vendor pins**: since #503 (2026-10-15) a runtime made before
 `runtime\vendor` existed STOPS the app's build ("predates the page
 features … Re-run windows-app\Vendor\fetch-runtime.ps1"), and the re-run
-fetches only that folder — "Diagrams and graphs" below.
+fetches only that folder — "Diagrams and graphs" below. Since #568
+(2026-10-22) the same is true of a runtime made before Pyodide joined that
+folder: its manifest has no `pyodide` key, the build stops with the same
+sentence, and the re-run redoes the whole vendor phase (49 s here) —
+"Runnable code (#455)" below.
 
 **Stop any running copy before building** — a running app holds
 `Plantoir.Core.dll` open and the build fails with `MSB3027 … file is locked
@@ -6798,14 +6802,15 @@ and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170).
 This section is what Windows does differently, and what it measured.
 
 **What the runtime carries, since 2026-10-15 (#503, the catch-up's batch
-5A).** `fetch-runtime.ps1` has a vendor phase that mirrors the Dockerfile's
-`/opt/vendor` into `runtime\vendor`:
+5A), and Pyodide since 2026-10-22 (#568).** `fetch-runtime.ps1` has a vendor
+phase that mirrors the Dockerfile's `/opt/vendor` into `runtime\vendor`:
 
 | Folder | What | How it is checked |
 |---|---|---|
 | `pagedjs\` | Paged.js 0.4.3's `paged.min.js` + `LICENSE.md` (#454) | the tarball's SHA-256, then the file's (`fileSha256`) and its 502,617 bytes |
 | `pagedjs\fonts\` | Latin Modern's six OTFs + `LICENSE-Latin-Modern.txt` (#499) | the `.deb`'s SHA-256, then each font against `latinModern.files` |
 | `function-plot\` | function-plot 1.25.4's `function-plot.js` + `LICENSE` | the tarball's SHA-256, then the file's and its 202,953 bytes |
+| `pyodide\` | Pyodide 314.0.7's five runtime files + `README.txt` naming MPL-2.0 (#455, #568) | the tarball's SHA-256 and its 6,757,104 bytes, then each file against `pyodide.files` — "Runnable code (#455)" below |
 | `tikz-engine\` | node-tikzjax 1.0.5 from `support\figures\package-lock.json` (`npm ci --omit=dev`) | `npm ls node-tikzjax@1.0.5`, then the three `tex\*.gz` against `nodeTikzjax.files` |
 
 Each URL is written out in full in the script, because
@@ -6834,23 +6839,22 @@ licence asks a changed font be renamed).
 fetching ~600 MB again.** What runs is decided from `manifest.json`'s KEYS,
 never from folders (a crashed `npm ci` leaves a `node_modules` that looks
 done): no manifest, everything; a manifest whose vendor keys (`pagedjs`,
-`latinModern`, `functionPlot`, `nodeTikzjax`) are missing or differ from the
-pins, `runtime\vendor` is deleted and only the vendor phase runs, against the
+`latinModern`, `functionPlot`, `nodeTikzjax`, and `pyodide` since #568) are
+missing or differ from the pins, `runtime\vendor` is deleted and only the vendor phase runs, against the
 node and python already there (both paths set before any phase), and the
 manifest is merged. The plan review's M4 found the first draft would have
 called `npm.cmd` with an empty `$nodeDir` on that path.
 
 **A run that dies part-way leaves a runtime the build refuses and the next
 run repairs** (the 5A implementation review's L1 and L3). Before
-`runtime\vendor` is touched, the manifest is rewritten WITHOUT the four vendor
+`runtime\vendor` is touched, the manifest is rewritten WITHOUT the vendor
 keys — on a fresh clone that is the first manifest written, the five base keys
 right after the base phases. So a vendor phase that fails (a download, `npm
 ci`, a hash) leaves base keys only: `CheckNativeRuntimeManifest` stops the
 build, and a re-run takes the vendor-only path instead of trying to move Node
-onto a `runtime
-ode` that is already there. REJECTED: keeping the old
+onto a `runtime\node` that is already there. REJECTED: keeping the old
 manifest until the end, which is what 5A did — after a pin bump a failed
-vendor-only run left all four keys (old values) beside no `vendor` folder, a
+vendor-only run left every vendor key (old values) beside no `vendor` folder, a
 runtime the build accepted and `publish.ps1` shipped without engines; and
 checking for the folder in `CheckNativeRuntimeManifest`, which is the "decide
 from folders" the script exists to avoid. **A version and its address cannot
@@ -6866,9 +6870,14 @@ whatever `Vendor\runtime` holds — so a build PC with a 2026-08-19 runtime
 would have published an installer with no engines, silently.
 `Plantoir.csproj` → `CheckNativeRuntimeManifest` now runs before
 `CopyNativeRuntime` and `PublishNativeRuntime` and fails the build, saying to
-re-run `fetch-runtime.ps1`, when the manifest lacks any of the four keys.
-Must-fail measured: with `nodeTikzjax` removed from the manifest the x64
-Debug build stopped with that error; restored, it built. No runtime at all is
+re-run `fetch-runtime.ps1`, when the manifest lacks any of the vendor keys
+(four from #503, five since #568 added `pyodide`). Must-fail measured: with
+`nodeTikzjax` removed from the manifest the x64 Debug build stopped with that
+error; restored, it built. Measured again for `pyodide` on 2026-10-22: the
+key removed, the x64 Debug build stopped at `Plantoir.csproj(104,5)` with
+"…predates the page features (Paged.js, Latin Modern, function-plot, the
+TikZ engine, Pyodide): its manifest.json lacks their keys…"; restored, it
+built. No runtime at all is
 still allowed, as before (the targets are skipped).
 
 **Installing over an older version.** Inno never removes a file a newer
