@@ -549,6 +549,26 @@ class PreviewPageSceneTests(unittest.TestCase):
         # The two left out are real shots, so leaving them out is a decision
         # rather than a stale name.
         identifiers = [shot["id"] for shot in self.manifest_shots()]
+        # Each figure's page, named as the planting steps name it, so the
+        # changed-page guard can match their report: a page planted from
+        # CODE_PAGES or folders.json, or one of the ready-made course's.
+        import demo_folders
+        import marketing_folder
+        known = set()
+        for code, place, _ in marketing_folder.CODE_PAGES:
+            known.add(f"{code}/{place}")
+        for page in demo_folders.planted_pages():
+            known.add(f"{page['course']}/{page['place']}")
+        for scene in ("code", "quizzes"):
+            for shot in preview_pages_windows.preview_page_shots(scene):
+                capture = shot["capture"]
+                label = preview_pages_windows.page_label(capture)
+                with self.subTest(shot=shot["id"], label=label):
+                    place = label.split("/", 1)[1]
+                    shared = build.REPO / "support" / "example_content" / capture["course"] / "shared" / place
+                    self.assertTrue(label in known or shared.is_file(), label)
+        self.assertEqual(preview_pages_windows.page_label({"course": "ICS3U", "path": "/Warm-Ups/Spot-the-Bug"}),
+                         "ICS3U/Warm-Ups/Spot the Bug.md")
         for excluded in preview_pages_windows.NOT_ON_WINDOWS:
             with self.subTest(excluded=excluded):
                 self.assertIn(excluded, identifiers)
