@@ -7077,8 +7077,7 @@ Headless Edge 155.0.4283.60 through Playwright (`channel="msedge"`, a fresh
 profile per context), against the preview above — a section built with
 `preview.ps1` from this runtime, served at `http://localhost:8081`. This
 PC's WebView2 Runtime is 155.0.4283.62, the same Chromium; the preview pane
-itself is measured separately ("WebView2" below). No Chrome is installed
-here.
+itself is measured below ("WebView2"). No Chrome is installed here.
 
 - **Isolation**: `self.crossOriginIsolated` is `true` on the runner page,
   no input box; `false` on the YouTube page, which shows the box and its
@@ -7126,8 +7125,37 @@ here.
 
 ### WebView2 (the preview pane)
 
-OWED: needs the app's window on an unlocked desktop, so it is sequenced
-separately from this piece's headless work.
+Measured 2026-10-22 on the same PC, unlocked desktop: the x64 Debug app
+with `--state-dir` and `--auto-preview PYT1O 1` (the button's own code
+path), so the pane showed the app's own preview — Quartz's server at
+`http://127.0.0.1:8081`, started by the app from the bundled runtime. The
+pane was driven over WebView2's debugging port
+(`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=…`), so keys
+are Chromium input events, not the OS keyboard. WebView2 Runtime
+155.0.4283.62 (user agent `… Chrome/155.0.0.0 … Edg/155.0.0.0`).
+
+- **Isolation in the pane**: `self.crossOriginIsolated` is `true` on the
+  runner page (no input box), `false` on the YouTube page (the box shows) —
+  the pane is a browser like any other here, and the app adds nothing that
+  breaks the headers.
+- **First Run to the first prompt**, the cache cleared before each
+  (`Network.clearBrowserCache`), 5 runs: **2.17–3.49 s, median 2.27 s** (the
+  3.49 s was the first run after the app opened). **A second Run**:
+  **0.07–0.08 s**.
+- **`input()` with two prompts**: the answer field had the focus at Run; the
+  transcript was `Name? Ada` / `Colour? blue` / `Hello, Ada who likes blue`,
+  as in Edge. **Ctrl-D** at the second prompt: the EOFError traceback,
+  `Finished with an error.`
+- **Stop then Run**: stopped in **0.04 s**; the next Run's first prompt
+  **2.32 s** (a new thread), and it ran correctly.
+- **Tab** inserted four spaces, **Shift-Tab** restored the code exactly,
+  **Escape then Tab** left the editor — WebView2 does not take Tab for the
+  app's own focus ring while the editor has it.
+- **Maths offline**: every request not to the preview's origin aborted —
+  both formulas rendered from the site's own KaTeX stylesheet and faces
+  (`KaTeX_Main`, `KaTeX_Math`, `KaTeX_Size1`); the only addresses refused
+  were Google Fonts' stylesheet and, from the YouTube page being left, one
+  YouTube logging call.
 
 ### verify-deploy.ps1
 
