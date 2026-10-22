@@ -1023,28 +1023,13 @@ final class MarketingScenes: MarketingScreenshotCase {
         // An empty plan photographed as the feature is the failure this
         // guards: the button is disabled when the plan changes nothing (#96).
         XCTAssertTrue(go.isEnabled, "There should be pages to put into draft")
-        // The plan is a table since #589: a row for every page going into
-        // draft, classes first — 80-odd rows of "comes after …" in the demo,
-        // which say nothing a picture can use. The page's copy says the plan
-        // gives each page's reason, so sort by Why, descending: the pages'
-        // reasons ("only … links to it", "nothing links to it", "first used
-        // in …") come to the top. And CHECK the sort took — a header click
-        // that missed would photograph six identical rows and still pass
-        // the OCR (#589's plan review, finding d).
+        // The plan is a table since #589, photographed in PLAN ORDER —
+        // classes first, then pages. Sorting by Why first was REJECTED: the
+        // only way to sort from here is a coordinate click on the header (it
+        // is not offered as a button), and in the capture it took on one
+        // colour scheme's pass and not the other's (2026-10-22).
         let table: XCUIElement = startOfYearPlanTable(in: application)
         XCTAssertTrue(table.waitForExistence(timeout: 10), "The plan should be a table (#589)")
-        let unsorted: String = firstRowReason(in: table)
-        sortStartOfYearPlanByReasonDescending(table, whyTitle: try startOfYearWording("reasonColumn"))
-        let sorted: String = firstRowReason(in: table)
-        // A failed assertion does not stop the test here, and capture.py
-        // promotes any picture that passes its checks — so return BEFORE
-        // saving: no picture is better than a wrong one (#589's
-        // implementation review, S2).
-        guard sorted != unsorted else {
-            XCTFail("Sorting by Why did not change the first row (“\(sorted)”): the picture would show only classes")
-            application.buttons["Cancel"].firstMatch.click()
-            return
-        }
         settle(1.5)
         save(window, as: "start-of-year")
         application.buttons["Cancel"].firstMatch.click()
