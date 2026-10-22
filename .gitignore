@@ -65,6 +65,9 @@ mac-app/Vendor/.helpers.*/
 # contracts/shared-rules.json → obsidianAddOnsForFigures, never committed.
 mac-app/Vendor/obsidian-addons/
 mac-app/Vendor/.obsidian-addons.*/
+# windows-app/Vendor/fetch-obsidian-addons.ps1 (GitHub #581), from the same pins.
+windows-app/Vendor/obsidian-addons/
+windows-app/Vendor/.obsidian-addons.*/
 
 # Update-signing keys never live in the repository (#337): the private key stays
 # in %USERPROFILE%\.plantoir-release, outside every clone.
