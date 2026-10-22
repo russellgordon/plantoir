@@ -482,6 +482,10 @@ the release side.
     row for #632, 2026-10-22, is the first) is not by itself a reason to pass
     `--required-warning` here: it would take Skip away from every mac
     teacher for a sentence that does not apply to them.
+    Nor is it a reason to mark the WINDOWS item critical (`--critical-versions`):
+    a critical offer shows Install and Reopen alone, which would funnel every
+    1.8.5 teacher into exactly the daily-offer path that is broken on their
+    copy. The sentence in the notes is the mitigation; 1.8.6 is not marked.
 
   **The one exception so far was v1.4.0, which carried three warnings and was
   cut WITHOUT the flag.** All three were for a teacher installing v1.4.0 BY
