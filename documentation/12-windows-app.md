@@ -8060,13 +8060,78 @@ Run directly:
 | `test_quartz_analytics_off.py` | 6 tests, OK |
 | `test_netlify_badge.py` | 19 tests, OK |
 
-### Still owed after the headless part
+### #571 item 3 in the WebView2 preview pane
 
-- **The WebView2 preview pane** (#571 item 3): the four kinds wrong and
-  right, keyboard only, light and dark, plus Ctrl+P and a printable page's
-  handout. This needs the real app on an unlocked desktop.
+Measured 2026-10-22 on the same PC, on an unlocked desktop, in this branch's
+own x64 Debug build. The app was started with `--state-dir` pointing at a
+scratch state folder whose `settings.json` named the scratch working folder,
+plus `--auto-preview EXC2O 1`, which is the Preview button's own code path.
+The pane showed the app's own preview, Quartz's server at
+`http://127.0.0.1:8081` started by the app from its bundled runtime, about
+40 s after launch.
+
+The pane was driven over WebView2's debugging port
+(`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333`,
+Playwright `connect_over_cdp`). Its keys are therefore Chromium input events
+sent to the page, not the OS keyboard. The user agent was
+`… Chrome/155.0.0.0 … Edg/155.0.0.0` (WebView2 Runtime 155.0.4283.62), and
+the pane was 984 × 603 CSS px.
+
+Each theme was set with `prefers-color-scheme` and `saved-theme`, and the
+pane was photographed in both. The same script steps as in Edge above
+passed in light AND dark:
+
+| Quiz | What was done | Feedback |
+|---|---|---|
+| Single choice | 10 Tabs from the top; Space on the wrong choice, then Shift+Tab back and ArrowDown | `notRight`, then `right` |
+| Select all | Space on the boxes | `notRight`, then `right` |
+| Short answer | typed, then Enter | `notRight`, then `right` |
+| Fill in the blank | typed both blanks, then Enter | "1 of 2 blanks is right. Try again, or show the answer.", then `right` |
+| One blank (`Quiz One Blank`) | a wrong answer | exactly `feedback.blanks` {1, 0} = `notRight` |
+
+Other things seen:
+
+- Enter on a folded quiz's title opened it, and its content stopped being
+  inert.
+- The blanks were labelled "Blank 1 of 2" and "Blank 2 of 2".
+- The question labels the choices' `FIELDSET`.
+- Feedback was `role="status"` `aria-live="polite"`.
+- The feedback colours were Edge's to the value: rgb(74, 87, 74) on
+  rgb(247, 250, 245) in light, rgb(207, 224, 201) on rgb(18, 21, 18) in
+  dark.
+
+**Paper and the handout in the pane.**
+
+- **⌘P/Ctrl+P's layout.** `Page.printToPDF` is headless-only, so the paper
+  was read as the pane lays the page out under print media
+  (`Emulation.setEmulatedMedia` print, `body.innerText`). In both themes,
+  `Quiz Printable` showed both questions and neither `printable-answer-7f3a`
+  nor `printable-explain-7f3a`. Two limits on this:
+  - The quizzes were unanswered when it printed; the paper of a quiz whose
+    answer the student revealed was not looked at.
+  - That a real Ctrl+P in the pane opens WebView2's own print window is the
+    2026-10-15 measurement in "Printable pages" above, not this sitting's.
+- **The handout.** The app's print shim was present in the pane
+  (`window.webkit.messageHandlers`), so the app's Print ▸ Questions only
+  hands the handout to the teacher's browser. The browser half is the Edge
+  measurement above. In the pane's own frame, with the shim taken away so
+  `print.inline.ts` takes its own path, Print ▸ Questions only laid out a
+  handout holding the questions and neither sentinel.
+
+**A real OS Ctrl+P was not sent to the pane.** `WScript.Shell.AppActivate`
+reported success but did not bring the app forward on this desktop, so the
+one `SendKeys("^p")` went to the terminal in front instead. Nothing visible
+happened, and no further keys were sent. A real keystroke in the pane needs
+the window brought forward by hand, or by UI Automation as `DrivenApp`
+does.
+
+### Still owed after this sitting
+
 - **Narrator** (#593 item 3, #571 item 3): Tab to a box reads its words,
-  Space ticks it, and a link in an item still navigates; the question is read
-  as the group's label, the blank as "Blank 1 of 2", and feedback is
-  announced. Only the proxy above has been measured.
+  Space ticks it, and a link in an item still navigates; the question is
+  read as the group's label, the blank as "Blank 1 of 2", and feedback is
+  announced. Only the proxy above has been measured, in Edge and in the
+  pane. Someone has to listen to Narrator itself.
+- **A real OS Ctrl+P in the pane during this sitting.** It is covered by
+  the 2026-10-15 measurement in "Printable pages".
 - **The WebKit leg** of #618 and #620, once #597 lands.
