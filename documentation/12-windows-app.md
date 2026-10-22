@@ -7173,6 +7173,32 @@ The dialog measures each part at its width, logs the fit to `startup.log`
 ("Start of Year sheet laid out: …") and refits with it, and refits again
 when the window changes size.
 
+**Measured** (this PC: i5-8365U, Windows 11 Pro 26200, 1920 × 1080 at 150%,
+2026-10-22; the app's own `--stage-scene start-of-year` on a worst-case
+ICS3U section 2: its first class in draft, classes dated before today, a real
+scheduled deploy, a page with no room for a key, 175 rows, the links-left
+list 30-odd pages long):
+
+| Window (XamlRoot) | Warnings | Above shown | Rows shown | Notes: must-read / all / shown | Dialog |
+|---|---|---|---|---|---|
+| 700 epx (the scene's window) | 185 | 185 of 249 | 2 (66) | 349 / 474 / 199 | 699 epx |
+| 563 epx (the 600 epx minimum, less its title bar) | 184 | 184 of 248 | 2 (66) | 348 / 472 / 63 | 563 epx |
+
+- The chrome measured **250–251 epx** against the layout's 250 (now 251);
+  the dialog refits with what it reads.
+- **The three warnings are never cut** (184–185 epx); the intro under them
+  scrolls in its area in this worst case.
+- **Rows are 32 epx on one line and 50 epx when Why wraps to two** (a
+  reason naming a 42-character page title). The Why column is 272 epx wide.
+- **What does NOT hold in this worst case, said rather than hidden:** the
+  must-read notes (348 epx, almost all of it the links-left list) do not fit
+  whole at either height, so the notes area scrolls — 199 epx shown at 700,
+  63 at the minimum. Everything stays reachable by scrolling inside its own
+  area; nothing is clipped out of reach. The mac's 120 pt notes floor cannot
+  be kept at the minimum window once the warnings (never capped) and two
+  rows are placed: 563 − 251 − 184 − 66 = 62. A short plan (no links left,
+  no warnings) shows its notes whole.
+
 **Rejected:** the mac's fixed budget (above); a What-changes column, two
 tables, rows for the staying pages, and a table in the MCP text (the mac's
 rejections, `09-mac-app.md` → "The pages as a table (#589)"). The

@@ -118,10 +118,12 @@ public static class StartOfYearSheetLayout
     /// Everything that is not the area above, the rows or the notes: the
     /// dialog's title, its padding, the summary lines, the header row, the
     /// panel's spacing and the button row. Measured on this PC in the real
-    /// dialog (documentation/12-windows-app.md → "The Start of Year sheet as a
-    /// table"); the dialog logs what it measures each time it opens.
+    /// dialog: 250–251 epx on this PC at 150% (i5-8365U, 2026-10-22,
+    /// documentation/12-windows-app.md → "The Start of Year sheet as a
+    /// table"). The dialog logs what it measures each time it opens, and
+    /// refits with the chrome it reads from the laid-out dialog.
     /// </summary>
-    public const double Chrome = 250;
+    public const double Chrome = 251;
 
     /// <summary>The notes' floor when they are that tall, as the mac's 120 pt.</summary>
     public const double NotesFloor = 120;
