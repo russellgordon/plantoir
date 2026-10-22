@@ -113,16 +113,28 @@ public static class StartOfYearDialog
         if (CourseActivity.IsPublishing(folder, course.Code))
             return StartOfYearWording.Fill(StartOfYearWording.DeployUnderWay, ("course", course.Code));
 
-        var lines = new List<string>
-        {
-            StartOfYearWording.Fill(StartOfYearWording.UndoIntro, ("pages", StartOfYearWording.PagesCounted(entry.Written.Count))),
-        };
         // Named as the plan names them (#389): title, and folder only when two share it.
         var pages = workspace.StartOfYearPages(workspace.Course(course.Code), section);
         var naming = StartOfYearPlan.Make(pages);
         string NameOf(string path) => pages.FirstOrDefault(p => string.Equals(p.Id, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
             is { } page ? naming.NameOf(page) : StartOfYearWording.PageName(Path.GetFileNameWithoutExtension(path));
-        lines.AddRange(entry.Written.Keys.Select(path => "• " + NameOf(path)));
+        // Sorted by the undo's own rule before the teacher agrees (#564): what
+        // would go back, what changed since and stays, and a page already as
+        // it was in neither list — so the sheet's count is the result's.
+        var (wouldPutBack, wouldLeave) = AssistWorkspace.WhatAnUndoWouldDo(entry.Written);
+        var lines = new List<string>
+        {
+            wouldPutBack.Count == 0 && wouldLeave.Count == 0
+                ? StartOfYearWording.UndoAllAlreadyBack
+                : StartOfYearWording.Fill(StartOfYearWording.UndoIntro, ("pages", StartOfYearWording.PagesCounted(wouldPutBack.Count))),
+        };
+        lines.AddRange(wouldPutBack.Select(path => "• " + NameOf(path)));
+        if (wouldLeave.Count > 0)
+        {
+            lines.Add("");
+            lines.Add(StartOfYearWording.Fill(StartOfYearWording.UndoSkipped, ("pages", StartOfYearWording.PagesCounted(wouldLeave.Count))));
+            lines.AddRange(wouldLeave.Select(path => "• " + NameOf(path)));
+        }
         var text = new TextBlock { Text = string.Join("\n", lines), TextWrapping = TextWrapping.Wrap };
         var dialog = new ContentDialog
         {
@@ -138,6 +150,7 @@ public static class StartOfYearDialog
         var (putBack, left) = AssistWorkspace.UndoStartOfYear(entry.Written);
         StartOfYearSessionUndo.End(folder, course.Code, section);
         AssistWorkspace.NoteStartOfYearUndone(course.Code, section, StartOfYearAskedFrom.TheApp, putBack.Count, left.Count);
+        if (putBack.Count == 0 && left.Count == 0) return StartOfYearWording.UndoAllAlreadyBack;
         string said = StartOfYearWording.Fill(StartOfYearWording.Undone, ("pages", StartOfYearWording.PagesCounted(putBack.Count)));
         if (left.Count > 0)
             said += " " + StartOfYearWording.Fill(StartOfYearWording.UndoLeftSome,

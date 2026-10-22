@@ -149,50 +149,153 @@ public sealed class UndoHistory
         _open = null;
     }
 
+    /// <summary>
+    /// Remember an entry exactly as given, for the contract's undo rows
+    /// (<c>undoFiles</c>): <see cref="End"/> drops a file whose BEFORE equals
+    /// its AFTER, and one row is exactly that file.
+    /// </summary>
+    internal void Remember(Entry entry) => _entries.Add(entry);
+
     /// <summary>Abandon recording, for an operation that threw partway.</summary>
     public void Abandon() => _open = null;
 
     /// <summary>
-    /// Put the most recent operation back. Files somebody else has changed
-    /// since are left alone and named, because our copy of them is stale and
-    /// writing it would destroy whatever they did.
+    /// Put the most recent operation back. Each file gets ONE verdict
+    /// (<see cref="UndoVerdict.Of"/>, #564 / mac #555): already back (nothing
+    /// written, not counted, does not hold the entry), put back, or left alone
+    /// because somebody else has changed it since — our copy of it is stale
+    /// and writing it would destroy whatever they did. The entry comes off the
+    /// list once nothing is left alone.
     /// </summary>
     public UndoResult Undo()
     {
         if (_entries.Count == 0)
             return new UndoResult(false, "This conversation hasn’t changed anything yet.",
-                Array.Empty<string>(), Array.Empty<string>());
+                Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
 
         var entry = _entries[^1];
         var restored = new List<string>();
+        var alreadyBack = new List<string>();
         var skipped = new List<string>();
 
         foreach (var (path, state) in entry.Files)
         {
-            string? current;
-            try { current = File.Exists(path) ? File.ReadAllText(path) : null; }
-            catch { skipped.Add(path); continue; }
-
-            if (current != state.After) { skipped.Add(path); continue; }
-
+            switch (UndoVerdict.Of(path, state))
+            {
+                case UndoVerdict.Kind.AlreadyBack:
+                    alreadyBack.Add(path);
+                    continue;
+                case UndoVerdict.Kind.LeftAlone:
+                    skipped.Add(path);
+                    continue;
+            }
             try
             {
                 if (state.Before is null) File.Delete(path);
                 else File.WriteAllText(path, state.Before);
                 restored.Add(path);
             }
+            // A write that fails is left alone, as the mac's is: the file
+            // still holds what the change left, so the entry must stay.
             catch { skipped.Add(path); }
         }
 
-        // Only forget the operation once it has actually been put back. A
+        // Only forget the operation once nothing is left holding it. A
         // half-undone change stays on the list so the teacher can try again
-        // after sorting out whatever is holding the other files.
+        // after sorting out whatever is holding the other files — and the
+        // files an earlier press put back no longer count against it (#564).
         if (skipped.Count == 0) _entries.RemoveAt(_entries.Count - 1);
 
-        return new UndoResult(restored.Count > 0, entry.Description, restored, skipped);
+        return new UndoResult(restored.Count > 0 || (skipped.Count == 0 && alreadyBack.Count > 0),
+                              entry.Description, restored, skipped, alreadyBack);
     }
 }
 
-/// <summary>How an undo went.</summary>
+/// <summary>
+/// What an undo does with one saved file (#564, the mac's
+/// <c>AssistUndoVerdict</c>, #555; the rows are <c>contracts/assist-cases.json</c>
+/// → <c>undoFiles.files</c>). ONE rule, asked by <see cref="UndoHistory.Undo"/>
+/// and by the start-of-year undo sheet before the teacher agrees, so the sheet
+/// can never list a page differently from how the undo treats it.
+/// </summary>
+public static class UndoVerdict
+{
+    public enum Kind
+    {
+        /// <summary>The disk holds what the change left: write BEFORE back (or remove the file when BEFORE is null).</summary>
+        PutBack,
+
+        /// <summary>
+        /// The disk already holds BEFORE — an earlier press, or the teacher,
+        /// put it back. Nothing is written, it is not counted as put back, and
+        /// it does not hold the change on the list. Until #564 it read as
+        /// "edited since", so a change taken back in part never came off.
+        /// </summary>
+        AlreadyBack,
+
+        /// <summary>Anything else: the teacher has changed it since, and newer work is never thrown away.</summary>
+        LeftAlone,
+    }
+
+    /// <summary>
+    /// Which of the three this file is, read off the disk now. BEFORE is
+    /// compared first, so a row the change left as it found it (all absent,
+    /// or BEFORE equal to AFTER) is already back rather than a removal that
+    /// fails and holds the change for ever.
+    /// </summary>
+    public static Kind Of(string path, UndoHistory.FileState state) =>
+        Holds(path, state.Before) ? Kind.AlreadyBack
+        : Holds(path, state.After) ? Kind.PutBack
+        : Kind.LeftAlone;
+
+    /// <summary>
+    /// Whether the disk holds this copy. Null means NOTHING is at the path —
+    /// not "could not be read as text": a folder, or a file that is not UTF-8,
+    /// matches neither copy (the contract's <c>currentKind</c> rows). Text
+    /// means a readable UTF-8 file with exactly this text, ONE leading byte-
+    /// order mark dropped first, because the saved copies came from
+    /// <c>File.ReadAllText</c>, which drops it (the mac's
+    /// <c>String(contentsOf:encoding:)</c> drops it too).
+    /// </summary>
+    internal static bool Holds(string path, string? expected)
+    {
+        bool isFile = File.Exists(path);
+        if (expected is null) return !isFile && !Directory.Exists(path);
+        if (!isFile) return false;
+        return ReadStrictly(path) is { } now && now == expected;
+    }
+
+    private static readonly System.Text.UTF8Encoding Strict = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+    /// <summary>The file's text, or null when it cannot be read or is not UTF-8.</summary>
+    internal static string? ReadStrictly(string path)
+    {
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            int start = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? 3 : 0;
+            return Strict.GetString(bytes, start, bytes.Length - start);
+        }
+        catch { return null; }
+    }
+}
+
+/// <summary>Which sentence answers an undo (#564): the names are <c>assist-wording.json</c> keys.</summary>
+public enum UndoAnswer { NothingToUndo, Undid, UndidPartly, CouldNotUndo }
+
+/// <summary>How an undo went: what was written back, what was left alone, and what was already back.</summary>
 public sealed record UndoResult(
-    bool Succeeded, string Description, IReadOnlyList<string> Restored, IReadOnlyList<string> Skipped);
+    bool Succeeded, string Description, IReadOnlyList<string> Restored, IReadOnlyList<string> Skipped,
+    IReadOnlyList<string> AlreadyBack)
+{
+    /// <summary>
+    /// Every file back → undid (even when this press wrote nothing, its files
+    /// all already back); written and left → undidPartly; nothing written and
+    /// something left → couldNotUndo; no files at all → nothingToUndo.
+    /// </summary>
+    public UndoAnswer Answer =>
+        Restored.Count == 0 && Skipped.Count == 0 && AlreadyBack.Count == 0 ? UndoAnswer.NothingToUndo
+        : Skipped.Count == 0 ? UndoAnswer.Undid
+        : Restored.Count == 0 ? UndoAnswer.CouldNotUndo
+        : UndoAnswer.UndidPartly;
+}
