@@ -52,13 +52,37 @@ public sealed class ClubNounTests : IDisposable
     private static string TeacherCopy(CallToolResult result) =>
         result.Meta?[AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>() ?? ModelCopy(result);
 
-    private static IEnumerable<(string What, Func<PlantoirTools, CallToolResult> Call)> Plans() => new (string, Func<PlantoirTools, CallToolResult>)[]
+    /// <summary>
+    /// Week 1 linking to Week 2, both hidden or both visible, written over the
+    /// scratch club AFTER <see cref="Club"/> made it — kept out of
+    /// <see cref="Club"/> itself so the other plans run on the plain fixture
+    /// (#556). A hidden Week 2 is a linked class a publish LEAVES ALONE; a
+    /// visible one is a linked class an unpublish KEEPS, "a class of its own".
+    /// </summary>
+    private PlantoirTools Linked(PlantoirTools tools, bool visible)
+    {
+        string classes = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes");
+        string publish = visible ? "true" : "false";
+        File.WriteAllText(Path.Combine(classes, "Week 1.md"),
+            $"---\ntitle: Week 1\npublish: {publish}\ncreated: 2025-09-18T07:00:00.000-0400\n---\n\nToday: [[Week 2]]\n");
+        File.WriteAllText(Path.Combine(classes, "Week 2.md"),
+            $"---\ntitle: Week 2\npublish: {publish}\ncreated: 2025-09-25T07:00:00.000-0400\n---\n\nWeek 2\n");
+        return tools;
+    }
+
+    private IEnumerable<(string What, Func<PlantoirTools, CallToolResult> Call)> Plans() => new (string, Func<PlantoirTools, CallToolResult>)[]
     {
         ("make room", tools => tools.PlanMakeRoomForClasses("ICS3U", 1, 1, 2)),
         ("next page", tools => tools.PlanAddNextClass("ICS3U", 1)),
         ("duplicate", tools => tools.PlanAddNextClass("ICS3U", 1, duplicate: "Week 1")),
         ("add pages", tools => tools.PlanAddClasses("ICS3U", 1, 1, 2)),
         ("start of year", tools => tools.PlanPrepareForStartOfYear("ICS3U", 1)),
+        // #556: the three publish plans, each over a linked class.
+        ("publish pages", tools => Linked(tools, visible: false).PlanPublishPages("ICS3U", 1, new[] { "Week 1" })),
+        ("unpublish pages", tools => Linked(tools, visible: true).PlanUnpublishPages("ICS3U", 1, new[] { "Week 1" })),
+        ("publish the class on", tools => Linked(tools, visible: false).PlanPublishClassOn("ICS3U", 1, "2025-09-18")),
+        ("nothing changes, a name unknown",
+         tools => Linked(tools, visible: false).PlanPublishPages("ICS3U", 1, new[] { "Week 2", "Week 99" })),
     };
 
     [Fact]
@@ -90,6 +114,40 @@ public sealed class ClubNounTests : IDisposable
         Assert.Contains(AssistWording.MakingRoomCannotBeUndoneForAMeeting, TeacherCopy(makeRoom));
         Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndone, TeacherCopy(makeRoom));
         Assert.Contains(AssistWording.MakingRoomCannotBeUndone, ModelCopy(makeRoom));
+    }
+
+    /// <summary>
+    /// #556 (the mac's #267): a club's publish and unpublish cards say
+    /// "meeting" for a linked class left alone and for the reason one is kept,
+    /// as the Section menu's table under them already did (#548); the model's
+    /// copy keeps the class forms (<see cref="TheNounNeverReachesWhatTheModelReads"/>
+    /// holds it byte for byte). The kept line is the contract's sentence with
+    /// no folder because only one page in the section is called Week 2.
+    /// </summary>
+    [Fact]
+    public void AClubsPublishCardSaysMeetingForLinkedClasses()
+    {
+        var leftAlone = new[] { "Week 2" };
+        foreach (var publishing in new[]
+                 {
+                     Linked(Club("meeting"), visible: false).PlanPublishPages("ICS3U", 1, new[] { "Week 1" }),
+                     Linked(Club("meeting"), visible: false).PlanPublishClassOn("ICS3U", 1, "2025-09-18"),
+                 })
+        {
+            Assert.Contains(AssistWording.LinkedClassWasLeftAloneForAMeeting(leftAlone), TeacherCopy(publishing));
+            Assert.DoesNotContain(AssistWording.LinkedClassWasLeftAlone(leftAlone), TeacherCopy(publishing));
+            Assert.Contains(AssistWording.LinkedClassWasLeftAlone(leftAlone), ModelCopy(publishing));
+            Assert.True(publishing.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
+        }
+
+        var hiding = Linked(Club("meeting"), visible: true).PlanUnpublishPages("ICS3U", 1, new[] { "Week 1" });
+        Assert.Contains(AssistWording.LinkedClassStaysVisibleForAMeeting("Week 2"), TeacherCopy(hiding));
+        Assert.DoesNotContain(AssistWording.LinkedClassStaysVisible("Week 2"), TeacherCopy(hiding));
+        Assert.Contains(AssistWording.LinkedClassStaysVisible("Week 2"), ModelCopy(hiding));
+
+        // A course that is not a club reads the class form on its card too.
+        var asAClass = Linked(Club(null), visible: false).PlanPublishPages("ICS3U", 1, new[] { "Week 1" });
+        Assert.Contains(AssistWording.LinkedClassWasLeftAlone(leftAlone), TeacherCopy(asAClass));
     }
 
     /// <summary>
