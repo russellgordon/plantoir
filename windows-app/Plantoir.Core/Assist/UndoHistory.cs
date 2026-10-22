@@ -204,10 +204,12 @@ public sealed class UndoHistory
         // half-undone change stays on the list so the teacher can try again
         // after sorting out whatever is holding the other files — and the
         // files an earlier press put back no longer count against it (#564).
-        if (skipped.Count == 0) _entries.RemoveAt(_entries.Count - 1);
+        bool cameOff = skipped.Count == 0;
+        if (cameOff) _entries.RemoveAt(_entries.Count - 1);
 
-        return new UndoResult(restored.Count > 0 || (skipped.Count == 0 && alreadyBack.Count > 0),
-                              entry.Description, restored, skipped, alreadyBack);
+        // Succeeded is the mac's `!restored.isEmpty || entryCameOff`: something
+        // was written back, or the change is off the list (every file back).
+        return new UndoResult(restored.Count > 0 || cameOff, entry.Description, restored, skipped, alreadyBack);
     }
 }
 

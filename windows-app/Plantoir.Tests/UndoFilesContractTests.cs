@@ -70,12 +70,14 @@ public sealed class UndoFilesContractTests : IDisposable
     }
 
     /// <summary>
-    /// Every <c>presses</c> row: several files, Undo pressed step by step,
-    /// with the counts, the change left on the list, the sentence and the
-    /// Section menu's trail ending each press must give.
+    /// Every <c>presses</c> row, pressed through the REAL tool —
+    /// <c>PlantoirTools.UndoLastChange</c>, as the Section menu's server runs
+    /// it — with the counts, the change left on the list, the sentence the
+    /// teacher reads and the menu's trail ending (read by
+    /// <see cref="SectionVerbs.Ending"/> from what the server answered).
     /// </summary>
     [Fact]
-    public void EveryPressRowEndsAsTheContractSays()
+    public async Task EveryPressRowEndsAsTheContractSays()
     {
         var rows = Family["presses"]!.AsArray();
         Assert.True(rows.Count >= 3, "presses rows have gone missing");
@@ -84,6 +86,8 @@ public sealed class UndoFilesContractTests : IDisposable
             string name = row!["name"]!.ToString();
             Assert.True(row["why"] is not null, $"{name} has no stated reason");
             string folder = MakeFolder();
+            File.WriteAllText(Path.Combine(folder, "preview.ps1"), "# marker");
+            File.WriteAllText(Path.Combine(folder, "deploy.ps1"), "# marker");
             var files = new Dictionary<string, UndoHistory.FileState>(StringComparer.OrdinalIgnoreCase);
             foreach (var fileRow in row["files"]!.AsArray())
             {
@@ -92,7 +96,10 @@ public sealed class UndoFilesContractTests : IDisposable
                 files[path] = new UndoHistory.FileState(fileRow["before"]?.GetValue<string>(), fileRow["after"]?.GetValue<string>());
             }
             var history = new UndoHistory();
-            history.Remember(Change(files));
+            var entry = Change(files);
+            history.Remember(entry);
+            var tools = new AssistScenarioTests.RealTools(
+                new AssistWorkspace(folder, new FakeLauncher(), undo: history) { Surface = AssistSurface.Menu });
 
             int index = 0;
             foreach (var step in row["steps"]!.AsArray())
@@ -107,22 +114,33 @@ public sealed class UndoFilesContractTests : IDisposable
                         else File.WriteAllText(path, text.GetValue<string>());
                     }
                 }
+                // What this press will find, by the undo's own rule, before it runs.
+                var verdicts = history.Entries.Count == 0 ? new List<UndoVerdict.Kind>()
+                    : history.Entries[^1].Files.Select(f => UndoVerdict.Of(f.Key, f.Value)).ToList();
                 int entriesBefore = history.Entries.Count;
-                var result = history.Undo();
-                Assert.True(step["expectPutBack"]!.GetValue<int>() == result.Restored.Count, $"{label}: put back {result.Restored.Count}");
-                Assert.True(step["expectAlreadyBack"]!.GetValue<int>() == result.AlreadyBack.Count, $"{label}: already back {result.AlreadyBack.Count}");
-                Assert.True(step["expectLeftAlone"]!.GetValue<int>() == result.Skipped.Count, $"{label}: left alone {result.Skipped.Count}");
-                Assert.True(step["expectEntriesLeft"]!.GetValue<int>() == history.Entries.Count, $"{label}: changes left {history.Entries.Count}");
-                Assert.True(step["expectSentence"]!.ToString() == Camel(result.Answer), $"{label}: sentence {Camel(result.Answer)}");
 
-                // The server notes a write with no new undo entry exactly when
-                // it answers undidPartly (PlantoirTools.UndoLastChange), and the
-                // menu's ending is read from that and from the list moving.
-                var answer = AssistToolAnswer.Same("") with
+                var answer = await tools.CallTool("undo_last_change", new JsonObject());
+
+                Assert.True(step["expectPutBack"]!.GetValue<int>() == verdicts.Count(v => v == UndoVerdict.Kind.PutBack), $"{label}: put back");
+                Assert.True(step["expectAlreadyBack"]!.GetValue<int>() == verdicts.Count(v => v == UndoVerdict.Kind.AlreadyBack), $"{label}: already back");
+                int leftAlone = verdicts.Count(v => v == UndoVerdict.Kind.LeftAlone);
+                Assert.True(step["expectLeftAlone"]!.GetValue<int>() == leftAlone, $"{label}: left alone");
+                Assert.True(step["expectEntriesLeft"]!.GetValue<int>() == history.Entries.Count, $"{label}: changes left {history.Entries.Count}");
+
+                string sentence = step["expectSentence"]!.ToString();
+                string description = entry.Description;
+                switch (sentence)
                 {
-                    Changed = history.Entries.Count != entriesBefore || result.Answer == UndoAnswer.UndidPartly,
-                };
-                string ending = SectionVerbs.Ending("undo_last_change", answer, entriesBefore, history.Entries.Count, "ICS3U", 1);
+                    case "undid": Assert.Equal(AssistWording.UndidFromTheMenu(description), answer.Summary); break;
+                    case "undidPartly": Assert.Equal(AssistWording.UndidPartlyFromTheMenu(description, leftAlone), answer.Summary); break;
+                    case "couldNotUndo": Assert.StartsWith(AssistWording.CouldNotUndoFromTheMenu(description, leftAlone), answer.Summary); break;
+                    case "nothingToUndo": Assert.Equal(AssistWording.NothingToUndoFromTheMenu, answer.Summary); break;
+                    default: Assert.Fail($"{label}: unknown sentence {sentence}"); break;
+                }
+
+                Assert.True(answer.ChangesToUndo == history.Entries.Count, $"{label}: the server's depth");
+                Assert.True(answer.Changed is not null, $"{label}: the menu's server says whether it changed anything");
+                string ending = SectionVerbs.Ending("undo_last_change", answer, entriesBefore, answer.ChangesToUndo, "ICS3U", 1);
                 Assert.True(step["expectEnding"]!.ToString() == ending, $"{label}: trail ending {ending}");
             }
         }

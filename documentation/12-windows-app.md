@@ -7041,8 +7041,11 @@ at the end of a session Windows may end the process before the last window's
 message, and the last window's close may follow it), and only in a process
 that wrote its own "Plantoir opened" — the same guard, so a scheduled run or
 a marketing capture leaves no unpaired close. The end-of-session path waits
-at most 500 ms for the writers' cross-process lock instead of the usual 5 s,
-which is about Windows' own kill timeout.
+at most 500 ms IN ALL — for this process's own trail lock and the writers'
+cross-process lock together (`ActivityTrail.Append` with
+`Monitor.TryEnter`) — instead of the usual 5 s for the cross-process lock,
+which is about Windows' own kill timeout. A line that cannot get the lock in
+that time is dropped rather than holding the session up.
 
 **Rejected:** reading "install" from the at-quit install (it fires when the
 teacher quits with an update ready — the mac's `willInstallUpdate` trap); a
@@ -7062,7 +7065,10 @@ What Windows owed:
   the `CoverageMapsBuilt` pattern — in the console reader
   (`ScriptRunner.RecordHealthFinding`, and the 8000-character carry guard),
   the scheduled publish's record reader (`ScheduledHealthFindings`) and the
-  wrapper's marker scan (`TaskScheduling.cs`). The sentences are
+  wrapper's marker scan (`TaskScheduling.cs`). A scheduled-deploy wrapper
+  written before this change has no `PLANTOIR_MY_PROGRESS:` in its scan, so a
+  scheduled run's line reaches the trail only once that deploy is scheduled
+  again — the same as for `PLANTOIR_MAPS:`. The sentences are
   `myProgressBuilt.trailLine.shapes`, "N page(s)" spelled 1 page / N pages.
 - **`include_my_progress` and `success_criteria_headings`**, read-only
   (`CourseConfiguration.IncludesMyProgress(section)`, `SuccessCriteriaHeadings`;
