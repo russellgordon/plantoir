@@ -139,7 +139,7 @@
       },
       "alt": "A Python program on a class website's Spot the Bug page, changed so its loop starts at the first name, with Run, Stop and Reset under it, its output — Ali, Bea and Cy, one to a line — and the word Finished.",
       "caption": "Students change the program, press Run, and read what it prints underneath.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "Try this one",
         "Run",
@@ -160,7 +160,7 @@
       },
       "alt": "A Python program on the Talking to the User page, run and waiting: the output shows Player name: Priya, then Minutes practised this week: with 185 being typed in a field right after the prompt, and the line Waiting for your answer under the buttons.",
       "caption": "The program stops at each input() and waits. The student types the answer right in the output and presses Return.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "The program",
         "Player name: Priya",
@@ -180,7 +180,7 @@
       },
       "alt": "A Python program on the Reading an Error Message page that asked how many hours, was answered abc, and ended in a traceback: line 2, then ValueError: invalid literal for int() with base 10: 'abc'.",
       "caption": "Answered abc where it wanted a number. An error names the line in the editor, in Python's own words.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "A crash, in full",
         "Traceback",
@@ -243,7 +243,7 @@
       },
       "alt": "A self-check question on a class website asking what a two-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it.",
       "caption": "A question students check for themselves, with your explanation once they have.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "What does this program print?",
         "Check",
@@ -282,7 +282,7 @@
       },
       "alt": "A self-check question on a class website with the balanced equation for burning propane and two blanks: 0.0998 mol marked right and 4.39 g marked not right, the line 1 of 2 blanks is right, and the explanation opened under it, which names the step that answer skipped.",
       "caption": "Wrong, and why: each blank marked on its own.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "1 of 2 blanks is right",
         "Not right",
@@ -302,7 +302,7 @@
       },
       "alt": "A sight passage on a class website and, under it, a select-all-that-apply question asking which details show the tins are hidden, with the two right choices ticked, the word Right!, and the explanation opened under it.",
       "caption": "A passage read closely: select all that apply.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "Select all that apply",
         "Right!",
