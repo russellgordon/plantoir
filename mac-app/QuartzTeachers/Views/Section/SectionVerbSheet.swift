@@ -127,6 +127,11 @@ final class SectionVerbSheetModel: Identifiable {
     /// `.planned` in place of `body`.
     var planTable: AssistPlanTable?
 
+    /// Whether the plan's disclosure is open (#622): the pages already the
+    /// way they were asked to be, added to the table. Closed for every new
+    /// plan.
+    var showsAlreadyRight: Bool = false
+
     /// The call waiting on the default button at the plan.
     var pendingCall: AssistToolCall?
 
@@ -393,6 +398,30 @@ final class SectionVerbSheetModel: Identifiable {
         )
     }
 
+    /// Space on the picker's selected row (#608): ticks it, or unticks it.
+    /// Only a row the search leaves showing — a row the teacher cannot see
+    /// is never changed by a key.
+    func flipTick(ofRowWithID id: String?) {
+        for row in shownRows where row.id == id {
+            if ticked.contains(row.name) {
+                ticked.remove(row.name)
+            } else {
+                ticked.insert(row.name)
+            }
+        }
+    }
+
+    /// Space on the later-classes list's selected row (#608).
+    func flipLaterTick(ofClassWithID id: String?) {
+        for page in laterClasses where page.id == id {
+            if laterTicked.contains(page.place) {
+                laterTicked.remove(page.place)
+            } else {
+                laterTicked.insert(page.place)
+            }
+        }
+    }
+
     func laterBinding(for page: ClassesDatedLater.Flagged) -> Binding<Bool> {
         return Binding(
             get: { return self.laterTicked.contains(page.place) },
@@ -465,7 +494,22 @@ struct SectionVerbSheet: View {
     /// sorts by that column (#524, the `AllBackupsView` precedent).
     @State var planSortOrder: [KeyPathComparator<AssistPlanTable.Row>] = [KeyPathComparator(\.position)]
 
+    /// The picker's and the later-classes list's selected row (#608): what
+    /// Space ticks. Selecting a row is not ticking it.
+    @State var pickedRowID: String? = nil
+    @State var pickedLaterClassID: String? = nil
+
     static let tallestList: CGFloat = 340
+
+    /// The sheet's width to open with, and the narrowest it can be made
+    /// (#621): what it was before it could be resized.
+    static let width: CGFloat = 560
+
+    /// How many rows the picker and the later-classes list show before the
+    /// table scrolls inside itself (#608): twelve, as the plan that follows
+    /// shows, so the two steps of one flow are the same height — 318 pt,
+    /// under the 340 the list of checkboxes was capped at.
+    static let mostPickerRowsShown: Int = 12
 
     /// How many plan rows show before the table scrolls inside itself, and
     /// how tall the notes under it may grow: one height budget for the plan
@@ -474,22 +518,101 @@ struct SectionVerbSheet: View {
     static let mostPlanRowsShown: Int = 12
     static let tallestPlanNotes: CGFloat = 120
 
+    /// The fewest rows the plan table is tall enough for when pages are
+    /// folded under it (#622, the director's ruling on R8): the table is as
+    /// tall as the rows a teacher reads, and opening the disclosure adds the
+    /// rest INSIDE it — the sheet never grows when it opens — so a plan of
+    /// one or two changes keeps room for the folded rows to scroll in. Five,
+    /// Start of Year's own budget (`StartOfYearSheet.mostPlanRowsShown`).
+    static let fewestPlanRowsUnderAFold: Int = 5
+
+    /// The gap between the plan table and the disclosure under it (#622):
+    /// 6 pt, so the disclosure reads as the table's, and so the worst plan
+    /// stays within `CopyPageChecklist.tallestSheet` (`planTable`).
+    static let foldSpacing: CGFloat = 6
+
     // MARK: - Computed properties
 
-    /// The plan table's rows, in the order the teacher sorted them.
-    var sortedPlanRows: [AssistPlanTable.Row] {
+    /// The plan table's rows as drawn (#622): the rows to read, and the
+    /// pages already the way they were asked to be only while the
+    /// disclosure is open. They come last in plan order, so opening it
+    /// appends them. A plan with nothing else to read shows every row.
+    var drawnPlanRows: [AssistPlanTable.Row] {
         guard let table = model.planTable else {
             return []
         }
-        return table.rows.sorted(using: planSortOrder)
+        if !SectionVerbSheet.foldsAlreadyRight(table) {
+            return table.rows
+        }
+        var drawn: [AssistPlanTable.Row] = table.rowsToRead
+        if model.showsAlreadyRight {
+            for row in table.rowsAlreadyRight {
+                drawn.append(row)
+            }
+        }
+        return drawn
     }
 
-    /// The table's height: every row up to `mostPlanRowsShown`, then it
-    /// scrolls inside itself. A `Table` has no natural height.
+    /// The words of the disclosure under the plan table (#622) — "Show the
+    /// 16 pages already visible" — or nil when the plan folds nothing away.
+    var alreadyRightLabel: String? {
+        guard let table = model.planTable, SectionVerbSheet.foldsAlreadyRight(table) else {
+            return nil
+        }
+        return AssistWording.menuPlanShowAlready(
+            count: table.rowsAlreadyRight.count,
+            publishing: table.rowsAlreadyRight.first?.change != .alreadyHidden
+        )
+    }
+
+    /// The plan table's rows, in the order the teacher sorted them.
+    var sortedPlanRows: [AssistPlanTable.Row] {
+        return drawnPlanRows.sorted(using: planSortOrder)
+    }
+
+    /// The table's height: the rows a teacher reads up to
+    /// `mostPlanRowsShown`, then it scrolls inside itself. A `Table` has no
+    /// natural height. It is counted with the disclosure CLOSED, and never
+    /// fewer than `fewestPlanRowsUnderAFold` (or every row, when there are
+    /// fewer) while pages are folded under it, so opening the disclosure
+    /// changes neither the table's height nor the sheet's (#622).
     var planTableHeight: CGFloat {
-        var shown: Int = model.planTable?.rows.count ?? 0
+        guard let table = model.planTable else {
+            return ListTableMetrics.height(forRowCount: 0, showsHeader: true)
+        }
+        var shown: Int = table.rows.count
+        if SectionVerbSheet.foldsAlreadyRight(table) {
+            shown = table.rowsToRead.count
+            var floor: Int = SectionVerbSheet.fewestPlanRowsUnderAFold
+            if floor > table.rows.count {
+                floor = table.rows.count
+            }
+            if shown < floor {
+                shown = floor
+            }
+        }
         if shown > SectionVerbSheet.mostPlanRowsShown {
             shown = SectionVerbSheet.mostPlanRowsShown
+        }
+        return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
+    }
+
+    /// The picker's height (#608): counted from EVERY page offered, not the
+    /// ones the search leaves showing, so the sheet stays still while the
+    /// teacher types; up to `mostPickerRowsShown`, then it scrolls inside.
+    var pickerTableHeight: CGFloat {
+        var shown: Int = model.pageRows.count
+        if shown > SectionVerbSheet.mostPickerRowsShown {
+            shown = SectionVerbSheet.mostPickerRowsShown
+        }
+        return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
+    }
+
+    /// The later-classes list's height (#608), the same way.
+    var laterClassesTableHeight: CGFloat {
+        var shown: Int = model.laterClasses.count
+        if shown > SectionVerbSheet.mostPickerRowsShown {
+            shown = SectionVerbSheet.mostPickerRowsShown
         }
         return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
     }
@@ -509,15 +632,33 @@ struct SectionVerbSheet: View {
         } else {
             // The one sheet title shape (#457's HIG sweep, `SheetTitle`).
             VStack(alignment: .leading, spacing: 12) {
-                content
+                // Every stage stays flexible (#621): the content is wrapped
+                // in ONE stack before the flexible frame — a frame on a
+                // multi-view builder frames each child, which gave the table
+                // 223 of 628 pt and the summary 560 — and the frame takes any
+                // height the teacher adds, at the top, so the buttons stay at
+                // the bottom. Not a `Spacer`: it adds a spacing (12 pt) to
+                // the size every stage opens at.
+                VStack(alignment: .leading, spacing: 12) {
+                    content
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
                 buttons
             }
             .padding([.horizontal, .bottom], 20)
             .sheetTitle(sheetTitle)
-            .frame(width: 560)
-            .fixedSize(horizontal: false, vertical: true)
+            // 560 wide and its content's height to open with, which is also
+            // the smallest the sheet can be made; no largest (#621). A table
+            // takes the height added (`flexibleTableHeight`), its Page column
+            // the width.
+            .frame(minWidth: SectionVerbSheet.width, idealWidth: SectionVerbSheet.width, maxWidth: .infinity)
+            .background(SheetGrowsToItsMinimum().accessibilityHidden(true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("sectionVerbSheet")
+            // `.fitted` is what makes a sheet resizable at all — the default
+            // sizing is not, and snaps back on every change (measured) — and
+            // it opens the sheet at the size above.
+            .presentationSizing(.fitted)
             // #475's question at Deploy, gone without an answer — the window
             // closed under it, say — is a Cancel: nothing deploys.
             .onDisappear {
@@ -540,7 +681,7 @@ struct SectionVerbSheet: View {
         case .planned where model.planTable != nil:
             planTable
         case .planned, .finished:
-            CappedScrollArea(cap: SectionVerbSheet.tallestList) {
+            CappedScrollArea(cap: SectionVerbSheet.tallestList, growsWithItsSheet: true) {
                 Text(model.body)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -561,39 +702,39 @@ struct SectionVerbSheet: View {
     }
 
     /// The page plan (#524): the summary, a read-only table with a row for
-    /// every page, and the card's other sentences under it.
+    /// every page a teacher reads before Go, the pages already the way they
+    /// were asked to be behind a disclosure under it (#622), and the card's
+    /// other sentences.
     @ViewBuilder
     var planTable: some View {
         if let table = model.planTable {
             Text(table.summary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("sectionVerbSheetPlanSummary")
-            // No `selection:`: the rows are read, not chosen.
-            Table(sortedPlanRows, sortOrder: $planSortOrder) {
-                TableColumn(AssistWording.menuPlanPageColumn, value: \.title) { (row: AssistPlanTable.Row) in
-                    Text(row.title)
-                        .help(row.title)
+            // The table and the disclosure under it as one part, 6 pt apart
+            // rather than 12: the disclosure belongs to the table, and the
+            // worst plan (twelve rows, the disclosure and the notes at their
+            // cap) is 616 pt that way and 622 with a full spacing, over the
+            // 620 a 13-inch screen allows (`CopyPageChecklist.tallestSheet`).
+            VStack(alignment: .leading, spacing: SectionVerbSheet.foldSpacing) {
+                planRowsTable
+                if let alreadyRightLabel {
+                    // No content of its own: opening it adds the rows to the
+                    // table above (`drawnPlanRows`), one table and one sort,
+                    // as #589 chose one table over two.
+                    DisclosureGroup(
+                        alreadyRightLabel,
+                        isExpanded: Binding(
+                            get: { return model.showsAlreadyRight },
+                            set: { isOpen in model.showsAlreadyRight = isOpen }
+                        )
+                    ) {
+                        EmptyView()
+                    }
+                    .accessibilityIdentifier("sectionVerbSheetPlanAlreadyRight")
                 }
-                .width(min: 90, ideal: 130)
-                TableColumn(AssistWording.menuPlanFolderColumn, value: \.folder) { (row: AssistPlanTable.Row) in
-                    Text(row.folder)
-                        .foregroundStyle(.secondary)
-                        .help(row.folder)
-                }
-                .width(min: 80, ideal: 110)
-                TableColumn(AssistWording.menuPlanChangeColumn, value: \.whatChanges) { (row: AssistPlanTable.Row) in
-                    // A date move or a reason is long; the tooltip has it whole.
-                    Text(row.whatChanges)
-                        .help(row.whatChanges)
-                }
-                // The widest: it carries the longest words (a date move, a
-                // reason). Three equal columns, as first drawn, cut it at
-                // about twenty letters in the real 560-point sheet.
-                .width(min: 180, ideal: 240)
             }
-            .tableStyle(.bordered(alternatesRowBackgrounds: true))
-            .frame(height: planTableHeight)
-            .accessibilityIdentifier("sectionVerbSheetPlanTable")
+            .layoutPriority(1)
             if !table.notes.isEmpty {
                 CappedScrollArea(cap: SectionVerbSheet.tallestPlanNotes) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -612,6 +753,38 @@ struct SectionVerbSheet: View {
         }
     }
 
+    /// The plan's rows: Page, Folder and What changes. No `selection:`: the
+    /// rows are read, not chosen. Page has no largest width and the other
+    /// two do, so the width a teacher adds goes to the titles (#621); at 560
+    /// the caps change nothing (131/121/220, as before).
+    var planRowsTable: some View {
+        Table(sortedPlanRows, sortOrder: $planSortOrder) {
+            TableColumn(AssistWording.menuPlanPageColumn, value: \.title) { (row: AssistPlanTable.Row) in
+                Text(row.title)
+                    .help(row.title)
+            }
+            .width(min: 90, ideal: 130)
+            TableColumn(AssistWording.menuPlanFolderColumn, value: \.folder) { (row: AssistPlanTable.Row) in
+                Text(row.folder)
+                    .foregroundStyle(.secondary)
+                    .help(row.folder)
+            }
+            .width(min: 80, ideal: 110, max: 140)
+            TableColumn(AssistWording.menuPlanChangeColumn, value: \.whatChanges) { (row: AssistPlanTable.Row) in
+                // A date move or a reason is long; the tooltip has it whole.
+                Text(row.whatChanges)
+                    .help(row.whatChanges)
+            }
+            // The widest at 560: it carries the longest words (a date move,
+            // a reason). Three equal columns, as first drawn, cut it at about
+            // twenty letters in the real 560-point sheet.
+            .width(min: 180, ideal: 240, max: 320)
+        }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .flexibleTableHeight(planTableHeight)
+        .accessibilityIdentifier("sectionVerbSheetPlanTable")
+    }
+
     @ViewBuilder
     var choosing: some View {
         Text(model.intro)
@@ -625,24 +798,7 @@ struct SectionVerbSheet: View {
                 ))
                 .borderedTextField()
                 .accessibilityIdentifier("sectionVerbSheetSearch")
-                CappedScrollArea(cap: SectionVerbSheet.tallestList) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(model.shownRows) { row in
-                            Toggle(isOn: model.binding(for: row)) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(row.title)
-                                    Text(secondLine(for: row))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .accessibilityLabel(row.title)
-                            .accessibilityValue(secondLine(for: row))
-                            .accessibilityIdentifier("sectionVerbRow-\(row.name)")
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                pickerTable
             }
         case .publishClass:
             DatePicker("", selection: Binding(
@@ -676,29 +832,78 @@ struct SectionVerbSheet: View {
         }
     }
 
+    /// The pages to tick (#608): a bordered, banded table — Page (with its
+    /// checkbox), Folder and Date — the look of the plan that follows it, so
+    /// the two steps of one flow look alike. A click on a box ticks it;
+    /// Space ticks the selected row. Its rows are in the order `rows` gives
+    /// (classes by date, then the rest by folder), and no header sorts them.
+    var pickerTable: some View {
+        Table(model.shownRows, selection: $pickedRowID) {
+            TableColumn(AssistWording.menuPlanPageColumn) { (row: SectionVerbSheetModel.PageRow) in
+                Toggle(row.title, isOn: model.binding(for: row))
+                    .toggleStyle(.checkbox)
+                    .lineLimit(1)
+                    .help(row.title)
+                    .accessibilityIdentifier("sectionVerbRow-\(row.name)")
+            }
+            .width(min: 90, ideal: 130)
+            TableColumn(AssistWording.menuPlanFolderColumn) { (row: SectionVerbSheetModel.PageRow) in
+                Text(row.folder)
+                    .foregroundStyle(.secondary)
+                    .help(row.folder)
+            }
+            .width(min: 80, ideal: 110, max: 140)
+            TableColumn(AssistWording.menuPickDateColumn) { (row: SectionVerbSheetModel.PageRow) in
+                Text(dateCell(for: row))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 150, max: 180)
+        }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .flexibleTableHeight(pickerTableHeight)
+        .onKeyPress(.space) {
+            if pickedRowID == nil {
+                return .ignored
+            }
+            model.flipTick(ofRowWithID: pickedRowID)
+            return .handled
+        }
+        .accessibilityIdentifier("sectionVerbSheetPickerTable")
+    }
+
     @ViewBuilder
     var laterClasses: some View {
         Text(model.kind == .laterClassesAtDeploy
              ? AssistWording.laterClassesAtDeploy(nextDay: model.nextClassDay, noun: model.noun)
              : AssistWording.laterClassesAtPublish(nextDay: model.nextClassDay, noun: model.noun))
             .fixedSize(horizontal: false, vertical: true)
-        CappedScrollArea(cap: SectionVerbSheet.tallestList) {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(model.laterClasses) { page in
-                    Toggle(isOn: model.laterBinding(for: page)) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(page.title)
-                            Text(AssistWording.laterClassesDay(weekday: page.date.weekdayName, date: page.date.text))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .accessibilityLabel(page.title)
+        // The same shape as the picker (#608): a checkbox and the class's
+        // title, then its day.
+        Table(model.laterClasses, selection: $pickedLaterClassID) {
+            TableColumn(AssistWording.menuPlanPageColumn) { (page: ClassesDatedLater.Flagged) in
+                Toggle(page.title, isOn: model.laterBinding(for: page))
+                    .toggleStyle(.checkbox)
+                    .lineLimit(1)
+                    .help(page.title)
                     .accessibilityIdentifier("laterClassRow-\(page.place)")
-                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .width(min: 90, ideal: 130)
+            TableColumn(AssistWording.menuPickDateColumn) { (page: ClassesDatedLater.Flagged) in
+                Text(AssistWording.laterClassesDay(weekday: page.date.weekdayName, date: page.date.text))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 150, max: 180)
         }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .flexibleTableHeight(laterClassesTableHeight)
+        .onKeyPress(.space) {
+            if pickedLaterClassID == nil {
+                return .ignored
+            }
+            model.flipLaterTick(ofClassWithID: pickedLaterClassID)
+            return .handled
+        }
+        .accessibilityIdentifier("laterClassesTable")
         Text(AssistWording.laterClassesKeptNote(noun: model.noun))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -745,10 +950,18 @@ struct SectionVerbSheet: View {
 
     // MARK: - Functions
 
-    func secondLine(for row: SectionVerbSheetModel.PageRow) -> String {
+    /// Whether the plan folds its already-right pages away (#622): only when
+    /// there are some, and something else to read above them.
+    static func foldsAlreadyRight(_ table: AssistPlanTable) -> Bool {
+        return !table.rowsAlreadyRight.isEmpty && !table.rowsToRead.isEmpty
+    }
+
+    /// The picker's Date cell: a class's day, as the later-classes question
+    /// says it; nothing for a page that is not a class.
+    func dateCell(for row: SectionVerbSheetModel.PageRow) -> String {
         if let date = row.date, row.isClass {
-            return row.folder + " · " + AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text)
+            return AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text)
         }
-        return row.folder
+        return ""
     }
 }

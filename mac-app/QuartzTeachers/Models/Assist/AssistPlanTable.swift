@@ -11,7 +11,9 @@ import Foundation
 /// the pages an unpublish keeps, the classes a publish left as they are, the pages
 /// whose settings have no room for a key, and the pages already the way they
 /// were asked to be. The card stopped at fifteen ("…and N more"); the table
-/// does not stop.
+/// does not stop. Since #622 the sheet draws `rowsToRead` and folds
+/// `rowsAlreadyRight` behind a disclosure; the rows themselves, and the plan
+/// they come from, are unchanged.
 ///
 /// `nonisolated`: a plain value carried on `AssistToolOutcome`.
 nonisolated struct AssistPlanTable: Sendable, Equatable {
@@ -72,4 +74,40 @@ nonisolated struct AssistPlanTable: Sendable, Equatable {
     /// page of its own, names that fit no page — word for word as the card
     /// says them.
     let notes: [String]
+
+    // MARK: - Computed properties
+
+    /// The rows a teacher reads before Go (#622): every page that changes,
+    /// and every page that stays for a reason — the pages an unpublish
+    /// keeps, the linked classes left as they are, the pages with no room
+    /// for a key. Only the pages already the way they were asked to be are
+    /// left out, since they say nothing new and grow all year.
+    var rowsToRead: [Row] {
+        var toRead: [Row] = []
+        for row in rows where !AssistPlanTable.isAlreadyRight(row.change) {
+            toRead.append(row)
+        }
+        return toRead
+    }
+
+    /// The pages already visible (or already hidden): what the sheet folds
+    /// away behind a disclosure, and what the summary counts as "already".
+    var rowsAlreadyRight: [Row] {
+        var already: [Row] = []
+        for row in rows where AssistPlanTable.isAlreadyRight(row.change) {
+            already.append(row)
+        }
+        return already
+    }
+
+    // MARK: - Functions
+
+    static func isAlreadyRight(_ change: Change) -> Bool {
+        switch change {
+        case .alreadyVisible, .alreadyHidden:
+            return true
+        default:
+            return false
+        }
+    }
 }
