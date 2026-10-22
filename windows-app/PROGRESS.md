@@ -16,7 +16,7 @@ Read this first; the dated entries below are history, newest first, and an earli
 Branch `issue/593-measurement-sitting`. Measured, nothing built: no product code, contract or test changed. A native build (`preview.ps1 --build-only` with `PLANTOIR_RUNTIME`) of verify.sh's own EXC2O fixtures was run through headless Edge 155.0.4283.60 (Lenovo 20QES70500, i5-8365U, 16 GB, UHD 620, Windows 11 Pro 26200).
 
 - **#571 item 2.** LF and CR LF quiz pages were built separately and read alike, byte for byte (kinds, data, hashes, the 18 error lines), with no `readDifferently` line. On a CR LF page the nested answer renders under its title.
-- **#598.** No `plausible.io` anywhere in `public\`. `mermaid_draws.mjs` drew 2 of 2 under the `_headers` a Netlify publish writes; the engine comes from cdnjs, as designed.
+- **#598.** No `plausible.io` anywhere in `public\`. `mermaid_draws.mjs` drew 2 of 2 under the `_headers` a deploy to Netlify writes; the engine comes from cdnjs, as designed.
 - **#618 / #620.** The PNGs carry 600 × 200 and 400 × 1800 with `data-pl-sized`; the hand fixtures give 40 × 120, 40 × 120, 302 × 151 and auto. `picture_heights.mjs` OK, 3 runs of 3.
 - **#593.** `task_boxes.mjs` OK. Its paper half has no poppler here, so ink was read by pdf.js plus the check's own `boxInk`: all four sheets pass. With site data blocked by the profile, the handout keeps the ticks. The one-blank line is exactly `feedback.blanks` {1, 0}.
 - **#571 item 3.** `quiz_check.mjs` fails only on its two Swift lines (#570). The four kinds pass wrong then right by keyboard, in light and dark. Neither Ctrl+P's paper nor the handout carries a quiz answer.
