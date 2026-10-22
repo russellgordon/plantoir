@@ -9005,18 +9005,33 @@ sortable `Table` — the look #524 gave Publish Pages ("The plan as a table
   The warnings moved ABOVE the intro: they are what must be read before Go
   (#524's sheet has no warnings, so there is no layout of its to keep). The cap
   is set so that in the worst case — the notice and all three warnings, the
-  scheduled deploy's on two lines — every warning AND the intro's first line
-  are in view without scrolling (measured 153 pt); only the rest of the intro
-  scrolls. The first cap, 100 pt, put the third warning — the scheduled
+  scheduled deploy's on two lines — every warning is in view without
+  scrolling, and the intro's first line too when the first class's title is
+  short (measured 153 pt with "Unit 1, Day 1"; all 9,800 example class titles
+  are 14 characters or fewer). `firstClassIsHidden` quotes the title, so a
+  long one makes the warnings taller: they alone stay in view up to a title of
+  about 95 characters (measured 147 pt with a 40-character title,
+  `testTheWarningsStayInViewWithALongFirstClassTitle`), and past that the
+  scheduled deploy's second line is clipped (#589's fixes review, F2). The first cap, 100 pt, put the third warning — the scheduled
   deploy's, "will put these changes in front of students" — below the fold,
   and on a first showing with three warnings none of the intro, with overlay
   scroll bars giving no sign of either (#589's implementation review, S1).
   `testEveryWarningAndTheIntrosFirstLineAreInView` pins it; with the old 100
   pt cap it goes red (153 > 100). The two list headings (`classesHeading`,
   `pagesHeading`) stay, unchanged, as the summary lines over the table.
-- **Under it**, in a second capped area of 76 pt: already in draft, no room
-  for a key, what stays (still a disclosure group), the links left (likewise),
-  `publishingFromNowOn` and `undoEndsWhenYouQuit` — unchanged words.
+- **Under it**, in a second capped area: `publishingFromNowOn` and
+  `undoEndsWhenYouQuit` FIRST — they must be read before Go — then no room for
+  a key, already in draft, what stays (still a disclosure group) and the links
+  left (likewise), in unchanged words. The cap is a floor of 100 pt that grows
+  by whatever height a short table leaves unused (`notesCap(for:)`), so a plan
+  of a few rows shows its notes whole and the worst case is unchanged. In the
+  worst case the two sentences end at 48 and 72 pt (read off the real notes,
+  `testTheSentencesUnderTheTableAreInView`). Rejected, measured by #589's fixes
+  review (F1): a fixed 76 pt cap with the two sentences LAST, the old order —
+  `publishingFromNowOn` was clipped on EVERY sheet, the undo's limit hidden,
+  and in the worst case both hidden with the links-left heading (they ended
+  at 176 and 200 pt). Putting them back last turns the test red; a 76 pt cap
+  alone no longer does, because in the new order they end at 72.
 - **The Why column takes the rest of the width and allows two lines.** The
   longest reason, `reasonOnlyHiddenPagesLink` ("only “…” links to it, and
   students will not see that page"), is about 400 pt; on one line in a
@@ -9037,8 +9052,8 @@ view (a scroll inside a scroll was the other thing to avoid), and:
 | Title band, bottom margin, gaps, buttons | about 52 + 20 + 4 × 12 + 22 |
 | Notice, warnings, intro (capped) | 156 |
 | The two summary lines | about 36 |
-| The table | at most 198 — seven one-line rows (7 × 24 + 2 + 28) |
-| The notes (capped) | 76 |
+| The table | at most 174 — six one-line rows (6 × 24 + 2 + 28) |
+| The notes (capped) | at least 100, plus what a short table leaves |
 
 The bordered table draws a one-line row at 24 pt and a two-line row at 40
 (measured on the real `NSTableView`; SwiftUI's table uses automatic row
@@ -9047,14 +9062,15 @@ counts each row at the height it will draw — 40 when the reason is wider than
 `widestOneLineReason`, 244 pt in the system font (measured: text up to about
 250 pt stays on one line in the 254-point column; set under the narrower,
 scroll-bar case so a misjudged row leaves a few points of band rather than a
-scroll) — up to the 198 pt cap. With the real sheet hosted at its width
+scroll) — up to the 174 pt cap. With the real sheet hosted at its width
 (`StartOfYearPlanTableTests`, as `CopyPageChecklistSizeTests` does): **610 pt
 in the worst case** — the notice, all three warnings, a page with no room for a
 key, links left, a class already in draft and nineteen rows — against 620, and
 at least the three parts' caps plus 120 the other way, so a collapsed table or
-area cannot pass; **438 pt** for a three-row plan with no warnings. (The first
-budget — eight rows, both caps 100 — measured 602, and hid a warning; see
-above.) Twelve rows measured 698 (red);
+area cannot pass; **466 pt** for a three-row plan with no warnings, its notes
+whole. (The first budget — eight rows, both caps 100 — measured 602 and hid a
+warning; the second — seven rows, 156 above and 76 below — measured 610 and
+clipped the notes; see above.) Twelve rows measured 698 (red);
 the table uncapped, 914 (red) — both under the first budget. A short table's frame equals the sum of its
 drawn rows plus the header and border, checked against the real table, so the
 estimate cannot drift into an inner scroll unnoticed.

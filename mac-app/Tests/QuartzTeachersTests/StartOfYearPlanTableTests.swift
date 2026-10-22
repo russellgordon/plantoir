@@ -240,7 +240,13 @@ final class StartOfYearPlanTableTests: XCTestCase {
     /// warning — "will put these changes in front of students" — was below
     /// the fold, and overlay scroll bars give no sign there is more). The
     /// notice and warnings are laid out exactly as the sheet lays them out,
-    /// with the intro's first line under them, at the area's width.
+    /// with the intro's first line under them, at the area's width. This
+    /// builds its OWN copy of the area from the sheet's pieces
+    /// (`mustBeReadBeforeGo`, `planIntroSpacing`): a longer sentence or a
+    /// smaller cap turns it red, but it would not see `planView` putting the
+    /// intro back above the warnings or padding the area (#589's fixes
+    /// review, F3). The fixture's first class is "Unit 1, Day 1"; the claim
+    /// about the intro's first line holds for short titles only (F2).
     func testEveryWarningAndTheIntrosFirstLineAreInView() throws {
         let made = try AssistFixture.makeRunner()
         defer {
@@ -269,6 +275,83 @@ final class StartOfYearPlanTableTests: XCTestCase {
         // line are really there (each is at least one 16-point line).
         XCTAssertGreaterThanOrEqual(height, 5 * 16, "only \(height) pt: something in the opening is not showing")
         print("StartOfYearPlanTableTests: notice, three warnings and the intro's first line \(height) pt against \(StartOfYearSheet.tallestPlanIntro)")
+    }
+
+    /// The `firstClassIsHidden` warning quotes the first class's title, so a
+    /// long one makes the warnings taller: with a 40-character title the
+    /// notice and all three warnings still fit the area above the table
+    /// (the intro's first line may then scroll; #589's fixes review, F2).
+    func testTheWarningsStayInViewWithALongFirstClassTitle() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutTheWorstCase(in: made.course)
+        let longTitle: String = "Unit 1, Day 1: Welcome to Computer Study"
+        XCTAssertEqual(longTitle.count, 40)
+        try "---\ntitle: \(longTitle)\npublish: false\ncreated: 2026-09-01T07:00:00.000-0400\n---\n\nSee [[Marks]].\n".write(
+            to: ClassPages.folderURL(forSection: 1, in: made.course).appendingPathComponent("Unit 1, Day 1.md"),
+            atomically: true, encoding: .utf8
+        )
+        let moment: Date = Date(timeIntervalSince1970: 1_800_000_000)
+        let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made, scheduledDeploy: moment)
+        model.load()
+        guard case .ready(let plan) = model.stage else {
+            return XCTFail("no plan: \(model.stage)")
+        }
+        XCTAssertEqual(plan.firstClass.displayTitle, longTitle)
+        XCTAssertEqual(plan.warnings().count, 3, "\(plan.warnings())")
+        let warnings = VStack(alignment: .leading, spacing: StartOfYearSheet.planIntroSpacing) {
+            StartOfYearSheet.mustBeReadBeforeGo(plan, notice: StartOfYearWording.changedSinceShown)
+        }
+        .frame(width: 520, alignment: .leading)
+        let height: CGFloat = StartOfYearPlanTableTests.measuredHeight(of: warnings, width: 520)
+        XCTAssertLessThanOrEqual(
+            height, StartOfYearSheet.tallestPlanIntro,
+            "With a 40-character first class, the notice and three warnings need \(height) pt against \(StartOfYearSheet.tallestPlanIntro)"
+        )
+        XCTAssertGreaterThanOrEqual(height, 4 * 16, "only \(height) pt: a warning is not showing")
+        print("StartOfYearPlanTableTests: notice and three warnings, 40-character first class, \(height) pt against \(StartOfYearSheet.tallestPlanIntro)")
+    }
+
+    /// In the worst case — the table full, so the notes area is at its floor
+    /// — the two sentences that must be read before Go, publishing from now
+    /// on and the undo's limit, end inside the notes area's cap. Read off the
+    /// sheet's REAL notes (`planNotes` reports where each ends), so putting
+    /// them back last turns this red, as does a smaller cap (#589's fixes
+    /// review, F1: at 76 pt with them last, publishing was clipped on every
+    /// sheet).
+    func testTheSentencesUnderTheTableAreInView() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutTheWorstCase(in: made.course)
+        let moment: Date = Date(timeIntervalSince1970: 1_800_000_000)
+        let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made, scheduledDeploy: moment)
+        model.load()
+        guard case .ready(let plan) = model.stage else {
+            return XCTFail("no plan: \(model.stage)")
+        }
+        XCTAssertFalse(plan.publishPlan.noRoomForAKey.isEmpty)
+        XCTAssertFalse(plan.danglingSources.isEmpty)
+        XCTAssertGreaterThan(plan.classesAlreadyInDraft, 0)
+        let cap: CGFloat = StartOfYearSheet.notesCap(for: plan.tableRows())
+        XCTAssertEqual(cap, StartOfYearSheet.tallestPlanNotes, "a full table leaves the notes at their floor")
+        let bottoms: NoteBottoms = NoteBottoms()
+        let notes = StartOfYearSheet.planNotes(plan, first: plan.firstClass.displayTitle) { (name: String, bottom: CGFloat) in
+            bottoms.byName[name] = bottom
+        }
+        let host: TableHost = TableHost(notes, size: NSSize(width: 520, height: 900))
+        defer {
+            host.close()
+        }
+        for name in ["publishingFromNowOn", "undoEndsWhenYouQuit"] {
+            let bottom: CGFloat = try XCTUnwrap(bottoms.byName[name], "\(name) was never laid out")
+            XCTAssertGreaterThan(bottom, 0)
+            XCTAssertLessThanOrEqual(bottom, cap, "\(name) ends at \(bottom) pt, below the notes area's \(cap) pt")
+            print("StartOfYearPlanTableTests: \(name) ends at \(bottom) pt against \(cap)")
+        }
     }
 
     /// A plan of three rows and no warnings is a short sheet: no area
@@ -385,4 +468,13 @@ final class StartOfYearPlanTableTests: XCTestCase {
             to: course.directoryURL.appendingPathComponent("Concepts/Full.md"), atomically: true, encoding: .utf8
         )
     }
+}
+
+/// Where the notes' two must-read sentences end, collected outside the view.
+@MainActor
+final class NoteBottoms {
+
+    // MARK: - Stored properties
+
+    var byName: [String: CGFloat] = [:]
 }

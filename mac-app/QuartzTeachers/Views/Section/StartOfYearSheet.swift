@@ -229,27 +229,38 @@ struct StartOfYearSheet: View {
     /// about 440 for the three parts that grow. #524's twelve rows (318 pt)
     /// did not fit: they left about 120 for everything above and below.
     ///
-    /// Seven rows on one line each; fewer when a reason takes two lines.
-    static let mostPlanRowsShown: Int = 7
+    /// Six rows on one line each; fewer when a reason takes two lines.
+    static let mostPlanRowsShown: Int = 6
 
     /// The notice, the warnings and the intro, above the table. The warnings
     /// come FIRST, because they are what must be read before Go, and the cap
     /// is set so that in the worst case — the notice and all three warnings,
-    /// the scheduled deploy's on two lines — every warning AND the first line
-    /// of the intro are in view without scrolling; only the rest of the intro
-    /// scrolls (#589's implementation review, S1: at 100 pt the third warning,
-    /// the one about a scheduled deploy, was below the fold, and on a first
-    /// showing with three warnings none of the intro was). Pinned by
-    /// `StartOfYearPlanTableTests.testEveryWarningAndTheIntrosFirstLineAreInView`.
+    /// the scheduled deploy's on two lines — every warning is in view without
+    /// scrolling, and the first line of the intro too when the first class's
+    /// title is short (all 9,800 example class titles are 14 characters or
+    /// fewer); the warnings alone stay in view up to a title of about 95
+    /// characters, since `firstClassIsHidden` quotes it (#589's fixes review,
+    /// F2). At 100 pt the third warning, the one about a scheduled deploy,
+    /// was below the fold, and on a first showing with three warnings none of
+    /// the intro was (#589's implementation review, S1). Pinned by
+    /// `StartOfYearPlanTableTests.testEveryWarningAndTheIntrosFirstLineAreInView`
+    /// and `testTheWarningsStayInViewWithALongFirstClassTitle`.
     static let tallestPlanIntro: CGFloat = 156
 
     /// The gap between the notice, the warnings and the intro: 6 rather than
     /// 8, which is what lets the cap above hold them all.
     static let planIntroSpacing: CGFloat = 6
 
-    /// Everything under the table: already in draft, no room for a key, what
-    /// stays, the links left, publishing from now on, the undo's limit.
-    static let tallestPlanNotes: CGFloat = 76
+    /// Everything under the table, at least: publishing from now on and the
+    /// undo's limit FIRST — they must be read before Go — then no room for a
+    /// key, already in draft, what stays and the links left. The area also
+    /// takes whatever height a short table leaves unused (`notesCap(for:)`),
+    /// so a plan of a few rows shows its notes whole. In the worst case (a
+    /// full table) the two sentences are in view at this floor; at 76 pt,
+    /// with them LAST, publishing was clipped on every sheet and, in the worst
+    /// case, hidden with the links-left heading (#589's fixes review, F1).
+    /// Pinned by `testTheSentencesUnderTheTableAreInView`.
+    static let tallestPlanNotes: CGFloat = 100
 
     /// A row whose reason takes two lines (#589's plan review: the longest
     /// reason, "only “…” links to it, and students will not see that page",
@@ -389,8 +400,8 @@ struct StartOfYearSheet: View {
             planSummary(plan)
             planTable(rows)
         }
-        CappedScrollArea(cap: StartOfYearSheet.tallestPlanNotes) {
-            planNotes(plan, first: first)
+        CappedScrollArea(cap: StartOfYearSheet.notesCap(for: rows)) {
+            StartOfYearSheet.planNotes(plan, first: first)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("startOfYearPlanNotes")
         }
@@ -464,21 +475,44 @@ struct StartOfYearSheet: View {
         .accessibilityIdentifier("startOfYearPlanTable")
     }
 
-    /// Everything the plan says under its lists, word for word as before.
+    /// Everything the plan says under its lists, word for word as before —
+    /// the two sentences that must be read before Go first (#589's fixes
+    /// review, F1). `reportBottom` hears where each of those two ends, in
+    /// the notes' own space, so a test can check they are inside the cap.
     @ViewBuilder
-    func planNotes(_ plan: StartOfYearPlan, first: String) -> some View {
+    static func planNotes(
+        _ plan: StartOfYearPlan,
+        first: String,
+        reportBottom: ((String, CGFloat) -> Void)? = nil
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            Text(StartOfYearWording.publishingFromNowOn(noun: plan.noun.singular))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { (proxy: GeometryProxy) in
+                    return proxy.frame(in: .named("startOfYearPlanNotes")).maxY
+                } action: { (bottom: CGFloat) in
+                    reportBottom?("publishingFromNowOn", bottom)
+                }
+            Text(StartOfYearWording.undoEndsWhenYouQuit)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { (proxy: GeometryProxy) in
+                    return proxy.frame(in: .named("startOfYearPlanNotes")).maxY
+                } action: { (bottom: CGFloat) in
+                    reportBottom?("undoEndsWhenYouQuit", bottom)
+                }
+            if !plan.publishPlan.noRoomForAKey.isEmpty {
+                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if plan.classesAlreadyInDraft > 0 {
                 Text(StartOfYearWording.alreadyInDraft(
                     classes: StartOfYearWording.counted(plan.classesAlreadyInDraft, noun: plan.noun)
                 ))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            }
-            if !plan.publishPlan.noRoomForAKey.isEmpty {
-                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             DisclosureGroup(StartOfYearWording.staysHeading(
                 pages: StartOfYearWording.pages(1 + plan.firstClassPages.count + plan.keyLinksPages.count)
@@ -511,14 +545,9 @@ struct StartOfYearSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            Text(StartOfYearWording.publishingFromNowOn(noun: plan.noun.singular))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(StartOfYearWording.undoEndsWhenYouQuit)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .coordinateSpace(.named("startOfYearPlanNotes"))
     }
 
     /// The undo's lists: each file by its title, never its path (#362).
@@ -608,6 +637,16 @@ struct StartOfYearSheet: View {
             }
         }
         return height
+    }
+
+    /// The notes area's cap: `tallestPlanNotes`, plus whatever height the
+    /// table leaves unused — all of it when there is no table — so the sheet's
+    /// worst case is unchanged and a short plan shows its notes whole.
+    static func notesCap(for rows: [StartOfYearPlanRow]) -> CGFloat {
+        if rows.isEmpty {
+            return tallestPlanNotes + tallestPlanTable
+        }
+        return tallestPlanNotes + tallestPlanTable - planTableHeight(for: rows)
     }
 
     /// Whether a reason fits on one line of the Why column.
