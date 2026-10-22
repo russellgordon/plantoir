@@ -3249,10 +3249,15 @@ red without the `try`).
 
 **One known, accepted change:** a picture whose FILE is found and sized but
 then fails to load in the browser (a server error, a file truncated after the
-build) now reserves a box of its stated size in Chromium, where it was 0 × 0
-before. It is accepted because that box is exactly the size the picture would
-have had, so nothing on the page moves around it as the rest of the page loads
-— which is the whole point of the piece.
+build) is drawn differently from 1.8.4 (measured in the fixes review,
+Playwright WebKit and Chromium, a 404 and a truncated PNG). With no alt text,
+Chromium reserves the box of its stated size where it drew 0 × 0 before, and
+WebKit still draws nothing. WITH alt text, Chromium draws the alt-text box as
+before, and WebKit draws a SQUARE as wide as the stated width (400 × 1800
+becomes 400 × 400) where it drew one line of alt text — exactly what a typed
+`|600` already did in 1.8.4. It is accepted because the picture never loads,
+so nothing on the page moves later, and the Chromium box is the size the
+picture would have had.
 
 Print is unchanged: the handout's `imagesReady` (`print.inline.ts`) already
 wrote exactly these attributes at print time, and ⌘P's `print.scss` already
