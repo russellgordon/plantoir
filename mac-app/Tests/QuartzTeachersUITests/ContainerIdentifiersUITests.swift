@@ -125,6 +125,16 @@ final class ContainerIdentifiersUITests: XCTestCase {
         let cancel: XCUIElement = application.sheets.firstMatch.buttons["Cancel"]
         XCTAssertTrue(cancel.exists, "The sheet should offer Cancel")
         XCTAssertNotEqual(cancel.identifier, "startOfYearSheet", "Cancel carries the sheet's identifier (#366)")
-        cancel.click()
+        // Escape is Cancel with the table just clicked (#589): the sheet goes,
+        // and nothing is written.
+        application.typeKey(.escape, modifierFlags: [])
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: go
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 10), .completed,
+                       "Escape did not close the Start of Year sheet after its table was clicked (#589)")
+        if go.exists {
+            cancel.click()
+        }
     }
 }

@@ -223,27 +223,33 @@ struct StartOfYearSheet: View {
     /// for a key, links left pointing at hidden pages and more rows than fit —
     /// must stay within `CopyPageChecklist.tallestSheet` (620 pt, a 13-inch Air
     /// at "Larger Text"), or Cancel and Go go off the bottom of the screen.
-    /// Measured with the real sheet (`StartOfYearSheetSizeTests`): about 52
+    /// Measured with the real sheet (`StartOfYearPlanTableTests`): about 52
     /// for the title band, 20 for the bottom margin, 12 between each part,
     /// about 22 for the buttons and 36 for the two summary lines, which leaves
     /// about 440 for the three parts that grow. #524's twelve rows (318 pt)
     /// did not fit: they left about 120 for everything above and below.
     ///
-    /// Eight rows on one line each; fewer when a reason takes two lines.
-    static let mostPlanRowsShown: Int = 8
-    static var tallestPlanTable: CGFloat {
-        return ListTableMetrics.height(forRowCount: mostPlanRowsShown, showsHeader: true)
-    }
+    /// Seven rows on one line each; fewer when a reason takes two lines.
+    static let mostPlanRowsShown: Int = 7
 
     /// The notice, the warnings and the intro, above the table. The warnings
-    /// come FIRST: they are what must be read before Go, and in the worst
-    /// case they and the intro together are taller than this, so it is the
-    /// intro — already read, the time before — that scrolls.
-    static let tallestPlanIntro: CGFloat = 100
+    /// come FIRST, because they are what must be read before Go, and the cap
+    /// is set so that in the worst case — the notice and all three warnings,
+    /// the scheduled deploy's on two lines — every warning AND the first line
+    /// of the intro are in view without scrolling; only the rest of the intro
+    /// scrolls (#589's implementation review, S1: at 100 pt the third warning,
+    /// the one about a scheduled deploy, was below the fold, and on a first
+    /// showing with three warnings none of the intro was). Pinned by
+    /// `StartOfYearPlanTableTests.testEveryWarningAndTheIntrosFirstLineAreInView`.
+    static let tallestPlanIntro: CGFloat = 156
+
+    /// The gap between the notice, the warnings and the intro: 6 rather than
+    /// 8, which is what lets the cap above hold them all.
+    static let planIntroSpacing: CGFloat = 6
 
     /// Everything under the table: already in draft, no room for a key, what
     /// stays, the links left, publishing from now on, the undo's limit.
-    static let tallestPlanNotes: CGFloat = 100
+    static let tallestPlanNotes: CGFloat = 76
 
     /// A row whose reason takes two lines (#589's plan review: the longest
     /// reason, "only “…” links to it, and students will not see that page",
@@ -257,6 +263,12 @@ struct StartOfYearSheet: View {
     /// 250 pt stays on one line. Set a little under the narrower case, so a
     /// misjudged row leaves a band of a few points rather than a scroll.
     static let widestOneLineReason: CGFloat = 244
+
+    // MARK: - Computed properties
+
+    static var tallestPlanTable: CGFloat {
+        return ListTableMetrics.height(forRowCount: mostPlanRowsShown, showsHeader: true)
+    }
 
     // MARK: - Body
 
@@ -360,17 +372,8 @@ struct StartOfYearSheet: View {
         let first: String = plan.firstClass.displayTitle
         let rows: [StartOfYearPlanRow] = plan.tableRows()
         CappedScrollArea(cap: StartOfYearSheet.tallestPlanIntro) {
-            VStack(alignment: .leading, spacing: 8) {
-                if let notice = model.notice {
-                    Text(notice)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                ForEach(plan.warnings(), id: \.self) { (warning: String) in
-                    Label(warning, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            VStack(alignment: .leading, spacing: StartOfYearSheet.planIntroSpacing) {
+                StartOfYearSheet.mustBeReadBeforeGo(plan, notice: model.notice)
                 Text(StartOfYearWording.intro(first: first, noun: plan.noun.singular))
                     .fixedSize(horizontal: false, vertical: true)
                 if plan.changesNothing {
@@ -390,6 +393,23 @@ struct StartOfYearSheet: View {
             planNotes(plan, first: first)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("startOfYearPlanNotes")
+        }
+    }
+
+    /// The notice and the warnings, first in the area above the table. Its
+    /// own function so a test can lay out exactly these and check they fit
+    /// under the area's cap.
+    @ViewBuilder
+    static func mustBeReadBeforeGo(_ plan: StartOfYearPlan, notice: String?) -> some View {
+        if let notice {
+            Text(notice)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        ForEach(plan.warnings(), id: \.self) { (warning: String) in
+            Label(warning, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -514,37 +534,6 @@ struct StartOfYearSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Functions
-
-    /// The table's height: every row, up to `tallestPlanTable`, then it
-    /// scrolls inside itself. A `Table` has no natural height, and its rows
-    /// are not all one height here — a reason over `widestOneLineReason`
-    /// takes two lines — so each row is counted at the height it will draw.
-    static func planTableHeight(for rows: [StartOfYearPlanRow]) -> CGFloat {
-        var height: CGFloat = ListTableMetrics.headerHeight + ListTableMetrics.borderAllowance
-        if rows.isEmpty {
-            height += ListTableMetrics.rowHeight
-        }
-        for row in rows {
-            if reasonFitsOnOneLine(row.why) {
-                height += ListTableMetrics.rowHeight
-            } else {
-                height += twoLineRowHeight
-            }
-            if height >= tallestPlanTable {
-                return tallestPlanTable
-            }
-        }
-        return height
-    }
-
-    /// Whether a reason fits on one line of the Why column.
-    static func reasonFitsOnOneLine(_ why: String) -> Bool {
-        let font: NSFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-        let width: CGFloat = (why as NSString).size(withAttributes: [.font: font]).width
-        return width <= widestOneLineReason
-    }
-
     @ViewBuilder
     var buttons: some View {
         HStack {
@@ -595,5 +584,36 @@ struct StartOfYearSheet: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
+    }
+
+    // MARK: - Functions
+
+    /// The table's height: every row, up to `tallestPlanTable`, then it
+    /// scrolls inside itself. A `Table` has no natural height, and its rows
+    /// are not all one height here — a reason over `widestOneLineReason`
+    /// takes two lines — so each row is counted at the height it will draw.
+    static func planTableHeight(for rows: [StartOfYearPlanRow]) -> CGFloat {
+        var height: CGFloat = ListTableMetrics.headerHeight + ListTableMetrics.borderAllowance
+        if rows.isEmpty {
+            height += ListTableMetrics.rowHeight
+        }
+        for row in rows {
+            if reasonFitsOnOneLine(row.why) {
+                height += ListTableMetrics.rowHeight
+            } else {
+                height += twoLineRowHeight
+            }
+            if height >= tallestPlanTable {
+                return tallestPlanTable
+            }
+        }
+        return height
+    }
+
+    /// Whether a reason fits on one line of the Why column.
+    static func reasonFitsOnOneLine(_ why: String) -> Bool {
+        let font: NSFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let width: CGFloat = (why as NSString).size(withAttributes: [.font: font]).width
+        return width <= widestOneLineReason
     }
 }
