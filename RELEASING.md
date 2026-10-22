@@ -116,6 +116,8 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-22 | Every build's trail says whether it made the section's My Progress page, and why not when it did not; a course's own `include_my_progress` and `success_criteria_headings` are honoured | Windows (mac shipped it in v1.8.2, #545) | #599 |
 | 2026-10-22 | Undo Last Change, pressed again once an edited page is set back, takes the whole change back instead of staying stuck; the start-of-year undo sheet says which pages will go back and which stay | Windows (mac shipped it in v1.8.0, #555) | #564 |
 | 2026-10-22 | Get Ready for the Start of the Year shows the pages going into draft as a table — Page, Folder, Why — with the warnings first and the pages with no room for a key named before Go | Windows (mac shipped it in v1.8.4, #589) | #619 |
+| 2026-10-22 | Hiding a class no longer keeps up a page just because it is CALLED something like "Curriculum Coverage": only pages inside a curriculum folder stay visible | Windows (the mac always did this) | #615 |
+| 2026-10-22 | Publish Pages… and the assistant's plan no longer list the curriculum expectations a class links to as "already visible", or count them in the summary | Windows (mac shipped it in v1.8.4, #607) | #617 |
 
 
 ## Warnings the release notes MUST carry
