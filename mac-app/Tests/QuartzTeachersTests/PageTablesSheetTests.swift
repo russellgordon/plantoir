@@ -526,6 +526,92 @@ final class PageTablesSheetTests: XCTestCase {
         print("PageTablesSheetTests: tallest plan \(height) pt against \(CopyPageChecklist.tallestSheet)")
     }
 
+    // MARK: - Start of Year (#621)
+
+    /// Start of Year, presented for real: resizable, opening at its
+    /// content's size, which is its smallest; 300 pt more sheet is 300 more
+    /// table; and the width added goes to Page.
+    func testStartOfYearIsResizableAndItsTableTakesTheRoom() throws {
+        var made: [URL] = []
+        defer {
+            for root in made {
+                try? FileManager.default.removeItem(at: root)
+            }
+        }
+        let twenty = try AssistFixture.makeRunner()
+        made.append(twenty.root)
+        try StartOfYearPlanTableTests.layOutClasses(20, in: twenty.course)
+        let few = try AssistFixture.makeRunner()
+        made.append(few.root)
+        try StartOfYearPlanTableTests.layOutAFewPages(in: few.course)
+        let models: [(String, StartOfYearSheetModel)] = [
+            ("twenty classes", StartOfYearPlanTableTests.model(twenty)),
+            ("three rows", StartOfYearPlanTableTests.model(few)),
+        ]
+        for (name, model) in models {
+            model.load()
+            let expected: NSSize = PageTablesSheetTests.fittingSize(of: StartOfYearSheet(model: model))
+            let host: SheetHost = SheetHost(StartOfYearSheet(model: model))
+            defer {
+                host.close()
+            }
+            let sheet: NSWindow = try XCTUnwrap(host.sheet, "\(name): no sheet was presented")
+            XCTAssertTrue(sheet.styleMask.contains(.resizable), "\(name): the sheet cannot be resized")
+            XCTAssertEqual(sheet.frame.width, 560, accuracy: 0.5, name)
+            XCTAssertEqual(sheet.frame.height, expected.height, accuracy: 0.5, "\(name): it opened at another height")
+            XCTAssertEqual(sheet.minSize.width, 560, accuracy: 0.5, name)
+            XCTAssertEqual(sheet.minSize.height, expected.height, accuracy: 0.5, "\(name): its smallest is not the size it opens at")
+
+            let table: NSTableView = try XCTUnwrap(host.tables().first, name)
+            let tableBefore: CGFloat = table.enclosingScrollView?.frame.height ?? 0
+            let widthsBefore: [CGFloat] = PageTablesSheetTests.widths(of: table)
+            let opened: NSSize = sheet.contentLayoutRect.size
+            host.resizeSheet(to: NSSize(width: opened.width, height: opened.height + 300))
+            let tableAfter: CGFloat = table.enclosingScrollView?.frame.height ?? 0
+            XCTAssertEqual(tableAfter - tableBefore, 300, accuracy: 1, "\(name): the table grew \(tableAfter - tableBefore) pt of the 300 added")
+            host.resizeSheet(to: NSSize(width: 900, height: opened.height + 300))
+            let widthsAfter: [CGFloat] = PageTablesSheetTests.widths(of: table)
+            XCTAssertEqual(widthsAfter.count, 3, name)
+            if widthsAfter.count == 3 && widthsBefore.count == 3 {
+                let page: CGFloat = widthsAfter[0] - widthsBefore[0]
+                let others: CGFloat = (widthsAfter[1] - widthsBefore[1]) + (widthsAfter[2] - widthsBefore[2])
+                XCTAssertGreaterThan(page, others, "\(name): Page gained \(page) pt and the other two \(others): \(widthsBefore) to \(widthsAfter)")
+            }
+            print("PageTablesSheetTests: Start of Year, \(name): opens \(sheet.minSize), columns \(widthsBefore) at 560, \(widthsAfter) at 900")
+            XCTAssertFalse(host.reachedAScreen, "\(name): the sheet reached a display")
+        }
+    }
+
+    /// Start of Year's other stages (reading, the result, the undo's lists, a
+    /// problem) open exactly as tall as the scroll area they had — their
+    /// content's height from 200 to 460 pt — and, unlike it, grow with a
+    /// sheet made taller.
+    func testStartOfYearsOtherStagesOpenAsTheyDidAndGrowWithTheSheet() throws {
+        for lines in [1, 12, 60] {
+            var sentences: [String] = []
+            while sentences.count < lines {
+                sentences.append("• Page \(sentences.count + 1)")
+            }
+            let before: some View = ScrollView {
+                PageTablesSheetTests.lines(sentences)
+            }
+            .frame(minHeight: 200, maxHeight: 460)
+            let now: some View = CappedScrollArea(cap: StartOfYearSheet.tallestOtherStage, growsWithItsSheet: true) {
+                PageTablesSheetTests.lines(sentences)
+            }
+            .frame(minHeight: StartOfYearSheet.shortestOtherStage)
+            let opened: CGFloat = PageTablesSheetTests.fittingSize(of: now).height
+            XCTAssertEqual(opened, PageTablesSheetTests.fittingSize(of: before).height, "\(lines) lines open at another height")
+            let host: TableHost = TableHost(now, size: NSSize(width: 560, height: opened + 300))
+            defer {
+                host.close()
+            }
+            let scroll: NSScrollView? = PageTablesSheetTests.firstScrollView(in: host.window.contentView)
+            XCTAssertEqual(scroll?.frame.height ?? 0, opened + 300, accuracy: 1, "\(lines) lines: the area did not take the height added")
+            print("PageTablesSheetTests: Start of Year's other stage, \(lines) lines, opens at \(opened)")
+        }
+    }
+
     // MARK: - The default size
 
     /// Every sheet whose content this piece did not mean to change opens at
@@ -641,6 +727,32 @@ final class PageTablesSheetTests: XCTestCase {
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
         hostingView.layoutSubtreeIfNeeded()
         return hostingView.fittingSize
+    }
+
+    /// Lines of text as Start of Year's other stages lay them out.
+    static func lines(_ sentences: [String]) -> some View {
+        return VStack(alignment: .leading, spacing: 10) {
+            ForEach(sentences, id: \.self) { (sentence: String) in
+                Text(sentence)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The first scroll view under `view`, depth first.
+    static func firstScrollView(in view: NSView?) -> NSScrollView? {
+        guard let view else {
+            return nil
+        }
+        if let scroll = view as? NSScrollView {
+            return scroll
+        }
+        for subview in view.subviews {
+            if let found = firstScrollView(in: subview) {
+                return found
+            }
+        }
+        return nil
     }
 
     static func widths(of table: NSTableView) -> [CGFloat] {
