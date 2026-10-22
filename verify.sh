@@ -1898,7 +1898,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
-        "$HIT_COURSE/Anchor Fixture.md" \
+        "$HIT_COURSE/Anchor Fixture.md" "$HIT_COURSE/Picture Fixture.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
         "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
         "$HIT_COURSE/Live Plain Link.md" "$HIT_COURSE/Live Framed.md" "$HIT_COURSE/Live Autorun.md" "$HIT_COURSE/Live Box.md" \
@@ -2448,6 +2448,27 @@ formula = " \\\\\n".join(f"y_{{{i}}} &= {i}x + {i}" for i in range(1, 61))
 cell = "<br>".join(f"TALLROW-{i:02d}" for i in range(1, 91))
 open(sys.argv[1], "w").write("---\nprintable: true\n---\nBefore the tall formula (plantoir-toolong-sentinel-7f3a).\n\n$$\n\\begin{aligned}\n"
     + formula + "\n\\end{aligned}\n$$\n\n| Row | Lines |\n|---|---|\n| 1 | " + cell + " |\n\n> [!answer]-\n>\n> Never printed.\n")
+PY
+
+# #609: Picture Fixture - two of the pictures above, each about thirty
+# paragraphs further down the page than the last, so each is well below the
+# window when the page opens and the first is out of view again by the time
+# the second is reached (browser-checks/picture_heights.mjs). One is sized the
+# way a teacher's `![[x.png|600]]` writes it (width="600" height="auto"), the
+# other bare (width and height both "auto"). No fixture had a picture far
+# below the fold, and Plain Long Page is #501's, so it is left alone.
+# Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE/Picture Fixture.md" <<'PY'
+import sys
+def paragraphs(first, count):
+    return "".join(f"Paragraph {n}: the class works out the slope of a line through two given points, "
+                   "then checks it against a graph drawn on the board and writes down what the number means.\n\n"
+                   for n in range(first, first + count))
+open(sys.argv[1], "w", encoding="utf-8").write(
+    "---\ntitle: Picture Fixture\n---\nTwo pictures far below the window (plantoir-picture-fixture-609).\n\n"
+    + paragraphs(1, 30) + "![[plantoir-hazard-wide.png|600]]\n\n"
+    + paragraphs(31, 30) + "![[plantoir-hazard-tall.png]]\n\n"
+    + paragraphs(61, 10))
 PY
 
 # ---- #485 E1: diagrams and graphs, planted for the same build ----
@@ -4295,6 +4316,15 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "a link to a heading did not land on it once the page settled (browser-checks/heading_anchor.mjs, #604)"
     cat /tmp/verify_heading_anchor.log
   fi
+  # #609: every picture laid out at its real height before it is scrolled to,
+  # so nothing below it moves when it arrives (Safari has no scroll anchoring
+  # to hide the shift; the layout is the same in Chrome, which is asked here).
+  if node browser-checks/picture_heights.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_picture_heights.log 2>&1; then
+    pass "pictures far below the window are laid out before they are scrolled to, so the text below them does not jump: Picture Fixture loaded, every picture and the faces arrived, nothing scrolled - $(head -1 /tmp/verify_picture_heights.log | sed 's/^OK: //') (#609, browser-checks/picture_heights.mjs)"
+  else
+    fail "a picture far below the window had no height until it was scrolled to, or the page grew when it was (browser-checks/picture_heights.mjs, #609)"
+    cat /tmp/verify_picture_heights.log
+  fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.
   if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
     pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, the fixture's row at 1 / 4 on a fresh profile (the teacher's [x]), every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
@@ -4303,8 +4333,8 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_my_progress.log
   fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), and My Progress in a browser (#545): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), and My Progress in a browser (#545): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before they are scrolled to (#609): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before they are scrolled to (#609): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
