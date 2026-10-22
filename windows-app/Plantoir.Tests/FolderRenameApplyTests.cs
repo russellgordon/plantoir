@@ -132,11 +132,11 @@ public sealed class FolderRenameApplyTests : IDisposable
     public void AddingANameCreatesTheFolderInEverySection()
     {
         MakeCourse(Config);
-        Assert.True(SpecialFolderRenamer.CreateFoldersOnDisk("Labs", FolderScope.PerSection, CourseDir, Sections));
+        Assert.Equal(2, SpecialFolderRenamer.CreateFoldersOnDisk("Labs", FolderScope.PerSection, CourseDir, Sections).FoldersCreated);
         Assert.True(Directory.Exists(Path.Combine(CourseDir, "section1", "Labs")));
         Assert.True(Directory.Exists(Path.Combine(CourseDir, "section2", "Labs")));
         // Already there: nothing made, and nothing said.
-        Assert.False(SpecialFolderRenamer.CreateFoldersOnDisk("Labs", FolderScope.PerSection, CourseDir, Sections));
+        Assert.Equal(0, SpecialFolderRenamer.CreateFoldersOnDisk("Labs", FolderScope.PerSection, CourseDir, Sections).FoldersCreated);
     }
 
     // ---- The keys that carry across --------------------------------------------

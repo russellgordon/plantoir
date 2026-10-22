@@ -226,7 +226,12 @@ public static class SpecialNames
     public const string RenameNothingWasThere =
         "There was no folder by that name on this PC, so only this course’s settings changed. Make it in Obsidian when you need it.";
 
-    /// <summary>Adding a name creates the folder; the teacher is told so.</summary>
+    /// <summary>
+    /// Adding a name creates the folder; the teacher is told so. Since #580 the
+    /// folder arrives with its index page and a page to duplicate
+    /// (<see cref="FolderScaffold"/>); the message is unchanged, and its reason
+    /// is <c>specialNames.addCreatesTheFolder.why</c> in the contract.
+    /// </summary>
     public const string AddCreatesTheFolder =
         "Plantoir made the folder “{name}” for you. Open it in Obsidian to put pages in it.";
 

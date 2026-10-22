@@ -190,7 +190,7 @@ public static class SectionAdder
             string bare = PageVisibilityReader.TrimCarriageReturn(lines[index]);
             if (bare.StartsWith(' ') || bare.StartsWith('\t')) continue;
             if (newTitle is not null && PageVisibilityReader.ValuePart("title", bare) is not null)
-                close -= PageFrontmatter.ReplaceKeyLine(lines, index, "title", "title: " + newTitle, close);
+                close -= PageFrontmatter.ReplaceKeyLine(lines, index, "title", "title: " + FolderScaffold.FrontmatterTitle(newTitle), close);
             else if (newCreated is not null && PageVisibilityReader.ValuePart("created", bare) is not null)
                 close -= PageFrontmatter.ReplaceKeyLine(lines, index, "created", "created: " + newCreated, close);
         }
@@ -481,8 +481,12 @@ public static class SectionAdder
         // frontmatter is copied verbatim, which is what a course still using
         // `draft:` wants: the new section matches its siblings rather than
         // becoming the one page in the course with a different vocabulary.
+        //
+        // The title is quoted by #580's rule (#586): a course name holding
+        // ": ", or a folder called 'Tis the Season, would otherwise give a
+        // page the build cannot read.
         string title = newTitle ?? fallbackTitle ?? "";
-        return $"title: {title}\ncreated: {created}\npublish: {(fallbackIsDraft ? "false" : "true")}";
+        return $"title: {FolderScaffold.FrontmatterTitle(title)}\ncreated: {created}\npublish: {(fallbackIsDraft ? "false" : "true")}";
     }
 
     /// <summary>
@@ -498,7 +502,16 @@ public static class SectionAdder
             foreach (string line in lines)
             {
                 if (!line.StartsWith("title:", StringComparison.Ordinal)) continue;
-                string value = line["title:".Length..].Trim();
+                // A quoted sibling — what setup and this file write since
+                // #586 for a name holding ": " — is unwrapped FIRST, or the
+                // trailing quote hides "Section 1" from the swap and the
+                // form's wording silently replaces the teacher's. A value only
+                // YAML could decode gives the form's wording, as an unreadable
+                // sibling always has. The title stays plain until written.
+                // Only the FIRST title line is read (the `break` below); the
+                // mac's loop reads on, which differs only for a page with two.
+                string? value = PlainTitle(line["title:".Length..].Trim());
+                if (value is null) break;
                 var match = System.Text.RegularExpressions.Regex.Match(value, @"Section \d+$");
                 if (match.Success)
                     return value[..match.Index] + "Section " + sectionNumber;
@@ -509,6 +522,27 @@ public static class SectionAdder
         bool showsGrade = course.Configuration.ShowsGradeInTitle(sectionNumber);
         string prefix = showsGrade && gradeLabel.Length > 0 ? gradeLabel + " " : "";
         return $"{prefix}{course.Configuration.CourseName}, Section {sectionNumber}";
+    }
+
+    /// <summary>
+    /// The text a <c>title:</c> line's value stands for, or null when this
+    /// reader does not take its form (the mac's <c>plainTitle(fromValue:)</c>,
+    /// #586). Double-quoted: decoded strictly as a JSON string, which is
+    /// exactly what <see cref="FolderScaffold.FrontmatterTitle"/> writes;
+    /// YAML's escapes are a superset (<c>\x41</c>), so a value only YAML could
+    /// decode is null. Single-quoted: stripped, <c>''</c> read as <c>'</c>.
+    /// Anything else — plain, or a quote that never closes — as written.
+    /// </summary>
+    public static string? PlainTitle(string value)
+    {
+        if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
+        {
+            try { return System.Text.Json.JsonSerializer.Deserialize<string>(value); }
+            catch (Exception) { return null; }
+        }
+        if (value.Length >= 2 && value[0] == '\'' && value[^1] == '\'')
+            return value[1..^1].Replace("''", "'");
+        return value;
     }
 
     /// <summary>Grade label derived from course code (e.g. "ICS3U" -> "Grade 11", "MCMPR11" -> "Grade 11").</summary>
