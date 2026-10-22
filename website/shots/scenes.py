@@ -99,9 +99,12 @@ SCENES: list[Scene] = [
     Scene(
         name="start-of-year", produces=["start-of-year"], kind="ui-test", test="testGetReadyForTheStartOfTheYear",
         # #96 has landed: a missing identifier is now a broken scene, not a wait.
-        identifiers=["startOfYear-", "startOfYearGo"],
-        what_it_sets_up="ICS3U section 2 → Get Ready for the Start of the Year…, the plan with its draft "
-                        "lists unfolded to show each page's reason; cancelled, so nothing is put into draft.",
+        identifiers=["startOfYear-", "startOfYearGo", "startOfYearPlanTable"],
+        # The test clicks the header by this title and reads the rows' reasons.
+        wording=[("shared-rules.json", "startOfYear.wording.reasonColumn")],
+        what_it_sets_up="ICS3U section 2 → Get Ready for the Start of the Year…, the plan's table of pages "
+                        "going into draft sorted by Why, descending, so the pages' reasons come above the "
+                        "classes' (#589; the test checks the sort took); cancelled, so nothing is put into draft.",
     ),
     Scene(
         name="curriculum-settings", produces=["curriculum-settings"], kind="ui-test",
