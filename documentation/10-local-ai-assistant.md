@@ -2241,6 +2241,86 @@ false. One trap met while wiring the cases: two classes named TOGETHER link to
 each other, and the second must not be reported as "staying" because it is a
 class, so the report skips any page that is itself going down.
 
+#### A curriculum page the walk reaches is not "already visible" (#607)
+
+Reported by Russell on 1.8.3, 2026-10-20: Section ▸ Publish Pages… for an
+ICS3U class listed the curriculum expectations it cites — a page in
+`Curriculum`, another in a `College Board …` folder — among 36 "already
+visible" rows, and counted them in `menuPlanSummary`. A class citing several
+expectations pushed the rows a teacher needs to read further into the
+scroll, about pages nothing in the publish touches.
+
+**The issue's premise was wrong, and the fix is shaped by the correction.**
+It said curriculum pages are "always published" by a rule in
+`build_site.py`. Measured at `origin/dev` 80dddf4db: there is no such rule.
+`_is_in_curriculum_folder` is defined and has no caller (the build pipeline's
+[dates section](05-build-pipeline.md#dates-drive-everything) already said so
+for dates), and `patches/publish.ts` publishes any page that does not say
+`publish: false`. A curriculum page is visible because NOTHING MARKS IT
+HIDDEN — so a teacher can hide one, and a publish must still be able to put
+it back up.
+
+**The rule.** On the PUBLISH side only, a curriculum page (by
+`AssistCurriculumMentions.isCurriculum(pageAt:in:)`: any folder segment
+containing "curriculum", case-insensitively — the same test as
+`neverTakenDownByFollowingLinks`) that the walk reached and that is already
+visible is left out of `alreadyRight`. Three things deliberately stay as they
+were:
+
+- **A hidden curriculum page the class links to is still a change** and still
+  goes up. Leaving it out would publish a class that links to a page students
+  cannot open — the one thing publishing must never do
+  (`followingLinks.publishing.why`).
+- **A curriculum page the teacher NAMED stays listed.** They asked about it,
+  so "already visible" is the answer to their question (director's ruling,
+  2026-10-21).
+- **The hide side is untouched.** An unpublish already keeps curriculum pages
+  up through `reasonToKeep`'s `.curriculum`, and its "stays visible: it is a
+  curriculum page" rows are left as they are. Start of Year uses
+  `planHiding(exactly:)`, which never passes through `plan()`; the links
+  checklist's class plans do pass through `plan()`, but never read the
+  already-visible list, so the trim changes nothing they show.
+
+**Where, and why there.** `AssistPublishPlan.plan(...)`, after both
+`appendChanges` calls, through `leavingOutLinkedCurriculumPages`. The list is
+trimmed once where it is COLLECTED, because `describe()` (the assistant's card
+and reply: "N pages are already visible."), `tabulated` (the menu's rows) and
+its `menuPlanSummary` all read that one stored property — so the three agree
+by construction, and nothing that writes a page reads it. `changes`,
+`linked`, `noRoomForAKey` and the date moves are untouched, so which pages a
+publish writes, and what it writes to them, cannot change.
+
+**REJECTED.**
+- *Filtering at render time* — three places to keep in step, and
+  `describe()` has no `Course` to run the folder test with.
+- *Filtering the walk's `linked` pages* — drops the hidden expectation from
+  the changes, so it would not go up.
+- *Dropping named pages too* — hides the answer to a question the teacher
+  asked.
+- *A new key in `assist-cases.json`* (the issue's suggestion) — it would move
+  the generated `note` and need a new runner on both sides, where
+  `followingLinks.publishing.cases` already runs through a real publish on
+  both.
+
+**The contract case** is `followingLinks.publishing.cases` → "a curriculum
+page a class links to is not listed as already visible": a hidden class
+linking a visible `Curriculum/A1.4`, a hidden `Ontario Curriculum/A1.5` and a
+visible ordinary page. A1.5 must go up, A1.4 must be byte-identical, and the
+plan's already-visible list must be exactly the ordinary page — which shows
+the list is trimmed, not emptied. It needed two new case fields, `folder` and
+`expectAlreadyRight`, defined in `publishing.casesNote` and pinned there by
+`SharedRulesContractTests.testThePublishingCasesSayWhatABodyIs`, because a
+harness that ignores either passes the case while testing nothing.
+
+**Measured.** With `AssistPublishPlan.swift` put back to its `origin/dev`
+text (copy and restore), the contract case went red listing A1.4 beside the
+ordinary page, and `PublishPlanTableTests.testALinkedCurriculumPageIsNotListedAsAlreadyVisible`
+went red with an A1.4 row and a summary counting 2 already visible instead
+of 1. With the named-page exception removed,
+`testACurriculumPageTheTeacherNamesIsStillListed` went red. No wording key
+moved, and no trail line: the trail records what was written, and that set
+is unchanged.
+
 ### What counts as a link
 
 Settled 2026-09-26,
