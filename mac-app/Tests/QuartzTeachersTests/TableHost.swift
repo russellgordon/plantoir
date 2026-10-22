@@ -53,27 +53,15 @@ final class TableHost {
     /// A point at which a window of `size` overlaps no display of this Mac:
     /// beyond the bottom-left corner of all of them together, with room to
     /// spare for a sheet hung under it and for growing.
+    /// The one formula is the app's, which keeps the test host's own windows
+    /// in the same place (`UnitTestHostWindows`, #633).
     static func offScreenOrigin(for size: NSSize) -> NSPoint {
-        var left: CGFloat = 0
-        var bottom: CGFloat = 0
-        for screen in NSScreen.screens {
-            if screen.frame.minX < left {
-                left = screen.frame.minX
-            }
-            if screen.frame.minY < bottom {
-                bottom = screen.frame.minY
-            }
-        }
-        let margin: CGFloat = 4000
-        return NSPoint(x: left - size.width - margin, y: bottom - size.height - margin)
+        return UnitTestHostWindows.offScreenOrigin(for: size, displays: UnitTestHostWindows.displayFrames())
     }
 
     /// Whether any part of `frame` is on a display of this Mac.
     static func isOnAScreen(_ frame: NSRect) -> Bool {
-        for screen in NSScreen.screens where screen.frame.intersects(frame) {
-            return true
-        }
-        return false
+        return UnitTestHostWindows.overlapsADisplay(frame, displays: UnitTestHostWindows.displayFrames())
     }
 
     /// Lets SwiftUI and AppKit settle: layout, row realisation, bindings.
