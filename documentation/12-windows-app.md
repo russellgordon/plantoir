@@ -7792,6 +7792,11 @@ normalise CR LF before reading.
 - **6k passed on both builds.** Each log had 32 `plantoir: error:` lines.
   Eighteen of them were Quiz Fixture's, as the contract's cases expect,
   along with one `quizzesNotReady` finding for "18 self-check questions".
+  The other 14 belong to other fixtures and are expected on Windows: 2 are
+  Figures Fixture's deliberately broken drawings (functionplot block 3 and
+  tikz block 6, `\foo`), and 12 are "Swift programs cannot be made ready"
+  lines (Swift Playground 7, Runner Fixture 3, Quiz Playground 2), because
+  Windows compiles no Swift (#570).
   Neither log contained the `readDifferently` sentence ("the site and the
   folder check read this question differently…").
 - **The two builds read alike, to the byte.** All four pages gave identical
@@ -7833,8 +7838,14 @@ built files is Quartz v4.5.0's
 `https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs`,
 and the policy's `script-src` now names `https://cdnjs.cloudflare.com`. That
 is #594's design: allow the host rather than carry the engine. The policy
-was the one a publish writes, but nothing was deployed; checking live
-Netlify is `verify-deploy.ps1`'s job.
+was the one a deploy to Netlify writes, but nothing was deployed; checking
+live Netlify is `verify-deploy.ps1`'s job.
+
+Every `.mjs` check in this section ran on the runtime's own Node 20.18.1
+(`windows-app\Vendor\runtime\node\node.exe`) with
+`--experimental-websocket`, because the checks expect Node 22's built-in
+WebSocket. That is the same arrangement as doc 12's earlier browser
+measurements.
 
 On Git Bash, run the check with `MSYS_NO_PATHCONV=1`. Without it the
 `/Printable-Fixture.html` argument becomes
@@ -8042,12 +8053,26 @@ question ("Which graph shows y=(x−3)2+2?"). The blanks are labelled
 - The handout, questions only, was reached by
   `#plantoir-print=questionsOnly&paper=portrait` and read from its frame as
   it printed. In both themes it has the questions and neither sentinel.
+- **No answer was revealed before printing**, in my script or in
+  `quiz_check.mjs`. Its paper step (8a) runs on a page freshly loaded by the
+  twenty shuffle loads before it, and asks that no button, feedback, answer
+  or explanation is displayed under print media. So what paper shows after
+  a student pressed Show answer, or got a question right and opened its
+  explanation, is OWED in Edge as well as in the pane.
+
+**Why 27 Tabs here and 10 in the pane.** The count depends on the window,
+not on the quiz. At 1280 px wide, Quartz lays out both sidebars, and their
+links (search, the explorer, the page's table of contents) come before the
+article in Tab order. In the 984 px pane, Quartz's narrower layout has fewer
+of them. The elements were not counted one by one.
 
 ### Tests
 
 `dotnet test Plantoir.Tests/Plantoir.Tests.csproj --filter
 FullyQualifiedName~PythonToolchainTests`: **Passed 77, Failed 0, Skipped 0,
-Total 77** (2 m 49 s). That run includes `test_my_progress.py`,
+Total 77** (2 m 49 s). The 77 count FILES, not Python test cases: 75 are the
+discovered `scripts/test_*.py` (one `[Theory]` row each), and 2 are the
+class's own `[Fact]`s. That run includes `test_my_progress.py`,
 `test_quartz_additions_wiring.py`, `test_quizzes.py`,
 `test_task_box_contrast.py` and `test_quartz_analytics_off.py`.
 
@@ -8109,8 +8134,10 @@ Other things seen:
   nor `printable-explain-7f3a`. Two limits on this:
   - The quizzes were unanswered when it printed; the paper of a quiz whose
     answer the student revealed was not looked at.
-  - That a real Ctrl+P in the pane opens WebView2's own print window is the
-    2026-10-15 measurement in "Printable pages" above, not this sitting's.
+  - The 2026-10-15 measurement in "Printable pages" above (WebView2
+    155.0.4283.45, a printable page with NO quizzes) shows only that a real
+    Ctrl+P in the pane opens WebView2's own print window. It says nothing
+    about quizzes.
 - **The handout.** The app's print shim was present in the pane
   (`window.webkit.messageHandlers`), so the app's Print ▸ Questions only
   hands the handout to the teacher's browser. The browser half is the Edge
@@ -8132,6 +8159,9 @@ does.
   read as the group's label, the blank as "Blank 1 of 2", and feedback is
   announced. Only the proxy above has been measured, in Edge and in the
   pane. Someone has to listen to Narrator itself.
-- **A real OS Ctrl+P in the pane during this sitting.** It is covered by
-  the 2026-10-15 measurement in "Printable pages".
+- **A real Ctrl+P in the pane on a quiz page with an answer REVEALED**, and
+  the same in Edge: what paper shows after Show answer, or after a right
+  answer opens its explanation. Not measured anywhere in this sitting. The
+  2026-10-15 measurement covers only that Ctrl+P opens the print window, on
+  a page with no quizzes.
 - **The WebKit leg** of #618 and #620, once #597 lands.
