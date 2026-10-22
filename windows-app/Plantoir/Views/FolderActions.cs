@@ -200,13 +200,16 @@ public static class FolderActions
     }
 
     /// <summary>
-    /// Asks Obsidian to quit and waits up to five seconds for it to be gone.
+    /// Asks Obsidian to quit and waits for it to be gone: up to 5 s for its
+    /// windows, then up to 3 s for its processes — at most about 8 s. Returns
+    /// whether its processes are gone (<see cref="ObsidianProcesses.QuitAndWaitAsync"/>);
+    /// callers decide on <see cref="ObsidianIsRunning"/>, which is its windows.
     /// Since #581 this closes EVERY Obsidian window (<see cref="ObsidianProcesses.QuitAndWaitAsync"/>);
     /// before, <c>CloseMainWindow</c> on each process closed one, so an
     /// Obsidian with two vaults open kept running — and the registration and
     /// rename paths that call this went on to write under it.
     /// </summary>
-    public static Task QuitObsidianAndWait() => ObsidianProcesses.QuitAndWaitAsync();
+    public static Task<bool> QuitObsidianAndWait() => ObsidianProcesses.QuitAndWaitAsync();
 
     /// <summary>
     /// Opens each of these vaults again, in order, so the last is in front

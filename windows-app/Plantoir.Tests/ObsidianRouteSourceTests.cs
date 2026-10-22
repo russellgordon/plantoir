@@ -47,9 +47,13 @@ public class ObsidianRouteSourceTests
         var callers = Directory.EnumerateFiles(AppFolder, "*.cs", SearchOption.AllDirectories)
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
                            && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-            .Where(file => File.ReadAllText(file).Contains("new ObsidianOpenRoute(", StringComparison.Ordinal))
-            .Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal).ToList();
-        Assert.Equal(new[] { "SectionDetailView.xaml.cs", "SidebarPane.Menus.cs" }, callers);
+            .Select(file => (Name: Path.GetFileName(file),
+                             Count: File.ReadAllLines(file).Count(line => line.Contains("new ObsidianOpenRoute(", StringComparison.Ordinal))))
+            .Where(pair => pair.Count > 0)
+            .ToDictionary(pair => pair.Name, pair => pair.Count);
+        Assert.Equal(1, callers.GetValueOrDefault("SidebarPane.Menus.cs"));
+        Assert.Equal(1, callers.GetValueOrDefault("SectionDetailView.xaml.cs"));
+        Assert.Equal(2, callers.Values.Sum());
     }
 
     /// <summary>The reference branch locks again before the note, and records it on the trail when it did anything.</summary>

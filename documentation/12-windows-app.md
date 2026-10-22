@@ -3509,8 +3509,9 @@ to hear about the one they left.
 
 Eleven of the twelve follow a dialog. **The twelfth follows a wait that is not
 a dialog at all**, and it is the widest window in the file: inside the rename,
-`FolderActions.QuitObsidianAndWait` polls for up to five seconds (50 × 100 ms)
-with nothing on screen, so the File menu and Ctrl+O are both fully live — and
+`FolderActions.QuitObsidianAndWait` polls for up to about eight seconds (since
+#581: up to 5 s for Obsidian's windows, then up to 3 s for its processes; it
+was five, 50 × 100 ms) with nothing on screen, so the File menu and Ctrl+O are both fully live — and
 everything after it reads the LIVE workspace, down to setting the selection to
 the renamed code. A check before a wait says nothing about what is true after
 it.
@@ -7733,7 +7734,13 @@ back the other vaults (measured: closing windows one by one unmarks all but
 the last), registration now notes the vaults open BEFORE quitting and reopens
 them after registering, this course last — the add-ons route's own reopen.
 The rename path's reason for not reopening Obsidian afterwards (the vault to
-reopen is in the folder just left) is unchanged and still holds. The vaults to reopen are noted BEFORE anything closes: measured,
+reopen is in the folder just left) is unchanged and still holds; and the
+rename now checks too: if Obsidian is still running after the quit, the
+folder is not moved and nothing is registered, and the teacher is told "{code}
+was not renamed, because Obsidian is still open. Close Obsidian, then rename
+the course again." (an inline sentence, like the rename's other words, which
+are in no contract). When the windows close but the processes outlive the
+3 s wait, the quit says so in `startup.log` (never the trail) and goes on. The vaults to reopen are noted BEFORE anything closes: measured,
 closing one vault window of several clears that vault's `"open"` mark in the
 registry (the last window to close keeps its mark). Reopening opens the first
 vault, waits up to 10 s for a window, then the rest 0.4 s apart, this course
