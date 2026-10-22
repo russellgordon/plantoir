@@ -10,7 +10,9 @@ transformer, straight after the quizzes' (its script and styles ride the
 Print button's component, PlantoirMetaLine.tsx), and since #545 My
 Progress's emitter, straight before Assets (its script and styles ride the
 same component). Since #609 the rule that lays every picture out before it
-scrolls into view rides that component too.
+scrolls into view rides that component too, and since #612 the picture
+sizes' transformer goes straight after the task boxes', with its one rule
+(`height: auto` for the pictures it sized) beside #609's.
 
 Run against embedded copies of Quartz v4.5.0's own files (measured in
 quartz-teacher:dev-test, 2026-10-17): wired once, a second build changes
@@ -137,8 +139,13 @@ class WiringTests(unittest.TestCase):
                       "the quizzes' transformer goes straight after the figures', so after Description, at its indent")
         self.assertEqual(self.text("transformers").count('export { PlantoirTasks } from "./plantoirTasks"'), 1)
         self.assertEqual(config.count("Plugin.PlantoirTasks(),"), 1)
-        self.assertIn("      Plugin.PlantoirQuizzes(),\n      Plugin.PlantoirTasks(),\n      Plugin.Latex(", config,
+        self.assertIn("      Plugin.PlantoirQuizzes(),\n      Plugin.PlantoirTasks(),\n", config,
                       "the task boxes' transformer goes straight after the quizzes', at its indent")
+        self.assertEqual(self.text("transformers").count(
+            'export { PlantoirPictureSizes } from "./plantoirPictureSizes"'), 1)
+        self.assertEqual(config.count("Plugin.PlantoirPictureSizes(),"), 1)
+        self.assertIn("      Plugin.PlantoirTasks(),\n      Plugin.PlantoirPictureSizes(),\n      Plugin.Latex(", config,
+                      "the picture sizes' transformer (#612) goes straight after the task boxes', at its indent")
         self.assertEqual(self.text("emitters").count('export { PlantoirProgress } from "./plantoirProgress"'), 1)
         self.assertEqual(config.count("Plugin.PlantoirProgress(),"), 1)
         self.assertIn("      Plugin.ContentPage(),\n      Plugin.PlantoirProgress(),\n      Plugin.Assets(),", config,
@@ -197,6 +204,37 @@ class WiringTests(unittest.TestCase):
         self.assertIn("Plugin.PlantoirQuizzes(),\n      Plugin.PlantoirTasks(),\n", config)
         self.assertEqual(self.text("transformers").count("PlantoirTasks"), 1)
 
+    def test_a_section_wired_before_612_gets_the_picture_sizes_after_its_task_boxes(self):
+        self.files["config"].write_text(CONFIG.replace(
+            "      Plugin.Description(),\n",
+            "      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n"
+            "      Plugin.PlantoirTasks(),\n", 1),
+            encoding="utf-8")
+        self.files["transformers"].write_text(
+            TRANSFORMERS_INDEX + 'export { PlantoirTasks } from "./plantoirTasks" // PLANTOIR-ADDITIONS\n',
+            encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        config = self.text("config")
+        self.assertEqual(config.count("Plugin.PlantoirTasks("), 1)
+        self.assertIn("Plugin.PlantoirTasks(),\n      Plugin.PlantoirPictureSizes(),\n      Plugin.Latex(", config)
+        self.assertEqual(self.text("transformers").count("PlantoirTasks"), 1)
+        self.assertEqual(self.text("transformers").count("PlantoirPictureSizes"), 1)
+
+    def test_picture_sizes_without_the_task_boxes_anchor_are_said_and_left_out(self):
+        # Every anchor above it gone (Description is the first link), so the
+        # task boxes are never wired and the picture sizes have nothing to
+        # follow: said in plain words, and the settings left alone.
+        import contextlib
+        import io
+        changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")
+        self.files["config"].write_text(changed, encoding="utf-8")
+        said = io.StringIO()
+        with contextlib.redirect_stdout(said):
+            build_site.wire_quartz_additions(self.output)
+        self.assertNotIn("PlantoirPictureSizes", self.text("config"))
+        self.assertIn("⚠️ Could not reserve the pictures' space on the site's pages: the site's settings have changed shape.",
+                      said.getvalue())
+
     def test_task_boxes_without_the_quizzes_anchor_are_said_and_left_out(self):
         changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")
         self.files["config"].write_text(changed, encoding="utf-8")
@@ -231,7 +269,8 @@ class WiringTests(unittest.TestCase):
         for line in (components / "styles" / "pictures.scss").read_text(encoding="utf-8").splitlines():
             if not line.strip().startswith("//") and line.strip() != "":
                 rules.append(line.strip())
-        self.assertEqual(rules, ["html body img {", "content-visibility: visible;", "}"])
+        self.assertEqual(rules, ["html body img {", "content-visibility: visible;", "}",
+                                 "html body img[data-pl-sized] {", "height: auto;", "}"])
 
     def test_quizzes_without_the_figures_anchor_are_said_and_left_out(self):
         changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")
