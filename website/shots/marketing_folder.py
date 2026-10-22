@@ -192,6 +192,23 @@ def refuse_foreign_courses(folder: Path) -> None:
                 "so it may be somebody's real working folder — a Computer Science teacher's would hold ICS3U "
                 "and ICS4U too. Nothing was changed. Point --marketing-folder at a folder of its own."
             )
+    foreign = foreign_courses(folder)
+    if foreign:
+        raise ForeignFolder(
+            f"{folder} holds courses this set-up did not make ({', '.join(foreign)}), so it looks like "
+            "somebody's real working folder. Nothing was changed. Point --marketing-folder at a folder "
+            "of its own."
+        )
+
+
+def foreign_courses(folder: Path) -> list[str]:
+    """The course folders in `folder` this set-up does not make: anything but
+    ICS3U, ICS4U and a reference copy of either. The allow-list behind
+    `refuse_foreign_courses`, shared with the Windows preview pictures
+    (preview_pages_windows.py), whose folder carries no marker."""
+    courses = folder / "courses"
+    if not courses.is_dir():
+        return []
     allowed: set[str] = set()
     for course in COURSES:
         allowed.add(course["code"])
@@ -208,12 +225,7 @@ def refuse_foreign_courses(folder: Path) -> None:
         if config is not None and config.get("kept_for_reference") is True and code in allowed:
             continue
         foreign.append(entry.name)
-    if foreign:
-        raise ForeignFolder(
-            f"{folder} holds courses this set-up did not make ({', '.join(foreign)}), so it looks like "
-            "somebody's real working folder. Nothing was changed. Point --marketing-folder at a folder "
-            "of its own."
-        )
+    return foreign
 
 
 # ---------- Writing without overwriting ----------
