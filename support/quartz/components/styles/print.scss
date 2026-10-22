@@ -235,7 +235,9 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
   }
 
   // Quartz lays out nothing off screen (`content-visibility: auto`), and a
-  // picture below the fold measured 0 x 0 on paper (#499 review B1).
+  // picture below the fold measured 0 x 0 on paper (#499 review B1). Since
+  // #609 pictures.scss does the same for every page on screen; this stays,
+  // so paper never depends on that file.
   img {
     content-visibility: visible !important;
   }

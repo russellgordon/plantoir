@@ -640,7 +640,9 @@ final class SharedRulesContractTests: XCTestCase {
     }
 
     /// `followingLinks.publishing.casesNote` says what a case's `body` means,
-    /// so the other app can build the same harness without reading this one.
+    /// so the other app can build the same harness without reading this one —
+    /// and, since #607, what `folder` and `expectAlreadyRight` mean, because a
+    /// harness that ignores either passes the case without testing anything.
     @MainActor
     func testThePublishingCasesSayWhatABodyIs() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("followingLinks")
@@ -648,6 +650,8 @@ final class SharedRulesContractTests: XCTestCase {
         let note: String = try XCTUnwrap(publishing["casesNote"] as? String)
         XCTAssertTrue(note.contains("`body`"))
         XCTAssertTrue(note.contains("never both"))
+        XCTAssertTrue(note.contains("`folder`"), "the note no longer says what a page's folder means")
+        XCTAssertTrue(note.contains("`expectAlreadyRight`"), "the note no longer says what the already-visible list means")
         let cases: [[String: Any]] = try XCTUnwrap(publishing["cases"] as? [[String: Any]])
         XCTAssertFalse(cases.isEmpty)
     }

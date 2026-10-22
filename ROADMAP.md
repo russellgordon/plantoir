@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 19 October 2026. The current release is **1.8.3** on the Mac and **1.7.2** on Windows.*
+*Last updated: 22 October 2026. The current release is **1.8.4** on the Mac and **1.7.2** on Windows.*
 
 A few things to know before you read on:
 
@@ -28,7 +28,7 @@ need to read those to use Plantoir.
 
 ## Next: Windows catches up to 1.8
 
-Plantoir 1.8.3 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
+Plantoir 1.8.4 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
 download joins the release, with:
 
 - **Runnable Python, self-check quizzes, maths served by your own site and
