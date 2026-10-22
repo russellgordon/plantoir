@@ -124,6 +124,14 @@ public static class ScheduledHealthFindings
                                maps.TrailSentence, maps.Course, maps.Section, writtenAt);
         }
 
+        // The build's PLANTOIR_MY_PROGRESS: line (#599): "my students have no
+        // My Progress page" is as likely to follow an overnight publish.
+        foreach (var progress in MyProgressBuilt.ReportsIn(lines))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.MyProgressPageBuilt,
+                               progress.TrailSentence, progress.Course, progress.Section, writtenAt);
+        }
+
         // The build's PLANTOIR_KEPT_OFF: line (#340), when the wrapper's scan keeps it.
         foreach (var keptOff in HowITeachKeptOffReport.ReportsIn(lines))
         {

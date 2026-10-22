@@ -3867,7 +3867,11 @@ legacy `curriculum_folder` naming the primary.
 publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
 `Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
 reader would never see the line. A wrapper written before this keeps its old
-scan until its schedule is set again.
+scan until its schedule is set again. `PLANTOIR_MY_PROGRESS:` (#599) rides the
+same three places — the console reader, the record reader and the wrapper's
+scan — and a wrapper written before #599 likewise misses it until the
+schedule is set again ("My Progress: the trail line and the two readers
+(#599)" below).
 
 The build prints the line from the contract's own prefix
 (`build_site.announce_coverage_maps` reads `coverageMapsBuilt.marker.prefix`
@@ -5514,8 +5518,9 @@ pinned:
   (`InsertClassesTests.MakeRoomWhoseNewPageCouldNotBeSaved_IsCarriedPastAndNotedAsAChange`,
   `ADuplicateWhoseNewPageCouldNotBeSaved_ThrowsAndIsNotStillTaken`).
 - **A partial undo.** `UndoHistory.Undo` keeps the entry when any file was
-  skipped, so `undo_last_change` notes the change when files were both
-  restored and skipped.
+  left alone (since #564 a file an earlier press already put back no longer
+  counts), so `undo_last_change` notes the change exactly when it answers
+  `undidPartly`: files both put back and left alone.
 - **A publish or hide that wrote and then stopped part way**, both the page
   list (`AssistWorkspace.Apply`) and the whole unit (`ApplyWholeUnit`). The
   recording is abandoned on the throw, so the top entry does not move. Each
@@ -5553,17 +5558,18 @@ outside assistant) is decided in one place.
 **Undo's ending comes from the depth plus `changed`**
 (`SectionVerbs.Ending`). The depth went DOWN means the entry came off: "took
 the last change back". `UndoHistory.Undo` removes the entry exactly when
-nothing was skipped, so a whole undo lowers the depth by one at any depth; the
+nothing was left alone (a file already back does not hold it, #564), so a whole undo lowers the depth by one at any depth; the
 cap of twenty trims only when an entry is added. `changed` with the depth
 unmoved is "took part of the last change back"; anything else is "changed
 nothing". It used to count an answer containing "is put back" as a whole
 undo, and `UndidPartlyFromTheMenu` (the twin the menu shows) contains those words too, so
-a partial undo read as a whole one. A second press after the edit is undone is
-partial AGAIN: the file the first press restored no longer matches what the
-change wrote, so it is skipped and the entry stays. The mac behaves the same,
-and a `decision` issue
-([#555](https://github.com/russellgordon/plantoir/issues/555)) asks whether an entry that blocks the list for good is
-right. Pinned by `SectionVerbsTests.APartialUndo_TookPartOfTheLastChangeBack`,
+a partial undo read as a whole one. Until #564 a second press after the edit
+was undone was partial AGAIN: the file the first press restored no longer
+matched what the change wrote, so it was skipped and the entry stayed for
+good. Russell ruled on mac [#555](https://github.com/russellgordon/plantoir/issues/555)
+(option 2) that a file already holding its BEFORE text is ALREADY BACK, and
+since #564 the second press takes the change off ("took the last change
+back") — see "Undo: three verdicts, not two (#564)" below. Pinned by `SectionVerbsTests.APartialUndo_TookPartOfTheLastChangeBack`,
 `APublishThatStoppedPartWay_IsCarriedOut`,
 `AWholeUnitThatStoppedPartWay_IsCarriedOut`,
 `APublishWhoseFirstWriteFails_SaysNothingWasChanged`,
@@ -7002,3 +7008,207 @@ test reads `codeRunnerBlocks.swift` or `swiftImage` yet, and
 `swiftCouldNotBePrepared` check in `siteHealth.repair.neverOffered`, where
 review S8 put it so this suite and the mac's stay green.
 
+
+## The trail's first and last lines (#565, the mac's #560), v1.8.0
+
+**"Plantoir opened" prints the version a teacher can name.** It was built
+from the assembly version as `Major.Minor (Build)`, so `<Version>1.7.2</Version>`
+read "Plantoir 1.7 (2)" while the update lines on the same trail said "from
+1.7.1 to 1.7.2". `ProblemReportEnvironment.AppVersion` now spells it with
+`AppUpdates.Spell` (the updater's own spelling, #465) and adds a build in
+brackets ONLY when the assembly carries a revision. Windows has no build
+number of its own: `<Version>1.7.2</Version>` makes the assembly 1.7.2.0, so
+the line is "Plantoir opened — Plantoir 1.7.2 · pid N · C:\…\Plantoir.exe".
+An unused second `NoteLaunch(appVersion, buildNumber, …)` overload, which
+printed a third shape, is gone.
+
+**"Plantoir closed — {reason} · pid N"** (`ActivityTrail.Event.AppClosed`,
+`mustRecord` → "app closed") is new on both platforms. The reasons, from
+`QuitConfirmation.ClosingReasonFor`:
+
+| What happened | Reason on the trail |
+|---|---|
+| The teacher closed the last window — including with an update ready, which installs as Plantoir quits (`AtQuitGated`): that quit is still theirs, as the mac rules for Install on Quit | quit by the teacher |
+| `App.QuitForUpdate`, the updater's own exit after starting the installer | to install a new version |
+| `WM_QUERYENDSESSION` / `WM_ENDSESSION` carrying `ENDSESSION_CLOSEAPP` (lParam bit 0x1) — Restart Manager closing this one app, which is how the installer (`installer.iss` `CloseApplications=yes`) closes a running Plantoir | to install a new version |
+| The end-of-session messages WITHOUT that bit: a sign-out (`ENDSESSION_LOGOFF`), restart or shut down | asked to close by Windows |
+
+**Where it is written, and why there.** From `App.QuitTime`, after the
+update-at-quit decision; and from `SessionEnding`'s window subclass on
+`WM_ENDSESSION` with wParam TRUE, BEFORE `DefSubclassProc` returns, because
+at the end of a session Windows may end the process before the last window's
+`Closed` ever runs. Once per process (every subclassed window hears the
+message, and the last window's close may follow it), and only in a process
+that wrote its own "Plantoir opened" — the same guard, so a scheduled run or
+a marketing capture leaves no unpaired close. The end-of-session path waits
+at most 500 ms IN ALL — for this process's own trail lock and the writers'
+cross-process lock together (`ActivityTrail.Append` with
+`Monitor.TryEnter`) — instead of the usual 5 s for the cross-process lock,
+which is about Windows' own kill timeout. A line that cannot get the lock in
+that time is dropped rather than holding the session up, and is tried only
+once (there is no later moment). The ordinary quit's line waits for the
+locks as every line does, and counts as written only once it has reached the
+file (`Append` returns whether it did).
+
+**Rejected:** reading "install" from the at-quit install (it fires when the
+teacher quits with an update ready — the mac's `willInstallUpdate` trap); a
+fourth "asked by another program" reason (a scripted close sends the same
+`WM_CLOSE` as the title bar's X). **Not measured:** a real sign-out, restart
+or installer run. The reason table is pinned by
+`AppOpenedAndClosedTests.TheReasonIsReadFromWhatTheAppKnew`, the once-only
+guard by `TheClosedLineIsWrittenOnceAndOnlyAfterTheOpenedLine`.
+
+## My Progress: the trail line and the two readers (#599, the mac's #545), v1.8.2
+
+The page itself is shared toolchain, and Windows inherits it with the build.
+What Windows owed:
+
+- **`my progress page built`** (`ActivityTrail.Event.MyProgressPageBuilt`),
+  read from the build's `PLANTOIR_MY_PROGRESS:` line by `MyProgressBuilt` —
+  the `CoverageMapsBuilt` pattern — in the console reader
+  (`ScriptRunner.RecordHealthFinding`, and the 8000-character carry guard),
+  the scheduled publish's record reader (`ScheduledHealthFindings`) and the
+  wrapper's marker scan (`TaskScheduling.cs`). A scheduled-deploy wrapper
+  written before this change has no `PLANTOIR_MY_PROGRESS:` in its scan, so a
+  scheduled run's line reaches the trail only once that deploy is scheduled
+  again — the same as for `PLANTOIR_MAPS:`. The sentences are
+  `myProgressBuilt.trailLine.shapes`, "N page(s)" spelled 1 page / N pages.
+- **`include_my_progress` and `success_criteria_headings`**, read-only
+  (`CourseConfiguration.IncludesMyProgress(section)`, `SuccessCriteriaHeadings`;
+  the switch and the list are #595), run against `myProgress.config.cases`.
+  `include_my_progress` is read as the BUILD reads it
+  (`build_site._resolve_section_switch`): a map's `sections` entry, then its
+  `sectionN`, then its `default`, else on; any other value by Python's truth,
+  so the string "false" is on. **A known difference, left alone:**
+  `IncludesCurriculumCoverage` here honours only a boolean or
+  `sections.sectionN`, while the build also honours the flat and `default`
+  forms. Only a hand-edited config can show it — both apps write the
+  `sections` form — and it is noted on #595 rather than changed here.
+
+**Measured** (this PC: i5-8365U, Windows 11 Pro 26200; the bundled runtime's
+Python 3.11.9 and node 20.18.1; Edge 155.0.4283.60 headless; 2026-10-22): a
+native `preview.ps1 EXC2O 1 --build-only` of the example course, with one
+"Success criteria" list of three boxes added to a published class, took 37 s,
+printed `PLANTOIR_MY_PROGRESS: {"course": "EXC2O", "section": 1, "built":
+true, "pages": 1, "reason": "built"}` and wrote `My-Progress.html` (24,405
+bytes; the slug, not "My Progress.html") and `progress-manifest.json` (1,324
+bytes, the three items under "Unit 3, Day 14"); Key Links links it. In Edge,
+on a fresh profile, it read 0 / 3; two ticks on the class made it 2 / 3 under
+Unit 3, Day 14, and a reload kept 2 / 3.
+
+## Undo: three verdicts, not two (#564, the mac's #555), v1.8.0
+
+`UndoHistory.Undo` had two outcomes per file, put back or skipped, and kept
+the entry while anything was skipped. A file an earlier press had already put
+back holds its BEFORE text, so it was skipped too, and a change taken back in
+part never came off the list. Russell's ruling on #555 (option 2): such a
+file is ALREADY BACK. Each saved file now gets ONE verdict,
+`UndoVerdict.Of(path, state)`:
+
+- **alreadyBack** — the disk holds BEFORE: nothing is written, it is not
+  counted as put back, and it does not hold the entry. BEFORE is compared
+  first, so a row the change left as it found it cannot stick.
+- **putBack** — the disk holds AFTER: BEFORE is written back, or the file
+  deleted when BEFORE is null. A write that fails is left alone, as on the mac.
+- **leftAlone** — anything else.
+
+"Null" means NOTHING at the path: a folder, or a file that is not UTF-8, is
+neither copy and is left alone (the old `File.ReadAllText` decoded non-UTF-8
+bytes silently and called a folder "no file"). The strict reader drops ONE
+leading byte-order mark first, because the saved copies came from
+`File.ReadAllText`, which drops it — the mac's `String(contentsOf:encoding:)`
+does the same — so a page saved with a mark still matches its copy.
+
+`UndoResult.Answer` picks the sentence: every file back → `undid` (even when
+this press found them all already back); written and left → `undidPartly`;
+nothing written and something left → `couldNotUndo`; nothing at all →
+`nothingToUndo`. No new AssistWording sentence. `NoteAChangeWithNoUndoEntry`
+fires exactly on `undidPartly`. The start-of-year undo sheet previews by the
+same verdict (`AssistWorkspace.WhatAnUndoWouldDo`): put back under
+`undoIntro`, staying under `undoSkipped`, a page already back in neither, and
+`startOfYear.wording.undoAllAlreadyBack` when both are empty. (Before this it
+listed every written file, with no preview of what stays.)
+
+The preview: `AssistToolRunner` restarts the preview whenever it stopped one
+for an edit tool, whatever the tool wrote, so an undo that writes nothing
+already put the preview back here. It is pinned now
+(`SectionVerbsTests.AnUndoThatFindsEveryPageAlreadyBack_StillRestartsThePreviewItStopped`).
+The rows are `assist-cases.json` → `undoFiles`, run by `UndoFilesContractTests`;
+by copy-and-restore of the old rule, 5 tests went red.
+
+## The Start of Year sheet as a table (#619, the mac's #589), v1.8.4
+
+`StartOfYearSheet.Make` cuts the plan into what the dialog draws, and
+`Views/StartOfYearSheetView` draws it on #548's `PlanTable.Row` and
+`PlanTableOrder`:
+
+- **Above the table**, in a scroller: the warnings first (already taught,
+  the scheduled deploy, the first class in draft), in the caution colour, then
+  the intro.
+- **The summary**: the two list headings, unchanged.
+- **The table**: Page (`AssistWording.MenuPlanPageColumn`), Folder
+  (`MenuPlanFolderColumn`), Why (`StartOfYearWording.ReasonColumn`, the new
+  `startOfYear.wording.reasonColumn`); a row for every page going into draft,
+  classes first and then pages, in plan order, sortable by a header. The
+  title cell has no quotation marks and the folder is always shown. Why is
+  `StartOfYearWording.Reason`, the clause the line always carried, word for
+  word; it takes the rest of the width and wraps to two lines.
+- **Under it**, in a scroller: publishing from now on, the links left
+  pointing at hidden pages, and the pages with no room for a key FIRST; then
+  already in draft and what stays.
+
+**The no-room note is now said BEFORE Go.** Until #619 it appeared only in
+the result. `StartOfYearPagesWithNoRoom` asks the write's own rule
+(`StartOfYearDraftEdit`, shared with `PrepareForStartOfYear`), so the sheet
+names exactly the pages Go will leave as they are. The MCP text
+(`Describe`) is unchanged, and every sentence on the sheet is one it, or the result, says (the no-room note is the result's `AssistWording.PagesWhoseSettingsCannotBeAddedTo`).
+
+**The height rule** (`StartOfYearSheetLayout.For`, pure). The mac's fixed
+620 pt budget cannot be copied: this window's minimum height is 600 epx, and
+a ContentDialog cannot scroll content it clips. So the budget is the window's
+height (at most `ContentDialogMaxHeight`, 756) less the measured chrome, and
+the parts give way in an order, each scrolling inside itself rather than
+being cut:
+
+1. the ROWS, from five down to two (each counted at its own measured height
+   — a Why on two lines makes a taller row than #548's 32 epx pitch);
+2. the notes, never below what must be read before Go, nor below the mac's
+   120 floor when they are that tall;
+3. the intro above, down to the warnings — the warnings are NEVER capped;
+4. on a window too short for all of that, the notes down to two lines.
+
+The dialog measures each part at its width, logs the fit to `startup.log`
+("Start of Year sheet: …"), reads its real chrome from the laid-out dialog
+("Start of Year sheet laid out: …") and refits with it, and refits again
+when the window changes size.
+
+**Measured** (this PC: i5-8365U, Windows 11 Pro 26200, 1920 × 1080 at 150%,
+2026-10-22; the app's own `--stage-scene start-of-year` on a worst-case
+ICS3U section 2: its first class in draft, classes dated before today, a real
+scheduled deploy, a page with no room for a key, 175 rows, the links-left
+list 30-odd pages long):
+
+| Window (XamlRoot) | Warnings | Above shown | Rows shown | Notes: must-read / all / shown | Dialog |
+|---|---|---|---|---|---|
+| 700 epx (the scene's window) | 185 | 185 of 249 | 2 (66) | 349 / 474 / 199 | 699 epx |
+| 563 epx (the 600 epx minimum, less its title bar) | 184 | 184 of 248 | 2 (66) | 348 / 472 / 63 | 563 epx |
+
+- The chrome measured **250–251 epx** against the layout's 250 (now 251);
+  the dialog refits with what it reads.
+- **The three warnings are never cut** (184–185 epx); the intro under them
+  scrolls in its area in this worst case.
+- **Rows are 32 epx on one line and 50 epx when Why wraps to two** (a
+  reason naming a 42-character page title). The Why column is 272 epx wide.
+- **What does NOT hold in this worst case, said rather than hidden:** the
+  must-read notes (348 epx, almost all of it the links-left list) do not fit
+  whole at either height, so the notes area scrolls — 199 epx shown at 700,
+  63 at the minimum. Everything stays reachable by scrolling inside its own
+  area; nothing is clipped out of reach. The mac's 120 pt notes floor cannot
+  be kept at the minimum window once the warnings (never capped) and two
+  rows are placed: 563 − 251 − 184 − 66 = 62. A short plan (no links left,
+  no warnings) shows its notes whole.
+
+**Rejected:** the mac's fixed budget (above); a What-changes column, two
+tables, rows for the staying pages, and a table in the MCP text (the mac's
+rejections, `09-mac-app.md` → "The pages as a table (#589)"). The
+start-of-year picture on plantoir.app is retaken separately.

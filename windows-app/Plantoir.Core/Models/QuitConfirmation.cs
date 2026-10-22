@@ -36,6 +36,46 @@ public static class QuitConfirmation
         TheSystemIsEnding,
     }
 
+    /// <summary>
+    /// Why Plantoir closed, for the trail's <c>app closed</c> line (#565, mac
+    /// #560). Finer than <see cref="Reason"/>: the question cares only whether
+    /// Windows is ending the session, the trail also whether an install did it.
+    /// </summary>
+    public enum ClosingReason
+    {
+        /// <summary>The teacher closed the last window — including with an update ready, which installs as Plantoir quits: that quit is still theirs.</summary>
+        ByTheTeacher,
+
+        /// <summary>
+        /// Plantoir's updater started the installer and quit for it
+        /// (<c>App.QuitForUpdate</c>), or the installer closed Plantoir
+        /// through Restart Manager: <c>WM_QUERYENDSESSION</c> /
+        /// <c>WM_ENDSESSION</c> carrying <c>ENDSESSION_CLOSEAPP</c>
+        /// (installer.iss <c>CloseApplications=yes</c>).
+        /// </summary>
+        ToInstallANewVersion,
+
+        /// <summary>Windows is logging off, restarting or shutting down: the end-of-session messages WITHOUT <c>ENDSESSION_CLOSEAPP</c>.</summary>
+        AskedByWindows,
+    }
+
+    /// <summary>The words on the trail, after "Plantoir closed — ".</summary>
+    public static string Words(ClosingReason reason) => reason switch
+    {
+        ClosingReason.ToInstallANewVersion => "to install a new version",
+        ClosingReason.AskedByWindows => "asked to close by Windows",
+        _ => "quit by the teacher",
+    };
+
+    /// <summary><c>ENDSESSION_CLOSEAPP</c>: the lParam bit Restart Manager sets when it closes ONE application, as an installer asks it to.</summary>
+    public const long EndSessionCloseApp = 0x1;
+
+    /// <summary>Which reason a close is, from what the app knew at that moment. Installing wins: the updater's own exit, or Restart Manager closing this app for an installer.</summary>
+    public static ClosingReason ClosingReasonFor(bool quittingForTheUpdater, bool sessionEnding, long endSessionFlags) =>
+        quittingForTheUpdater || (sessionEnding && (endSessionFlags & EndSessionCloseApp) != 0)
+            ? ClosingReason.ToInstallANewVersion
+            : sessionEnding ? ClosingReason.AskedByWindows : ClosingReason.ByTheTeacher;
+
     /// <summary>What this app has under way at the moment of the quit.</summary>
     public sealed record UnderWay(int Publishes, int PreviewsOpen, int PreviewsBeingBuilt, int CopiesBeingSaved);
 

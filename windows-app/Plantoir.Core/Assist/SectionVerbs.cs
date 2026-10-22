@@ -284,7 +284,8 @@ public sealed class SectionVerbs : IAsyncDisposable
     /// <para>Undo Last Change has three endings (#550, the mac's #531). The
     /// entry came off — the depth went DOWN — is "took the last change back":
     /// <c>UndoHistory.Undo</c> removes the entry exactly when nothing was
-    /// skipped, so a whole undo always lowers the depth by one at any depth
+    /// left alone — a file an earlier press already put back no longer
+    /// counts against it (#564) — so a whole undo always lowers the depth by one at any depth
     /// (the cap of twenty trims only when an entry is added). Some files went
     /// back and the entry stayed (the server noted a change, the depth did
     /// not move) is "took part of the last change back". Anything else changed
