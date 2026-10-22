@@ -442,7 +442,12 @@ as it takes to bring the block's bottom (its output included) inside the
 window, and only then is the window photographed; it fails the
 run with its reason, or when `--prepare-timeout` (120 s here) runs out.
 Vision must read each shot's `expectText`. The print set (both platforms)
-takes only scene `print-set`, so these never reach MPM2D's preview. `--code-shots code-python` retakes some of them. Two things in
+takes only scene `print-set`, so these never reach MPM2D's preview. `--code-shots code-python` retakes some of them.
+On Windows, `capture_windows.py --code` takes the four that are not Swift
+from native previews of `~/School Web Space` with the same prepare scripts
+(#590; `website/SCREENSHOTS.md` → "The Code and Quizzes pages' figures on
+Windows"); the Swift two stay Mac only while Swift stays read-only on
+Windows, until #570 is decided (v1.9.0). Two things in
 the pictures are the page's own, not the capture's: `code-python-error`'s
 traceback names `main.py` while the page's prose says `hours.py` (#561's
 known mismatch: that prose is about a program on the student's computer),
@@ -488,6 +493,9 @@ quiz is never photographed. Planting puts the three pages into
 in the sidebar, and the live demo sites carry them from their next deploy.
 `--quiz-shots quiz-math` retakes some; `--code --code-shots code-quiz`
 retakes the Code page's quiz, whose frame shows the page's opening sentence.
+On Windows, `capture_windows.py --quizzes` takes all four the same way, from
+native previews of `~/Teaching` and `~/School Web Space` (#590;
+`website/SCREENSHOTS.md` → "The Code and Quizzes pages' figures on Windows").
 
 **Before starting:** the screen unlocked and left alone for about an hour,
 
