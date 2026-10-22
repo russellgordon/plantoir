@@ -92,8 +92,10 @@ def launcher_environment() -> dict:
 def shots_of_kind(kind: str) -> list[dict]:
     """The print set's shots of `kind`: scene `print-set` only. Other
     `preview-page` shots are pages of other previews — the Code page's
-    figures (#562, scene `code`) are ICS3U's and ICS4U's, which MPM2D's
-    preview would answer with a 404 — and Windows takes none of them yet."""
+    figures (#562, scene `code`) are ICS3U's and ICS4U's, the Quizzes
+    page's (#587, scene `quizzes`) the demo courses' too, which MPM2D's
+    preview would answer with a 404. Windows takes those with
+    `capture_windows.py --code` / `--quizzes` (preview_pages_windows.py)."""
     manifest = json.loads((WEBSITE / "shots.json").read_text(encoding="utf-8"))
     wanted = []
     for shot in manifest["shots"]:
@@ -108,21 +110,22 @@ def recipe_folders() -> list[str]:
     return list(contract["recipeFolders"]["folders"])
 
 
-def mirror_toolchain(folder: Path) -> None:
+def mirror_toolchain(folder: Path, source: Path = REPO) -> None:
     """What the app does to a folder it touches: the launchers at the top,
-    the recipe in `.toolchain/`, both from THIS tree, so the pictures are of
-    the branch being released and not of whatever app is installed."""
+    the recipe in `.toolchain/`, both from THIS tree (or `source`, the
+    tree's committed files, for the preview pictures), so the pictures are
+    of the branch being released and not of whatever app is installed."""
     (folder / "courses").mkdir(parents=True, exist_ok=True)
     for name in LAUNCHERS:
-        shutil.copy2(REPO / name, folder / name)
+        shutil.copy2(source / name, folder / name)
     toolchain = folder / ".toolchain"
     toolchain.mkdir(parents=True, exist_ok=True)
     for name in RECIPE_ROOT_FILES:
-        if (REPO / name).exists():
-            shutil.copy2(REPO / name, toolchain / name)
+        if (source / name).exists():
+            shutil.copy2(source / name, toolchain / name)
     for name in recipe_folders():
         shutil.rmtree(toolchain / name, ignore_errors=True)
-        shutil.copytree(REPO / name, toolchain / name)
+        shutil.copytree(source / name, toolchain / name)
     print(f"   Mirrored the launchers and the build recipe into {folder}")
 
 
@@ -183,18 +186,20 @@ def pty_driver() -> Path:
 
 
 class Preview:
-    """`preview.ps1 MPM2D 1 --non-interactive`, stopped with the launcher's
-    own `--stop` whatever happens."""
+    """`preview.ps1 <code> <section> --non-interactive` (MPM2D 1 for the
+    print set), stopped with the launcher's own `--stop` whatever happens."""
 
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path, code: str = PRINT_CODE, section: int = 1):
         self.folder = folder
+        self.code = code
+        self.section = str(section)
         self.process: subprocess.Popen | None = None
         self.address = ""
         self.lines: list[str] = []
 
     def __enter__(self) -> "Preview":
-        announce(f"Building and serving the preview of {PRINT_CODE}")
-        self.process = subprocess.Popen(powershell("preview.ps1", PRINT_CODE, "1", "--non-interactive"),
+        announce(f"Building and serving the preview of {self.code}")
+        self.process = subprocess.Popen(powershell("preview.ps1", self.code, self.section, "--non-interactive"),
                                         cwd=self.folder, env=launcher_environment(),
                                         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
@@ -208,14 +213,14 @@ class Preview:
                 break
         if not (started and self.address):
             print("".join(self.lines[-40:]), file=sys.stderr)
-            raise SystemExit(f"The preview of {PRINT_CODE} did not start.")
+            raise SystemExit(f"The preview of {self.code} did not start.")
         # Keep reading, so a full pipe never stalls the server.
         threading.Thread(target=lambda: [None for _ in self.process.stdout], daemon=True).start()
         print(f"   The preview is at {self.address}")
         return self
 
     def __exit__(self, *_) -> None:
-        subprocess.run(powershell("preview.ps1", PRINT_CODE, "1", "--stop"), cwd=self.folder,
+        subprocess.run(powershell("preview.ps1", self.code, self.section, "--stop"), cwd=self.folder,
                        env=launcher_environment(), capture_output=True)
         if self.process is not None and self.process.poll() is None:
             self.process.terminate()
