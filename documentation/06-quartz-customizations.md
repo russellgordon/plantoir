@@ -585,6 +585,7 @@ on its next preview:
 | `components/scripts/printRules.ts` | The rules with no DOM and no imports — answer/question/unfold roles, labels and answer places, question numbering, part letters and columns, title cleaning, page labels, the paper box, the footer, which callouts keep a box, the code box, the completeness decision, and the `@page`/`@font-face` text both ⌘P and the handout write — so `scripts/check_print_rules_against_the_site.py` can bundle it with the scaffold's esbuild and run every contract case in Node (verify.sh). `PlantoirMetaLine.tsx` imports it too, so ⌘P's page box and the handout's cannot drift. |
 | `components/scripts/print.inline.ts` | The button, the handout, ⌘P and the preview handoff (F3–F5). Bundled into every site; inert unless the page carries a printable meta line. |
 | `components/styles/sidebarPageMarker.scss` | Not print: the sidebar's page dot (#515, H). Rides on `PlantoirMetaLine`'s `concatenateResources` as `figures.scss` does, so no wiring edit; reaches every page's `index.css`. |
+| `components/styles/pictures.scss` | Not print: every picture laid out at its real height before it scrolls into view (#609, M) — one rule overriding Quartz's `img { content-visibility: auto }`. Rides on `PlantoirMetaLine` the same way; reaches every page's `index.css`. |
 | `components/styles/print.scss` | On-screen button styles, ⌘P rules under `@media print { html.plantoir-printable … }`, and handout rules under `html.plantoir-print-frame`. No bare `@page` anywhere (review B2: it cannot be scoped). |
 
 Two marker edits wire them in (`wire_quartz_additions`, idempotent, ALWAYS):
@@ -655,8 +656,10 @@ answer toggles the same class; plan finding C). On Print:
    count, so the number box is as wide as "110".
 3a. Every picture decoded and given `width`/`height` from its NATURAL size
    (a `|300` width kept) — never from the screen, where Quartz's
-   `content-visibility: auto` measures every picture below the fold 0 × 0
-   (#499 review B1). Then every element that carries words or a picture is
+   `content-visibility: auto` measured every picture below the fold 0 × 0
+   (#499 review B1; since #609 the screen lays every picture out, M, but at
+   the column's size, not the paper's, so natural sizes are still the ones
+   to use). Then every element that carries words or a picture is
    stamped for the completeness check (step 6a).
 4. An iframe ON SCREEN but invisible (`opacity:0`): off screen, Safari
    paginated about one page per 8 s (11 pages ≈ 90 s); on screen, 192 ms.
@@ -884,8 +887,8 @@ grey-green, and Escape in the menu no longer hands focus to Search.
 
 **How each fault was fixed, measured by turning the fix off alone:**
 pictures had no height when Paged.js measured (natural sizes written, and
-`content-visibility: visible` — the screen's box is 0 × 0 below the fold,
-review B1); code scrolled, and Paged.js 0.4.3 will not split a scrolling box
+`content-visibility: visible` — the screen's box was 0 × 0 below the fold,
+review B1, until #609 laid every picture out on screen too, M); code scrolled, and Paged.js 0.4.3 will not split a scrolling box
 (`overflow: visible` on code, by class); a 3,134 px Mermaid diagram under
 the same rule printed three pages of arrows and stopped the layout (review
 B2 — diagrams keep their box and are capped with every picture at the
@@ -3049,10 +3052,138 @@ window's top once settled, five runs out of five; a reader who scrolls up
 at once is left there. Must-fail: the script's listener disabled in the
 built bundle.
 
+## M. Pictures laid out before they scroll into view (#609, v1.8.4)
+
+In Safari, a long page with pictures jumped while it was scrolled: the text
+below each picture was shoved down by the picture's whole height, once per
+picture, with one frame of an unpainted band where the picture had opened.
+On a page of screenshots that reads as the page jittering or flashing. It is
+long-standing upstream Quartz behaviour, not anything Plantoir added (the
+sidebar, the table of contents, the search panel and Safari 26's top-colour
+sampling were all measured still: 0 frame-to-frame change).
+
+### M1. The cause
+
+Quartz v4.5.0's own `quartz/styles/base.scss:522` gives every picture
+`img { content-visibility: auto }`. That puts each `<img>` under size
+containment with no `contain-intrinsic-size` length, so a picture off screen
+is laid out at ZERO height. WebKit makes a picture "relevant" — gives it its
+real height — only when its zero-height box reaches the window, and in the
+next rendering update everything below it moves down by that height
+(290–734 px on the pages measured). WebKit 26.6 ships with scroll anchoring
+OFF (`CSSScrollAnchoringEnabled = 0`, read from `WKPreferences._features`),
+so nothing absorbs the shift. Chromium does the same layout, but further
+ahead of the window and with scroll anchoring on, so there it happens out of
+sight. Later passes over the same page are calm, because
+`contain-intrinsic-size: auto` remembers each size once laid out — which is
+why the jump shows on the first scroll through a page.
+
+### M2. The fix
+
+`support/quartz/components/styles/pictures.scss`, one rule:
+
+```scss
+html body img { content-visibility: visible; }
+```
+
+carried by `PlantoirMetaLine.tsx`'s `concatenateResources` exactly as
+`figures.scss` and the sidebar marker are (F1), so it reaches every page's
+`index.css`, folder and tag pages included, and changes no page's HTML. It is
+**global, not gated**: Quartz writes one `index.css` for every page, so a
+style is global by construction, and every page with a picture needs it. The
+selector is three types long because this stylesheet lands BEFORE
+`base.scss` in `index.css` and must win by specificity (0,0,3 over 0,0,1) —
+do not shorten it. Print already forced the same (`print.scss`'s
+`html.plantoir-printable img` and `print.inline.ts`'s frame rule); those stay,
+so print does not depend on this file.
+
+### M3. Measured (2026-10-21, M4 Pro, macOS 26.6)
+
+A real WKWebView in a window with trackpad-style momentum (composited
+frames), Playwright 1.63 WebKit 26.6 (build 2359) and Chromium (1243) at
+1440 × 860, on a live 15-picture page (Your First Playground), scrolled fast:
+
+| | WebKit down | WebKit up | Chromium down | Chromium up |
+|---|---|---|---|---|
+| Quartz as shipped | 5 jumps, 1,543–1,772 px, largest 482 | 11 jumps, 3,716 px, largest 734 | 0 | 0 |
+| with the rule | 0 | 0 | 0 | 0 |
+
+On a 2-picture page (Variables and Data Types) the page's height grew
+8,530 → 9,060 → 9,590 px during one scroll; with the rule it is 9,590 from the
+first paint. Cost, five runs each: first paint and load unchanged within
+noise in both engines; WebKit's longest frame fell from 37 ms to 19 ms (the
+relayouts WERE the long frames); Chromium flat at 17–19 ms. Chromium's pixels
+do not change: the only differences are a page height that is right from the
+first paint (its scrollbar thumb stops creeping) and off-screen pictures
+painted early.
+
+Re-measured on the fixture verify.sh builds (Picture Fixture, two pictures,
+three runs each, the same wheel scroll): WebKit 1 jump of 1,800 px down and 2
+up (2,000 px) before, 0 and 0 after; Chromium 0 both ways before and after,
+its page height growing 5,441 → 7,241 px mid-scroll before and constant at
+7,241 after.
+
+### M4. The check
+
+`browser-checks/picture_heights.mjs`, in Chrome for Testing like its
+neighbours, on verify.sh's planted **Picture Fixture** (two of the #499
+hazard pictures about thirty paragraphs apart, one sized `|600` — Quartz
+writes `width="600" height="auto"` — and one bare). It waits until both
+pictures' bytes and the faces have arrived and the page's height has held for
+a second, then asks: each picture well below the window (or the check could
+not fail), each with a height above 0 BEFORE anything is scrolled, and
+neither the page's height nor any picture's changing as each is scrolled to.
+Chrome is enough because the zero-height layout is the same in both engines;
+only whether the shift can be SEEN is WebKit's. A WebKit leg belongs with
+#597's release gate. Must-fail, by copy-and-restore of `pictures.scss` with
+its rule taken out: red three runs out of three (`plantoir-hazard-wide.png,
+3067 px down the page, had no height before it was scrolled to (0 px)`), green
+three out of three with it back.
+
+### M5. Rejected
+
+- **Gating it per page** (`GATED_ASSETS`, `scripts/page_features.py`) — that
+  gates engine FOLDERS, not styles, and Quartz's single `index.css` makes a
+  style global anyway.
+- **A `contain-intrinsic-size` length** — a picture's real size is unknown to
+  a stylesheet, and a guess still jumps by its error.
+- **`overflow-anchor`** — WebKit does not ship scroll anchoring at all.
+- **A WebKit-only `@supports` hack** — Chromium's pixels do not change, so
+  there is nothing to protect it from.
+- **`loading="eager"`** — irrelevant: Quartz writes no `loading` attribute, so
+  pictures are already eager.
+- **The in-page jump meter as a gate** (`jumpmeter.js`, the measurement rig)
+  — it measures movement in document coordinates and includes the article's
+  containers, so in Chromium it counts scroll anchoring's own correction as
+  six false jumps scrolling up. A meter that counts only leaf blocks inside
+  the window reads 0 there. Evidence, not a gate.
+
+### M6. The known gap: a slow first visit (#612)
+
+The rule fixes pictures that are cached or arrive quickly, which is the case
+reported. It does **not** fix a first visit on a slow network: Quartz writes
+`height="auto"` (not a valid value) and, for a bare `![[x.png]]`,
+`width="auto"`, so a picture whose bytes have not arrived has no aspect ratio
+and no size in ANY engine, with or without the rule — and Netlify serves
+pictures `max-age=0, must-revalidate`, so every visit pays a round trip.
+Measured with each picture's bytes delayed (600 ms + 350 ms per picture, a
+reader scrolling in bursts): 14 jumps, largest 587 px, in BOTH engines with
+the rule; 0 in both with real `width`/`height` attributes plus
+`img { height: auto }`, with or without the rule. With the bytes held and
+never answered, all 15 pictures are 0 px tall in both engines and the page is
+4,714 px tall instead of 9,675. Writing each picture's real size into the
+HTML at build time is
+[#612](https://github.com/russellgordon/plantoir/issues/612) (v1.9.0): it
+changes every page's HTML, so it is its own piece. When it lands, strengthen
+this check: hold the pictures' bytes (CDP `Fetch.requestPaused`) and still
+ask for a height above 0 — red today, green with the attributes.
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
-except the page marker H adds on top of them from `support/quartz` — with six asset exceptions, all in
+except the page marker H adds on top of them from `support/quartz`, and
+Quartz's `img { content-visibility: auto }`, which M overrides so pictures
+are laid out before they scroll into view — with six asset exceptions, all in
 `quartz/static/` and all written every build: `og-image.png` is redrawn as the
 section's social sharing card (C2-13), and `favicon.ico`, `icon.svg`,
 `apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25); since

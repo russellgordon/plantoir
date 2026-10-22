@@ -1,0 +1,45 @@
+// #609: every picture is laid out at its real height from the first paint,
+// not when it scrolls into view. Rides on PlantoirMetaLine.tsx, as
+// figures.scss does: Quartz writes ONE index.css for every page, so this
+// reaches every page of every site, folder and tag pages included, and
+// changes no page's HTML.
+//
+// Why. Quartz v4.5.0's own quartz/styles/base.scss:522 gives every picture
+// `img { content-visibility: auto }`. A picture off screen is then laid out
+// at ZERO height (size containment, no contain-intrinsic-size length), and
+// WebKit gives it its real height only once that zero-height box is inside
+// the window - so in the middle of a scroll everything below the picture is
+// pushed down by the picture's whole height (290-734 px on the pages
+// measured), once per picture. Chromium does the same layout further ahead
+// of the window and absorbs the shift with scroll anchoring; WebKit 26.6
+// ships with scroll anchoring OFF (CSSScrollAnchoringEnabled = 0), so in
+// Safari the text visibly jumps. On a page of screenshots that is a run of
+// jolts, each with one frame of an unpainted band where the picture opened.
+//
+// Measured (2026-10-21, M4 Pro, macOS 26.6; WKWebView with trackpad-style
+// momentum and Playwright WebKit 26.6, Chromium as control; a 15-picture
+// page): WebKit 5 jumps scrolling down -> 0, 11 jumps scrolling up -> 0;
+// Chromium 0 before and after, pixels unchanged; WebKit's longest frame
+// 37 ms -> 19 ms (the relayouts were the long frames), first paint and load
+// unchanged within noise. browser-checks/picture_heights.mjs holds it.
+//
+// Why `html body img`: it must beat Quartz's bare `img` by SPECIFICITY,
+// because this file's rules come BEFORE base.scss's in index.css. Do not
+// shorten it. Print already forced the same (print.scss, `html.plantoir-
+// printable img` and `html.plantoir-print-frame img`); those stay, harmless.
+//
+// Rejected: gating it per page (Quartz writes one index.css, so a style is
+// global by construction, and every page with a picture needs it); a
+// `contain-intrinsic-size` length (a picture's real size is unknown here,
+// and a guess still jumps by its error); `overflow-anchor` (WebKit does not
+// ship scroll anchoring); a WebKit-only `@supports` hack (Chromium's pixels
+// do not change anyway). Also rejected: making the in-page jump meter the
+// gate - it counts scroll anchoring's own correction in Chromium as six
+// false jumps scrolling up. Not fixed here: a FIRST visit on a slow network
+// still shifts, in both engines, because Quartz writes `height="auto"`, so a
+// picture whose bytes have not arrived has no size at all - real picture
+// sizes in the HTML are #612.
+
+html body img {
+  content-visibility: visible;
+}
