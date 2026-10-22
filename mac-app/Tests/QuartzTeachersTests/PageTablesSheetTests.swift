@@ -204,6 +204,109 @@ final class PageTablesSheetTests: XCTestCase {
         print("PageTablesSheetTests: forty-page picker \(height) pt against \(CopyPageChecklist.tallestSheet)")
     }
 
+    // MARK: - The fold (#622)
+
+    /// The rows a teacher reads are every row but the pages already the way
+    /// they were asked to be: a change, a page an unpublish keeps, a linked
+    /// class left as it is and a page with no room for a key all stay in
+    /// view. And the rows folded away are exactly what the summary counts as
+    /// "already".
+    func testOnlyThePagesAlreadyRightFoldAway() async throws {
+        var rows: [AssistPlanTable.Row] = []
+        let changes: [AssistPlanTable.Change] = [
+            .willBecomeVisible, .alreadyVisible, .willBecomeHidden, .staysVisible,
+            .alreadyHidden, .staysAsItIs, .staysExactlyAsItIs,
+        ]
+        for change in changes {
+            rows.append(AssistPlanTable.Row(
+                position: rows.count, title: "Page \(rows.count)", folder: "Concepts", change: change, whatChanges: ""
+            ))
+        }
+        let made: AssistPlanTable = AssistPlanTable(summary: "", rows: rows, notes: [])
+        var toRead: [AssistPlanTable.Change] = []
+        for row in made.rowsToRead {
+            toRead.append(row.change)
+        }
+        XCTAssertEqual(toRead, [.willBecomeVisible, .willBecomeHidden, .staysVisible, .staysAsItIs, .staysExactlyAsItIs])
+        var folded: [AssistPlanTable.Change] = []
+        for row in made.rowsAlreadyRight {
+            folded.append(row.change)
+        }
+        XCTAssertEqual(folded, [.alreadyVisible, .alreadyHidden])
+
+        let plans = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: plans.root)
+        }
+        let outcome: AssistToolOutcome = try await PageTablesSheetTests.planAClassLinking(hidden: 4, visible: 16, in: plans)
+        let table: AssistPlanTable = try XCTUnwrap(outcome.planTable, outcome.forTheCard)
+        XCTAssertEqual(table.rowsToRead.count, 5)
+        XCTAssertEqual(table.rowsAlreadyRight.count, 16)
+        XCTAssertEqual(table.summary, AssistWording.menuPlanSummary(
+            changing: 5, already: table.rowsAlreadyRight.count, publishing: true
+        ))
+    }
+
+    /// The plan sheet opens with the pages already visible folded away
+    /// under a disclosure that wears `menuPlanShowAlready`; a click on it
+    /// adds every one of them to the same table, which stays the height it
+    /// was. A Hide plan does the same with `menuPlanShowAlready(publishing:
+    /// false)`, and a plan with nothing already right has no disclosure.
+    func testThePlanFoldsThePagesAlreadyRightUntilTheDisclosureIsOpened() async throws {
+        var made: [URL] = []
+        defer {
+            for root in made {
+                try? FileManager.default.removeItem(at: root)
+            }
+        }
+        let publishing = try AssistFixture.makeRunner(surface: .menu)
+        made.append(publishing.root)
+        let publish: AssistToolOutcome = try await PageTablesSheetTests.planAClassLinking(hidden: 4, visible: 16, in: publishing)
+        let hiding = try AssistFixture.makeRunner(surface: .menu)
+        made.append(hiding.root)
+        let hide: AssistToolOutcome = try await PageTablesSheetTests.planHidingAClassLinkingHiddenPages(in: hiding)
+        let cases: [(String, AssistToolOutcome, SectionVerbSheetModel.Kind, Course, Int, Int, String)] = [
+            ("Publish", publish, .publishPages, publishing.course, 5, 21,
+             AssistWording.menuPlanShowAlready(count: 16, publishing: true)),
+            ("Hide", hide, .hidePages, hiding.course, 2, 4,
+             AssistWording.menuPlanShowAlready(count: 2, publishing: false)),
+        ]
+        for (name, outcome, kind, course, closedRows, openRows, label) in cases {
+            let model: SectionVerbSheetModel = PageTablesSheetTests.plannedModel(outcome, kind: kind, course: course)
+            let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+            XCTAssertEqual(sheet.alreadyRightLabel, label, name)
+            let host: TableHost = TableHost(sheet, size: PageTablesSheetTests.fittingSize(of: sheet))
+            defer {
+                host.close()
+            }
+            let table: NSTableView = try XCTUnwrap(host.tables().first, name)
+            XCTAssertFalse(model.showsAlreadyRight, "\(name): the disclosure is open to begin with")
+            XCTAssertEqual(table.numberOfRows, closedRows, "\(name): the folded rows are drawn")
+            let tableHeight: CGFloat? = table.enclosingScrollView?.frame.height
+            let triangle: NSView = try XCTUnwrap(PageTablesSheetTests.disclosureTriangle(under: table, in: host.window), name)
+            PageTablesSheetTests.click(triangle, in: host)
+            XCTAssertTrue(model.showsAlreadyRight, "\(name): a click did not open the disclosure")
+            XCTAssertEqual(table.numberOfRows, openRows, "\(name): opening it did not add the folded rows")
+            XCTAssertEqual(table.enclosingScrollView?.frame.height, tableHeight, "\(name): the table grew when it opened")
+            var last: [AssistPlanTable.Change] = []
+            for row in sheet.drawnPlanRows.suffix(openRows - closedRows) {
+                last.append(row.change)
+            }
+            XCTAssertEqual(last.count, openRows - closedRows)
+            for change in last {
+                XCTAssertTrue(AssistPlanTable.isAlreadyRight(change), "\(name): a folded row is not already right")
+            }
+        }
+
+        let nothingFolded = try AssistFixture.makeRunner(surface: .menu)
+        made.append(nothingFolded.root)
+        let twentyOne: AssistToolOutcome = try await PublishPlanTableTests.planAClassLinkingTwentyPages(in: nothingFolded)
+        let plain: SectionVerbSheetModel = PageTablesSheetTests.plannedModel(twentyOne, kind: .publishPages, course: nothingFolded.course)
+        let plainSheet: SectionVerbSheet = SectionVerbSheet(model: plain, pressDefault: {}, cancel: {})
+        XCTAssertNil(plainSheet.alreadyRightLabel, "a disclosure with nothing under it")
+        XCTAssertEqual(plainSheet.drawnPlanRows.count, 21)
+    }
+
     // MARK: - The default size
 
     /// Every sheet whose content this piece did not mean to change opens at
@@ -402,6 +505,93 @@ final class PageTablesSheetTests: XCTestCase {
         model.body = outcome.forTheCard
         model.planTable = outcome.planTable
         return model
+    }
+
+    /// A hidden class, Unit 1, Day 1, linking `hidden` hidden concept pages
+    /// and `visible` visible ones: the class and the hidden pages change,
+    /// and the visible ones are already visible — #622's "5 pages would
+    /// change, 16 already visible" with 4 and 16.
+    static func planAClassLinking(hidden: Int, visible: Int, in made: AssistFixture.Made) async throws -> AssistToolOutcome {
+        var links: String = ""
+        var number: Int = 1
+        while number <= hidden {
+            links += "[[Hidden \(number)]] "
+            try "---\ntitle: Hidden \(number)\npublish: false\n---\nIdea.\n".write(
+                to: made.course.directoryURL.appendingPathComponent("Concepts/Hidden \(number).md"),
+                atomically: true, encoding: .utf8
+            )
+            number += 1
+        }
+        number = 1
+        while number <= visible {
+            links += "[[Seen \(number)]] "
+            try "---\ntitle: Seen \(number)\npublish: true\n---\nIdea.\n".write(
+                to: made.course.directoryURL.appendingPathComponent("Concepts/Seen \(number).md"),
+                atomically: true, encoding: .utf8
+            )
+            number += 1
+        }
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: links, in: made.course)
+        return await made.runner.run(call: SectionVerbs.publishPages(
+            course: "ICS3U", section: 1, names: ["section1/All Classes/Unit 1, Day 1"], planning: true
+        ))
+    }
+
+    /// Hiding a visible class that links one visible page and two hidden
+    /// ones: two pages hide, and two are already hidden.
+    static func planHidingAClassLinkingHiddenPages(in made: AssistFixture.Made) async throws -> AssistToolOutcome {
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", body: "Uses [[Ohm]], [[Gone 1]] and [[Gone 2]].",
+                                in: made.course)
+        let concepts: URL = made.course.directoryURL.appendingPathComponent("Concepts")
+        try "---\ntitle: Ohm\npublish: true\n---\nV = IR.\n".write(
+            to: concepts.appendingPathComponent("Ohm.md"), atomically: true, encoding: .utf8
+        )
+        for name in ["Gone 1", "Gone 2"] {
+            try "---\ntitle: \(name)\npublish: false\n---\nGone.\n".write(
+                to: concepts.appendingPathComponent("\(name).md"), atomically: true, encoding: .utf8
+            )
+        }
+        return await made.runner.run(call: SectionVerbs.hidePages(
+            course: "ICS3U", section: 1, names: ["section1/All Classes/Unit 1, Day 1"], planning: true
+        ))
+    }
+
+    /// The disclosure's triangle: SwiftUI draws it, and the one AppKit view
+    /// it leaves is the small key-loop stand-in at its place — the first one
+    /// below the table, at the sheet's leading margin.
+    static func disclosureTriangle(under table: NSTableView, in window: NSWindow) -> NSView? {
+        guard let content = window.contentView, let scroll = table.enclosingScrollView else {
+            return nil
+        }
+        let tableBottom: CGFloat = scroll.convert(scroll.bounds, to: nil).minY
+        var best: NSView?
+        for view in content.subviews {
+            let frame: NSRect = view.convert(view.bounds, to: nil)
+            let isSmall: Bool = frame.width < 16 && frame.height < 16
+            if isSmall && frame.maxY <= tableBottom {
+                if best == nil || frame.maxY > best!.convert(best!.bounds, to: nil).maxY {
+                    best = view
+                }
+            }
+        }
+        return best
+    }
+
+    /// A click at the middle of a view, as `TableHost.clickCell` clicks.
+    static func click(_ view: NSView, in host: TableHost) {
+        let frame: NSRect = view.convert(view.bounds, to: nil)
+        let point: NSPoint = NSPoint(x: frame.midX, y: frame.midY)
+        for type in [NSEvent.EventType.leftMouseDown, NSEvent.EventType.leftMouseUp] {
+            if let event = NSEvent.mouseEvent(
+                with: type, location: point, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: host.window.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 1
+            ) {
+                host.window.sendEvent(event)
+            }
+        }
+        host.pump()
     }
 
     /// Hiding a class whose linked page another visible class still links
