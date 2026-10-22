@@ -1258,6 +1258,25 @@ else
   cat /tmp/verify_figure_rules_site.log
 fi
 
+# ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
+# pictureSizes.js (the file the site's transformer imports) reads every
+# picture in scripts/fixtures/picture-sizes/ in Node; each answer must be
+# Pillow's exif_transpose size, or the named answer for the SVGs and for the
+# pictures the engines disagree about, and the same from a 16-byte first
+# read; and every case of the attribute rule holds.
+echo ""
+echo "🔎 Checking the picture-size reader against Pillow…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_picture_sizes_against_the_site.py" /opt/scripts/check_picture_sizes_against_the_site.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/fixtures/picture-sizes" /opt/scripts/fixtures/picture-sizes),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_picture_sizes_against_the_site.py \
+  >/tmp/verify_picture_sizes.log 2>&1; then
+  pass "every picture's own size is read as Pillow reads it, EXIF orientation in either byte order included, the SVG and disputed cases as named, and every attribute case holds - $(tail -1 /tmp/verify_picture_sizes.log | sed 's/^OK: //') (scripts/check_picture_sizes_against_the_site.py, #612)"
+else
+  fail "the picture-size reader disagrees with Pillow or with a named case (scripts/check_picture_sizes_against_the_site.py, #612)"
+  cat /tmp/verify_picture_sizes.log
+fi
+
 # Every figure in the example courses draws, with its description, in the
 # real engines (#485 E1): a payload's figure that could not be drawn would
 # put "This diagram couldn't be drawn." on a page a teacher just installed.
@@ -2450,14 +2469,16 @@ open(sys.argv[1], "w").write("---\nprintable: true\n---\nBefore the tall formula
     + formula + "\n\\end{aligned}\n$$\n\n| Row | Lines |\n|---|---|\n| 1 | " + cell + " |\n\n> [!answer]-\n>\n> Never printed.\n")
 PY
 
-# #609: Picture Fixture - two of the pictures above, each about thirty
-# paragraphs further down the page than the last, so each is well below the
-# window when the page opens and the first is out of view again by the time
-# the second is reached (browser-checks/picture_heights.mjs). One is sized the
-# way a teacher's `![[x.png|600]]` writes it (width="600" height="auto"), the
-# other bare (width and height both "auto"). No fixture had a picture far
-# below the fold, and Plain Long Page is #501's, so it is left alone.
-# Removed by restore_hit_fixture.
+# #609: Picture Fixture - three of the pictures above, each well below the
+# window when the page opens, the first out of view again by the time the
+# next is reached (browser-checks/picture_heights.mjs). One is sized the way
+# a teacher's `![[x.png|600]]` writes it, one bare. Since #612 the build
+# writes both PNGs' real width and height (600 x 200 and 400 x 1800), which
+# gives them a size even off screen - so the third, the viewBox-only SVG, is
+# one the build deliberately CANNOT size (sizing a bare viewBox-only SVG
+# would shrink it), and it alone keeps #609's rule provable. No fixture had
+# a picture far below the fold, and Plain Long Page is #501's, so it is left
+# alone. Removed by restore_hit_fixture.
 python3 - "$HIT_COURSE/Picture Fixture.md" <<'PY'
 import sys
 def paragraphs(first, count):
@@ -2465,9 +2486,10 @@ def paragraphs(first, count):
                    "then checks it against a graph drawn on the board and writes down what the number means.\n\n"
                    for n in range(first, first + count))
 open(sys.argv[1], "w", encoding="utf-8").write(
-    "---\ntitle: Picture Fixture\n---\nTwo pictures far below the window (plantoir-picture-fixture-609).\n\n"
+    "---\ntitle: Picture Fixture\n---\nThree pictures far below the window (plantoir-picture-fixture-609).\n\n"
     + paragraphs(1, 30) + "![[plantoir-hazard-wide.png|600]]\n\n"
-    + paragraphs(31, 30) + "![[plantoir-hazard-tall.png]]\n\n"
+    + paragraphs(31, 15) + "![[plantoir-hazard-viewbox.svg]]\n\n"
+    + paragraphs(46, 15) + "![[plantoir-hazard-tall.png]]\n\n"
     + paragraphs(61, 10))
 PY
 
@@ -4177,6 +4199,64 @@ else
   fail "the sidebar's page dot is missing from index.css, or the sidebar's row templates changed under it (#515)"
 fi
 
+# ---- #612: pictures carry their real width and height, by the built text ----
+# Picture Fixture's two PNGs must carry the size the build read from them
+# and the marker that gives them pictures.scss's `height: auto`, and the
+# viewBox-only SVG must be left exactly as Quartz writes it - which is what
+# keeps browser-checks/picture_heights.mjs able to prove #609's rule. Read
+# with a parser, so the order Quartz writes the attributes in does not
+# matter (it differs between an embed and a Markdown or raw picture), and
+# the rule itself must be in the one index.css every page links.
+if python3 - "$SITE_PUBLIC" <<'SIZESPY'
+import sys
+from html.parser import HTMLParser
+from pathlib import Path
+public = Path(sys.argv[1])
+problems = []
+class Pictures(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.found = {}
+    def handle_starttag(self, tag, attrs):
+        if tag != "img":
+            return
+        attributes = dict(attrs)
+        name = (attributes.get("src") or "").split("/")[-1]
+        if name.startswith("plantoir-hazard-"):
+            self.found.setdefault(name, []).append(attributes)
+page = public / "Picture-Fixture.html"
+pictures = Pictures()
+pictures.feed(page.read_text(encoding="utf-8") if page.is_file() else "")
+expected = {
+    "plantoir-hazard-wide.png": {"width": "600", "height": "200", "data-pl-sized": ""},
+    "plantoir-hazard-tall.png": {"width": "400", "height": "1800", "data-pl-sized": ""},
+    "plantoir-hazard-viewbox.svg": {"width": "auto", "height": "auto", "data-pl-sized": None},
+}
+for name, want in expected.items():
+    seen = pictures.found.get(name, [])
+    if len(seen) != 1:
+        problems.append(f"Picture-Fixture.html has {len(seen)} <img> for {name}, not 1")
+        continue
+    for attribute, value in want.items():
+        if attribute == "data-pl-sized":
+            got = "" if attribute in seen[0] else None
+        else:
+            got = seen[0].get(attribute)
+        if got != value:
+            problems.append(f"{name}: {attribute} is {got!r}, expected {value!r}")
+css = (public / "index.css").read_text(encoding="utf-8") if (public / "index.css").is_file() else ""
+if "html body img[data-pl-sized]{height:auto}" not in css:
+    problems.append("index.css lacks html body img[data-pl-sized]{height:auto}")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+SIZESPY
+then
+  pass "pictures carry their real width and height in the built page: Picture Fixture's two PNGs 600 x 200 and 400 x 1800 with the marker, the viewBox-only SVG left as Quartz writes it, and the marked pictures' height: auto in index.css (#612)"
+else
+  fail "a picture in the built Picture Fixture does not carry the width and height the build should write, or index.css lacks the rule for them (#612)"
+fi
+
 # ---- #594: no page-view counter in the built site ----
 # Quartz's default config loaded plausible.io's script on every page and
 # sent each student's page view there; nobody set it up. The real build of
@@ -4316,13 +4396,15 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "a link to a heading did not land on it once the page settled (browser-checks/heading_anchor.mjs, #604)"
     cat /tmp/verify_heading_anchor.log
   fi
-  # #609: every picture laid out at its real height before it is scrolled to,
-  # so nothing below it moves when it arrives (Safari has no scroll anchoring
-  # to hide the shift; the layout is the same in Chrome, which is asked here).
+  # #612 and #609: every picture laid out at its real height before its
+  # bytes arrive and before it is scrolled to, so nothing below it moves
+  # when it does (Safari has no scroll anchoring to hide the shift; the
+  # layout is the same in Chrome, which is asked here), and a sized picture
+  # keeps its own shape in a phone's width.
   if node browser-checks/picture_heights.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_picture_heights.log 2>&1; then
-    pass "pictures far below the window are laid out before they are scrolled to, so the text below them does not jump: Picture Fixture loaded, every picture and the faces arrived, nothing scrolled - $(head -1 /tmp/verify_picture_heights.log | sed 's/^OK: //') (#609, browser-checks/picture_heights.mjs)"
+    pass "pictures keep their place before their bytes arrive and before they are scrolled to, so the text below them does not jump: Picture Fixture with its two PNGs' downloads held, then every picture arrived and nothing scrolled, then a 390 px window - $(head -1 /tmp/verify_picture_heights.log | sed 's/^OK: //') (#612, #609, browser-checks/picture_heights.mjs)"
   else
-    fail "a picture far below the window had no height until it was scrolled to, or the page grew when it was (browser-checks/picture_heights.mjs, #609)"
+    fail "a picture had no height until its bytes arrived or until it was scrolled to, the page grew when it did, or a sized picture lost its shape in a narrow window (browser-checks/picture_heights.mjs, #612, #609)"
     cat /tmp/verify_picture_heights.log
   fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.
@@ -4333,8 +4415,8 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_my_progress.log
   fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before they are scrolled to (#609): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before they are scrolled to (#609): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before their bytes arrive and before they are scrolled to (#612, #609): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before their bytes arrive and before they are scrolled to (#612, #609): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
