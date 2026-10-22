@@ -1,22 +1,34 @@
-// Pictures are laid out at their real height before they scroll into view
-// (#609), in headless Chrome for Testing, against a server this check starts
-// itself.
+// Pictures are laid out at their real height before their bytes arrive
+// (#612) and before they scroll into view (#609), in headless Chrome for
+// Testing, against a server this check starts itself.
 //
-// Quartz's own base.scss gives every img `content-visibility: auto`, so a
-// picture off screen is laid out at ZERO height and takes its real height
-// only when it nears the window. Chromium absorbs the shift with scroll
-// anchoring; Safari has none, so there the text below jumps down by the
-// picture's height mid-scroll. support/quartz/components/styles/pictures.scss
-// turns that off for every picture. The layout is the same in both engines -
-// only whether the shift can be SEEN differs - so this is asked of Chrome:
+// Two causes, one symptom: the text below a picture jumps down by the
+// picture's whole height when it gets one. Quartz writes a picture as
+// `width="600" height="auto"`, so until its bytes arrive it has no height at
+// all (#612: plantoirPictureSizes.ts now writes its real width and height,
+// and pictures.scss gives those pictures `height: auto`). And Quartz's
+// base.scss gives every img `content-visibility: auto`, so a picture off
+// screen is laid out at ZERO height until it nears the window (#609:
+// pictures.scss turns that off). Chromium hides the second with scroll
+// anchoring and Safari cannot; the layout is the same in both engines - only
+// whether the shift can be SEEN differs - so this is asked of Chrome, in
+// three phases, on verify.sh's Picture Fixture:
 //
-//  1. verify.sh's Picture Fixture loaded in a laptop-sized window; every
-//     picture's bytes and the page's faces arrived (before that, a picture
-//     has no height in any engine, with or without the rule - #612);
-//  2. each picture is well below the window (or the check could not fail),
-//     and has a height above 0 BEFORE anything is scrolled;
-//  3. scrolled to each picture in turn: the page's height and every
-//     picture's height are what they were before scrolling.
+//  A. (#612) A first visit on a slow network: the two PNGs' downloads are
+//     HELD (Fetch.enable, never answered). Each must already be drawn at its
+//     own shape from the page alone, and when the bytes are let through
+//     neither picture nor page may change height. Waits on
+//     document.fonts.status, NOT document.fonts.ready: Chrome holds that
+//     promise until the document finishes loading, which a held picture
+//     never lets it do.
+//  B. (#609) A fresh visit with every byte arrived: each picture is well
+//     below the window (or the check could not fail) and has a height above
+//     0 BEFORE anything is scrolled, and scrolling to each in turn changes
+//     no picture's height and not the page's. The fixture's third picture,
+//     a viewBox-only SVG, is one the build deliberately cannot size, so it
+//     is what keeps #609's rule provable now that the PNGs carry sizes.
+//  C. (#612) A 390 px window: each sized picture keeps its own shape (the
+//     `height: auto` that lets its width shrink without squashing it).
 //
 //   node browser-checks/picture_heights.mjs <chrome> <site folder>
 
@@ -32,7 +44,11 @@ if (!chromePath || !siteFolder) {
   process.exit(2)
 }
 const PAGE = "/Picture-Fixture"
-const PICTURES = 2
+const PICTURES = 3
+// The two PNGs' shapes, height over width, as verify.sh draws them. The
+// third picture (the viewBox-only SVG) has no entry: the build leaves it
+// unsized, and only phase B asks about it.
+const SHAPES = { "plantoir-hazard-wide.png": 300 / 900, "plantoir-hazard-tall.png": 1800 / 400 }
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
   ".json": "application/json", ".wasm": "application/wasm", ".svg": "image/svg+xml", ".png": "image/png",
@@ -105,13 +121,13 @@ async function run(chunk) {
     waiting.set(id, resolve)
     socket.send(JSON.stringify({ id, method, params }))
   })
-  socket.onmessage = (event) => {
+  socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data)
     if (message.id && waiting.has(message.id)) {
       waiting.get(message.id)(message.result ?? message.error)
       waiting.delete(message.id)
     }
-  }
+  })
   const evaluate = async (expression) => {
     const answer = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })
     if (answer?.exceptionDetails) throw new Error(JSON.stringify(answer.exceptionDetails).slice(0, 400))
@@ -126,6 +142,7 @@ async function run(chunk) {
         src: picture.getAttribute("src").split("/").pop(),
         arrived: picture.complete && picture.naturalHeight > 0,
         top: Math.round(picture.getBoundingClientRect().top + scrollY),
+        width: Math.round(picture.getBoundingClientRect().width),
         height: Math.round(picture.getBoundingClientRect().height),
       })),
       page: document.documentElement.scrollHeight,
@@ -139,6 +156,82 @@ async function run(chunk) {
       await send("Runtime.enable")
       siteServer = await serve()
       const base = `http://127.0.0.1:${siteServer.address().port}`
+
+      // A. (#612) The PNGs' bytes held: a first visit on a slow network.
+      const held = []
+      const heldListener = (event) => {
+        const message = JSON.parse(event.data)
+        if (message.method === "Fetch.requestPaused") held.push(message.params.requestId)
+      }
+      socket.addEventListener("message", heldListener)
+      const patterns = []
+      for (const name of Object.keys(SHAPES)) patterns.push({ urlPattern: `*${name}*`, requestStage: "Request" })
+      await send("Fetch.enable", { patterns })
+      await send("Page.navigate", { url: base + PAGE })
+      let heldState = null
+      let heldSteady = 0
+      for (let tries = 0; tries < 160 && heldSteady < 4; tries += 1) {
+        await pause(250)
+        const state = await evaluate(`(() => {
+          if (document.readyState === "loading" || document.fonts.status !== "loaded") return null
+          return ${PICTURE_STATE}
+        })()`).catch(() => null)
+        if (state === null || state.pictures.length < PICTURES || held.length < Object.keys(SHAPES).length) {
+          heldSteady = 0
+          continue
+        }
+        heldSteady = heldState !== null && state.page === heldState.page ? heldSteady + 1 : 0
+        heldState = state
+      }
+      if (heldState === null || heldSteady < 4) {
+        return finish(1, `FAIL: Picture Fixture never settled with its two PNGs' bytes held (${held.length} held): ${JSON.stringify(heldState)}`)
+      }
+      const heldProblems = []
+      for (const picture of heldState.pictures) {
+        if (!(picture.src in SHAPES)) continue
+        if (picture.arrived) {
+          heldProblems.push(`${picture.src} arrived although its bytes were held, so this phase proves nothing`)
+        }
+        const expected = Math.round(picture.width * SHAPES[picture.src])
+        if (picture.width <= 0) {
+          heldProblems.push(`${picture.src} had no size at all before its bytes arrived (${picture.width} x ${picture.height} px), so the text below it moved when they did`)
+        } else if (Math.abs(picture.height - expected) > 1) {
+          heldProblems.push(`${picture.src} was ${picture.width} x ${picture.height} px before its bytes arrived; its own shape makes that ${picture.width} x ${expected}`)
+        }
+      }
+      for (const requestId of held) await send("Fetch.continueRequest", { requestId })
+      await send("Fetch.disable")
+      socket.removeEventListener("message", heldListener)
+      let arrived = null
+      for (let tries = 0; tries < 80; tries += 1) {
+        await pause(250)
+        arrived = await evaluate(PICTURE_STATE)
+        if (arrived.pictures.every((picture) => picture.arrived)) break
+      }
+      if (!arrived.pictures.every((picture) => picture.arrived)) {
+        heldProblems.push("the held pictures never arrived once they were let through")
+      }
+      await pause(250)
+      arrived = await evaluate(PICTURE_STATE)
+      if (Math.abs(arrived.page - heldState.page) > 1) {
+        heldProblems.push(`the page was ${heldState.page} px tall before the pictures' bytes arrived and ${arrived.page} px after: the text below them jumped`)
+      }
+      for (let index = 0; index < arrived.pictures.length && index < heldState.pictures.length; index += 1) {
+        const picture = arrived.pictures[index]
+        if (!(picture.src in SHAPES)) continue
+        if (Math.abs(picture.height - heldState.pictures[index].height) > 1) {
+          heldProblems.push(`${picture.src} was ${heldState.pictures[index].height} px tall before its bytes arrived and ${picture.height} px after`)
+        }
+      }
+      if (heldProblems.length > 0) return finish(1, "FAIL: " + [...new Set(heldProblems)].join("\nFAIL: "))
+      const heldSizes = []
+      for (const picture of heldState.pictures) {
+        if (picture.src in SHAPES) heldSizes.push(`${picture.width} x ${picture.height}`)
+      }
+
+      // B. (#609) A fresh visit, every byte let through.
+      await send("Page.navigate", { url: "about:blank" })
+      await pause(250)
       await send("Page.navigate", { url: base + PAGE })
       // 1. Settled: loaded, every picture's bytes and the faces arrived, and
       // the page's height unchanged for a second (four reads 250 ms apart).
@@ -194,9 +287,22 @@ async function run(chunk) {
           }
         }
       }
+      // C. (#612) In a phone's width every sized picture keeps its own shape.
+      await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: false })
+      await pause(500)
+      const narrow = await evaluate(PICTURE_STATE)
+      const narrowSizes = []
+      for (const picture of narrow.pictures) {
+        if (!(picture.src in SHAPES)) continue
+        const expected = Math.round(picture.width * SHAPES[picture.src])
+        narrowSizes.push(`${picture.width} x ${picture.height}`)
+        if (picture.width <= 0 || Math.abs(picture.height - expected) > 1) {
+          problems.push(`in a 390 px window ${picture.src} was ${picture.width} x ${picture.height} px; its own shape makes that ${picture.width} x ${expected}`)
+        }
+      }
       if (problems.length > 0) return finish(1, "FAIL: " + [...new Set(problems)].join("\nFAIL: "))
-      const described = before.pictures.map((picture) => `${picture.height} px tall at ${picture.top} px down`).join(" and ")
-      finish(0, `OK: ${before.pictures.length} pictures laid out before any scroll (${described}, window ${before.window} px); the page stayed ${before.page} px tall scrolling to each (${visited.join(", ")})`)
+      const described = before.pictures.map((picture) => `${picture.height} px tall at ${picture.top} px down`).join(", ")
+      finish(0, `OK: with their bytes held, ${heldSizes.join(" and ")} px from the page alone and unchanged when they arrived (page ${heldState.page} px both ways); ${before.pictures.length} pictures laid out before any scroll (${described}, window ${before.window} px), the page staying ${before.page} px tall scrolling to each (${visited.join(", ")}); ${narrowSizes.join(" and ")} px in a 390 px window`)
     } catch (error) {
       finish(1, "FAIL: " + (error?.stack ?? error))
     }

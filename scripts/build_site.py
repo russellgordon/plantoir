@@ -1574,12 +1574,13 @@ def _wire_list_page_toc(layout_ts: Path) -> None:
 
 def _wire_transformers_index(index_ts: Path) -> None:
     """Export the figures transformer (#485 E1), the runnable code's (#455),
-    the self-check quizzes' (#563) and the task boxes' (#519) beside
-    Quartz's own."""
+    the self-check quizzes' (#563), the task boxes' (#519) and the picture
+    sizes' (#612) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
-                         ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks")):
+                         ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks"),
+                         ("PlantoirPictureSizes", "./plantoirPictureSizes")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1692,6 +1693,31 @@ def _wire_tasks_transformer(config_ts: Path) -> None:
         print("⚠️ Could not make the site's task boxes tickable: the site's settings have changed shape.")
         return
     text = text[:at] + "\n" + indent + "Plugin.PlantoirTasks()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_picture_sizes_transformer(config_ts: Path) -> None:
+    """Put the picture sizes' transformer (#612) straight AFTER the task
+    boxes': it works at the html stage, after CrawlLinks has made every
+    picture's address final, and writes each picture's own width and height
+    so a slow first visit does not shift the text. Anchored on
+    PlantoirTasks, so a section wired before #612 gets it in the same place
+    as a fresh one; without that anchor the pictures are simply left as
+    Quartz writes them."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirPictureSizes(" in text:
+        return
+    anchor = "Plugin.PlantoirTasks(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not reserve the pictures' space on the site's pages: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not reserve the pictures' space on the site's pages: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirPictureSizes()," + text[at:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -1911,7 +1937,10 @@ def wire_quartz_additions(output_dir: Path) -> None:
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
     button's component), the task boxes' one (#519: its transformer after
-    the quizzes'; export, script and styles ride as the quizzes' do), My
+    the quizzes'; export, script and styles ride as the quizzes' do), the
+    picture sizes' one (#612: its transformer after the task boxes'; its
+    export rides the transformers index, and its one style rule rides the
+    Print button's component in pictures.scss), My
     Progress's two (#545: its emitter exported beside Quartz's and put
     before Assets; its script and styles ride as the quizzes' do), the
     folder pages' table of contents (#520), and
@@ -1931,6 +1960,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
+        (output_dir / "quartz.config.ts", _wire_picture_sizes_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz" / "plugins" / "emitters" / "index.ts", _wire_emitters_index),
         (output_dir / "quartz.config.ts", _wire_progress_emitter),
