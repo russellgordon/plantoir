@@ -295,23 +295,48 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>
-    /// Put back what a start-of-year write changed: each file still holding
-    /// exactly what was written goes back to what it held before; a file
-    /// changed since is left as it is and named (the assistant's skip rule).
+    /// What an undo of a start-of-year write WOULD do, asked before the
+    /// teacher agrees: the pages it would put back and the ones it would leave
+    /// because they changed since — sorted by the undo's own rule,
+    /// <see cref="UndoVerdict.Of"/> (#564, the mac's <c>whatAnUndoWouldDo</c>),
+    /// so the sheet cannot call a page "left alone" that the undo then treats
+    /// as already back. A page already as it was is in neither list.
     /// </summary>
-    public static (IReadOnlyList<string> PutBack, IReadOnlyList<string> LeftAsTheyAre) UndoStartOfYear(
+    public static (IReadOnlyList<string> PutBack, IReadOnlyList<string> LeftAsTheyAre) WhatAnUndoWouldDo(
         IReadOnlyDictionary<string, (string Before, string After)> written)
     {
         var putBack = new List<string>();
         var left = new List<string>();
         foreach (var (path, (before, after)) in written)
         {
-            string now;
-            try { now = File.ReadAllText(path); } catch { left.Add(path); continue; }
-            if (now != after) { left.Add(path); continue; }
-            File.WriteAllText(path, before);
-            putBack.Add(path);
+            var verdict = UndoVerdict.Of(path, new UndoHistory.FileState(before, after));
+            if (verdict == UndoVerdict.Kind.PutBack) putBack.Add(path);
+            else if (verdict == UndoVerdict.Kind.LeftAlone) left.Add(path);
         }
         return (putBack, left);
+    }
+
+    /// <summary>
+    /// Put back what a start-of-year write changed, by the same verdict: a
+    /// file still holding exactly what was written goes back to what it held
+    /// before; a file already back is left as it is and not counted; a file
+    /// changed since — or one that could not be written — is left and named.
+    /// </summary>
+    public static (IReadOnlyList<string> PutBack, IReadOnlyList<string> LeftAsTheyAre) UndoStartOfYear(
+        IReadOnlyDictionary<string, (string Before, string After)> written)
+    {
+        var (toPutBack, left) = WhatAnUndoWouldDo(written);
+        var putBack = new List<string>();
+        var leftAsTheyAre = new List<string>(left);
+        foreach (string path in toPutBack)
+        {
+            try
+            {
+                File.WriteAllText(path, written[path].Before);
+                putBack.Add(path);
+            }
+            catch { leftAsTheyAre.Add(path); }
+        }
+        return (putBack, leftAsTheyAre);
     }
 }

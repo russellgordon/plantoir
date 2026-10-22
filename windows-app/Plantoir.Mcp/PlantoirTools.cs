@@ -1785,20 +1785,21 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             return Answering(nothingToUndo);
 
         var result = history.Undo();
-        if (!result.Succeeded && result.Restored.Count == 0 && result.Skipped.Count == 0)
+        if (result.Answer == UndoAnswer.NothingToUndo)
             return Answering(nothingToUndo);
         // #355: an undo of getting a section ready leaves its own line.
         AssistWorkspace.NoteIfItUndidAStartOfYear(result, StartOfYearAskedFrom.AnOutsideAssistant);
 
-        // Nothing went back, because every file has been edited since. This
-        // must not read like a success, and a count of files put back reads
-        // exactly like one when the count is zero.
         // Some files went back and the rest were kept, so the entry STAYS on
         // the list: a write with no new undo entry, which the menu's trail
         // reads as "took part of the last change back" (#550, the mac's #531).
-        if (result.Restored.Count > 0 && result.Skipped.Count > 0) workspace.NoteAChangeWithNoUndoEntry();
+        // Files an earlier press already put back are neither (#564).
+        if (result.Answer == UndoAnswer.UndidPartly) workspace.NoteAChangeWithNoUndoEntry();
 
-        if (result.Restored.Count == 0)
+        // Nothing went back, because a file has been edited since. This must
+        // not read like a success, and a count of files put back reads
+        // exactly like one when the count is zero.
+        if (result.Answer == UndoAnswer.CouldNotUndo)
         {
             string refusal = (menu ? AssistWording.CouldNotUndoFromTheMenu(result.Description, result.Skipped.Count)
                                    : AssistWording.CouldNotUndo(result.Description, result.Skipped.Count)) +
@@ -1809,8 +1810,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
         // The wordings are the contract's, not this file's. What a teacher is
         // told about an undo is one of the sentences both apps must say
-        // identically — see contracts/assist-wording.json.
-        string summary = result.Skipped.Count == 0
+        // identically — see contracts/assist-wording.json. Every file back,
+        // even when this press found them all already back, is "undid".
+        string summary = result.Answer == UndoAnswer.Undid
             ? (menu ? AssistWording.UndidFromTheMenu(result.Description) : AssistWording.Undid(result.Description))
             : (menu ? AssistWording.UndidPartlyFromTheMenu(result.Description, result.Skipped.Count)
                     : AssistWording.UndidPartly(result.Description, result.Skipped.Count));
