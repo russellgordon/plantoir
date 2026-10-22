@@ -7709,3 +7709,459 @@ pass that recognises `//` comments and strings (raw ones included) before a
 `/*` can open, and a `/*` that never closes fails the test naming its file —
 so the next occurrence reports its real cause rather than four innocent events
 (`ActivityTrailWiringTests.TheScanReadsAStarStarInACommentAsAComment`).
+
+## The 1.8.5 measurement sitting (#593, #571 items 2–3, #618, #620, #598, #605)
+
+Six issues asked Windows to measure or confirm site behaviour it inherits
+from the shared `support/quartz/` and `scripts/`. Nothing was built for them:
+no product code, contract or test changed. This section says what was run,
+what came out, and what is still owed.
+
+**Hardware and versions** (2026-10-22): Lenovo 20QES70500, Intel Core
+i5-8365U @ 1.60 GHz, 16 GB, Intel UHD Graphics 620, Windows 11 Pro 26200.
+Microsoft Edge 155.0.4283.60 (from Playwright's `browser.version` and from
+`msedge.exe`'s file version); WebView2 Runtime 155.0.4283.62. The runtime is
+Node 20.18.1 and Python 3.11.9 (manifest made 2026-10-22, Pyodide 314.0.7).
+The checks' own Python is 3.14.7 with Playwright for Python. Chrome is not
+installed, so every `<chrome>` argument below is `msedge.exe`.
+
+### The site everything was measured on
+
+The course is a scratch working folder:
+
+- `website/shots/print_set_windows.mirror_toolchain` copied the launchers and
+  `.toolchain\` from this tree.
+- `courses\EXC2O` was copied from `support/example_course`.
+- verify.sh's own plant blocks (lines 1957–3034 at dev 0df44a5f2) ran
+  unchanged under Git Bash, with `python3` pointed at `python`. They planted
+  How I Teach, the printable fixtures, Plain Long Page, the marker fixtures,
+  the #499 pictures, `#609: Picture Fixture`, figures, runnable code, #505,
+  #569, QUIZPLANTS, TASKPLANTS, the #596 authoring examples and Progress
+  Fixture.
+- One page was added for #620 item 4 (below).
+
+The build was the launcher the app runs, not the window:
+`preview.ps1 EXC2O 1 --build-only --non-interactive --full-rebuild`, with
+`PLANTOIR_RUNTIME` set to `windows-app\Vendor\runtime`. It read 355 Markdown
+files and wrote 454. The first full rebuild took 129 s and the second 63 s.
+The site lands in `%LOCALAPPDATA%\Plantoir\builds\<folder id>\EXC2O\section1\public`.
+Each browser check below was given a COPY of that `public\` and started its
+own server, as on the mac; none used the native preview's address.
+
+**Every planted page is CR LF on this side, twice over.**
+
+- On Windows, Python's `write_text` writes `\n` as `\r\n`, so the planted
+  sources are CR LF: Quiz Fixture has 335 CRs, Task Fixture 109, Picture
+  Fixture 151.
+- The build copies every page in text mode, so even an LF source becomes
+  CR LF in the build's `content\`. The LF Quiz Fixture's copy has 335 CRs
+  over 335 lines.
+
+For every fixture except the comparison below, this does no harm. It is
+the very case Windows owed, and the text hook and the answer reader
+normalise CR LF before reading.
+
+### #571 item 2: CR LF and LF read alike
+
+**Method.**
+
+1. After planting, `Quiz Fixture.md`, `Quiz Playground.md` and
+   `Quiz Printable.md` were rewritten with `write_bytes`, once as pure LF
+   (every `\r\n` made `\n`) and once as pure CR LF.
+2. Both versions were counted before building, with `tr -cd '\r' | wc -c`
+   and a byte count in PowerShell:
+
+   | Page | LF build: CRs in the source | CR LF build: CRs / LFs in the source |
+   |---|---|---|
+   | Quiz Fixture | 0 | 335 / 335 |
+   | Quiz Playground | 0 | 88 / 88 |
+   | Quiz Printable | 0 | 23 / 23 |
+
+3. Build A used the LF pages and build B the CR LF pages. Both were
+   `--full-rebuild`, and nothing else in the course changed.
+4. verify.sh's 6k check (`QUIZPY`, verbatim) ran against each build's
+   `public\` and that build's own log. The log was passed as a Windows path,
+   and two assertions were put in front of the check: the log exists, and it
+   holds at least one `plantoir: error:` line. Without them, a missing log
+   would pass "no `readDifferently`".
+5. A second reader recorded each quiz's kind, problem, data,
+   `data-quiz-hash` and title text on the four quiz pages.
+
+**Results.**
+
+- **6k passed on both builds.** Each log had 32 `plantoir: error:` lines.
+  Eighteen of them were Quiz Fixture's, as the contract's cases expect,
+  along with one `quizzesNotReady` finding for "18 self-check questions".
+  The other 14 belong to other fixtures and are expected on Windows: 2 are
+  Figures Fixture's deliberately broken drawings (functionplot block 3 and
+  tikz block 6, `\foo`), and 12 are "Swift programs cannot be made ready"
+  lines (Swift Playground 7, Runner Fixture 3, Quiz Playground 2), because
+  Windows compiles no Swift (#570).
+  Neither log contained the `readDifferently` sentence ("the site and the
+  folder check read this question differently…").
+- **The two builds read alike, to the byte.** All four pages gave identical
+  records: Quiz Fixture's 37 quizzes, Quiz Playground's 9, Quiz Printable's 2
+  and Quiz CRLF's 1. Kinds, problems, answers, correct choices and
+  `data-quiz-hash` all matched, and so did the `plantoir: error:` lines,
+  line for line.
+- **A CR LF page renders its nested answer under its title.**
+  `Quiz-CRLF.html` is CR LF at the source (11 CRs). Its title holds only
+  "Simplify 2³ · 2⁴". The answer is a separate hidden `plantoir-quiz-answer`
+  block (`Answer: 2^7`), and the explanation is its own folded `[!explain]`
+  callout. `data-quiz` is `{"answers":["$2^7$"]}`. In both builds, no title
+  on any of the four pages contained `[!answer]`, `[!explain]`, `> >`,
+  "Answer" or "Why".
+
+### #598: no page-view counter, and Mermaid draws under the Netlify policy
+
+**No page-view counter.** `Select-String plausible.io` found nothing in
+`public\postscript.js` (172,710 bytes), and nothing across all 454 files in
+`public\`. The bare word `plausible` matched twice, both in a rubric's text
+("instruments are plausible"): once in `Tasks/Space-Mission-Proposal.html`
+and once in the search index. The build's `quartz.config.ts` says
+`analytics: null,`.
+
+**Mermaid draws.** This followed verify.sh's recipe:
+
+1. Clone `public\`.
+2. On the clone, run `deploy.py`'s own two writers in deploy order:
+   `isolation_headers.publish_headers(site, "netlify")`, then
+   `netlify_badge.write_netlify_headers_file`.
+3. Run
+   `node --experimental-websocket browser-checks/mermaid_draws.mjs <edge> <clone> /Printable-Fixture.html`.
+
+It printed **`OK: 2 of 2 diagrams drawn, 0 requests blocked by the policy,
+under the policy _headers carries`** (3.8 s).
+
+The site does not carry its own Mermaid. The only Mermaid address in the
+built files is Quartz v4.5.0's
+`https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs`,
+and the policy's `script-src` now names `https://cdnjs.cloudflare.com`. That
+is #594's design: allow the host rather than carry the engine. The policy
+was the one a deploy to Netlify writes, but nothing was deployed; checking
+live Netlify is `verify-deploy.ps1`'s job.
+
+Every `.mjs` check in this section ran on the runtime's own Node 20.18.1
+(`windows-app\Vendor\runtime\node\node.exe`) with
+`--experimental-websocket`, because the checks expect Node 22's built-in
+WebSocket. That is the same arrangement as doc 12's earlier browser
+measurements.
+
+On Git Bash, run the check with `MSYS_NO_PATHCONV=1`. Without it the
+`/Printable-Fixture.html` argument becomes
+`C:\Program Files\Git\Printable-Fixture.html`, and the check fails with
+"no such page".
+
+### #605: My Progress
+
+`python scripts/test_my_progress.py` ran 27 tests, OK, in 1.4 s, and
+`PythonToolchainTests` ran the same file green (see Tests below). There was
+nothing to build.
+
+A note for #599's readers: **Alt-click on Windows is the mac's
+Option-click**. Each item's words come from the built label, and maths is
+listed as 06 → L6 describes.
+
+### #618 and #620: pictures sized in the HTML and laid out before they scroll
+
+**The built text.** verify.sh's `SIZESPY` ran verbatim (exit 0), alongside
+a parser over every `<img>`. In `Picture-Fixture.html`:
+
+| Picture | Built `<img>` |
+|---|---|
+| `plantoir-hazard-wide.png` | `width="600" height="200"`, `data-pl-sized` |
+| `plantoir-hazard-tall.png` | `width="400" height="1800"`, `data-pl-sized` |
+| `plantoir-hazard-viewbox.svg` | `width="auto" height="auto"`, no marker |
+
+`index.css` carries both `html body img[data-pl-sized]{height:auto}` (#612)
+and `html body img{content-visibility:visible}` (#609). So the bundle's copy
+of `support/quartz/` carries the transformer, the wiring found its
+`PlantoirTasks` anchor, and Node on Windows resolved the course's POSIX file
+names to the pictures.
+
+**The reader, by hand (#620 item 4).** Four fixtures from
+`scripts/fixtures/picture-sizes/` were copied into `Media\` and embedded
+bare on a page of their own, `Picture Sizes Hand`:
+
+| Picture | Built `<img>` |
+|---|---|
+| `jpeg-hand-II-o6.jpg` | `width="40" height="120"`, `data-pl-sized` |
+| `png-exif-o6.png` | `width="40" height="120"`, `data-pl-sized` |
+| `named-svg-cm.svg` | `width="302" height="151"`, `data-pl-sized` |
+| `named-svg-viewbox-only.svg` | `width="auto" height="auto"`, no marker |
+
+These are the answers the mac's oracle holds the same JavaScript to.
+
+**The browser check.**
+`node --experimental-websocket browser-checks/picture_heights.mjs <edge> <public copy>`
+takes the site FOLDER and serves it itself. It ran three times, 6.8–7.0 s
+each, and printed the same line every time:
+
+> OK: with their bytes held, 600 x 200 and 400 x 1800 px from the page
+> alone and unchanged when they arrived (page 11520 px both ways); 3
+> pictures laid out before any scroll (200 px tall at 3075 px down, 2400 px
+> tall at 4721 px down, 1800 px tall at 8567 px down, window 805 px), the
+> page staying 11520 px tall scrolling to each (11520, 11520, 11520); 358 x
+> 119 and 358 x 1611 px in a 390 px window
+
+Each of the three phases matches #620's numbers:
+
+- A: 600 × 200 and 400 × 1800.
+- B: 3 pictures laid out.
+- C: 358 × 119 and 358 × 1611.
+
+This run covers #618 too. Its own expected "2 pictures" line predates
+#612's third picture, the viewBox-only SVG, which is now the picture that
+proves #609's rule.
+
+`test_quartz_additions_wiring.py` passed 14 tests, OK, both directly and
+through `PythonToolchainTests`. That includes
+`test_the_print_buttons_component_carries_the_picture_rule` and the #612
+wiring cases.
+
+**Not done: the WebKit leg.** It is owed when #597 lands. Edge is Chromium,
+where the shift never showed.
+
+### #593: task boxes, and the one-blank line
+
+**The mac's `browser-checks/task_boxes.mjs`, in headless Edge.** Run
+unchanged, it got through every section before paper, then stopped at
+`pdftotext -bbox`. The only `pdftotext` here is Git for Windows' xpdf 4.06,
+which has no `-bbox`, and poppler's `pdftoppm` is not installed. No system
+software was installed for this. Instead, a scratch copy was run whose only
+change replaced section 9's ink read with "keep the four PDFs". Everything
+else ran as written and printed (29 s):
+
+> OK: 29 boxes on the fixture, ticks kept and restored, words, a link, Tab
+> and Space, a transcluded copy in step, five round trips and one
+> listener, the router's reused box showing its own page, a not-ready quiz
+> left alone, storage refused, twins: Twin B reused Twin A's box yes; …;
+> handout boxes x__ (the page showed x__); storage refused: handout xx_
+> (the page showed xx_)
+
+That covers item 1 — tick, untick, reload, navigation by the site's own
+links with the router reusing a box, and transclusion setting its source's
+tick — and Tab then Space.
+
+**Ink on paper (item 2), read without poppler.** The four PDFs are
+`Page.printToPDF` with `printBackground: false` on US letter: Task Printable
+and Task Twin A, each in light and dark. They were read in headless Edge:
+
+1. pdf.js 4.10.38 (legacy build, from jsdelivr) rendered each sheet to a
+   canvas at 150 dpi.
+2. The canvas was turned to grey with Rec. 601 luma, as `pdftoppm -gray`
+   does.
+3. Word boxes came from pdf.js's text layer (ascent 0.9 and descent 0.25 of
+   the font size). Latin Modern's "fi" ligature has no text there, so
+   "first" was matched as "rst".
+4. Each box was judged by `task_boxes.mjs`'s own `boxInk` and
+   `boxInkThrough`, lifted verbatim from the file, with its own thresholds:
+   at least 20 inked pixels in the ticked box, at most 3 in the unticked
+   one.
+
+| Paper | Ticked box (inked px, w × h px) | Unticked box |
+|---|---|---|
+| printable, light | 47, 26 × 16 | 0, 26 × 17 |
+| printable, dark | 47, 26 × 16 | 0, 26 × 17 |
+| plain (Twin A), light | 62, 25 × 21 | 0, 25 × 20 |
+| plain (Twin A), dark | 62, 25 × 21 | 0, 25 × 20 |
+
+All four pass. This re-implements the mac's pixel read rather than running
+the mac's tool. The only difference is where the word boxes come from
+(pdf.js rather than poppler's `-bbox`); how a box is judged is the same.
+
+**Site data BLOCKED (item 2).** The mac check's "storage refused" replaces
+`localStorage` with a getter that throws. Here the browser itself refused
+storage:
+
+- A persistent headless Edge profile was started whose `Default\Preferences`
+  holds `profile.content_settings.exceptions.cookies` =
+  `{"http://127.0.0.1:8765,*": {"setting": 2}}`, Block for that origin. The
+  setting was still in place after the run.
+- On Task Printable, `localStorage.setItem` threw `SecurityError: Failed to
+  read the 'localStorage' property from 'Window': Access is denied for this
+  document.`
+- Tab reached the first box and Space ticked it: `_x_` became `xx_`.
+- Print ▸ Questions only laid out the handout with `xx_`, and the page still
+  showed `xx_` afterwards.
+
+**Item 4, the one-blank line.**
+
+- On `Quiz One Blank`, typing "London" and pressing Enter says **"Not quite.
+  Try again, or show the answer."** That is exactly what
+  `quizCallouts.feedback.blanks` gives for `{count: 1, right: 0}`, which says
+  `words.site.notRight`. The check read both from the contract and compared
+  them as strings.
+- "Paris" says "Right!".
+- With two blanks and one right, it says "1 of 2 blanks is right. Try again,
+  or show the answer." (case `{2, 1}`).
+
+The same in light and dark, and in `quiz_check.mjs`.
+
+**Item 3 (Narrator): OWED, not passed.** What a screen reader is HANDED was
+read from the DOM (below, under #571). That is a proxy for what Narrator
+says, not a measurement of it. Narrator itself still has to be listened to
+on a desktop.
+
+### #571 item 3: the four kinds in Edge, keyboard only, and paper
+
+**The mac's `browser-checks/quiz_check.mjs`, unchanged** (42 s), printed:
+
+```
+FAIL: Swift run in a choice prints its output: {"status":"This program isn't ready to run yet.","output":""}; Swift run in the revealed explanation prints its output: {"status":"This program isn't ready to run yet.","output":""}
+```
+
+That is its whole problem list: the two Swift lines and nothing else.
+Windows compiles no Swift (#570), and the build reported
+`swiftCouldNotBePrepared` for 12 blocks on 3 pages. A copy whose only change
+expects those two runs to be "not ready" printed:
+
+```
+OK: 9 quizzes, every kind wrong then right, the shuffle in 20 orders over 20 loads, the score kept and cleared, five page changes clean, a transcluded quiz on its own, Swift in a choice and an explanation ("", ""), paper and the handout questions only
+```
+
+(40 s.)
+
+**Keyboard only, light and dark.** A Playwright script drove headless Edge
+at 1280 × 900, with `color_scheme` and `saved-theme` set to each theme, on
+Quiz Playground:
+
+| Kind | Wrong | Right |
+|---|---|---|
+| Single choice (reached by 27 Tabs from the top) | Space on choice 1, Enter on Check: `notRight` | Shift+Tab back, ArrowDown: `right` |
+| Select all | Space on 2 and on 4: `notRight` | Space to tick 5 and untick 4: `right` |
+| Short answer | "2^8", Enter: `notRight` | "2^7", Enter: `right` |
+| Fill in the blank | "100" / "on the moon": "1 of 2 blanks is right…" | "sea level": `right` |
+
+Enter on a folded quiz's title turned its `aria-expanded` from "false" to
+"true", and its content stopped being inert. The feedback text was
+rgb(74, 87, 74) on rgb(247, 250, 245) in light, and rgb(207, 224, 201) on
+rgb(18, 21, 18) in dark.
+
+**What a screen reader is handed (the proxy).** On the page's second quiz,
+the choices are a `FIELDSET` whose `aria-labelledby` resolves to the
+question ("Which graph shows y=(x−3)2+2?"). The blanks are labelled
+"Blank 1 of 2" and "Blank 2 of 2". Feedback is `role="status"`
+`aria-live="polite"`. Real Narrator speech is OWED.
+
+**Ctrl+P's paper and the handout.**
+
+- `page.pdf` of `Quiz Printable` (print media, `print_background=False`,
+  letter) is 1 sheet in both themes. Its text (`pdftotext -enc UTF-8 -raw`)
+  has both questions and neither `printable-answer-7f3a` nor
+  `printable-explain-7f3a`.
+- The handout, questions only, was reached by
+  `#plantoir-print=questionsOnly&paper=portrait` and read from its frame as
+  it printed. In both themes it has the questions and neither sentinel.
+- **No answer was revealed before printing**, in my script or in
+  `quiz_check.mjs`. Its paper step (8a) runs on a page freshly loaded by the
+  twenty shuffle loads before it, and asks that no button, feedback, answer
+  or explanation is displayed under print media. So what paper shows after
+  a student pressed Show answer, or got a question right and opened its
+  explanation, is OWED in Edge as well as in the pane.
+
+**Why 27 Tabs here and 10 in the pane.** The count depends on the window,
+not on the quiz. At 1280 px wide, Quartz lays out both sidebars, and their
+links (search, the explorer, the page's table of contents) come before the
+article in Tab order. In the 984 px pane, Quartz's narrower layout has fewer
+of them. The elements were not counted one by one.
+
+### Tests
+
+`dotnet test Plantoir.Tests/Plantoir.Tests.csproj --filter
+FullyQualifiedName~PythonToolchainTests`: **Passed 77, Failed 0, Skipped 0,
+Total 77** (2 m 49 s). The 77 count FILES, not Python test cases: 75 are the
+discovered `scripts/test_*.py` (one `[Theory]` row each), and 2 are the
+class's own `[Fact]`s. That run includes `test_my_progress.py`,
+`test_quartz_additions_wiring.py`, `test_quizzes.py`,
+`test_task_box_contrast.py` and `test_quartz_analytics_off.py`.
+
+Run directly:
+
+| File | Result |
+|---|---|
+| `test_quizzes.py` | 19 tests, OK |
+| `test_task_box_contrast.py` | 4 tests, OK (the tick at least 6.06:1 light, 12.19:1 dark) |
+| `test_quartz_analytics_off.py` | 6 tests, OK |
+| `test_netlify_badge.py` | 19 tests, OK |
+
+### #571 item 3 in the WebView2 preview pane
+
+Measured 2026-10-22 on the same PC, on an unlocked desktop, in this branch's
+own x64 Debug build. The app was started with `--state-dir` pointing at a
+scratch state folder whose `settings.json` named the scratch working folder,
+plus `--auto-preview EXC2O 1`, which is the Preview button's own code path.
+The pane showed the app's own preview, Quartz's server at
+`http://127.0.0.1:8081` started by the app from its bundled runtime, about
+40 s after launch.
+
+The pane was driven over WebView2's debugging port
+(`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333`,
+Playwright `connect_over_cdp`). Its keys are therefore Chromium input events
+sent to the page, not the OS keyboard. The user agent was
+`… Chrome/155.0.0.0 … Edg/155.0.0.0` (WebView2 Runtime 155.0.4283.62), and
+the pane was 984 × 603 CSS px.
+
+Each theme was set with `prefers-color-scheme` and `saved-theme`, and the
+pane was photographed in both. The same script steps as in Edge above
+passed in light AND dark:
+
+| Quiz | What was done | Feedback |
+|---|---|---|
+| Single choice | 10 Tabs from the top; Space on the wrong choice, then Shift+Tab back and ArrowDown | `notRight`, then `right` |
+| Select all | Space on the boxes | `notRight`, then `right` |
+| Short answer | typed, then Enter | `notRight`, then `right` |
+| Fill in the blank | typed both blanks, then Enter | "1 of 2 blanks is right. Try again, or show the answer.", then `right` |
+| One blank (`Quiz One Blank`) | a wrong answer | exactly `feedback.blanks` {1, 0} = `notRight` |
+
+Other things seen:
+
+- Enter on a folded quiz's title opened it, and its content stopped being
+  inert.
+- The blanks were labelled "Blank 1 of 2" and "Blank 2 of 2".
+- The question labels the choices' `FIELDSET`.
+- Feedback was `role="status"` `aria-live="polite"`.
+- The feedback colours were Edge's to the value: rgb(74, 87, 74) on
+  rgb(247, 250, 245) in light, rgb(207, 224, 201) on rgb(18, 21, 18) in
+  dark.
+
+**Paper and the handout in the pane.**
+
+- **⌘P/Ctrl+P's layout.** `Page.printToPDF` is headless-only, so the paper
+  was read as the pane lays the page out under print media
+  (`Emulation.setEmulatedMedia` print, `body.innerText`). In both themes,
+  `Quiz Printable` showed both questions and neither `printable-answer-7f3a`
+  nor `printable-explain-7f3a`. Two limits on this:
+  - The quizzes were unanswered when it printed; the paper of a quiz whose
+    answer the student revealed was not looked at.
+  - The 2026-10-15 measurement in "Printable pages" above (WebView2
+    155.0.4283.45, a printable page with NO quizzes) shows only that a real
+    Ctrl+P in the pane opens WebView2's own print window. It says nothing
+    about quizzes.
+- **The handout.** The app's print shim was present in the pane
+  (`window.webkit.messageHandlers`), so the app's Print ▸ Questions only
+  hands the handout to the teacher's browser. The browser half is the Edge
+  measurement above. In the pane's own frame, with the shim taken away so
+  `print.inline.ts` takes its own path, Print ▸ Questions only laid out a
+  handout holding the questions and neither sentinel.
+
+**A real OS Ctrl+P was not sent to the pane.** `WScript.Shell.AppActivate`
+reported success but did not bring the app forward on this desktop, so the
+one `SendKeys("^p")` went to the terminal in front instead. Nothing visible
+happened, and no further keys were sent. A real keystroke in the pane needs
+the window brought forward by hand, or by UI Automation as `DrivenApp`
+does.
+
+### Still owed after this sitting
+
+- **Narrator** (#593 item 3, #571 item 3): Tab to a box reads its words,
+  Space ticks it, and a link in an item still navigates; the question is
+  read as the group's label, the blank as "Blank 1 of 2", and feedback is
+  announced. Only the proxy above has been measured, in Edge and in the
+  pane. Someone has to listen to Narrator itself.
+- **A real Ctrl+P in the pane on a quiz page with an answer REVEALED**, and
+  the same in Edge: what paper shows after Show answer, or after a right
+  answer opens its explanation. Not measured anywhere in this sitting. The
+  2026-10-15 measurement covers only that Ctrl+P opens the print window, on
+  a page with no quizzes.
+- **The WebKit leg** of #618 and #620, once #597 lands.
