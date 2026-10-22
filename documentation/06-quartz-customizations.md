@@ -585,7 +585,9 @@ on its next preview:
 | `components/scripts/printRules.ts` | The rules with no DOM and no imports — answer/question/unfold roles, labels and answer places, question numbering, part letters and columns, title cleaning, page labels, the paper box, the footer, which callouts keep a box, the code box, the completeness decision, and the `@page`/`@font-face` text both ⌘P and the handout write — so `scripts/check_print_rules_against_the_site.py` can bundle it with the scaffold's esbuild and run every contract case in Node (verify.sh). `PlantoirMetaLine.tsx` imports it too, so ⌘P's page box and the handout's cannot drift. |
 | `components/scripts/print.inline.ts` | The button, the handout, ⌘P and the preview handoff (F3–F5). Bundled into every site; inert unless the page carries a printable meta line. |
 | `components/styles/sidebarPageMarker.scss` | Not print: the sidebar's page dot (#515, H). Rides on `PlantoirMetaLine`'s `concatenateResources` as `figures.scss` does, so no wiring edit; reaches every page's `index.css`. |
-| `components/styles/pictures.scss` | Not print: every picture laid out at its real height before it scrolls into view (#609, M) — one rule overriding Quartz's `img { content-visibility: auto }`. Rides on `PlantoirMetaLine` the same way; reaches every page's `index.css`. |
+| `components/styles/pictures.scss` | Not print: every picture laid out at its real height before it scrolls into view (#609, M) — one rule overriding Quartz's `img { content-visibility: auto }` — and, since #612 (N), `height: auto` for the pictures the build sized (`img[data-pl-sized]`). Rides on `PlantoirMetaLine` the same way; reaches every page's `index.css`. |
+| `plugins/transformers/plantoirPictureSizes.ts` | Not print: writes each local picture's real `width` and `height` and the marker `data-pl-sized` at the html stage, straight after `PlantoirTasks` (#612, N). Exported by the transformers index and wired into `quartz.config.ts` by `wire_quartz_additions`. |
+| `plugins/transformers/pictureSizes.js` | Not print: the dependency-free reader of a picture's own size and the attribute rule (#612, N). Plain JS so `scripts/check_picture_sizes_against_the_site.py` imports the same file in Node and holds it to Pillow. |
 | `components/styles/print.scss` | On-screen button styles, ⌘P rules under `@media print { html.plantoir-printable … }`, and handout rules under `html.plantoir-print-frame`. No bare `@page` anywhere (review B2: it cannot be scoped). |
 
 Two marker edits wire them in (`wire_quartz_additions`, idempotent, ALWAYS):
@@ -3140,6 +3142,16 @@ its rule taken out: red three runs out of three (`plantoir-hazard-wide.png,
 3067 px down the page, had no height before it was scrolled to (0 px)`), green
 three out of three with it back.
 
+**Since #612 this is phase B of three** (N4). The two PNGs now carry their
+real sizes in the HTML, which gives them a size even under
+`content-visibility: auto`, so they can no longer prove this rule: with it
+removed the old two-picture check stayed GREEN. Picture Fixture therefore
+gained a third picture the build deliberately cannot size — the viewBox-only
+`plantoir-hazard-viewbox.svg`, between paragraphs 45 and 46 — and it is now
+the one that goes red without the rule: `plantoir-hazard-viewbox.svg, 4714 px
+down the page, had no height before it was scrolled to (0 px)`, three runs
+out of three (2026-10-22).
+
 ### M5. Rejected
 
 - **Gating it per page** (`GATED_ASSETS`, `scripts/page_features.py`) — that
@@ -3158,32 +3170,220 @@ three out of three with it back.
   six false jumps scrolling up. A meter that counts only leaf blocks inside
   the window reads 0 there. Evidence, not a gate.
 
-### M6. The known gap: a slow first visit (#612)
+### M6. The known gap: a slow first visit (#612) — closed by N
 
 The rule fixes pictures that are cached or arrive quickly, which is the case
-reported. It does **not** fix a first visit on a slow network: Quartz writes
-`height="auto"` (not a valid value) and, for a bare `![[x.png]]`,
-`width="auto"`, so a picture whose bytes have not arrived has no aspect ratio
-and no size in ANY engine, with or without the rule — and Netlify serves
-pictures `max-age=0, must-revalidate`, so every visit pays a round trip.
-Measured with each picture's bytes delayed (600 ms + 350 ms per picture, a
-reader scrolling in bursts): 14 jumps, largest 587 px, in BOTH engines with
-the rule; 0 in both with real `width`/`height` attributes plus
-`img { height: auto }`, with or without the rule. With the bytes held and
-never answered, all 15 pictures are 0 px tall in both engines and the page is
-4,714 px tall instead of 9,675. Writing each picture's real size into the
-HTML at build time is
-[#612](https://github.com/russellgordon/plantoir/issues/612) (v1.9.0): it
-changes every page's HTML, so it is its own piece. When it lands, strengthen
-this check: hold the pictures' bytes (CDP `Fetch.requestPaused`) and still
-ask for a height above 0 — red today, green with the attributes.
+reported. It did **not** fix a first visit on a slow network, because Quartz
+writes `height="auto"` (and `width="auto"` for a bare picture), so a picture
+whose bytes have not arrived has no size in any engine, with or without the
+rule. That is [#612](https://github.com/russellgordon/plantoir/issues/612),
+shipped in v1.8.5: the build now writes each picture's real width and height
+— **section N**, which has the cause, the numbers and the check.
+
+## N. Pictures sized in the HTML (#612, v1.8.5)
+
+On a first visit over a slow network the text still jumped, in BOTH engines:
+Quartz writes a picture as `width="600" height="auto"` (`|600`) or
+`width="auto" height="auto"` (bare), and `auto` is not a valid value for
+either attribute, so until a picture's bytes arrive it has no aspect ratio
+and no size at all. As each picture landed, everything below it moved down by
+its whole height. Netlify serves pictures `max-age=0, must-revalidate`, so
+every visit pays at least a round trip per picture. M's rule cannot help:
+there is nothing to lay out until the bytes are there.
+
+### N1. The fix
+
+The build writes each picture's real `width` and `height` into the `<img>`,
+plus a marker, and one CSS rule lets the shape do the rest:
+
+- **`support/quartz/plugins/transformers/plantoirPictureSizes.ts`**, an
+  html-stage transformer wired straight after `PlantoirTasks`
+  (`build_site._wire_picture_sizes_transformer`, anchored on
+  `Plugin.PlantoirTasks(),`; a missing anchor is said in plain words and the
+  pictures are left as Quartz writes them). It is after `CrawlLinks`, so every
+  `src` is final. For each `<img>` whose src is not remote and not `data:`, it
+  decodes the src, strips `?query` and `#hash`, joins it to the page's folder,
+  tidies `.` and `..`, and looks it up among the course's own files by slug —
+  `ctx.allSlugs` zipped with `ctx.allFiles`, which is exactly where Quartz's
+  Assets emitter writes each file, so the lookup is the inverse of the
+  emit. The map is built once per list (a preview's rebuild replaces both
+  arrays, so the map follows). The size is cached by path, modification time
+  and length.
+- **`support/quartz/plugins/transformers/pictureSizes.js`**, plain JS with no
+  dependency but Node's `fs`, so the same file is imported by the transformer
+  and by the check. It reads a picture's own size from its first 256 KiB
+  (the whole file when that is not enough — the answer never depends on
+  where the first read stopped; the check proves it from a 16-byte read):
+  PNG (IHDR, and an `eXIf` orientation before the first IDAT), GIF (the
+  logical screen, only when the first frame fills it), JPEG (the first frame
+  header, with the EXIF orientation in either byte order; 5–8 swap width and
+  height, as `image-orientation: from-image` does), WebP (VP8, VP8L, VP8X),
+  BMP, and SVG (the ROOT element's `width`/`height` in px or unitless, or
+  cm/mm/in/pt/pc at 96 px to the inch; comments, prolog and DOCTYPE skipped;
+  attribute names case-sensitive, as browsers read them).
+- **The attribute rule** (`sizedAttributes`): a style attribute, a height
+  that is not `auto` (a teacher's `|600x400`, a raw `<img height>`), or a
+  width that is neither `auto` nor a whole number (`50%`, `300px`) → the tag
+  is left exactly as written. A whole-number width is kept and the height
+  follows the picture's shape (`|520` on a 1400 × 1580 picture → 520 × 587).
+  No width → the picture's own width and height. An SVG with only a viewBox
+  gets a size only when a width was given. Anything it cannot read → nothing.
+- **`pictures.scss`**: `html body img[data-pl-sized] { height: auto; }`, next
+  to M's rule and carried the same way. Only the marked pictures: the global
+  `img { height: auto }` the issue first proposed CHANGES a teacher's
+  `|600x400` (measured: 600 × 400 drawn as 600 × 300 at 1440 wide, 358 × 400
+  as 358 × 179 at 390). Without the rule at all, a sized picture in a column
+  narrower than its width attribute is squashed: 358 × 200 instead of
+  358 × 119 in a phone's window.
+
+**The invariant**: once its bytes have arrived, every picture is drawn exactly
+the size it was in 1.8.4 — the only difference measured is an SVG sized in cm,
+302.4 × 151.2 before and 302 × 151 now. What changes is only the time before
+the bytes arrive.
+
+Print is unchanged: the handout's `imagesReady` (`print.inline.ts`) already
+wrote exactly these attributes at print time, and ⌘P's `print.scss` already
+sets `height: auto`.
+
+### N2. Measured (2026-10-22, M4 Pro, macOS 26.6)
+
+Playwright 1.63, WebKit 26.6 and Chromium, 1440 × 860; the reader scrolls in
+bursts (10 × 12 wheel ticks of 90 px, a pause after each); pictures answered
+600 ms + 350 ms × n late; three runs each; a 15-picture page with the live
+"Your First Playground" page's sizes and `|W` widths. Built through the real
+image, origin/dev (v1.8.4) against this branch:
+
+| | WebKit down | Chromium down | WebKit up | Chromium up | pictures 0 px tall at load |
+|---|---|---|---|---|---|
+| v1.8.4 | 14, 14, 14 jumps, largest 587 px | 14, 14, 14, largest 587 | 5, largest 587 | 5, largest 587 | 15 of 15 |
+| with #612 | 0, 0, 0 | 0, 0, 0 | 0 | 0 | 0 of 15 |
+
+Page height during the slow scroll: 4,499 → 9,404 px in 16 steps before;
+9,406 → 9,404 after (a `|W` picture's height is rounded, 586.8 → 587, and the
+natural ratio takes over once the bytes arrive — under the meter's 2 px).
+
+Once every picture has arrived, every article picture's box (left, top,
+width, height) and the page height compared between the two builds, both
+engines, 1440 and 390 wide, on the 15-picture page, verify.sh's Picture
+Fixture and an edge-case page of 24 pictures (px, cm and viewBox-only SVGs,
+GIF, animated GIF, EXIF-rotated JPEG bare and `|300`, WebP, BMP, a broken and
+a missing file, `|600x400`, `|caption|250`, `|50%`, a Markdown picture, a
+remote one, and raw `<img>` tags with `width="50%"`, `width="300px"`,
+`style="height:100px"`, `style="max-height:100px"` and `style="width:50%"`):
+0 boxes differ except the cm SVG above; page heights identical (within that
+one pixel). First contentful paint, five loads: WebKit 130–142 ms before,
+126–171 after; Chromium 116–148 before, 120–172 after — noise.
+
+Publishing: #612 alone changes `index.css` and every page that shows a local
+picture, nothing else — but every page is already re-uploaded on every
+publish today (Quartz's element ids are random per build: the planner measured 304 of
+304 pages differing between two builds of identical content, and `deploy.py`
+deploys by digest), so it adds no new class of upload. Nothing that decides
+"already published" reads built bytes.
+
+### N3. The reader's oracle
+
+`scripts/check_picture_sizes_against_the_site.py`, run by verify.sh in the
+image (it needs Node and Pillow, so it is a `check_*`, not a `test_*`):
+`pictureSizes.js` reads every file in the COMMITTED corpus
+`scripts/fixtures/picture-sizes/` (54 small files; how each was drawn is
+`scripts/fixtures/make_picture_sizes_corpus.py`). Each picture Pillow can
+decode must be read exactly as `ImageOps.exif_transpose(picture).size`, and
+each it cannot decode as null (35 files: every format, palette, grey, CMYK,
+progressive, interlaced, animated, lossless and alpha, EXIF orientations 1–8,
+PNG `eXIf`, JPEG fill bytes, a PNG cut short and a PNG with no picture data);
+19 named cases hold (the SVGs, which Pillow cannot read, and the files where
+the engines disagree, below); every answer is the same from a 16-byte first
+read; and 19 cases of the attribute rule hold. Pillow writes EXIF only
+big-endian, so four JPEGs carry an EXIF block built byte by byte, two of
+them little-endian — without them the `II` branch, which Windows tools and
+many phones write, is never reached. Proven red by copy-and-restore: with
+the orientation swap removed, 8 of the 35 disagree (o5–o8, the three
+hand-built swaps, the PNG `eXIf`); with little-endian forced off, the two
+`II` files.
+
+Deliberately NOT sized, each measured in both engines by the plan or its
+review:
+- **a WebP with EXIF**: WebKit honours its orientation and Chromium ignores
+  it, so no one width and height is right in both;
+- **a GIF whose first frame does not fill its logical screen**: drawn
+  200 × 100 by one engine and 100 × 50 by the other;
+- **a bare SVG with only a viewBox**: today it is drawn at the column's
+  width (790 × 1185); sized from its viewBox it became 300 × 450;
+- **HEIC and TIFF**: Chromium cannot draw them.
+
+### N4. The checks
+
+- **Built text** (verify.sh, Chrome-free, after the fixture build): the
+  built `Picture-Fixture.html`'s two PNGs carry `width="600" height="200"`
+  and `width="400" height="1800"` with the marker, and the viewBox-only SVG
+  is still `width="auto" height="auto"` with no marker. Read with a parser,
+  because Quartz writes the attributes in a different order for an embed
+  (`src, width, height, alt`) than for a Markdown or raw picture. Also
+  `html body img[data-pl-sized]{height:auto}` in the built `index.css`.
+- **`browser-checks/picture_heights.mjs`**, three phases on Picture Fixture:
+  - **A (#612)**, the two PNGs' downloads HELD (CDP `Fetch.enable` with a
+    pattern for each, never answered): each picture must already be drawn at
+    its own shape from the page alone, and when the bytes are let through
+    neither the picture nor the page may change height. **Trap, measured by
+    the planner:** `await document.fonts.ready` never resolves while a
+    picture is held — Chrome holds that promise until the document finishes
+    loading — so this phase waits on `document.fonts.status === "loaded"`
+    and four steady reads of the page's height instead.
+  - **B (#609)**, M4's check, on all three pictures.
+  - **C (#612)**, a 390 × 844 window (`Emulation.setDeviceMetricsOverride`):
+    each sized picture within 1 px of its width × its own shape.
+
+Must-fail, each by copy-and-restore of the source and a rebuilt image, three
+runs each (2026-10-22): v1.8.4's `pictures.scss` and `build_site.py` with the
+two new files removed → red in A (`plantoir-hazard-wide.png was 600 x 0 px
+before its bytes arrived; its own shape makes that 600 x 200`, `the page was
+9626 px tall before the pictures' bytes arrived and 11626 px after`); M's rule
+removed → red in B on the SVG; the `[data-pl-sized]` rule removed → red in C
+(`in a 390 px window plantoir-hazard-wide.png was 358 x 200 px; its own shape
+makes that 358 x 119`). Green three out of three with everything back.
+
+### N5. Rejected
+
+- **A Pillow pass over the built site.** A preview is Quartz's own
+  `build --serve`, and an edit during a preview rebuilds in Node with no
+  Python in the loop, so the first edit would lose every size.
+- **A Pillow-written list of sizes the transformer reads** (the figures
+  pattern). Right for a publish, but a picture added during a preview would
+  stay unsized until the preview restarted, at about twice the code.
+- **`sharp`**: in Quartz's `node_modules`, but nothing Plantoir runs uses it
+  (`CustomOgImages` is off), and its Windows binary has never been exercised.
+- **A global `img { height: auto }`**: changes a typed `|600x400` (above).
+- **Sizing a viewBox-only SVG from its viewBox**: shrinks it (above).
+- **An inline `aspect-ratio` style** instead of attributes: a style would
+  outrank a teacher's own CSS and gives the handout's `imagesReady` nothing
+  to read; width and height attributes are what browsers already turn into
+  an aspect ratio.
+
+### N6. Known gaps
+
+- **Pictures the build cannot size** — remote addresses, missing or broken
+  files, the formats above, a raw `<img>` with a `%` width or a style — are
+  left exactly as Quartz writes them, so on a slow first visit they still
+  move the text when they arrive, as in 1.8.4. M's rule still lays them out
+  the moment their bytes are there. Nothing is wrong with the teacher's page,
+  so nothing is said to the teacher.
+- **A picture REPLACED during a preview** with one of a different size keeps
+  its OLD width and height on any page not rebuilt since — a page not edited
+  during that preview — until the preview restarts (the plan review measured
+  it under `quartz build --serve`: an 800 × 400 picture replaced by a
+  1600 × 400 one stayed `width="800" height="400"` on an unedited page). Once
+  its bytes arrive the new picture's shape wins (`height: auto`), but at the
+  old width. A page edited during the preview, or a picture ADDED during it,
+  is sized right. A publish is always a fresh build and is never affected.
 
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
 except the page marker H adds on top of them from `support/quartz`, and
 Quartz's `img { content-visibility: auto }`, which M overrides so pictures
-are laid out before they scroll into view — with six asset exceptions, all in
+are laid out before they scroll into view, and the pictures' `width` and
+`height`, which N writes from each picture's own file — with six asset exceptions, all in
 `quartz/static/` and all written every build: `og-image.png` is redrawn as the
 section's social sharing card (C2-13), and `favicon.ico`, `icon.svg`,
 `apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25); since
