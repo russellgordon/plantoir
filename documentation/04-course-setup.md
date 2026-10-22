@@ -469,7 +469,7 @@ has the rule, what it deliberately costs, and where its cases live.
 
 **A folder added LATER, in Course Settings, starts the way a folder made
 here does** ([#506](https://github.com/russellgordon/plantoir/issues/506),
-mac; Windows owes it — #580). Adding a name to the shared or per-section folder list makes the
+mac; Windows since [#580](https://github.com/russellgordon/plantoir/issues/580), `FolderScaffold.cs`). Adding a name to the shared or per-section folder list makes the
 folder on disk, and since #506 puts the same two pages inside it that this
 step writes: its `index.md` (step 7's shape — per-section keys for a shared
 folder, `created`/`publish: true` for a per-section one — and the same
@@ -528,6 +528,10 @@ title (grade prefix, name, `, Section N`): setup, here; the mac's
 `SectionAdder` (the copied front page's swapped title, and the scaffold from a
 sibling's frontmatter — its fallback already quoted); and
 `SiteHealthRepair.restoreSectionIndex`, which writes the course name alone.
+Windows' two do the same since [#586](https://github.com/russellgordon/plantoir/issues/586):
+`SectionAdder.ReplaceTitleAndCreated` (both swap sites go through it) and its
+fallback, `SectionAdder.PlainTitle` for the sibling read, and
+`SiteHealthRepair.RestoreIndex`, all through `FolderScaffold.FrontmatterTitle`.
 `SectionAdder.sectionTitle` still returns PLAIN text, and reads a quoted
 sibling back first (a double-quoted value as a JSON string, a single-quoted one
 with `''` as `'`): without that, the trailing quote hides "Section 1" from the

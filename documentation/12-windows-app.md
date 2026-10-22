@@ -7524,3 +7524,101 @@ removed again (copy-and-restore), the #607 case and two
 trail records what a publish or unpublish WROTE. A publish writes the same
 pages as before (#607's reasoning), and an unpublish that now hides one page
 more still says truthfully how many it hid.
+## A folder added later, and titles YAML can read (#580, #586; the mac's #506, #575), v1.8.0 / v1.8.1
+
+**What a teacher sees.** A folder added in Course Settings ▸ Content Structure
+after the course was made now starts like a folder made with the course: an
+`index.md`, so the site's sidebar shows it, and a `_DUPLICATE ME.md`, so there
+is a page to copy — for a shared folder, and in every section for a
+per-section one. The notice ("Plantoir made the folder … for you") is
+unchanged. And a course whose name holds `: ` ("Physics: Mechanics") gets a
+front page the build can read when a section is added or the front page is put
+back. The shared behaviour, what was measured and what was rejected is in
+`documentation/04-course-setup.md` → "5. Content structure"; this section is
+what is particular to Windows.
+
+**The writer is `Plantoir.Core/Models/FolderScaffold.cs`**, a port of the
+mac's `FolderScaffold.swift`, and `SpecialFolderRenamer.CreateFoldersOnDisk`
+calls it after making the folders: it now returns a `FolderScaffold.Outcome`
+(folders made, index pages, templates) instead of a bool, and writes pages
+only into the folders that call made. `CourseSettingsView.CreateFolderForNewEntry`
+passes the bundled template, the file names at the top of the PRIMARY
+curriculum folder (`CurriculumFolderRule.ForCourse(...).Resolved[0]`, read
+from the disk AFTER the folders are made, in the mac's order — so a
+"Curriculum" folder added to a course with none is read as empty and its own
+template's connection is taken out; `CreateFoldersOnDisk` takes it as a
+`Func` for that reason), and writes the trail line `FolderScaffold.FolderCreatedTrailLine`
+— the mac's, word for word: ", with its index page and a page to duplicate",
+", with its index page" or ", with a page to duplicate", or nothing.
+
+Four things here differ from a straight port, each on purpose:
+
+- **The template is read CRLF → LF** (`FolderScaffold.TemplateFrom`). This
+  PC's checkout has `core.autocrlf=true`, so `support/skeletons/**/_DUPLICATE
+  ME.md` is CRLF in the working tree, and `Plantoir.csproj` copies
+  `support/**` from it into the bundle; the contract's bytes, and every page
+  the mac writes, are LF. Without it an installed app would write CRLF
+  templates beside LF index pages. Pages are written UTF-8 WITHOUT a
+  byte-order mark, with `FileMode.CreateNew` — the mac's `.withoutOverwriting`
+  — so a page that appeared in between is never written over.
+- **The expectation shape is checked by hand, not by a .NET regex**
+  (`IsSpecificExpectationStem`): `\d` there takes every Unicode digit and `$`
+  matches before a trailing newline, both wider than setup's
+  `^[A-Z]\d+\.\d+$` in Python. File names sort ORDINAL, as Python's
+  `sorted(glob)` does, so `B1.10` comes before `B1.2`.
+- **The new folders are compared by `Path.GetFullPath`, ignoring case**, as
+  NTFS does.
+- **The per-section index is not SectionAdder's fallback literal**, which
+  ends without a newline; the contract's bytes carry one.
+
+**The title rule is `FolderScaffold.FrontmatterTitle`** (the contract's
+`foldersAddedLater.titleQuoting`), used by both index writers, SectionAdder
+and SiteHealthRepair. It escapes only C0 control characters, as JSON and the
+mac do; DEL makes a name quoted but is written raw — the known limit the
+contract's note records, the same on both apps.
+
+**#586: three writers.** `SectionAdder.ReplaceTitleAndCreated` quotes the
+title it swaps in — the copied front page and the scaffold from a sibling's
+frontmatter both go through it, so one line covers the mac's two swap sites —
+and `ScaffoldFrontmatter`'s no-sibling fallback quotes too.
+`SectionAdder.SectionTitle` stays PLAIN and first reads a quoted sibling back
+(`SectionAdder.PlainTitle`, the mac's `plainTitle(fromValue:)`): double-quoted
+is decoded strictly as a JSON string by System.Text.Json, so a value only YAML
+could decode (`\x41`) or two strings in one (`"a", "b"`) gives the wizard's
+form; single-quoted is stripped with `''` → `'`; a quote that never closes is
+taken as written. One difference from the mac, kept: Windows reads only the
+FIRST `title:` line of the sibling and stops (the `break`), where the mac's
+loop reads on; they differ only for a front page with two title lines, which
+no Plantoir writer produces. `SiteHealthRepair.RestoreIndex` quotes the course name it
+puts back. Courses already made with a plain colon title are left alone, as on
+the mac (a one-click repair is a v1.9.0 follow-on).
+
+**Not on disk, on purpose.** The contract's seventh folder case is `Unit 1:
+Kinematics`, and NTFS refuses `:` in a name, so every case runs IN MEMORY
+through `FolderScaffold.Pages`; the disk tests use colon-free names that still
+need quoting (`'Tis the Season`). A teacher on Windows can never meet the
+colon case for a folder; a course NAME with a colon is the case that matters
+here, and it is a title, not a path.
+
+**Testing.** `FolderScaffoldContractTests` (all 7 `foldersAddedLater.cases`
+as bytes, the 15 `titleQuoting.cases`, the 6 `frontPages` cases twice each
+through the real `SectionAdder.AddSection`, every skeleton template against
+`templateSource`, and the click's rules on disk) and
+`SiteHealthRepairTests.AFrontPagePutBackQuotesACourseNameThatNeedsIt`.
+`scripts/test_folder_titles.py` runs whole through `PythonToolchainTests`.
+**Must-fail** (copy-and-restore, 2026-10-22): with dev's `SectionAdder.cs` and
+`SiteHealthRepair.cs` and a `CreateFoldersOnDisk` that writes nothing inside,
+13 of the 62 tests in the two classes failed (four of them only because the
+stub `PlainTitle` passed values through); with `FrontmatterTitle` returning
+the name unquoted, 7 failed — the folder cases, the title cases, the front
+pages, both sibling-title tests, the on-disk quoted folder and the repair.
+
+A trap met on the way, worth knowing: a doc comment reading `support/**`
+turned `ActivityTrailWiringTests` red, naming four events in OTHER files as
+never recorded. Its scan strips `/* … */` across the concatenated product
+source before `//` lines, so a `/*` inside a `///` comment swallows every file
+after it up to the next `*/`. The scan now strips each FILE on its own, in one
+pass that recognises `//` comments and strings (raw ones included) before a
+`/*` can open, and a `/*` that never closes fails the test naming its file —
+so the next occurrence reports its real cause rather than four innocent events
+(`ActivityTrailWiringTests.TheScanReadsAStarStarInACommentAsAComment`).

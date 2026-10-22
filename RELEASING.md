@@ -121,6 +121,8 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-22 | The editable block's own syntax colours and line numbers on a Windows-built site (inherited, measured in Edge) | Windows (the mac since v1.8.1, #585) | #592 |
 | 2026-10-22 | Hiding a class no longer keeps up a page just because it is CALLED something like "Curriculum Coverage": only pages inside a curriculum folder stay visible | Windows (the mac always did this) | #615 |
 | 2026-10-22 | Publish Pages… and the assistant's plan no longer list the curriculum expectations a class links to as "already visible", or count them in the summary | Windows (mac shipped it in v1.8.4, #607) | #617 |
+| 2026-10-22 | A folder added in Course Settings starts with its index page, so it appears in the site's sidebar, and a page to duplicate — shared, or in every section | Windows (mac shipped it in v1.8.0, #506) | #580 |
+| 2026-10-22 | A course whose name holds ": " ("Physics: Mechanics") gets a front page the build can read when a section is added or the front page is put back | Windows (mac shipped it in v1.8.1, #575) | #586 |
 
 
 ## Warnings the release notes MUST carry
