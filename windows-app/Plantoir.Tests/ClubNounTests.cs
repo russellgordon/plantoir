@@ -82,7 +82,7 @@ public sealed class ClubNounTests : IDisposable
         ("unpublish pages", tools => Linked(tools, visible: true).PlanUnpublishPages("ICS3U", 1, new[] { "Week 1" })),
         ("publish the class on", tools => Linked(tools, visible: false).PlanPublishClassOn("ICS3U", 1, "2025-09-18")),
         ("nothing changes, a name unknown",
-         tools => Linked(tools, visible: false).PlanPublishPages("ICS3U", 1, new[] { "Week 2", "Week 99" })),
+         tools => Linked(tools, visible: true).PlanPublishPages("ICS3U", 1, new[] { "Week 2", "Week 99" })),
     };
 
     [Fact]
@@ -144,6 +144,13 @@ public sealed class ClubNounTests : IDisposable
         Assert.Contains(AssistWording.LinkedClassStaysVisibleForAMeeting("Week 2"), TeacherCopy(hiding));
         Assert.DoesNotContain(AssistWording.LinkedClassStaysVisible("Week 2"), TeacherCopy(hiding));
         Assert.Contains(AssistWording.LinkedClassStaysVisible("Week 2"), ModelCopy(hiding));
+
+        // Nothing would change and a name fits no page: an ANSWER, not a plan,
+        // with the teacher's copy beside the model's (the mac nouns this card too).
+        var unknown = Linked(Club("meeting"), visible: true).PlanPublishPages("ICS3U", 1, new[] { "Week 2", "Week 99" });
+        Assert.Null(unknown.Meta?[AssistToolAnswer.IsPlanKey]);
+        Assert.Contains(PublishPlan.NoPageIsCalledLine(new[] { "Week 99" }), TeacherCopy(unknown));
+        Assert.NotNull(unknown.Meta?[AssistToolAnswer.TeacherSummaryKey]);
 
         // A course that is not a club reads the class form on its card too.
         var asAClass = Linked(Club(null), visible: false).PlanPublishPages("ICS3U", 1, new[] { "Week 1" });
