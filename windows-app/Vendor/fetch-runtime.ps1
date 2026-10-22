@@ -13,10 +13,12 @@ Windows pieces, and the app ships the folder the same way it ships llama/.
     runtime\wrangler\   wrangler 4.80.0 (npm prefix; Cloudflare deploys)
     runtime\fonts\      Noto Color Emoji (social sharing cards)
     runtime\vendor\     the page features a site carries only when a page
-                        asks for them (#496, #503): pagedjs\ (Paged.js 0.4.3,
-                        and Latin Modern in pagedjs\fonts\), function-plot\
-                        (function-plot 1.25.4) and tikz-engine\ (node-tikzjax
-                        1.0.5 and its locked dependencies)
+                        asks for them (#496, #503, #568): pagedjs\ (Paged.js
+                        0.4.3, and Latin Modern in pagedjs\fonts\),
+                        function-plot\ (function-plot 1.25.4), pyodide\
+                        (Pyodide 314.0.7's five runtime files, for runnable
+                        Python) and tikz-engine\ (node-tikzjax 1.0.5 and its
+                        locked dependencies, run at build time only)
     runtime\manifest.json
 
 Pins mirror the Dockerfile deliberately: Node 20 because Quartz v4.5.0 is
@@ -33,7 +35,8 @@ from runtime\manifest.json's KEYS what is missing. No manifest: everything is
 fetched. A manifest from before the vendor folder (every runtime made before
 2026-10-15) or with a vendor version that differs from the pins: runtime\vendor
 is deleted and ONLY the vendor phase runs, against the node and python
-already there, so nobody fetches ~600 MB again for the ~45 MB of new pieces.
+already there, so nobody fetches ~600 MB again for the vendor pieces (~56 MB since
+Pyodide joined them, #568).
 It never infers a phase from folders: an npm ci that crashed leaves a
 node_modules that looks finished. The app's build REFUSES a runtime whose
 manifest lacks the vendor keys (Plantoir.csproj -> CheckNativeRuntimeManifest),
@@ -60,6 +63,7 @@ $PagedjsVersion      = "0.4.3"
 $LatinModernVersion  = "2.005-1"
 $FunctionPlotVersion = "1.25.4"
 $NodeTikzjaxVersion  = "1.0.5"
+$PyodideVersion      = "314.0.7"
 # The literal addresses, beside the versions they must carry. A bump that
 # edits a version and not its address would compare the manifest against
 # the new version while fetching the old bytes (or never fetch at all), so
@@ -70,12 +74,14 @@ $LatinModernUrl  = "https://deb.debian.org/debian/pool/main/l/lmodern/fonts-lmod
 $LatinModernSnapshotUrl = "https://snapshot.debian.org/archive/debian/20230101T000000Z/pool/main/l/lmodern/fonts-lmodern_2.005-1_all.deb"
 $FunctionPlotUrl = "https://registry.npmjs.org/function-plot/-/function-plot-1.25.4.tgz"
 $NodeTikzjaxSpec = "node-tikzjax@1.0.5"
+$PyodideUrl      = "https://github.com/pyodide/pyodide/releases/download/314.0.7/pyodide-core-314.0.7.tar.bz2"
 foreach ($pair in @(
         @($PagedjsUrl, "pagedjs-$PagedjsVersion.tgz"),
         @($LatinModernUrl, "fonts-lmodern_${LatinModernVersion}_all.deb"),
         @($LatinModernSnapshotUrl, "fonts-lmodern_${LatinModernVersion}_all.deb"),
         @($FunctionPlotUrl, "function-plot-$FunctionPlotVersion.tgz"),
-        @($NodeTikzjaxSpec, "node-tikzjax@$NodeTikzjaxVersion"))) {
+        @($NodeTikzjaxSpec, "node-tikzjax@$NodeTikzjaxVersion"),
+        @($PyodideUrl, "$PyodideVersion/pyodide-core-$PyodideVersion.tar.bz2"))) {
     if (-not $pair[0].EndsWith($pair[1], [StringComparison]::Ordinal)) {
         throw "$($pair[0]) does not carry $($pair[1]): a version above was changed without its address."
     }
@@ -113,6 +119,18 @@ $LatinModernFiles = [ordered]@{
     "lmsans10-bold.otf"        = "a597b710326c1a8a2c7238d808e5d38711638a72a32383478db4829d63afd687"
     "lmmono10-regular.otf"     = "22deb6d3be3ffcb40b33f0e010afb256c677d97c2a2bdee1f5740cdc97751558"
 }
+# Pyodide 314.0.7 (#455, #568): the tarball and the five files kept from it,
+# the contract's own hashes (toolchain.json -> pins -> pyodide: sha256 and
+# files), checked here as the Dockerfile checks them.
+$PyodideTarSha256 = "2abdcc2e35208af406e07724cffa85bc582ced97e9028383ecf5462541393f95"
+$PyodideTarLength = 6757104
+$PyodideFiles = [ordered]@{
+    "pyodide.mjs"       = "6f1d60f7bf529beb300f0f47983c921d3982363640ba20af0e38efdddbc66109"
+    "pyodide.asm.mjs"   = "f7cdc8ece80678ceb712f8e65ebe6d3a83203a180c399865f49612a051693635"
+    "pyodide.asm.wasm"  = "cc36e3cab04fdfc9a63ff13eb52eae2b911bf46c025cc7b281f394bd3de1d5e6"
+    "python_stdlib.zip" = "fa1957e5777068fc4f7437f96d860ae2fbe9c19732ba06c84e004ec16dd7dd7a"
+    "pyodide-lock.json" = "5dc2fc119108bc148c7457dc86e7675b5c87e1cafd420b9c34c1eaef7b36c010"
+}
 $NodeTikzjaxTexFiles = [ordered]@{
     "tex\core.dump.gz"     = "ae9f69dfe3837606240c5b9cb50f86aa0ee7463bbae4c26f2843b17eb155b91f"
     "tex\tex.wasm.gz"      = "f8667f45e90039832df4f62550f10ff0c2f47781dbfdde9510f0ff3f360a61ba"
@@ -138,6 +156,7 @@ $VendorPins = [ordered]@{
     latinModern  = $LatinModernVersion
     functionPlot = $FunctionPlotVersion
     nodeTikzjax  = $NodeTikzjaxVersion
+    pyodide      = $PyodideVersion
 }
 
 # What to run is decided from the manifest's KEYS, never from folders.
@@ -184,7 +203,7 @@ function Write-RuntimeManifest($Fields) {
 
 # The manifest as it should read while runtime\vendor is absent or being
 # made: every key found (or the five base keys on a fresh run) WITHOUT the
-# four vendor keys. Written BEFORE the vendor folder is touched, so a run
+# vendor keys. Written BEFORE the vendor folder is touched, so a run
 # that dies part-way leaves a manifest the app's build refuses
 # (CheckNativeRuntimeManifest) and the next run repairs by the vendor-only
 # path, rather than one naming engines that are not there (5A review, L1
@@ -432,6 +451,52 @@ if missing:
     Copy-Item (Join-Path $fpTmp "package\LICENSE") $fpDir
     Assert-Sha256 (Join-Path $fpDir "function-plot.js") $FunctionPlotJsSha256 202953
     Write-Host "function-plot $FunctionPlotVersion in place." -ForegroundColor Green
+
+    # Pyodide 314.0.7 (#455, #568): runs a page's ```python run blocks in the
+    # student's browser. Five files of the core tarball are kept - pyodide.mjs
+    # (the module a module worker imports), pyodide.asm.mjs, pyodide.asm.wasm,
+    # python_stdlib.zip and pyodide-lock.json - with a README naming the
+    # licence, MPL-2.0 (the tarball carries no LICENSE file). The folder name
+    # is load-bearing (page_features.RUNNER_LANGUAGES -> engine): it is copied
+    # into a site's static\ under the same name, with
+    # support\gated\pyodide\plantoir-worker.js laid over it.
+    # Unpacked with the runtime's own Python (tarfile + bz2), as the Dockerfile
+    # does with python3 -m tarfile, rather than bsdtar. MEASURED 2026-10-22:
+    # this PC's bsdtar (3.8.9, bz2lib 1.0.8) does read bzip2 - but, as with
+    # Latin Modern's xz above, an older Windows 10 bsdtar is not known to, and
+    # the embeddable Python's _bz2 is certainly there.
+    $pyoDir = Join-Path $VendorOut "pyodide"
+    New-Item -ItemType Directory -Force $pyoDir | Out-Null
+    $pyoTar = Join-Path $Temp "pyodide-core.tar.bz2"
+    Fetch $PyodideUrl $pyoTar $PyodideTarSha256
+    Assert-Sha256 $pyoTar $PyodideTarSha256 $PyodideTarLength
+    $pyoScript = Join-Path $Temp "unpack_pyodide.py"
+    @'
+import os, shutil, sys, tarfile
+archive_path, out, names = sys.argv[1], sys.argv[2], sys.argv[3:]
+wanted = {"pyodide/" + n: n for n in names}
+found = set()
+with tarfile.open(archive_path, "r:bz2") as archive:
+    for member in archive:
+        target = wanted.get(member.name)
+        if target is None or not member.isfile():
+            continue
+        with archive.extractfile(member) as source, open(os.path.join(out, target), "wb") as sink:
+            shutil.copyfileobj(source, sink)
+        found.add(member.name)
+missing = sorted(set(wanted) - found)
+if missing:
+    sys.exit("not in the tarball: " + ", ".join(missing))
+'@ | Set-Content $pyoScript -Encoding ascii
+    & "$pyDir\python.exe" -I $pyoScript $pyoTar $pyoDir @($PyodideFiles.Keys)
+    if ($LASTEXITCODE -ne 0) { throw "Unpacking Pyodide failed" }
+    foreach ($name in $PyodideFiles.Keys) { Assert-Sha256 (Join-Path $pyoDir $name) $PyodideFiles[$name] }
+    # The Dockerfile's README line, byte for byte (ASCII, one LF).
+    [IO.File]::WriteAllText((Join-Path $pyoDir "README.txt"),
+        "Pyodide $PyodideVersion (MPL-2.0). Source: https://github.com/pyodide/pyodide/tree/$PyodideVersion`n",
+        (New-Object Text.UTF8Encoding $false))
+    $pyoBytes = (Get-ChildItem $pyoDir -File | Where-Object Name -ne "README.txt" | Measure-Object -Property Length -Sum).Sum
+    Write-Host ("Pyodide $PyodideVersion in place: {0:N0} bytes in five files." -f $pyoBytes) -ForegroundColor Green
 
     # node-tikzjax 1.0.5 (#503): the TikZ engine, run at BUILD time by
     # support\figures\plantoir-figures.mjs with the runtime's node. Installed
