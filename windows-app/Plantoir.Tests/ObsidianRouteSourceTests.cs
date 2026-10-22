@@ -36,6 +36,22 @@ public class ObsidianRouteSourceTests
         Assert.Equal(3, callers.Values.Sum());
     }
 
+    /// <summary>
+    /// #581's route is built in two places only: Open in Obsidian (the
+    /// sidebar, every route) and the preview trigger (no question asked). A
+    /// third caller would be a second way in nobody reviewed.
+    /// </summary>
+    [Fact]
+    public void TheAddOnsRouteIsBuiltOnlyBySidebarAndPreview()
+    {
+        var callers = Directory.EnumerateFiles(AppFolder, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                           && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .Where(file => File.ReadAllText(file).Contains("new ObsidianOpenRoute(", StringComparison.Ordinal))
+            .Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal).ToList();
+        Assert.Equal(new[] { "SectionDetailView.xaml.cs", "SidebarPane.Menus.cs" }, callers);
+    }
+
     /// <summary>The reference branch locks again before the note, and records it on the trail when it did anything.</summary>
     [Fact]
     public void TheReferenceRoute_LocksAgainBeforeTheNote()

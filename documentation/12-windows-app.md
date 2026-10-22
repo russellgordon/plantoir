@@ -7674,7 +7674,9 @@ Obsidian).
   byte-order mark is a character (decoded with `Encoding.UTF8.GetString`, as
   Python's utf-8 reader keeps it). It agrees with the Python on 2,000 generated
   pages (fixed seed; CR LF, lone CR, BOM, invalid UTF-8, nested containers) and
-  on every `figureFences.fences` case.
+  on every `figureFences.fences` case. A lone `\r` inside a line is text here
+  exactly as it is in the mac's `FigureFenceScan.swift` and the Python (all
+  three split on `\n` only) — reviewed, mac-identical, no change.
 - **A link is a reparse point with a `LinkTarget`** (junction or symbolic
   link). A OneDrive placeholder folder is a reparse point too; it is a folder
   here, never refused and never skipped. The scan never follows a link (no
@@ -7714,14 +7716,24 @@ shown or not (`ObsidianProcesses`). Before, any process named Obsidian counted
 — another account's, or a crash reporter outliving the windows. And
 `QuitObsidianAndWait` now closes EVERY shown Obsidian window (main windows
 before owned ones), then `CloseMainWindow` on any process still there after
-1.5 s, then waits up to 5 s. Before #581 it called `CloseMainWindow` on each
-process, which closed ONE window: an Obsidian with two vaults open kept
-running. That was a live fault in the two older callers too — vault
-REGISTRATION (Open in Obsidian on a course Obsidian has never seen) and the
-course RENAME — which then wrote the registry under a running Obsidian. Both
-now really close it. The rename path's reason for not reopening Obsidian
-afterwards (the vault to reopen is in the folder just left) is unchanged and
-still holds. The vaults to reopen are noted BEFORE anything closes: measured,
+1.5 s, then waits up to 5 s for the windows — and then up to 3 s more for the
+PROCESSES (measured: windows gone at 0.4 s, processes at 0.66 s; a registry
+or add-on list written in that gap can be overwritten as Obsidian exits). Any
+window left after the wait means "did not close" for all of them: nothing is
+written, and a half-closed set is not reopened. Before #581 it called
+`CloseMainWindow` on each process, which closed ONE window: an Obsidian with
+two vaults open kept running. That was a live fault in the two older callers
+too — vault REGISTRATION (Open in Obsidian on a course Obsidian has never
+seen) and the course RENAME — which then wrote the registry under a running
+Obsidian. **The quit change fixes them only when the quit succeeds**, so
+registration now also checks: if Obsidian is still running after the quit, it
+writes nothing and opens the link as it is (the course stays unregistered;
+nothing false is said). And because Obsidian started by a link does NOT bring
+back the other vaults (measured: closing windows one by one unmarks all but
+the last), registration now notes the vaults open BEFORE quitting and reopens
+them after registering, this course last — the add-ons route's own reopen.
+The rename path's reason for not reopening Obsidian afterwards (the vault to
+reopen is in the folder just left) is unchanged and still holds. The vaults to reopen are noted BEFORE anything closes: measured,
 closing one vault window of several clears that vault's `"open"` mark in the
 registry (the last window to close keeps its mark). Reopening opens the first
 vault, waits up to 10 s for a window, then the rest 0.4 s apart, this course

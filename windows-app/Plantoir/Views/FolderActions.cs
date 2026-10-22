@@ -155,9 +155,14 @@ public static class FolderActions
 
     /// <summary>
     /// The full dance. A running Obsidian keeps its vault list in memory and
-    /// overwrites the registry on exit, so an unknown vault means: quit it,
-    /// seed defaults, patch auto-reveal, register, then open the link
-    /// (Obsidian restores its windows on relaunch).
+    /// overwrites the registry on exit, so an unknown vault means: note the
+    /// vaults open now, quit it, and — only once it is no longer running —
+    /// seed defaults, patch auto-reveal, register, open every vault that was
+    /// open again, then open the link, this course last. Obsidian does NOT
+    /// bring them back by itself when it is started with a link (measured on
+    /// 1.14.4, #581: closing its windows one by one unmarks all but the last).
+    /// If Obsidian did not close (a question of its own on screen), nothing is
+    /// written under it: the link is opened as it is, the course unregistered.
     /// </summary>
     public static async Task OpenInObsidian(string revealFolder, string vaultPath, string bundledDefaultsPath,
                                             string? page = null)
@@ -174,10 +179,18 @@ public static class FolderActions
             return;
         }
 
+        var wereOpen = Plantoir.Core.Models.ObsidianFigureAddOnsOffer.VaultsOpen(ObsidianIsRunning, registryJson);
         await QuitObsidianAndWait();
+        if (ObsidianIsRunning)
+        {
+            // Never write under a running Obsidian: it would write its own list back over ours.
+            OpenUri(uri);
+            return;
+        }
         SeedObsidianDefaultsIfMissing(vaultPath, bundledDefaultsPath);
         EnableAutoRevealInLayout(vaultPath);
         RegisterVault(vaultPath);
+        await ReopenVaults(wereOpen.Where(path => !Plantoir.Core.Models.ObsidianFigureAddOnsOffer.SamePath(path, vaultPath)).ToList());
         OpenUri(uri);
     }
 

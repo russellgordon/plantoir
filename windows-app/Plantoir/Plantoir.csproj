@@ -112,13 +112,13 @@
     <ItemGroup>
       <_PlantoirAddOnChecked Include="@(_PlantoirAddOnHashed)">
         <AddOnId>$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))</AddOnId>
-        <Pinned>$([System.Text.RegularExpressions.Regex]::IsMatch($(_PlantoirContract), '&quot;id&quot;: &quot;$([System.Text.RegularExpressions.Regex]::Escape($([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))))&quot;,[^\]]*?&quot;name&quot;: &quot;$([System.Text.RegularExpressions.Regex]::Escape('%(Filename)%(Extension)'))&quot;,\s*&quot;bytes&quot;: \d+,\s*&quot;sha256&quot;: &quot;$([System.String]::Copy('%(FileHash)').ToLowerInvariant())&quot;'))</Pinned>
+        <Pinned>$([System.Text.RegularExpressions.Regex]::IsMatch($(_PlantoirContract), '&quot;id&quot;\s*:\s*&quot;$([System.Text.RegularExpressions.Regex]::Escape($([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))))&quot;,[^\]]*?\{(?=[^{}]*&quot;name&quot;\s*:\s*&quot;$([System.Text.RegularExpressions.Regex]::Escape('%(Filename)%(Extension)'))&quot;)(?=[^{}]*&quot;sha256&quot;\s*:\s*&quot;$([System.String]::Copy('%(FileHash)').ToLowerInvariant())&quot;)[^{}]*\}'))</Pinned>
       </_PlantoirAddOnChecked>
     </ItemGroup>
     <Error Condition="'@(_PlantoirAddOnFile->Count())' != '$(_PlantoirAddOnFileCount)'"
            Text="windows-app\Vendor\obsidian-addons holds @(_PlantoirAddOnFile->Count()) files, not the $(_PlantoirAddOnFileCount) the contract pins: run windows-app\Vendor\fetch-obsidian-addons.ps1 again and build again." />
     <Error Condition="'%(_PlantoirAddOnChecked.Pinned)' != 'True'"
-           Text="windows-app\Vendor\obsidian-addons\%(_PlantoirAddOnChecked.AddOnId)\%(_PlantoirAddOnChecked.Filename)%(_PlantoirAddOnChecked.Extension) is not the file contracts\shared-rules.json pins: run windows-app\Vendor\fetch-obsidian-addons.ps1 again and build again." />
+           Text="windows-app\Vendor\obsidian-addons\%(_PlantoirAddOnChecked.AddOnId)\%(_PlantoirAddOnChecked.Filename)%(_PlantoirAddOnChecked.Extension) is not the file contracts\shared-rules.json pins: run windows-app\Vendor\fetch-obsidian-addons.ps1 again and build again. (If the fetch says the files are in place, the contract's obsidianAddOnsForFigures.addOns layout may have changed - an add-on's id must come before its files - and this check needs updating.)" />
   </Target>
 
   <!-- Ensure the MCP server binary is always freshly published beside the app -->
