@@ -272,11 +272,14 @@ python3 website/shots/capture.py --quizzes  # the Quizzes page's figures (v1.8.1
   `--prepare-timeout`; the page's own minute to load stops counting once it has
   loaded (until #562 that minute ran from launch and was never cancelled, so a
   page photographed after 60 s was reported as "had not finished loading" —
-  measured: a settle of 62 s failed that way, and passes now). Mac only by
-  design for now: Windows carries no Python and compiles no Swift for a class
-  site in v1.8, and `capture_windows.py` makes no marketing preview, so the
-  four are `windows: false` and owed by name; its print set takes only scene
-  `print-set`. `website/README.md` → "The Code page" has the run.
+  measured: a settle of 62 s failed that way, and passes now). On Windows
+  `capture_windows.py --code` takes the four Python and quiz figures from
+  native previews of `~/School Web Space` (#590, "The Code and Quizzes pages'
+  figures on Windows" below); the two Swift ones stay Mac only (Swift stays
+  read-only on Windows, Russell's ruling on #570). All are `windows: false`
+  and owed by name until their 2× pictures are taken and promoted; the print
+  set takes only scene `print-set`. `website/README.md` → "The Code page" has
+  the run.
 - **The Quizzes page's figures** (#587: `quiz-math`, `quiz-chemistry`,
   `quiz-english`, `quiz-code-run`) are taken the same way, by `capture.py
   --quizzes`: previews of the DEMO folder (`~/Desktop/Teaching`: MCV4U,
@@ -286,9 +289,10 @@ python3 website/shots/capture.py --quizzes  # the Quizzes page's figures (v1.8.1
   script answers the first quiz (the fifth and the score, for
   `quiz-code-run`), presses Check, waits for the contract's words, and fails
   rather than photographs a quiz too tall for the 1280 × 860 window. The run
-  refuses a demo folder that does not hold the three demo courses. Mac only:
-  Windows has no quizzes until #571, so the four are `windows: false` and
-  owed by name. `website/README.md` → "The Quizzes page" has the run.
+  refuses a demo folder that does not hold the three demo courses. On Windows
+  `capture_windows.py --quizzes` takes all four (#590, below); they stay
+  `windows: false` and owed by name until their 2× pictures are taken and
+  promoted. `website/README.md` → "The Quizzes page" has the run.
 - **Mobile View**: Photographed in the iOS Simulator using RocketSim to render
   the authentic device bezel.
 - **Appearance Switching**: Machine appearance is toggled between Light and
@@ -302,6 +306,10 @@ python website/shots/capture_windows.py --sites [ids]    # the class sites, in E
 python website/shots/capture_windows.py --figures        # the hero and the colour figures
 python website/shots/capture_windows.py --app [scenes]   # the app's scenes, How I Teach, the schedule
 python website/shots/capture_windows.py --print-set      # what printing does: a preview of MPM2D (~/Plantoir Print)
+python website/shots/capture_windows.py --code [ids]     # the Code page's figures (#590), 2x only
+python website/shots/capture_windows.py --quizzes [ids]  # the Quizzes page's figures (#590), 2x only
+python website/shots/capture_windows.py --code --quizzes --dry-run   # the same at any scale, into scratch only
+python website/shots/capture_windows.py --promote id,id  # no pictures: windows: true once they pass
 python website/shots/capture_windows.py --provision-demo <folder>   # no pictures: a demo folder's state (#445)
 ```
 
@@ -313,9 +321,9 @@ of the tree (`windows-app/Plantoir/bin/x64/Debug/...` after
 `dotnet build -p:Platform=x64`). The scenes and what each sets up are
 `SCENES` in `app_scenes_windows.py`; the working folders are made by the
 app (`--stage-scene provision`). Text read-back on Windows is `windowshot
---ocr <png>` (Windows.Media.Ocr); only `--print-set` checks `expectText` with
-it so far, so the other pictures are looked at; every scene refuses the wrong
-states it can detect.
+--ocr <png>` (Windows.Media.Ocr); `--print-set`, `--code` and `--quizzes`
+check `expectText` with it, and the other pictures are looked at; every scene
+refuses the wrong states it can detect.
 
 **The app's pictures at 2×, unscaled (#557, 2026-10-16).** Every `--app`
 scene was retaken in both themes in the 3840 × 2034 Remote Desktop session
@@ -384,6 +392,54 @@ run — delete both to start clean. **Everything before the shutter runs on a
 locked desktop; the photographs do not** (Windows.Graphics.Capture sends no
 frame for a window nobody can see, measured 2026-10-15), and the run stops
 there and says so.
+
+**The Code and Quizzes pages' figures on Windows (`--code`, `--quizzes`, #590).**
+`preview_pages_windows.py` takes every `preview-page` shot of scene `code` or
+`quizzes` except `code-swift` and `code-swift-live` (`NOT_ON_WINDOWS`; Swift
+stays read-only on Windows, Russell's ruling on #570): `code-python`,
+`code-python-live`, `code-python-error`, `code-quiz` and `quiz-code-run` from
+ICS3U in the marketing folder, which on Windows is `~/School Web Space`
+(`app_scenes_windows.MARKETING`), and `quiz-math`, `quiz-chemistry`,
+`quiz-english` from the demo folder, `~/Teaching`. `capture.workspace` says
+which. Each folder is refused unless it is THAT folder by resolved path and
+holds only what its set-up makes: for the marketing folder the Mac's
+allow-list (`marketing_folder.foreign_courses`: ICS3U, ICS4U, reference
+copies) without the Mac's `.plantoir-marketing-folder` marker, which the
+Windows folder has never had (it is made by the app's New Course panel and
+its courses were copied in from the Mac, #460), so writing one now would only
+make it pass a test it was not made by; for the demo folder
+`demo_folders.identify` and, after planting, `demo_state_problems` (run
+`--provision-demo` first if it says the colours or front pages are wrong).
+Before the first write, every non-reference course in each folder is zipped
+into its own `courses/_backups/<CODE>/<CODE>_backup_<stamp>.zip`, the name a
+teacher's own backup has, so the Backups list can put it back. Then the Mac's
+own steps: `marketing_folder.apply_code_steps` (ICS3U's runnable pages
+brought up to date — measured 2026-10-22 on a copy: the Windows ICS3U
+predated #561 and none of its pages was runnable; all 37 came up to date with
+their College Board embeds put back — and `CODE_PAGES` planted, Check Your
+Loops among them), or `add_code_pages` for the quizzes alone, and
+`demo_folders.apply_planted_pages` for the three demo quiz pages. A page a
+figure shows that was "left as you changed it" stops the run. The launchers
+and `.toolchain/` are mirrored from the COMMITTED tree (`git archive HEAD`,
+the Mac's #562 fix N5), the run refuses while Plantoir is running (it would
+mirror its own back), and each course is previewed once, natively
+(`print_set_windows.Preview`). Each page is opened in an Edge `--app` window
+at 1280 × 860 DIPs (`fit=True`), scrolled to the top (`at_the_top`), put into
+its state by the Mac's own `shots/prepare/<id>.js`, evaluated over the
+DevTools protocol as `(async (timeoutMs) => { … })(120000)` — anything but
+`"ready"` stops the run, and a quiz taller than the window is the script's own
+refusal — then photographed by windowshot in light and dark and read back
+against `expectText`. A real run refuses unless the window is drawn at 2×
+(`fitted_scale` within 0.01 of 2.0) and each picture is 2560 × 1720 (#557),
+copies it into site/img unscaled, and records the scale in
+`%TEMP%/plantoir-marketing-shots/preview-pages-windows.json`. `--dry-run`
+takes every picture at this screen's scale into `parts-preview-windows-dry-run`
+and writes nothing to site/img. Nothing promotes: `--promote id,...` marks a
+shot `windows: true` only when both PNGs and their WebP twins are in site/img
+at 2560 × 1720 and the record says 2×, and leaves `WINDOWS_PICTURE_OWED` and
+site.json's availability flags to the release commit. One caption is the
+Mac's words on both: `code-python-live` says the student "presses Return",
+and shots.json has no Windows caption field (none was added).
 
 Every run first runs `test_demo_folders.py` and stops if it is red (no
 `dotnet test` discovers `website/shots` tests). The demo sites it photographs

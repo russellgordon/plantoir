@@ -426,23 +426,26 @@ class ReleaseReadinessTests(unittest.TestCase):
 # mac only at first, were taken on Windows by `capture_windows.py
 # --print-set` on the first unlocked desktop after the 1.7.1 catch-up.
 WINDOWS_PICTURE_OWED: dict = {
-    # The Code page (#562). Windows' v1.8 builds carry no Python runtime yet
-    # and make no Swift program runnable, and the pictures are taken from a
-    # preview of the marketing folder, which capture_windows.py does not make.
-    # Owed by the windows issue that follows #562 (its draft:
-    # 562-windows-issue.md); code-swift stays owed until Windows compiles Swift.
-    "code-python": "Windows carries no Python for runnable blocks yet (#568)",
-    "code-python-live": "Windows carries no Python for runnable blocks yet (#568), nor live input's headers (#583)",
-    "code-python-error": "Windows carries no Python for runnable blocks yet (#568)",
-    "code-swift-live": "Windows makes no Swift block runnable yet (#570), nor live input's headers (#583)",
-    "code-swift": "Windows makes no Swift block runnable yet (#570)",
-    "code-quiz": "no Windows capture of the marketing folder's previews yet",
-    # The Quizzes page (#587): previews of the demo and marketing folders'
-    # planted quiz pages. Owed by the windows issue that follows #587.
-    "quiz-math": "no Windows quizzes until #571; no Windows capture of the previews",
-    "quiz-chemistry": "no Windows quizzes until #571; no Windows capture of the previews",
-    "quiz-english": "no Windows quizzes until #571; no Windows capture of the previews",
-    "quiz-code-run": "no Windows quizzes until #571; no Windows capture of the previews",
+    # The Code page (#562) and the Quizzes page (#587). Since #590,
+    # capture_windows.py --code / --quizzes takes every one of these but the
+    # two Swift figures, from native previews of ~/School Web Space and
+    # ~/Teaching (preview_pages_windows.py) -- at exactly 2x only (#557), so
+    # they are taken in a 4K session at 200%. A shot leaves this list in the
+    # commit that marks it `windows: true` (`capture_windows.py --promote`
+    # checks the pictures first), which is the release commit whose installer
+    # has the feature. The reasons below are what each one still waits on.
+    # code-swift and code-swift-live stay owed: Swift stays read-only on
+    # Windows (Russell's ruling on #570).
+    "code-python": "the 2x picture, taken in a 4K session (#590)",
+    "code-python-live": "the 2x picture, taken in a 4K session (#590)",
+    "code-python-error": "the 2x picture, taken in a 4K session (#590)",
+    "code-swift-live": "Swift stays read-only on Windows (#570, Russell's ruling): never taken",
+    "code-swift": "Swift stays read-only on Windows (#570, Russell's ruling): never taken",
+    "code-quiz": "the 2x picture, taken in a 4K session (#590)",
+    "quiz-math": "the 2x picture, taken in a 4K session (#590)",
+    "quiz-chemistry": "the 2x picture, taken in a 4K session (#590)",
+    "quiz-english": "the 2x picture, taken in a 4K session (#590)",
+    "quiz-code-run": "the 2x picture, taken in a 4K session (#590)",
 }
 
 
@@ -530,6 +533,23 @@ class PreviewPageSceneTests(unittest.TestCase):
         import print_set_windows
         self.assertEqual([shot["id"] for shot in print_set_windows.shots_of_kind("preview-page")], ["print-page"])
         self.assertEqual([shot["id"] for shot in print_set_windows.shots_of_kind("handout")], ["print-handout"])
+
+    def test_the_windows_code_and_quiz_passes_take_only_their_own(self):
+        # #590: capture_windows.py --code / --quizzes (preview_pages_windows.py)
+        # take each scene's own pages and never the Swift two, which stay
+        # read-only on Windows (Russell's ruling on #570). Plain Python, so it
+        # runs on either machine.
+        sys.path.insert(0, str(build.WEBSITE / "shots"))
+        import preview_pages_windows
+        self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("code")],
+                         ["code-python", "code-python-live", "code-python-error", "code-quiz"])
+        self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("quizzes")],
+                         ["quiz-math", "quiz-chemistry", "quiz-english", "quiz-code-run"])
+        self.assertEqual(preview_pages_windows.preview_page_shots("code", ["code-swift"]), [])
+        for shot in preview_pages_windows.preview_page_shots("code") + preview_pages_windows.preview_page_shots("quizzes"):
+            with self.subTest(shot=shot["id"]):
+                self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).exists())
+                self.assertIn(shot["capture"]["workspace"], ("marketing", "demo"))
 
     @unittest.skipUnless(sys.platform == "darwin", "capture.py is the Mac's")
     def test_the_mac_print_set_and_code_set_take_only_their_own(self):

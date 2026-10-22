@@ -21,6 +21,15 @@ What it does:
 6. Scales and optimizes all captured PNGs and generates WebP companions.
 7. Rebuilds the marketing site (website/build.py).
 
+Not part of a full run (as on the Mac): ``--code`` and ``--quizzes`` take the
+Code and Quizzes pages' figures from native previews of the marketing folder
+(``~/School Web Space``, ICS3U) and the demo folder (``~/Teaching``), each
+page put into its figure's state by ``website/shots/prepare/<id>.js``
+(``preview_pages_windows.py``, #590). Only at exactly 2x (#557); with
+``--dry-run`` at any scale, into a scratch folder, nothing into site/img.
+Neither promotes a shot: ``--promote id,...`` does, once the pictures pass
+its checks.
+
 ``--provision-demo <folder>`` instead gives a demo working folder the state
 ``marketing/folders.json`` describes, through ``plantoir-mcp.exe``
 (``demo_folders.py``, shared with the Mac). Every run first checks that spec
@@ -272,6 +281,22 @@ def main() -> int:
         --print-set        what printing does: print-page (light, dark) and
                            print-handout, from a preview of MPM2D in
                            ~/Plantoir Print (print_set_windows.py)
+        --code [id,id]     the Code page's figures (code-python,
+                           code-python-live, code-python-error, code-quiz;
+                           never the Swift two, #570), from previews of
+                           ~/School Web Space (preview_pages_windows.py)
+        --quizzes [id,id]  the Quizzes page's figures (quiz-math,
+                           quiz-chemistry, quiz-english from ~/Teaching,
+                           quiz-code-run from ~/School Web Space)
+        --dry-run          with --code / --quizzes: every page put into its
+                           state and photographed at this screen's scale,
+                           into a scratch folder; nothing into site/img, no
+                           site rebuild
+        --promote id,id    no pictures: mark these preview-page figures
+                           `windows: true` once both pictures are in site/img
+                           at 2560 x 1720 and were taken at 2x; take them off
+                           WINDOWS_PICTURE_OWED by hand in the same commit
+                           (site.json's availability flags are the release's)
         --provision-demo <folder>
                            no pictures: give a demo folder the state
                            marketing/folders.json describes (colours, the
@@ -301,6 +326,30 @@ def main() -> int:
         if index + 1 < len(arguments) and not arguments[index + 1].startswith("--"):
             return arguments[index + 1].split(",")
         return None
+
+    if "--promote" in arguments:
+        from preview_pages_windows import promote
+        named = listed_after("--promote")
+        if not named:
+            print("--promote needs the figures' ids after it, comma-separated.", file=sys.stderr)
+            return 2
+        return promote(named)
+
+    if "--code" in arguments or "--quizzes" in arguments:
+        # The Code and Quizzes pages' figures, on their own: never part of a
+        # full run, and a dry run rebuilds nothing.
+        from preview_pages_windows import capture_preview_pages
+        dry_run = "--dry-run" in arguments
+        selection = {}
+        for flag, scene in (("--code", "code"), ("--quizzes", "quizzes")):
+            if flag in arguments:
+                selection[scene] = listed_after(flag)
+        capture_preview_pages(selection, dry_run=dry_run)
+        if dry_run:
+            return 0
+        announce("Rebuilding plantoir.app")
+        subprocess.run([sys.executable, str(WEBSITE / "build.py")], cwd=REPO, check=True)
+        return 0
 
     everything = not any(flag in arguments for flag in ("--sites", "--figures", "--app", "--print-set"))
     if everything or "--sites" in arguments:
