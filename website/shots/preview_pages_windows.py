@@ -208,8 +208,13 @@ def back_up(folder: Path, codes: list[str]) -> list[Path]:
 
 def page_label(capture: dict) -> str:
     """`ICS3U/Warm-Ups/Spot the Bug.md`: the page a shot shows, as the steps'
-    report names it (a preview's path is the file name with dashes)."""
-    return f"{capture['course']}/{capture['path'].strip('/').replace('-', ' ')}.md"
+    report names it. A preview's address is the file's path with each space
+    a dash, and only the FILE name is turned back: a folder's own dash stays
+    (`Warm-Ups`), which replacing every dash lost, so the changed-page guard
+    never matched code-python (the Fable sweep, 2026-10-22). Pinned for all
+    eight figures against the steps' own naming in test_build_data.py."""
+    *folders, name = capture["path"].strip("/").split("/")
+    return "/".join([capture["course"], *folders, name.replace("-", " ") + ".md"])
 
 
 def refuse_changed_pages(report, shots: list[dict]) -> None:
