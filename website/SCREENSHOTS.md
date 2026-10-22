@@ -440,6 +440,14 @@ at 2560 × 1720 and the record says 2×, and leaves `WINDOWS_PICTURE_OWED` and
 site.json's availability flags to the release commit. One caption is the
 Mac's words on both: `code-python-live` says the student "presses Return",
 and shots.json has no Windows caption field (none was added).
+Measured 2026-10-22 on this PC's 1920 × 1080 console at 150% (`fitted_scale`
+1.126, so 1441 × 968 pictures): `--code --quizzes --dry-run` took all 16, every
+prepare script "ready" and every `expectText` read, in about 13 minutes
+including four native previews. The first attempt stopped at the sixth window
+("No window appeared to photograph"): a launch on a profile a dying Edge still
+held went to that Edge. Each window now waits for the profile's processes to
+end first and is tried once more if none appears (`take_window`); the second
+attempt needed neither.
 
 Every run first runs `test_demo_folders.py` and stops if it is red (no
 `dotnet test` discovers `website/shots` tests). The demo sites it photographs
