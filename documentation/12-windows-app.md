@@ -7170,8 +7170,10 @@ as JavaScript with COEP, and the overlay byte for byte — and the borrowed
 page's ```` ```swift run ```` fence is EXPECTED to be reported as not ready
 (`swift.reasons.notOnWindows` on a `plantoir: error:` line, and the
 `swiftCouldNotBePrepared` folder problem) by the preview and by the publish
-that rebuilds; only the compiled program, which Windows cannot make (#570),
-is a skip. It also times each Netlify and Cloudflare publish and counts the
+that rebuilds; and the compiled program, which Windows cannot make (#570),
+is asserted ABSENT — a program found on a Windows-built site fails the run —
+rather than skipped, so a Windows run can be the "nothing skipped" run
+`RELEASING.md` asks for (the #568 implementation review). It also times each Netlify and Cloudflare publish and counts the
 bytes sent on the interface the default route uses (route metric plus
 interface metric: sorting on the route's alone read a Wi-Fi counter that
 never moved beside the wired adapter).
@@ -7183,8 +7185,11 @@ engine ("Netlify requires 17 file"), Cloudflare **33 s**; then **11 s**
 ("8 file") and **20 s** ("Uploaded 7 files (46 already uploaded)") again.
 Its byte counts read 0 (the Wi-Fi counter; fixed above), so the number of
 bytes a first publish of the engine sends is not measured here. The SECOND
-run, onto the same sites: **140 passed, 0 failed, 8 skipped** (the eight are
-the Swift program, once per host and folder); publishes of 10–12 s to
+run, onto the same sites: **140 passed, 0 failed, 8 skipped** (the eight
+were the Swift program, once per host and folder, then reported as skips;
+these totals are from BEFORE the change above, which turns those eight into
+asserted passes, so a clean run should now read 148 passed, 0 failed,
+0 skipped — the next release run re-measures it); publishes of 10–12 s to
 Netlify ("7 file", 182–239 KiB sent) and 20–29 s to Cloudflare ("Uploaded 7
 files (46 already uploaded)", 400–709 KiB) on Ethernet.
 

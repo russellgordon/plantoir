@@ -112,6 +112,9 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-22 | Runnable Python blocks and the site's own maths fonts work in a site built on Windows: the Windows app now carries Pyodide 314.0.7 (a Windows re-run of `fetch-runtime.ps1` is needed on every build PC; the build refuses without it) | Windows (the mac has had #455/#494 since v1.8.0) | #568 |
+| 2026-10-22 | A runnable block on a page with nothing from another website asks for each `input()` line as the program runs, in a Windows preview and a Windows publish (inherited, measured in Edge and the preview pane) | Windows (the mac since v1.8.1, #583) | #591 |
+| 2026-10-22 | The editable block's own syntax colours and line numbers on a Windows-built site (inherited, measured in Edge) | Windows (the mac since v1.8.1, #585) | #592 |
 
 
 ## Warnings the release notes MUST carry

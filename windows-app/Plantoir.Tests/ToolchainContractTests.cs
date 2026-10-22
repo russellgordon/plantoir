@@ -189,6 +189,14 @@ public class ToolchainContractTests
         string tarball = pin["sha256"]!.ToString();
         Assert.True(recipe.Contains($"\"{tarball}\"", StringComparison.Ordinal),
             $"fetch-runtime.ps1 does not check the Pyodide tarball against the contract's sha256 {tarball}.");
+        // The tarball's LENGTH lives only in the pin's `why` prose ("the core
+        // tarball (6,757,104 bytes, `sha256`)"), so it is read from there.
+        var stated = System.Text.RegularExpressions.Regex.Match(pin["why"]!.ToString(),
+            @"core tarball \(([0-9,]+) bytes");
+        Assert.True(stated.Success, "toolchain.json's pyodide `why` no longer states the tarball's length.");
+        long length = long.Parse(stated.Groups[1].Value.Replace(",", ""), System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(System.Text.RegularExpressions.Regex.IsMatch(recipe, @"\$PyodideTarLength\s*=\s*" + length + @"\b"),
+            $"fetch-runtime.ps1's $PyodideTarLength is not the {length} bytes the contract states.");
         var files = pin["files"]!.AsObject();
         Assert.Equal(5, files.Count);
         foreach (var (name, digest) in files)
