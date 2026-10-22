@@ -102,7 +102,11 @@ final class StartOfYearPlanTableTests: XCTestCase {
             return XCTFail("no plan: \(model.stage)")
         }
         XCTAssertEqual(plan.tableRows().count, 19)
-        let host: TableHost = TableHost(StartOfYearSheet(model: model), size: NSSize(width: 560, height: 900))
+        // At the size the sheet opens at: its table takes any height it is
+        // given since #621, so a taller host would be measuring the host.
+        let host: TableHost = TableHost(
+            StartOfYearSheet(model: model), size: PageTablesSheetTests.fittingSize(of: StartOfYearSheet(model: model))
+        )
         defer {
             host.close()
         }
@@ -133,7 +137,11 @@ final class StartOfYearPlanTableTests: XCTestCase {
         }
         try StartOfYearPlanTableTests.layOutAFewPages(in: made.course)
         let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made)
-        let host: TableHost = TableHost(StartOfYearSheet(model: model), size: NSSize(width: 560, height: 900))
+        // At the size the sheet opens at: its table takes any height it is
+        // given since #621, so a taller host would be measuring the host.
+        let host: TableHost = TableHost(
+            StartOfYearSheet(model: model), size: PageTablesSheetTests.fittingSize(of: StartOfYearSheet(model: model))
+        )
         defer {
             host.close()
         }
