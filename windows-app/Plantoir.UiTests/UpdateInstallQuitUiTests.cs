@@ -28,7 +28,7 @@ public class UpdateInstallQuitUiTests
 {
     private const string Code = "UPD2O";
     private const string Version = "999.0.1";
-    /// <summary>The menu path measured 3 s from the click to the old process gone (1.7.2 → 1.8.5, i5-8365U).</summary> That was the REAL installer on the installed copy; this test's .cmd stand-in exits in about 1 s, the figure doc 12 quotes.
+    /// <summary>The menu path measured 3 s from the click to the old process gone (1.7.2 → 1.8.5, i5-8365U). That was the REAL installer on the installed copy; this test's .cmd stand-in exits in about 1 s, the figure doc 12 quotes.</summary>
     private static readonly TimeSpan ExitWithin = TimeSpan.FromSeconds(30);
 
     [UiFact]
