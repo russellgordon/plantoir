@@ -288,6 +288,42 @@ def run_prepare(script: Path):
     return prepare_page
 
 
+def capture_profile_processes() -> int:
+    """How many Edge processes still run on the capture's own profile."""
+    from hero_windows import EDGE_PROFILE
+    query = ("@(Get-CimInstance Win32_Process -Filter \"Name='msedge.exe'\" | Where-Object { $_.CommandLine -and "
+             "$_.CommandLine.Contains('" + str(EDGE_PROFILE) + "') }).Count")
+    said = subprocess.run(["powershell", "-NoProfile", "-Command", query], capture_output=True, text=True)
+    try:
+        return int(said.stdout.strip() or "0")
+    except ValueError:
+        return 0
+
+
+def take_window(url: str, part: Path, script: Path) -> None:
+    """`capture_page` once the last capture's Edge has really gone, tried a
+    second time when no window appears. Measured 2026-10-22 in the first
+    dry run: the sixth window of a row never appeared ("No window appeared
+    to photograph") a second after the fifth's Edge was killed — a launch on
+    a profile that a dying Edge still holds is handed to that Edge, which
+    then exits, so the launched process owns no window. Waiting for the
+    profile's processes to end, and one retry, is the cure; anything else
+    still stops the run."""
+    from hero_windows import capture_page, stop_matching, EDGE_PROFILE
+    for attempt in (1, 2):
+        deadline = time.time() + 20
+        while capture_profile_processes() and time.time() < deadline:
+            time.sleep(0.5)
+        try:
+            capture_page(url, "", part, size_dip=PAGE_SIZE_DIP, prepare_page=run_prepare(script), fit=True)
+            return
+        except SystemExit as stopped:
+            if attempt == 2 or "No window appeared" not in str(stopped):
+                raise
+            print("   no window appeared; once more, after the last Edge has gone")
+            stop_matching("msedge.exe", str(EDGE_PROFILE))
+
+
 def refuse_the_wrong_scale(dry_run: bool) -> float:
     from hero_windows import fitted_scale, make_dpi_aware
     make_dpi_aware()
@@ -321,7 +357,7 @@ def record(shot_id: str, theme: str, scale: float, picture: Path) -> None:
 
 def photograph_course(folder: Path, code: str, shots: list[dict], scale: float, dry_run: bool) -> list[str]:
     """One preview of `code`, every shot of it in light then dark."""
-    from hero_windows import capture_page, read_theme, write_theme
+    from hero_windows import read_theme, write_theme
     from images import prepare
     parts = DRY_PARTS if dry_run else PARTS
     parts.mkdir(parents=True, exist_ok=True)
@@ -340,7 +376,7 @@ def photograph_course(folder: Path, code: str, shots: list[dict], scale: float, 
                     write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
                     announce(f"{shot['id']}, {theme}")
                     part = parts / f"{shot['id']}-windows-{theme}.png"
-                    capture_page(url, "", part, size_dip=PAGE_SIZE_DIP, prepare_page=run_prepare(script), fit=True)
+                    take_window(url, part, script)
                     print_set_windows.must_show(part, shot)
                     if dry_run:
                         taken.append(f"{shot['id']}-{theme}")
