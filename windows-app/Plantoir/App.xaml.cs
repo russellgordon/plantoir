@@ -405,6 +405,11 @@ public partial class App : Application
             }
         }
         catch (Exception ex) { LogDiagnostic($"update at quit: {ex.Message}"); }
+        // The trail's last line from this process (#565): why it closed, with
+        // the pid of its "Plantoir opened". Once — WM_ENDSESSION may already
+        // have written it — and only after the opened line.
+        try { Plantoir.Core.Scripting.ActivityTrail.NoteClosed(Services.SessionEnding.ClosingReason(_installerStarted)); }
+        catch (Exception ex) { LogDiagnostic($"closing line: {ex.Message}"); }
         WorkspaceViewModel.IsTerminating = true;
         FolderContainers.ReleaseEverythingAtQuit(
             Settings.RememberedWindows.Select(w => w.Path).Distinct().ToList());

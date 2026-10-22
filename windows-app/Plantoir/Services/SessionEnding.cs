@@ -20,6 +20,18 @@ internal static class SessionEnding
     /// <summary>True from the moment Windows asks to end the session.</summary>
     public static bool IsEnding { get; private set; }
 
+    /// <summary>
+    /// The lParam of the last end-of-session message: <c>ENDSESSION_CLOSEAPP</c>
+    /// (0x1) when Restart Manager is closing this one app for an installer,
+    /// <c>ENDSESSION_LOGOFF</c> (0x80000000) for a sign-out, 0 for a shutdown
+    /// or restart (#565).
+    /// </summary>
+    public static long Flags { get; private set; }
+
+    /// <summary>Why Plantoir is closing, as the trail's <c>app closed</c> line says it (#565).</summary>
+    public static Plantoir.Core.Models.QuitConfirmation.ClosingReason ClosingReason(bool quittingForTheUpdater) =>
+        Plantoir.Core.Models.QuitConfirmation.ClosingReasonFor(quittingForTheUpdater, IsEnding, Flags);
+
     private delegate IntPtr SubclassProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam,
                                          UIntPtr id, UIntPtr data);
 
@@ -40,8 +52,27 @@ internal static class SessionEnding
 
     private static IntPtr OnMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam, UIntPtr id, UIntPtr data)
     {
-        if (message == WM_QUERYENDSESSION) IsEnding = true;
+        if (message == WM_QUERYENDSESSION)
+        {
+            IsEnding = true;
+            Flags = (long)lParam;
+        }
         else if (message == WM_ENDSESSION && wParam == IntPtr.Zero) IsEnding = false;   // the end was called off
+        else if (message == WM_ENDSESSION)
+        {
+            // The session IS ending (#565): Windows may end the process before
+            // the last window's Closed ever runs, so the trail's closing line
+            // is written here, BEFORE DefSubclassProc returns — once, though
+            // every subclassed window hears this, and with a short wait for
+            // the writers' lock, well inside Windows' kill timeout.
+            Flags = (long)lParam;
+            try
+            {
+                Plantoir.Core.Scripting.ActivityTrail.NoteClosed(
+                    ClosingReason(quittingForTheUpdater: false), TimeSpan.FromMilliseconds(500));
+            }
+            catch { }
+        }
         return DefSubclassProc(hWnd, message, wParam, lParam);
     }
 }
