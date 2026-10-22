@@ -47,7 +47,11 @@ final class ContainerIdentifiersUITests: XCTestCase {
 
     /// The start-of-year sheet's Go keeps its own identifier (#366). Before
     /// the fix, Cancel and "Put These into Draft" both read back as
-    /// `startOfYearSheet`. Cancelled at the end: nothing is written.
+    /// `startOfYearSheet`. Since #589 the plan's table is found by its own
+    /// identifier too, and Escape closes the sheet. (Its header was clicked
+    /// to sort it here once, and that worked; the same click in the capture
+    /// sorted on one pass of two, so it was dropped from both.) Nothing is
+    /// written.
     func testTheStartOfYearSheetKeepsItsButtonsIdentifiers() throws {
         guard ProcessInfo.processInfo.environment["PLANTOIR_UI_TESTS"] == "1" else {
             throw XCTSkip("Opt-in: set PLANTOIR_UI_TESTS=1. This drives the real app and needs the foreground.")
@@ -70,6 +74,12 @@ final class ContainerIdentifiersUITests: XCTestCase {
                 atomically: true, encoding: .utf8
             )
         }
+        // A page nothing links to, so the table has a second row (#589).
+        let conceptsURL: URL = fixtureURL.appendingPathComponent("courses/EXC2O/Concepts")
+        try FileManager.default.createDirectory(at: conceptsURL, withIntermediateDirectories: true)
+        try "---\ntitle: Unlinked Notes\npublishForSection1: true\n---\n\nNotes.\n".write(
+            to: conceptsURL.appendingPathComponent("Unlinked Notes.md"), atomically: true, encoding: .utf8
+        )
 
         let launch: IsolatedLaunch = try IsolatedLaunch.launch(workspace: fixtureURL)
         let application: XCUIApplication = launch.application
@@ -94,9 +104,24 @@ final class ContainerIdentifiersUITests: XCTestCase {
             print(application.sheets.firstMatch.debugDescription)
             XCTFail("Go has no identifier of its own: the sheet's swallowed it (#366).")
         }
+        let table: XCUIElement = startOfYearPlanTable(in: application)
+        if !table.waitForExistence(timeout: 10) {
+            print("=== SHEET TREE ===")
+            print(application.sheets.firstMatch.debugDescription)
+            XCTFail("The plan's table has no identifier of its own (#589).")
+        }
         let cancel: XCUIElement = application.sheets.firstMatch.buttons["Cancel"]
         XCTAssertTrue(cancel.exists, "The sheet should offer Cancel")
         XCTAssertNotEqual(cancel.identifier, "startOfYearSheet", "Cancel carries the sheet's identifier (#366)")
-        cancel.click()
+        // Escape is Cancel (#589): the sheet goes, and nothing is written.
+        application.typeKey(.escape, modifierFlags: [])
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: go
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 10), .completed,
+                       "Escape did not close the Start of Year sheet with its plan shown (#589)")
+        if go.exists {
+            cancel.click()
+        }
     }
 }
