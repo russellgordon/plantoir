@@ -3241,6 +3241,19 @@ the size it was in 1.8.4 — the only difference measured is an SVG sized in cm,
 302.4 × 151.2 before and 302 × 151 now. What changes is only the time before
 the bytes arrive.
 
+A size is an improvement, never a requirement: the transformer works on
+each picture inside its own `try`, so whatever goes wrong reading one picture
+leaves THAT picture exactly as Quartz wrote it and the page, and the build,
+carry on (the oracle's fifth part, N3, proves it with a reader that throws;
+red without the `try`).
+
+**One known, accepted change:** a picture whose FILE is found and sized but
+then fails to load in the browser (a server error, a file truncated after the
+build) now reserves a box of its stated size in Chromium, where it was 0 × 0
+before. It is accepted because that box is exactly the size the picture would
+have had, so nothing on the page moves around it as the rest of the page loads
+— which is the whole point of the piece.
+
 Print is unchanged: the handout's `imagesReady` (`print.inline.ts`) already
 wrote exactly these attributes at print time, and ⌘P's `print.scss` already
 sets `height: auto`.
@@ -3294,7 +3307,11 @@ progressive, interlaced, animated, lossless and alpha, EXIF orientations 1–8,
 PNG `eXIf`, JPEG fill bytes, a PNG cut short and a PNG with no picture data);
 19 named cases hold (the SVGs, which Pillow cannot read, and the files where
 the engines disagree, below); every answer is the same from a 16-byte first
-read; and 19 cases of the attribute rule hold. Pillow writes EXIF only
+read; 19 cases of the attribute rule hold; and the transformer itself,
+bundled with Quartz's esbuild over a page of three pictures with a reader that
+throws for the middle one, leaves that one untouched and sizes the other two
+(proven red by copy-and-restore without the per-picture `try`: `FAIL: one
+picture's reader failing failed the whole page`). Pillow writes EXIF only
 big-endian, so four JPEGs carry an EXIF block built byte by byte, two of
 them little-endian — without them the `II` branch, which Windows tools and
 many phones write, is never reached. Proven red by copy-and-restore: with
