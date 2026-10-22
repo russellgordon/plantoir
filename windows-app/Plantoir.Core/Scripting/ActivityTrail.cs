@@ -677,6 +677,14 @@ public static class ActivityTrail
         /// change, so "Preview opened somewhere odd" can be answered.
         /// </summary>
         PreviewStartPageChosenInSettings,
+
+        /// <summary>
+        /// What a build did about the section's My Progress page (#599, mac
+        /// #545): made it and how many pages count, or made none and why. Read
+        /// from the build's <c>PLANTOIR_MY_PROGRESS:</c> line by the console
+        /// reader and by the scheduled publish's log reader. Never a page's words.
+        /// </summary>
+        MyProgressPageBuilt,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -804,6 +812,7 @@ public static class ActivityTrail
         Event.GuidanceCouldNotBeWritten => "guidance for assistants could not be written",
         Event.PreviewStartedAtThePageLastViewed => "preview started at the page last viewed",
         Event.PreviewStartPageChosenInSettings => "preview start page chosen in Settings",
+        Event.MyProgressPageBuilt => "my progress page built",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
