@@ -2279,6 +2279,63 @@ the same day.)
   offered again even when skipped (#453), and the daily check starts once the
   first window is up and never counts an offer nobody saw as an answer
   (#465). Both are in `11-release-strategy.md` → "Updating itself on Windows".
+
+  **The quit an install asks for is carried to the UI thread (#632, v1.8.6).**
+  Seen on the 1.7.2 → 1.8.5 proof: Install and Reopen on the DAILY check's
+  offer started the installer and left the old window up, so the installer
+  met a running `Plantoir.exe` under `/NOCLOSEAPPLICATIONS` and gave up having
+  changed nothing; the same answer from File ▸ Check for Updates… installed.
+  The cause, proven rather than read off the source: what decides the thread
+  is where NetSparkle's engine (`AppUpdater.Sparkle()`) is first BUILT — it
+  keeps that thread's `SynchronizationContext` and raises `DownloadFinished`
+  through it. The daily check runs from a `System.Threading.Timer`, so when it
+  is the first check of a launch the engine is built on a pool thread and
+  `InstallWhenFreeAsync` → `UpdatePrompts.QuitForInstall` →
+  `App.QuitForUpdate` → `QuitTime` → `Current.Exit()` runs there, and
+  `Current.Exit()` off the UI thread **returns having done nothing** — no
+  exception, no `MainWindow.Closed`. The red run's startup.log, 2026-10-22:
+
+  ```
+  QuitForUpdate on thread 5, UI thread: no
+  QuitTime called
+  QuitTime: calling Current.Exit
+  Current.Exit returned
+  ```
+
+  It follows that a File ▸ Check for Updates… in a launch where the daily
+  check had already built the engine would have hung the same way; the menu
+  is safe only when IT builds the engine (and on that path
+  `ToolchainReadiness.WhenWritingCopiesFinish()` resumes on the UI context
+  too). Worth knowing besides: `QuitTime` had already written the trail's
+  `Plantoir closed — to install a new version` and set
+  `WorkspaceViewModel.IsTerminating` before the `Exit()` that did nothing, so
+  the window left up was half torn down, and the trail said it had closed.
+
+  The fix is in ONE place, `App.QuitForUpdate`: on the UI thread it calls
+  `QuitTime()` directly, as always; from anywhere else it hands it to the UI
+  thread's `DispatcherQueue` (the one `OnLaunched` already obtains), and says
+  so in startup.log (`UI thread: no, so the quit is handed to it`); a refused
+  `TryEnqueue` is logged. Rejected: building the engine or starting the timer
+  on the UI thread (fixes this route and leaves the next off-thread caller
+  broken), guarding `QuitTime` for every caller (wider than the fault; its
+  other callers are UI-thread handlers), and fixing it in `UpdatePrompts`
+  (the call into `Exit()` is the one place every route goes through).
+
+  **The test**: `UpdateInstallQuitUiTests` (two `[UiFact]`s — the daily
+  check's offer, and Check for Updates… as the control) serves a feed signed
+  with a throwaway Ed25519 key from localhost and an "installer" that is a
+  `.cmd` writing a marker, so nothing installs and nothing reopens. A Debug
+  build has no updater (`AppUpdates.FeedFor(developmentBuild: true)` is null)
+  and is never per-user from `bin\`, so the Debug build alone accepts
+  `--update-feed-for-tests <url>`, `--update-key-for-tests <base64>` and
+  `--update-first-look-for-tests <seconds>` (`AppUpdater.FirstLook`, default
+  `FirstRetry`, one minute); a Release build compiles them out. Windows has
+  no `PLANTOIR_UPDATE_FEED` — that name is the mac's (`PLANTOIR_UPDATE_FEED_URL`).
+  Measured on the Lenovo 20QES70500 (i5-8365U), 2026-10-22, x64 Debug: before
+  the fix the daily path started the installer 0.7 s after the click and the
+  old process was STILL RUNNING 30 s later, while the menu path was gone in
+  1.0 s; after it, the daily path is gone 0.9 s after the click and the menu
+  path 0.6 s.
 - **Stable code signing** (entry from the signing fix): sign dev builds
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.

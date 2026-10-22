@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-22 | Install and Reopen on the update offer that comes by itself once a day now closes Plantoir, installs and opens the new version, as it already did from File ▸ Check for Updates…; before, the window stayed open and nothing was installed. | Windows | [#632](https://github.com/russellgordon/plantoir/issues/632) |
 
 
 ## Warnings the release notes MUST carry
@@ -126,6 +127,7 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-10-22 (#632) | **Windows:** if you choose Install and Reopen on the offer that appears by itself and Plantoir stays open, choose File ▸ Check for Updates… and install from there. | The fix is IN this release, so it takes effect only from the copy after it: a teacher on 1.8.5 or earlier who accepts the daily offer for this release meets the old fault once. Windows only — not by itself a reason to pass the mac's `--required-warning`; that is the cutter's call. |
 
 ## Trim the roadmap
 
