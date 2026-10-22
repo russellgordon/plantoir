@@ -21,7 +21,13 @@ in Node, and:
 3. every answer is the same when the first read is only 16 bytes, so the
    build's read-the-start-first shortcut can never change a size;
 4. every `sizedAttributes` case in ATTRIBUTE_CASES - the attribute rule,
-   including a raw <img> the build must leave alone (review S1).
+   including a raw <img> the build must leave alone (review S1);
+5. the transformer itself (plantoirPictureSizes.ts, bundled with Quartz's
+   esbuild) over a page of three pictures, with the reader replaced by one
+   that THROWS for one of them: the page is still transformed, that picture
+   is left exactly as Quartz wrote it, and the other two are sized
+   (implementation review F1 - a size is an improvement, never a reason for
+   a build to fail).
 
 The corpus is committed (scripts/fixtures/make_picture_sizes_corpus.py is
 how it was drawn). The count of each kind is printed and checked against a
@@ -41,6 +47,9 @@ import toolchain_paths  # noqa: E402
 from PIL import Image, ImageOps  # noqa: E402
 
 READER_JS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "pictureSizes.js"
+TRANSFORMER_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "plantoirPictureSizes.ts"
+QUARTZ_PATH_TS = toolchain_paths.QUARTZ_DIR / "quartz" / "util" / "path.ts"
+NODE_MODULES = toolchain_paths.QUARTZ_DIR / "node_modules"
 CORPUS = Path(__file__).resolve().parent / "fixtures" / "picture-sizes"
 
 # Asked of nobody but this list: [width, height], {"ratio": height / width},
@@ -114,6 +123,93 @@ console.log(JSON.stringify({ answers, attributes }))
 """
 
 
+# Bundles the transformer with esbuild's own API (from Quartz's node_modules).
+# Its reader is swapped for STUB_JS, which throws for one picture and asks
+# the real reader about the rest; Quartz's path helpers come from Quartz.
+BUILD = r"""
+import { createRequire } from "module"
+const require = createRequire("NODE_MODULES/")
+const { build } = require("esbuild")
+await build({
+  entryPoints: [process.argv[2]], outfile: process.argv[3], bundle: true, platform: "node", format: "esm",
+  logLevel: "error", nodePaths: ["NODE_MODULES"],
+  plugins: [{ name: "swap", setup(builder) {
+    builder.onResolve({ filter: /^\.\/pictureSizes\.js$/ }, () => ({ path: "STUB_JS" }))
+    builder.onResolve({ filter: /^\.\.\/\.\.\/util\/path$/ }, () => ({ path: "QUARTZ_PATH_TS" }))
+    builder.onResolve({ filter: /^\.\.\/types$/ }, () => ({ path: "types", namespace: "empty" }))
+    builder.onLoad({ filter: /.*/, namespace: "empty" }, () => ({ contents: "export {}", loader: "js" }))
+  } }],
+})
+"""
+
+STUB_JS = r"""
+import * as real from "READER_JS"
+export function pictureSizeOfFile(path, firstRead) {
+  return real.pictureSizeOfFile(path, firstRead)
+}
+export function sizedAttributes(properties, size) {
+  if (String(properties.src).includes("throws")) throw new Error("a reader that fails on this picture")
+  return real.sizedAttributes(properties, size)
+}
+"""
+
+TRANSFORMER_RUNNER = r"""
+import { PlantoirPictureSizes } from "TRANSFORMER_TS"
+const [directory] = process.argv.slice(2)
+const files = ["Media/wide.png", "Media/throws.png", "Media/tall.png"]
+const ctx = { allFiles: files, allSlugs: files, argv: { directory } }
+function picture(src, width) {
+  return { type: "element", tagName: "img", properties: { src, width, height: "auto", alt: "" }, children: [] }
+}
+const tree = { type: "root", children: [
+  picture("./Media/wide.png", "600"), picture("./Media/throws.png", "auto"), picture("./Media/tall.png", "auto"),
+] }
+let threw = null
+try {
+  for (const make of PlantoirPictureSizes().htmlPlugins(ctx)) make()(tree, { data: { slug: "page" } })
+} catch (error) {
+  threw = String(error)
+}
+const after = []
+for (const node of tree.children) after.push(node.properties)
+console.log(JSON.stringify({ threw, after }))
+"""
+
+
+def transformer_failures(work: Path) -> list:
+    """Section 5: one picture's failure leaves that picture alone."""
+    failures = []
+    site = work / "content"
+    (site / "Media").mkdir(parents=True)
+    shutil.copyfile(CORPUS / "png-rgb.png", site / "Media" / "wide.png")      # 120 x 40
+    shutil.copyfile(CORPUS / "png-rgb.png", site / "Media" / "throws.png")
+    shutil.copyfile(CORPUS / "png-grey.png", site / "Media" / "tall.png")     # 30 x 90
+    (work / "stub.mjs").write_text(STUB_JS.replace("READER_JS", str(work / "pictureSizes.js")), encoding="utf-8")
+    (work / "build.mjs").write_text(BUILD.replace("NODE_MODULES", str(NODE_MODULES)).replace(
+        "STUB_JS", str(work / "stub.mjs")).replace("QUARTZ_PATH_TS", str(QUARTZ_PATH_TS)), encoding="utf-8")
+    (work / "transformer.mjs").write_text(TRANSFORMER_RUNNER.replace("TRANSFORMER_TS", str(TRANSFORMER_TS)),
+                                          encoding="utf-8")
+    built = subprocess.run(["node", str(work / "build.mjs"), str(work / "transformer.mjs"),
+                            str(work / "transformer.bundle.mjs")], capture_output=True, text=True)
+    if built.returncode != 0:
+        return ["the transformer did not bundle: " + built.stderr.strip()[-600:]]
+    said = subprocess.run(["node", str(work / "transformer.bundle.mjs"), str(site)], capture_output=True, text=True)
+    if said.returncode != 0:
+        return ["the transformer did not run: " + said.stderr.strip()[-600:]]
+    result = json.loads(said.stdout.strip().splitlines()[-1])
+    if result["threw"] is not None:
+        failures.append(f"one picture's reader failing failed the whole page: {result['threw']}")
+        return failures
+    wide, broken, tall = result["after"]
+    if broken != {"src": "./Media/throws.png", "width": "auto", "height": "auto", "alt": ""}:
+        failures.append(f"the picture whose reader failed was changed: {json.dumps(broken)}")
+    if (wide.get("width"), wide.get("height"), "dataPlSized" in wide) != (600, 200, True):
+        failures.append(f"the picture before it was not sized 600 x 200: {json.dumps(wide)}")
+    if (tall.get("width"), tall.get("height"), "dataPlSized" in tall) != (30, 90, True):
+        failures.append(f"the picture after it was not sized 30 x 90: {json.dumps(tall)}")
+    return failures
+
+
 def pillow_size(path: Path):
     try:
         with Image.open(path) as picture:
@@ -163,6 +259,7 @@ def main() -> int:
             print("FAIL: the reader did not run in Node: " + said.stderr.strip()[-600:])
             return 1
         result = json.loads(said.stdout.strip().splitlines()[-1])
+        failures.extend(transformer_failures(work))
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -199,7 +296,8 @@ def main() -> int:
                         f"{asked_named} named (all {NAMED_FLOOR}): the corpus is not all there")
 
     summary = (f"{asked_pillow} pictures agree with Pillow, {asked_named} named cases hold, "
-               f"every one the same from a 16-byte first read, {len(ATTRIBUTE_CASES)} attribute cases")
+               f"every one the same from a 16-byte first read, {len(ATTRIBUTE_CASES)} attribute cases, "
+               f"and a picture whose reader fails left as Quartz wrote it while the rest of its page is sized")
     if failures:
         for failure in failures:
             print("FAIL: " + failure)

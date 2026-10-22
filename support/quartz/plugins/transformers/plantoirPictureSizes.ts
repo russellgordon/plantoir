@@ -130,6 +130,30 @@ function slugOfPicture(pageSlug: string, src: string): string | null {
   return parts.join("/")
 }
 
+type BuildFacts = { allSlugs: readonly string[]; allFiles: readonly string[]; argv: { directory: string } }
+
+// One <img>: its new width and height, or null to leave it as it is. Writes
+// nothing itself, so a picture it fails on is untouched.
+function sizesFor(node: Element, pageSlug: string, ctx: BuildFacts): { width: number; height: number } | null {
+  if (node.tagName !== "img") {
+    return null
+  }
+  const properties = node.properties ?? {}
+  const src = properties.src
+  if (typeof src !== "string" || src === "" || isRemote(src)) {
+    return null
+  }
+  const pictureSlug = slugOfPicture(pageSlug, src)
+  if (pictureSlug === null) {
+    return null
+  }
+  const fileName = filesBySlug(ctx.allSlugs, ctx.allFiles).get(pictureSlug)
+  if (fileName === undefined) {
+    return null
+  }
+  return sizedAttributes(properties, sizeOfFile(joinSegments(ctx.argv.directory, fileName)))
+}
+
 export const PlantoirPictureSizes: QuartzTransformerPlugin = () => ({
   name: "PlantoirPictureSizes",
   htmlPlugins(ctx) {
@@ -137,26 +161,20 @@ export const PlantoirPictureSizes: QuartzTransformerPlugin = () => ({
       () => (tree: HtmlRoot, file) => {
         const pageSlug = (file.data.slug ?? "") as FullSlug
         visit(tree, "element", (node: Element) => {
-          if (node.tagName !== "img") {
-            return
+          // A size is an improvement, never a requirement: whatever goes
+          // wrong with one picture (#612 implementation review F1), that
+          // picture is left exactly as Quartz wrote it and the page - and
+          // the build - carry on.
+          let sized: { width: number; height: number } | null = null
+          try {
+            sized = sizesFor(node, pageSlug, ctx)
+          } catch {
+            sized = null
           }
-          const properties = node.properties ?? {}
-          const src = properties.src
-          if (typeof src !== "string" || src === "" || isRemote(src)) {
-            return
-          }
-          const pictureSlug = slugOfPicture(pageSlug, src)
-          if (pictureSlug === null) {
-            return
-          }
-          const fileName = filesBySlug(ctx.allSlugs, ctx.allFiles).get(pictureSlug)
-          if (fileName === undefined) {
-            return
-          }
-          const sized = sizedAttributes(properties, sizeOfFile(joinSegments(ctx.argv.directory, fileName)))
           if (sized === null) {
             return
           }
+          const properties = node.properties ?? {}
           properties.width = sized.width
           properties.height = sized.height
           properties.dataPlSized = ""
