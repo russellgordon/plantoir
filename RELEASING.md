@@ -119,6 +119,8 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-22 | Runnable Python blocks work in a site built on Windows (the site's own maths fonts were already there; measured to match the mac's KaTeX 0.16.21): the Windows app now carries Pyodide 314.0.7 (a Windows re-run of `fetch-runtime.ps1` is needed on every build PC; the build refuses without it) | Windows (the mac has had #455/#494 since v1.8.0) | #568 |
 | 2026-10-22 | A runnable block on a page with nothing from another website asks for each `input()` line as the program runs, in a Windows preview and a Windows publish (inherited, measured in Edge and the preview pane) | Windows (the mac since v1.8.1, #583) | #591 |
 | 2026-10-22 | The editable block's own syntax colours and line numbers on a Windows-built site (inherited, measured in Edge) | Windows (the mac since v1.8.1, #585) | #592 |
+| 2026-10-22 | A folder added in Course Settings starts with its index page, so it appears in the site's sidebar, and a page to duplicate — shared, or in every section | Windows (mac shipped it in v1.8.0, #506) | #580 |
+| 2026-10-22 | A course whose name holds ": " ("Physics: Mechanics") gets a front page the build can read when a section is added or the front page is put back | Windows (mac shipped it in v1.8.1, #575) | #586 |
 
 
 ## Warnings the release notes MUST carry
