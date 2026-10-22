@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Observation
 
@@ -60,6 +61,11 @@ final class StartOfYearSheetModel {
     /// How the backup is made. Injectable so a test can make it fail.
     private let backUp: (Course, URL) async throws -> URL
 
+    /// When this section's own scheduled deploy will run, if one is set.
+    /// Injectable so a test can show the sheet with that warning (#589's
+    /// worst case) without setting a real one.
+    private let readScheduledDeploy: (Course, Int, URL) -> Date?
+
     // MARK: - Computed properties
 
     var title: String {
@@ -80,6 +86,11 @@ final class StartOfYearSheetModel {
          today: @escaping () -> CalendarDay = { return CalendarDay.today() },
          backUp: @escaping (Course, URL) async throws -> URL = { course, coursesDirectoryURL in
              return try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .teacher)
+         },
+         scheduledDeploy: @escaping (Course, Int, URL) -> Date? = { course, sectionNumber, workspaceURL in
+             return ScheduledDeploy.nextRun(
+                 courseCode: course.code, sectionNumber: sectionNumber, inWorkingFolder: workspaceURL
+             )
          }) {
         self.course = course
         self.sectionNumber = sectionNumber
@@ -87,6 +98,7 @@ final class StartOfYearSheetModel {
         self.mode = mode
         self.readToday = today
         self.backUp = backUp
+        self.readScheduledDeploy = scheduledDeploy
     }
 
     // MARK: - Functions
@@ -95,9 +107,7 @@ final class StartOfYearSheetModel {
     func load() {
         switch mode {
         case .getReady:
-            let scheduled: Date? = ScheduledDeploy.nextRun(
-                courseCode: course.code, sectionNumber: sectionNumber, inWorkingFolder: workspaceURL
-            )
+            let scheduled: Date? = readScheduledDeploy(course, sectionNumber, workspaceURL)
             switch StartOfYearPlanner.plan(
                 forSection: sectionNumber, in: course, workspaceURL: workspaceURL,
                 today: readToday(), scheduledDeploy: scheduled
@@ -191,25 +201,81 @@ final class StartOfYearSheetModel {
 
 /// The sheet: what getting a section ready would do, every page with its
 /// reason, and the result — or, in undo mode, what would go back (#96).
+///
+/// The plan is a table since #589 — a row for every page going into draft,
+/// with its folder and why, the look #524 gave Publish Pages — between two
+/// capped areas: what must be read before Go above it, and what stays and
+/// what follows below it. Its height budget is in `tallestPlanTable`.
 struct StartOfYearSheet: View {
 
     // MARK: - Stored properties
 
     @State var model: StartOfYearSheetModel
 
+    /// The table's order: plan order (classes, then pages) to begin with; a
+    /// column header sorts by that column (#589, as #524).
+    @State var planSortOrder: [KeyPathComparator<StartOfYearPlanRow>] = [KeyPathComparator(\.position)]
+
     @Environment(\.dismiss) var dismiss
+
+    /// The one budget for the plan (#589): the whole sheet, in its worst case
+    /// — the "changed since" notice, all three warnings, a page with no room
+    /// for a key, links left pointing at hidden pages and more rows than fit —
+    /// must stay within `CopyPageChecklist.tallestSheet` (620 pt, a 13-inch Air
+    /// at "Larger Text"), or Cancel and Go go off the bottom of the screen.
+    /// Measured with the real sheet (`StartOfYearSheetSizeTests`): about 52
+    /// for the title band, 20 for the bottom margin, 12 between each part,
+    /// about 22 for the buttons and 36 for the two summary lines, which leaves
+    /// about 440 for the three parts that grow. #524's twelve rows (318 pt)
+    /// did not fit: they left about 120 for everything above and below.
+    ///
+    /// Eight rows on one line each; fewer when a reason takes two lines.
+    static let mostPlanRowsShown: Int = 8
+    static var tallestPlanTable: CGFloat {
+        return ListTableMetrics.height(forRowCount: mostPlanRowsShown, showsHeader: true)
+    }
+
+    /// The notice, the warnings and the intro, above the table. The warnings
+    /// come FIRST: they are what must be read before Go, and in the worst
+    /// case they and the intro together are taller than this, so it is the
+    /// intro — already read, the time before — that scrolls.
+    static let tallestPlanIntro: CGFloat = 100
+
+    /// Everything under the table: already in draft, no room for a key, what
+    /// stays, the links left, publishing from now on, the undo's limit.
+    static let tallestPlanNotes: CGFloat = 100
+
+    /// A row whose reason takes two lines (#589's plan review: the longest
+    /// reason, "only “…” links to it, and students will not see that page",
+    /// is about 400 pt and was cut at its useful half on one line). MEASURED
+    /// on the real bordered table, macOS 26: 24 pt on one line, 40 on two.
+    static let twoLineRowHeight: CGFloat = 40
+
+    /// The widest reason that still fits on one line in the Why column, in
+    /// the system font. MEASURED: in the 560-point sheet the column is 254 pt
+    /// wide (248.5 when the table shows a scroll bar), and text up to about
+    /// 250 pt stays on one line. Set a little under the narrower case, so a
+    /// misjudged row leaves a band of a few points rather than a scroll.
+    static let widestOneLineReason: CGFloat = 244
 
     // MARK: - Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    content
+            if case .ready(let plan) = model.stage {
+                // No outer scroll view for the plan (#589): the table scrolls
+                // inside itself, and a scroll inside a scroll is the shape
+                // every list here has refused.
+                planView(plan)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        content
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 200, maxHeight: 460)
             }
-            .frame(minHeight: 200, maxHeight: 460)
             buttons
         }
         .padding([.horizontal, .bottom], 20)
@@ -238,8 +304,9 @@ struct StartOfYearSheet: View {
                 .frame(maxWidth: .infinity)
         case .problem(let sentence):
             Text(sentence)
-        case .ready(let plan):
-            planView(plan)
+        case .ready:
+            // Drawn by `body`, outside the scroll view (#589).
+            EmptyView()
         case .done(let done):
             Text(StartOfYearWording.done(pages: StartOfYearWording.pages(done.pagesWritten)))
             if !done.leftAlone.isEmpty {
@@ -284,91 +351,152 @@ struct StartOfYearSheet: View {
         }
     }
 
+    /// The plan (#589): what must be read before Go; a summary over a
+    /// read-only table with a row for every page going into draft; and the
+    /// rest of what the plan says, under it. Every sentence is the one it
+    /// was before the table; only the two lists of lines became rows.
     @ViewBuilder
     func planView(_ plan: StartOfYearPlan) -> some View {
         let first: String = plan.firstClass.displayTitle
-        if let notice = model.notice {
-            Text(notice)
-                .foregroundStyle(.orange)
-        }
-        Text(StartOfYearWording.intro(first: first, noun: plan.noun.singular))
-        ForEach(plan.warnings(), id: \.self) { warning in
-            Label(warning, systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
-        }
-        if plan.changesNothing {
-            Text(StartOfYearWording.nothingToDo(first: first, nouns: plan.noun.plural))
-        }
-        let classChanges: [StartOfYearDraft] = plan.draftsThatChange(plan.classDrafts)
-        if !classChanges.isEmpty {
-            DisclosureGroup(StartOfYearWording.classesHeading(
-                classes: StartOfYearWording.counted(classChanges.count, noun: plan.noun)
-            )) {
-                draftList(classChanges, plan: plan, first: first)
-            }
-        }
-        let pageChanges: [StartOfYearDraft] = plan.draftsThatChange(plan.pageDrafts)
-        if !pageChanges.isEmpty {
-            DisclosureGroup(StartOfYearWording.pagesHeading(pages: StartOfYearWording.pages(pageChanges.count))) {
-                draftList(pageChanges, plan: plan, first: first)
-            }
-        }
-        if plan.classesAlreadyInDraft > 0 {
-            Text(StartOfYearWording.alreadyInDraft(
-                classes: StartOfYearWording.counted(plan.classesAlreadyInDraft, noun: plan.noun)
-            ))
-            .foregroundStyle(.secondary)
-        }
-        if !plan.publishPlan.noRoomForAKey.isEmpty {
-            Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
-                .foregroundStyle(.orange)
-        }
-        DisclosureGroup(StartOfYearWording.staysHeading(
-            pages: StartOfYearWording.pages(1 + plan.firstClassPages.count + plan.keyLinksPages.count)
-        )) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("• " + StartOfYearWording.staysFirstClass(
-                    first: first, pages: StartOfYearWording.pages(plan.firstClassPages.count)
-                ))
-                if !plan.keyLinksPages.isEmpty {
-                    Text("• " + StartOfYearWording.staysKeyLinks(
-                        pages: StartOfYearWording.pages(max(0, plan.keyLinksPages.count - 1))
-                    ))
+        let rows: [StartOfYearPlanRow] = plan.tableRows()
+        CappedScrollArea(cap: StartOfYearSheet.tallestPlanIntro) {
+            VStack(alignment: .leading, spacing: 8) {
+                if let notice = model.notice {
+                    Text(notice)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Text("• " + StartOfYearWording.staysEverythingElse)
+                ForEach(plan.warnings(), id: \.self) { (warning: String) in
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(StartOfYearWording.intro(first: first, noun: plan.noun.singular))
+                    .fixedSize(horizontal: false, vertical: true)
+                if plan.changesNothing {
+                    Text(StartOfYearWording.nothingToDo(first: first, nouns: plan.noun.plural))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("startOfYearPlanIntro")
         }
-        if !plan.danglingSources.isEmpty {
-            DisclosureGroup(StartOfYearWording.linksLeftHeading) {
+        if !rows.isEmpty {
+            planSummary(plan)
+            planTable(rows)
+        }
+        CappedScrollArea(cap: StartOfYearSheet.tallestPlanNotes) {
+            planNotes(plan, first: first)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("startOfYearPlanNotes")
+        }
+    }
+
+    /// The two headings the lists had, as the lines over the table: how many
+    /// classes, and how many other pages.
+    func planSummary(_ plan: StartOfYearPlan) -> some View {
+        let classChanges: Int = plan.draftsThatChange(plan.classDrafts).count
+        let pageChanges: Int = plan.draftsThatChange(plan.pageDrafts).count
+        return VStack(alignment: .leading, spacing: 4) {
+            if classChanges > 0 {
+                Text(StartOfYearWording.classesHeading(
+                    classes: StartOfYearWording.counted(classChanges, noun: plan.noun)
+                ))
+            }
+            if pageChanges > 0 {
+                Text(StartOfYearWording.pagesHeading(pages: StartOfYearWording.pages(pageChanges)))
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("startOfYearPlanSummary")
+    }
+
+    /// The table: Page, Folder and Why, every page going into draft — not
+    /// capped, it scrolls inside itself past `tallestPlanTable`. No
+    /// `selection:`: the rows are read, not chosen.
+    func planTable(_ rows: [StartOfYearPlanRow]) -> some View {
+        return Table(rows.sorted(using: planSortOrder), sortOrder: $planSortOrder) {
+            TableColumn(AssistWording.menuPlanPageColumn, value: \.title) { (row: StartOfYearPlanRow) in
+                Text(row.title)
+                    .help(row.title)
+            }
+            .width(min: 90, max: 140)
+            TableColumn(AssistWording.menuPlanFolderColumn, value: \.folder) { (row: StartOfYearPlanRow) in
+                Text(row.folder)
+                    .foregroundStyle(.secondary)
+                    .help(row.folder)
+            }
+            .width(min: 60, max: 100)
+            TableColumn(StartOfYearWording.reasonColumn, value: \.why) { (row: StartOfYearPlanRow) in
+                // Two lines, so the longest reason reads whole; the tooltip
+                // has it whole when a long title makes it longer still.
+                Text(row.why)
+                    .lineLimit(2)
+                    .help(row.why)
+            }
+            // The rest of the width: it carries the longest words.
+            .width(min: 220, ideal: 300)
+        }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .frame(height: StartOfYearSheet.planTableHeight(for: rows))
+        .accessibilityIdentifier("startOfYearPlanTable")
+    }
+
+    /// Everything the plan says under its lists, word for word as before.
+    @ViewBuilder
+    func planNotes(_ plan: StartOfYearPlan, first: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if plan.classesAlreadyInDraft > 0 {
+                Text(StartOfYearWording.alreadyInDraft(
+                    classes: StartOfYearWording.counted(plan.classesAlreadyInDraft, noun: plan.noun)
+                ))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            if !plan.publishPlan.noRoomForAKey.isEmpty {
+                Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            DisclosureGroup(StartOfYearWording.staysHeading(
+                pages: StartOfYearWording.pages(1 + plan.firstClassPages.count + plan.keyLinksPages.count)
+            )) {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(plan.danglingSources, id: \.page.relativePath) { source in
-                        Text("• " + StartOfYearWording.linksLeftLine(
-                            name: plan.name(of: source.page),
-                            links: source.hiddenTargets.count == 1
-                                ? "1 link" : "\(source.hiddenTargets.count) links"
+                    Text("• " + StartOfYearWording.staysFirstClass(
+                        first: first, pages: StartOfYearWording.pages(plan.firstClassPages.count)
+                    ))
+                    if !plan.keyLinksPages.isEmpty {
+                        Text("• " + StartOfYearWording.staysKeyLinks(
+                            pages: StartOfYearWording.pages(max(0, plan.keyLinksPages.count - 1))
                         ))
                     }
+                    Text("• " + StartOfYearWording.staysEverythingElse)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        Text(StartOfYearWording.publishingFromNowOn(noun: plan.noun.singular))
-            .foregroundStyle(.secondary)
-        Text(StartOfYearWording.undoEndsWhenYouQuit)
-            .foregroundStyle(.secondary)
-    }
-
-    /// Each page by its title, and its folder only when another page in the
-    /// section shares the title (#362) — built by the plan, the same line
-    /// `describe()` gives an outside assistant. (The `id:` is the page's path
-    /// on purpose: an identity, never shown.)
-    func draftList(_ drafts: [StartOfYearDraft], plan: StartOfYearPlan, first: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(drafts, id: \.page.relativePath) { draft in
-                Text("• " + plan.line(for: draft, first: first))
-                    .textSelection(.enabled)
+            if !plan.danglingSources.isEmpty {
+                DisclosureGroup(StartOfYearWording.linksLeftHeading) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(plan.danglingSources, id: \.page.relativePath) { (source: StartOfYearDanglingSource) in
+                            Text("• " + StartOfYearWording.linksLeftLine(
+                                name: plan.name(of: source.page),
+                                links: source.hiddenTargets.count == 1
+                                    ? "1 link" : "\(source.hiddenTargets.count) links"
+                            ))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
+            Text(StartOfYearWording.publishingFromNowOn(noun: plan.noun.singular))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(StartOfYearWording.undoEndsWhenYouQuit)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -384,6 +512,37 @@ struct StartOfYearSheet: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Functions
+
+    /// The table's height: every row, up to `tallestPlanTable`, then it
+    /// scrolls inside itself. A `Table` has no natural height, and its rows
+    /// are not all one height here — a reason over `widestOneLineReason`
+    /// takes two lines — so each row is counted at the height it will draw.
+    static func planTableHeight(for rows: [StartOfYearPlanRow]) -> CGFloat {
+        var height: CGFloat = ListTableMetrics.headerHeight + ListTableMetrics.borderAllowance
+        if rows.isEmpty {
+            height += ListTableMetrics.rowHeight
+        }
+        for row in rows {
+            if reasonFitsOnOneLine(row.why) {
+                height += ListTableMetrics.rowHeight
+            } else {
+                height += twoLineRowHeight
+            }
+            if height >= tallestPlanTable {
+                return tallestPlanTable
+            }
+        }
+        return height
+    }
+
+    /// Whether a reason fits on one line of the Why column.
+    static func reasonFitsOnOneLine(_ why: String) -> Bool {
+        let font: NSFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let width: CGFloat = (why as NSString).size(withAttributes: [.font: font]).width
+        return width <= widestOneLineReason
     }
 
     @ViewBuilder

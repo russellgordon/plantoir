@@ -257,6 +257,7 @@ final class StartOfYearTests: XCTestCase {
             "reasonOnlyHiddenPagesLink": StartOfYearWording.reasonOnlyHiddenPagesLink(page: "{page}"),
             "reasonOnlyAFolderLists": StartOfYearWording.reasonOnlyAFolderLists(page: "{page}"),
             "reasonNothingLinks": StartOfYearWording.reasonNothingLinks,
+            "reasonColumn": StartOfYearWording.reasonColumn,
             "staysFirstClass": StartOfYearWording.staysFirstClass(first: "{first}", pages: "{pages}"),
             "staysKeyLinks": StartOfYearWording.staysKeyLinks(pages: "{pages}"),
             "staysEverythingElse": StartOfYearWording.staysEverythingElse,

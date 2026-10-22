@@ -1,0 +1,350 @@
+import AppKit
+import SwiftUI
+import XCTest
+@testable import QuartzTeachers
+
+/// The Start of Year sheet's pages as a table (#589): a row for every page
+/// going into draft — classes first, then pages — with its folder and why,
+/// the look #524 gave Publish Pages; and the sheet still fitting on a
+/// 13-inch screen in its worst case.
+///
+/// Every plan here comes from `StartOfYearPlanner.plan`, the call the sheet
+/// itself makes, on a course laid out on disk. Sentences are named by their
+/// `StartOfYearWording` member, never quoted.
+@MainActor
+final class StartOfYearPlanTableTests: XCTestCase {
+
+    // MARK: - Stored properties
+
+    private var previousTrail: ProblemReportStore = ActivityTrail.store
+    private var trailFolder: URL = URL(fileURLWithPath: "/")
+
+    // MARK: - Set up and tear down
+
+    override func setUp() async throws {
+        previousTrail = ActivityTrail.store
+        trailFolder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("start-of-year-table-trail-\(UUID().uuidString)")
+        ActivityTrail.store = ProblemReportStore(folderURL: trailFolder)
+        StartOfYearUndoRegistry.shared.forgetAll()
+    }
+
+    override func tearDown() async throws {
+        ActivityTrail.store = previousTrail
+        try? FileManager.default.removeItem(at: trailFolder)
+        StartOfYearUndoRegistry.shared.forgetAll()
+    }
+
+    // MARK: - The rows
+
+    /// A row for every page the write will change, classes first, each with
+    /// the reason clause the plan's own line gives it — and every row's line
+    /// is in `describe()`, so the table and the plan an outside assistant is
+    /// shown cannot drift apart.
+    func testTheTableHasARowForEveryPageGoingIntoDraft() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutAFewPages(in: made.course)
+        let plan: StartOfYearPlan = try StartOfYearPlanTableTests.plan(made)
+        let rows: [StartOfYearPlanRow] = plan.tableRows()
+
+        var expected: [StartOfYearDraft] = []
+        for draft in plan.draftsThatChange(plan.classDrafts) {
+            expected.append(draft)
+        }
+        for draft in plan.draftsThatChange(plan.pageDrafts) {
+            expected.append(draft)
+        }
+        XCTAssertEqual(rows.count, expected.count)
+        XCTAssertEqual(rows.count, plan.changeCount, "a row for every page the write changes")
+
+        var seen: [String] = []
+        for row in rows {
+            seen.append("\(row.folder)/\(row.title) \(row.reasonKey)")
+        }
+        XCTAssertEqual(seen, [
+            "section1/All Classes/Unit 1, Day 2 laterClass",
+            "Concepts/Watt firstUsedLater",
+            "Concepts/Ohm onlyHiddenPagesLinkToIt",
+        ])
+
+        let first: String = plan.firstClass.displayTitle
+        let described: [String] = plan.describe().components(separatedBy: "\n")
+        var index: Int = 0
+        while index < rows.count {
+            let row: StartOfYearPlanRow = rows[index]
+            let draft: StartOfYearDraft = expected[index]
+            XCTAssertEqual(row.position, index)
+            XCTAssertEqual(row.why, draft.reason.sentence(first: first))
+            XCTAssertTrue(described.contains("• " + StartOfYearWording.draftLine(name: plan.name(of: draft.page), reason: row.why)),
+                          "describe() has no line for “\(row.title)”: \(plan.describe())")
+            index += 1
+        }
+        XCTAssertEqual(rows[2].why, StartOfYearWording.reasonOnlyHiddenPagesLink(page: "Notes"))
+    }
+
+    // MARK: - The sheet
+
+    /// Twenty classes: the sheet draws one table row for every one of them,
+    /// under the three column names, on the measured bordered-table metrics,
+    /// and scrolls inside after `mostPlanRowsShown`.
+    func testTheSheetShowsOneTableRowPerPage() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutClasses(20, in: made.course)
+        let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made)
+        model.load()
+        guard case .ready(let plan) = model.stage else {
+            return XCTFail("no plan: \(model.stage)")
+        }
+        XCTAssertEqual(plan.tableRows().count, 19)
+        let host: TableHost = TableHost(StartOfYearSheet(model: model), size: NSSize(width: 560, height: 900))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "no table on the Start of Year sheet")
+        XCTAssertEqual(table.numberOfRows, 19)
+        var titles: [String] = []
+        for column in table.tableColumns {
+            titles.append(column.title)
+        }
+        XCTAssertEqual(titles, [
+            AssistWording.menuPlanPageColumn, AssistWording.menuPlanFolderColumn, StartOfYearWording.reasonColumn,
+        ])
+        XCTAssertEqual(table.headerView?.frame.height, ListTableMetrics.headerHeight)
+        XCTAssertEqual(table.rect(ofRow: 0).height, ListTableMetrics.rowHeight)
+        XCTAssertEqual(table.enclosingScrollView?.frame.height, StartOfYearSheet.tallestPlanTable)
+        XCTAssertEqual(StartOfYearSheet.tallestPlanTable,
+                       ListTableMetrics.height(forRowCount: StartOfYearSheet.mostPlanRowsShown, showsHeader: true))
+    }
+
+    /// A few rows, one of them carrying the longest kind of reason: that row
+    /// takes two lines, so the reason reads whole, and the table is exactly
+    /// as tall as the rows it draws — the height worked out before drawing
+    /// agrees with the real table, with no inner scroll and no empty band.
+    func testAShortTableIsAsTallAsItsRowsAndTheLongestReasonReadsWhole() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutAFewPages(in: made.course)
+        let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made)
+        let host: TableHost = TableHost(StartOfYearSheet(model: model), size: NSSize(width: 560, height: 900))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "no table on the Start of Year sheet")
+        XCTAssertEqual(table.numberOfRows, 3)
+        var drawn: CGFloat = ListTableMetrics.headerHeight + ListTableMetrics.borderAllowance
+        var heights: [CGFloat] = []
+        var row: Int = 0
+        while row < table.numberOfRows {
+            heights.append(table.rect(ofRow: row).height)
+            drawn += table.rect(ofRow: row).height
+            row += 1
+        }
+        XCTAssertEqual(heights, [ListTableMetrics.rowHeight, ListTableMetrics.rowHeight, StartOfYearSheet.twoLineRowHeight],
+                       "the longest reason should take two lines and the others one")
+        XCTAssertEqual(table.enclosingScrollView?.frame.height, drawn,
+                       "the table's frame and its rows disagree: a scroll inside, or an empty band")
+    }
+
+    /// Return is Go while the table has focus — the table must not swallow
+    /// the sheet's default key. The backup is made to fail, so the press is
+    /// seen by the sheet refusing and nothing is written. (Escape goes
+    /// through `dismiss`, which this host cannot observe; it was checked in
+    /// the running app, as #524's was.)
+    func testReturnGoesWhileTheTableHasFocus() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutAFewPages(in: made.course)
+        let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made)
+        let host: TableHost = TableHost(StartOfYearSheet(model: model), size: NSSize(width: 560, height: 900))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first)
+        host.select(row: 1, in: table)
+        XCTAssertTrue(host.window.firstResponder === table, "the table did not take focus")
+        host.press(keyCode: 36, characters: "\r")
+        var waited: Int = 0
+        while waited < 20 {
+            if case .problem = model.stage {
+                break
+            }
+            // Go starts a Task on the main actor; let it run.
+            try await Task.sleep(for: .milliseconds(100))
+            host.pump(0.05)
+            waited += 1
+        }
+        guard case .problem(let sentence) = model.stage else {
+            return XCTFail("Return did not reach Go with the table focused (notice: \(model.notice ?? "none"))")
+        }
+        XCTAssertEqual(sentence, StartOfYearWording.backupFailed(course: "ICS3U"))
+    }
+
+    // MARK: - The height budget
+
+    /// The worst case: the "changed since" notice, all three warnings, a
+    /// page with no room for a key, links left pointing at hidden pages, a
+    /// class already in draft, and more rows than the table shows. The sheet
+    /// stays within `CopyPageChecklist.tallestSheet` — and, the other
+    /// direction, every part is really there at its cap, so a collapsed
+    /// table or area cannot pass.
+    func testTheWorstCaseSheetStaysOnTheScreen() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutTheWorstCase(in: made.course)
+        let moment: Date = Date(timeIntervalSince1970: 1_800_000_000)
+        let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made, scheduledDeploy: moment)
+        model.load()
+        model.notice = StartOfYearWording.changedSinceShown
+        guard case .ready(let plan) = model.stage else {
+            return XCTFail("no plan: \(model.stage)")
+        }
+        // The case really is the worst one before it is measured.
+        XCTAssertEqual(plan.warnings().count, 3, "\(plan.warnings())")
+        XCTAssertFalse(plan.publishPlan.noRoomForAKey.isEmpty, "no page with no room for a key")
+        XCTAssertFalse(plan.danglingSources.isEmpty, "no links left pointing at hidden pages")
+        XCTAssertGreaterThan(plan.classesAlreadyInDraft, 0)
+        XCTAssertGreaterThan(plan.tableRows().count, StartOfYearSheet.mostPlanRowsShown)
+
+        let height: CGFloat = StartOfYearPlanTableTests.measuredHeight(of: StartOfYearSheet(model: model))
+        XCTAssertLessThanOrEqual(
+            height, CopyPageChecklist.tallestSheet,
+            "The Start of Year sheet is \(height) pt tall; Cancel and Go go off a 1280 × 800 screen past \(CopyPageChecklist.tallestSheet)"
+        )
+        // The lower bound: the table and both capped areas are there at their
+        // caps, with the title band, the summary and the buttons around them.
+        let parts: CGFloat = StartOfYearSheet.tallestPlanTable + StartOfYearSheet.tallestPlanIntro
+            + StartOfYearSheet.tallestPlanNotes
+        XCTAssertGreaterThanOrEqual(
+            height, parts + 120,
+            "The sheet is only \(height) pt: the table or an area under or over it has collapsed"
+        )
+        print("StartOfYearPlanTableTests: worst-case sheet \(height) pt against \(CopyPageChecklist.tallestSheet)")
+    }
+
+    /// A plan of three rows and no warnings is a short sheet: no area
+    /// reserves its cap, and the table is its rows.
+    func testAShortPlanMakesAShortSheet() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutAFewPages(in: made.course)
+        let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made)
+        model.load()
+        guard case .ready(let plan) = model.stage else {
+            return XCTFail("no plan: \(model.stage)")
+        }
+        let height: CGFloat = StartOfYearPlanTableTests.measuredHeight(of: StartOfYearSheet(model: model))
+        let parts: CGFloat = StartOfYearSheet.tallestPlanTable + StartOfYearSheet.tallestPlanIntro
+            + StartOfYearSheet.tallestPlanNotes
+        XCTAssertLessThan(height, parts + 100, "A three-row plan is \(height) pt tall — something reserves space it does not use")
+        XCTAssertGreaterThanOrEqual(
+            height, StartOfYearSheet.planTableHeight(for: plan.tableRows()) + 200,
+            "A three-row plan is only \(height) pt tall: its table or its sentences are not showing"
+        )
+        print("StartOfYearPlanTableTests: three-row sheet \(height) pt")
+    }
+
+    // MARK: - Helpers
+
+    /// Lays the sheet out at its own width and reports the height its
+    /// content claims, after forcing a layout pass — as
+    /// `CopyPageChecklistSizeTests.measuredHeight` does.
+    static func measuredHeight(of view: some View) -> CGFloat {
+        let hostingView: NSHostingView = NSHostingView(rootView: AnyView(view))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 560, height: 2000)
+        hostingView.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        hostingView.layoutSubtreeIfNeeded()
+        return hostingView.fittingSize.height
+    }
+
+    static func model(_ made: AssistFixture.Made, scheduledDeploy: Date? = nil) -> StartOfYearSheetModel {
+        return StartOfYearSheetModel(
+            course: made.course, sectionNumber: 1, workspaceURL: made.root, mode: .getReady,
+            today: { return CalendarDay(year: 2026, month: 9, day: 8)! },
+            backUp: { _, _ in
+                throw CocoaError(.fileWriteNoPermission)
+            },
+            scheduledDeploy: { _, _, _ in
+                return scheduledDeploy
+            }
+        )
+    }
+
+    static func plan(_ made: AssistFixture.Made) throws -> StartOfYearPlan {
+        switch StartOfYearPlanner.plan(
+            forSection: 1, in: made.course, workspaceURL: made.root,
+            today: CalendarDay(year: 2026, month: 9, day: 8)!
+        ) {
+        case .failure(let problem):
+            throw problem
+        case .success(let plan):
+            return plan
+        }
+    }
+
+    /// Unit 1, Day 1 and Day 2 (both visible, Day 2 linking Watt); Ohm,
+    /// which only the hidden page Notes links to. Three rows: Day 2 (comes
+    /// after Day 1), Watt (first used in Day 2), Ohm (only Notes links to it
+    /// — the longest kind of reason).
+    static func layOutAFewPages(in course: Course) throws {
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-08", body: "One.", in: course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "true", date: "2026-09-09",
+                                body: "See [[Watt]].", in: course)
+        try StartOfYearTests.writeCoursePage("Watt", links: [], in: course)
+        try StartOfYearTests.writeCoursePage("Ohm", links: [], in: course)
+        try "---\ntitle: Notes\npublishForSection1: false\n---\n\nSee [[Ohm]].\n".write(
+            to: course.directoryURL.appendingPathComponent("Concepts/Notes.md"), atomically: true, encoding: .utf8
+        )
+    }
+
+    /// `count` visible classes, Unit 1, Day 1 onwards, all after today but
+    /// the first.
+    static func layOutClasses(_ count: Int, in course: Course) throws {
+        var day: Int = 1
+        while day <= count {
+            try AssistFixture.write(page: "Unit 1, Day \(day)", publish: "true",
+                                    date: String(format: "2026-09-%02d", day + 7), body: "Day \(day).", in: course)
+            day += 1
+        }
+    }
+
+    /// Every sentence the plan can add at once: the first class in draft,
+    /// classes dated before today going into draft, a class already in
+    /// draft, Marks (kept, as the first class links it) left linking two
+    /// pages going into draft, and Full, whose settings have no room for a
+    /// key. Twenty classes, so the table is past its rows. The scheduled
+    /// deploy, the third warning, is the model's to inject.
+    static func layOutTheWorstCase(in course: Course) throws {
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", date: "2026-09-01",
+                                body: "See [[Marks]].", in: course)
+        var day: Int = 2
+        while day <= 20 {
+            let body: String = day == 2 ? "See [[Watt]] and [[Volt]]." : "Day \(day)."
+            try AssistFixture.write(page: "Unit 1, Day \(day)", publish: "true",
+                                    date: String(format: "2026-09-%02d", day), body: body, in: course)
+            day += 1
+        }
+        try AssistFixture.write(page: "Unit 1, Day 21", publish: "false", date: "2026-09-21", body: "Later.", in: course)
+        for concept in ["Watt", "Volt"] {
+            try StartOfYearTests.writeCoursePage(concept, links: [], in: course)
+        }
+        try StartOfYearTests.writeCoursePage("Marks", links: ["Watt", "Volt"], in: course)
+        try "---\n  title: Full\n---\nBody.\n".write(
+            to: course.directoryURL.appendingPathComponent("Concepts/Full.md"), atomically: true, encoding: .utf8
+        )
+    }
+}

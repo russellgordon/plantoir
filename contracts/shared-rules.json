@@ -20439,6 +20439,7 @@
       "reasonOnlyHiddenPagesLink": "only “{page}” links to it, and students will not see that page",
       "reasonOnlyAFolderLists": "only the “{page}” folder's own page lists it",
       "reasonNothingLinks": "nothing links to it",
+      "reasonColumn": "Why",
       "staysFirstClass": "“{first}”, and the {pages} it links to",
       "staysKeyLinks": "Key Links, and the {pages} it lists",
       "staysEverythingElse": "Every folder's own page, every curriculum page, and every page something students can still see links to.",
