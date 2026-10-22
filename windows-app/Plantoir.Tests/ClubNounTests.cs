@@ -83,6 +83,10 @@ public sealed class ClubNounTests : IDisposable
         ("publish the class on", tools => Linked(tools, visible: false).PlanPublishClassOn("ICS3U", 1, "2025-09-18")),
         ("nothing changes, a name unknown",
          tools => Linked(tools, visible: true).PlanPublishPages("ICS3U", 1, new[] { "Week 2", "Week 99" })),
+        // ...and the write itself with preview=false, which answers the same way and writes nothing.
+        ("publish, nothing changes, no preview",
+         tools => Linked(tools, visible: true).PublishPages("ICS3U", 1, pages: new[] { "Week 2", "Week 99" }, preview: false)
+                      .GetAwaiter().GetResult()),
     };
 
     [Fact]
@@ -151,6 +155,10 @@ public sealed class ClubNounTests : IDisposable
         Assert.Null(unknown.Meta?[AssistToolAnswer.IsPlanKey]);
         Assert.Contains(PublishPlan.NoPageIsCalledLine(new[] { "Week 99" }), TeacherCopy(unknown));
         Assert.NotNull(unknown.Meta?[AssistToolAnswer.TeacherSummaryKey]);
+        var unknownWrite = Linked(Club("meeting"), visible: true)
+            .PublishPages("ICS3U", 1, pages: new[] { "Week 2", "Week 99" }, preview: false).GetAwaiter().GetResult();
+        Assert.Contains(PublishPlan.NoPageIsCalledLine(new[] { "Week 99" }), TeacherCopy(unknownWrite));
+        Assert.NotNull(unknownWrite.Meta?[AssistToolAnswer.TeacherSummaryKey]);
 
         // A course that is not a club reads the class form on its card too.
         var asAClass = Linked(Club(null), visible: false).PlanPublishPages("ICS3U", 1, new[] { "Week 1" });
