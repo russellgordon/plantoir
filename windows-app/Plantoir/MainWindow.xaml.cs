@@ -75,7 +75,18 @@ public sealed partial class MainWindow : Window
         if (remembered)
         {
             var asRemembered = new WindowFrameFit.Frame((int)frame!.X, (int)frame.Y, width, height);
-            var fitted = OnADisplay(asRemembered, out nearestWorkArea);
+            // Never let putting the frame on a display stop the window opening:
+            // the frame is only re-saved by a window that opened, so a throw
+            // here would fail every later launch too. On any failure the
+            // remembered frame is used as it is (the path before #558).
+            WindowFrameFit.Frame fitted;
+            try { fitted = OnADisplay(asRemembered, out nearestWorkArea); }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"MainWindow ctor: could not check the remembered frame against the displays ({ex.GetType().Name}: {ex.Message}); opening it as remembered");
+                fitted = asRemembered;
+                nearestWorkArea = workArea;
+            }
             refitted = fitted != asRemembered;
             if (refitted)
                 App.LogDiagnostic($"MainWindow ctor: remembered frame {asRemembered} is on no display; opening at {fitted}");

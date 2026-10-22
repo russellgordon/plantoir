@@ -2105,7 +2105,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             // Four words, when four words are the whole answer.
             if (plan.NothingToDoSentence is { } already) return Answering(already);
-            if (plan.ChangesNothing && !preview) return Answering(plan.Describe());
+            // The teacher's copy in the course's noun, as every publish plan's (#556).
+            if (plan.ChangesNothing && !preview)
+                return Answering(plan.Describe(workspace.NounForCourse(plan.CourseCode)), plan.Describe());
 
             // The count comes from the PLAN, not from what the writes
             // reported: it is the number the teacher just agreed to, and the

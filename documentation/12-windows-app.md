@@ -6588,8 +6588,13 @@ remembered frame, every display's work area (`DisplayArea.FindAll()`, read by
 App SDK versions) and the nearest one (`DisplayArea.GetFromRect(…, Nearest)`).
 The frame is **kept exactly** when its title-bar strip — its top 32 epx —
 overlaps SOME work area by at least 100 epx across and a third of the strip
-down, both in that display's pixels (`GetDpiForMonitor` of
-`MonitorFromRect`): epx, because 100 raster pixels is only 50 epx at 200%.
+down, both converted at the nearest display's scale (one scale,
+`GetDpiForMonitor` of `MonitorFromRect` on the whole remembered rectangle):
+epx, because 100 raster pixels is only 50 epx at 200%. And if any of this
+throws (`FindAll`'s projection has thrown on some Windows App SDK versions,
+and the package floats on 1.*), the frame opens as remembered and
+`startup.log` says so: a frame is re-saved only by a window that opened, so a
+throw that stopped the window would have failed every later launch.
 Otherwise it is shrunk to no larger than the nearest work area and centred
 on it, and centred again after the minimum size has grown it. After the fix
 the same seeded frame opened with its visible frame at (269, 54), 1382 × 891,
