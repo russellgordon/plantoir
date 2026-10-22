@@ -1715,8 +1715,18 @@ public sealed partial class SectionDetailView : UserControl
         // during it cannot lose either.
         if (trail is not null)
             ActivityTrail.Note(ActivityTrail.Event.PreviewStartedAtThePageLastViewed, trail, _course.Code, _sectionNumber);
+        // Obsidian's add-ons for diagrams and graphs (#581): after the
+        // teacher's yes, a fresh preview adds what the course needs —
+        // silently, off the UI thread, never into a course open in Obsidian.
+        _ = AddObsidianAddOnsAfterAPreview();
         RefreshChrome();
         LoadIfNeeded(opens == PreviewStartPage.Opens.RememberedPage && page is not null ? page : root);
+    }
+
+    private async Task AddObsidianAddOnsAfterAPreview()
+    {
+        try { await new ObsidianOpenRoute(new ObsidianWorld(show: null)).AfterAPreviewAsync(_course); }
+        catch (Exception error) { App.LogDiagnostic($"Obsidian add-ons after a preview of {_course.Code}: {error.Message}"); }
     }
 
     /// <summary>Interface updates must never yank the teacher back from a page they navigated to.</summary>

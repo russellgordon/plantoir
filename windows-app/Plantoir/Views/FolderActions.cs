@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -67,7 +68,30 @@ public static class FolderActions
         }
     }
 
-    public static bool ObsidianIsRunning => Process.GetProcessesByName("Obsidian").Length > 0;
+    /// <summary>
+    /// Obsidian is running for this teacher: an Obsidian.exe in this Windows
+    /// session owns a top-level window, shown or not (#581,
+    /// <see cref="ObsidianProcesses"/>). Until #581 this was any process named
+    /// Obsidian — another account's, or a crash reporter outliving the windows.
+    /// </summary>
+    public static bool ObsidianIsRunning => ObsidianProcesses.IsRunning;
+
+    /// <summary>
+    /// Obsidian's registry as it is on disk now, or null. Read with
+    /// <c>FileShare.ReadWrite</c>: Obsidian rewrites it in place, and a read
+    /// that refuses to share would fail at exactly that moment (#581).
+    /// </summary>
+    public static string? ReadObsidianRegistry()
+    {
+        try
+        {
+            if (!File.Exists(ObsidianRegistryPath)) return null;
+            using var stream = new FileStream(ObsidianRegistryPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch { return null; }
+    }
 
     /// <summary>Obsidian opens FILES, not folders: target the landing page.</summary>
     public static string ObsidianTarget(string folderPath, string vaultPath)
@@ -115,7 +139,10 @@ public static class FolderActions
     {
         try
         {
-            string? existing = File.Exists(ObsidianRegistryPath) ? File.ReadAllText(ObsidianRegistryPath) : null;
+            string? existing = ReadObsidianRegistry();
+            // A registry that is there and could not be read is never replaced
+            // by one holding only this vault: that would lose every other one.
+            if (existing is null && File.Exists(ObsidianRegistryPath)) return;
             string identifier = string.Concat(Enumerable.Range(0, 16)
                 .Select(_ => "0123456789abcdef"[Random.Shared.Next(16)]));
             string updated = RegistryJsonAfterRegistering(existing, vaultPath, identifier,
@@ -138,9 +165,7 @@ public static class FolderActions
         // A PAGE, when one is named (the How I Teach row opens the page, not the vault).
         string target = page ?? ObsidianTarget(revealFolder, vaultPath);
         string uri = ObsidianUri(target);
-        string? registryJson = null;
-        try { registryJson = File.Exists(ObsidianRegistryPath) ? File.ReadAllText(ObsidianRegistryPath) : null; }
-        catch { }
+        string? registryJson = ReadObsidianRegistry();
 
         if (FolderIsInRegisteredVault(target, registryJson))
         {
@@ -161,18 +186,28 @@ public static class FolderActions
         try { Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); } catch { }
     }
 
-    public static async Task QuitObsidianAndWait()
+    /// <summary>
+    /// Asks Obsidian to quit and waits up to five seconds for it to be gone.
+    /// Since #581 this closes EVERY Obsidian window (<see cref="ObsidianProcesses.QuitAndWaitAsync"/>);
+    /// before, <c>CloseMainWindow</c> on each process closed one, so an
+    /// Obsidian with two vaults open kept running — and the registration and
+    /// rename paths that call this went on to write under it.
+    /// </summary>
+    public static Task QuitObsidianAndWait() => ObsidianProcesses.QuitAndWaitAsync();
+
+    /// <summary>
+    /// Opens each of these vaults again, in order, so the last is in front
+    /// (#581's reopen). The first link starts Obsidian; the rest wait for its
+    /// window (at most ten seconds) and then follow a moment apart, rather than
+    /// racing Electron's single-instance lock with several starts at once.
+    /// </summary>
+    public static async Task ReopenVaults(IReadOnlyList<string> vaultPaths)
     {
-        var running = Process.GetProcessesByName("Obsidian");
-        if (running.Length == 0) return;
-        foreach (var process in running)
+        for (int i = 0; i < vaultPaths.Count; i++)
         {
-            try { process.CloseMainWindow(); } catch { }
-        }
-        for (int attempt = 0; attempt < 50; attempt++)
-        {
-            await Task.Delay(100);
-            if (Process.GetProcessesByName("Obsidian").Length == 0) return;
+            OpenUri(ObsidianUri(vaultPaths[i]));
+            if (i == 0) await ObsidianProcesses.WaitUntilRunningAsync(10_000);
+            await Task.Delay(400);
         }
     }
 
