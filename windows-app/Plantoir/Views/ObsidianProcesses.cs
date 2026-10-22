@@ -46,10 +46,20 @@ public static class ObsidianProcesses
         return found;
     }
 
-    /// <summary>Top-level windows owned by Obsidian in this session: the handle, whether it is shown, and whether another window owns it (a pop-out).</summary>
+    /// <summary>Whether any Obsidian.exe of this session is still alive, window or not.</summary>
+    public static bool AnyProcessLeft()
+    {
+        var processes = InThisSession();
+        foreach (var process in processes) process.Dispose();
+        return processes.Count > 0;
+    }
+
+    /// <summary>Top-level windows owned by Obsidian in this session: the handle, whether it is shown, and whether another window owns it.</summary>
     public static List<(IntPtr Handle, bool Visible, bool Owned)> Windows()
     {
-        var ids = new HashSet<uint>(InThisSession().Select(p => (uint)p.Id));
+        var processes = InThisSession();
+        var ids = new HashSet<uint>(processes.Select(p => (uint)p.Id));
+        foreach (var process in processes) process.Dispose();
         var windows = new List<(IntPtr, bool, bool)>();
         if (ids.Count == 0) return windows;
         EnumWindows((handle, _) =>
@@ -64,8 +74,26 @@ public static class ObsidianProcesses
     /// <summary>Whether Obsidian is running for this teacher (see the remarks).</summary>
     public static bool IsRunning => Windows().Count > 0;
 
-    /// <summary>Asks Obsidian to quit — every shown main window, then pop-outs, then CloseMainWindow on what is left — and waits up to five seconds for it to be gone.</summary>
+    /// <summary>
+    /// Asks Obsidian to quit — every shown main window, then owned ones, then
+    /// CloseMainWindow on what is left — and waits up to five seconds for its
+    /// windows to go, then up to three more for its PROCESSES (measured on
+    /// 1.14.4: windows gone at 0.4 s, processes at 0.66 s; a registry or an
+    /// add-on list written in that gap could be overwritten as it exits). Any
+    /// window still there afterwards means "did not close" for ALL of them:
+    /// <see cref="IsRunning"/> stays true and the callers write nothing.
+    /// (On Windows a pop-out is not an owned window, so "pop-outs after"
+    /// orders nothing there; every window closes in the same 0.4 s.)
+    /// </summary>
     public static async Task QuitAndWaitAsync()
+    {
+        await CloseWindowsAndWaitAsync();
+        if (IsRunning) return;
+        var clock = Stopwatch.StartNew();
+        while (AnyProcessLeft() && clock.ElapsedMilliseconds < 3000) await Task.Delay(100);
+    }
+
+    private static async Task CloseWindowsAndWaitAsync()
     {
         if (!IsRunning) return;
         var shown = Windows().Where(w => w.Visible).ToList();
@@ -85,6 +113,7 @@ public static class ObsidianProcesses
                 foreach (var process in InThisSession())
                 {
                     try { process.CloseMainWindow(); } catch { }
+                    process.Dispose();
                 }
             }
         }
