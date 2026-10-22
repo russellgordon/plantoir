@@ -7161,7 +7161,7 @@ by copy-and-restore of the old rule, 5 tests went red.
 the result. `StartOfYearPagesWithNoRoom` asks the write's own rule
 (`StartOfYearDraftEdit`, shared with `PrepareForStartOfYear`), so the sheet
 names exactly the pages Go will leave as they are. The MCP text
-(`Describe`) is unchanged, and every sentence on the sheet is one it says.
+(`Describe`) is unchanged, and every sentence on the sheet is one it, or the result, says (the no-room note is the result's `AssistWording.PagesWhoseSettingsCannotBeAddedTo`).
 
 **The height rule** (`StartOfYearSheetLayout.For`, pure). The mac's fixed
 620 pt budget cannot be copied: this window's minimum height is 600 epx, and

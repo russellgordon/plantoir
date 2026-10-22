@@ -57,7 +57,12 @@ internal static class SessionEnding
             IsEnding = true;
             Flags = (long)lParam;
         }
-        else if (message == WM_ENDSESSION && wParam == IntPtr.Zero) IsEnding = false;   // the end was called off
+        else if (message == WM_ENDSESSION && wParam == IntPtr.Zero)
+        {
+            // The end was called off: neither the end nor its kind stands.
+            IsEnding = false;
+            Flags = 0;
+        }
         else if (message == WM_ENDSESSION)
         {
             // The session IS ending (#565): Windows may end the process before
