@@ -87,6 +87,39 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ("plantoir-deploy-verify-" + [Guid]
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 $folderTarget = Join-Path $work "published"
 
+# A page of runnable code and a formula (#455, #494, #583), borrowed into the
+# section so every destination carries the Python engine, the site's own
+# KaTeX and the isolation headers; removed on EVERY exit path (the finally at
+# the bottom). The same page as verify-deploy.sh's, Swift fence included:
+# Windows compiles no Swift (#493, #570), so that fence is EXPECTED to be
+# reported as not ready (codeRunnerBlocks.swift.reasons.notOnWindows) rather
+# than dropped - a Windows-built site carries Swift's thread with Run off.
+$runnerPage = Join-Path $WorkingFolder "courses\$Course\section$Section\Runner Deploy Check.md"
+$runnerPageText = @'
+---
+title: Runner Deploy Check
+codeRunner: true
+---
+A page of runnable code borrowed by verify-deploy.ps1 (plantoir-runner-deploy-7f3a), and a formula: $\frac{a}{b} = c^2$.
+
+```python run stdin
+name = input("Name? ")
+print("Hello,", name)
+```
+
+```swift run
+print("What is your name?")
+let name = readLine() ?? ""
+print("Hello, \(name)!")
+```
+'@
+function Remove-RunnerPage {
+    if (Test-Path -LiteralPath $runnerPage) {
+        Remove-Item -LiteralPath $runnerPage -Force -ErrorAction SilentlyContinue
+        Write-Host "  took the borrowed page of runnable code away" -ForegroundColor DarkGray
+    }
+}
+
 # UTF-8 with NO byte-order mark, always. Windows PowerShell 5.1's
 # `-Encoding UTF8` writes a BOM, and `build_site.py` reads course_config.json
 # as plain utf-8 and dies on it: "Unexpected UTF-8 BOM (decode using
@@ -451,6 +484,166 @@ function Url-FromLog([string]$log) {
     return @($all)[0]
 }
 
+# ------------------------------------------- runnable code and KaTeX (#455)
+# The Windows counterpart of verify-deploy.sh's check_engine and
+# check_engine_folder (#568): every host must send the engine's files with
+# types a browser will run - .wasm as application/wasm
+# (WebAssembly.instantiateStreaming refuses anything else), .mjs and the
+# workers as JavaScript - and any CSP it sends must let wasm compile
+# ('unsafe-eval' or 'wasm-unsafe-eval'); KaTeX's stylesheet and a face come
+# back from the site itself, and no CSP names the CDN. The page of runnable
+# code is isolated (COOP + COEP), the engine folders carry COEP, and the
+# front page carries neither (contracts/shared-rules.json ->
+# codeRunnerBlocks.loading, .isolation). curl.exe by full path, as the mac
+# uses curl: Invoke-WebRequest under 5.1 follows redirects without saying
+# which headers were the last response's.
+$script:Curl = Join-Path $env:SystemRoot "System32\curl.exe"
+$script:Measured = @()
+$script:ContractsDir = Join-Path $PSScriptRoot "contracts"
+
+# The LAST response's status and headers (after any redirects when -Follow),
+# names lower-cased.
+function Get-Response([string]$Url, [switch]$Follow, [string]$SaveTo = "NUL") {
+    $arguments = @('-s', '-D', '-', '-o', $SaveTo, '--max-time', '30')
+    if ($Follow) { $arguments += '-L' }
+    $raw = (& $script:Curl @arguments $Url 2>$null) -join "`n"
+    $blocks = @(($raw -replace "`r", "") -split "`n`n" | Where-Object { $_ -match '^HTTP/' })
+    $result = @{ Code = 0; Headers = @{} }
+    if ($blocks.Count -eq 0) { return $result }
+    $lines = $blocks[-1] -split "`n"
+    if ($lines[0] -match '^HTTP/\S+\s+(\d{3})') { $result.Code = [int]$Matches[1] }
+    foreach ($line in $lines | Select-Object -Skip 1) {
+        if ($line -match '^([^:]+):\s*(.*)$') { $result.Headers[$Matches[1].ToLowerInvariant()] = $Matches[2] }
+    }
+    return $result
+}
+
+function Check-Engine([string]$What, [string]$Base) {
+    foreach ($name in @('pyodide.asm.wasm', 'pyodide.asm.mjs', 'pyodide.mjs', 'plantoir-worker.js', 'python_stdlib.zip', 'pyodide-lock.json')) {
+        $r = Get-Response "${Base}static/pyodide/$name"
+        $type = ([string]$r.Headers['content-type']).ToLowerInvariant()
+        $want = if ($name -like '*.wasm') { 'application/wasm' } elseif ($name -like '*.mjs' -or $name -like '*.js') { 'javascript' } else { '' }
+        if ($r.Code -ne 200) { No "$What answered HTTP $($r.Code) for static/pyodide/$name" }
+        elseif ($want -and -not $type.Contains($want)) { No "$What sends static/pyodide/$name as '$type', which a browser will not run as $want" }
+        else { Ok "$What sends static/pyodide/$name (HTTP 200, $type)" }
+    }
+    $csp = [string](Get-Response "${Base}static/pyodide/plantoir-worker.js").Headers['content-security-policy']
+    if (-not $csp -or $csp -match "'(unsafe-eval|wasm-unsafe-eval)'") { Ok "$What's worker may compile WebAssembly ($(if ($csp) { 'CSP allows it' } else { 'no CSP' }))" }
+    else { No "$What's worker CSP allows no wasm: $csp" }
+
+    # Hosts answer the .html address with a redirect to the pretty one
+    # (Netlify 301, Cloudflare 308), so the page is fetched following it.
+    $pageFile = Join-Path $work "runner-page.html"
+    $r = Get-Response "${Base}Runner-Deploy-Check" -Follow -SaveTo $pageFile
+    $html = if (Test-Path $pageFile) { Get-Content -LiteralPath $pageFile -Raw -Encoding UTF8 } else { "" }
+    if ($r.Code -eq 200 -and $html -match 'class="plantoir-runner"') { Ok "$What's page of runnable code carries its runnable block" }
+    else { No "$What's page of runnable code answered HTTP $($r.Code) or carries no runnable block" }
+
+    # Runnable Swift (#493): the thread and its WASI shim ride support/ into
+    # every Windows-built site, so they are checked as the mac checks them.
+    # The PROGRAM is not: Windows compiles none (#570), so there is no
+    # static/swift-wasm/ to fetch - said as a skip, never as a pass.
+    foreach ($name in @('plantoir-swift-worker.js', 'plantoir-wasi.mjs')) {
+        $r = Get-Response "${Base}static/swift/$name"
+        $type = ([string]$r.Headers['content-type']).ToLowerInvariant()
+        if ($r.Code -eq 200 -and $type.Contains('javascript')) { Ok "$What sends static/swift/$name (HTTP 200, $type)" }
+        else { No "$What answered HTTP $($r.Code), '$type' for static/swift/$name (a module worker needs JavaScript)" }
+    }
+    if ($html -match 'data-runner-wasm="static/swift-wasm/') { No "$What's page carries a Swift program, which a Windows build cannot make (#570) - where did it come from?" }
+    else { Skipped "$What's Swift program (Windows compiles no Swift yet, #493 / #570; the block shows with Run off)" }
+
+    # Live input (#583), following the host's redirect (Netlify answers an
+    # address with capitals with a 301 to its lower-case form).
+    $r = Get-Response "${Base}Runner-Deploy-Check" -Follow
+    if ($r.Headers['cross-origin-opener-policy'] -match '^same-origin' -and $r.Headers['cross-origin-embedder-policy'] -match '^require-corp') {
+        Ok "$What isolates the page of runnable code (COOP same-origin, COEP require-corp), so it asks for input as it runs"
+    } else { No "$What does not send COOP and COEP on the page of runnable code, so it keeps the input box" }
+    if ($r.Headers['content-security-policy'] -match 'jsdelivr') { No "$What's CSP still names cdn.jsdelivr.net" }
+    else { Ok "$What's CSP names no CDN for the maths" }
+    foreach ($name in @('pyodide/pyodide.mjs', 'pyodide/plantoir-worker.js', 'swift/plantoir-wasi.mjs', 'swift/plantoir-swift-worker.js')) {
+        $r = Get-Response "${Base}static/$name"
+        if ($r.Headers['cross-origin-embedder-policy'] -match '^require-corp') { Ok "$What sends COEP on static/$name" }
+        else { No "$What sends no COEP on static/$name, which an isolated page's worker needs" }
+    }
+    $r = Get-Response $Base -Follow
+    if ($r.Headers.ContainsKey('cross-origin-embedder-policy')) { No "$What sends COEP on the front page, which has no runnable code - its frames would break" }
+    else { Ok "$What sends no COEP on the front page, which has no runnable code" }
+
+    $r = Get-Response "${Base}static/katex/katex.min.css"
+    if ($r.Code -eq 200 -and ([string]$r.Headers['content-type']) -match '^text/css') { Ok "$What serves KaTeX's stylesheet itself (text/css)" }
+    else { No "$What does not serve static/katex/katex.min.css as text/css" }
+    $r = Get-Response "${Base}static/katex/fonts/KaTeX_Main-Regular.woff2"
+    if ($r.Code -eq 200) { Ok "$What serves KaTeX's faces itself" } else { No "$What answered HTTP $($r.Code) for a KaTeX face" }
+}
+
+# The pinned engine files, byte for byte, in a folder publish.
+function Check-EngineFolder([string]$What, [string]$Site) {
+    $pins = @{}
+    foreach ($pin in (Get-Content -LiteralPath (Join-Path $script:ContractsDir "toolchain.json") -Raw -Encoding UTF8 | ConvertFrom-Json).pins) { $pins[$pin.pin] = $pin }
+    $problems = @()
+    foreach ($entry in $pins['pyodide'].files.PSObject.Properties) {
+        $path = Join-Path $Site "static\pyodide\$($entry.Name)"
+        if (-not (Test-Path -LiteralPath $path) -or (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant() -ne $entry.Value) { $problems += "static/pyodide/$($entry.Name)" }
+    }
+    foreach ($entry in $pins['katex'].files.PSObject.Properties) {
+        $relative = $entry.Name -replace '^dist/', ''
+        $path = Join-Path $Site ("static\katex\" + $relative.Replace('/', '\'))
+        if (-not (Test-Path -LiteralPath $path) -or (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant() -ne $entry.Value) { $problems += "static/katex/$relative" }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $Site "static\pyodide\plantoir-worker.js"))) { $problems += "static/pyodide/plantoir-worker.js" }
+    # Swift's thread, as it is in support/gated/swift. Not the program: there
+    # is none on Windows (#570).
+    foreach ($item in Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot "support\gated\swift") -File) {
+        $copy = Join-Path $Site "static\swift\$($item.Name)"
+        if (-not (Test-Path -LiteralPath $copy) -or (Get-FileHash -LiteralPath $copy).Hash -ne (Get-FileHash -LiteralPath $item.FullName).Hash) { $problems += "static/swift/$($item.Name)" }
+    }
+    if ($problems.Count -eq 0) { Ok "$What carries the pinned Python engine, KaTeX and Swift's thread, byte for byte" }
+    else { No "$What lacks or changed: $($problems -join ', ')" }
+    if (Test-Path -LiteralPath (Join-Path $Site "static\swift-wasm")) { No "$What carries static/swift-wasm, which a Windows build cannot make (#570)" }
+    else { Skipped "$What's Swift program (Windows compiles no Swift yet, #493 / #570)" }
+}
+
+# The borrowed page's Swift fence, said the way the contract says it: on
+# Windows its one sentence (codeRunnerBlocks.swift.reasons.notOnWindows) on a
+# `plantoir: error:` line, and the swiftCouldNotBePrepared folder problem.
+# EXPECTED here, so its absence is the failure.
+$script:NotOnWindows = ""
+if ((Get-Content -LiteralPath (Join-Path $script:ContractsDir "shared-rules.json") -Raw -Encoding UTF8) -match '"notOnWindows":\s*"([^"]+)"') { $script:NotOnWindows = $Matches[1] }
+function Check-SwiftSaidNotOnWindows([string]$What, [string]$Log) {
+    if (-not $script:NotOnWindows) { No "contracts/shared-rules.json carries no swift.reasons.notOnWindows to look for"; return }
+    $line = ($Log -split "`r?`n" | Where-Object { $_ -match '^plantoir: error: .*Runner Deploy Check\.md: swift block 1' } | Select-Object -First 1)
+    if ($line -and $line.Contains($script:NotOnWindows)) { Ok "$What said the Swift block cannot be made ready on Windows, in the contract's words" }
+    else { No "$What did not say, on a plantoir: error: line, that the Swift block cannot be made ready on Windows" }
+    if ($Log -match 'PLANTOIR_HEALTH: \{"name": "swiftCouldNotBePrepared"') { Ok "$What reported the swiftCouldNotBePrepared folder problem" }
+    else { No "$What did not report the swiftCouldNotBePrepared folder problem" }
+}
+
+# How long a publish takes and how many bytes it sends: seconds around the
+# launcher, and the SentBytes delta of the interface the default route uses
+# (read on a quiet machine, or it counts everything else too).
+function Get-SentBytes {
+    try {
+        # The route Windows actually takes: route metric PLUS interface metric.
+        # Sorting on RouteMetric alone picked a Wi-Fi beside a wired adapter on
+        # the build PC (both 0) and read a counter that never moved: 0 KiB.
+        $alias = (Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop |
+            Sort-Object { $_.RouteMetric + (Get-NetIPInterface -InterfaceIndex $_.InterfaceIndex -AddressFamily IPv4).InterfaceMetric } |
+            Select-Object -First 1).InterfaceAlias
+        return @{ Alias = $alias; Bytes = [int64](Get-NetAdapterStatistics -Name $alias -ErrorAction Stop).SentBytes }
+    } catch { return @{ Alias = '?'; Bytes = [int64]0 } }
+}
+function Measure-Deploy([string]$Label, [string]$Script, [string[]]$LauncherArgs, [string]$LogFile) {
+    $before = Get-SentBytes
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $run = Run-Launcher -Script $Script -LauncherArgs $LauncherArgs -LogFile $LogFile
+    $seconds = [int]$clock.Elapsed.TotalSeconds
+    $after = Get-SentBytes
+    $files = [regex]::Matches([string]$run.Log, 'Netlify requires \d+ file|Uploaded \d+ files \(\d+ already uploaded\)') | Select-Object -Last 1
+    $count = if ($files) { $files.Value } else { "no upload count" }
+    $script:Measured += "${Label}: $seconds s, $count, $([int](($after.Bytes - $before.Bytes) / 1024)) KiB sent on $($after.Alias)"
+    return $run
+}
+
 # Everything from here is wrapped so the course's own settings are put back on
 # EVERY exit path. It used to rely on `trap`, which does not run on Ctrl+C -
 # so interrupting a run left the course pointed at whichever destination the
@@ -459,6 +652,8 @@ try {
 
 # --------------------------------------------------- the preview, and the race
 Hdr "Preview - serve mode, which is what a teacher actually uses"
+[IO.File]::WriteAllText($runnerPage, ($runnerPageText -replace "`r`n", "`n"), $script:NoBom)
+Ok "a page of runnable code borrowed into section $Section (removed on any exit)"
 $previewLog = Join-Path $work "preview.log"
 $previewProcess = Start-Process -FilePath "cmd.exe" `
     -ArgumentList "/c", ".\preview.bat $Course $Section > `"$previewLog`" 2>&1" `
@@ -491,6 +686,11 @@ if (-not $port) {
         Ok "the preview serves its front page"
         if ($r.Content -match 'ws://localhost') { Ok "the preview carries the live-reload client, as a preview should" }
         else { No "the preview has no live-reload client - serve mode may not be running" }
+        # The preview's own server sends the isolation headers by the same
+        # rule (build_site._wire_isolation_serve on the section's copy of
+        # Quartz's handlers.js, which the native preview runs - #591).
+        Check-Engine "the preview" "http://localhost:$port/"
+        Check-SwiftSaidNotOnWindows "the preview" (Get-Content -LiteralPath $previewLog -Raw -Encoding UTF8)
     }
 }
 
@@ -533,6 +733,9 @@ if ($afterPreview.Log -match 'Killed existing process on port') {
     Ok "no preview was stopped by port"
 }
 Check-Folder "folder (after a preview)" (Join-Path $folderTarget "section$Section")
+# The publish that REBUILDS (the preview's site is never shipped), so the one
+# that says what its build found; the folder publish below reuses that build.
+Check-SwiftSaidNotOnWindows "the publish after a preview" $afterPreview.Log
 
 # ----------------------------------------------- each destination on its own
 Hdr "Destination 1 of 3 - a folder on this PC"
@@ -542,14 +745,15 @@ Set-Destination -Primary "local_folder" -FolderPath $folderTarget
 $folderRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-folder.log")
 if ($folderRun.ExitCode -eq 0) { Ok "publish to a folder exited 0" } else { No "publish to a folder exited $($folderRun.ExitCode)" }
 Check-Folder "folder" (Join-Path $folderTarget "section$Section")
+Check-EngineFolder "the folder" (Join-Path $folderTarget "section$Section")
 
 Hdr "Destination 2 of 3 - Netlify"
 if ($haveNetlify) {
     Set-Destination -Primary "netlify"
-    $netlifyRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-netlify.log")
+    $netlifyRun = Measure-Deploy "Netlify, first publish with the engine" "deploy.bat" @($Course, "$Section") (Join-Path $work "deploy-netlify.log")
     if ($netlifyRun.ExitCode -eq 0) { Ok "publish to Netlify exited 0" } else { No "publish to Netlify exited $($netlifyRun.ExitCode)" }
     $netlifyUrl = Url-FromLog $netlifyRun.Log
-    if ($netlifyUrl) { Check-Url "Netlify" $netlifyUrl -MustEndWith "netlify.app" } else { No "no Netlify address in the output" }
+    if ($netlifyUrl) { Check-Url "Netlify" $netlifyUrl -MustEndWith "netlify.app"; Check-Engine "Netlify" "$($netlifyUrl.TrimEnd('/'))/" } else { No "no Netlify address in the output" }
 } else { Skipped "Netlify (no credentials)" }
 
 Hdr "Destination 3 of 3 - Cloudflare Pages"
@@ -558,12 +762,12 @@ if ($haveCloudflare) {
     # --target is REQUIRED: deploy.ps1 defaults $TARGET to netlify and never
     # reads deploy_target from the configuration. Setting the config key alone
     # published to Netlify while this script reported a Cloudflare pass.
-    $cloudflareRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--target", "cloudflare") -LogFile (Join-Path $work "deploy-cloudflare.log")
+    $cloudflareRun = Measure-Deploy "Cloudflare, first publish with the engine" "deploy.bat" @($Course, "$Section", "--target", "cloudflare") (Join-Path $work "deploy-cloudflare.log")
     if ($cloudflareRun.ExitCode -eq 0) { Ok "publish to Cloudflare exited 0" } else { No "publish to Cloudflare exited $($cloudflareRun.ExitCode)" }
     if ($cloudflareRun.Log -match '(?i)cloudflare|wrangler|pages\.dev') { Ok "the launcher really went to Cloudflare" }
     else { No "the Cloudflare leg's output never mentions Cloudflare - it published somewhere else" }
     $cloudflareUrl = Url-FromLog $cloudflareRun.Log
-    if ($cloudflareUrl) { Check-Url "Cloudflare Pages" $cloudflareUrl -MustEndWith "pages.dev" } else { No "no Cloudflare address in the output" }
+    if ($cloudflareUrl) { Check-Url "Cloudflare Pages" $cloudflareUrl -MustEndWith "pages.dev"; Check-Engine "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/" } else { No "no Cloudflare address in the output" }
 } else { Skipped "Cloudflare Pages (no credentials)" }
 
 # ------------------------------------------------------------- the pairings
@@ -584,6 +788,7 @@ if ($haveNetlify) {
     $u = Url-FromLog $legOne.Log
     if ($u) { Check-Url "Netlify (paired)" $u -MustEndWith "netlify.app" } else { No "no Netlify address in the paired output" }
     Check-Folder "folder (paired)" (Join-Path $folderTarget "section$Section")
+    Check-EngineFolder "the folder (paired with Netlify)" (Join-Path $folderTarget "section$Section")
 } else { Skipped "Netlify + folder (no Netlify credentials)" }
 
 Hdr "Pairing 2 of 3 - Cloudflare primary, a folder also"
@@ -599,24 +804,30 @@ if ($haveCloudflare) {
     if ($cfPaired) { Check-Url "Cloudflare (paired with a folder)" $cfPaired -MustEndWith "pages.dev" }
     else { No "no Cloudflare address in the paired output" }
     Check-Folder "folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
+    Check-EngineFolder "the folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
 } else { Skipped "Cloudflare + folder (no Cloudflare credentials)" }
 
 Hdr "Pairing 3 of 3 - Netlify primary, Cloudflare also"
 if ($haveNetlify -and $haveCloudflare) {
     Set-Destination -Primary "netlify" -AdditionalJson '[{"type":"cloudflare_pages"}]'
-    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair3-netlify.log")
+    $legOne = Measure-Deploy "Netlify, second publish" "deploy.bat" @($Course, "$Section") (Join-Path $work "pair3-netlify.log")
     Set-Destination -Primary "cloudflare_pages"
-    $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--target", "cloudflare") -LogFile (Join-Path $work "pair3-cf.log")
+    $legTwo = Measure-Deploy "Cloudflare, second publish" "deploy.bat" @($Course, "$Section", "--target", "cloudflare") (Join-Path $work "pair3-cf.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), cloudflare $($legTwo.ExitCode))" }
-    $u1 = Url-FromLog $legOne.Log; if ($u1) { Check-Url "Netlify (paired with Cloudflare)" $u1 -MustEndWith "netlify.app" }
-    $u2 = Url-FromLog $legTwo.Log; if ($u2) { Check-Url "Cloudflare (paired with Netlify)" $u2 -MustEndWith "pages.dev" }
+    $u1 = Url-FromLog $legOne.Log; if ($u1) { Check-Url "Netlify (paired with Cloudflare)" $u1 -MustEndWith "netlify.app"; Check-Engine "Netlify (paired with Cloudflare)" "$($u1.TrimEnd('/'))/" }
+    $u2 = Url-FromLog $legTwo.Log; if ($u2) { Check-Url "Cloudflare (paired with Netlify)" $u2 -MustEndWith "pages.dev"; Check-Engine "Cloudflare (paired with Netlify)" "$($u2.TrimEnd('/'))/" }
 } else { Skipped "Netlify + Cloudflare (needs both sets of credentials)" }
 
 # ------------------------------------------------------------------ finishing
 $script:ReachedTheEnd = $true
 Hdr "Result"
 Write-Host "  $($script:Pass) passed, $($script:Fail) failed, $($script:Skip) skipped"
+if ($script:Measured.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  Publishing a site that carries the Python engine (#455), measured:"
+    foreach ($line in $script:Measured) { Write-Host "    $line" }
+}
 Write-Host "  logs: $work"
 if ($script:Fail -gt 0) {
     Write-Host "  Failures:" -ForegroundColor Red
@@ -629,6 +840,7 @@ exit 0
 finally {
     Restore-Config
     Stop-AnyPreview
+    Remove-RunnerPage
 
     # DID THIS RUN ACTUALLY FINISH? Measured the hard way: a PowerShell error
     # inside Run-Launcher ended the run after four checks, printed no Result
