@@ -104,7 +104,9 @@ public sealed class PublishPlan
 
     /// <summary>
     /// <see cref="LeftAloneSentence"/> in the course's noun — the menu table's
-    /// note (#548). The card keeps the class form (a separate issue).
+    /// note (#548) and, since #556, the teacher's card
+    /// (<see cref="Describe(ClassNoun, int)"/>). The model's copy asks for the
+    /// class form.
     /// </summary>
     internal string? LeftAloneSentenceFor(ClassNoun noun)
     {
@@ -187,10 +189,31 @@ public sealed class PublishPlan
     }
 
     /// <summary>
-    /// The proposal as a teacher would read it.
-    /// Plain sentences, no markdown, no machinery.
+    /// The proposal in the class form — the MODEL's copy, and the card of any
+    /// course that is not a club. Plain sentences, no markdown, no machinery.
     /// </summary>
-    public string Describe(int mostListed = 15)
+    public string Describe(int mostListed = 15) => Describe(ClassNoun.Class, mostListed);
+
+    /// <summary>
+    /// The kept page's reason in the course's noun: "it is a meeting of its
+    /// own" for a club's linked class (#556, the mac's
+    /// <c>stayingVisibleLine(noun:)</c>), every other reason as recorded. The
+    /// one expression the card and the table both say it with.
+    /// </summary>
+    internal static string ReasonFor(PlannedKept staying, ClassNoun noun) =>
+        noun == ClassNoun.Meeting && staying.Reason == AssistWorkspace.ClassOfItsOwn
+            ? AssistWorkspace.MeetingOfItsOwn
+            : staying.Reason;
+
+    /// <summary>
+    /// The proposal as a teacher would read it, in the course's noun (#556,
+    /// the mac's <c>describe(noun:)</c>): a club's card says "meeting" for the
+    /// linked classes a publish leaves alone and for the reason an unpublish
+    /// keeps one. Only the TEACHER's copy is asked for in the meeting form —
+    /// the model's copy is <see cref="Describe(int)"/>, byte for byte
+    /// (<c>AssistWording.Meetings.cs</c>, <c>ClubNounTests</c>).
+    /// </summary>
+    public string Describe(ClassNoun noun, int mostListed = 15)
     {
         var lines = new List<string>();
         string verb = Publishes ? "publishing" : "unpublishing";
@@ -248,12 +271,12 @@ public sealed class PublishPlan
                     lines.Add($"…and {Kept.Count - listed} more.");
                     break;
                 }
-                lines.Add($"{staying.Page.Named} {AssistWording.PlanStaysVisibleBecause(staying.Reason)}");
+                lines.Add($"{staying.Page.Named} {AssistWording.PlanStaysVisibleBecause(ReasonFor(staying, noun))}");
                 listed++;
             }
         }
 
-        if (Publishes && LeftAloneSentence is { } leftAlone)
+        if (Publishes && LeftAloneSentenceFor(noun) is { } leftAlone)
         {
             lines.Add("");
             lines.Add(leftAlone);
@@ -301,8 +324,7 @@ public sealed class PublishPlan
             Add(change.Page, change.WillBeVisible ? PlanTable.Change.WillBecomeVisible : PlanTable.Change.WillBecomeHidden,
                 AssistWording.PlanWillBecome(change.WillBeVisible, ClassesWhoseDatesAreTakenBy(change)));
         foreach (var staying in Kept)
-            Add(staying.Page, PlanTable.Change.StaysVisible, AssistWording.PlanStaysVisibleBecause(
-                meeting && staying.Reason == AssistWorkspace.ClassOfItsOwn ? AssistWorkspace.MeetingOfItsOwn : staying.Reason));
+            Add(staying.Page, PlanTable.Change.StaysVisible, AssistWording.PlanStaysVisibleBecause(ReasonFor(staying, noun)));
         if (Publishes)
             foreach (var page in LeftAlonePages)
                 Add(page, PlanTable.Change.StaysAsItIs,
