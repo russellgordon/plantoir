@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 22 October 2026. The current release is **1.8.5** on the Mac and on Windows.*
+*Last updated: 22 October 2026. The current release is **1.8.6** on the Mac and **1.8.5** on Windows.*
 
 A few things to know before you read on:
 
