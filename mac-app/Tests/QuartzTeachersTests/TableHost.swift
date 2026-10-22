@@ -6,6 +6,18 @@ import SwiftUI
 /// never made key or activated — so a test can reach the `NSTableView` a
 /// SwiftUI `Table` becomes and click its cells as a teacher would.
 ///
+/// **Off screen did not hold until v1.8.6, and this is why.** MEASURED on
+/// macOS 26.6 (#621): a titled `NSWindow` made at (-5608, -4900) came back
+/// from its initializer at (1112, 92), on the main display; `setFrameOrigin`
+/// moved it off again; and `orderFrontRegardless()` put it straight back at
+/// (0, 0). AppKit calls `constrainFrameRect(_:to:)` whenever a titled window
+/// is placed on screen, and for a window on no display it constrains to the
+/// main one. So every window this host made sat at the bottom-left of the
+/// screen while its test ran. Now the host's window is an
+/// `OffScreenWindow`, which refuses that constraint and any move onto a
+/// display, and "outside any display" is worked out from the displays this
+/// Mac has (`offScreenOrigin(for:)`) rather than a fixed -6000.
+///
 /// Measured for issue #266 before being relied on: an in-process mouse click
 /// sent through `NSWindow.sendEvent` at `frameOfCell(atColumn:row:)` of the
 /// table ticks the box in that cell and writes the model, exactly as a real
@@ -23,18 +35,46 @@ final class TableHost {
     // MARK: - Initializer
 
     init<Content: View>(_ content: Content, size: NSSize = NSSize(width: 520, height: 600)) {
-        window = NSWindow(
-            contentRect: NSRect(origin: NSPoint(x: -6000, y: -6000), size: size),
+        let origin: NSPoint = TableHost.offScreenOrigin(for: size)
+        window = OffScreenWindow(
+            contentRect: NSRect(origin: origin, size: size),
             styleMask: [.titled], backing: .buffered, defer: false
         )
         window.isReleasedWhenClosed = false
+        window.animationBehavior = .none
         window.contentView = NSHostingView(rootView: content.frame(width: size.width, height: size.height, alignment: .top))
-        window.setFrameOrigin(NSPoint(x: -6000, y: -6000))
+        window.setFrameOrigin(origin)
         window.orderFrontRegardless()
         pump()
     }
 
     // MARK: - Functions
+
+    /// A point at which a window of `size` overlaps no display of this Mac:
+    /// beyond the bottom-left corner of all of them together, with room to
+    /// spare for a sheet hung under it and for growing.
+    static func offScreenOrigin(for size: NSSize) -> NSPoint {
+        var left: CGFloat = 0
+        var bottom: CGFloat = 0
+        for screen in NSScreen.screens {
+            if screen.frame.minX < left {
+                left = screen.frame.minX
+            }
+            if screen.frame.minY < bottom {
+                bottom = screen.frame.minY
+            }
+        }
+        let margin: CGFloat = 4000
+        return NSPoint(x: left - size.width - margin, y: bottom - size.height - margin)
+    }
+
+    /// Whether any part of `frame` is on a display of this Mac.
+    static func isOnAScreen(_ frame: NSRect) -> Bool {
+        for screen in NSScreen.screens where screen.frame.intersects(frame) {
+            return true
+        }
+        return false
+    }
 
     /// Lets SwiftUI and AppKit settle: layout, row realisation, bindings.
     func pump(_ seconds: Double = 0.3) {
@@ -156,5 +196,44 @@ final class ListBox {
     init(_ names: [String], second secondNames: [String] = []) {
         self.names = names
         self.secondNames = secondNames
+    }
+}
+
+/// A window that stays off every display (#621).
+///
+/// MEASURED on macOS 26.6, two ways AppKit moved a test window placed
+/// beyond every display back onto the main one:
+/// - ordering in a titled window constrains it to a display through
+///   `constrainFrameRect(_:to:)`: from (-5608, -4900) to (0, 0) on
+///   `orderFrontRegardless()`. So every `TableHost` window sat at the
+///   bottom-left of the screen while its test ran;
+/// - presenting a sheet from it, `NSSheetMoveHelper`'s `_configureFinalState`
+///   calls `setFrameOrigin` on the PARENT so that the sheet lands on a
+///   display: the parent went to (-320, -239) and the sheet to (0, 0).
+/// So this answers "where it is" to the first, and puts any frame that
+/// would overlap a display back beyond them all, which answers the second.
+final class OffScreenWindow: NSWindow {
+
+    // MARK: - Functions
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        return frameRect
+    }
+
+    override func setFrameOrigin(_ point: NSPoint) {
+        let kept: NSRect = OffScreenWindow.keptOffTheScreens(NSRect(origin: point, size: frame.size))
+        super.setFrameOrigin(kept.origin)
+    }
+
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        super.setFrame(OffScreenWindow.keptOffTheScreens(frameRect), display: flag)
+    }
+
+    /// `frame`, or the same size beyond every display if it overlaps one.
+    static func keptOffTheScreens(_ frame: NSRect) -> NSRect {
+        if TableHost.isOnAScreen(frame) {
+            return NSRect(origin: TableHost.offScreenOrigin(for: frame.size), size: frame.size)
+        }
+        return frame
     }
 }

@@ -3234,7 +3234,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 
 | Item | What it opens | The tool it runs |
 |---|---|---|
-| Publish Pages… | a searchable checklist of the hidden pages, classes first, then the plan as a table (#524) | `plan_publish_pages`, then `publish_pages` |
+| Publish Pages… | a searchable table of the hidden pages to tick, classes first (#608), then the plan as a table (#524), the pages already visible folded under it (#622) | `plan_publish_pages`, then `publish_pages` |
 | Hide Pages… | the same, of the visible pages | `plan_unpublish_pages`, then `unpublish_pages` |
 | Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan as a table (#524) | `plan_publish_class_on`, then `publish_class_on` |
 | Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
@@ -3436,7 +3436,8 @@ reference-course gate and outside-change hold); putting the rows in `detail`
 sheet (the existing sheet's stage changes what it draws; `SheetTitleScanTests`
 still counts 17 sheets); a selectable table (the rows are read, not chosen,
 and the page names are no longer selectable text — the notes still are);
-widening the sheet mid-flow (it stays 560); twenty rows before scrolling
+widening the sheet mid-flow (it stayed 560 until v1.8.6; since #621 the
+TEACHER may widen it, and the sheet never widens itself); twenty rows before scrolling
 (above); the table on the assistant window's Go/Cancel card (a narrow chat
 bubble; it stays text, Russell's ruling 3); "will be hidden" for the column
 (the card's shipped "will become hidden" is kept, ruling 6).
@@ -3449,6 +3450,92 @@ rows travel in the tool result's `_meta`, because the planner runs in another
 process; the rows shown are what fits the window (2 to 12, the notes giving way first), not a fixed 12;
 the ListView kept Return for itself, so Return is caught before it; and a
 club's table speaks of meetings while Windows' card does not yet.
+
+#### v1.8.6: the picker is a table, the plan folds, the sheets resize (#608, #621, #622)
+
+Three changes to the same sheets, one piece, measured on macOS 26.6 with the
+real sheets presented off screen (`PageTablesSheetTests`, through
+`SheetHost`).
+
+**The picker is a table (#608).** The first stage of Publish Pages… and Hide
+Pages… was a stack of checkboxes with a grey second line, which with ten or
+more classes ran together. It is now a bordered, banded `Table` — Page (the
+checkbox IS the title, the Xcode target-membership shape the Course Settings
+tables use, with the tooltip and the `sectionVerbRow-<name>` identifier),
+Folder and Date (`menuPickDateColumn`, a class's day as the later-classes
+question says it; empty for a page that is not a class). A click on a box
+ticks it; Space ticks the selected row, and selecting is not ticking; Return
+and Escape still reach Continue and Cancel with a row selected (#524 had only
+measured a table without a selection); Space typed in Find a Page ticks
+nothing. The table's height is counted from EVERY page offered, not the ones
+the search leaves, so the sheet stays still while the teacher types, and it
+shows twelve rows before scrolling (318 pt, under the 340 the checkbox list
+was capped at); the forty-page picker is 506 pt against 620. REJECTED: a
+separate fourth checkbox column, as the issue sketched.
+
+**The plan lists what changes (#622).** The table holds
+`AssistPlanTable.rowsToRead`: every change, and every page that stays for a
+reason (kept by an unpublish, a linked class left as it is, no room for a
+key) — those must be read before Go. The pages already the way they were
+asked to be (`rowsAlreadyRight`: already visible, already hidden, nothing
+else) sit behind a `DisclosureGroup` under the table, closed for every new
+plan, worded `menuPlanShowAlready(count:publishing:)` — four keys,
+`menuPlanShowAlready`, `…Hiding`, `…OnePage`, `…OnePageHiding`. The
+disclosure has no content of its own: opening it appends those rows to the
+SAME table, in plan order — one table and one sort, as #589 chose. A plan
+with nothing else to read shows every row and no disclosure. The summary line
+is unchanged. Russell's ruling (R8): **the sheet must not grow when the
+disclosure opens.** So the table's height counts the rows shown with the
+disclosure CLOSED, never fewer than five rows' worth while pages are folded
+(`fewestPlanRowsUnderAFold`, Start of Year's budget), and the folded rows
+scroll inside it: opening the disclosure on a plan of 5 + 16 leaves the sheet
+at 560 × 316 and its minimum at 316, with 21 rows scrolling in a 150-pt
+table and the last one reachable. Counting the drawn rows instead (measured)
+raises the minimum to 484 under the open sheet. The disclosure sits 6 pt
+under the table rather than 12: the worst plan — twelve rows, the
+disclosure, the notes at their 120-pt cap — measures 616 pt that way and 622
+with a full spacing, over the 620 a 13-inch screen allows.
+
+**The sheets resize (#621).** `SectionVerbSheet` (and Start of Year, below)
+is `.frame(minWidth: 560, idealWidth: 560, maxWidth: .infinity)` with
+`.presentationSizing(.fitted)`. Measured: the default sizing is NOT
+resizable, even with flexible content, and snaps back on every change;
+`.fitted` makes the sheet resizable, opens it at its content's size, and
+makes that size its minimum — so the size a teacher saw before is the default
+and the least (the picker 338, the later classes 290, the plan of 21 pages
+454, a hide plan of two rows 214, the text stages 124 and 412, all equal to
+dev's). Every table is `flexibleTableHeight(today's height)` — `minHeight =
+idealHeight` = what it was, no maximum, `layoutPriority(1)` — so 300 pt more
+sheet is 300 pt more table. The text stages' `CappedScrollArea` takes
+`growsWithItsSheet` likewise (the implementation review's A-F1): a Re-date
+card still opens at 412, and 300 pt more sheet is 300 pt more text, where
+before its 304-pt area stayed put under a band. The plan's Folder and What changes are capped at
+140 and 320 and Page is not, so the width added goes to the titles
+(125/115/215 at 560, unchanged; 335/140/320 at 900). The content is wrapped
+in ONE `VStack` before `.frame(maxHeight: .infinity, alignment: .top)`: a
+frame on a multi-view builder frames each child (the table got 223 of 628 pt,
+the summary 560), and a `Spacer` adds a spacing to every opening size
+(measured +20 on every stage).
+
+`.fitted` never fits a sheet AGAIN after it opens (the plan review's B1): on
+the move from a two-row picker to the plan, the minimum rose to 454 pt
+under a 266-pt sheet, the content was centred and clipped and the buttons
+were off its bottom; `.fitted.sticky()` and an `.id` per stage behave the
+same. `SheetGrowsToItsMinimum`, a background `NSView`, watches the sheet
+window's `contentMinSize` (measured: SwiftUI announces that key; `minSize`
+sends nothing) and, on the next main-actor turn, grows the window to it —
+never shrinking it, so a sheet the teacher made bigger stays bigger, and the
+next, shorter stage leaves it where it is. The disclosure never raises the
+minimum, so it never moves the sheet.
+
+REJECTED: two tables for the fold (one height function and one sort, as
+#589); a literal 620-pt minimum (a two-row picker would carry about 300 pt of
+empty table, and it would move Start of Year's figure); growing the window
+when the disclosure opens (Russell); `.automatic` sizing (not resizable);
+Copy a Page (not a `Table`, and its figure is in the reference scene — a
+follow-up issue if wanted). The trail is unchanged: this is how the plan is
+shown, not what Publish does. Windows: the five keys travel in
+`assist-wording.json`; the layout went as one `windows` issue.
 
 ### Classes dated after the next class, at Deploy (#475)
 
@@ -3492,7 +3579,9 @@ WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
   testTheClassesDatedLaterLineFollowsADeployThatWentOut` runs the real
   wrapper both ways).
 
-The sheet lists the flagged classes, every one ticked, and ALWAYS offers two
+The sheet lists the flagged classes, every one ticked — since v1.8.6 (#608)
+in the picker's table, Page (with its checkbox) and Date, Space ticking the
+selected row, in a sheet the teacher can resize (#621) — and ALWAYS offers two
 buttons beside Cancel: **Hide Ticked and Deploy** (the default) and **Keep All
 and Deploy**, which keeps every listed class at its date and hides nothing —
 the director's ruling on the implementation review's finding 1 (Russell may
@@ -9050,9 +9139,26 @@ sortable `Table` — the look #524 gave Publish Pages ("The plan as a table
   longest reason, `reasonOnlyHiddenPagesLink` ("only “…” links to it, and
   students will not see that page"), is about 400 pt; on one line in a
   240-point column it was cut at its useful half (#589's plan review). Page is
-  90–140 pt and Folder 60–100, which leaves Why 254 pt in the 560-point sheet
-  (248.5 with a scroll bar showing). `.help` still carries every cell whole for
-  a long title.
+  at least 90 pt and Folder 60–100, which leaves Why 254 pt in the 560-point
+  sheet (248 with a scroll bar showing). `.help` still carries every cell
+  whole for a long title.
+- **Resizable since v1.8.6 (#621)**, as Publish Pages… ("The plan as a table
+  (#524)" → v1.8.6): the same root frame, `.presentationSizing(.fitted)` and
+  `SheetGrowsToItsMinimum`, and the table is `flexibleTableHeight`. Until
+  then Page was capped at 140 so Why took the spare width; now Page has no
+  cap and Why is capped at 300, so the width added goes to the titles — and
+  at 560 the columns are still 124/94/254 (118.5/88.5/248 with a scroll bar),
+  which the two-line arithmetic above rests on; at 900, 412/100/300. The
+  sheet opens at 606, 478 and 466 pt as before. KNOWN: NSTableView keeps
+  the teacher's proportions, so widening and then narrowing again can leave
+  Why under 244 pt (the plan review measured 225.5), and a reason the height
+  was worked out for on one line may then take two; Russell: "we'll see how
+  it works in practice". The other stages (reading, the result, the undo's
+  lists, a problem) were a `ScrollView` framed 200–460, which made 460 the
+  largest the sheet's content could be, so a sheet made taller at the plan
+  was held to it after Go; they are a `CappedScrollArea` capped at 460 with
+  `growsWithItsSheet`, measured to open at exactly the old heights (200, 302
+  and 460 pt at 1, 12 and 60 lines) and to take any height added.
 
 **The height budget — MEASURED, macOS 26.6.** Every sheet here must fit in
 `CopyPageChecklist.tallestSheet` (620 pt: a 13-inch Air at "Larger Text").
