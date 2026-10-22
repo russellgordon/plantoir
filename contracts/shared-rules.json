@@ -1809,6 +1809,33 @@
             "Worksheet"
           ],
           "why": "The referrer test reads the same links publishing follows (folded into #325, 2026-09-26): Study Guide, which students can see, still leads to Worksheet with a Markdown-style link, so taking Worksheet down with the class would leave a dead link on a visible page."
+        },
+        {
+          "name": "a page only NAMED like curriculum is not kept up as a curriculum page",
+          "pages": [
+            {
+              "title": "Unit 2, Day 3",
+              "isClassPage": true,
+              "visible": true,
+              "links": [
+                "Curriculum Coverage"
+              ]
+            },
+            {
+              "title": "Curriculum Coverage",
+              "isClassPage": false,
+              "visible": true,
+              "links": []
+            }
+          ],
+          "unpublish": [
+            "Unit 2, Day 3"
+          ],
+          "expectHidden": [
+            "Unit 2, Day 3",
+            "Curriculum Coverage"
+          ],
+          "why": "#615. neverTakenDownByFollowingLinks keeps a curriculum page up by its FOLDER: any folder segment containing 'curriculum'. The file name is never part of the test (curriculumRules.isCurriculumPage says the same), so a page that is merely CALLED 'Curriculum Coverage', in an ordinary folder and linked only from the class being hidden, goes down with that class like any other page. Windows used to match the file name as well and kept it up, which the mac never did."
         }
       ]
     },
