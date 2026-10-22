@@ -169,7 +169,8 @@ internal static class NamedGapLedger
 
         // ---- toolchain.json → pins: none held open. pagedjs, functionPlot
         // and nodeTikzjax (and latinModern, newly watched) landed in
-        // fetch-runtime.ps1 with #503's batch 5A.
+        // fetch-runtime.ps1 with #503's batch 5A; pyodide (#455) with #568,
+        // never ledgered: the fetch landed in the same piece as the pin.
 
         // ---- class-planning.json → sectionIndexPointer.dateCases (pointAt cases)
 
