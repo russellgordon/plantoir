@@ -83,6 +83,10 @@ public sealed class AppUpdater : IDisposable
     internal static readonly TimeSpan FirstRetry = TimeSpan.FromMinutes(1);
     internal static readonly TimeSpan HourlyLook = TimeSpan.FromHours(1);
 
+    /// <summary>How soon after <see cref="Start"/> the first daily look comes: <see cref="FirstRetry"/>,
+    /// shortened only by a Debug build's UI test (#632).</summary>
+    public TimeSpan FirstLook { get; set; } = FirstRetry;
+
     /// <summary>When the last offer nobody saw asked to be tried again — what the tests read.</summary>
     internal TimeSpan? LastRetryScheduled { get; private set; }
 
@@ -154,7 +158,7 @@ public sealed class AppUpdater : IDisposable
         // sleeps at night and is never relaunched still checks once a day.
         // A process-time timer of 86400 s drifted by every hour spent asleep.
         _daily = new Timer(_ => { if (DailyCheckIsDue(DateTime.UtcNow)) _ = DailyCheckAsync(); }, null,
-                           FirstRetry, HourlyLook);
+                           FirstLook, HourlyLook);
     }
 
     /// <summary>
