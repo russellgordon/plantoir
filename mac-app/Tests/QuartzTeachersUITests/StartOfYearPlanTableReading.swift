@@ -58,7 +58,10 @@ extension XCTestCase {
     /// above the classes' "comes after …". The header is asked for by its
     /// title; where the tree does not offer it as a button, the click goes
     /// to the header row over the Why column, which is the right-hand half
-    /// of the table.
+    /// of the table. MEASURED on the first run (macOS 26.6, 2026-10-21): the
+    /// table reaches the tree as an outline and its header is NOT offered as
+    /// a button, so it is the coordinate click that sorts — and the first
+    /// row's reason changing is what showed that it did.
     func sortStartOfYearPlanByReasonDescending(_ table: XCUIElement, whyTitle: String) {
         for _ in 0..<2 {
             let header: XCUIElement = table.buttons[whyTitle]

@@ -8892,7 +8892,8 @@ anything is written: the intro; the warnings (classes dated before today that
 are going into draft; this folder's scheduled deploy for the section, which
 would put the change in front of students; a first class that is itself in
 draft); every class and every other page going into draft, each by its
-title with its reason, in disclosure groups; what stays; the links left on pages students will
+title with its folder and its reason, in one table (since #589 — "The pages as
+a table" below); what stays; the links left on pages students will
 see that will lead to hidden pages, grouped by page with a count; the sentence
 that publishing a class by hand after this leaves it with dead links (issue
 #333); and that the undo ends when Plantoir quits. Go is disabled when there is
@@ -8912,8 +8913,9 @@ the publish plan and the re-date planner already use; the "(in …)" suffix is
 this sheet's and the links checklist's (#385 reuses `StartOfYearPageNaming`
 through `LinksChecklistNaming` — see "The links checklist (#379)" below), so do
 not copy it into the assistant's replies without deciding to. One builder, `StartOfYearPlan.line(for:first:)` (`draftLine`),
-serves both disclosure lists AND the MCP plan text (`describe()`), and the
-links-left list takes the same name. "Shares a title" is decided across EVERY
+serves the MCP plan text (`describe()`) — and, until #589, the sheet's two
+disclosure lists; the sheet's table rows (`tableRows()`) are built from the
+same drafts and reason clauses — and the links-left list takes the same name. "Shares a title" is decided across EVERY
 page the section's graph read, not within the list shown — a "Notes" going into
 draft whose twin STAYS is exactly the case a teacher could not otherwise tell
 apart (the contract case "a page is named by its title, and by its folder only
@@ -8973,6 +8975,109 @@ alert, and nearly every row starts UNTICKED: a page that only a later, hidden
 class links directly is that class's material and "will come with that
 class". So pressing Publish on the defaults does not undo Get Ready. See
 "The links checklist (#379)" below.
+
+### The pages as a table (#589)
+
+Since v1.8.4 the sheet shows the pages going into draft as one read-only,
+sortable `Table` — the look #524 gave Publish Pages ("The plan as a table
+(#524)" above) — instead of two folded lists of bullet lines.
+
+- **Columns:** Page and Folder reuse #524's keys
+  (`AssistWording.menuPlanPageColumn`, `menuPlanFolderColumn`); the third is
+  **Why** — a new key, `startOfYear.wording.reasonColumn`, retyped as
+  `StartOfYearWording.reasonColumn` and pinned key by key in
+  `StartOfYearTests.testTheWordingIsTheContractsWording`. Its cells are the
+  reason clauses the lines always carried (`reasonLaterClass`,
+  `reasonFirstUsedIn`, …), word for word. The title cell has no quotation
+  marks (a cell, not a sentence — #524's rule), and the folder is ALWAYS shown,
+  so the "(in …)" a line needs to tell two pages with one title apart is not
+  needed in a cell.
+- **Rows:** every page the write will change, classes first and then pages, in
+  plan order (`StartOfYearPlan.tableRows()`, `position` as the id and the first
+  sort order; a header click sorts by that column). Not capped — the table
+  scrolls inside itself. Built from `draftsThatChange` and
+  `reason.sentence(first:)`, the pieces `describe()` is made of, and
+  `StartOfYearPlanTableTests.testTheTableHasARowForEveryPageGoingIntoDraft`
+  checks every row's line is in `describe()`, so the sheet and the MCP plan
+  cannot drift. Never `relativePath` (the #362 source scan still holds).
+- **Above the table**, in a `CappedScrollArea` of 100 pt: the "changed since"
+  notice, then the warnings, then the intro and "nothing to do". The warnings
+  moved ABOVE the intro: they are what must be read before Go, and in the worst
+  case the area is taller than its cap, so it is the intro — read the time
+  before — that scrolls. The two list headings (`classesHeading`,
+  `pagesHeading`) stay, unchanged, as the summary lines over the table.
+- **Under it**, in a second capped area of 100 pt: already in draft, no room
+  for a key, what stays (still a disclosure group), the links left (likewise),
+  `publishingFromNowOn` and `undoEndsWhenYouQuit` — unchanged words.
+- **The Why column takes the rest of the width and allows two lines.** The
+  longest reason, `reasonOnlyHiddenPagesLink` ("only “…” links to it, and
+  students will not see that page"), is about 400 pt; on one line in a
+  240-point column it was cut at its useful half (#589's plan review). Page is
+  90–140 pt and Folder 60–100, which leaves Why 254 pt in the 560-point sheet
+  (248.5 with a scroll bar showing). `.help` still carries every cell whole for
+  a long title.
+
+**The height budget — MEASURED, macOS 26.6.** Every sheet here must fit in
+`CopyPageChecklist.tallestSheet` (620 pt: a 13-inch Air at "Larger Text").
+#524's budget — twelve rows, 318 pt — did not fit here: with this sheet's
+intro, warnings and notes the plan review measured about 720 pt with no
+warnings and about 790 with all three. So the plan stage has NO outer scroll
+view (a scroll inside a scroll was the other thing to avoid), and:
+
+| Part | Budget |
+|---|---|
+| Title band, bottom margin, gaps, buttons | about 52 + 20 + 4 × 12 + 22 |
+| Notice, warnings, intro (capped) | 100 |
+| The two summary lines | about 36 |
+| The table | at most 222 — eight one-line rows (8 × 24 + 2 + 28) |
+| The notes (capped) | 100 |
+
+The bordered table draws a one-line row at 24 pt and a two-line row at 40
+(measured on the real `NSTableView`; SwiftUI's table uses automatic row
+heights). A `Table` has no natural height, so `StartOfYearSheet.planTableHeight`
+counts each row at the height it will draw — 40 when the reason is wider than
+`widestOneLineReason`, 244 pt in the system font (measured: text up to about
+250 pt stays on one line in the 254-point column; set under the narrower,
+scroll-bar case so a misjudged row leaves a few points of band rather than a
+scroll) — up to the 222 pt cap. With the real sheet hosted at its width
+(`StartOfYearPlanTableTests`, as `CopyPageChecklistSizeTests` does): **602 pt
+in the worst case** — the notice, all three warnings, a page with no room for a
+key, links left, a class already in draft and nineteen rows — against 620, and
+at least the three parts' caps plus 120 the other way, so a collapsed table or
+area cannot pass; **462 pt** for a three-row plan with no warnings. Caps of 104
+measured 610; 100 was taken for the margin. Twelve rows measured 698 (red);
+the table uncapped, 914 (red). A short table's frame equals the sum of its
+drawn rows plus the header and border, checked against the real table, so the
+estimate cannot drift into an inner scroll unnoticed.
+
+**Keys.** Return is Go with the table focused (in-process key event, as #524's
+test); Escape goes through `dismiss`, which a hosted view cannot observe.
+
+**The marketing figure** (`start-of-year`) clicks the Why header twice
+(descending), so the pages' reasons ("only … links to it", "nothing links to
+it", "first used in …") come above eighty rows of "comes after …", and ASSERTS
+the first row's reason changed — a click that missed would photograph
+identical rows and still pass the OCR. MEASURED on the first run of the opt-in
+`ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
+(2026-10-21): `startOfYearPlanTable` reaches the tree (as an outline); its
+header is NOT offered as a button, so the click is a coordinate on the header
+row over the Why column (`sortStartOfYearPlanByReasonDescending`), and it
+sorts — the first row went from "comes after …" to "nothing links to it".
+
+**The trail is unchanged, on purpose:** this changes how the plan is shown,
+not what Go writes; "made ready for the start of the year … from the app"
+still says what happened.
+
+REJECTED: a "What changes" column (#524's) — every row goes into draft, so it
+would say one phrase ninety times; two tables, one for classes and one for
+pages (two headers and two scrolls in a 620-point sheet, and the summary lines
+already say which is which); rows for pages "already in draft", left with no
+room, or staying (the first two stay sentences, and staying pages would need
+new wording and bury the list); the stays and links-left lists and the undo
+sheet's lists as tables (not asked for — a follow-up if wanted); a table in the
+MCP plan text (an outside assistant reads lines); keeping #524's twelve rows
+(698 pt, measured); keeping the outer scroll view around the plan (a scroll
+inside a scroll).
 
 ## Today's class on the front page (#397)
 
