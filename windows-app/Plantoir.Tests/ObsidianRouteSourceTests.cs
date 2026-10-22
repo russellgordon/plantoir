@@ -24,13 +24,36 @@ public class ObsidianRouteSourceTests
             .Where(pair => pair.Count > 0)
             .ToDictionary(pair => pair.Name, pair => pair.Count);
 
-        // The sidebar's route: the live course (Menus) and the reference course (Reference).
-        Assert.Equal(1, callers.GetValueOrDefault("SidebarPane.Menus.cs"));
+        // The sidebar's route: the live course (Menus, through #581's ObsidianOpenRoute,
+        // whose world is the one place that opens it) and the reference course (Reference).
+        Assert.Equal(0, callers.GetValueOrDefault("SidebarPane.Menus.cs"));
+        Assert.Contains("new ObsidianOpenRoute(new ObsidianWorld(", File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs")));
+        Assert.Equal(1, callers.GetValueOrDefault("ObsidianWorld.cs"));
         Assert.Equal(1, callers.GetValueOrDefault("SidebarPane.Reference.cs"));
         // The named exception: Course Settings' How I Teach row opens a PAGE of
         // a LIVE course (a reference course has no such row), not the course.
         Assert.Equal(1, callers.GetValueOrDefault("CourseSettingsView.xaml.cs"));
         Assert.Equal(3, callers.Values.Sum());
+    }
+
+    /// <summary>
+    /// #581's route is built in two places only: Open in Obsidian (the
+    /// sidebar, every route) and the preview trigger (no question asked). A
+    /// third caller would be a second way in nobody reviewed.
+    /// </summary>
+    [Fact]
+    public void TheAddOnsRouteIsBuiltOnlyBySidebarAndPreview()
+    {
+        var callers = Directory.EnumerateFiles(AppFolder, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                           && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .Select(file => (Name: Path.GetFileName(file),
+                             Count: File.ReadAllLines(file).Count(line => line.Contains("new ObsidianOpenRoute(", StringComparison.Ordinal))))
+            .Where(pair => pair.Count > 0)
+            .ToDictionary(pair => pair.Name, pair => pair.Count);
+        Assert.Equal(1, callers.GetValueOrDefault("SidebarPane.Menus.cs"));
+        Assert.Equal(1, callers.GetValueOrDefault("SectionDetailView.xaml.cs"));
+        Assert.Equal(2, callers.Values.Sum());
     }
 
     /// <summary>The reference branch locks again before the note, and records it on the trail when it did anything.</summary>

@@ -125,6 +125,7 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-22 | A course whose name holds ": " ("Physics: Mechanics") gets a front page the build can read when a section is added or the front page is put back | Windows (mac shipped it in v1.8.1, #575) | #586 |
 | 2026-10-22 | In a club, the publish and unpublish plan says "meeting" for a linked meeting it leaves as it is or keeps visible, matching the table under it | Windows (the mac since #267) | #556 |
 | 2026-10-22 | A window remembered on a screen that has since been unplugged (or a resolution since lowered) reopens on the nearest screen instead of out of sight; a window that can still be grabbed by its title bar reopens exactly where it was | Windows (the mac always did this) | #558 |
+| 2026-10-22 | Open in Obsidian offers, once and before Obsidian opens, to add the add-ons that draw a course's diagrams and graphs (TikZJax, Functionplot), and after the yes adds what a course uses at Open in Obsidian and after a preview — never under an open course, which it offers to reopen; File ▸ Settings ▸ Obsidian holds the toggle; backups leave Plantoir's add-ons out. Every Windows build PC must run `windows-app\Vendor\fetch-obsidian-addons.ps1` once (the build refuses without it). Quitting Obsidian from Plantoir (registering a course, renaming one) now closes every Obsidian window, not one | Windows (mac shipped it in v1.8.0, #495) | #581 |
 
 
 ## Warnings the release notes MUST carry
@@ -183,7 +184,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    predates any of them; `publish.ps1` never runs it, and the build now
    REFUSES a runtime whose manifest lacks those keys rather than ship one
    without them (#503; `pyodide` joined the keys with #568, so every runtime
-   made before 2026-10-22 is refused until the fetch is re-run). Then `az login`, then
+   made before 2026-10-22 is refused until the fetch is re-run), and **run
+   `windows-app\Vendor\fetch-obsidian-addons.ps1`** — it returns at once when
+   the seven add-on files already match the contract's pins, and the build
+   REFUSES a missing or stale copy (#581). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`). **Then build and sign the Windows update feed
@@ -284,6 +288,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    before its `vendor` folder — #503):
 
        powershell -File Vendor\fetch-runtime.ps1
+       powershell -File Vendor\fetch-obsidian-addons.ps1
        powershell -File publish.ps1 -Sign
 
    One-time tooling on a new machine (the Azure account/identity setup itself

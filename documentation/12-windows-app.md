@@ -442,6 +442,7 @@ the build mirrors it beside the executable:
 ```powershell
 cd windows-app
 .\Vendor\fetch-runtime.ps1        # REQUIRED once per clone
+.\Vendor\fetch-obsidian-addons.ps1   # REQUIRED once per clone (#581): the build refuses without it
 dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
@@ -3522,8 +3523,9 @@ to hear about the one they left.
 
 Eleven of the twelve follow a dialog. **The twelfth follows a wait that is not
 a dialog at all**, and it is the widest window in the file: inside the rename,
-`FolderActions.QuitObsidianAndWait` polls for up to five seconds (50 × 100 ms)
-with nothing on screen, so the File menu and Ctrl+O are both fully live — and
+`FolderActions.QuitObsidianAndWait` polls for up to about eight seconds (since
+#581: up to 5 s for Obsidian's windows, then up to 3 s for its processes; it
+was five, 50 × 100 ms) with nothing on screen, so the File menu and Ctrl+O are both fully live — and
 everything after it reads the LIVE workspace, down to setting the selection to
 the renamed code. A check before a wait says nothing about what is true after
 it.
@@ -8165,3 +8167,177 @@ does.
   2026-10-15 measurement covers only that Ctrl+P opens the print window, on
   a page with no quizzes.
 - **The WebKit leg** of #618 and #620, once #597 lands.
+## Obsidian's add-ons for diagrams and graphs on Windows (#581, the mac's #495)
+
+**What a teacher sees.** The first time Open in Obsidian is pressed on a course
+with a ```` ```tikz ```` or ```` ```functionplot ```` fence, and BEFORE
+Obsidian opens, Plantoir asks `obsidianAddOnsForFigures.wording.offerTitle`:
+Add Them (the default), Not Now, and a "Don't ask again" box that turns Not Now
+into no. One yes covers every course. After it, a course gets the add-ons it
+uses at Open in Obsidian and, silently, when a section's preview has shown a
+fresh build. File ▸ Settings ▸ Obsidian (a section after Preview, as the mac's
+pane is) holds the one toggle. Everything else — the cases, the words, the
+order — is the contract's, and `documentation/09-mac-app.md` → "Obsidian's
+add-ons for diagrams and graphs (#495)" carries the reasoning and what was
+rejected; this section says only what Windows does differently and what it
+measured.
+
+**The files.** `windows-app/Vendor/fetch-obsidian-addons.ps1` reads every id,
+version, size, SHA-256 and address from `obsidianAddOnsForFigures.addOns` (it
+carries no pin of its own — `ObsidianFigureAddOnsTests` fails on any 64-hex run
+in it), caches by SHA-256 in `%LOCALAPPDATA%\Plantoir-dev\obsidian-addons`
+(or `$env:PLANTOIR_ADDONS_CACHE`), installs nothing on one mismatch, and swaps
+`Vendor\obsidian-addons\<id>\<file>` in (4.3 s the first time here, 3.6 s when
+already in place). The contract is 2.09 MB, past Windows PowerShell 5.1's
+`ConvertFrom-Json` limit, so on 5.1 it reads with the serializer that limit
+comes from, raised. **Run it once per clone or worktree.** `Plantoir.csproj`
+ships the folder as Content (`obsidian-addons\` beside Plantoir.exe, and in
+`publish`), and `CheckObsidianAddOns` REFUSES the build when the folder is
+missing, holds other than the pinned 7 files, or holds a file whose (id, name,
+SHA-256) is not a triple in the contract — not merely "a hash that appears
+somewhere": functionplot's licence under tikzjax's name is refused. Each
+refusal was seen (missing, 8 files, a flipped byte, the swapped licence).
+
+**The model is in Plantoir.Core, behind `IObsidianWorld`.** The mac's route
+lives in its `WorkspaceModel`; Windows' Open in Obsidian lives in the WinUI
+project, which the test project does not reference, so the sequence
+(`ObsidianOpenRoute`), the decisions (`ObsidianFigureAddOnsOffer`), the pass
+(`ObsidianFigureAddOns`), the words and the trail are Core, and
+`Plantoir/Views/ObsidianWorld.cs` supplies only FolderActions and the two
+ContentDialogs (through `ShowDialogSafelyAsync`, so DialogGate holds the
+menus). `ObsidianOpenRouteTests` drives sequence steps 1–8 through a fake world
+with no window. The How I Teach row's "open the page" still calls
+FolderActions directly, as the mac's does (it opens a page, not Open in
+Obsidian).
+
+**Windows' own decisions, each a review finding.**
+
+- **The fence reader is a port of `fenced_blocks`**, not `MarkdownCode`
+  (`FigureFenceScan.cs`): lines split on `\n` only, a lone `\r` is text, a
+  byte-order mark is a character (decoded with `Encoding.UTF8.GetString`, as
+  Python's utf-8 reader keeps it). It agrees with the Python on 2,000 generated
+  pages (fixed seed; CR LF, lone CR, BOM, invalid UTF-8, nested containers) and
+  on every `figureFences.fences` case. A lone `\r` inside a line is text here
+  exactly as it is in the mac's `FigureFenceScan.swift` and the Python (all
+  three split on `\n` only) — reviewed, mac-identical, no change.
+- **A link is a reparse point with a `LinkTarget`** (junction or symbolic
+  link). A OneDrive placeholder folder is a reparse point too; it is a folder
+  here, never refused and never skipped. The scan never follows a link (no
+  loop, nothing outside the course read). A page is skipped unread when its
+  attributes say `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS` (0x400000),
+  `RECALL_ON_OPEN` (0x40000) or `Offline` — the mac's `SF_DATALESS`. Measured
+  on this PC's OneDrive (running, Files On-Demand): the one evicted file reads
+  evicted from its attributes without being downloaded; `Documents` and
+  `Pictures` (cloud folders) read as folders. No evicted `.md` was available
+  and none was made (it would upload to the teacher's account).
+- **The list is written by hand** as `JSON.stringify(ids, undefined, 2)` writes
+  it: a general serializer escapes non-ASCII and `+<>&'`, and a second pass
+  would then change bytes Obsidian wrote (tested with a non-ASCII id).
+- **Renames, replaces and deletes retry for about 0.75 s** (Defender, the
+  indexer or OneDrive can hold a 7.8 MB file just written); still refused, the
+  add-on is `couldNotWrite` with the system's reason.
+- **`couldNotWrite` needs a deny-write ACL here**: the read-only attribute does
+  not stop writes into a folder on Windows (a test proves it does not). The
+  test denies Write/Delete to the current user's SID with `DirectorySecurity`,
+  removes it in a `finally`, and sweeps a stale denied folder at start.
+- **One `SemaphoreSlim` for every pass**, every course (the mac's actor); 8
+  passes at once are seen one at a time.
+- **The registry** (`%APPDATA%\obsidian\obsidian.json`) is read with
+  `FileShare.ReadWrite`, and paths are compared with either separator and any
+  case. `RegisterVault` no longer replaces a registry that EXISTS but could not
+  be read with one holding only the new vault (that would have lost every other
+  vault).
+- **The archiver** (`CourseArchiver.ZipFolder`, every backup and archive)
+  leaves out each folder directly under the zipped folder's
+  `.obsidian\plugins` that carries the `.plantoir` marker, partial copies
+  included; the teacher's own add-ons and the list stay (`backups.cases`, a
+  real zip read back).
+
+**"Running" and "quit", changed for every caller.** `FolderActions.ObsidianIsRunning`
+is now: an `Obsidian.exe` in THIS Windows session owns a top-level window,
+shown or not (`ObsidianProcesses`). Before, any process named Obsidian counted
+— another account's, or a crash reporter outliving the windows. And
+`QuitObsidianAndWait` now closes EVERY shown Obsidian window (main windows
+before owned ones), then `CloseMainWindow` on any process still there after
+1.5 s, then waits up to 5 s for the windows — and then up to 3 s more for the
+PROCESSES (measured: windows gone at 0.4 s, processes at 0.66 s; a registry
+or add-on list written in that gap can be overwritten as Obsidian exits). Any
+window left after the wait means "did not close" for all of them: nothing is
+written, and a half-closed set is not reopened. Before #581 it called
+`CloseMainWindow` on each process, which closed ONE window: an Obsidian with
+two vaults open kept running. That was a live fault in the two older callers
+too — vault REGISTRATION (Open in Obsidian on a course Obsidian has never
+seen) and the course RENAME — which then wrote the registry under a running
+Obsidian. **The quit change fixes them only when the quit succeeds**, so
+registration now also checks: if Obsidian is still running after the quit, it
+writes nothing and opens the link as it is (the course stays unregistered;
+nothing false is said). And because Obsidian started by a link does NOT bring
+back the other vaults (measured: closing windows one by one unmarks all but
+the last), registration now notes the vaults open BEFORE quitting and reopens
+them after registering, this course last — the add-ons route's own reopen.
+The rename path's reason for not reopening Obsidian afterwards (the vault to
+reopen is in the folder just left) is unchanged and still holds; and the
+rename now checks too: if Obsidian is still running after the quit, the
+folder is not moved and nothing is registered, and the teacher is told "{code}
+was not renamed, because Obsidian is still open. Close Obsidian, then rename
+the course again." (an inline sentence, like the rename's other words, which
+are in no contract). When the windows close but the processes outlive the
+3 s wait, the quit says so in `startup.log` (never the trail) and goes on. The vaults to reopen are noted BEFORE anything closes: measured,
+closing one vault window of several clears that vault's `"open"` mark in the
+registry (the last window to close keeps its mark). Reopening opens the first
+vault, waits up to 10 s for a window, then the rest 0.4 s apart, this course
+last — rather than racing Electron's single-instance lock.
+
+**Measured live** (2026-10-22, i5-8365U, Windows 11 Pro 26200, 1920 × 1080,
+Obsidian **1.14.4** — not the mac's 1.13.7; a temp working folder through
+`--state-dir`, Obsidian's registry backed up first and restored byte for byte
+after, the temp vaults' window files removed):
+
+- The offer appeared 182 ms after Open in Obsidian, Obsidian not yet started;
+  Add Them added TikZJax (marker, list `["obsidian-tikzjax"]` in Obsidian's own
+  format) and Obsidian opened 2.3 s later through the registration path.
+- **Obsidian's trust question puts focus on "Browse vault in Restricted Mode",
+  and Enter chooses it** (the focus ring was on it; Enter closed the question
+  and the tikz fence then showed as code). `windowsWording.offerMessage`'s
+  "pressing Enter chooses the other button" and `settingFooter`'s Enter
+  sentence are TRUE on Windows.
+- **After "Trust author and enable plugins", Obsidian 1.14.4 opened its
+  Settings ▸ Community plugins in a window of its own** — on a first-time
+  trust (a fresh course) and on a trust after Restricted Mode. The contract's
+  `wording.note` says Obsidian "does not open its settings (measured on
+  1.13.7, #582)", and the offer's sentence telling the teacher to close the
+  settings was removed for that reason. Either 1.14 changed it or Windows
+  differs; this is a decision for the mac and Russell, not a Windows-only
+  wording change, so nothing was changed here.
+- The reopen, with two vaults open, one minimised, a pop-out of the other, and
+  text typed 1.2 s before Reopen was pressed: every window gone in about 0.4 s,
+  every Obsidian process gone at 0.66 s, the add-on written, MCR3U back at
+  1.9 s and MPM2D (this course) last at 2.8 s, both registry marks `"open":
+  true` again, and the typed text saved. Obsidian did not bring the pop-out
+  back (its own restore). On Windows a pop-out is NOT an owned window (no
+  `GW_OWNER`), so "main windows before pop-outs" orders nothing there; it costs
+  nothing, since all of them close within the same 0.4 s. `didNotClose` never
+  fired.
+- The registration path's quit (a two-vault Obsidian, Open in Obsidian on a
+  never-registered course) closed it in about 0.35 s and opened the new course
+  at 2.4 s.
+- Both figures drew once trusted (reading view; the course defaults open pages
+  in source view, where a fence shows as code).
+- Settings ▸ Obsidian: shown as stored (on), off stored `no` and on stored `yes`,
+  one trail line each; the footer reads the Windows Enter sentence.
+- The scan, headless (`ObsidianFigureAddOns.KindsUsed`): the MPM2D example
+  payload, 232 pages, both kinds — 1,872 ms the very first time those files
+  were read on this PC, 38 ms in a fresh process after, 19–27 ms warm; TGJ2O
+  107 pages 902 ms cold, 16–27 ms after. So a first Open in Obsidian on a course
+  never read can wait about 2 s before Obsidian opens (the mac measured 39–63 ms
+  cold). The pass: re-hashing the 7 files 42 ms, a full first pass 74 ms, a
+  second pass (all `alreadyThere`, no byte or date changed) 87 ms.
+
+**Not measured:** the preview trigger on a real preview (unit-tested through
+the route), Obsidian's "Exit Restricted mode" label on 1.14.4 (the footer
+quotes the 1.13.7 label), and a OneDrive-evicted `.md`.
+
+**Shared text left for the joint follow-up** (the issue's item 9): the
+`plantoir-math-graphs` skill §9 and `figureFences.knownLimits[2]` still say
+nothing about Plantoir adding the add-ons; with both platforms adding them now,
+they can say so — together with the mac, not from here.

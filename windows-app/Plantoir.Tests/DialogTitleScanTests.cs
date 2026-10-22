@@ -44,6 +44,7 @@ public class DialogTitleScanTests
         ["Views/FormBuilders.cs"] = 1,
         ["Views/LinksChecklistDialog.cs"] = 1,
         ["Views/NewCourseDialog.cs"] = 1,
+        ["Views/ObsidianWorld.cs"] = 2,   // the add-ons offer and the reopen question (#581)
         ["Views/SectionDetailView.xaml.cs"] = 14,
         ["Views/SectionScheduleDialog.cs"] = 1,
         ["Views/SectionVerbDialog.cs"] = 1,

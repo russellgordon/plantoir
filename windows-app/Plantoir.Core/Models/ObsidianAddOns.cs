@@ -33,20 +33,36 @@ public static class ObsidianAddOns
         bool AddOnsFolderIsALink = false,
         bool AddOnsFolderCouldNotBeRead = false,
         bool SettingsFolderIsALink = false,
-        bool PublishSiteIsSet = false)
+        bool PublishSiteIsSet = false,
+        IReadOnlyList<string>? PlantoirAddOnNamesOrNull = null)
     {
         public static readonly Found None = new(Array.Empty<string>());
 
         /// <summary>
+        /// The add-ons PLANTOIR put there for diagrams and graphs (#581, the
+        /// mac's #495), by folder name, sorted: the folders carrying its
+        /// <c>.plantoir</c> marker, a half-written <c>&lt;id&gt;.plantoir-partial</c>
+        /// among them. Left behind like every add-on, but never the reason the
+        /// sheet speaks — the teacher did not choose them. The trail names them.
+        /// </summary>
+        public IReadOnlyList<string> PlantoirAddOnNames => PlantoirAddOnNamesOrNull ?? Array.Empty<string>();
+
+        /// <summary>
         /// Whether there is anything to SAY (<c>hasAddOnsWhen</c>). An empty
         /// <c>plugins/</c> and a <c>[]</c> list say nothing: telling a teacher
-        /// their add-ons were left behind when they had none is false.
+        /// their add-ons were left behind when they had none is false. So are
+        /// Plantoir's own (<see cref="PlantoirAddOnNames"/>).
         /// </summary>
         public bool IsEmpty => AddOnNames.Count == 0 && !AddOnsFolderIsALink && !AddOnsFolderCouldNotBeRead
                                && !SettingsFolderIsALink && !PublishSiteIsSet;
     }
 
-    /// <summary>Looks at a course's settings folder: names only, one level, never inside an add-on.</summary>
+    /// <summary>
+    /// Looks at a course's settings folder: names only, one level, never
+    /// inside an add-on — except ONE attribute read of Plantoir's
+    /// <c>.plantoir</c> marker per folder, which tells its add-ons from the
+    /// teacher's (<see cref="ObsidianFigureAddOns.PlantoirAddOnFolders"/>).
+    /// </summary>
     public static Found FoundIn(string courseDirectory)
     {
         string settings = Path.Combine(courseDirectory, SettingsFolderName);
@@ -55,6 +71,7 @@ public static class ObsidianAddOns
         if (settingsInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)) return Found.None with { SettingsFolderIsALink = true };
 
         var names = new List<string>();
+        var plantoirs = new List<string>();
         bool pluginsIsALink = false, pluginsUnreadable = false;
         var plugins = new DirectoryInfo(Path.Combine(settings, "plugins"));
         if (plugins.Exists)
@@ -67,12 +84,14 @@ public static class ObsidianAddOns
                     names = plugins.EnumerateFileSystemInfos("*", ReferenceLock.Unfiltered)
                         .Select(entry => entry.Name).Where(name => !name.StartsWith('.'))
                         .OrderBy(name => name, StringComparer.Ordinal).ToList();
+                    plantoirs = ObsidianFigureAddOns.PlantoirAddOnFolders(plugins.FullName);
+                    names = names.Where(name => !plantoirs.Contains(name)).ToList();
                 }
                 catch { pluginsUnreadable = true; }
             }
         }
         bool publish = File.Exists(Path.Combine(settings, "publish.json")) || Directory.Exists(Path.Combine(settings, "publish.json"));
-        return new Found(names, pluginsIsALink, pluginsUnreadable, false, publish);
+        return new Found(names, pluginsIsALink, pluginsUnreadable, false, publish, plantoirs);
     }
 
     /// <summary>
@@ -85,6 +104,8 @@ public static class ObsidianAddOns
         var clauses = new List<string>();
         if (found.AddOnNames.Count > 0)
             clauses.Add($"{found.AddOnNames.Count} Obsidian {(found.AddOnNames.Count == 1 ? "add-on" : "add-ons")} left behind ({string.Join(", ", found.AddOnNames)})");
+        if (found.PlantoirAddOnNames.Count > 0)
+            clauses.Add($"Plantoir's add-ons for diagrams and graphs left behind ({string.Join(", ", found.PlantoirAddOnNames)})");
         if (found.AddOnsFolderIsALink) clauses.Add("Obsidian's add-ons folder was a link and was left behind");
         if (found.AddOnsFolderCouldNotBeRead) clauses.Add("Obsidian's add-ons folder could not be read and was left behind");
         if (found.SettingsFolderIsALink) clauses.Add("Obsidian's settings folder was a link and was left behind");
