@@ -676,6 +676,7 @@ enum AssistContract {
             "menuMakeRoomAt": AssistWording.menuMakeRoomAt(),
             "menuMakeRoomAtForAMeeting": AssistWording.menuMakeRoomAt(noun: .meeting),
             "menuFindAPage": AssistWording.menuFindAPage,
+            "menuPickDateColumn": AssistWording.menuPickDateColumn,
             "menuContinueButton": AssistWording.menuContinueButton,
             "menuPublishButton": AssistWording.menuPublishButton,
             "menuHideButton": AssistWording.menuHideButton,

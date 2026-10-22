@@ -2166,6 +2166,12 @@ nonisolated enum AssistWording {
 
     static let menuFindAPage: String = "Find a page"
 
+    /// The picker's and the later-classes list's third column (#608): a
+    /// class's day, as `laterClassesDay` says it. The Page and Folder
+    /// columns are the plan table's own (`menuPlanPageColumn`,
+    /// `menuPlanFolderColumn`), so the two steps of one flow read alike.
+    static let menuPickDateColumn: String = "Date"
+
     static let menuContinueButton: String = "Continue"
     static let menuPublishButton: String = "Publish"
     static let menuHideButton: String = "Hide"
