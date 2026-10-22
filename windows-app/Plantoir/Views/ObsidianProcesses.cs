@@ -85,12 +85,19 @@ public static class ObsidianProcesses
     /// (On Windows a pop-out is not an owned window, so "pop-outs after"
     /// orders nothing there; every window closes in the same 0.4 s.)
     /// </summary>
-    public static async Task QuitAndWaitAsync()
+    /// <returns>Whether every Obsidian process of this session is gone. False
+    /// with no window left means the processes outlived the 3 s: written to
+    /// startup.log (for the developer, never the trail), since a write made
+    /// then may still be overwritten.</returns>
+    public static async Task<bool> QuitAndWaitAsync()
     {
         await CloseWindowsAndWaitAsync();
-        if (IsRunning) return;
+        if (IsRunning) return false;
         var clock = Stopwatch.StartNew();
         while (AnyProcessLeft() && clock.ElapsedMilliseconds < 3000) await Task.Delay(100);
+        if (!AnyProcessLeft()) return true;
+        App.LogDiagnostic("Obsidian: its windows closed but its processes were still running 3 s later; going on (#581).");
+        return false;
     }
 
     private static async Task CloseWindowsAndWaitAsync()

@@ -2131,11 +2131,12 @@ public sealed partial class SidebarPane : UserControl
 
             await FolderActions.QuitObsidianAndWait();
             // Asked AGAIN after the wait, and this is the WIDEST window in the
-            // whole rename: quitting Obsidian polls for up to five seconds
-            // with NO dialog on screen at all, so the File menu and Ctrl+O are
+            // whole rename: quitting Obsidian polls for up to about eight
+            // seconds (5 s for its windows, 3 s for its processes, #581) with
+            // NO dialog on screen at all, so the File menu and Ctrl+O are
             // both fully live. Everything below reads the LIVE workspace — the
             // taken-codes list, the reload, and the selection it sets — so a
-            // folder chosen during those five seconds would have this rename
+            // folder chosen during those seconds would have this rename
             // select a course code in a folder that never had one, which is
             // the "Course Not Found" #162 exists to remove. A check before a
             // wait says nothing about what is true after it.
@@ -2153,6 +2154,17 @@ public sealed partial class SidebarPane : UserControl
             // (workingFolderSelection.alsoCleared), and a sentence about the
             // old folder is exactly what it forbids.
             if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+
+            // Obsidian did not close (a question of its own on screen): never
+            // move the folder or register a vault under it (#581 review) — it
+            // would write its own list back over the new one. Nothing has been
+            // done, and the teacher is told so.
+            if (FolderActions.ObsidianIsRunning)
+            {
+                await ShowError("Obsidian didn’t close",
+                    $"{course.Code} was not renamed, because Obsidian is still open. Close Obsidian, then rename the course again.");
+                return;
+            }
         }
 
         try
