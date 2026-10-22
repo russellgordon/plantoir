@@ -35,11 +35,25 @@
 // ship scroll anchoring); a WebKit-only `@supports` hack (Chromium's pixels
 // do not change anyway). Also rejected: making the in-page jump meter the
 // gate - it counts scroll anchoring's own correction in Chromium as six
-// false jumps scrolling up. Not fixed here: a FIRST visit on a slow network
-// still shifts, in both engines, because Quartz writes `height="auto"`, so a
-// picture whose bytes have not arrived has no size at all - real picture
-// sizes in the HTML are #612.
+// false jumps scrolling up. A FIRST visit on a slow network is #612's, below.
 
 html body img {
   content-visibility: visible;
+}
+
+// #612: a picture the build has given its real width and height (marked
+// data-pl-sized by plantoirPictureSizes.ts) keeps its own shape at any
+// width. Its box is reserved from the HTML alone, before a byte of it has
+// arrived, so nothing below it moves when it does (14 jumps of up to 587 px
+// -> 0 on a slow first visit, WebKit and Chromium). Without this line a
+// sized picture in a column narrower than its width attribute is squashed:
+// 358 x 200 instead of 358 x 119 in a phone's window.
+//
+// Only the marked pictures: a global `img { height: auto }` would also
+// change a teacher's typed `|600x400` (600 x 400 drawn as 600 x 300), and
+// every picture the build did not size is left exactly as in 1.8.4.
+// `html body` for the same reason as the rule above.
+
+html body img[data-pl-sized] {
+  height: auto;
 }
