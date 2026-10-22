@@ -542,7 +542,10 @@ function Check-Engine([string]$What, [string]$Base) {
     # Runnable Swift (#493): the thread and its WASI shim ride support/ into
     # every Windows-built site, so they are checked as the mac checks them.
     # The PROGRAM is not: Windows compiles none (#570), so there is no
-    # static/swift-wasm/ to fetch - said as a skip, never as a pass.
+    # static/swift-wasm/ to fetch. Its ABSENCE is asserted (a program found
+    # here fails the run), not skipped: RELEASING.md asks for a run with
+    # nothing skipped, and eight standing skips would make that impossible on
+    # Windows (the #568 implementation review).
     foreach ($name in @('plantoir-swift-worker.js', 'plantoir-wasi.mjs')) {
         $r = Get-Response "${Base}static/swift/$name"
         $type = ([string]$r.Headers['content-type']).ToLowerInvariant()
@@ -550,7 +553,7 @@ function Check-Engine([string]$What, [string]$Base) {
         else { No "$What answered HTTP $($r.Code), '$type' for static/swift/$name (a module worker needs JavaScript)" }
     }
     if ($html -match 'data-runner-wasm="static/swift-wasm/') { No "$What's page carries a Swift program, which a Windows build cannot make (#570) - where did it come from?" }
-    else { Skipped "$What's Swift program (Windows compiles no Swift yet, #493 / #570; the block shows with Run off)" }
+    else { Ok "$What's page carries no Swift program, as a Windows build cannot make one (#493 / #570; the block shows with Run off)" }
 
     # Live input (#583), following the host's redirect (Netlify answers an
     # address with capitals with a 301 to its lower-case form).
@@ -600,7 +603,7 @@ function Check-EngineFolder([string]$What, [string]$Site) {
     if ($problems.Count -eq 0) { Ok "$What carries the pinned Python engine, KaTeX and Swift's thread, byte for byte" }
     else { No "$What lacks or changed: $($problems -join ', ')" }
     if (Test-Path -LiteralPath (Join-Path $Site "static\swift-wasm")) { No "$What carries static/swift-wasm, which a Windows build cannot make (#570)" }
-    else { Skipped "$What's Swift program (Windows compiles no Swift yet, #493 / #570)" }
+    else { Ok "$What carries no static/swift-wasm, as a Windows build cannot make one (#493 / #570)" }
 }
 
 # The borrowed page's Swift fence, said the way the contract says it: on
@@ -608,7 +611,10 @@ function Check-EngineFolder([string]$What, [string]$Site) {
 # `plantoir: error:` line, and the swiftCouldNotBePrepared folder problem.
 # EXPECTED here, so its absence is the failure.
 $script:NotOnWindows = ""
-if ((Get-Content -LiteralPath (Join-Path $script:ContractsDir "shared-rules.json") -Raw -Encoding UTF8) -match '"notOnWindows":\s*"([^"]+)"') { $script:NotOnWindows = $Matches[1] }
+try {
+    $script:NotOnWindows = [string](Get-Content -LiteralPath (Join-Path $script:ContractsDir "shared-rules.json") -Raw -Encoding UTF8 |
+        ConvertFrom-Json).codeRunnerBlocks.swift.reasons.notOnWindows
+} catch { $script:NotOnWindows = "" }
 function Check-SwiftSaidNotOnWindows([string]$What, [string]$Log) {
     if (-not $script:NotOnWindows) { No "contracts/shared-rules.json carries no swift.reasons.notOnWindows to look for"; return }
     $line = ($Log -split "`r?`n" | Where-Object { $_ -match '^plantoir: error: .*Runner Deploy Check\.md: swift block 1' } | Select-Object -First 1)
