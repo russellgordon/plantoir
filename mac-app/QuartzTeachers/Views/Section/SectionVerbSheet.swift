@@ -127,6 +127,11 @@ final class SectionVerbSheetModel: Identifiable {
     /// `.planned` in place of `body`.
     var planTable: AssistPlanTable?
 
+    /// Whether the plan's disclosure is open (#622): the pages already the
+    /// way they were asked to be, added to the table. Closed for every new
+    /// plan.
+    var showsAlreadyRight: Bool = false
+
     /// The call waiting on the default button at the plan.
     var pendingCall: AssistToolCall?
 
@@ -509,20 +514,74 @@ struct SectionVerbSheet: View {
     static let mostPlanRowsShown: Int = 12
     static let tallestPlanNotes: CGFloat = 120
 
+    /// The fewest rows the plan table is tall enough for when pages are
+    /// folded under it (#622, the director's ruling on R8): the table is as
+    /// tall as the rows a teacher reads, and opening the disclosure adds the
+    /// rest INSIDE it — the sheet never grows when it opens — so a plan of
+    /// one or two changes keeps room for the folded rows to scroll in. Five,
+    /// Start of Year's own budget (`StartOfYearSheet.mostPlanRowsShown`).
+    static let fewestPlanRowsUnderAFold: Int = 5
+
     // MARK: - Computed properties
 
-    /// The plan table's rows, in the order the teacher sorted them.
-    var sortedPlanRows: [AssistPlanTable.Row] {
+    /// The plan table's rows as drawn (#622): the rows to read, and the
+    /// pages already the way they were asked to be only while the
+    /// disclosure is open. They come last in plan order, so opening it
+    /// appends them. A plan with nothing else to read shows every row.
+    var drawnPlanRows: [AssistPlanTable.Row] {
         guard let table = model.planTable else {
             return []
         }
-        return table.rows.sorted(using: planSortOrder)
+        if !SectionVerbSheet.foldsAlreadyRight(table) {
+            return table.rows
+        }
+        var drawn: [AssistPlanTable.Row] = table.rowsToRead
+        if model.showsAlreadyRight {
+            for row in table.rowsAlreadyRight {
+                drawn.append(row)
+            }
+        }
+        return drawn
     }
 
-    /// The table's height: every row up to `mostPlanRowsShown`, then it
-    /// scrolls inside itself. A `Table` has no natural height.
+    /// The words of the disclosure under the plan table (#622) — "Show the
+    /// 16 pages already visible" — or nil when the plan folds nothing away.
+    var alreadyRightLabel: String? {
+        guard let table = model.planTable, SectionVerbSheet.foldsAlreadyRight(table) else {
+            return nil
+        }
+        return AssistWording.menuPlanShowAlready(
+            count: table.rowsAlreadyRight.count,
+            publishing: table.rowsAlreadyRight.first?.change != .alreadyHidden
+        )
+    }
+
+    /// The plan table's rows, in the order the teacher sorted them.
+    var sortedPlanRows: [AssistPlanTable.Row] {
+        return drawnPlanRows.sorted(using: planSortOrder)
+    }
+
+    /// The table's height: the rows a teacher reads up to
+    /// `mostPlanRowsShown`, then it scrolls inside itself. A `Table` has no
+    /// natural height. It is counted with the disclosure CLOSED, and never
+    /// fewer than `fewestPlanRowsUnderAFold` (or every row, when there are
+    /// fewer) while pages are folded under it, so opening the disclosure
+    /// changes neither the table's height nor the sheet's (#622).
     var planTableHeight: CGFloat {
-        var shown: Int = model.planTable?.rows.count ?? 0
+        guard let table = model.planTable else {
+            return ListTableMetrics.height(forRowCount: 0, showsHeader: true)
+        }
+        var shown: Int = table.rows.count
+        if SectionVerbSheet.foldsAlreadyRight(table) {
+            shown = table.rowsToRead.count
+            var floor: Int = SectionVerbSheet.fewestPlanRowsUnderAFold
+            if floor > table.rows.count {
+                floor = table.rows.count
+            }
+            if shown < floor {
+                shown = floor
+            }
+        }
         if shown > SectionVerbSheet.mostPlanRowsShown {
             shown = SectionVerbSheet.mostPlanRowsShown
         }
@@ -616,7 +675,9 @@ struct SectionVerbSheet: View {
     }
 
     /// The page plan (#524): the summary, a read-only table with a row for
-    /// every page, and the card's other sentences under it.
+    /// every page a teacher reads before Go, the pages already the way they
+    /// were asked to be behind a disclosure under it (#622), and the card's
+    /// other sentences.
     @ViewBuilder
     var planTable: some View {
         if let table = model.planTable {
@@ -649,6 +710,21 @@ struct SectionVerbSheet: View {
             .tableStyle(.bordered(alternatesRowBackgrounds: true))
             .frame(height: planTableHeight)
             .accessibilityIdentifier("sectionVerbSheetPlanTable")
+            if let alreadyRightLabel {
+                // No content of its own: opening it adds the rows to the
+                // table above (`drawnPlanRows`), one table and one sort, as
+                // #589 chose one table over two.
+                DisclosureGroup(
+                    alreadyRightLabel,
+                    isExpanded: Binding(
+                        get: { return model.showsAlreadyRight },
+                        set: { isOpen in model.showsAlreadyRight = isOpen }
+                    )
+                ) {
+                    EmptyView()
+                }
+                .accessibilityIdentifier("sectionVerbSheetPlanAlreadyRight")
+            }
             if !table.notes.isEmpty {
                 CappedScrollArea(cap: SectionVerbSheet.tallestPlanNotes) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -831,6 +907,12 @@ struct SectionVerbSheet: View {
     }
 
     // MARK: - Functions
+
+    /// Whether the plan folds its already-right pages away (#622): only when
+    /// there are some, and something else to read above them.
+    static func foldsAlreadyRight(_ table: AssistPlanTable) -> Bool {
+        return !table.rowsAlreadyRight.isEmpty && !table.rowsToRead.isEmpty
+    }
 
     /// The picker's Date cell: a class's day, as the later-classes question
     /// says it; nothing for a page that is not a class.

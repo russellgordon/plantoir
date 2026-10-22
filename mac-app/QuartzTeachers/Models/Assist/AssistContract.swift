@@ -694,6 +694,11 @@ enum AssistContract {
             "menuPlanChangeColumn": AssistWording.menuPlanChangeColumn,
             "menuPlanAlreadyVisible": AssistWording.menuPlanAlreadyVisible,
             "menuPlanAlreadyHidden": AssistWording.menuPlanAlreadyHidden,
+            // #622: the disclosure under the table that holds them.
+            "menuPlanShowAlready": AssistWording.menuPlanShowAlready(count: 16, publishing: true),
+            "menuPlanShowAlreadyHiding": AssistWording.menuPlanShowAlready(count: 2, publishing: false),
+            "menuPlanShowAlreadyOnePage": AssistWording.menuPlanShowAlready(count: 1, publishing: true),
+            "menuPlanShowAlreadyOnePageHiding": AssistWording.menuPlanShowAlready(count: 1, publishing: false),
             "menuPlanStaysAsItIs": AssistWording.menuPlanStaysAsItIs(),
             "menuPlanStaysAsItIsForAMeeting": AssistWording.menuPlanStaysAsItIs(noun: .meeting),
             "menuPlanStaysExactlyAsItIs": AssistWording.menuPlanStaysExactlyAsItIs,
