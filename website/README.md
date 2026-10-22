@@ -446,7 +446,8 @@ takes only scene `print-set`, so these never reach MPM2D's preview. `--code-shot
 On Windows, `capture_windows.py --code` takes the four that are not Swift
 from native previews of `~/School Web Space` with the same prepare scripts
 (#590; `website/SCREENSHOTS.md` → "The Code and Quizzes pages' figures on
-Windows"); the Swift two stay Mac only. Two things in
+Windows"); the Swift two stay Mac only while Swift stays read-only on
+Windows, until #570 is decided (v1.9.0). Two things in
 the pictures are the page's own, not the capture's: `code-python-error`'s
 traceback names `main.py` while the page's prose says `hours.py` (#561's
 known mismatch: that prose is about a program on the student's computer),

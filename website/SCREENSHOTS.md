@@ -276,7 +276,7 @@ python3 website/shots/capture.py --quizzes  # the Quizzes page's figures (v1.8.1
   `capture_windows.py --code` takes the four Python and quiz figures from
   native previews of `~/School Web Space` (#590, "The Code and Quizzes pages'
   figures on Windows" below); the two Swift ones stay Mac only (Swift stays
-  read-only on Windows, Russell's ruling on #570). All are `windows: false`
+  read-only on Windows until #570 is decided, v1.9.0). All are `windows: false`
   and owed by name until their 2× pictures are taken and promoted; the print
   set takes only scene `print-set`. `website/README.md` → "The Code page" has
   the run.
@@ -396,7 +396,7 @@ there and says so.
 **The Code and Quizzes pages' figures on Windows (`--code`, `--quizzes`, #590).**
 `preview_pages_windows.py` takes every `preview-page` shot of scene `code` or
 `quizzes` except `code-swift` and `code-swift-live` (`NOT_ON_WINDOWS`; Swift
-stays read-only on Windows, Russell's ruling on #570): `code-python`,
+stays read-only on Windows until #570 is decided, v1.9.0): `code-python`,
 `code-python-live`, `code-python-error`, `code-quiz` and `quiz-code-run` from
 ICS3U in the marketing folder, which on Windows is `~/School Web Space`
 (`app_scenes_windows.MARKETING`), and `quiz-math`, `quiz-chemistry`,
@@ -420,9 +420,16 @@ their College Board embeds put back — and `CODE_PAGES` planted, Check Your
 Loops among them), or `add_code_pages` for the quizzes alone, and
 `demo_folders.apply_planted_pages` for the three demo quiz pages. A page a
 figure shows that was "left as you changed it" stops the run. The launchers
-and `.toolchain/` are mirrored from the COMMITTED tree (`git archive HEAD`,
-the Mac's #562 fix N5), the run refuses while Plantoir is running (it would
-mirror its own back), and each course is previewed once, natively
+and `.toolchain/` are mirrored from the COMMITTED recipe (`git archive HEAD --`
+the launchers, the recipe's root files and its folders, not the whole
+repository; the Mac's #562 fix N5), overwriting the folder's own without a
+backup, since they are regenerated from the recipe whenever the app touches
+the folder. The pages planted, the prepare scripts and shots.json still come
+from the working tree, so the run refuses while `git status` names
+`support/example_content`, `website/shots/demo`, `website/shots/marketing`,
+`website/shots/prepare` or `website/shots.json`. Every run adds one backup
+zip per course, so delete old ones from the Backups list now and then. The run
+refuses while Plantoir is running (it would mirror its own back), and each course is previewed once, natively
 (`print_set_windows.Preview`). Each page is opened in an Edge `--app` window
 at 1280 × 860 DIPs (`fit=True`), scrolled to the top (`at_the_top`), put into
 its state by the Mac's own `shots/prepare/<id>.js`, evaluated over the
@@ -431,7 +438,9 @@ DevTools protocol as `(async (timeoutMs) => { … })(120000)` — anything but
 refusal — then photographed by windowshot in light and dark and read back
 against `expectText`. A real run refuses unless the window is drawn at 2×
 (`fitted_scale` within 0.01 of 2.0) and each picture is 2560 × 1720 (#557),
-copies it into site/img unscaled, and records the scale in
+copies both themes into site/img unscaled only once BOTH have passed (so a
+failed dark picture never leaves a new light one beside an old dark), and
+records the scale in
 `%TEMP%/plantoir-marketing-shots/preview-pages-windows.json`. `--dry-run`
 takes every picture at this screen's scale into `parts-preview-windows-dry-run`
 and writes nothing to site/img. Nothing promotes: `--promote id,...` marks a
