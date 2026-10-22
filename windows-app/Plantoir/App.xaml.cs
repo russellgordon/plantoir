@@ -396,14 +396,14 @@ public partial class App : Application
     /// <summary>The update engine's exit: the installer is already started.</summary>
     /// <remarks>
     /// #632: carried to the UI thread when it is called from anywhere else.
-    /// Which thread this is called on is decided by where NetSparkle's engine
-    /// was first BUILT (it keeps that thread's SynchronizationContext and
-    /// raises DownloadFinished through it): the daily check builds it on a
-    /// timer thread, and there <c>Current.Exit()</c> returns having done
-    /// nothing — measured: "QuitForUpdate on thread 5, UI thread: no", then
-    /// "Current.Exit returned", and the old window stayed up while the
-    /// installer met it and gave up. On the UI thread (the menu, when it built
-    /// the engine) the call is the same direct one it always was.
+    /// It runs on the thread that started the check (observed; the likely
+    /// mechanism is the download's async continuation resuming on its
+    /// caller's context): the daily check starts on a timer thread, and there
+    /// <c>Current.Exit()</c> returns having done nothing — measured:
+    /// "QuitForUpdate on thread 5, UI thread: no", then "Current.Exit
+    /// returned", and the old window stayed up while the installer met it and
+    /// gave up. On the UI thread (Check for Updates…) the call is the same
+    /// direct one it always was.
     /// </remarks>
     public static void QuitForUpdate()
     {
