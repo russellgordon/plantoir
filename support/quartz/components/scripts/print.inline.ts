@@ -773,8 +773,9 @@ function markWideTables(within: Element) {
 // the page before a picture in its frame has loaded, and a picture with no
 // size of its own is laid out 0 px tall (#499 fault 6, review B1). Taken from
 // the picture's NATURAL size - never from the page on screen, where Quartz
-// skips laying out anything off screen and every picture below the fold
-// measured 0 × 0. A width the teacher gave (`|300`) is kept.
+// skipped laying out anything off screen and every picture below the fold
+// measured 0 × 0 (since #609 it is laid out, but at the column's size, not
+// the paper's). A width the teacher gave (`|300`) is kept.
 async function imagesReady(within: HTMLElement) {
   const waits: Promise<unknown>[] = []
   for (const image of within.querySelectorAll("img")) {

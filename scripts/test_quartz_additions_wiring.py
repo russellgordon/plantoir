@@ -9,7 +9,8 @@ straight after the figures transformer, and since #519 the task boxes'
 transformer, straight after the quizzes' (its script and styles ride the
 Print button's component, PlantoirMetaLine.tsx), and since #545 My
 Progress's emitter, straight before Assets (its script and styles ride the
-same component).
+same component). Since #609 the rule that lays every picture out before it
+scrolls into view rides that component too.
 
 Run against embedded copies of Quartz v4.5.0's own files (measured in
 quartz-teacher:dev-test, 2026-10-17): wired once, a second build changes
@@ -216,6 +217,21 @@ class WiringTests(unittest.TestCase):
                      / "PlantoirMetaLine.tsx").read_text(encoding="utf-8")
         self.assertIn('import progressStyle from "./styles/progress.scss"', component)
         self.assertIn('import progressScript from "./scripts/progress.inline"', component)
+
+    def test_the_print_buttons_component_carries_the_picture_rule(self):
+        # #609: every picture laid out at its real height before it scrolls
+        # into view, on every page (Quartz's base.scss gives an off-screen
+        # img zero height). The selector must outrank Quartz's bare `img`,
+        # because this stylesheet comes BEFORE base.scss in index.css.
+        components = Path(build_site.__file__).resolve().parent.parent / "support" / "quartz" / "components"
+        component = (components / "PlantoirMetaLine.tsx").read_text(encoding="utf-8")
+        self.assertIn('import picturesStyle from "./styles/pictures.scss"', component)
+        self.assertIn("sidebarPageMarkerStyle, picturesStyle, quizStyle", component)
+        rules = []
+        for line in (components / "styles" / "pictures.scss").read_text(encoding="utf-8").splitlines():
+            if not line.strip().startswith("//") and line.strip() != "":
+                rules.append(line.strip())
+        self.assertEqual(rules, ["html body img {", "content-visibility: visible;", "}"])
 
     def test_quizzes_without_the_figures_anchor_are_said_and_left_out(self):
         changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")
