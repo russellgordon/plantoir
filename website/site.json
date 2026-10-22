@@ -55,13 +55,13 @@
         "windows": true
       },
       "runnable-python": {
-        "windows": false
+        "windows": true
       },
       "runnable-swift": {
         "windows": false
       },
       "quizzes": {
-        "windows": false
+        "windows": true
       }
     }
   },

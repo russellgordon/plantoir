@@ -33,19 +33,27 @@ struct CappedScrollArea<Content: View>: View {
     /// The tallest the area may be. Beyond this it scrolls.
     let cap: CGFloat
 
+    /// Whether the area also takes any height it is OFFERED past its own
+    /// (#621): it still opens at its content's height up to the cap, and
+    /// that is still the least it is given, but in a sheet the teacher makes
+    /// taller it grows with the sheet instead of leaving a band under it.
+    /// Off by default, so every area made before keeps its fixed height.
+    let growsWithItsSheet: Bool
+
     let content: Content
 
     // MARK: - Initializer
 
-    init(cap: CGFloat, @ViewBuilder content: () -> Content) {
+    init(cap: CGFloat, growsWithItsSheet: Bool = false, @ViewBuilder content: () -> Content) {
         self.cap = cap
+        self.growsWithItsSheet = growsWithItsSheet
         self.content = content()
     }
 
     // MARK: - Body
 
     var body: some View {
-        CappedHeightLayout(cap: cap) {
+        CappedHeightLayout(cap: cap, growsWithItsSheet: growsWithItsSheet) {
             ScrollView(.vertical) {
                 content
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -62,6 +70,9 @@ struct CappedHeightLayout: Layout {
 
     let cap: CGFloat
 
+    /// `CappedScrollArea.growsWithItsSheet`.
+    var growsWithItsSheet: Bool = false
+
     // MARK: - Functions
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
@@ -72,7 +83,14 @@ struct CappedHeightLayout: Layout {
         // "as tall as you like" — and then refuse anything over the cap.
         let natural: CGSize = child.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
         let width: CGFloat = proposal.width ?? natural.width
-        let height: CGFloat = min(natural.height, cap)
+        var height: CGFloat = min(natural.height, cap)
+        // Offered more than that — the sheet made taller, or the largest a
+        // sheet asks about (an infinite offer) — and allowed to grow: take
+        // it. Offered less, or asked for its own size (nil), it is the
+        // capped height, so that is both where it opens and its least.
+        if growsWithItsSheet, let offered = proposal.height, offered > height {
+            height = offered
+        }
         return CGSize(width: width, height: height)
     }
 

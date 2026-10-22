@@ -438,16 +438,10 @@ WINDOWS_PICTURE_OWED: dict = {
     # has the feature. The reasons below are what each one still waits on.
     # code-swift and code-swift-live stay owed: Swift stays read-only on
     # Windows until #570 is decided (v1.9.0).
-    "code-python": "the 2x picture, taken in a 4K session (#590)",
-    "code-python-live": "the 2x picture, taken in a 4K session (#590)",
-    "code-python-error": "the 2x picture, taken in a 4K session (#590)",
     "code-swift-live": "Swift stays read-only on Windows until #570 is decided (v1.9.0)",
     "code-swift": "Swift stays read-only on Windows until #570 is decided (v1.9.0)",
-    "code-quiz": "the 2x picture, taken in a 4K session (#590)",
-    "quiz-math": "the 2x picture, taken in a 4K session (#590)",
-    "quiz-chemistry": "the 2x picture, taken in a 4K session (#590)",
-    "quiz-english": "the 2x picture, taken in a 4K session (#590)",
-    "quiz-code-run": "the 2x picture, taken in a 4K session (#590)",
+    "quiz-math": "too tall for the 1280 x 860 window at 2x: quiz-math.js refuses it (767 pt) (#590)",
+    "quiz-code-run": "too tall for the 1280 x 860 window at 2x: quiz-code-run.js refuses it (744 pt) (#590)",
 }
 
 
