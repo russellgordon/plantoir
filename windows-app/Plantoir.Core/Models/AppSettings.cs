@@ -104,6 +104,45 @@ public sealed class AppSettings
     }
 
     /// <summary>
+    /// The teacher's one answer about Obsidian's add-ons for diagrams and
+    /// graphs (#581; the mac's <c>obsidianFigureAddOns</c> preference):
+    /// <c>notAsked</c>, <c>yes</c> or <c>no</c>, app-wide. Kept RAW, so a
+    /// value this build does not know reads as notAsked
+    /// (<see cref="ObsidianFigureAddOnsAnswers.Reading"/>). Changed by the
+    /// offer's answer and by File ▸ Settings ▸ Obsidian's toggle
+    /// (<see cref="ChangeObsidianFigureAddOns"/>).
+    /// </summary>
+    public string ObsidianFigureAddOns { get; set; } = "notAsked";
+
+    /// <summary>The answer, read as the contract reads it.</summary>
+    [JsonIgnore]
+    public ObsidianFigureAddOnsAnswer ObsidianFigureAddOnsAnswer
+    {
+        get => ObsidianFigureAddOnsAnswers.Reading(ObsidianFigureAddOns);
+        set
+        {
+            string stored = ObsidianFigureAddOnsAnswers.Stored(value);
+            if (ObsidianFigureAddOns == stored) return;
+            ObsidianFigureAddOns = stored;
+            Save();
+        }
+    }
+
+    /// <summary>
+    /// File ▸ Settings ▸ Obsidian's toggle (<c>answer.toggle</c>): on stores
+    /// yes, off stores no. Saved at once; nothing when unchanged. Turning it
+    /// off adds nothing new and removes nothing already added. Returns whether
+    /// anything changed, so the pane writes one trail line per change.
+    /// </summary>
+    public bool ChangeObsidianFigureAddOns(bool on)
+    {
+        var answer = on ? Plantoir.Core.Models.ObsidianFigureAddOnsAnswer.Yes : Plantoir.Core.Models.ObsidianFigureAddOnsAnswer.No;
+        if (ObsidianFigureAddOnsAnswer == answer) return false;
+        ObsidianFigureAddOnsAnswer = answer;
+        return true;
+    }
+
+    /// <summary>
     /// Which section File ▸ Settings… opened on last ("assistant", "preview", "deploying"),
     /// so it opens there again — the mac remembers its pane the same way
     /// (<c>SettingsPane.storageKey</c>). Open Settings… beside the Account ID

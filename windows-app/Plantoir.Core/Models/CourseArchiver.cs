@@ -313,14 +313,22 @@ public static class CourseArchiver
     /// container-made links (content\Media) cannot be traversed by Windows
     /// and sank the whole backup. Reparse points are skipped for the same
     /// reason. A failure never leaves a partial zip behind.
+    /// <para>Plantoir's own Obsidian add-ons are left out too (#581, the mac's
+    /// #495; <c>obsidianAddOnsForFigures.backups</c>): every folder directly
+    /// under the zipped folder's <c>.obsidian\plugins</c> that carries the
+    /// <c>.plantoir</c> marker — a half-written <c>&lt;id&gt;.plantoir-partial</c>
+    /// among them — about 12.9 MB a course. The teacher's own add-ons and the
+    /// list stay, so a restored course gets Plantoir's back at the next pass on
+    /// a PC whose answer is yes. Worked out at zip time, by the marker alone.</para>
     /// </summary>
     public static void ZipFolder(string folderPath, string archivePath)
     {
         string rootName = Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar));
+        var leftOut = PlantoirAddOnsIn(folderPath);
         try
         {
             using var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
-            AddFolder(archive, folderPath, rootName);
+            AddFolder(archive, folderPath, rootName, leftOut);
         }
         catch
         {
@@ -329,7 +337,19 @@ public static class CourseArchiver
         }
     }
 
-    private static void AddFolder(ZipArchive archive, string folderPath, string entryPrefix)
+    /// <summary>The full paths of the folders under <c>.obsidian\plugins</c> that carry Plantoir's marker; none when either folder is a link.</summary>
+    private static HashSet<string> PlantoirAddOnsIn(string folderPath)
+    {
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string settings = Path.Combine(folderPath, ObsidianAddOns.SettingsFolderName);
+        string plugins = Path.Combine(settings, "plugins");
+        if (ObsidianFigureAddOns.KindOf(settings) != ObsidianFigureAddOns.EntryKind.Directory) return paths;
+        if (ObsidianFigureAddOns.KindOf(plugins) != ObsidianFigureAddOns.EntryKind.Directory) return paths;
+        foreach (string name in ObsidianFigureAddOns.PlantoirAddOnFolders(plugins)) paths.Add(Path.Combine(plugins, name));
+        return paths;
+    }
+
+    private static void AddFolder(ZipArchive archive, string folderPath, string entryPrefix, IReadOnlySet<string> leftOut)
     {
         foreach (string file in Directory.EnumerateFiles(folderPath))
         {
@@ -342,7 +362,8 @@ public static class CourseArchiver
             string name = Path.GetFileName(sub);
             if (ExcludedFromArchives.Contains(name)) continue;
             if ((new DirectoryInfo(sub).Attributes & FileAttributes.ReparsePoint) != 0) continue;
-            AddFolder(archive, sub, entryPrefix + "/" + name);
+            if (leftOut.Contains(sub)) continue;   // Plantoir's own add-on (#581)
+            AddFolder(archive, sub, entryPrefix + "/" + name, leftOut);
         }
     }
 }
