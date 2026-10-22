@@ -220,6 +220,54 @@ final class PublishPlanTableTests: XCTestCase {
         )), "\(table.notes)")
     }
 
+    /// A class that links a curriculum expectation and an ordinary page,
+    /// both already visible: the expectation has no row and is not counted
+    /// (#607). It is visible because nothing marks it hidden, so listing it
+    /// tells a teacher nothing — and a class citing six expectations pushed
+    /// the rows they need to read down the table.
+    func testALinkedCurriculumPageIsNotListedAsAlreadyVisible() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try PublishPlanTableTests.layOutAClassCitingAnExpectation(in: made.course)
+        let outcome: AssistToolOutcome = await made.runner.run(call: SectionVerbs.publishPages(
+            course: "ICS3U", section: 1, names: ["section1/All Classes/Unit 1, Day 4"], planning: true
+        ))
+        XCTAssertTrue(outcome.isPlan, outcome.summary)
+        let table: AssistPlanTable = try XCTUnwrap(outcome.planTable, "a menu page plan carries its rows")
+        var seen: [String] = []
+        for row in table.rows {
+            seen.append("\(row.folder)/\(row.title) \(row.change)")
+        }
+        XCTAssertEqual(seen.sorted(), [
+            "Concepts/Seen alreadyVisible",
+            "section1/All Classes/Unit 1, Day 4 willBecomeVisible",
+        ])
+        XCTAssertEqual(table.summary, AssistWording.menuPlanSummary(changing: 1, already: 1, publishing: true))
+    }
+
+    /// The same class, with the expectation NAMED as well: the teacher asked
+    /// about it, so it keeps its row and its place in the count (#607).
+    func testACurriculumPageTheTeacherNamesIsStillListed() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try PublishPlanTableTests.layOutAClassCitingAnExpectation(in: made.course)
+        let outcome: AssistToolOutcome = await made.runner.run(call: SectionVerbs.publishPages(
+            course: "ICS3U", section: 1,
+            names: ["section1/All Classes/Unit 1, Day 4", "Curriculum/A1.4"], planning: true
+        ))
+        let table: AssistPlanTable = try XCTUnwrap(outcome.planTable, outcome.forTheCard)
+        var alreadyVisible: [String] = []
+        for row in table.rows where row.change == .alreadyVisible {
+            alreadyVisible.append(row.title)
+        }
+        XCTAssertEqual(alreadyVisible.sorted(), ["A1.4", "Seen"])
+        XCTAssertEqual(table.summary, AssistWording.menuPlanSummary(changing: 1, already: 2, publishing: true))
+    }
+
     /// Only a page plan asked for from the menu carries rows: not Re-date,
     /// and not the assistant's plan of the same pages.
     func testOnlyAMenuPagePlanCarriesATable() async throws {
@@ -347,6 +395,21 @@ final class PublishPlanTableTests: XCTestCase {
                 to: folder.appendingPathComponent("_DUPLICATE ME.md"), atomically: true, encoding: .utf8
             )
         }
+    }
+
+    /// A hidden class, Unit 1, Day 4, linking a curriculum expectation and a
+    /// concept page, both visible.
+    static func layOutAClassCitingAnExpectation(in course: Course) throws {
+        try AssistFixture.write(page: "Unit 1, Day 4", publish: "false", date: "2026-09-11",
+                                body: "Covers [[A1.4]]; read [[Seen]].", in: course)
+        let curriculum: URL = course.directoryURL.appendingPathComponent("Curriculum")
+        try FileManager.default.createDirectory(at: curriculum, withIntermediateDirectories: true)
+        try "---\ntitle: A1.4\npublish: true\n---\nAn expectation.\n".write(
+            to: curriculum.appendingPathComponent("A1.4.md"), atomically: true, encoding: .utf8
+        )
+        try "---\ntitle: Seen\npublish: true\n---\nSeen.\n".write(
+            to: course.directoryURL.appendingPathComponent("Concepts/Seen.md"), atomically: true, encoding: .utf8
+        )
     }
 
     /// The plan of a hidden class that links twenty hidden concept pages.
