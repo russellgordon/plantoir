@@ -945,11 +945,21 @@ public static class ActivityTrail
 
     private static readonly TimeSpan WritersWait = TimeSpan.FromSeconds(5);
 
-    private static void Append(string line) => Append(line, WritersWait);
+    private static void Append(string line) => Append(line, WritersWait, capsThisProcess: false);
 
-    private static void Append(string line, TimeSpan wait)
+    /// <param name="capsThisProcess">True for the end-of-session line: the wait
+    /// then caps this process's own lock too. Every other line waits for it as
+    /// long as it takes, as before.</param>
+    private static void Append(string line, TimeSpan wait, bool capsThisProcess = true)
     {
-        lock (_lock)
+        // The wait caps BOTH locks: this process's own (another thread may be
+        // inside its own mutex wait) and the writers' mutex across processes,
+        // so the end-of-session line's 500 ms is the whole wait (#565 review).
+        // A line that cannot get this process's lock in time is dropped rather
+        // than written beside another thread's half-written one.
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        if (!System.Threading.Monitor.TryEnter(_lock, capsThisProcess ? wait : System.Threading.Timeout.InfiniteTimeSpan)) return;
+        try
         {
             try
             {
@@ -965,7 +975,8 @@ public static class ActivityTrail
                 bool held = false;
                 try
                 {
-                    try { held = writers.WaitOne(wait); }
+                    TimeSpan left = capsThisProcess ? wait - started.Elapsed : wait;
+                    try { held = writers.WaitOne(left > TimeSpan.Zero ? left : TimeSpan.Zero); }
                     catch (System.Threading.AbandonedMutexException) { held = true; }   // a writer died holding it: ours now
 
                     // Written even when the wait timed out: a line that might
@@ -984,6 +995,10 @@ public static class ActivityTrail
             {
                 // Never fail caller if log write fails
             }
+        }
+        finally
+        {
+            System.Threading.Monitor.Exit(_lock);
         }
     }
 }

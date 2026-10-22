@@ -153,6 +153,31 @@ public class StartOfYearSheetTests
         Assert.True(fit.NotesCap >= StartOfYearSheetLayout.NotesFloor, $"{fit.NotesCap}");
     }
 
+    /// <summary>A plan with no rows still fits: an empty table is its border, and nothing is negative.</summary>
+    [Fact]
+    public void NoRowsIsAnEmptyTable()
+    {
+        var fit = StartOfYearSheetLayout.For(700, 250, 40, 100, 60, 80, Array.Empty<double>());
+        Assert.Equal(0, fit.Rows);
+        Assert.Equal(StartOfYearSheetLayout.TableBorder, fit.TableHeight);
+        Assert.Equal((100, 80), (fit.AboveCap, fit.NotesCap));
+        Assert.True(fit.AllShown);
+    }
+
+    /// <summary>A window shorter than the chrome itself: every size stays non-negative, and the warnings are still whole.</summary>
+    [Fact]
+    public void AWindowShorterThanTheChromeGivesNoNegativeSizes()
+    {
+        var fit = StartOfYearSheetLayout.For(200, 250, 90, 160, 125, 200, Rows(19));
+        Assert.True(fit.AboveCap >= 0 && fit.NotesCap >= 0 && fit.TableHeight >= 0, $"{fit}");
+        Assert.Equal(90, fit.AboveCap);
+        Assert.Equal(StartOfYearSheetLayout.FewestRows, fit.Rows);
+        Assert.False(fit.AllShown);
+
+        var empty = StartOfYearSheetLayout.For(0, 250, 0, 0, 0, 0, Array.Empty<double>());
+        Assert.True(empty.AboveCap >= 0 && empty.NotesCap >= 0 && empty.TableHeight >= 0, $"{empty}");
+    }
+
     /// <summary>Two-line rows are counted at their own height, not the one-line pitch.</summary>
     [Fact]
     public void TwoLineRowsAreCountedAtTheirHeight()
