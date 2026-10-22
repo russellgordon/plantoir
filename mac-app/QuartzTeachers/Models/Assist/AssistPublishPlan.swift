@@ -861,6 +861,13 @@ enum AssistPublishPlanner {
             forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
             noRoomForAKey: &noRoomForAKey
         )
+        // A curriculum page the class merely links to is not news (#607).
+        // Only on the publish side, and only from the "already" list: a
+        // hidden one is still a change and still goes up, or the class would
+        // link to a page students cannot open.
+        if publishes {
+            alreadyRight = leavingOutLinkedCurriculumPages(alreadyRight, named: chosen, in: course)
+        }
 
         // A page whose date would move but whose visibility is already right
         // still has to be written, so the date moves are carried through whole
@@ -1006,6 +1013,35 @@ enum AssistPublishPlanner {
             linkedClassesLeftAlone: [],
             dateMoves: dateMoves
         )
+    }
+
+    /// The pages already visible, without the curriculum pages that are only
+    /// there because a link led to them (#607).
+    ///
+    /// A curriculum page is visible because nothing marks it hidden, not
+    /// because of any rule that keeps it so — but a class that cites six
+    /// expectations would otherwise list six "already visible" rows above the
+    /// ones a teacher needs to read, and count them in the summary line. A page
+    /// the teacher NAMED stays in: they asked about it, so the answer is news.
+    ///
+    /// Trimmed here, once, rather than where the plan is shown: `describe()`,
+    /// `tabulated` and its summary line all read this one list, so they agree
+    /// by construction — and `describe()` has no course to ask with.
+    private static func leavingOutLinkedCurriculumPages(
+        _ pages: [AssistSectionPage],
+        named chosen: Set<String>,
+        in course: Course
+    ) -> [AssistSectionPage] {
+        var keptInTheList: [AssistSectionPage] = []
+        for page in pages {
+            let wasNamed: Bool = chosen.contains(page.fileURL.path)
+            let isCurriculum: Bool = AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course)
+            if isCurriculum && !wasNamed {
+                continue
+            }
+            keptInTheList.append(page)
+        }
+        return keptInTheList
     }
 
     /// Of the classes the walk stopped at, the ones worth a sentence.

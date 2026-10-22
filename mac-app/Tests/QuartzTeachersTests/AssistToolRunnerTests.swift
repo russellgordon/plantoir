@@ -3321,6 +3321,10 @@ final class AssistToolRunnerTests: XCTestCase {
     /// — transitively, and still stopping at a class. Three of the pages the
     /// case expects to go up are reachable only through a table link, so it
     /// cannot pass on a reader that drops them.
+    ///
+    /// Since #607 a page may sit in a named `folder`, and a case may say
+    /// which pages the PLAN lists as already visible (`expectAlreadyRight`):
+    /// a curriculum page the class links to is not one of them.
     @MainActor
     func testPublishingFollowsLinksAsTheContractSays() async throws {
         try await runPublishingCases(key: "publishing")
@@ -3331,7 +3335,9 @@ final class AssistToolRunnerTests: XCTestCase {
     /// `See [[x]].` paragraphs) or `body` (written exactly as given), never
     /// both — the contract's `publishing.casesNote`. Every page's BODY must
     /// come through the publish byte for byte: a publish changes whether
-    /// students see a page, never what it says.
+    /// students see a page, never what it says. A page that is not a class
+    /// may carry `folder`; a case may carry `expectAlreadyRight`, checked
+    /// against the plan of the same publish on the Section menu's surface.
     @MainActor
     private func runPublishingCases(key: String) async throws {
         for testCase in try AssistToolRunnerTests.cases(
@@ -3344,30 +3350,53 @@ final class AssistToolRunnerTests: XCTestCase {
             defer { try? FileManager.default.removeItem(at: made.root) }
 
             var isAClass: [String: Bool] = [:]
+            var folders: [String: String] = [:]
             for page in pages {
                 let title: String = try XCTUnwrap(page["title"] as? String)
                 let classPage: Bool = page["isClassPage"] as? Bool ?? false
                 let visible: Bool = page["visible"] as? Bool ?? false
                 let written: String? = page["body"] as? String
+                let folder: String? = page["folder"] as? String
                 if written != nil && page["links"] != nil {
                     XCTFail("\(name): “\(title)” carries both `links` and `body`")
                     continue
                 }
+                if classPage && folder != nil {
+                    XCTFail("\(name): “\(title)” is a class and carries a `folder`")
+                    continue
+                }
                 isAClass[title] = classPage
+                if let folder {
+                    folders[title] = folder
+                }
                 try writeContractPage(
                     title: title, isClassPage: classPage, visible: visible,
-                    links: page["links"] as? [String] ?? [], body: written, in: made.course
+                    links: page["links"] as? [String] ?? [], body: written,
+                    inFolder: folder, in: made.course
                 )
             }
 
             var before: [String: String] = [:]
             for (title, classPage) in isAClass {
                 before[title] = contractPageText(
-                    title: title, isClassPage: classPage, in: made.course
+                    title: title, isClassPage: classPage, inFolder: folders[title], in: made.course
                 )
             }
 
             let asked: [String] = try XCTUnwrap(testCase["publish"] as? [String])
+
+            // What the PLAN lists as already visible (#607), asked of a
+            // second copy of the same course on the Section menu's surface —
+            // the one surface whose plan carries rows to read it from.
+            if let expectedAlreadyRight = testCase["expectAlreadyRight"] as? [String] {
+                let listed: [String] = try await alreadyVisibleRowsOfThePlan(
+                    publishing: asked, pages: pages
+                )
+                XCTAssertEqual(
+                    listed.sorted(), expectedAlreadyRight.sorted(),
+                    "\(name): the plan's already-visible pages"
+                )
+            }
             _ = await made.runner.run(call: call(
                 "publish_pages",
                 arguments: [
@@ -3378,7 +3407,8 @@ final class AssistToolRunnerTests: XCTestCase {
 
             for title in testCase["expectVisible"] as? [String] ?? [] {
                 let after: String = contractPageText(
-                    title: title, isClassPage: isAClass[title] ?? false, in: made.course
+                    title: title, isClassPage: isAClass[title] ?? false,
+                    inFolder: folders[title], in: made.course
                 )
                 XCTAssertEqual(
                     PageVisibilityReader.answer(in: after, forSection: 1), .visible,
@@ -3387,7 +3417,8 @@ final class AssistToolRunnerTests: XCTestCase {
             }
             for title in testCase["expectUntouched"] as? [String] ?? [] {
                 let after: String = contractPageText(
-                    title: title, isClassPage: isAClass[title] ?? false, in: made.course
+                    title: title, isClassPage: isAClass[title] ?? false,
+                    inFolder: folders[title], in: made.course
                 )
                 XCTAssertEqual(
                     after, before[title],
@@ -3396,7 +3427,7 @@ final class AssistToolRunnerTests: XCTestCase {
             }
             for (title, classPage) in isAClass {
                 let after: String = contractPageText(
-                    title: title, isClassPage: classPage, in: made.course
+                    title: title, isClassPage: classPage, inFolder: folders[title], in: made.course
                 )
                 XCTAssertEqual(
                     AssistToolRunnerTests.bodyAfterFrontmatter(after),
@@ -3405,6 +3436,38 @@ final class AssistToolRunnerTests: XCTestCase {
                 )
             }
         }
+    }
+
+    /// The titles a Section-menu plan of this publish lists as already
+    /// visible, for `expectAlreadyRight` (#607): the case's pages laid out in
+    /// a course of their own, so the publish being tested is not disturbed.
+    @MainActor
+    private func alreadyVisibleRowsOfThePlan(
+        publishing asked: [String], pages: [[String: Any]]
+    ) async throws -> [String] {
+        let menu = try AssistFixture.makeRunner(surface: .menu)
+        defer { try? FileManager.default.removeItem(at: menu.root) }
+        for page in pages {
+            try writeContractPage(
+                title: try XCTUnwrap(page["title"] as? String),
+                isClassPage: page["isClassPage"] as? Bool ?? false,
+                visible: page["visible"] as? Bool ?? false,
+                links: page["links"] as? [String] ?? [],
+                body: page["body"] as? String,
+                inFolder: page["folder"] as? String,
+                in: menu.course
+            )
+        }
+        let planned: AssistToolOutcome = await menu.runner.run(call: SectionVerbs.publishPages(
+            course: "ICS3U", section: 1, names: asked, planning: true
+        ))
+        XCTAssertTrue(planned.isPlan, planned.summary)
+        let table: AssistPlanTable = try XCTUnwrap(planned.planTable, "a menu page plan carries its rows")
+        var listed: [String] = []
+        for row in table.rows where row.change == .alreadyVisible {
+            listed.append(row.title)
+        }
+        return listed
     }
 
     /// A page's text after its closing `---`, or the whole text when it has
@@ -4165,7 +4228,8 @@ final class AssistToolRunnerTests: XCTestCase {
 
     /// One page of a contract case, written where its kind belongs: a class
     /// page in the section's classes folder, anything else as a course-level
-    /// page, which is where a real course keeps its worksheets and notes.
+    /// page, which is where a real course keeps its worksheets and notes —
+    /// in `Concepts`, or in the case's own `folder` when it names one (#607).
     @MainActor
     private func writeContractPage(title: String,
                                    isClassPage: Bool,
@@ -4173,6 +4237,7 @@ final class AssistToolRunnerTests: XCTestCase {
                                    links: [String],
                                    body written: String? = nil,
                                    dated: String = "2026-09-08",
+                                   inFolder folder: String? = nil,
                                    in course: Course) throws {
         var body: String = "About \(title)."
         for target in links {
@@ -4185,7 +4250,8 @@ final class AssistToolRunnerTests: XCTestCase {
             try write(page: title, publish: visible ? "true" : "false", date: dated,
                       body: body, in: course)
         } else {
-            try write(courseLevelPage: title, publishForSection1: visible ? "true" : "false",
+            try write(courseLevelPage: title, inFolder: folder ?? "Concepts",
+                      publishForSection1: visible ? "true" : "false",
                       dated: dated, body: body, in: course)
         }
     }
@@ -4193,11 +4259,12 @@ final class AssistToolRunnerTests: XCTestCase {
     @MainActor
     private func contractPageText(title: String,
                                   isClassPage: Bool,
+                                  inFolder folder: String? = nil,
                                   in course: Course) -> String {
         if isClassPage {
             return text(ofPage: title, in: course)
         }
-        return text(ofCourseLevelPage: title, in: course)
+        return text(ofCourseLevelPage: title, inFolder: folder ?? "Concepts", in: course)
     }
 
     // MARK: - What an undo SAYS

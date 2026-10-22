@@ -84,6 +84,13 @@ nonisolated enum StartOfYearWording {
 
     static let reasonNothingLinks: String = "nothing links to it"
 
+    /// The table's third column (#589): the reason a page goes, beside its
+    /// Page and Folder (`AssistWording.menuPlanPageColumn`,
+    /// `menuPlanFolderColumn`, reused from #524). "Why", not #524's "What
+    /// changes": every row here goes into draft, so that column would say one
+    /// phrase on every row.
+    static let reasonColumn: String = "Why"
+
     // MARK: - What stays
 
     static func staysFirstClass(first: String, pages: String) -> String {
