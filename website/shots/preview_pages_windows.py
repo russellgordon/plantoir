@@ -443,7 +443,7 @@ def capture_preview_pages(selection: dict[str, list[str] | None], dry_run: bool 
             unknown = [identifier for identifier in only if identifier not in [shot["id"] for shot in chosen]]
             if unknown:
                 raise SystemExit(f"Not a Windows {scene} figure: {', '.join(unknown)}"
-                                 + (" (Swift stays read-only on Windows, #570)"
+                                 + (" (Swift stays read-only on Windows until #570 is decided, v1.9.0)"
                                     if set(unknown) & set(NOT_ON_WINDOWS) else ""))
         for shot in chosen:
             if shot not in shots:
