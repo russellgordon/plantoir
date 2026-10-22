@@ -327,6 +327,15 @@ public class ContractTests
         Assert.Equal(wording["menuPlanSummaryOnePage"]!.ToString(), AssistWording.MenuPlanSummary(1, 0, publishing: true));
         Assert.Equal(wording["planNothingWouldChange"]!.ToString(), AssistWording.MenuPlanSummary(0, 5, publishing: true));
 
+        // #634 (mac #608, #622): the picker's Date column, and the disclosure
+        // that folds the pages already right — one dispatcher, four keys.
+        Assert.Equal(wording["menuPickDateColumn"]!.ToString(), AssistWording.MenuPickDateColumn);
+        Assert.Equal(wording["menuPlanShowAlready"]!.ToString(), AssistWording.MenuPlanShowAlready(16, publishing: true));
+        Assert.Equal(wording["menuPlanShowAlreadyHiding"]!.ToString(), AssistWording.MenuPlanShowAlready(2, publishing: false));
+        Assert.Equal(wording["menuPlanShowAlreadyHiding"]!.ToString(), AssistWording.MenuPlanShowAlreadyHiding(2));
+        Assert.Equal(wording["menuPlanShowAlreadyOnePage"]!.ToString(), AssistWording.MenuPlanShowAlready(1, publishing: true));
+        Assert.Equal(wording["menuPlanShowAlreadyOnePageHiding"]!.ToString(), AssistWording.MenuPlanShowAlready(1, publishing: false));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();

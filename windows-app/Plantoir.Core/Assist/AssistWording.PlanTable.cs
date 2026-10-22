@@ -107,6 +107,29 @@ public static partial class AssistWording
                           : MenuPlanSummaryHiding(changing, already);
     }
 
+    /// <summary>
+    /// The disclosure under the plan table (#634, the mac's #622), closed to
+    /// begin with: opening it adds the pages already the way they were asked
+    /// to be to the same table. The mac's <c>menuPlanShowAlready(count:publishing:)</c>;
+    /// it returns <see cref="MenuPlanShowAlreadyHiding"/>,
+    /// <see cref="MenuPlanShowAlreadyOnePage"/> and <see cref="MenuPlanShowAlreadyOnePageHiding"/>,
+    /// the members the contract's other three keys name.
+    /// </summary>
+    public static string MenuPlanShowAlready(int count, bool publishing)
+    {
+        if (count == 1) return publishing ? MenuPlanShowAlreadyOnePage : MenuPlanShowAlreadyOnePageHiding;
+        return publishing ? $"Show the {count} pages already visible" : MenuPlanShowAlreadyHiding(count);
+    }
+
+    /// <summary><see cref="MenuPlanShowAlready"/> for a hide plan of more than one page already hidden.</summary>
+    public static string MenuPlanShowAlreadyHiding(int count) => $"Show the {count} pages already hidden";
+
+    /// <summary><see cref="MenuPlanShowAlready"/> for one page already visible.</summary>
+    public const string MenuPlanShowAlreadyOnePage = "Show the page already visible";
+
+    /// <summary><see cref="MenuPlanShowAlready"/> for one page already hidden.</summary>
+    public const string MenuPlanShowAlreadyOnePageHiding = "Show the page already hidden";
+
     /// <summary><see cref="MenuPlanSummary"/> for a hide plan with pages already hidden.</summary>
     public static string MenuPlanSummaryHiding(int changing, int already) =>
         $"{changing} {(changing == 1 ? "page" : "pages")} would change, {already} already hidden.";

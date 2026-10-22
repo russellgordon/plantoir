@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
@@ -74,25 +75,30 @@ internal sealed class SectionVerbDialog
             DefaultButton = ContentDialogButton.Primary,
         };
         AutomationProperties.SetAutomationId(_dialog, "sectionVerbDialog");
+        _dialog.Content = _host;
         if (ShowsAPlanTable(item))
         {
             // Wide enough for the plan table's three columns, and the SAME
             // width at every stage: a dialog that widened at the plan would
-            // jump (the mac rejected widening mid-flow for that, #524). Never
-            // wider than the window less a margin. The window opens at its
-            // 900 epx minimum at every scale since #542 (it was 680 and 595
-            // epx wide at 175% and 200% before), but that minimum is clamped
-            // to the work area, so a narrow display still gets a narrower root.
-            if (root.Size.Width > 0)
-                _planWidth = Math.Min(PlanTableDialogWidth, root.Size.Width - 2 * PlanDialogMargin);
-            _dialog.Resources["ContentDialogMinWidth"] = _planWidth;
-            _dialog.Resources["ContentDialogMaxWidth"] = _planWidth;
+            // jump (the mac rejected widening mid-flow for that, #524). Since
+            // #634 (the mac's #621, the sheets resize) the width follows the
+            // WINDOW — 680 at its 900-epx minimum, growing with it up to 300
+            // more (PageTableLayout.DialogWidth), never wider than the window
+            // less a margin — and a resized window resizes the dialog. The
+            // template reads ContentDialogMin/MaxWidth once, so they are set
+            // wide open here and the HOST carries the width, at every stage.
+            _dialog.Resources["ContentDialogMaxWidth"] = 100000.0;
+            // Every fit is #548's up to 756 epx; a taller window gives the
+            // table its rows (PlanTableLayout.ExtraRows), so the dialog may be
+            // taller than ContentDialog's own 756.
+            _dialog.Resources["ContentDialogMaxHeight"] = 100000.0;
+            SizeTheHost(root);
         }
         _dialog.PrimaryButtonClick += PrimaryPressed;
-        // The plan table's resize handler is on the WINDOW's XamlRoot, which
-        // outlives this dialog: a close at the plan (Cancel, Escape) changes
-        // neither the stage nor the content, so the handler's own guard never
-        // fires, and it would stay for the window's life. Taken off here.
+        // The resize handler is on the WINDOW's XamlRoot, which outlives this
+        // dialog: attached while the dialog is up, and taken off when it closes
+        // — at any stage, Cancel and Escape included.
+        _dialog.Opened += (_, _) => StartFollowingTheWindow();
         _dialog.Closed += (_, _) => StopRefitting();
         _dialog.Closing += (_, args) =>
         {
@@ -315,7 +321,7 @@ internal sealed class SectionVerbDialog
     private void ShowChoosing(UIElement content)
     {
         _stage = Stage.Choose;
-        _dialog.Content = content;
+        SetContent(content);
         _dialog.PrimaryButtonText = AssistWording.MenuContinueButton;
         _dialog.CloseButtonText = AssistWording.MenuCancelButton;
         // Live until a caller says otherwise (a pick with nothing ticked greys it).
@@ -331,7 +337,7 @@ internal sealed class SectionVerbDialog
         _workingWords = words;
         AutomationProperties.SetAutomationId(words, "sectionVerbWorking");
         panel.Children.Add(words);
-        _dialog.Content = panel;
+        SetContent(panel);
         _dialog.PrimaryButtonText = "";
         _dialog.CloseButtonText = "";
     }
@@ -342,7 +348,7 @@ internal sealed class SectionVerbDialog
         var words = Words(card);
         words.IsTextSelectionEnabled = true;
         AutomationProperties.SetAutomationId(words, "sectionVerbPlan");
-        _dialog.Content = new ScrollViewer { Content = words, MaxHeight = 420, MinWidth = 420 };
+        SetContent(new ScrollViewer { Content = words, MaxHeight = 420, MinWidth = 420 });
         _dialog.PrimaryButtonText = _verbButton;
         DialogButtons.EnablePrimary(_dialog, true);
         _dialog.CloseButtonText = AssistWording.MenuCancelButton;
@@ -354,20 +360,49 @@ internal sealed class SectionVerbDialog
     private static bool ShowsAPlanTable(Item item) =>
         item is Item.PublishPages or Item.HidePages or Item.PublishClassForADate;
 
-    /// <summary>The dialog's width for those three at most, pinned at construction.</summary>
-    private const double PlanTableDialogWidth = 680;
-
-    /// <summary>What the dialog leaves of the window at each side when the window is narrower than that.</summary>
-    private const double PlanDialogMargin = 24;
-
     /// <summary>The ContentDialog's own padding at each side of its content.</summary>
-    private const double DialogPadding = 24;
+    private const double DialogPadding = PageTableLayout.DialogPadding;
 
-    private double _planWidth = PlanTableDialogWidth;
+    /// <summary>
+    /// What every stage is drawn in (#634): for the three page items it
+    /// carries the dialog's width, so the dialog is one width at every stage
+    /// and follows the window.
+    /// </summary>
+    private readonly Grid _host = new();
 
-    /// <summary>The plan table's handler on the window's <c>XamlRoot.Changed</c>, while one is attached.</summary>
+    /// <summary>The dialog's width (the three page items): <see cref="PageTableLayout.DialogWidth"/> at the window's width.</summary>
+    private double _planWidth = PageTableLayout.PageSheetWidth;
+
+    /// <summary>What the stage showing does when the window changes size: the table's rows, the plan's notes and columns.</summary>
+    private Action? _relayout;
+
+    /// <summary>The handler on the window's <c>XamlRoot.Changed</c>, while the dialog is up.</summary>
     private Windows.Foundation.TypedEventHandler<XamlRoot, XamlRootChangedEventArgs>? _refit;
     private XamlRoot? _refitRoot;
+
+    private void SizeTheHost(XamlRoot? root)
+    {
+        if (!ShowsAPlanTable(_item)) return;
+        if (root is { Size.Width: > 0 })
+            _planWidth = PageTableLayout.DialogWidth(PageTableLayout.PageSheetWidth, root.Size.Width);
+        _host.Width = _planWidth - 2 * DialogPadding;
+    }
+
+    private void StartFollowingTheWindow()
+    {
+        StopRefitting();
+        if (_dialog.XamlRoot is not { } root) return;
+        _refit = (_, _) =>
+        {
+            SizeTheHost(root);
+            _relayout?.Invoke();
+        };
+        _refitRoot = root;
+        root.Changed += _refit;
+        // The size the window had when the dialog opened.
+        SizeTheHost(root);
+        _relayout?.Invoke();
+    }
 
     private void StopRefitting()
     {
@@ -376,12 +411,23 @@ internal sealed class SectionVerbDialog
         _refitRoot = null;
     }
 
-    /// <summary>
+    /// <summary>A stage's content, in the host; the last stage's relayout is dropped with it.</summary>
+    private void SetContent(UIElement content, Action? relayout = null)
+    {
+        _host.Children.Clear();
+        _host.Children.Add(content);
+        _relayout = relayout;
+    }
+
+    /// <summary>The window's height, or ContentDialog's old maximum before it is known.</summary>
+    private double WindowHeight => _dialog.XamlRoot is { Size.Height: > 0 } root ? root.Size.Height : PlanTableLayout.DialogMaxHeight;
+
     /// The plan stage of the three page items: the summary, a read-only table
-    /// of EVERY page (sortable by its headers), and the card's other sentences
-    /// under it. Built from the rows the menu's server sent, never by parsing
-    /// the card. Return still presses the verb's button and Escape Cancel while
-    /// the table has focus (measured, doc 12).
+    /// of the pages a teacher reads before Go (sortable by its headers), the
+    /// pages already right folded under it (#634, the mac's #622), and the
+    /// card's other sentences under that. Built from the rows the menu's
+    /// server sent, never by parsing the card. Return still presses the verb's
+    /// button and Escape Cancel while the table has focus (measured, doc 12).
     /// </summary>
     private void ShowPlanTable(PlanTable table)
     {
@@ -394,18 +440,29 @@ internal sealed class SectionVerbDialog
         AutomationProperties.SetAutomationId(summary, "sectionVerbPlan");
         panel.Children.Add(summary);
 
+        // The columns' widths follow the dialog's (#634): at 680 exactly #548's
+        // 170 / 150 / the rest; wider, Page takes what What changes (capped at
+        // 320, the mac's) does not.
+        var grids = new List<Grid>();
         Grid Columns()
         {
-            var grid = new Grid { ColumnSpacing = 12 };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var grid = new Grid { ColumnSpacing = PageTableLayout.ColumnSpacing };
+            for (int i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grids.Add(grid);
             return grid;
         }
+        void SizeTheColumns()
+        {
+            var (page, folder, change) = PageTableLayout.PlanColumns(_planWidth);
+            foreach (var grid in grids)
+            {
+                grid.ColumnDefinitions[0].Width = new GridLength(page);
+                grid.ColumnDefinitions[1].Width = new GridLength(folder);
+                grid.ColumnDefinitions[2].Width = new GridLength(change);
+            }
+        }
 
-        // The notes first, so their height is known before the rows are counted.
         StackPanel? notes = null;
-        double notesNatural = 0;
         if (table.Notes.Count > 0)
         {
             notes = new StackPanel { Spacing = 6 };
@@ -417,15 +474,13 @@ internal sealed class SectionVerbDialog
                 AutomationProperties.SetAutomationId(note, $"sectionVerbPlanNote{i}");
                 notes.Children.Add(note);
             }
-            notes.Measure(new Windows.Foundation.Size(_planWidth - 2 * DialogPadding, double.PositiveInfinity));
-            notesNatural = notes.DesiredSize.Height;
         }
 
         var list = new ListView
         {
             SelectionMode = ListViewSelectionMode.None,
             IsItemClickEnabled = false,
-            BorderThickness = new Thickness(1),
+            BorderThickness = new Thickness(PageTableLayout.TableBorder),
             CornerRadius = new CornerRadius(4),
             TabIndex = 1,
         };
@@ -453,25 +508,35 @@ internal sealed class SectionVerbDialog
                 Grid.SetColumn(cell, i);
                 grid.Children.Add(cell);
             }
-            var item = new ListViewItem { Content = grid, MinHeight = PlanTableLayout.RowPitch, Padding = new Thickness(12, 0, 12, 0) };
+            var item = new ListViewItem
+            {
+                Content = grid,
+                MinHeight = PlanTableLayout.RowPitch,
+                Padding = new Thickness(PageTableLayout.RowPadding, 0, PageTableLayout.RowPadding, 0),
+            };
             AutomationProperties.SetAutomationId(item, $"sectionVerbPlanRow{row.Position}");
             AutomationProperties.SetName(item, $"{row.Title}, {row.Folder}, {row.WhatChanges}");
             rowItems[row.Position] = item;
         }
 
+        // The pages already right are folded away, closed for every new plan
+        // (#622); opening adds them to the SAME table, through the one sort.
+        bool open = false;
         var order = PlanTableOrder.Opening;
         void Fill()
         {
             list.Items.Clear();
-            foreach (var row in PlanTableOrder.Sorted(table.Rows, order.Column, order.Ascending))
+            foreach (var row in PlanTableOrder.Sorted(table.DrawnRows(open), order.Column, order.Ascending))
                 list.Items.Add(rowItems[row.Position]);
+            TickTable.Band(list);
         }
 
         // The headers sort. They stay in the Tab order, AFTER the table
         // (TabIndex 2), so Tab reaches the table first; Return on a focused
         // header sorts, as a button does (doc 12).
         var header = Columns();
-        header.Margin = new Thickness(13, 0, 13, 0);   // over the table's border and the rows' padding
+        header.Margin = new Thickness(PageTableLayout.TableBorder + PageTableLayout.RowPadding, 0,
+                                      PageTableLayout.TableBorder + PageTableLayout.RowPadding, 0);
         var sortButtons = new List<(Button Button, string Title, PlanTableOrder.Column Column)>();
         void TitleTheHeaders()
         {
@@ -512,8 +577,21 @@ internal sealed class SectionVerbDialog
         }
         TitleTheHeaders();
         Fill();
+        SizeTheColumns();
         panel.Children.Add(header);
-        panel.Children.Add(list);
+
+        // The table and its disclosure as one part, 4 epx apart: the
+        // disclosure reads as the table's (the mac's 6-pt reason).
+        var tablePart = new StackPanel { Spacing = 4 };
+        tablePart.Children.Add(list);
+        if (table.FoldLabel is { } label)
+            tablePart.Children.Add(Disclosure(label, isOpen =>
+            {
+                open = isOpen;
+                Fill();
+            }));
+        panel.Children.Add(tablePart);
+
         ScrollViewer? scroller = null;
         if (notes is not null)
         {
@@ -524,35 +602,36 @@ internal sealed class SectionVerbDialog
 
         // Rows and the notes' cap from the window's height (PlanTableLayout),
         // and again whenever the window changes size while the plan shows —
-        // counted once, a window made shorter would clip what was counted.
+        // counted once, a window made shorter would clip what was counted. The
+        // notes are measured at the dialog's LIVE width, which follows the window.
+        // The table's height is FIXED — counted with the disclosure closed —
+        // so opening it never grows the dialog (Russell's ruling on the mac):
+        // a MaxHeight would let a short table shrink to its rows and grow when
+        // the folded rows arrive, the mac's measured 316 → 484.
         PlanTableLayout.Fit? fitted = null;
+        double fittedWidth = 0;
         void Fit()
         {
-            double windowHeight = _dialog.XamlRoot?.Size.Height ?? PlanTableLayout.DialogMaxHeight;
-            var fit = PlanTableLayout.For(windowHeight, notesNatural);
-            if (fit == fitted) return;
+            SizeTheColumns();
+            double notesNatural = 0;
+            if (notes is not null)
+            {
+                notes.Measure(new Windows.Foundation.Size(_planWidth - 2 * DialogPadding, double.PositiveInfinity));
+                notesNatural = notes.DesiredSize.Height;
+            }
+            double windowHeight = WindowHeight;
+            var fit = PlanTableLayout.For(windowHeight, notesNatural, table.FoldsAlreadyRight);
+            if (fit == fitted && fittedWidth == _planWidth) return;
             fitted = fit;
-            list.MaxHeight = fit.TableHeight;
+            fittedWidth = _planWidth;
+            int rows = Math.Min(table.RowsWhenClosed, fit.Rows);
+            list.Height = rows * PlanTableLayout.RowPitch + 2 * PageTableLayout.TableBorder;
             if (scroller is not null) scroller.MaxHeight = fit.NotesCap;
-            App.LogDiagnostic($"Plan table: window {windowHeight:0} epx tall, notes {notesNatural:0} epx (shown at most " +
-                              $"{fit.NotesCap:0}), {fit.Rows} rows shown of {table.Rows.Count}");
+            App.LogDiagnostic($"Plan table: window {windowHeight:0} epx tall, dialog {_planWidth:0} wide, notes {notesNatural:0} epx " +
+                              $"(shown at most {fit.NotesCap:0}), {rows} rows tall of {table.Rows.Count} " +
+                              $"({table.RowsToRead.Count} to read{(table.FoldsAlreadyRight ? $", {table.RowsAlreadyRight.Count} folded" : "")})");
         }
         Fit();
-        if (_dialog.XamlRoot is { } root)
-        {
-            StopRefitting();
-            _refit = (_, _) =>
-            {
-                if (_stage != Stage.Plan || !ReferenceEquals(_dialog.Content, panel))
-                {
-                    StopRefitting();
-                    return;
-                }
-                Fit();
-            };
-            _refitRoot = root;
-            root.Changed += _refit;
-        }
 
         // Return is the verb's button while the table has focus, as it is
         // everywhere else in the dialog. MEASURED (doc 12): with the focus on
@@ -576,10 +655,52 @@ internal sealed class SectionVerbDialog
         // follows the last input, so a mouse user is not shown a ring.
         list.Loaded += (_, _) => list.Focus(FocusState.Programmatic);
 
-        _dialog.Content = panel;
+        SetContent(panel, Fit);
         _dialog.PrimaryButtonText = _verbButton;
         DialogButtons.EnablePrimary(_dialog, true);
         _dialog.CloseButtonText = AssistWording.MenuCancelButton;
+    }
+
+    /// <summary>
+    /// The plan's disclosure (#634, the mac's <c>DisclosureGroup</c>): a
+    /// borderless toggle with a chevron and the words, closed to begin with.
+    /// A <c>ToggleButton</c>, so Narrator hears its state through the Toggle
+    /// pattern. REJECTED: <c>Expander</c>, whose header is 48 epx on a card
+    /// background with an animation — a second panel, where the mac's is one
+    /// line of the table's (the plan review).
+    /// </summary>
+    private static ToggleButton Disclosure(string label, Action<bool> toggled)
+    {
+        var chevron = new FontIcon { Glyph = "", FontSize = 10 };
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        content.Children.Add(chevron);
+        content.Children.Add(new TextBlock { Text = label });
+        var button = new ToggleButton
+        {
+            Content = content,
+            Padding = new Thickness(2, 4, 6, 4),
+            BorderThickness = new Thickness(0),
+            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            TabIndex = 3,
+        };
+        // A toggle that is on keeps the look of one that is off: the chevron
+        // says the state, as a disclosure's does.
+        var clear = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        foreach (string key in new[] { "ToggleButtonBackgroundChecked", "ToggleButtonBackgroundCheckedPointerOver",
+                                       "ToggleButtonBackgroundCheckedPressed", "ToggleButtonBorderBrushChecked",
+                                       "ToggleButtonBorderBrushCheckedPointerOver", "ToggleButtonBorderBrushCheckedPressed",
+                                       "ToggleButtonBackground", "ToggleButtonBorderBrush" })
+            button.Resources[key] = clear;
+        if (Application.Current.Resources.TryGetValue("TextFillColorPrimaryBrush", out var primary) && primary is Brush text)
+            foreach (string key in new[] { "ToggleButtonForegroundChecked", "ToggleButtonForegroundCheckedPointerOver",
+                                           "ToggleButtonForegroundCheckedPressed" })
+                button.Resources[key] = text;
+        AutomationProperties.SetAutomationId(button, "sectionVerbPlanAlreadyRight");
+        AutomationProperties.SetName(button, label);
+        button.Checked += (_, _) => { chevron.Glyph = ""; toggled(true); };
+        button.Unchecked += (_, _) => { chevron.Glyph = ""; toggled(false); };
+        return button;
     }
 
     private void ShowResult(string said)
@@ -588,7 +709,7 @@ internal sealed class SectionVerbDialog
         var words = Words(said);
         words.IsTextSelectionEnabled = true;
         AutomationProperties.SetAutomationId(words, "sectionVerbResult");
-        _dialog.Content = new ScrollViewer { Content = words, MaxHeight = 420, MinWidth = 420 };
+        SetContent(new ScrollViewer { Content = words, MaxHeight = 420, MinWidth = 420 });
         _dialog.PrimaryButtonText = "";
         _dialog.CloseButtonText = AssistWording.MenuDoneButton;
         _dialog.DefaultButton = ContentDialogButton.Close;
@@ -678,28 +799,28 @@ internal sealed class SectionVerbDialog
 
         _stage = Stage.LaterClasses;
         _laterRows.Clear();
-        var list = new StackPanel { Spacing = 2 };
-        int index = 0;
-        foreach (var page in flagged)
-        {
-            string shown = $"{page.Title} — {AssistWording.LaterClassesDay(page.Date!.Value)}";
-            var box = new CheckBox { Content = shown, IsChecked = true };
-            AutomationProperties.SetName(box, shown);
-            AutomationProperties.SetAutomationId(box, $"laterClass{index++}");
-            box.Checked += (_, _) => NameTheLaterClassesButton();
-            box.Unchecked += (_, _) => NameTheLaterClassesButton();
-            _laterRows.Add((page, box));
-            list.Children.Add(box);
-        }
+        // A table, the picker's shape (#634, the mac's #608): Page with its
+        // box, and Date. Return is the main button; Space ticks the row.
+        var table = TickTable.ForLaterClasses(flagged, _meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle);
+        foreach (var row in table.Rows) _laterRows.Add((flagged[row.Index], row.Box));
+        table.Changed += NameTheLaterClassesButton;
+        table.Enter = () => { if (_stage == Stage.LaterClasses) _ = Advance(); };
         var panel = new StackPanel { Spacing = 12, MinWidth = 460 };
         panel.Children.Add(Words(_meeting ? AssistWording.LaterClassesAtPublishForAMeeting(nextDay)
                                           : AssistWording.LaterClassesAtPublish(nextDay)));
-        panel.Children.Add(new ScrollViewer { Content = list, MaxHeight = 320 });
+        panel.Children.Add(table.Panel);
         var note = Words(_meeting ? AssistWording.LaterClassesKeptNoteForAMeeting : AssistWording.LaterClassesKeptNote);
         note.Opacity = 0.8;
         panel.Children.Add(note);
         _dialog.Title = _meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle;
-        _dialog.Content = panel;
+        void Rows()
+        {
+            int rows = PageTableLayout.PickerRows(WindowHeight, flagged.Count);
+            table.SetRows(rows);
+            App.LogDiagnostic($"Later classes at Publish Pages: window {WindowHeight:0} epx tall, {rows} rows tall of {flagged.Count}");
+        }
+        Rows();
+        SetContent(panel, Rows);
         _dialog.CloseButtonText = AssistWording.MenuCancelButton;
         DialogButtons.EnablePrimary(_dialog, true);
         NameTheLaterClassesButton();
@@ -750,38 +871,55 @@ internal sealed class SectionVerbDialog
     {
         var titleCounts = pages.GroupBy(page => page.Title, StringComparer.OrdinalIgnoreCase)
                                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-        var list = new StackPanel { Spacing = 2 };
-        int index = 0;
-        foreach (var page in pages)
+        // A table (#634, the mac's #608): Page — the box is the title — Folder
+        // and Date, a class's day as the later-classes question says it.
+        var offers = new List<TickTable.Offer>();
+        for (int index = 0; index < pages.Count; index++)
         {
+            var page = pages[index];
             // Two pages of one title — every shipped course's _DUPLICATE ME
-            // templates — are told apart by their folder.
-            string shown = titleCounts[page.Title] > 1 ? $"{page.Title} — {page.Folder}" : page.Title;
-            var box = new CheckBox { Content = shown };
-            AutomationProperties.SetName(box, shown);
-            AutomationProperties.SetAutomationId(box, $"sectionVerbPage{index++}");
-            box.Checked += (_, _) => UpdateContinue();
-            box.Unchecked += (_, _) => UpdateContinue();
-            _rows.Add((page, box));
-            list.Children.Add(box);
+            // templates — are told apart by their folder, in the Folder
+            // column and in the box's name for Narrator.
+            string name = titleCounts[page.Title] > 1 ? $"{page.Title} — {page.Folder}" : page.Title;
+            string day = page.IsClass && page.Date is { } date ? AssistWording.LaterClassesDay(date) : "";
+            offers.Add(new TickTable.Offer(page.Title, name, $"sectionVerbPage{index}", $"sectionVerbPageRow{index}",
+                                           new[] { page.Folder, day }, Ticked: false));
         }
+        var table = new TickTable("sectionVerbPickerTable",
+                                  publishing ? AssistWording.MenuPickPagesToPublish : AssistWording.MenuPickPagesToHide,
+                                  new[] { AssistWording.MenuPlanFolderColumn, AssistWording.MenuPickDateColumn },
+                                  new[] { PageTableLayout.PickFolder, PageTableLayout.PickDate }, offers);
+        for (int i = 0; i < pages.Count; i++) _rows.Add((pages[i], table.Rows[i].Box));
+        table.Changed += UpdateContinue;
+        // Return reaches Continue with a row selected — when Continue is live.
+        table.Enter = () => { if (_stage == Stage.Choose && Ticked().Count > 0) _ = Advance(); };
+
         var find = new TextBox { PlaceholderText = AssistWording.MenuFindAPage };
         AutomationProperties.SetName(find, AssistWording.MenuFindAPage);
         AutomationProperties.SetAutomationId(find, "sectionVerbFind");
         find.TextChanged += (_, _) =>
         {
             string wanted = find.Text.Trim();
-            foreach (var (page, box) in _rows)
-                box.Visibility = wanted.Length == 0
-                                 || page.Title.Contains(wanted, StringComparison.CurrentCultureIgnoreCase)
-                                 || page.Folder.Contains(wanted, StringComparison.CurrentCultureIgnoreCase)
-                    ? Visibility.Visible : Visibility.Collapsed;
+            table.ShowOnly(row => wanted.Length == 0
+                                  || pages[row.Index].Title.Contains(wanted, StringComparison.CurrentCultureIgnoreCase)
+                                  || pages[row.Index].Folder.Contains(wanted, StringComparison.CurrentCultureIgnoreCase));
         };
         var panel = new StackPanel { Spacing = 12, MinWidth = 460 };
         panel.Children.Add(Words(publishing ? AssistWording.MenuPickPagesToPublish : AssistWording.MenuPickPagesToHide));
         panel.Children.Add(find);
-        panel.Children.Add(new ScrollViewer { Content = list, MaxHeight = 360 });
+        panel.Children.Add(table.Panel);
+        // The table's height is counted from EVERY page offered, never the
+        // search's leftovers, so the dialog stays still while the teacher
+        // types (the mac's #608); the window decides how many of them.
+        void Rows()
+        {
+            int rows = PageTableLayout.PickerRows(WindowHeight, pages.Count);
+            table.SetRows(rows);
+            App.LogDiagnostic($"Pages to tick: window {WindowHeight:0} epx tall, dialog {_planWidth:0} wide, {rows} rows tall of {pages.Count}");
+        }
+        Rows();
         ShowChoosing(panel);
+        _relayout = Rows;
         UpdateContinue();
     }
 

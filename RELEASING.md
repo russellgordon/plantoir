@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-22 | Publish Pages… and Hide Pages… show their pages as a banded table — Page (the tick box is the title), Folder and Date — and so does the question about classes dated later, at Publish Pages… and at Deploy; Space ticks the selected row. The plan lists only the pages a teacher must read, with the pages already visible (or hidden) folded behind a disclosure under the table (`menuPlanShowAlready`). The page dialogs and Start of Year grow with a wider (or, from 757 epx, taller) window. | Windows (the mac since v1.8.6, #608 #621 #622) | [#634](https://github.com/russellgordon/plantoir/issues/634) |
 | 2026-10-22 | Install and Reopen on the update offer that comes by itself once a day now closes Plantoir, installs and opens the new version, as it already did from File ▸ Check for Updates…; before, the window stayed open and nothing was installed. | Windows | [#632](https://github.com/russellgordon/plantoir/issues/632) |
 
 
