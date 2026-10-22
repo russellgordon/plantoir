@@ -6958,25 +6958,219 @@ argument must be a `figureRules.js` inside a `"type": "module"` package (a
 section's Quartz is one); handed the repository's copy directly, Node reads
 it as CommonJS and the helper dies before it says it is ready.
 
-## Runnable code (#455) and KaTeX served by the site (#494), v1.8.0: what the runtime owes
+## Runnable code (#455) and KaTeX served by the site (#494), v1.8.0: the runtime carries Pyodide (#568)
 
 The mac shipped both in v1.8.0; the shared Python, the page's code and the
 skill reach this side unchanged (`page_features.py`, `build_site.py`,
 `support/quartz/**`, `support/gated/pyodide/plantoir-worker.js`, the
-`plantoir-runnable-code` skill). What this runtime owes is in the `windows`
-issue for #455 (milestone v1.8.0): `fetch-runtime.ps1` fetching
-`pyodide-core-314.0.7.tar.bz2` and keeping its five files and a README in
-`runtime\vendor\pyodide` (13,531,207 bytes; whether `tar.exe` reads bzip2 is
-unmeasured — the image uses `python3 -m tarfile`), the katex version this
-runtime's lockfile installs (the mac's gives **0.16.21**; record what
-`npm ls katex` says here), `verify-deploy.ps1`'s engine and KaTeX checks, and
-measurements in Edge, Chrome and the WebView2 preview pane. Until the fetch
-lands, `ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` is
-red on the `pyodide` pin, or held open in `NamedGapLedger` by that issue. The
-manual is [06 → I](06-quartz-customizations.md#i-runnable-code-455-v180),
+`plantoir-runnable-code` skill). The manual is
+[06 → I](06-quartz-customizations.md#i-runnable-code-455-v180),
 [06 → C2-26](06-quartz-customizations.md#c2-applied-on-every-build),
 [05 → Runnable code](05-build-pipeline.md#runnable-code-what-the-build-does-455-v180)
 and [07 → Runnable code and KaTeX on each host](07-deployment.md#runnable-code-and-katex-on-each-host-455-494-v180).
+This section is what Windows does differently, and what it measured
+(2026-10-22, Intel Core i5-8365U @ 1.60 GHz, 16 GB, Intel UHD Graphics 620,
+Windows 11 Pro 26200, wired Ethernet; Node 20.18.1).
+
+**What landed (#568, 2026-10-22).** `fetch-runtime.ps1`'s vendor phase
+fetches `pyodide-core-314.0.7.tar.bz2` from the project's GitHub release,
+checks it against the contract's `sha256` and its 6,757,104 bytes, keeps the
+five files the image keeps — `pyodide.mjs`, `pyodide.asm.mjs`,
+`pyodide.asm.wasm`, `python_stdlib.zip`, `pyodide-lock.json` — each checked
+against `pyodide.files`, and writes the Dockerfile's README line byte for
+byte (`Pyodide 314.0.7 (MPL-2.0). Source: …/tree/314.0.7`, 83 bytes, one
+LF). `pyodide` is the fifth vendor key in `manifest.json`, so a runtime made
+before 2026-10-22 takes the vendor-only path (the whole vendor phase again,
+**49 s** here, downloads 1.05 + 4.32 + 0.19 + 6.44 MB then `npm ci`), and
+`CheckNativeRuntimeManifest` refuses it until then — "Diagrams and graphs"
+above, which also has the must-fail measurement. `build_site.py` finds the
+folder with no new variable (`toolchain_paths.VENDOR_DIR`), and a build of a
+page with a runnable block printed "▶️  This site carries what runs Python
+for 2 pages" and carried the five files plus the worker.
+
+**The runtime grows by 13,531,290 bytes** — the five files, 13,531,207 bytes
+as the contract's `why` says (pyodide.mjs 17,931; pyodide.asm.mjs 1,250,344;
+pyodide.asm.wasm 9,598,218; python_stdlib.zip 2,545,637; pyodide-lock.json
+119,077), plus the 83-byte README. `runtime\vendor` went from 42,185,233 to
+55,716,523 bytes. A site carries them only when a page students can see has a
+runnable block (`codeRunnerBlocks.siteCarriesEngine`).
+
+**Unpacked with the runtime's own Python, not bsdtar.** MEASURED: this PC's
+`%SystemRoot%\System32\tar.exe` is bsdtar 3.8.9 with bz2lib 1.0.8, so it
+does read bzip2. The script still uses the embeddable Python's `tarfile`
+(`r:bz2`; `_bz2.pyd` ships in the embeddable zip), extracting only the five
+names and refusing a tarball that lacks one — the same reason the Latin
+Modern step gives for xz (an older Windows 10's bsdtar is not known to carry
+the library, and the build PC is the only place this runs), and the same
+tool the Dockerfile uses (`python3 -m tarfile`). REJECTED: bsdtar, for that
+reason; holding the pin open in `NamedGapLedger` instead of fetching (the
+fetch was small enough to land with the pin).
+
+**KaTeX: the runtime's lockfile installs 0.16.21, the mac's version.**
+`npm ls katex` in `runtime\quartz` gives `katex@0.16.21` (and
+`micromark-extension-math`'s copy deduped to it). The three files the
+contract pins (`katex.min.css`, `contrib/copy-tex.min.js`, `LICENSE`) match
+`katex.files` byte for byte, and the 20 woff2 faces total 259,792 bytes, the
+mac's number — so a Windows-built site serves exactly the mac's KaTeX.
+
+**`scripts/test_katex_assets.py` was red on Windows, and the runtime was not
+why.** `InstallTests.carried()` listed the copied files with
+`str(path.relative_to(...))`, which is `contrib\copy-tex.min.js` here against
+the expected `contrib/copy-tex.min.js`; it uses `.as_posix()` now, which is
+the same string on the mac. `build_site.install_katex_assets` itself compares
+`Path` objects and was right. (Run by hand from a cp1252 console the file
+also throws two `UnicodeEncodeError`s on build_site's emoji prints;
+`PythonToolchainTests` sets `PYTHONUTF8` and `PYTHONIOENCODING`, so the suite
+never sees them.)
+
+**Tests.** `ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`
+is green on the `pyodide` pin's `windowsRuntimeContains`;
+`TheWindowsRuntimeRecipesVendorVersionsAreTheContracts` holds
+`$PyodideVersion`; `TheWindowsRuntimeRecipeChecksPyodidesContractHashes` holds
+the recipe's tarball hash and five file hashes against the contract (only
+Pyodide's: `nodeTikzjax.sha256` is for the record, `npm ci` checks its own
+lockfile); and `TheNativeRuntimeCarriesPyodideAtTheContractsHashes`
+(`[NativeRuntimeFact]`, skipped with its reason only where there is no
+runtime at all) reads the runtime on the machine back — it FAILS on a
+manifest without `pyodide`, as the build does, and on any file or README
+that is not the contract's.
+
+### The preview's isolation headers (#591, mac #583): inherited
+
+Windows' preview is Quartz's own server, run from the section's copied
+scaffold (`node <builds>\…\section1\quartz\bootstrap-cli.mjs build --serve`,
+`cwd` the section), so `build_site._wire_isolation_serve` patches that copy's
+`quartz\cli\handlers.js` exactly as on the mac. Two things could have stopped
+it and did not: the native-only loopback patch (`fetch-runtime.ps1` rewrites
+`server.listen` and the WebSocket server, not the `serve()` anchor), and line
+endings (the runtime's `handlers.js` has no CR, and the 8-space
+`const release = await buildMutex.acquire()` anchor occurs once). Read back
+from a native preview with curl:
+
+| Address | What came back |
+|---|---|
+| a page with a ```` ```python run ```` block that reads `input()` | `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp` |
+| the same with a YouTube `<iframe>` | neither header, and the preview printed `plantoir: note: Lessons/Video Check.md: students type this page's input in a box before Run, because the page also shows a video, a PDF or another web page in a frame - …` (`words.notLiveBecause` + `notLiveFrame`, once per page) |
+| the front page | neither header |
+| `static/pyodide/*` and `static/swift/*` | `Cross-Origin-Embedder-Policy: require-corp` on every file |
+| `pyodide.asm.wasm` / `.mjs` / the workers | `application/wasm` / `application/javascript; charset=utf-8` |
+| `static/katex/katex.min.css` / a face | `text/css; charset=utf-8` / `font/woff2` |
+
+**The publish inherits it too**: `deploy.py` → `isolation_headers.py` is
+shared, and `verify-deploy.ps1` read the same headers back from Netlify and
+Cloudflare Pages (below). Nothing was changed for #591.
+
+### The editor's colours and line numbers (#592, mac #585): carried
+
+`Plantoir.csproj` ships `scripts\**`, `support\**` and `contracts\**` by glob,
+and `ToolchainMirror.RecipeFolders` mirrors the same folders into a working
+folder's `.toolchain`, so `support\quartz\components\scripts\codeRunnerColour.ts`,
+`support\quartz\components\styles\codeLines.scss` and
+`scripts\fixtures\runner-colour\` (python.txt, swift.txt) are in the x64
+Debug build's `Toolchain\` (checked). Windows does not run
+`scripts/check_runner_rules_against_the_site.py` (it needs the image's
+Shiki), so #592's item 2 does not apply here.
+
+### Measured in Edge (headless), on a native preview
+
+Headless Edge 155.0.4283.60 through Playwright (`channel="msedge"`, a fresh
+profile per context), against the preview above — a section built with
+`preview.ps1` from this runtime, served at `http://localhost:8081`. This
+PC's WebView2 Runtime is 155.0.4283.62, the same Chromium; the preview pane
+itself is measured separately ("WebView2" below). No Chrome is installed
+here.
+
+- **Isolation**: `self.crossOriginIsolated` is `true` on the runner page,
+  no input box; `false` on the YouTube page, which shows the box and its
+  `words.inputAhead` line, and its transcript was `Name? Ada` / `Hi Ada`.
+- **Nothing of the engine on load**: 0 requests under `static/pyodide/`
+  before Run; Run fetched the worker, `pyodide.mjs`, `pyodide.asm.mjs`,
+  `pyodide.asm.wasm`, `python_stdlib.zip` and `pyodide-lock.json`.
+- **First Run** (cold, a fresh context each time, empty cache) to the first
+  prompt on the page: **2.29–2.42 s, median 2.38 s** (5 runs); the whole
+  program with both answers 2.36–2.53 s. **A second Run** on the same page:
+  **0.10–0.12 s**.
+- **`input()` with two prompts**: Run focused the answer field
+  (`plantoir-runner-answer`); `Ada` Return, `blue` Return gave the transcript
+  `Name? Ada` / `Colour? blue` / `Hello, Ada who likes blue`, byte for byte
+  the box's shape. **Ctrl-D** at the second prompt: `Colour? ` then the
+  `EOFError: EOF when reading a line` traceback naming line 2, status
+  `Finished with an error.`
+- **Stop then Run**: `while True: time.sleep(0.1)` stopped in **0.03 s**
+  (`Stopped.`); the next Run reached its first prompt in **2.6–2.9 s**,
+  because Stop ends the thread and the next Run starts a new one (a cold
+  start from the browser's cache), and ran correctly.
+- **One thread after page changes**: 1 worker before, 1 after three round
+  trips between the runner page and the YouTube page by the site's own links
+  (each crossing the isolation line, so each a whole load) with a run on each
+  return.
+- **Tab** at the start of a line inserted four spaces; **Shift-Tab** put the
+  code back exactly; **Escape then Tab** left the editor.
+- **Colours (#592)**, light and dark (`saved-theme`): a line typed into the
+  editor (`def f(): return "x" + 42  # note`) was coloured by the tokenizer
+  in the same colours as Shiki's static block for the same kinds — `def`
+  rgb(215, 58, 73) light / rgb(249, 117, 131) dark, a comment
+  rgb(106, 115, 125) in both; the string and number took github-light's and
+  github-dark's (rgb(3, 47, 98) / rgb(158, 203, 255), rgb(0, 92, 197) /
+  rgb(121, 184, 255)). **Gutter**: 6 numbers for 6 editor lines and 6
+  coloured lines, and the copy's text equal to the editor's. **Undo**: each
+  Ctrl+Z took one typed character back (Playwright types key by key) and the
+  copy and gutter stayed in step after every one. **Hairline**: the
+  runnable gutter's `border-right` and a static block's number's
+  (`[data-line]::before`) are the same, `1px solid rgb(229, 229, 229)` light
+  and `1px solid rgb(57, 54, 57)` dark; `font-variant-ligatures: none`.
+- **Maths offline**: with every request not to the preview's own origin
+  aborted (the only one asked for was Google Fonts' stylesheet), both
+  formulas rendered, `KaTeX_Main`, `KaTeX_Math` and `KaTeX_Size1` loaded from
+  `static/katex/fonts/`, and the stylesheet was the site's own.
+
+### WebView2 (the preview pane)
+
+OWED: needs the app's window on an unlocked desktop, so it is sequenced
+separately from this piece's headless work.
+
+### verify-deploy.ps1
+
+Gained the mac's `check_engine` and `check_engine_folder` (#568): each engine
+file 200 with a runnable type, a worker CSP that allows wasm, the borrowed
+page's runnable block, COOP/COEP on that page and COEP on both engine
+folders, none on the front page, KaTeX's stylesheet as `text/css` and a
+face, no CSP naming jsdelivr, and the folder publishes' engine and KaTeX
+files against the contract's hashes. Swift is checked as far as Windows
+carries it — `static/swift/plantoir-swift-worker.js` and `plantoir-wasi.mjs`
+as JavaScript with COEP, and the overlay byte for byte — and the borrowed
+page's ```` ```swift run ```` fence is EXPECTED to be reported as not ready
+(`swift.reasons.notOnWindows` on a `plantoir: error:` line, and the
+`swiftCouldNotBePrepared` folder problem) by the preview and by the publish
+that rebuilds; only the compiled program, which Windows cannot make (#570),
+is a skip. It also times each Netlify and Cloudflare publish and counts the
+bytes sent on the interface the default route uses (route metric plus
+interface metric: sorting on the route's alone read a Wi-Fi counter that
+never moved beside the wired adapter).
+
+Two runs, 2026-10-22, a scratch course (`PYT1O`: two runnable pages, one
+with a YouTube frame, and the borrowed page). The FIRST, from a fresh state
+folder and onto new sites: Netlify **19 s** for the first publish with the
+engine ("Netlify requires 17 file"), Cloudflare **33 s**; then **11 s**
+("8 file") and **20 s** ("Uploaded 7 files (46 already uploaded)") again.
+Its byte counts read 0 (the Wi-Fi counter; fixed above), so the number of
+bytes a first publish of the engine sends is not measured here. The SECOND
+run, onto the same sites: **140 passed, 0 failed, 8 skipped** (the eight are
+the Swift program, once per host and folder); publishes of 10–12 s to
+Netlify ("7 file", 182–239 KiB sent) and 20–29 s to Cloudflare ("Uploaded 7
+files (46 already uploaded)", 400–709 KiB) on Ethernet.
+
+**What the first run also found, not fixed here:** on a FIRST publish (no
+saved surname, a new site) two of the harness's answered prompts failed
+`Assert-OnlyExpectedPromptsWereAnswered`, because the line PtyDriver saw
+joined the sentence before it with no line break: "…It is saved on this
+computer and only asked once.First time setup... what is your last name?
+(letters only):" and "…all users across the world.Enter Netlify site name
+[pyt1o-s1-2026-testing]:" (and in the log, "Saved teacher last name for
+future deploys: testingChoose a Website Address."). The answers were the
+right ones and the publishes succeeded; the anchored patterns are what
+refused them. It predates this piece (nothing here touches `deploy.py`'s
+prompts or PtyDriver) and is #623.
 
 ## Runnable Swift (#493), v1.8.0: Windows compiles none of it yet
 
