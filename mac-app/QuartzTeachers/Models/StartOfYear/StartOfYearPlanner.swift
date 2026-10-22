@@ -80,6 +80,42 @@ nonisolated struct StartOfYearDanglingSource {
     let hiddenTargets: [String]
 }
 
+/// One row of the sheet's table of pages going into draft (#589): the page,
+/// where it is, and why it goes.
+///
+/// Built by `StartOfYearPlan.tableRows()` from the same drafts and the same
+/// reason clauses as `line(for:first:)`, so the table and the plan an outside
+/// assistant is shown cannot disagree. The title is a cell, not a sentence —
+/// no quotation marks, as #524's table — and the folder is always shown, so
+/// the "(in …)" a line needs to tell two pages with one title apart (#362) is
+/// not needed in a cell.
+nonisolated struct StartOfYearPlanRow: Identifiable, Equatable {
+
+    // MARK: - Stored properties
+
+    /// Where the page comes in the plan — classes first, then pages, each in
+    /// plan order. The table's first order, and its identity.
+    let position: Int
+
+    let title: String
+
+    /// The folder within the course (`StartOfYearPageNaming.folder`).
+    let folder: String
+
+    /// The contract's name for the reason (`StartOfYearReason.key`), for a
+    /// test to ask about without reading the cell's words.
+    let reasonKey: String
+
+    /// The cell: the reason clause, as the line in `describe()` says it.
+    let why: String
+
+    // MARK: - Computed properties
+
+    var id: Int {
+        return position
+    }
+}
+
 /// How the start-of-year plan, its sheet and its undo name a page (#362).
 ///
 /// **By its title**, the app's one naming rule (`AssistSectionPage.displayTitle`,
@@ -379,6 +415,34 @@ struct StartOfYearPlan {
     /// `describe()` both build it here, so the two cannot disagree.
     func line(for draft: StartOfYearDraft, first: String) -> String {
         return StartOfYearWording.draftLine(name: name(of: draft.page), reason: draft.reason.sentence(first: first))
+    }
+
+    /// The table's rows (#589): every page the write will put into draft,
+    /// classes first and then pages, in plan order — the same pages, in the
+    /// same order, as the two lists in `describe()`. Not capped: the table
+    /// scrolls inside itself instead.
+    func tableRows() -> [StartOfYearPlanRow] {
+        let first: String = firstClass.displayTitle
+        var drafts: [StartOfYearDraft] = []
+        for draft in draftsThatChange(classDrafts) {
+            drafts.append(draft)
+        }
+        for draft in draftsThatChange(pageDrafts) {
+            drafts.append(draft)
+        }
+        var rows: [StartOfYearPlanRow] = []
+        for draft in drafts {
+            rows.append(StartOfYearPlanRow(
+                position: rows.count,
+                title: draft.page.displayTitle,
+                folder: StartOfYearPageNaming.folder(
+                    of: draft.page.fileURL, courseDirectoryURL: courseDirectoryURL, courseCode: courseCode
+                ),
+                reasonKey: draft.reason.key,
+                why: draft.reason.sentence(first: first)
+            ))
+        }
+        return rows
     }
 
     /// The whole plan in plain text, for an outside assistant to show a

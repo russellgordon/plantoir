@@ -111,8 +111,13 @@ final class StartOfYearNamingTests: XCTestCase {
             )
             XCTAssertFalse(text.contains("relativePath(of:"), "\(fileName) shows a file's path (#362)")
         }
-        // Positive controls: the lines come from the one builder.
-        XCTAssertTrue(sheet.contains("plan.line(for: draft"), "The sheet should build its lines through the plan")
+        // Positive controls: the lines come from the one builder. Since #589
+        // the sheet shows the pages as a table, whose rows the plan builds
+        // from the same drafts and reasons, naming the folder by its
+        // components — never from a path.
+        XCTAssertTrue(sheet.contains("plan.tableRows()"), "The sheet should build its rows through the plan")
+        XCTAssertTrue(planner.contains("folder: StartOfYearPageNaming.folder("), "A row's folder should be named as #362 names it")
+        XCTAssertTrue(planner.contains("why: draft.reason.sentence(first: first)"), "A row's reason should be the line's")
         XCTAssertTrue(sheet.contains("StartOfYearPageNaming.names("), "The undo should name by title")
         XCTAssertTrue(planner.contains("\"• \" + line(for: draft"), "describe() should use the plan's builder")
     }
