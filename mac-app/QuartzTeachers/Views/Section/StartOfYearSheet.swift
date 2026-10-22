@@ -279,6 +279,17 @@ struct StartOfYearSheet: View {
     /// misjudged row leaves a band of a few points rather than a scroll.
     static let widestOneLineReason: CGFloat = 244
 
+    /// The sheet's width to open with, and the narrowest it can be made
+    /// (#621). The two-line arithmetic above is worked out at this width:
+    /// Page, Folder and Why are 124/94/254 here (118.5/88.5/248 with a
+    /// scroll bar), as they were before the sheet could be resized.
+    static let width: CGFloat = 560
+
+    /// The stages other than the plan: at least this tall, and at most
+    /// `tallestOtherStage` to open with, then they scroll.
+    static let shortestOtherStage: CGFloat = 200
+    static let tallestOtherStage: CGFloat = 460
+
     // MARK: - Computed properties
 
     static var tallestPlanTable: CGFloat {
@@ -289,25 +300,39 @@ struct StartOfYearSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if case .ready(let plan) = model.stage {
-                // No outer scroll view for the plan (#589): the table scrolls
-                // inside itself, and a scroll inside a scroll is the shape
-                // every list here has refused.
-                planView(plan)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        content
+            // Every stage stays flexible (#621), as in `SectionVerbSheet`:
+            // one stack before the flexible frame, which takes any height
+            // the teacher adds at the top, so the buttons stay at the bottom.
+            VStack(alignment: .leading, spacing: 12) {
+                if case .ready(let plan) = model.stage {
+                    // No outer scroll view for the plan (#589): the table
+                    // scrolls inside itself, and a scroll inside a scroll is
+                    // the shape every list here has refused.
+                    planView(plan)
+                } else {
+                    // As tall as what it says, from 200 to 460 pt, to open
+                    // with — the size these stages always had — and every
+                    // point added after that (#621). A `maxHeight: 460` here
+                    // made the sheet's largest size 460 pt of content, so a
+                    // sheet made taller at the plan was held to it.
+                    CappedScrollArea(cap: StartOfYearSheet.tallestOtherStage, growsWithItsSheet: true) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            content
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: StartOfYearSheet.shortestOtherStage)
                 }
-                .frame(minHeight: 200, maxHeight: 460)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
             buttons
         }
         .padding([.horizontal, .bottom], 20)
         .sheetTitle(model.title)
-        .frame(width: 560)
+        // 560 wide and its content's height to open with, which is also the
+        // smallest it can be made; no largest (#621).
+        .frame(minWidth: StartOfYearSheet.width, idealWidth: StartOfYearSheet.width, maxWidth: .infinity)
+        .background(SheetGrowsToItsMinimum().accessibilityHidden(true))
         .onAppear {
             model.load()
         }
@@ -319,6 +344,8 @@ struct StartOfYearSheet: View {
         // `ContainerIdentifierTripwireTests` checks the order.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("startOfYearSheet")
+        // Resizable, and opened at the size above (#621, as Publish Pages).
+        .presentationSizing(.fitted)
     }
 
     // MARK: - Parts
@@ -457,7 +484,8 @@ struct StartOfYearSheet: View {
                 Text(row.title)
                     .help(row.title)
             }
-            .width(min: 90, max: 140)
+            // No largest width (#621): the width a teacher adds goes here.
+            .width(min: 90)
             TableColumn(AssistWording.menuPlanFolderColumn, value: \.folder) { (row: StartOfYearPlanRow) in
                 Text(row.folder)
                     .foregroundStyle(.secondary)
@@ -471,11 +499,13 @@ struct StartOfYearSheet: View {
                     .lineLimit(2)
                     .help(row.why)
             }
-            // The rest of the width: it carries the longest words.
-            .width(min: 220, ideal: 300)
+            // The rest of the width at 560: it carries the longest words.
+            // Capped at 300 so that past it the width goes to Page; at 560
+            // it is 254 either way, which the two-line rows rest on.
+            .width(min: 220, ideal: 300, max: 300)
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
-        .frame(height: StartOfYearSheet.planTableHeight(for: rows))
+        .flexibleTableHeight(StartOfYearSheet.planTableHeight(for: rows))
         .accessibilityIdentifier("startOfYearPlanTable")
     }
 

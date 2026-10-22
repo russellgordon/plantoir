@@ -3234,7 +3234,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 
 | Item | What it opens | The tool it runs |
 |---|---|---|
-| Publish Pages… | a searchable checklist of the hidden pages, classes first, then the plan as a table (#524) | `plan_publish_pages`, then `publish_pages` |
+| Publish Pages… | a searchable table of the hidden pages to tick, classes first (#608), then the plan as a table (#524), the pages already visible folded under it (#622) | `plan_publish_pages`, then `publish_pages` |
 | Hide Pages… | the same, of the visible pages | `plan_unpublish_pages`, then `unpublish_pages` |
 | Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan as a table (#524) | `plan_publish_class_on`, then `publish_class_on` |
 | Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
@@ -3436,7 +3436,8 @@ reference-course gate and outside-change hold); putting the rows in `detail`
 sheet (the existing sheet's stage changes what it draws; `SheetTitleScanTests`
 still counts 17 sheets); a selectable table (the rows are read, not chosen,
 and the page names are no longer selectable text — the notes still are);
-widening the sheet mid-flow (it stays 560); twenty rows before scrolling
+widening the sheet mid-flow (it stayed 560 until v1.8.6; since #621 the
+TEACHER may widen it, and the sheet never widens itself); twenty rows before scrolling
 (above); the table on the assistant window's Go/Cancel card (a narrow chat
 bubble; it stays text, Russell's ruling 3); "will be hidden" for the column
 (the card's shipped "will become hidden" is kept, ruling 6).
@@ -3449,6 +3450,92 @@ rows travel in the tool result's `_meta`, because the planner runs in another
 process; the rows shown are what fits the window (2 to 12, the notes giving way first), not a fixed 12;
 the ListView kept Return for itself, so Return is caught before it; and a
 club's table speaks of meetings while Windows' card does not yet.
+
+#### v1.8.6: the picker is a table, the plan folds, the sheets resize (#608, #621, #622)
+
+Three changes to the same sheets, one piece, measured on macOS 26.6 with the
+real sheets presented off screen (`PageTablesSheetTests`, through
+`SheetHost`).
+
+**The picker is a table (#608).** The first stage of Publish Pages… and Hide
+Pages… was a stack of checkboxes with a grey second line, which with ten or
+more classes ran together. It is now a bordered, banded `Table` — Page (the
+checkbox IS the title, the Xcode target-membership shape the Course Settings
+tables use, with the tooltip and the `sectionVerbRow-<name>` identifier),
+Folder and Date (`menuPickDateColumn`, a class's day as the later-classes
+question says it; empty for a page that is not a class). A click on a box
+ticks it; Space ticks the selected row, and selecting is not ticking; Return
+and Escape still reach Continue and Cancel with a row selected (#524 had only
+measured a table without a selection); Space typed in Find a Page ticks
+nothing. The table's height is counted from EVERY page offered, not the ones
+the search leaves, so the sheet stays still while the teacher types, and it
+shows twelve rows before scrolling (318 pt, under the 340 the checkbox list
+was capped at); the forty-page picker is 506 pt against 620. REJECTED: a
+separate fourth checkbox column, as the issue sketched.
+
+**The plan lists what changes (#622).** The table holds
+`AssistPlanTable.rowsToRead`: every change, and every page that stays for a
+reason (kept by an unpublish, a linked class left as it is, no room for a
+key) — those must be read before Go. The pages already the way they were
+asked to be (`rowsAlreadyRight`: already visible, already hidden, nothing
+else) sit behind a `DisclosureGroup` under the table, closed for every new
+plan, worded `menuPlanShowAlready(count:publishing:)` — four keys,
+`menuPlanShowAlready`, `…Hiding`, `…OnePage`, `…OnePageHiding`. The
+disclosure has no content of its own: opening it appends those rows to the
+SAME table, in plan order — one table and one sort, as #589 chose. A plan
+with nothing else to read shows every row and no disclosure. The summary line
+is unchanged. Russell's ruling (R8): **the sheet must not grow when the
+disclosure opens.** So the table's height counts the rows shown with the
+disclosure CLOSED, never fewer than five rows' worth while pages are folded
+(`fewestPlanRowsUnderAFold`, Start of Year's budget), and the folded rows
+scroll inside it: opening the disclosure on a plan of 5 + 16 leaves the sheet
+at 560 × 316 and its minimum at 316, with 21 rows scrolling in a 150-pt
+table and the last one reachable. Counting the drawn rows instead (measured)
+raises the minimum to 484 under the open sheet. The disclosure sits 6 pt
+under the table rather than 12: the worst plan — twelve rows, the
+disclosure, the notes at their 120-pt cap — measures 616 pt that way and 622
+with a full spacing, over the 620 a 13-inch screen allows.
+
+**The sheets resize (#621).** `SectionVerbSheet` (and Start of Year, below)
+is `.frame(minWidth: 560, idealWidth: 560, maxWidth: .infinity)` with
+`.presentationSizing(.fitted)`. Measured: the default sizing is NOT
+resizable, even with flexible content, and snaps back on every change;
+`.fitted` makes the sheet resizable, opens it at its content's size, and
+makes that size its minimum — so the size a teacher saw before is the default
+and the least (the picker 338, the later classes 290, the plan of 21 pages
+454, a hide plan of two rows 214, the text stages 124 and 412, all equal to
+dev's). Every table is `flexibleTableHeight(today's height)` — `minHeight =
+idealHeight` = what it was, no maximum, `layoutPriority(1)` — so 300 pt more
+sheet is 300 pt more table. The text stages' `CappedScrollArea` takes
+`growsWithItsSheet` likewise (the implementation review's A-F1): a Re-date
+card still opens at 412, and 300 pt more sheet is 300 pt more text, where
+before its 304-pt area stayed put under a band. The plan's Folder and What changes are capped at
+140 and 320 and Page is not, so the width added goes to the titles
+(125/115/215 at 560, unchanged; 335/140/320 at 900). The content is wrapped
+in ONE `VStack` before `.frame(maxHeight: .infinity, alignment: .top)`: a
+frame on a multi-view builder frames each child (the table got 223 of 628 pt,
+the summary 560), and a `Spacer` adds a spacing to every opening size
+(measured +20 on every stage).
+
+`.fitted` never fits a sheet AGAIN after it opens (the plan review's B1): on
+the move from a two-row picker to the plan, the minimum rose to 454 pt
+under a 266-pt sheet, the content was centred and clipped and the buttons
+were off its bottom; `.fitted.sticky()` and an `.id` per stage behave the
+same. `SheetGrowsToItsMinimum`, a background `NSView`, watches the sheet
+window's `contentMinSize` (measured: SwiftUI announces that key; `minSize`
+sends nothing) and, on the next main-actor turn, grows the window to it —
+never shrinking it, so a sheet the teacher made bigger stays bigger, and the
+next, shorter stage leaves it where it is. The disclosure never raises the
+minimum, so it never moves the sheet.
+
+REJECTED: two tables for the fold (one height function and one sort, as
+#589); a literal 620-pt minimum (a two-row picker would carry about 300 pt of
+empty table, and it would move Start of Year's figure); growing the window
+when the disclosure opens (Russell); `.automatic` sizing (not resizable);
+Copy a Page (not a `Table`, and its figure is in the reference scene — a
+follow-up issue if wanted). The trail is unchanged: this is how the plan is
+shown, not what Publish does. Windows: the five keys travel in
+`assist-wording.json`; the layout went as one `windows` issue.
 
 ### Classes dated after the next class, at Deploy (#475)
 
@@ -3492,7 +3579,9 @@ WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
   testTheClassesDatedLaterLineFollowsADeployThatWentOut` runs the real
   wrapper both ways).
 
-The sheet lists the flagged classes, every one ticked, and ALWAYS offers two
+The sheet lists the flagged classes, every one ticked — since v1.8.6 (#608)
+in the picker's table, Page (with its checkbox) and Date, Space ticking the
+selected row, in a sheet the teacher can resize (#621) — and ALWAYS offers two
 buttons beside Cancel: **Hide Ticked and Deploy** (the default) and **Keep All
 and Deploy**, which keeps every listed class at its date and hides nothing —
 the director's ruling on the implementation review's finding 1 (Russell may
@@ -9050,9 +9139,26 @@ sortable `Table` — the look #524 gave Publish Pages ("The plan as a table
   longest reason, `reasonOnlyHiddenPagesLink` ("only “…” links to it, and
   students will not see that page"), is about 400 pt; on one line in a
   240-point column it was cut at its useful half (#589's plan review). Page is
-  90–140 pt and Folder 60–100, which leaves Why 254 pt in the 560-point sheet
-  (248.5 with a scroll bar showing). `.help` still carries every cell whole for
-  a long title.
+  at least 90 pt and Folder 60–100, which leaves Why 254 pt in the 560-point
+  sheet (248 with a scroll bar showing). `.help` still carries every cell
+  whole for a long title.
+- **Resizable since v1.8.6 (#621)**, as Publish Pages… ("The plan as a table
+  (#524)" → v1.8.6): the same root frame, `.presentationSizing(.fitted)` and
+  `SheetGrowsToItsMinimum`, and the table is `flexibleTableHeight`. Until
+  then Page was capped at 140 so Why took the spare width; now Page has no
+  cap and Why is capped at 300, so the width added goes to the titles — and
+  at 560 the columns are still 124/94/254 (118.5/88.5/248 with a scroll bar),
+  which the two-line arithmetic above rests on; at 900, 412/100/300. The
+  sheet opens at 606, 478 and 466 pt as before. KNOWN: NSTableView keeps
+  the teacher's proportions, so widening and then narrowing again can leave
+  Why under 244 pt (the plan review measured 225.5), and a reason the height
+  was worked out for on one line may then take two; Russell: "we'll see how
+  it works in practice". The other stages (reading, the result, the undo's
+  lists, a problem) were a `ScrollView` framed 200–460, which made 460 the
+  largest the sheet's content could be, so a sheet made taller at the plan
+  was held to it after Go; they are a `CappedScrollArea` capped at 460 with
+  `growsWithItsSheet`, measured to open at exactly the old heights (200, 302
+  and 460 pt at 1, 12 and 60 lines) and to take any height added.
 
 **The height budget — MEASURED, macOS 26.6.** Every sheet here must fit in
 `CopyPageChecklist.tallestSheet` (620 pt: a 13-inch Air at "Larger Text").
@@ -10271,6 +10377,171 @@ unlocked reading, so the two are the same record. The first locked gate run
 settles it: 8 skips naming #315 and 0 failures means the key fired; the old
 16 failures mean it did not, and `IOConsoleLocked` is the fallback. Either
 way the result is a failure or a skip with a reason, never a silent pass.
+
+## Testing: the unit test host shows nothing on any display (#633)
+
+Written 2026-10-22, v1.8.6. The mac unit suite runs INSIDE Plantoir: the test
+host is the real app, and until this release it put the app's main window on
+a display at launch, became the frontmost app about two seconds later, took
+the menu bar, and hung every sheet and alert a test raised on that window in
+front of whoever was working at the Mac. Every class-level run did it, not
+only the full suite. Measured on macOS 26.6 with two (later three) displays.
+
+**Why the fix is in the app, not in the tests.** A probe timed the launch.
+The main window is ordered in on a display at **449 ms**, and the test
+bundle's principal class, the earliest code the test target can run, runs at
+**475 ms**. No test-target code can get there first. The app's
+`applicationWillFinishLaunching` can: no window exists yet, and XCTest is
+already loaded (true in every run measured, so `RealHome.isInsideTestBundle`
+reads correctly there).
+
+**What it does.** `UnitTestHostWindows.installIfThisIsTheUnitTestHost()` is
+the first line of `applicationWillFinishLaunching`. When
+`UnitTestHostWindows.quietsThisProcess(...)` says yes, it does two things.
+
+- **The host becomes an accessory app** (`setActivationPolicy(.accessory)`),
+  so it has no Dock tile and no menu bar of its own.
+- **`NSWindow`'s three placement methods get one answer.** These are
+  `constrainFrameRect(_:to:)`, `setFrame(_:display:)` and `setFrameOrigin(_:)`.
+  A window that is not a sheet always sits at ONE origin beyond every display:
+  `offScreenOrigin(for:displays:)`, beyond the bottom-left corner of all the
+  displays together, with 4000 pt to spare. A sheet is moved only if it would
+  overlap a display, so it stays beside its parent. The probe saw all three
+  methods used, by SwiftUI's window, alerts, sheets, popover windows and
+  text-input windows. The replacement is on `NSWindow` itself, so every
+  subclass that calls `super` is covered.
+
+The window is still ordered in, which matters because about twenty classes
+read it. The accessibility tree, `isOnActiveSpace`, presses and
+`cacheDisplay` screenshots all work off every display: a 23-class run, the
+probe's run B with 158 tests, had 0 skips. AppKit simply reports
+`window.screen == nil`.
+
+**Why the origin is pinned, not merely kept off.** "Keep off the displays"
+alone was measured first. AppKit's sheet helper moves the parent after every
+sheet, and over 23 classes the main window drifted from x = -5920 to
+x = -24070. With the pin taken out again during implementation, one sheet and
+one alert moved the main window from (-5512, -5610) to (-15304, -15990). A
+window that drifts is still off every display, so only its origin shows the
+difference, and the live test asserts it.
+
+**The front, handed back.** Off every display, an active host still takes the
+keyboard. Two classes activate it:
+
+- `MenuKeysBehindASheetTests`, on purpose: a window's menu keys reach the
+  menu bar only from the key window of the active app;
+- `AssistRevealsSectionOnScreenTests`, through the product's own
+  `activate(ignoringOtherApps:)`.
+
+`ActivationHandBack`, an `XCTestObservation` registered from the bundle's
+principal class, remembers the last other app at the front, and only an
+ordinary app with a Dock tile (`activationPolicy == .regular`): a background
+agent such as `UserNotificationCenter` activates now and then, and was once
+measured as the remembered app. When a test finishes with the host active, it
+yields activation to that app and asks it forward. If that app has quit or will
+not come forward, it yields to the Finder, which is always running, and asks it
+forward instead. `NSApp.deactivate()` is only the last resort: on its own it
+left the host active and frontmost for the whole 5 s it was watched. It never
+calls `hide`, which would order out the window the next tests read.
+Without the hand-back the host stayed frontmost for the remaining **115 s** of
+a 23-class run. With it, an external watcher measured the host frontmost for
+about **2.5 s in total** over 24 classes and 164 tests: one 2.4 s stretch for
+the class that activates it, and two blinks at launch (68 ms and 45 ms). Both
+classes needed no change: `MenuKeysBehindASheetTests` ran unmodified and
+passed. Starting inactive, its cooperative `activate` is refused, and its own
+`kAXFrontmostAttribute` fallback makes the accessory host key.
+
+**Who it is for, and who it is not.** `quietsThisProcess` answers true ONLY
+when XCTest is loaded into the app, that is, in the unit host. It is
+deliberately NOT `PlantoirDefaults.guardsAppKitBookkeeping`, which also arms
+for a UI test's `--state-dir` launch and for a marketing capture
+(`UITEST_WORKSPACE`). Those apps are driven from outside, by the UI runner or
+by `capture.py`, through windows that must be on a display. Copying the
+broader gate would hide them, so a test pins all eight combinations.
+
+- A teacher's Plantoir has no XCTest in it: the Debug and release app
+  binaries link none (`otool`).
+- Nor does the app a UI test launches: XCTest lives in the runner process.
+- The command-line paths (`--write-contracts` and the rest) `exit` in
+  `QuartzTeachersApp.init`, before `applicationWillFinishLaunching`.
+- The installer's body is `#if DEBUG`, so a release build carries no swizzle
+  at all. Checked with a Release build: its object file for
+  `UnitTestHostWindows` has no `keepEveryWindowOffTheDisplays` or
+  `placedFrame` symbol, and no reference to `method_setImplementation` or
+  `imp_implementationWithBlock`. The Debug object has all four.
+- A placement call off the main thread falls through to the original method
+  rather than tripping `MainActor.assumeIsolated`. None was ever seen; this
+  is a precaution, not a measured fault.
+
+**It chains with the sheet host.** `SheetsHungOffScreenStayThere` (#621)
+replaces `constrainFrameRect(_:to:)` again for sheets hung from a test's own
+`OffScreenWindow`. It is installed later, from the first `SheetHost`, so the
+answer it falls back to is this one, not AppKit's. Tests therefore never call
+the installer: a second install would cut that chain. The off-screen formula
+has one copy, and `TableHost.offScreenOrigin(for:)` asks it.
+
+**The teacher's saved window frame is untouched.** `AppKitBookkeepingGuard`
+(#361) puts AppKit's frame key back after every save. After the runs above,
+`NSWindow Frame main-AppWindow-1` read exactly as before them, never the
+off-screen origin.
+
+**The tests** are `UnitTestHostWindowsTests` and `ActivationHandBackTests`.
+Every live test was red on the old code, except the first hand-back test,
+which passes with the install call removed: its must-fail is the observer
+emptied. The must-fail proofs are recorded in the closing comment.
+
+- **The policy test:** the host is an accessory.
+- **The main-window test:** the main window is ordered in, `screen == nil`,
+  and it is off every display both by AppKit's frame and by the WINDOW
+  SERVER's bounds against `CGDisplayBounds`. It skips in a session with no
+  main window (#315), as `AppKitBookkeepingGuardTests` does.
+- **The sheet-and-alert test:** a sheet and an alert on the main window stay
+  off, and the window's origin does not move.
+- **Pure tests:** placement against three fake displays, one with negative
+  origins; and the gate.
+- **The hand-back test:** it activates the host the way `MenuKeys` does,
+  calls the observer itself, and asserts another app is frontmost within a
+  second. A plain "the host is not active" assertion cannot see a missing
+  hand-back: run alone, the host is never active, so it passes with no
+  hand-back at all (measured in the plan review).
+
+**Not fixed: a Dock tile can flash at launch.** The app's Info.plist has no
+`LSUIElement`, so LaunchServices launches the test host as an ordinary
+`Foreground` app. It stays one until `applicationWillFinishLaunching` makes it
+an accessory. Measured: **728 ms** of `Foreground` before `UIElement` in a
+one-class run (242 ms and 631 ms in the planner's runs). For that long a Dock
+tile can appear, and twice in one run the host was briefly frontmost (68 ms
+and 45 ms). Only `LSUIElement` in the Info.plist would avoid it, and that
+changes the teacher's app: no Dock tile and no menu bar for real. Rejected.
+
+**Rejected, and why.**
+
+- **Suppressing the window at launch** (`defaultLaunchBehavior` and friends).
+  Russell preferred keeping the window. About twenty classes would need a
+  helper to open one. And it reads `isInsideTestBundle` during the scene body,
+  which is exactly the early read the `static let` caveat on
+  `AppKitBookkeepingGuard.armIfATestIsDrivingThisRun` warns about.
+- **`.prohibited` activation:** `MenuKeysBehindASheetTests` could not become
+  key, so it would skip and lose its verification.
+- **`LSUIElement`:** see above.
+- **Fixing it from the test target** (the principal class, or a test helper):
+  26 ms too late, measured.
+- **Isa-swizzling the main window:** it is already
+  `NSKVONotifying_SwiftUI.AppKitWindow`.
+- **A `DYLD_INSERT_LIBRARIES` test dylib:** library validation, signing, and a
+  new target.
+- **Keep-off without the pin:** measured drift, above.
+- **Gating the product's `activate` calls on `isRunningTests`:** the hand-back
+  covers both callers without touching a product path.
+
+**Windows owes nothing.** `dotnet test` does not host the app, and
+`Plantoir.Tests` opens no windows (no `.Show()`, no `.Activate()`). Its UI
+suite owns the foreground by design. This section is the record.
+
+**One sighting worth knowing about.** The external watcher saw one window of
+the host with zero size at (0, 0) for about 200 ms near the end of the
+24-class run. With no area, it shows nothing. Of the 51 windows the host
+ordered in, none with any area ever overlapped a display.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 

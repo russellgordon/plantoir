@@ -184,6 +184,9 @@ public sealed class DrivenApp : IDisposable
     }
     public string WorkspacePath { get; }
 
+    /// <summary>The launched app's process id — what a test waiting for it to exit reads (#632).</summary>
+    public int ProcessId => _app?.ProcessId ?? throw new InvalidOperationException("the app was never launched");
+
     /// <summary>The folder this run's <c>--state-dir</c> points at — where the
     /// app keeps its settings, trail and any test-run record (#191).</summary>
     public string StateDirectory { get; }
@@ -225,8 +228,10 @@ public sealed class DrivenApp : IDisposable
     /// as <paramref name="beforeLaunch"/> seeded it (#558, which seeds a
     /// remembered frame). Off by default: the harness turns it off so a run
     /// opens exactly one window, on the working folder it built.</param>
+    /// <param name="extraArguments">Passed after <c>--state-dir</c> — the Debug
+    /// build's update-feed seam (#632) is the one that needs it.</param>
     public DrivenApp(Action<string> buildCourses, Action<string>? beforeLaunch = null, bool waitUntilReady = true,
-                     bool restoreWindows = false)
+                     bool restoreWindows = false, IEnumerable<string>? extraArguments = null)
     {
         // Closed rather than refused: two copies would fight over the
         // foreground, and a physical click meant for the sidebar would land in
@@ -321,6 +326,7 @@ public sealed class DrivenApp : IDisposable
         var psi = new ProcessStartInfo(ExecutablePath) { UseShellExecute = true };
         psi.ArgumentList.Add("--state-dir");
         psi.ArgumentList.Add(stateDir);   // ArgumentList quotes for us
+        foreach (string argument in extraArguments ?? Array.Empty<string>()) psi.ArgumentList.Add(argument);
         _app = Application.Launch(psi);
         _automation = new UIA3Automation();
 
