@@ -233,6 +233,8 @@ public static class StartOfYearWording
     public const string ReasonOnlyHiddenPagesLink = "only “{page}” links to it, and students will not see that page";
     public const string ReasonOnlyAFolderLists = "only the “{page}” folder's own page lists it";
     public const string ReasonNothingLinks = "nothing links to it";
+    /// <summary>The Start of Year sheet's third column (#619, mac #589): the reason clause a line always carried.</summary>
+    public const string ReasonColumn = "Why";
     public const string StaysFirstClass = "“{first}”, and the {pages} it links to";
     public const string StaysKeyLinks = "Key Links, and the {pages} it lists";
     public const string StaysEverythingElse = "Every folder's own page, every curriculum page, and every page something students can still see links to.";
@@ -264,6 +266,8 @@ public static class StartOfYearWording
     public const string UndoHasEnded = "This can no longer be undone here: the section has been deployed, or its pages have changed, since.";
     public const string BackupHoldsIt = "The backup “{backup}” holds the course as it was before.";
     public const string UndoEndsWhenYouQuit = "This undo is kept only while Plantoir is open. Quitting ends it.";
+    /// <summary>The undo sheet and its result when every page is already as it was (#564, mac #555), never "0 pages".</summary>
+    public const string UndoAllAlreadyBack = "Everything is already as it was before this change.";
 
     /// <summary>Every constant above, by the contract's key, for the pin.</summary>
     public static IReadOnlyDictionary<string, string> ByKey { get; } = new Dictionary<string, string>
@@ -272,7 +276,7 @@ public static class StartOfYearWording
         ["classesHeading"] = ClassesHeading, ["pagesHeading"] = PagesHeading, ["staysHeading"] = StaysHeading,
         ["alreadyInDraft"] = AlreadyInDraft, ["reasonLaterClass"] = ReasonLaterClass, ["reasonFirstUsedIn"] = ReasonFirstUsedIn,
         ["reasonOnlyHiddenPagesLink"] = ReasonOnlyHiddenPagesLink, ["reasonOnlyAFolderLists"] = ReasonOnlyAFolderLists,
-        ["reasonNothingLinks"] = ReasonNothingLinks, ["staysFirstClass"] = StaysFirstClass, ["staysKeyLinks"] = StaysKeyLinks,
+        ["reasonNothingLinks"] = ReasonNothingLinks, ["reasonColumn"] = ReasonColumn, ["staysFirstClass"] = StaysFirstClass, ["staysKeyLinks"] = StaysKeyLinks,
         ["staysEverythingElse"] = StaysEverythingElse, ["linksLeftHeading"] = LinksLeftHeading, ["linksLeftLine"] = LinksLeftLine,
         ["pageName"] = PageNameTemplate, ["pageNameInFolder"] = PageNameInFolderTemplate, ["draftLine"] = DraftLine,
         ["publishingFromNowOn"] = PublishingFromNowOn, ["alreadyTaught"] = AlreadyTaughtTemplate,
@@ -282,7 +286,7 @@ public static class StartOfYearWording
         ["writeFailed"] = WriteFailed, ["noFirstClass"] = NoFirstClass, ["undoTitle"] = UndoTitle, ["undoIntro"] = UndoIntro,
         ["undoSkipped"] = UndoSkipped, ["undoButton"] = UndoButton, ["undone"] = Undone, ["undoLeftSome"] = UndoLeftSome,
         ["undoButtonAfterward"] = UndoButtonAfterward, ["undoHasEnded"] = UndoHasEnded, ["backupHoldsIt"] = BackupHoldsIt,
-        ["undoEndsWhenYouQuit"] = UndoEndsWhenYouQuit,
+        ["undoEndsWhenYouQuit"] = UndoEndsWhenYouQuit, ["undoAllAlreadyBack"] = UndoAllAlreadyBack,
     };
 
     public static string Fill(string template, params (string Key, string Value)[] values)
@@ -385,16 +389,16 @@ public static class StartOfYearWording
         return string.Join("\n", lines);
     }
 
-    private static string Line(StartOfYearPlan plan, StartOfYearDraft draft)
+    private static string Line(StartOfYearPlan plan, StartOfYearDraft draft) =>
+        Fill(DraftLine, ("name", plan.NameOf(draft.Page)), ("reason", Reason(plan, draft)));
+
+    /// <summary>Why a page goes into draft: the clause a line carries after its name, and the sheet's Why cell (#619), word for word.</summary>
+    public static string Reason(StartOfYearPlan plan, StartOfYearDraft draft) => draft.Reason switch
     {
-        string reason = draft.Reason switch
-        {
-            StartOfYearReason.LaterClass => Fill(ReasonLaterClass, ("first", plan.First!.Name)),
-            StartOfYearReason.FirstUsedIn => Fill(ReasonFirstUsedIn, ("page", draft.Naming!.Name)),
-            StartOfYearReason.OnlyHiddenPagesLink => Fill(ReasonOnlyHiddenPagesLink, ("page", draft.Naming!.Name)),
-            StartOfYearReason.OnlyAFolderLists => Fill(ReasonOnlyAFolderLists, ("page", draft.Naming!.Name)),
-            _ => ReasonNothingLinks,
-        };
-        return Fill(DraftLine, ("name", plan.NameOf(draft.Page)), ("reason", reason));
-    }
+        StartOfYearReason.LaterClass => Fill(ReasonLaterClass, ("first", plan.First!.Name)),
+        StartOfYearReason.FirstUsedIn => Fill(ReasonFirstUsedIn, ("page", draft.Naming!.Name)),
+        StartOfYearReason.OnlyHiddenPagesLink => Fill(ReasonOnlyHiddenPagesLink, ("page", draft.Naming!.Name)),
+        StartOfYearReason.OnlyAFolderLists => Fill(ReasonOnlyAFolderLists, ("page", draft.Naming!.Name)),
+        _ => ReasonNothingLinks,
+    };
 }

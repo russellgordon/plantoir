@@ -683,6 +683,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             !Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(_unscannedHealthOutput) &&
             !Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(_unscannedHealthOutput) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.CoverageMapsBuilt.Marker, StringComparison.Ordinal) &&
+            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.MyProgressBuilt.Marker, StringComparison.Ordinal) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Assist.LinksChecklistMarker.Prefix, StringComparison.Ordinal))
             _unscannedHealthOutput = "";
     }
@@ -710,6 +711,14 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         if (Plantoir.Core.Models.CoverageMapsBuilt.Parse(line) is { } maps)
         {
             ActivityTrail.Note(ActivityTrail.Event.CurriculumMapsBuilt, maps.TrailSentence, maps.Course, maps.Section);
+            return;
+        }
+
+        // The build's PLANTOIR_MY_PROGRESS: line (#599): whether it made the
+        // section's My Progress page, and why not when it did not.
+        if (Plantoir.Core.Models.MyProgressBuilt.Parse(line) is { } progress)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.MyProgressPageBuilt, progress.TrailSentence, progress.Course, progress.Section);
             return;
         }
 
