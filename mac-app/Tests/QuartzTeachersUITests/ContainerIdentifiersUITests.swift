@@ -48,10 +48,10 @@ final class ContainerIdentifiersUITests: XCTestCase {
     /// The start-of-year sheet's Go keeps its own identifier (#366). Before
     /// the fix, Cancel and "Put These into Draft" both read back as
     /// `startOfYearSheet`. Since #589 the plan's table is found by its own
-    /// identifier too, and its Why header is clicked twice to sort it, the
-    /// way the marketing capture does — the first row must change, or the
-    /// capture's sort is a click whose effect nobody checked. Cancelled at
-    /// the end: nothing is written.
+    /// identifier too, and Escape closes the sheet. (Its header was clicked
+    /// to sort it here once, and that worked; the same click in the capture
+    /// sorted on one pass of two, so it was dropped from both.) Nothing is
+    /// written.
     func testTheStartOfYearSheetKeepsItsButtonsIdentifiers() throws {
         guard ProcessInfo.processInfo.environment["PLANTOIR_UI_TESTS"] == "1" else {
             throw XCTSkip("Opt-in: set PLANTOIR_UI_TESTS=1. This drives the real app and needs the foreground.")
@@ -74,8 +74,7 @@ final class ContainerIdentifiersUITests: XCTestCase {
                 atomically: true, encoding: .utf8
             )
         }
-        // A page nothing links to, so the table has a second reason to sort
-        // by (#589): Day 2 "comes after …", this one "nothing links to it".
+        // A page nothing links to, so the table has a second row (#589).
         let conceptsURL: URL = fixtureURL.appendingPathComponent("courses/EXC2O/Concepts")
         try FileManager.default.createDirectory(at: conceptsURL, withIntermediateDirectories: true)
         try "---\ntitle: Unlinked Notes\npublishForSection1: true\n---\n\nNotes.\n".write(
@@ -110,29 +109,17 @@ final class ContainerIdentifiersUITests: XCTestCase {
             print("=== SHEET TREE ===")
             print(application.sheets.firstMatch.debugDescription)
             XCTFail("The plan's table has no identifier of its own (#589).")
-        } else {
-            let unsorted: String = firstRowReason(in: table)
-            sortStartOfYearPlanByReasonDescending(table, whyTitle: try startOfYearWording("reasonColumn"))
-            let sorted: String = firstRowReason(in: table)
-            print("#589 first row's reason: unsorted “\(unsorted)”, after two clicks on Why “\(sorted)”")
-            if sorted == unsorted {
-                print("=== TABLE TREE ===")
-                print(table.debugDescription)
-            }
-            XCTAssertNotEqual(sorted, unsorted, "Two clicks on the Why header did not sort the table (#589)")
-            XCTAssertEqual(sorted, try startOfYearWording("reasonNothingLinks"))
         }
         let cancel: XCUIElement = application.sheets.firstMatch.buttons["Cancel"]
         XCTAssertTrue(cancel.exists, "The sheet should offer Cancel")
         XCTAssertNotEqual(cancel.identifier, "startOfYearSheet", "Cancel carries the sheet's identifier (#366)")
-        // Escape is Cancel with the table just clicked (#589): the sheet goes,
-        // and nothing is written.
+        // Escape is Cancel (#589): the sheet goes, and nothing is written.
         application.typeKey(.escape, modifierFlags: [])
         let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"), object: go
         )
         XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 10), .completed,
-                       "Escape did not close the Start of Year sheet after its table was clicked (#589)")
+                       "Escape did not close the Start of Year sheet with its plan shown (#589)")
         if go.exists {
             cancel.click()
         }

@@ -315,12 +315,12 @@ final class StartOfYearPlanTableTests: XCTestCase {
     }
 
     /// In the worst case — the table full, so the notes area is at its floor
-    /// — the two sentences that must be read before Go, publishing from now
-    /// on and the undo's limit, end inside the notes area's cap. Read off the
-    /// sheet's REAL notes (`planNotes` reports where each ends), so putting
-    /// them back last turns this red, as does a smaller cap (#589's fixes
-    /// review, F1: at 76 pt with them last, publishing was clipped on every
-    /// sheet).
+    /// — what must be read before Go under the table ends inside the cap:
+    /// publishing from now on, the links left pointing at hidden pages (said
+    /// nowhere after Go) and the pages with no room for a key, whole. Read
+    /// off the sheet's REAL notes (`planNotes` reports where each ends), so a
+    /// reordering or a smaller cap turns this red (#589's fixes reviews, F1
+    /// and R1). The undo's limit, which the result repeats, may scroll.
     func testTheSentencesUnderTheTableAreInView() throws {
         let made = try AssistFixture.makeRunner()
         defer {
@@ -346,12 +346,29 @@ final class StartOfYearPlanTableTests: XCTestCase {
         defer {
             host.close()
         }
-        for name in ["publishingFromNowOn", "undoEndsWhenYouQuit"] {
+        for name in ["publishingFromNowOn", "linksLeftHeading", "noRoomForAKey"] {
             let bottom: CGFloat = try XCTUnwrap(bottoms.byName[name], "\(name) was never laid out")
             XCTAssertGreaterThan(bottom, 0)
             XCTAssertLessThanOrEqual(bottom, cap, "\(name) ends at \(bottom) pt, below the notes area's \(cap) pt")
             print("StartOfYearPlanTableTests: \(name) ends at \(bottom) pt against \(cap)")
         }
+    }
+
+    /// A short table gives its unused height to the notes (#589's fixes
+    /// review, R3): with three rows the notes area may grow past its floor.
+    func testAShortTableGivesItsRoomToTheNotes() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutAFewPages(in: made.course)
+        let plan: StartOfYearPlan = try StartOfYearPlanTableTests.plan(made)
+        let rows: [StartOfYearPlanRow] = plan.tableRows()
+        XCTAssertEqual(rows.count, 3)
+        let unused: CGFloat = StartOfYearSheet.tallestPlanTable - StartOfYearSheet.planTableHeight(for: rows)
+        XCTAssertGreaterThan(unused, 0)
+        XCTAssertEqual(StartOfYearSheet.notesCap(for: rows), StartOfYearSheet.tallestPlanNotes + unused)
+        XCTAssertGreaterThan(StartOfYearSheet.notesCap(for: rows), StartOfYearSheet.tallestPlanNotes)
     }
 
     /// A plan of three rows and no warnings is a short sheet: no area

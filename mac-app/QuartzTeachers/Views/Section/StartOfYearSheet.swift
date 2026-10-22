@@ -229,8 +229,10 @@ struct StartOfYearSheet: View {
     /// about 440 for the three parts that grow. #524's twelve rows (318 pt)
     /// did not fit: they left about 120 for everything above and below.
     ///
-    /// Six rows on one line each; fewer when a reason takes two lines.
-    static let mostPlanRowsShown: Int = 6
+    /// Five rows on one line each; fewer when a reason takes two lines. The
+    /// sixth went to the notes, so the no-room note is whole in the worst
+    /// case (#589's fixes review, R1: it ended at 120 pt).
+    static let mostPlanRowsShown: Int = 5
 
     /// The notice, the warnings and the intro, above the table. The warnings
     /// come FIRST, because they are what must be read before Go, and the cap
@@ -251,16 +253,18 @@ struct StartOfYearSheet: View {
     /// 8, which is what lets the cap above hold them all.
     static let planIntroSpacing: CGFloat = 6
 
-    /// Everything under the table, at least: publishing from now on and the
-    /// undo's limit FIRST — they must be read before Go — then no room for a
-    /// key, already in draft, what stays and the links left. The area also
-    /// takes whatever height a short table leaves unused (`notesCap(for:)`),
-    /// so a plan of a few rows shows its notes whole. In the worst case (a
-    /// full table) the two sentences are in view at this floor; at 76 pt,
-    /// with them LAST, publishing was clipped on every sheet and, in the worst
-    /// case, hidden with the links-left heading (#589's fixes review, F1).
-    /// Pinned by `testTheSentencesUnderTheTableAreInView`.
-    static let tallestPlanNotes: CGFloat = 100
+    /// Everything under the table, at least, in the order it must be read
+    /// before Go (`planNotes`): publishing from now on, the links left, the
+    /// pages with no room for a key, then already in draft, what stays and the
+    /// undo's limit, which the result and the undo sheet say again. The area
+    /// also takes whatever height a short table leaves unused
+    /// (`notesCap(for:)`), so a plan of a few rows shows its notes whole. In
+    /// the worst case the first three end inside this floor (at 48, 80 and
+    /// 120 pt), and the commonest sheet (a full table, nothing extra) shows
+    /// publishing, what stays and the undo's limit whole (104 pt). At 76 pt with the must-read
+    /// sentences LAST, publishing was clipped on every sheet (#589's fixes
+    /// reviews, F1, R1, R2). Pinned by `testTheSentencesUnderTheTableAreInView`.
+    static let tallestPlanNotes: CGFloat = 120
 
     /// A row whose reason takes two lines (#589's plan review: the longest
     /// reason, "only “…” links to it, and students will not see that page",
@@ -475,10 +479,14 @@ struct StartOfYearSheet: View {
         .accessibilityIdentifier("startOfYearPlanTable")
     }
 
-    /// Everything the plan says under its lists, word for word as before —
-    /// the two sentences that must be read before Go first (#589's fixes
-    /// review, F1). `reportBottom` hears where each of those two ends, in
-    /// the notes' own space, so a test can check they are inside the cap.
+    /// Everything the plan says under its lists, word for word as before, in
+    /// the order a teacher must read it before Go (#589's fixes reviews, F1
+    /// and R1): publishing from now on; the links left pointing at hidden
+    /// pages (said only here, never after Go); the pages with no room for a
+    /// key; already in draft; what stays; and last the undo's limit, which
+    /// the result and the undo sheet both say again. `reportBottom` hears
+    /// where the first three end, in the notes' own space, so a test can
+    /// check they are inside the cap.
     @ViewBuilder
     static func planNotes(
         _ plan: StartOfYearPlan,
@@ -494,18 +502,34 @@ struct StartOfYearSheet: View {
                 } action: { (bottom: CGFloat) in
                     reportBottom?("publishingFromNowOn", bottom)
                 }
-            Text(StartOfYearWording.undoEndsWhenYouQuit)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if !plan.danglingSources.isEmpty {
+                DisclosureGroup(StartOfYearWording.linksLeftHeading) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(plan.danglingSources, id: \.page.relativePath) { (source: StartOfYearDanglingSource) in
+                            Text("• " + StartOfYearWording.linksLeftLine(
+                                name: plan.name(of: source.page),
+                                links: source.hiddenTargets.count == 1
+                                    ? "1 link" : "\(source.hiddenTargets.count) links"
+                            ))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 .onGeometryChange(for: CGFloat.self) { (proxy: GeometryProxy) in
                     return proxy.frame(in: .named("startOfYearPlanNotes")).maxY
                 } action: { (bottom: CGFloat) in
-                    reportBottom?("undoEndsWhenYouQuit", bottom)
+                    reportBottom?("linksLeftHeading", bottom)
                 }
+            }
             if !plan.publishPlan.noRoomForAKey.isEmpty {
                 Text(AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.publishPlan.noRoomForAKey))
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
+                    .onGeometryChange(for: CGFloat.self) { (proxy: GeometryProxy) in
+                        return proxy.frame(in: .named("startOfYearPlanNotes")).maxY
+                    } action: { (bottom: CGFloat) in
+                        reportBottom?("noRoomForAKey", bottom)
+                    }
             }
             if plan.classesAlreadyInDraft > 0 {
                 Text(StartOfYearWording.alreadyInDraft(
@@ -531,20 +555,14 @@ struct StartOfYearSheet: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if !plan.danglingSources.isEmpty {
-                DisclosureGroup(StartOfYearWording.linksLeftHeading) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(plan.danglingSources, id: \.page.relativePath) { (source: StartOfYearDanglingSource) in
-                            Text("• " + StartOfYearWording.linksLeftLine(
-                                name: plan.name(of: source.page),
-                                links: source.hiddenTargets.count == 1
-                                    ? "1 link" : "\(source.hiddenTargets.count) links"
-                            ))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            Text(StartOfYearWording.undoEndsWhenYouQuit)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { (proxy: GeometryProxy) in
+                    return proxy.frame(in: .named("startOfYearPlanNotes")).maxY
+                } action: { (bottom: CGFloat) in
+                    reportBottom?("undoEndsWhenYouQuit", bottom)
                 }
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .coordinateSpace(.named("startOfYearPlanNotes"))
