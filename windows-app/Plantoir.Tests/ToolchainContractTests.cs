@@ -194,7 +194,7 @@ public class ToolchainContractTests
         foreach (var (name, digest) in files)
         {
             var line = System.Text.RegularExpressions.Regex.Match(recipe,
-                "\"" + System.Text.RegularExpressions.Regex.Escape(name) + "\"\s*=\s*\"([0-9a-f]{64})\"");
+                "\"" + System.Text.RegularExpressions.Regex.Escape(name) + @"""\s*=\s*""([0-9a-f]{64})""");
             Assert.True(line.Success, $"fetch-runtime.ps1 keeps no hash for Pyodide's {name}.");
             Assert.Equal(digest!.ToString(), line.Groups[1].Value);
         }
@@ -219,8 +219,8 @@ public class ToolchainContractTests
         string version = pin["value"]!.ToString();
 
         Assert.True(manifest.ContainsKey("pyodide"),
-            $"{runtime}\manifest.json has no \"pyodide\": this runtime predates #568. Re-run " +
-            "windows-app\Vendor\fetch-runtime.ps1 (it fetches only runtime\vendor).");
+            $"{runtime}\\manifest.json has no \"pyodide\": this runtime predates #568. Re-run " +
+            "windows-app\\Vendor\\fetch-runtime.ps1 (it fetches only runtime\\vendor).");
         Assert.Equal(version, manifest["pyodide"]!.ToString());
 
         string folder = Path.Combine(runtime, "vendor", "pyodide");
@@ -231,7 +231,7 @@ public class ToolchainContractTests
         {
             using var stream = File.OpenRead(Path.Combine(folder, name));
             string got = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)).ToLowerInvariant();
-            Assert.True(got == digest!.ToString(), $"runtime\vendor\pyodide\{name}: SHA-256 {got}, the contract's is {digest}.");
+            Assert.True(got == digest!.ToString(), $"runtime\\vendor\\pyodide\\{name}: SHA-256 {got}, the contract's is {digest}.");
         }
         Assert.Equal(
             $"Pyodide {version} (MPL-2.0). Source: https://github.com/pyodide/pyodide/tree/{version}\n",
