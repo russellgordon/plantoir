@@ -165,10 +165,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 3. **Build the signed Windows bundle**: first **re-run
    `windows-app\Vendor\fetch-runtime.ps1`** — it returns at once when the
    runtime is current, and fetches only `runtime\vendor` (Paged.js, Latin
-   Modern, function-plot, the TikZ engine; about 45 MB, under a minute) when
-   the runtime predates them; `publish.ps1` never runs it, and the build now
+   Modern, function-plot, Pyodide, the TikZ engine; about 56 MB, under a
+   minute — 49 s measured on the build PC on 2026-10-22) when the runtime
+   predates any of them; `publish.ps1` never runs it, and the build now
    REFUSES a runtime whose manifest lacks those keys rather than ship one
-   without them (#503). Then `az login`, then
+   without them (#503; `pyodide` joined the keys with #568, so every runtime
+   made before 2026-10-22 is refused until the fetch is re-run). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`). **Then build and sign the Windows update feed
