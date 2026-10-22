@@ -7212,3 +7212,79 @@ list 30-odd pages long):
 tables, rows for the staying pages, and a table in the MCP text (the mac's
 rejections, `09-mac-app.md` → "The pages as a table (#589)"). The
 start-of-year picture on plantoir.app is retaken separately.
+
+## One curriculum test, folder segments only (#615), and a linked curriculum page is not "already visible" (#617, the mac's #607)
+
+**The predicate (#615).** The planner asks one question — is this page
+curriculum? — through `PagePaths.IsCurriculum(courseDirectory, fullPath)`, and
+`AssistWorkspace.IsCurriculum` now just calls it. The answer is the contract's
+(`followingLinks.neverTakenDownByFollowingLinks`, `curriculumRules.isCurriculumPage`)
+and the mac's (`AssistCurriculumMentions.isCurriculum(pageAt:in:)`): some
+FOLDER between the course and the page has "curriculum" in its name,
+case-insensitively. Until #615 `PagePaths.IsCurriculum` read the FILE name
+too, so a page called "Curriculum Coverage" (or "Curriculum Notes") in an
+ordinary folder was kept up as a curriculum page when the class linking to it
+was hidden, where the mac took it down. **The Windows hide side therefore
+changes:** a page merely NAMED "Curriculum …" is no longer kept with "it is a
+curriculum page."; it goes down with the class like any other page nothing
+visible still links to. Pages inside a curriculum folder are kept exactly as
+before. The contract case is `followingLinks.unpublishing.cases` → "a page
+only NAMED like curriculum is not kept up as a curriculum page" (added by
+this piece, green on the mac as it stands).
+
+Three edges the predicate now decides on purpose, pinned in
+`CurriculumPredicateTests`:
+
+- **Only folders inside the course count.** A working folder called
+  "Curriculum Work" does not make every page curriculum; a page outside the
+  course (a path that starts `..` from it, or on another drive) is false.
+- **A relative path is false.** `PlannedPage.RelativePath` is relative to the
+  WORKING folder, and `Path.GetRelativePath` reads a relative argument against
+  the PROCESS's working directory. The hide side's `ReasonToKeep` had been
+  passing it raw, which worked only by accident (the `..\..\` path it produced
+  still contained the course's own folders) and would have made every page
+  curriculum under a process directory with the word in it. It now resolves
+  the page with `PagePaths.ResolveInside(_folder, …)` first, through
+  `AssistWorkspace.IsCurriculumPage`, and so does the publish side below.
+  REJECTED: resolving a relative candidate against the course — the callers
+  hold paths relative to the working folder, so that would quietly read the
+  wrong place; false makes a missed resolve visible in a test instead.
+- **The contract's `isCurriculumPage.cases`** are run through it with a course
+  root in front, so the planner and the assistant's list of expectations
+  (`CurriculumRules.IsCurriculumPage`) answer alike.
+
+Not changed here: `LinkGraph.IsCurriculum` and `CurriculumRules.IsCurriculumPage`
+still test the folders of whatever path they are given (they take no course),
+and #614 — a curriculum folder renamed to something without the word, read
+from `course_config.json` — is deferred to v1.9.0.
+
+**The publish plan (#617).** What the mac decided and why, including what was
+rejected, is `10-local-ai-assistant.md` → "A curriculum page the walk reaches
+is not "already visible" (#607)". On Windows it is one line in
+`AssistWorkspace.PlanPublish`'s `linked` loop: when publishing, an
+already-visible linked page that `IsCurriculumPage` says is curriculum is
+skipped rather than added to `AlreadyRight`. `Describe()` (the card, the
+reply and the MCP `plan_publish_pages` text: "N pages are already
+visible."), `Tabulate()` (the Section menu's rows) and its
+`MenuPlanSummary` all read that one list, so they agree by construction. A
+HIDDEN linked curriculum page is still a change and goes up; a NAMED one is in
+`named` and stays listed; `changes`, the walk, the declined pages and the date
+moves are untouched; the hide side's `linked` list is not filtered.
+
+**The harness.** `FollowingLinksContractTests.Lay` now reads the case field
+`folder` (a course-level page, `publishForSection1:` / `createdSection1:`,
+written to `<course>/<folder>/<title>.md`; a class page carrying one fails the
+case) and checks `expectAlreadyRight` against the AlreadyVisible rows of
+`Tabulate()` for the same layout, taken before the publish. Until then the
+#607 case passed VACUOUSLY here: every non-class page went to
+`section1/<title>.md` and nothing read the expected list.
+
+**Measured** (2026-10-22): with the harness changed and the product not, the
+#607 case failed "already visible should be [Glossary], was [A1.4,
+Glossary]" and the new unpublishing case failed "“Curriculum Coverage” should
+be hidden"; with the product fix, both green; with the publishing skip
+removed again (copy-and-restore), the #607 case and two
+`CurriculumPredicateTests` went red, and restored, green. No trail change: the
+trail records what a publish or unpublish WROTE. A publish writes the same
+pages as before (#607's reasoning), and an unpublish that now hides one page
+more still says truthfully how many it hid.
