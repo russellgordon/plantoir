@@ -66,15 +66,125 @@ public class ActivityTrailWiringTests
     /// a call (bundle 1 review: <c>_ = "ActivityTrail.Event.X";</c> kept the
     /// first version of this scan green).
     /// </summary>
+    /// <remarks>
+    /// One FILE at a time, in one left-to-right pass, so a <c>//</c> comment or
+    /// a string is recognised before anything inside it can open a block
+    /// comment. The scan this replaced (#580) stripped <c>/* … */</c> across
+    /// every file joined together BEFORE <c>//</c> lines, so <c>support/**</c>
+    /// in a <c>///</c> line swallowed the files after it and the test blamed
+    /// four events in other files. A <c>/*</c> that never closes now fails the
+    /// test naming its file.
+    /// </remarks>
     private static string Code(IEnumerable<string> files)
     {
-        string all = string.Join("\n", files.Select(File.ReadAllText));
-        all = Regex.Replace(all, @"/\*.*?\*/", " ", RegexOptions.Singleline);
-        all = Regex.Replace(all, @"@""(?:""""|[^""])*""", "\"\"");
-        all = Regex.Replace(all, @"""(?:\\.|[^""\\\n])*""", "\"\"");
-        all = Regex.Replace(all, @"'(?:\\.|[^'\\\n])'", "' '");
-        all = Regex.Replace(all, @"//[^\n]*", "");
-        return all;
+        var all = new System.Text.StringBuilder();
+        foreach (string file in files)
+        {
+            all.Append(Stripped(File.ReadAllText(file), file)).Append('\n');
+        }
+        return all.ToString();
+    }
+
+    /// <summary>One file's source with its comments and string and character literals taken out.</summary>
+    internal static string Stripped(string source, string file)
+    {
+        var code = new System.Text.StringBuilder(source.Length);
+        int i = 0;
+        int n = source.Length;
+        while (i < n)
+        {
+            char c = source[i];
+            char next = i + 1 < n ? source[i + 1] : '\0';
+            if (c == '/' && next == '/')
+            {
+                while (i < n && source[i] != '\n') i++;
+                continue;
+            }
+            if (c == '/' && next == '*')
+            {
+                int close = source.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                if (close < 0)
+                    throw new Xunit.Sdk.XunitException(
+                        $"{file}: a /* at offset {i} never closes, so the trail-wiring scan cannot read what follows it.");
+                code.Append(' ');
+                i = close + 2;
+                continue;
+            }
+            // String prefixes: $, @, $@, @$, and $$… for raw strings.
+            int start = i;
+            bool verbatim = false;
+            while (i < n && (source[i] == '$' || source[i] == '@'))
+            {
+                if (source[i] == '@') verbatim = true;
+                i++;
+            }
+            if (i < n && source[i] == '"')
+            {
+                int quotes = 0;
+                while (i + quotes < n && source[i + quotes] == '"') quotes++;
+                if (quotes >= 3)
+                {
+                    // A raw string literal: closed by the same run of quotes.
+                    string fence = new string('"', quotes);
+                    int close = source.IndexOf(fence, i + quotes, StringComparison.Ordinal);
+                    i = close < 0 ? n : close + quotes;
+                    code.Append("\"\"");
+                    continue;
+                }
+                i++;
+                while (i < n)
+                {
+                    if (verbatim)
+                    {
+                        if (source[i] == '"' && i + 1 < n && source[i + 1] == '"') { i += 2; continue; }
+                        if (source[i] == '"') break;
+                    }
+                    else
+                    {
+                        if (source[i] == '\\') { i += 2; continue; }
+                        if (source[i] == '"' || source[i] == '\n') break;
+                    }
+                    i++;
+                }
+                i++;
+                code.Append("\"\"");
+                continue;
+            }
+            if (i > start)
+            {
+                // A $ or @ that did not start a string (@this, an identifier).
+                code.Append(source, start, i - start);
+                continue;
+            }
+            if (c == '\'')
+            {
+                var literal = Regex.Match(source.Substring(i, Math.Min(8, n - i)), @"^'(?:\\.[^']*|[^'\\\n])'");
+                if (literal.Success)
+                {
+                    code.Append("' '");
+                    i += literal.Length;
+                    continue;
+                }
+            }
+            code.Append(c);
+            i++;
+        }
+        return code.ToString();
+    }
+
+    [Fact]
+    public void TheScanReadsAStarStarInACommentAsAComment()
+    {
+        string stripped = Stripped(
+            "/// copies <c>support/**</c> from it\nNote(Event.A, \"x\");\n// a \"quote\nNote(Event.B, '\\'', \"//y\", @\"a\"\"b\", \"\"\"\nraw /* \n\"\"\");\n/* gone */ Note(Event.C);\n",
+            "sample.cs");
+        Assert.Contains("Note(Event.A", stripped);
+        Assert.Contains("Note(Event.B", stripped);
+        Assert.Contains("Note(Event.C", stripped);
+        Assert.DoesNotContain("gone", stripped);
+        Assert.DoesNotContain("raw", stripped);
+        var unclosed = Assert.Throws<Xunit.Sdk.XunitException>(() => Stripped("a /* b", "late.cs"));
+        Assert.Contains("late.cs", unclosed.Message);
     }
 
     /// <summary>

@@ -439,8 +439,10 @@ public static class SiteHealthRepair
             Directory.CreateDirectory(sectionDirectory);
             // The course's own name, matching the mac character for character:
             // the same button on the two platforms must not write differently
-            // titled pages into a teacher's vault.
-            File.WriteAllText(index, $"---\ntitle: {course.Configuration.CourseName}\n---\n");
+            // titled pages into a teacher's vault. Quoted by #580's rule when
+            // YAML would misread it plain (#586): "Physics: Mechanics" put
+            // back unquoted is a front page the build still cannot read.
+            File.WriteAllText(index, $"---\ntitle: {FolderScaffold.FrontmatterTitle(course.Configuration.CourseName)}\n---\n");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {

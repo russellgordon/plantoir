@@ -318,23 +318,38 @@ public static class SpecialFolderRenamer
     /// <summary>
     /// Adding a name to a list CREATES the folder — in every section, for a
     /// per-section one. It used to write a configuration entry pointing at
-    /// nothing. Nothing is put inside: an empty folder is the honest starting
-    /// state. True when at least one folder was made.
+    /// nothing. Since #580 (the mac's #506) the folder is not left empty: it
+    /// gets the two pages a folder made with the course gets, its
+    /// <c>index.md</c> and a <c>_DUPLICATE ME.md</c> (<see cref="FolderScaffold"/>),
+    /// written only into a folder this call has just made, never into one
+    /// already on disk and never over a file. <see cref="FolderScaffold.Outcome.FoldersCreated"/>
+    /// is 0 when nothing was made.
     /// </summary>
-    public static bool CreateFoldersOnDisk(string name, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
+    /// <param name="template">The bundled template's text (<see cref="FolderScaffold.ReadTemplate"/>); null leaves it out.</param>
+    /// <param name="curriculumPageNames">
+    /// Asked AFTER the folders are made, as the mac's <c>createFoldersOnDisk</c> reads
+    /// it: the file names at the top of the course's primary curriculum folder, or null.
+    /// </param>
+    /// <param name="created">The <c>created</c> stamp, in the wizard's form; null is now.</param>
+    public static FolderScaffold.Outcome CreateFoldersOnDisk(string name, FolderScope scope, string courseDirectory,
+        IReadOnlyList<int> sectionNumbers, string? template = null, Func<IReadOnlyList<string>?>? curriculumPageNames = null,
+        string? created = null)
     {
-        bool created = false;
+        var newFolders = new List<string>();
         foreach (var (place, _) in FolderLocations(name, scope, courseDirectory, sectionNumbers))
         {
             try
             {
                 if (Directory.Exists(place) || File.Exists(place)) continue;
                 Directory.CreateDirectory(place);
-                created = true;
+                newFolders.Add(place);
             }
             catch (Exception) { }
         }
-        return created;
+        if (newFolders.Count == 0) return new FolderScaffold.Outcome();
+        var pages = FolderScaffold.Pages(name, scope, sectionNumbers, curriculumPageNames?.Invoke(),
+            created ?? SectionAdder.Timestamp(DateTimeOffset.Now), template);
+        return FolderScaffold.WritePages(pages, newFolders, courseDirectory);
     }
 
     // ---- The configuration keys a rename carries across -----------------------

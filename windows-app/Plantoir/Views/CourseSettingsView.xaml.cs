@@ -208,11 +208,18 @@ public sealed partial class CourseSettingsView : UserControl
     /// </summary>
     private void CreateFolderForNewEntry(string name, FolderScope scope)
     {
-        bool created = SpecialFolderRenamer.CreateFoldersOnDisk(
-            name, scope, _course.DirectoryPath, Config.SectionNumbers);
-        if (!created) return;
+        // #580: the folder arrives with its index page and a page to duplicate.
+        // The curriculum folder is the PRIMARY one the course resolves to
+        // (#345's rule, the mac's #128), read from the disk AFTER the folders
+        // are made, in the mac's order.
+        var outcome = SpecialFolderRenamer.CreateFoldersOnDisk(
+            name, scope, _course.DirectoryPath, Config.SectionNumbers,
+            template: FolderScaffold.ReadTemplate(BundledToolchain.SupportPath(Path.Combine(FolderScaffold.TemplatePathInSupport))),
+            curriculumPageNames: () => FolderScaffold.TopLevelFileNames(_course.DirectoryPath,
+                CurriculumFolderRule.ForCourse(Config, _course.DirectoryPath).Resolved.FirstOrDefault()));
+        if (outcome.FoldersCreated == 0) return;
         ActivityTrail.Note(ActivityTrail.Event.FolderCreated,
-            $"created the folder {name} in {_course.Code} ({SpecialFolderRenamer.ConfigurationKey(scope)})");
+            FolderScaffold.FolderCreatedTrailLine(name, _course.Code, scope, outcome));
         ShowFolderNotice(SpecialNames.AddCreatesTheFolder.Replace("{name}", name));
     }
 
