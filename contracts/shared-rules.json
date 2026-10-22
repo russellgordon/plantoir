@@ -1554,7 +1554,7 @@
       "transitive": true,
       "disclosedInThePlan": true,
       "why": "Publishing a page whose links lead somewhere students cannot see is the one thing publishing must never do, so it always takes what it links to, and what those link to in turn. The plan names every page that will become visible, so a teacher agreeing to publish one class can see the four pages going with it. These three stay TRUE alongside stopsAtAClassPage below: the walk is still transitive and still takes what a page links to, it has ONE stop, and the plan names the classes it stopped at as well as the pages it took.",
-      "casesNote": "Run through a REAL publish on a course laid out from `pages`, the same harness as stopsAtAClassPage.cases. A page is written with frontmatter (a title and whether students see it) and then a BODY: a page carrying `links` gets a one-sentence body and then one `See [[name]].` paragraph per link (an empty list: the sentence alone); a page carrying `body` gets that text EXACTLY as written instead, byte for byte, so a link can sit in a table with its pipe escaped. A page carries one or the other, never both - a harness given both must fail the case rather than choose. After the publish, each page's body - the text after its frontmatter - must be byte-identical to what was written: a publish changes whether students see a page, never what the page says, and a publish that 'tidied' a table's `\\|` would split the cell. Added by #294; what counts as a link is readingALink.",
+      "casesNote": "Run through a REAL publish on a course laid out from `pages`, the same harness as stopsAtAClassPage.cases. A page is written with frontmatter (a title and whether students see it) and then a BODY: a page carrying `links` gets a one-sentence body and then one `See [[name]].` paragraph per link (an empty list: the sentence alone); a page carrying `body` gets that text EXACTLY as written instead, byte for byte, so a link can sit in a table with its pipe escaped. A page carries one or the other, never both - a harness given both must fail the case rather than choose. After the publish, each page's body - the text after its frontmatter - must be byte-identical to what was written: a publish changes whether students see a page, never what the page says, and a publish that 'tidied' a table's `\\|` would split the cell. Added by #294; what counts as a link is readingALink. A page that is not a class may carry `folder`: it is then written as a course-level page inside a folder of that name (relative to the course) rather than wherever the harness keeps such pages, so a folder test like isCurriculum can see it; a class page never carries one, and a harness given one on a class must fail the case rather than ignore it. A case may carry `expectAlreadyRight`: lay the same pages out again, ask for the PLAN of the same publish, and the titles it reports as already visible must be exactly this list, in any order - an empty list means none. A case without the field asserts nothing about that list. Added by #607.",
       "cases": [
         {
           "name": "links in a table, with aliases, are followed - and still stop at a class",
@@ -1698,6 +1698,20 @@
             "Answer Key"
           ],
           "why": "Both Markdown shapes go through the one mask every link reader uses (readingALink.codeIsNeverALink, #313, and commentIsNeverALink, #331): an example in code and a note in a comment are not links in any style."
+        },
+        {
+          "name": "a curriculum page a class links to is not listed as already visible",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "links": ["A1.4", "A1.5", "Glossary"]},
+            {"title": "A1.4", "folder": "Curriculum", "isClassPage": false, "visible": true, "links": []},
+            {"title": "A1.5", "folder": "Ontario Curriculum", "isClassPage": false, "visible": false, "links": []},
+            {"title": "Glossary", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3"],
+          "expectVisible": ["Unit 2, Day 3", "A1.5"],
+          "expectUntouched": ["A1.4", "Glossary"],
+          "expectAlreadyRight": ["Glossary"],
+          "why": "#607. A curriculum page is visible because nothing marks it hidden - the build has no rule that keeps it so - and a class citing six expectations listed six 'already visible' rows above the ones a teacher needs to read, and counted them in the plan's summary. So the publish plan leaves a curriculum page the walk reached out of its already-visible list, by the same folder test as neverTakenDownByFollowingLinks (any folder segment containing 'curriculum', so 'Ontario Curriculum' counts). Only that list: A1.5 is hidden, so it is still a change and still goes up, or the class would link to a page students cannot open; Glossary shows the list is trimmed, not emptied. A curriculum page the teacher NAMED stays listed - they asked about it. The hide plan is unchanged."
         }
       ]
     },
