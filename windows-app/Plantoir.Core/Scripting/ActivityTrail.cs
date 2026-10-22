@@ -685,6 +685,30 @@ public static class ActivityTrail
         /// reader and by the scheduled publish's log reader. Never a page's words.
         /// </summary>
         MyProgressPageBuilt,
+
+        // ---- Obsidian's add-ons for diagrams and graphs (#581; the mac's #495) ----
+        /// <summary>
+        /// Open in Obsidian asked the one question about the add-ons, and the
+        /// answer (Add Them, Not Now, Not Now and don't ask again) — or did NOT
+        /// ask because Obsidian opens the course inside a larger vault, said
+        /// once per course per run. A teacher who asks "why does Obsidian show
+        /// my graph as code?" is answered by it.
+        /// </summary>
+        ObsidianAddOnsOffered,
+        /// <summary>
+        /// A pass over a course: which add-ons were added, by name and version,
+        /// at Open in Obsidian, after a preview or after reopening — or why
+        /// nothing was (a refusal, the teacher's own copy, a failed write),
+        /// said once per course per run. Never a page's words.
+        /// </summary>
+        ObsidianAddOnsAdded,
+        /// <summary>
+        /// The reopen question was answered: Obsidian was reopened, Later was
+        /// chosen, or Obsidian did not close and so nothing was written.
+        /// </summary>
+        ObsidianReopenedForAddOns,
+        /// <summary>File ▸ Settings ▸ Obsidian turned the add-ons on or off — the only way back from "Don't ask again".</summary>
+        ObsidianAddOnsSettingChanged,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -813,6 +837,10 @@ public static class ActivityTrail
         Event.PreviewStartedAtThePageLastViewed => "preview started at the page last viewed",
         Event.PreviewStartPageChosenInSettings => "preview start page chosen in Settings",
         Event.MyProgressPageBuilt => "my progress page built",
+        Event.ObsidianAddOnsOffered => "obsidian add-ons offered",
+        Event.ObsidianAddOnsAdded => "obsidian add-ons added",
+        Event.ObsidianReopenedForAddOns => "obsidian reopened for add-ons",
+        Event.ObsidianAddOnsSettingChanged => "obsidian add-ons setting changed",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

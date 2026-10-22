@@ -239,6 +239,8 @@ reasons rather than tasks:
 
 ```powershell
 cd windows-app
+.\Vendor\fetch-runtime.ps1            # once per clone or worktree
+.\Vendor\fetch-obsidian-addons.ps1    # once per clone or worktree — the build refuses without it (#581)
 dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```

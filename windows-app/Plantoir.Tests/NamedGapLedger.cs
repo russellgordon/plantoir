@@ -156,21 +156,15 @@ internal static class NamedGapLedger
     // plan-table sentences (mac #524) that #551's piece held open that
     // morning, when the plan table landed. (Empty before that from
     // 2026-10-15, when the catch-up to mac 1.7.1, #481, closed its last two.)
-    // Not empty since 2026-10-22: #581's four Obsidian add-on events.
-
-    private const string ObsidianAddOns =
-        "Obsidian's add-ons for diagrams and graphs (mac #495) are #581's piece, built after #565's; held so the " +
-        "trail test can go green for #565 and #599. Its milestone is v1.8.0, so the 1.8.x version bump turns " +
-        "this entry red until #581 lands.";
+    // Not empty from 2026-10-22 until #581 landed the same day: its four
+    // Obsidian add-on events.
 
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")
-        // landed with batch 6; #581 owes these four.
-        Owed(ActivityTrailEvents, 581, V180, ObsidianAddOns,
-             "obsidian add-ons offered", "obsidian add-ons added",
-             "obsidian reopened for add-ons", "obsidian add-ons setting changed"),
+        // landed with batch 6; #581's four (Obsidian's add-ons for diagrams
+        // and graphs) with #581.
 
         // ---- specialNames.platformWording.keys
 
