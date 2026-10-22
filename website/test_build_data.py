@@ -203,7 +203,9 @@ class DownloadTests(unittest.TestCase):
         # v1.8.2 cut (2026-10-19) and the mac-only v1.8.3 cut (2026-10-19) pin
         # Windows to 1.7.2 until its 1.8 installer joins a release, and that
         # cut unpins it again.
-        self.assertEqual(pins["Windows"], "1.7.2")
+        # PlantoirSetup.exe joined v1.8.5 on 2026-10-22 (the Windows catch-up),
+        # which unpinned it again.
+        self.assertIsNone(pins["Windows"])
 
 
 class ShortcutTests(unittest.TestCase):
