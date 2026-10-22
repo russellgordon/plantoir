@@ -121,6 +121,8 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-22 | The editable block's own syntax colours and line numbers on a Windows-built site (inherited, measured in Edge) | Windows (the mac since v1.8.1, #585) | #592 |
 | 2026-10-22 | Hiding a class no longer keeps up a page just because it is CALLED something like "Curriculum Coverage": only pages inside a curriculum folder stay visible | Windows (the mac always did this) | #615 |
 | 2026-10-22 | Publish Pages… and the assistant's plan no longer list the curriculum expectations a class links to as "already visible", or count them in the summary | Windows (mac shipped it in v1.8.4, #607) | #617 |
+| 2026-10-22 | In a club, the publish and unpublish plan says "meeting" for a linked meeting it leaves as it is or keeps visible, matching the table under it | Windows (the mac since #267) | #556 |
+| 2026-10-22 | A window remembered on a screen that has since been unplugged (or a resolution since lowered) reopens on the nearest screen instead of out of sight; a window that can still be grabbed by its title bar reopens exactly where it was | Windows (the mac always did this) | #558 |
 
 
 ## Warnings the release notes MUST carry
