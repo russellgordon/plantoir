@@ -283,7 +283,7 @@ def main() -> int:
                            ~/Plantoir Print (print_set_windows.py)
         --code [id,id]     the Code page's figures (code-python,
                            code-python-live, code-python-error, code-quiz;
-                           never the Swift two, #570), from previews of
+                           not the Swift two until #570 is decided), from previews of
                            ~/School Web Space (preview_pages_windows.py)
         --quizzes [id,id]  the Quizzes page's figures (quiz-math,
                            quiz-chemistry, quiz-english from ~/Teaching,
@@ -334,6 +334,11 @@ def main() -> int:
             print("--promote needs the figures' ids after it, comma-separated.", file=sys.stderr)
             return 2
         return promote(named)
+
+    if "--dry-run" in arguments and not ("--code" in arguments or "--quizzes" in arguments):
+        # Without them a dry run would be the full REAL run.
+        print("--dry-run goes with --code or --quizzes; nothing else has a dry run.", file=sys.stderr)
+        return 2
 
     if "--code" in arguments or "--quizzes" in arguments:
         # The Code and Quizzes pages' figures, on their own: never part of a

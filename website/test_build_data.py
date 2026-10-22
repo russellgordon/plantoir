@@ -435,12 +435,12 @@ WINDOWS_PICTURE_OWED: dict = {
     # checks the pictures first), which is the release commit whose installer
     # has the feature. The reasons below are what each one still waits on.
     # code-swift and code-swift-live stay owed: Swift stays read-only on
-    # Windows (Russell's ruling on #570).
+    # Windows until #570 is decided (v1.9.0).
     "code-python": "the 2x picture, taken in a 4K session (#590)",
     "code-python-live": "the 2x picture, taken in a 4K session (#590)",
     "code-python-error": "the 2x picture, taken in a 4K session (#590)",
-    "code-swift-live": "Swift stays read-only on Windows (#570, Russell's ruling): never taken",
-    "code-swift": "Swift stays read-only on Windows (#570, Russell's ruling): never taken",
+    "code-swift-live": "Swift stays read-only on Windows until #570 is decided (v1.9.0)",
+    "code-swift": "Swift stays read-only on Windows until #570 is decided (v1.9.0)",
     "code-quiz": "the 2x picture, taken in a 4K session (#590)",
     "quiz-math": "the 2x picture, taken in a 4K session (#590)",
     "quiz-chemistry": "the 2x picture, taken in a 4K session (#590)",
@@ -536,9 +536,9 @@ class PreviewPageSceneTests(unittest.TestCase):
 
     def test_the_windows_code_and_quiz_passes_take_only_their_own(self):
         # #590: capture_windows.py --code / --quizzes (preview_pages_windows.py)
-        # take each scene's own pages and never the Swift two, which stay
-        # read-only on Windows (Russell's ruling on #570). Plain Python, so it
-        # runs on either machine.
+        # take each scene's own pages and not the Swift two, which stay
+        # read-only on Windows until #570 is decided (v1.9.0). Plain Python,
+        # so it runs on either machine.
         sys.path.insert(0, str(build.WEBSITE / "shots"))
         import preview_pages_windows
         self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("code")],
@@ -546,6 +546,12 @@ class PreviewPageSceneTests(unittest.TestCase):
         self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("quizzes")],
                          ["quiz-math", "quiz-chemistry", "quiz-english", "quiz-code-run"])
         self.assertEqual(preview_pages_windows.preview_page_shots("code", ["code-swift"]), [])
+        # The two left out are real shots, so leaving them out is a decision
+        # rather than a stale name.
+        identifiers = [shot["id"] for shot in self.manifest_shots()]
+        for excluded in preview_pages_windows.NOT_ON_WINDOWS:
+            with self.subTest(excluded=excluded):
+                self.assertIn(excluded, identifiers)
         for shot in preview_pages_windows.preview_page_shots("code") + preview_pages_windows.preview_page_shots("quizzes"):
             with self.subTest(shot=shot["id"]):
                 self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).exists())

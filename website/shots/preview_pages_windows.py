@@ -3,8 +3,8 @@
 
 The Windows twins of capture.py's `capture_code_set` and `capture_quiz_set`:
 every `preview-page` shot whose `capture.scene` is `code` or `quizzes`, except
-the two Swift ones (`NOT_ON_WINDOWS`: Swift stays read-only on Windows,
-Russell's ruling on #570, so code-swift and code-swift-live stay owed).
+the two Swift ones (`NOT_ON_WINDOWS`: Swift stays read-only on Windows until #570 is decided (v1.9.0),
+so code-swift and code-swift-live stay owed).
 
 Each is a page of a NATIVE preview (print_set_windows.Preview, the bundled
 runtime) of the folder its `capture.workspace` names:
@@ -76,8 +76,8 @@ PREPARE_DIR = HERE / "prepare"
 PREPARE_TIMEOUT_MS = 120000
 
 SCENES = ("code", "quizzes")
-# Swift stays read-only on Windows (#570, Russell's ruling): its two figures
-# stay owed, and no pass here ever takes them.
+# Swift stays read-only on Windows until #570 is decided (v1.9.0): its two figures
+# stay owed, and no pass here takes them meanwhile.
 NOT_ON_WINDOWS = ("code-swift", "code-swift-live")
 
 # #557: a Windows window capture is never scaled, and stands beside the Mac's
@@ -254,14 +254,40 @@ def plant(workspace: str, folder: Path, scenes: list[str], shots: list[dict]) ->
     return changed
 
 
+# What a run reads from the WORKING tree rather than from the commit: the
+# pages it plants (the ready-made course and shots/demo, shots/marketing),
+# the prepare scripts and shots.json. An uncommitted change to any of them
+# would be photographed as if it were committed, so a run refuses one.
+WORKING_TREE_INPUTS = ("support/example_content", "website/shots/demo", "website/shots/marketing",
+                       "website/shots/prepare", "website/shots.json")
+
+
+def refuse_uncommitted_inputs() -> None:
+    said = subprocess.run(["git", "-C", str(REPO), "status", "--porcelain", "--", *WORKING_TREE_INPUTS],
+                          capture_output=True, text=True, check=True)
+    if said.stdout.strip():
+        raise SystemExit("These have changes that are not committed, and the pictures would show them:\n"
+                         + said.stdout.rstrip() + "\nCommit or put them back first.")
+
+
 def committed_recipe() -> Path:
-    """The tree's files exactly as committed (`git archive HEAD`), never the
-    working tree: an uncommitted edit or an untracked __pycache__ must not
-    ride into a folder's .toolchain/ (the Mac's #562 review, N5)."""
+    """The recipe exactly as committed (`git archive HEAD -- <recipe>`):
+    the launchers, the recipe's root files and its folders, never the
+    working tree's, so an uncommitted edit or an untracked __pycache__ does
+    not ride into a folder's .toolchain/ (the Mac's #562 review, N5). Only
+    those paths, not the whole repository (about 158 MB). The pages planted,
+    the prepare scripts and shots.json still come from the working tree:
+    `refuse_uncommitted_inputs` stops a run while any of them has changes."""
     destination = SCRATCH / "committed-recipe"
     shutil.rmtree(destination, ignore_errors=True)
     destination.mkdir(parents=True)
-    archive = subprocess.run(["git", "-C", str(REPO), "archive", "--format=tar", "HEAD"],
+    wanted = [*print_set_windows.LAUNCHERS, *print_set_windows.RECIPE_ROOT_FILES,
+              *print_set_windows.recipe_folders()]
+    present: list[str] = []
+    for path in wanted:
+        if path not in present and (REPO / path).exists():
+            present.append(path)
+    archive = subprocess.run(["git", "-C", str(REPO), "archive", "--format=tar", "HEAD", "--", *present],
                              capture_output=True, check=True)
     with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
         tar.extractall(destination, filter="data")
@@ -372,26 +398,32 @@ def photograph_course(folder: Path, code: str, shots: list[dict], scale: float, 
                 capture = shot["capture"]
                 url = preview.address + capture["path"]
                 script = PREPARE_DIR / capture["prepare"]
+                # Both themes first, into the parts folder; only then are
+                # they copied into site/img and recorded, so a dark picture
+                # that fails never leaves a new light one beside an old dark.
+                pair: dict[str, Path] = {}
                 for theme in ("light", "dark"):
                     write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
                     announce(f"{shot['id']}, {theme}")
                     part = parts / f"{shot['id']}-windows-{theme}.png"
                     take_window(url, part, script)
                     print_set_windows.must_show(part, shot)
+                    if not dry_run:
+                        from PIL import Image
+                        with Image.open(part) as opened:
+                            size = opened.size
+                        if size != WANTED_PIXELS:
+                            raise SystemExit(f"{part.name} is {size[0]} x {size[1]}, not {WANTED_PIXELS[0]} x "
+                                             f"{WANTED_PIXELS[1]} (#557). Nothing past this point was taken.")
+                    pair[theme] = part
+                for theme, part in pair.items():
+                    taken.append(f"{shot['id']}-{theme}")
                     if dry_run:
-                        taken.append(f"{shot['id']}-{theme}")
                         continue
-                    from PIL import Image
-                    with Image.open(part) as opened:
-                        size = opened.size
-                    if size != WANTED_PIXELS:
-                        raise SystemExit(f"{part.name} is {size[0]} x {size[1]}, not {WANTED_PIXELS[0]} x "
-                                         f"{WANTED_PIXELS[1]} (#557). Nothing past this point was taken.")
                     destination = IMAGE_DIR / part.name
                     shutil.copyfile(part, destination)
                     prepare(destination)   # never scaled: 2x, like the mac's (#557)
                     record(shot["id"], theme, scale, destination)
-                    taken.append(f"{shot['id']}-{theme}")
                     print(f"   saved {destination.name} + WebP")
         finally:
             write_theme(was_apps, was_system)
@@ -430,6 +462,7 @@ def capture_preview_pages(selection: dict[str, list[str] | None], dry_run: bool 
     # Every folder is checked before ANY is written to.
     for workspace in workspaces:
         (refuse_marketing if workspace == "marketing" else refuse_demo)(places[workspace])
+    refuse_uncommitted_inputs()
     recipe = committed_recipe()
     taken: list[str] = []
     try:
