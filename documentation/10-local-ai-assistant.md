@@ -2276,9 +2276,10 @@ were:
   2026-10-21).
 - **The hide side is untouched.** An unpublish already keeps curriculum pages
   up through `reasonToKeep`'s `.curriculum`, and its "stays visible: it is a
-  curriculum page" rows are left as they are; `planHiding(exactly:)` and
-  `planPublishing(exactly:)` (Start of Year, the links checklist) never pass
-  through `plan()`.
+  curriculum page" rows are left as they are. Start of Year uses
+  `planHiding(exactly:)`, which never passes through `plan()`; the links
+  checklist's class plans do pass through `plan()`, but never read the
+  already-visible list, so the trim changes nothing they show.
 
 **Where, and why there.** `AssistPublishPlan.plan(...)`, after both
 `appendChanges` calls, through `leavingOutLinkedCurriculumPages`. The list is
