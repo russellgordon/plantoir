@@ -326,10 +326,13 @@ public static class SpecialFolderRenamer
     /// is 0 when nothing was made.
     /// </summary>
     /// <param name="template">The bundled template's text (<see cref="FolderScaffold.ReadTemplate"/>); null leaves it out.</param>
-    /// <param name="curriculumPageNames">The file names at the top of the course's primary curriculum folder, or null.</param>
+    /// <param name="curriculumPageNames">
+    /// Asked AFTER the folders are made, as the mac's <c>createFoldersOnDisk</c> reads
+    /// it: the file names at the top of the course's primary curriculum folder, or null.
+    /// </param>
     /// <param name="created">The <c>created</c> stamp, in the wizard's form; null is now.</param>
     public static FolderScaffold.Outcome CreateFoldersOnDisk(string name, FolderScope scope, string courseDirectory,
-        IReadOnlyList<int> sectionNumbers, string? template = null, IReadOnlyList<string>? curriculumPageNames = null,
+        IReadOnlyList<int> sectionNumbers, string? template = null, Func<IReadOnlyList<string>?>? curriculumPageNames = null,
         string? created = null)
     {
         var newFolders = new List<string>();
@@ -344,7 +347,7 @@ public static class SpecialFolderRenamer
             catch (Exception) { }
         }
         if (newFolders.Count == 0) return new FolderScaffold.Outcome();
-        var pages = FolderScaffold.Pages(name, scope, sectionNumbers, curriculumPageNames,
+        var pages = FolderScaffold.Pages(name, scope, sectionNumbers, curriculumPageNames?.Invoke(),
             created ?? SectionAdder.Timestamp(DateTimeOffset.Now), template);
         return FolderScaffold.WritePages(pages, newFolders, courseDirectory);
     }

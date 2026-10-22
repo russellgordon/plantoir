@@ -217,7 +217,7 @@ public class FolderScaffoldContractTests : IDisposable
     {
         string dir = NewCourseDirectory();
         var outcome = SpecialFolderRenamer.CreateFoldersOnDisk("Labs", FolderScope.Shared, dir, new[] { 1, 2 },
-            Template(), new[] { "A1.1.md", "index.md" }, "2026-10-17T09:30:00.000-0400");
+            Template(), () => new[] { "A1.1.md", "index.md" }, "2026-10-17T09:30:00.000-0400");
         Assert.Equal(new FolderScaffold.Outcome(1, 1, 1), outcome);
 
         byte[] index = File.ReadAllBytes(Path.Combine(dir, "Labs", "index.md"));
@@ -257,7 +257,7 @@ public class FolderScaffoldContractTests : IDisposable
     public void WithNoExpectationPagesTheCurriculumConnectionGoes()
     {
         string dir = NewCourseDirectory();
-        SpecialFolderRenamer.CreateFoldersOnDisk("Readings", FolderScope.Shared, dir, new[] { 1 }, Template(), new[] { "A1.md", "index.md" });
+        SpecialFolderRenamer.CreateFoldersOnDisk("Readings", FolderScope.Shared, dir, new[] { 1 }, Template(), () => new[] { "A1.md", "index.md" });
         string duplicate = File.ReadAllText(Path.Combine(dir, "Readings", "_DUPLICATE ME.md"));
         Assert.DoesNotContain("Curriculum connection", duplicate);
         Assert.DoesNotContain("%%curriculum-", duplicate);
@@ -281,6 +281,21 @@ public class FolderScaffoldContractTests : IDisposable
         string dir = NewCourseDirectory();
         SpecialFolderRenamer.CreateFoldersOnDisk("'Tis the Season", FolderScope.Shared, dir, new[] { 1 }, Template());
         Assert.StartsWith("---\ntitle: \"'Tis the Season\"\n", File.ReadAllText(Path.Combine(dir, "'Tis the Season", "index.md")));
+    }
+
+    /// <summary>The curriculum folder is read after the folder is made, in the mac's order.</summary>
+    [Fact]
+    public void TheCurriculumIsReadAfterTheFolderIsMade()
+    {
+        string dir = NewCourseDirectory();
+        bool existedWhenAsked = false;
+        SpecialFolderRenamer.CreateFoldersOnDisk("Curriculum", FolderScope.Shared, dir, new[] { 1 }, Template(), () =>
+        {
+            existedWhenAsked = Directory.Exists(Path.Combine(dir, "Curriculum"));
+            return FolderScaffold.TopLevelFileNames(dir, "Curriculum");
+        });
+        Assert.True(existedWhenAsked);
+        Assert.DoesNotContain("Curriculum connection", File.ReadAllText(Path.Combine(dir, "Curriculum", "_DUPLICATE ME.md")));
     }
 
     [Fact]
