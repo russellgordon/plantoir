@@ -41,6 +41,169 @@ final class PageTablesSheetTests: XCTestCase {
         try await super.tearDown()
     }
 
+    // MARK: - The picker (#608)
+
+    /// The picker is a table: one row per page offered, under Page, Folder
+    /// and Date, and a date only beside a class.
+    func testThePickerHasARowPerPageUnderPageFolderAndDate() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 2)
+        let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        let host: TableHost = TableHost(sheet, size: PageTablesSheetTests.fittingSize(of: sheet))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
+        XCTAssertEqual(table.numberOfRows, 5)
+        XCTAssertEqual(PageTablesSheetTests.titles(of: table), [
+            AssistWording.menuPlanPageColumn, AssistWording.menuPlanFolderColumn, AssistWording.menuPickDateColumn,
+        ])
+        XCTAssertEqual(table.rowHeight, ListTableMetrics.rowHeight)
+        let firstClass: SectionVerbSheetModel.PageRow = model.pageRows[0]
+        let date: CalendarDay = try XCTUnwrap(firstClass.date)
+        XCTAssertEqual(sheet.dateCell(for: firstClass),
+                       AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text))
+        XCTAssertEqual(sheet.dateCell(for: model.pageRows[4]), "", "a page that is not a class has no date")
+        XCTAssertEqual(table.enclosingScrollView?.frame.height, ListTableMetrics.height(forRowCount: 5, showsHeader: true))
+    }
+
+    /// A click on a row's checkbox ticks that page in the model, and a second
+    /// click unticks it.
+    func testAClickOnAPickerCheckboxTicksThatPage() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 2)
+        let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        let host: TableHost = TableHost(sheet, size: PageTablesSheetTests.fittingSize(of: sheet))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first)
+        XCTAssertTrue(model.ticked.isEmpty)
+        host.clickCell(of: table, column: 0, row: 3)
+        XCTAssertEqual(model.ticked, [model.pageRows[3].name], "the click did not tick the page in its row")
+        host.clickCell(of: table, column: 0, row: 3)
+        XCTAssertTrue(model.ticked.isEmpty, "a second click did not untick it")
+    }
+
+    /// Space ticks the selected row (selecting alone ticks nothing); with
+    /// the table focused and a row selected, Return still reaches Continue
+    /// and Escape Cancel; and Space typed in Find a Page ticks nothing.
+    func testSpaceTicksTheSelectedRowAndReturnAndEscapeStillReachTheButtons() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 3, pages: 2)
+        let presses: KeyPresses = KeyPresses()
+        let sheet: SectionVerbSheet = SectionVerbSheet(
+            model: model, pressDefault: { presses.defaults += 1 }, cancel: { presses.cancels += 1 }
+        )
+        let host: TableHost = TableHost(sheet, size: PageTablesSheetTests.fittingSize(of: sheet))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first)
+        host.select(row: 2, in: table)
+        XCTAssertTrue(host.window.firstResponder === table, "the table did not take focus")
+        XCTAssertTrue(model.ticked.isEmpty, "selecting a row ticked it")
+        host.pressSpace()
+        XCTAssertEqual(model.ticked, [model.pageRows[2].name], "Space did not tick the selected row")
+        XCTAssertTrue(model.defaultButtonIsEnabled)
+        host.press(keyCode: 36, characters: "\r")
+        XCTAssertEqual(presses.defaults, 1, "Return did not reach Continue with a row selected")
+        host.press(keyCode: 53, characters: "\u{1b}")
+        XCTAssertEqual(presses.cancels, 1, "Escape did not reach Cancel with a row selected")
+        host.pressSpace()
+        XCTAssertTrue(model.ticked.isEmpty, "a second Space did not untick it")
+
+        let field: NSTextField = try XCTUnwrap(PageTablesSheetTests.editableTextField(in: host.window), "no Find a Page field")
+        XCTAssertTrue(host.window.makeFirstResponder(field))
+        host.pump()
+        host.pressSpace()
+        XCTAssertTrue(model.ticked.isEmpty, "Space in Find a Page ticked a row")
+    }
+
+    /// Typing in Find a Page narrows the rows and leaves the sheet's height
+    /// where it was: the table is counted from every page, not the ones the
+    /// search leaves showing.
+    func testSearchingNarrowsThePickerWithoutMovingTheSheet() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 0, pages: 11)
+        let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        let before: NSSize = PageTablesSheetTests.fittingSize(of: sheet)
+        let host: TableHost = TableHost(sheet, size: before)
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first)
+        XCTAssertEqual(table.numberOfRows, 11)
+        model.search = "Page 1"
+        host.pump()
+        XCTAssertEqual(table.numberOfRows, 3, "Page 1, Page 10 and Page 11")
+        let after: NSSize = PageTablesSheetTests.fittingSize(of: sheet)
+        XCTAssertEqual(after.height, before.height, "the sheet changed height as the teacher typed")
+    }
+
+    /// The later-classes question at Publish and Deploy is the same table:
+    /// Page (with its checkbox) and Date, every class ticked to begin with,
+    /// and a click unticking one.
+    func testTheLaterClassesListIsATableAClickUnticks() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .laterClassesAtDeploy, course: made.course, sectionNumber: 1, title: "", item: nil
+        )
+        let first: CalendarDay = try XCTUnwrap(CalendarDay(year: 2026, month: 9, day: 11))
+        let second: CalendarDay = try XCTUnwrap(CalendarDay(year: 2026, month: 9, day: 14))
+        model.ask(about: [
+            ClassesDatedLater.Flagged(place: "section1/All Classes/Unit 2, Day 5", title: "Unit 2, Day 5", date: first),
+            ClassesDatedLater.Flagged(place: "section1/All Classes/Unit 2, Day 6", title: "Unit 2, Day 6", date: second),
+        ], nextDay: CalendarDay(year: 2026, month: 9, day: 9))
+        let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        let host: TableHost = TableHost(sheet, size: PageTablesSheetTests.fittingSize(of: sheet))
+        defer {
+            host.close()
+        }
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "the later classes are not a table")
+        XCTAssertEqual(table.numberOfRows, 2)
+        XCTAssertEqual(PageTablesSheetTests.titles(of: table), [AssistWording.menuPlanPageColumn, AssistWording.menuPickDateColumn])
+        XCTAssertEqual(model.laterTicked.count, 2)
+        host.clickCell(of: table, column: 0, row: 1)
+        XCTAssertEqual(model.laterTicked, ["section1/All Classes/Unit 2, Day 5"], "the click did not untick the class in its row")
+        host.select(row: 1, in: table)
+        host.pressSpace()
+        XCTAssertEqual(model.laterTicked.count, 2, "Space did not tick the selected class again")
+    }
+
+    /// The tallest picker — forty pages — still fits a 13-inch screen
+    /// (`CopyPageChecklist.tallestSheet`), and its table is really there at
+    /// twelve rows.
+    func testTheTallestPickerStaysOnTheScreen() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = PageTablesSheetTests.pickerModel(course: made.course, classes: 20, pages: 20)
+        let height: CGFloat = PageTablesSheetTests.fittingSize(
+            of: SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        ).height
+        XCTAssertLessThanOrEqual(height, CopyPageChecklist.tallestSheet, "the forty-page picker is \(height) pt")
+        let table: CGFloat = ListTableMetrics.height(forRowCount: SectionVerbSheet.mostPickerRowsShown, showsHeader: true)
+        XCTAssertGreaterThanOrEqual(height, table + 120, "only \(height) pt: the table or the words around it collapsed")
+        print("PageTablesSheetTests: forty-page picker \(height) pt against \(CopyPageChecklist.tallestSheet)")
+    }
+
     // MARK: - The default size
 
     /// Every sheet whose content this piece did not mean to change opens at
@@ -164,6 +327,66 @@ final class PageTablesSheetTests: XCTestCase {
             widths.append(column.width)
         }
         return widths
+    }
+
+    static func titles(of table: NSTableView) -> [String] {
+        var titles: [String] = []
+        for column in table.tableColumns {
+            titles.append(column.title)
+        }
+        return titles
+    }
+
+    /// The first text field a teacher can type in.
+    static func editableTextField(in window: NSWindow) -> NSTextField? {
+        guard let content = window.contentView else {
+            return nil
+        }
+        return firstEditableTextField(in: content)
+    }
+
+    static func firstEditableTextField(in view: NSView) -> NSTextField? {
+        if let field = view as? NSTextField, field.isEditable {
+            return field
+        }
+        for subview in view.subviews {
+            if let found = firstEditableTextField(in: subview) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    /// Publish Pages… at its first stage: `classes` classes, dated from
+    /// 9 September, then `pages` concept pages — the order `rows` gives.
+    static func pickerModel(course: Course, classes: Int, pages: Int) -> SectionVerbSheetModel {
+        let model: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .publishPages, course: course, sectionNumber: 1,
+            title: AssistWording.menuPublishPagesTitle(course: "ICS3U", section: "1"),
+            item: .publishPages
+        )
+        var rows: [SectionVerbSheetModel.PageRow] = []
+        var number: Int = 1
+        while number <= classes {
+            rows.append(SectionVerbSheetModel.PageRow(
+                name: "section1/All Classes/Unit 1, Day \(number)", title: "Unit 1, Day \(number)",
+                folder: "section1/All Classes",
+                fileURL: course.directoryURL.appendingPathComponent("section1/All Classes/Unit 1, Day \(number).md"),
+                isClass: true, date: CalendarDay(year: 2026, month: 9, day: 8 + number)
+            ))
+            number += 1
+        }
+        number = 1
+        while number <= pages {
+            rows.append(SectionVerbSheetModel.PageRow(
+                name: "Concepts/Page \(number)", title: "Page \(number)", folder: "Concepts",
+                fileURL: course.directoryURL.appendingPathComponent("Concepts/Page \(number).md"),
+                isClass: false, date: nil
+            ))
+            number += 1
+        }
+        model.pageRows = rows
+        return model
     }
 
     static func plannedModel(_ outcome: AssistToolOutcome, kind: SectionVerbSheetModel.Kind,

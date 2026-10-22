@@ -393,6 +393,30 @@ final class SectionVerbSheetModel: Identifiable {
         )
     }
 
+    /// Space on the picker's selected row (#608): ticks it, or unticks it.
+    /// Only a row the search leaves showing — a row the teacher cannot see
+    /// is never changed by a key.
+    func flipTick(ofRowWithID id: String?) {
+        for row in shownRows where row.id == id {
+            if ticked.contains(row.name) {
+                ticked.remove(row.name)
+            } else {
+                ticked.insert(row.name)
+            }
+        }
+    }
+
+    /// Space on the later-classes list's selected row (#608).
+    func flipLaterTick(ofClassWithID id: String?) {
+        for page in laterClasses where page.id == id {
+            if laterTicked.contains(page.place) {
+                laterTicked.remove(page.place)
+            } else {
+                laterTicked.insert(page.place)
+            }
+        }
+    }
+
     func laterBinding(for page: ClassesDatedLater.Flagged) -> Binding<Bool> {
         return Binding(
             get: { return self.laterTicked.contains(page.place) },
@@ -465,7 +489,18 @@ struct SectionVerbSheet: View {
     /// sorts by that column (#524, the `AllBackupsView` precedent).
     @State var planSortOrder: [KeyPathComparator<AssistPlanTable.Row>] = [KeyPathComparator(\.position)]
 
+    /// The picker's and the later-classes list's selected row (#608): what
+    /// Space ticks. Selecting a row is not ticking it.
+    @State var pickedRowID: String? = nil
+    @State var pickedLaterClassID: String? = nil
+
     static let tallestList: CGFloat = 340
+
+    /// How many rows the picker and the later-classes list show before the
+    /// table scrolls inside itself (#608): twelve, as the plan that follows
+    /// shows, so the two steps of one flow are the same height — 318 pt,
+    /// under the 340 the list of checkboxes was capped at.
+    static let mostPickerRowsShown: Int = 12
 
     /// How many plan rows show before the table scrolls inside itself, and
     /// how tall the notes under it may grow: one height budget for the plan
@@ -490,6 +525,26 @@ struct SectionVerbSheet: View {
         var shown: Int = model.planTable?.rows.count ?? 0
         if shown > SectionVerbSheet.mostPlanRowsShown {
             shown = SectionVerbSheet.mostPlanRowsShown
+        }
+        return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
+    }
+
+    /// The picker's height (#608): counted from EVERY page offered, not the
+    /// ones the search leaves showing, so the sheet stays still while the
+    /// teacher types; up to `mostPickerRowsShown`, then it scrolls inside.
+    var pickerTableHeight: CGFloat {
+        var shown: Int = model.pageRows.count
+        if shown > SectionVerbSheet.mostPickerRowsShown {
+            shown = SectionVerbSheet.mostPickerRowsShown
+        }
+        return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
+    }
+
+    /// The later-classes list's height (#608), the same way.
+    var laterClassesTableHeight: CGFloat {
+        var shown: Int = model.laterClasses.count
+        if shown > SectionVerbSheet.mostPickerRowsShown {
+            shown = SectionVerbSheet.mostPickerRowsShown
         }
         return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
     }
@@ -625,24 +680,7 @@ struct SectionVerbSheet: View {
                 ))
                 .borderedTextField()
                 .accessibilityIdentifier("sectionVerbSheetSearch")
-                CappedScrollArea(cap: SectionVerbSheet.tallestList) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(model.shownRows) { row in
-                            Toggle(isOn: model.binding(for: row)) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(row.title)
-                                    Text(secondLine(for: row))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .accessibilityLabel(row.title)
-                            .accessibilityValue(secondLine(for: row))
-                            .accessibilityIdentifier("sectionVerbRow-\(row.name)")
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                pickerTable
             }
         case .publishClass:
             DatePicker("", selection: Binding(
@@ -676,29 +714,78 @@ struct SectionVerbSheet: View {
         }
     }
 
+    /// The pages to tick (#608): a bordered, banded table — Page (with its
+    /// checkbox), Folder and Date — the look of the plan that follows it, so
+    /// the two steps of one flow look alike. A click on a box ticks it;
+    /// Space ticks the selected row. Its rows are in the order `rows` gives
+    /// (classes by date, then the rest by folder), and no header sorts them.
+    var pickerTable: some View {
+        Table(model.shownRows, selection: $pickedRowID) {
+            TableColumn(AssistWording.menuPlanPageColumn) { (row: SectionVerbSheetModel.PageRow) in
+                Toggle(row.title, isOn: model.binding(for: row))
+                    .toggleStyle(.checkbox)
+                    .lineLimit(1)
+                    .help(row.title)
+                    .accessibilityIdentifier("sectionVerbRow-\(row.name)")
+            }
+            .width(min: 90, ideal: 130)
+            TableColumn(AssistWording.menuPlanFolderColumn) { (row: SectionVerbSheetModel.PageRow) in
+                Text(row.folder)
+                    .foregroundStyle(.secondary)
+                    .help(row.folder)
+            }
+            .width(min: 80, ideal: 110, max: 140)
+            TableColumn(AssistWording.menuPickDateColumn) { (row: SectionVerbSheetModel.PageRow) in
+                Text(dateCell(for: row))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 150, max: 180)
+        }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .frame(height: pickerTableHeight)
+        .onKeyPress(.space) {
+            if pickedRowID == nil {
+                return .ignored
+            }
+            model.flipTick(ofRowWithID: pickedRowID)
+            return .handled
+        }
+        .accessibilityIdentifier("sectionVerbSheetPickerTable")
+    }
+
     @ViewBuilder
     var laterClasses: some View {
         Text(model.kind == .laterClassesAtDeploy
              ? AssistWording.laterClassesAtDeploy(nextDay: model.nextClassDay, noun: model.noun)
              : AssistWording.laterClassesAtPublish(nextDay: model.nextClassDay, noun: model.noun))
             .fixedSize(horizontal: false, vertical: true)
-        CappedScrollArea(cap: SectionVerbSheet.tallestList) {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(model.laterClasses) { page in
-                    Toggle(isOn: model.laterBinding(for: page)) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(page.title)
-                            Text(AssistWording.laterClassesDay(weekday: page.date.weekdayName, date: page.date.text))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .accessibilityLabel(page.title)
+        // The same shape as the picker (#608): a checkbox and the class's
+        // title, then its day.
+        Table(model.laterClasses, selection: $pickedLaterClassID) {
+            TableColumn(AssistWording.menuPlanPageColumn) { (page: ClassesDatedLater.Flagged) in
+                Toggle(page.title, isOn: model.laterBinding(for: page))
+                    .toggleStyle(.checkbox)
+                    .lineLimit(1)
+                    .help(page.title)
                     .accessibilityIdentifier("laterClassRow-\(page.place)")
-                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .width(min: 90, ideal: 130)
+            TableColumn(AssistWording.menuPickDateColumn) { (page: ClassesDatedLater.Flagged) in
+                Text(AssistWording.laterClassesDay(weekday: page.date.weekdayName, date: page.date.text))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 150, max: 180)
         }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .frame(height: laterClassesTableHeight)
+        .onKeyPress(.space) {
+            if pickedLaterClassID == nil {
+                return .ignored
+            }
+            model.flipLaterTick(ofClassWithID: pickedLaterClassID)
+            return .handled
+        }
+        .accessibilityIdentifier("laterClassesTable")
         Text(AssistWording.laterClassesKeptNote(noun: model.noun))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -745,10 +832,12 @@ struct SectionVerbSheet: View {
 
     // MARK: - Functions
 
-    func secondLine(for row: SectionVerbSheetModel.PageRow) -> String {
+    /// The picker's Date cell: a class's day, as the later-classes question
+    /// says it; nothing for a page that is not a class.
+    func dateCell(for row: SectionVerbSheetModel.PageRow) -> String {
         if let date = row.date, row.isClass {
-            return row.folder + " · " + AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text)
+            return AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text)
         }
-        return row.folder
+        return ""
     }
 }
