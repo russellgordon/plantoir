@@ -139,8 +139,6 @@ public class CurriculumPredicateTests : IDisposable
         // A hidden expectation is still a change, or the class would link to a page students cannot open.
         Assert.Contains(plan.Changes, c => c.Page.DisplayTitle == "A1.5" && c.WillBeVisible);
 
-        Assert.Contains("1 page is already visible.", plan.Describe());
-
         var table = workspace.Tabulate(plan);
         Assert.DoesNotContain(table.Rows, r => r.Title == "A1.4");
         Assert.Equal(AssistWording.MenuPlanSummary(plan.Changes.Count, 1, publishing: true), table.Summary);
@@ -158,13 +156,17 @@ public class CurriculumPredicateTests : IDisposable
     [Fact]
     public void TheModelsPlanCountsTheSameList()
     {
-        LayAClassCitingExpectations();
+        // The MCP text is the card's Describe() of the same plan, and that
+        // plan's list has only Glossary in it. Not quoted: the sentence is
+        // Describe()'s own, and a copy here would outlive a change to it.
+        var workspace = LayAClassCitingExpectations();
+        var plan = workspace.PlanPublish(Course, 1, new[] { "Unit 2, Day 3" });
+        Assert.Single(plan.AlreadyRight);
         var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
 
         string text = tools.PlanPublishPages(Course, 1, pages: new[] { "Unit 2, Day 3" }).Summary();
 
-        Assert.Contains("1 page is already visible.", text);
-        Assert.DoesNotContain("2 pages are already visible.", text);
+        Assert.Contains(plan.Describe(), text);
     }
 
     // ---- The hide side (#615) ---------------------------------------------
