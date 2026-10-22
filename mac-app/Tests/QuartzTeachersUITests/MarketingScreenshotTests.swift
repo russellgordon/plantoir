@@ -1018,31 +1018,26 @@ final class MarketingScenes: MarketingScreenshotCase {
         // Go by its own identifier: the sheet's stack carries `.contain`
         // before its identifier (#366), so `startOfYearGo` reaches the tree.
         // The plan is ready when Go exists.
-        let sheet: XCUIElement = application.sheets.firstMatch
         let go: XCUIElement = application.buttons["startOfYearGo"]
         XCTAssertTrue(go.waitForExistence(timeout: 60), "The plan should appear")
         // An empty plan photographed as the feature is the failure this
         // guards: the button is disabled when the plan changes nothing (#96).
         XCTAssertTrue(go.isEnabled, "There should be pages to put into draft")
-        // The plan's lists arrive folded: "going into draft" (classes, then
-        // pages) and, last, "staying as they are". The page's copy says the
-        // plan gives each page's reason, so unfold every list but the last.
-        let triangles: XCUIElementQuery = sheet.disclosureTriangles
-        XCTAssertGreaterThanOrEqual(triangles.count, 2,
-                                    "The plan should list what goes into draft and what stays")
-        // Unfold ONE list, the pages: their reasons ("first used in …") are
-        // what the copy promises, and the classes' list above it is 80-odd
-        // rows of "comes after …" that would push everything else out of
-        // the sheet. The lists come in order — classes, pages, what stays,
-        // links left — so the pages are the second when both are there.
-        let pagesList: XCUIElement = triangles.count >= 3
-            ? triangles.element(boundBy: 1)
-            : triangles.element(boundBy: 0)
-        // Its frame begins left of the chevron and runs over the label, and a
-        // click on the label does not unfold it: the chevron is drawn about
-        // 26 points in (measured on the capture).
-        pagesList.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5))
-            .withOffset(CGVector(dx: 26, dy: 0)).click()
+        // The plan is a table since #589: a row for every page going into
+        // draft, classes first — 80-odd rows of "comes after …" in the demo,
+        // which say nothing a picture can use. The page's copy says the plan
+        // gives each page's reason, so sort by Why, descending: the pages'
+        // reasons ("only … links to it", "nothing links to it", "first used
+        // in …") come to the top. And CHECK the sort took — a header click
+        // that missed would photograph eight identical rows and still pass
+        // the OCR (#589's plan review, finding d).
+        let table: XCUIElement = startOfYearPlanTable(in: application)
+        XCTAssertTrue(table.waitForExistence(timeout: 10), "The plan should be a table (#589)")
+        let unsorted: String = firstRowReason(in: table)
+        sortStartOfYearPlanByReasonDescending(table, whyTitle: try startOfYearWording("reasonColumn"))
+        let sorted: String = firstRowReason(in: table)
+        XCTAssertNotEqual(sorted, unsorted,
+                          "Sorting by Why did not change the first row: the picture would show only classes")
         settle(1.5)
         save(window, as: "start-of-year")
         application.buttons["Cancel"].firstMatch.click()
