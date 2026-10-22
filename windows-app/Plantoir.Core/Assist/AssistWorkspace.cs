@@ -1193,10 +1193,11 @@ public sealed partial class AssistWorkspace
     internal const string ClassOfItsOwn = "it is a class of its own.";
 
     /// <summary>
-    /// <see cref="ClassOfItsOwn"/> in a club, for the Section menu's plan table
-    /// only (#548): the planner records the class form, which is what the model
-    /// reads; <see cref="PublishPlan.Tabulate"/> says it in the course's noun,
-    /// as the mac's <c>finishing(noun:)</c> does.
+    /// <see cref="ClassOfItsOwn"/> in a club, for what the TEACHER reads — the
+    /// Section menu's plan table (#548) and the plan's card (#556): the planner
+    /// records the class form, which is what the model reads;
+    /// <see cref="PublishPlan.ReasonFor"/> says it in the course's noun, as the
+    /// mac's <c>finishing(noun:)</c> does.
     /// </summary>
     internal const string MeetingOfItsOwn = "it is a meeting of its own.";
 

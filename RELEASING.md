@@ -123,6 +123,8 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-22 | Publish Pages… and the assistant's plan no longer list the curriculum expectations a class links to as "already visible", or count them in the summary | Windows (mac shipped it in v1.8.4, #607) | #617 |
 | 2026-10-22 | A folder added in Course Settings starts with its index page, so it appears in the site's sidebar, and a page to duplicate — shared, or in every section | Windows (mac shipped it in v1.8.0, #506) | #580 |
 | 2026-10-22 | A course whose name holds ": " ("Physics: Mechanics") gets a front page the build can read when a section is added or the front page is put back | Windows (mac shipped it in v1.8.1, #575) | #586 |
+| 2026-10-22 | In a club, the publish and unpublish plan says "meeting" for a linked meeting it leaves as it is or keeps visible, matching the table under it | Windows (the mac since #267) | #556 |
+| 2026-10-22 | A window remembered on a screen that has since been unplugged (or a resolution since lowered) reopens on the nearest screen instead of out of sight; a window that can still be grabbed by its title bar reopens exactly where it was | Windows (the mac always did this) | #558 |
 
 
 ## Warnings the release notes MUST carry

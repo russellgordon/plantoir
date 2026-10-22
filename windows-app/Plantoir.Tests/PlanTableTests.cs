@@ -184,8 +184,10 @@ public class PlanTableTests
     /// <summary>
     /// A club: the table is the teacher's copy, so it says "meeting" in the
     /// left-alone cell, its note and the kept reason (the director's ruling on
-    /// the #548 plan review, F2). The card keeps the class form — a separate
-    /// issue — so these are checked against the meeting members, not the card.
+    /// the #548 plan review, F2). Since #556 the teacher's card does too
+    /// (<c>Describe(ClassNoun.Meeting)</c>), through the same
+    /// <c>PublishPlan.ReasonFor</c>; the class-form card, which is also the
+    /// model's copy, does not.
     /// </summary>
     [Fact]
     public void AClubsTableSpeaksOfMeetings()
@@ -214,8 +216,12 @@ public class PlanTableTests
                      AssistWording.LinkedClassStaysVisibleForAMeeting(SurelyUp.DisplayTitle));
         // Any other reason is the same in both.
         Assert.Equal(AssistWording.PlanStaysVisibleBecause(AssistWorkspace.KeptBecauseInKeyLinks), kept[0].WhatChanges);
-        // And the card is still the class form: the noun reaches the table only.
+        // The class-form card (the model's copy) never says it; the club's
+        // card (#556) says the table's kept line and left-alone note.
         Assert.DoesNotContain(AssistWorkspace.MeetingOfItsOwn, Hiding().Describe());
+        Assert.Contains($"“{SurelyUp.DisplayTitle}” {kept[1].WhatChanges}", Hiding().Describe(ClassNoun.Meeting).Split('\n'));
+        Assert.Contains(Assert.Single(publishing.Tabulate(FolderOf, ClassNoun.Meeting).Notes),
+                        publishing.Describe(ClassNoun.Meeting).Split('\n'));
     }
 
     [Fact]

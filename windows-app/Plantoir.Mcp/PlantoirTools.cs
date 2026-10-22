@@ -2105,7 +2105,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             // Four words, when four words are the whole answer.
             if (plan.NothingToDoSentence is { } already) return Answering(already);
-            if (plan.ChangesNothing && !preview) return Answering(plan.Describe());
+            // The teacher's copy in the course's noun, as every publish plan's (#556).
+            if (plan.ChangesNothing && !preview)
+                return Answering(plan.Describe(workspace.NounForCourse(plan.CourseCode)), plan.Describe());
 
             // The count comes from the PLAN, not from what the writes
             // reported: it is the number the teacher just agreed to, and the
@@ -2303,8 +2305,15 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private CallToolResult Proposing(PublishPlan plan)
     {
         if (plan.NothingToDoSentence is { } already) return Answering(already);
-        if (plan.ChangesNothing && plan.UnknownNames.Count > 0) return Answering(plan.Describe());
-        var proposal = Proposing(plan.Describe());
+        // The teacher's copy in the course's noun (#556, the mac's
+        // AssistToolRunner.swift 1007-1010, 1132-1135 and 1173-1176): a club's
+        // card says "meeting" for a linked class left alone or kept, while the
+        // text content — what the model and Claude Code read — stays the class
+        // form byte for byte (ClubNounTests). The answer below can carry the
+        // left-alone line too, so it has both copies as well.
+        string card = plan.Describe(workspace.NounForCourse(plan.CourseCode));
+        if (plan.ChangesNothing && plan.UnknownNames.Count > 0) return Answering(card, plan.Describe());
+        var proposal = Proposing(plan.Describe(), card);
         if (workspace.SpeaksFromTheMenu)
             proposal.Meta![AssistToolAnswer.PlanTableKey] = workspace.Tabulate(plan).ToJson();
         return proposal;

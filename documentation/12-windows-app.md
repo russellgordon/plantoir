@@ -1473,6 +1473,15 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   the section rewritten at every launch. **Files are read with a strict
   UTF-8 decoder**, so a file saved in another encoding is refused, never
   written over (`addCases` "cannot be read again").
+- **The skills are whatever `support\agent_guidance\skills\` holds**, five
+  today: `plantoir-page-authoring` (#596, the one the root files name FIRST;
+  it routes to the four below, `printablePages.agentGuidance.pageAuthoringSkill`),
+  `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code` and
+  `plantoir-quizzes` (#563). `AgentGuidance.Write` enumerates the folder, so a
+  new skill reaches a Windows working folder with no code. What the quizzes
+  skill teaches — the `> [!quiz]` callout and what the site does with it — is
+  [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and
+  what the build does is 05 → "Self-check quizzes: what the build does".
 - **The question** is a ContentDialog (`MainWindow.Guidance.cs`): title
   `askTitle`, `askFound` as the explanation under it, `askWhat`,
   `askYoursStays`, an Expander (`showWhatIsAdded`) over a read-only
@@ -1637,7 +1646,12 @@ ids, which sat on a Border that UI Automation never sees): see
 Tests: `PrintablePagesTests` (the getters, the corners cases, the 13
 printing words, the settings-saved clause), `AgentGuidanceTests` (the ten
 `rootFileCases` with a second pass each, the three `addCases`, the failure
-line and a path-free notice, the skills, Not Now, the hook),
+line and a path-free notice, the skills, Not Now, the hook — and, by skill,
+`TheGraphsSkillIsWrittenAndBothRootFilesNameIt`,
+`TheQuizzesSkillIsWrittenAndBothRootFilesNameIt` (#571) and
+`ThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst` (#600), each
+reading its skill's name from `shared-rules.json`; the runnable-code skill
+has no Windows test of its own),
 `PreviewBrowserHandoffTests` (modes and papers against the contract, the
 message, the trail words, a link's destination never on the trail, the
 shim's shape against `print.inline.ts`).
@@ -5804,16 +5818,36 @@ mac's keyless `planWillBecome(visible:withTheDatesOf:)`, is the one
 `WindowsOnlyWording` entry. No `NamedGapLedger` entry: the ledger is for work
 a later milestone owes, not a permanent mapping.
 
-**A club's table says "meeting"; its card does not, yet.** The table is the
+**A club's table says "meeting" — and since #556, so does its card.** The table is the
 teacher's copy and never the model's, so `Tabulate` takes the course's noun:
 the left-alone cell (`menuPlanStaysAsItIsForAMeeting`), its note
 (`linkedClass…LeftAloneForAMeeting`) and a kept class's reason ("it is a
 meeting of its own", `AssistWorkspace.MeetingOfItsOwn`, rendered with
 `PlanStaysVisibleBecause` to the contract's `linkedClassStaysVisibleForAMeeting`)
-— as the mac's `stayingVisibleLine(noun:)` does. Windows' CARD has never
-spoken the noun for these (the planner records the class form, and
-`Describe()` has no noun); that gap, on the menu's card and the assistant's,
-is a separate `windows` issue, not this piece.
+— as the mac's `stayingVisibleLine(noun:)` does. Until #556 Windows' CARD
+did not, so in a club the table and the card under it said "meeting" and
+"class" for the same page. Now `PublishPlan.Describe(ClassNoun, int)` is the
+teacher's card in the course's noun, and the kept reason goes through
+`PublishPlan.ReasonFor`, the ONE expression the card and the table both use;
+`Describe(int)` is the class form. The planner still RECORDS the class form
+(`AssistWorkspace.ClassOfItsOwn`), because that is what the model reads.
+`plan_publish_pages`, `plan_unpublish_pages` and `plan_publish_class_on` all
+end in `PlantoirTools.Proposing(PublishPlan)`, which now sends
+`Proposing(plan.Describe(), plan.Describe(noun))`: the text content (what the
+model and Claude Code read) is the class form byte for byte, and the club's
+card travels only in `_meta`, as every other club card does (#274). The
+answer for "nothing would change and a name fits no page" can carry the
+left-alone line too, so it is `Answering(card, model copy)` as well — the mac
+nouns that card (`AssistToolRunner.swift` 1007-1010, 1132-1135, 1173-1176).
+Measured rather than assumed: `Describe()` was printed for every branch
+(publish and hide, menu or not, nothing changes, declined only, one and two
+left alone, unknown names, an orphaned date move, more than fifteen changes
+and fifteen kept, a kept page with a folder) before and after the change, and
+the two outputs were identical. Pinned by `ClubNounTests` (the three plan
+tools and the unknown-name answer in `TheNounNeverReachesWhatTheModelReads`,
+and `AClubsPublishCardSaysMeetingForLinkedClasses`) and
+`PlanTableTests.AClubsTableSpeaksOfMeetings`. The table's own output did not
+move. No trail change: no event records a card.
 
 **Two differences from the mac, kept on purpose so neither side "fixes" them.**
 (1) The summary says `planNothingWouldChange` when no page changes, even when
@@ -6512,9 +6546,12 @@ when the scale changes (a monitor move, a display-scale change),
 `EnforceMinimumSize` re-applies the minimum AND grows a window left below it,
 unless it is maximised or minimised — the minimum alone does not grow one. **What holds
 what:** the first-run clamp is held by `WindowMinimumUiTests` (named above), on this one display
-at one scale; the remembered-frame order, the re-apply and the grow on a
-scale change (the multi-monitor cases) are held by reading the code, since
-there is one screen here and no test changes the display scale. **On a 1920-wide screen at 225–250% the work-area clamp can still cut
+at one scale; the re-apply and the grow on a scale change, and the remembered
+frame's move between monitors, are held by reading the code, since there is
+one screen here and no test changes the display scale; where a remembered
+frame is put when its display has gone (#558, below) is held by
+`WindowFrameFitTests` (the geometry) and `WindowOnScreenUiTests` (that the
+constructor applies it). **On a 1920-wide screen at 225–250% the work-area clamp can still cut
 the toolbar**: the window there is narrower than 900 epx (1920 / 2.25 = 853
 epx), which is below the width the long title needs — and so is any screen
 whose work area is under 900 epx wide, a 1280 × 800 laptop at 150% (853 epx)
@@ -6534,6 +6571,56 @@ the remaining option, not taken. The UiFact's
 right-edge check is 8 px × scale inside UI Automation's window rectangle,
 because that rectangle includes Windows 11's invisible resize border (7 px a
 side at 150%: `GetWindowRect` 1350 against the visible frame's 1332).
+
+**A remembered window whose display is gone (#558).** Before #558 the
+constructor moved a remembered frame to where it was and stopped there: #542
+fitted the SIZE to the nearest display, never the position. Measured
+2026-10-22 on the same PC (Lenovo 20QES70500, i5-8365U, one 1920 × 1080
+display at 150%, work area 1920 × 1008) with a frame seeded at X = 5000,
+Y = 200, 1400 × 900 and "restore windows on launch" on: the visible frame
+opened at (5009, 200), wholly beside the work area — a taskbar button and no
+window. A teacher meets this after undocking a laptop, unplugging a second
+screen or a projector, or lowering the resolution.
+
+Now `MainWindow.OnADisplay` hands `WindowFrameFit.Fit` (Plantoir.Core) the
+remembered frame, every display's work area (`DisplayArea.FindAll()`, read by
+`Count` and the indexer — enumerating that projection throws in some Windows
+App SDK versions) and the nearest one (`DisplayArea.GetFromRect(…, Nearest)`).
+The frame is **kept exactly** when its title-bar strip — its top 32 epx —
+overlaps SOME work area by at least 100 epx across and a third of the strip
+down, both converted at the nearest display's scale (one scale,
+`GetDpiForMonitor` of `MonitorFromRect` on the whole remembered rectangle):
+epx, because 100 raster pixels is only 50 epx at 200%. And if any of this
+throws (`FindAll`'s projection has thrown on some Windows App SDK versions,
+and the package floats on 1.*), the frame opens as remembered and
+`startup.log` says so: a frame is re-saved only by a window that opened, so a
+throw that stopped the window would have failed every later launch.
+Otherwise it is shrunk to no larger than the nearest work area and centred
+on it, and centred again after the minimum size has grown it. After the fix
+the same seeded frame opened with its visible frame at (269, 54), 1382 × 891,
+inside the work area. A frame that is kept takes exactly the old path.
+
+The rule asks for SOME overlap, not the whole strip inside one work area, and
+that was a plan-review correction: a window quit maximised is saved a few
+pixels outside its display (about (-11, -11) at 150%), a window can straddle
+two monitors side by side or stacked, and a top taskbar covers part of a
+strip — and each of those is a frame the teacher left on purpose, which a
+whole-strip rule would have shrunk and re-centred. `WindowFrameFitTests` has a
+case for each, and for the X = 5000 frame, a vanished right-hand monitor, a
+frame larger than the work area, a title bar above every display and a
+sliver of title bar too narrow to drag. **REJECTED:** always clamping the
+frame into the nearest work area (moves every one of those deliberate
+frames); clamping only the size (what #542 left, the position still off
+screen). **Known limit:** several windows remembered on one vanished
+monitor all come back centred on the same display, one exactly over another;
+the rule says where a window can be reached, not how to cascade them. A
+`startup.log` line (`MainWindow ctor: remembered frame … is on no display`)
+records a move; there is no trail line, because nothing a teacher did is
+being recorded. Mac: nothing to do — AppKit's frame restore already keeps a
+window on a screen. Pinned in the UI suite by
+`WindowOnScreenUiTests.ARememberedFrameOffEveryDisplayOpensInsideTheWorkArea`
+(opt-in, `DrivenApp(restoreWindows: true)`), red before the fix and green
+after, run alone.
 
 ### Known limits
 
