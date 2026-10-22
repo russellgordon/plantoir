@@ -142,6 +142,26 @@ public class SiteHealthRepairTests : IDisposable
 
     // ---- Doing it --------------------------------------------------------
 
+    /// <summary>
+    /// #586 (the mac's #575, <c>testAFrontPagePutBackQuotesACourseNameThatNeedsIt</c>):
+    /// a course name holding ": " put back plain is a front page the build
+    /// still cannot read, so it is quoted by #580's rule.
+    /// </summary>
+    [Fact]
+    public void AFrontPagePutBackQuotesACourseNameThatNeedsIt()
+    {
+        const string config = "{\"course_code\": \"SPH4U\", \"course_name\": \"Physics: Mechanics\", " +
+                              "\"section_numbers\": [1], \"num_sections\": 1}";
+        string courseDir = Path.Combine(_root, "courses", "SPH4U");
+        Directory.CreateDirectory(courseDir);
+        File.WriteAllText(Path.Combine(courseDir, "course_config.json"), config);
+        var course = new Course("SPH4U", courseDir, CourseConfiguration.FromBytes(Encoding.UTF8.GetBytes(config)));
+
+        Assert.Equal(SiteHealthRepair.Result.Restored, SiteHealthRepair.RestoreIndex(1, course));
+        Assert.Equal("---\ntitle: \"Physics: Mechanics\"\n---\n",
+                     File.ReadAllText(Path.Combine(course.SectionDirectory(1), "index.md")));
+    }
+
     [Fact]
     public void TheRestoredFrontPageCarriesTheCourseNameAndNothingElse()
     {
