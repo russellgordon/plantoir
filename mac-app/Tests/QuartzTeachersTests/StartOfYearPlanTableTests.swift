@@ -156,8 +156,9 @@ final class StartOfYearPlanTableTests: XCTestCase {
     /// Return is Go while the table has focus — the table must not swallow
     /// the sheet's default key. The backup is made to fail, so the press is
     /// seen by the sheet refusing and nothing is written. (Escape goes
-    /// through `dismiss`, which this host cannot observe; it was checked in
-    /// the running app, as #524's was.)
+    /// through `dismiss`, which this host cannot observe; the opt-in
+    /// `ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
+    /// presses it in the running app, after clicking the table's header.)
     func testReturnGoesWhileTheTableHasFocus() async throws {
         let made = try AssistFixture.makeRunner()
         defer {
@@ -233,6 +234,43 @@ final class StartOfYearPlanTableTests: XCTestCase {
         print("StartOfYearPlanTableTests: worst-case sheet \(height) pt against \(CopyPageChecklist.tallestSheet)")
     }
 
+    /// In the same worst case, every warning and the first line of the intro
+    /// are inside the area above the table without scrolling (#589's
+    /// implementation review, S1: at a 100 pt cap the scheduled deploy's
+    /// warning — "will put these changes in front of students" — was below
+    /// the fold, and overlay scroll bars give no sign there is more). The
+    /// notice and warnings are laid out exactly as the sheet lays them out,
+    /// with the intro's first line under them, at the area's width.
+    func testEveryWarningAndTheIntrosFirstLineAreInView() throws {
+        let made = try AssistFixture.makeRunner()
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try StartOfYearPlanTableTests.layOutTheWorstCase(in: made.course)
+        let moment: Date = Date(timeIntervalSince1970: 1_800_000_000)
+        let model: StartOfYearSheetModel = StartOfYearPlanTableTests.model(made, scheduledDeploy: moment)
+        model.load()
+        guard case .ready(let plan) = model.stage else {
+            return XCTFail("no plan: \(model.stage)")
+        }
+        XCTAssertEqual(plan.warnings().count, 3, "\(plan.warnings())")
+        let opening = VStack(alignment: .leading, spacing: StartOfYearSheet.planIntroSpacing) {
+            StartOfYearSheet.mustBeReadBeforeGo(plan, notice: StartOfYearWording.changedSinceShown)
+            Text(StartOfYearWording.intro(first: plan.firstClass.displayTitle, noun: plan.noun.singular))
+                .lineLimit(1)
+        }
+        .frame(width: 520, alignment: .leading)
+        let height: CGFloat = StartOfYearPlanTableTests.measuredHeight(of: opening, width: 520)
+        XCTAssertLessThanOrEqual(
+            height, StartOfYearSheet.tallestPlanIntro,
+            "The notice, the three warnings and the intro's first line need \(height) pt; the area above the table shows \(StartOfYearSheet.tallestPlanIntro) before it scrolls"
+        )
+        // The other direction: the four orange lines and the intro's first
+        // line are really there (each is at least one 16-point line).
+        XCTAssertGreaterThanOrEqual(height, 5 * 16, "only \(height) pt: something in the opening is not showing")
+        print("StartOfYearPlanTableTests: notice, three warnings and the intro's first line \(height) pt against \(StartOfYearSheet.tallestPlanIntro)")
+    }
+
     /// A plan of three rows and no warnings is a short sheet: no area
     /// reserves its cap, and the table is its rows.
     func testAShortPlanMakesAShortSheet() throws {
@@ -262,9 +300,9 @@ final class StartOfYearPlanTableTests: XCTestCase {
     /// Lays the sheet out at its own width and reports the height its
     /// content claims, after forcing a layout pass — as
     /// `CopyPageChecklistSizeTests.measuredHeight` does.
-    static func measuredHeight(of view: some View) -> CGFloat {
+    static func measuredHeight(of view: some View, width: CGFloat = 560) -> CGFloat {
         let hostingView: NSHostingView = NSHostingView(rootView: AnyView(view))
-        hostingView.frame = NSRect(x: 0, y: 0, width: 560, height: 2000)
+        hostingView.frame = NSRect(x: 0, y: 0, width: width, height: 2000)
         hostingView.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
         hostingView.layoutSubtreeIfNeeded()

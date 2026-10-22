@@ -1036,8 +1036,15 @@ final class MarketingScenes: MarketingScreenshotCase {
         let unsorted: String = firstRowReason(in: table)
         sortStartOfYearPlanByReasonDescending(table, whyTitle: try startOfYearWording("reasonColumn"))
         let sorted: String = firstRowReason(in: table)
-        XCTAssertNotEqual(sorted, unsorted,
-                          "Sorting by Why did not change the first row: the picture would show only classes")
+        // A failed assertion does not stop the test here, and capture.py
+        // promotes any picture that passes its checks — so return BEFORE
+        // saving: no picture is better than a wrong one (#589's
+        // implementation review, S2).
+        guard sorted != unsorted else {
+            XCTFail("Sorting by Why did not change the first row (“\(sorted)”): the picture would show only classes")
+            application.buttons["Cancel"].firstMatch.click()
+            return
+        }
         settle(1.5)
         save(window, as: "start-of-year")
         application.buttons["Cancel"].firstMatch.click()

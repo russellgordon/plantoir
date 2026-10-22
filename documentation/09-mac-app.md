@@ -9000,13 +9000,21 @@ sortable `Table` — the look #524 gave Publish Pages ("The plan as a table
   `StartOfYearPlanTableTests.testTheTableHasARowForEveryPageGoingIntoDraft`
   checks every row's line is in `describe()`, so the sheet and the MCP plan
   cannot drift. Never `relativePath` (the #362 source scan still holds).
-- **Above the table**, in a `CappedScrollArea` of 100 pt: the "changed since"
-  notice, then the warnings, then the intro and "nothing to do". The warnings
-  moved ABOVE the intro: they are what must be read before Go, and in the worst
-  case the area is taller than its cap, so it is the intro — read the time
-  before — that scrolls. The two list headings (`classesHeading`,
+- **Above the table**, in a `CappedScrollArea` of 156 pt: the "changed since"
+  notice, then the warnings, then the intro and "nothing to do", 6 pt apart.
+  The warnings moved ABOVE the intro: they are what must be read before Go
+  (#524's sheet has no warnings, so there is no layout of its to keep). The cap
+  is set so that in the worst case — the notice and all three warnings, the
+  scheduled deploy's on two lines — every warning AND the intro's first line
+  are in view without scrolling (measured 153 pt); only the rest of the intro
+  scrolls. The first cap, 100 pt, put the third warning — the scheduled
+  deploy's, "will put these changes in front of students" — below the fold,
+  and on a first showing with three warnings none of the intro, with overlay
+  scroll bars giving no sign of either (#589's implementation review, S1).
+  `testEveryWarningAndTheIntrosFirstLineAreInView` pins it; with the old 100
+  pt cap it goes red (153 > 100). The two list headings (`classesHeading`,
   `pagesHeading`) stay, unchanged, as the summary lines over the table.
-- **Under it**, in a second capped area of 100 pt: already in draft, no room
+- **Under it**, in a second capped area of 76 pt: already in draft, no room
   for a key, what stays (still a disclosure group), the links left (likewise),
   `publishingFromNowOn` and `undoEndsWhenYouQuit` — unchanged words.
 - **The Why column takes the rest of the width and allows two lines.** The
@@ -9027,10 +9035,10 @@ view (a scroll inside a scroll was the other thing to avoid), and:
 | Part | Budget |
 |---|---|
 | Title band, bottom margin, gaps, buttons | about 52 + 20 + 4 × 12 + 22 |
-| Notice, warnings, intro (capped) | 100 |
+| Notice, warnings, intro (capped) | 156 |
 | The two summary lines | about 36 |
-| The table | at most 222 — eight one-line rows (8 × 24 + 2 + 28) |
-| The notes (capped) | 100 |
+| The table | at most 198 — seven one-line rows (7 × 24 + 2 + 28) |
+| The notes (capped) | 76 |
 
 The bordered table draws a one-line row at 24 pt and a two-line row at 40
 (measured on the real `NSTableView`; SwiftUI's table uses automatic row
@@ -9039,19 +9047,22 @@ counts each row at the height it will draw — 40 when the reason is wider than
 `widestOneLineReason`, 244 pt in the system font (measured: text up to about
 250 pt stays on one line in the 254-point column; set under the narrower,
 scroll-bar case so a misjudged row leaves a few points of band rather than a
-scroll) — up to the 222 pt cap. With the real sheet hosted at its width
-(`StartOfYearPlanTableTests`, as `CopyPageChecklistSizeTests` does): **602 pt
+scroll) — up to the 198 pt cap. With the real sheet hosted at its width
+(`StartOfYearPlanTableTests`, as `CopyPageChecklistSizeTests` does): **610 pt
 in the worst case** — the notice, all three warnings, a page with no room for a
 key, links left, a class already in draft and nineteen rows — against 620, and
 at least the three parts' caps plus 120 the other way, so a collapsed table or
-area cannot pass; **462 pt** for a three-row plan with no warnings. Caps of 104
-measured 610; 100 was taken for the margin. Twelve rows measured 698 (red);
-the table uncapped, 914 (red). A short table's frame equals the sum of its
+area cannot pass; **438 pt** for a three-row plan with no warnings. (The first
+budget — eight rows, both caps 100 — measured 602, and hid a warning; see
+above.) Twelve rows measured 698 (red);
+the table uncapped, 914 (red) — both under the first budget. A short table's frame equals the sum of its
 drawn rows plus the header and border, checked against the real table, so the
 estimate cannot drift into an inner scroll unnoticed.
 
 **Keys.** Return is Go with the table focused (in-process key event, as #524's
-test); Escape goes through `dismiss`, which a hosted view cannot observe.
+test); Escape goes through `dismiss`, which a hosted view cannot observe, so
+the opt-in UI test presses it in the running app after clicking the table's
+header, and the sheet closes.
 
 **The marketing figure** (`start-of-year`) clicks the Why header twice
 (descending), so the pages' reasons ("only … links to it", "nothing links to
