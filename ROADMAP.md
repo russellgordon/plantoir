@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 22 October 2026. The current release is **1.8.5** on the Mac and **1.7.2** on Windows.*
+*Last updated: 22 October 2026. The current release is **1.8.5** on the Mac and on Windows.*
 
 A few things to know before you read on:
 
@@ -23,53 +23,6 @@ A few things to know before you read on:
 
 Each item links to its GitHub issue, if you want the full detail. You don't
 need to read those to use Plantoir.
-
----
-
-## Next: Windows catches up to 1.8
-
-Plantoir 1.8.5 is out for the Mac. Windows stays on 1.7.2 until its own 1.8
-download joins the release, with:
-
-- **Runnable Python, self-check quizzes, maths served by your own site and
-  the Undo fix**
-  ([#568](https://github.com/russellgordon/plantoir/issues/568),
-  [#571](https://github.com/russellgordon/plantoir/issues/571),
-  [#564](https://github.com/russellgordon/plantoir/issues/564)), and a
-  decision on how Swift programs will ever work on Windows
-  ([#570](https://github.com/russellgordon/plantoir/issues/570)).
-- **Obsidian add-ons installed for you, and a shared folder added later
-  appearing on the site**, as on the Mac
-  ([#581](https://github.com/russellgordon/plantoir/issues/581),
-  [#580](https://github.com/russellgordon/plantoir/issues/580)).
-- **Windows fixes:**
-  - a window can no longer reopen off screen after a monitor is unplugged
-    ([#558](https://github.com/russellgordon/plantoir/issues/558));
-  - why the first "Getting this folder ready" after an update can take about
-    two minutes is being looked into
-    ([#559](https://github.com/russellgordon/plantoir/issues/559));
-  - clubs see "meeting" rather than "class" when publishing
-    ([#556](https://github.com/russellgordon/plantoir/issues/556));
-  - an honest answer to what happens to a scheduled publish when the computer
-    is asleep at that time
-    ([#554](https://github.com/russellgordon/plantoir/issues/554)).
-- **Then what 1.8.1 brought the Mac:** programs that stop and ask for input
-  as they run, a coloured editor with line numbers, checklists students can
-  tick, the one-blank quiz wording, and a course name with a colon
-  ([#591](https://github.com/russellgordon/plantoir/issues/591),
-  [#592](https://github.com/russellgordon/plantoir/issues/592),
-  [#593](https://github.com/russellgordon/plantoir/issues/593),
-  [#586](https://github.com/russellgordon/plantoir/issues/586)).
-- **And what 1.8.2 brought the Mac:** Mermaid diagrams drawn again on sites
-  deployed to Netlify, a My Progress page for each section, and the guide
-  that tells Claude and Codex every way a page can be written
-  ([#598](https://github.com/russellgordon/plantoir/issues/598),
-  [#599](https://github.com/russellgordon/plantoir/issues/599),
-  [#600](https://github.com/russellgordon/plantoir/issues/600)).
-- **And what 1.8.3 brought the Mac:** My Progress looking like the sidebar
-  entries beside it, each page on it opening to show its checklist, and links
-  to a heading landing on it in Safari and Arc
-  ([#605](https://github.com/russellgordon/plantoir/issues/605)).
 
 ---
 
@@ -109,6 +62,13 @@ download joins the release, with:
   so pages look right without reaching other websites.
   ([#566](https://github.com/russellgordon/plantoir/issues/566))
 
+- **Decisions and measurements carried over from the Windows 1.8.5 catch-up:** how Swift
+  programs will ever run on Windows
+  ([#570](https://github.com/russellgordon/plantoir/issues/570)), what a
+  scheduled publish does when the computer is asleep
+  ([#554](https://github.com/russellgordon/plantoir/issues/554)), and a
+  curriculum folder renamed to a name without "curriculum"
+  ([#614](https://github.com/russellgordon/plantoir/issues/614)).
 ---
 
 ## Version 2.0 — interactive science
