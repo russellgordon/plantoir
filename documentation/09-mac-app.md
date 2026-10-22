@@ -3335,7 +3335,15 @@ Publish Pages…, Hide Pages… and Publish Class for a Date… — show instead
   (`menuPlanStaysAsItIs` — "as it is", as the card says it, not "hidden": a
   linked class whose flag the app will not read is listed too), the pages whose settings have no room for a key
   (`menuPlanStaysExactlyAsItIs`), and the pages already right
-  (`menuPlanAlreadyVisible` / `menuPlanAlreadyHidden`). The headers sort
+  (`menuPlanAlreadyVisible` / `menuPlanAlreadyHidden`). Since #607 a publish
+  leaves out of that last group, and out of the summary's count, an
+  already-visible curriculum page the class merely links to — it is visible
+  because nothing marks it hidden (there is no "always published" rule in the
+  build), so listing it told the teacher nothing; a hidden one is still a
+  change, and one the teacher named is still listed (the reasoning and what
+  was rejected:
+  [the assistant's page](10-local-ai-assistant.md#a-curriculum-page-the-walk-reaches-is-not-already-visible-607)).
+  The headers sort
   (`KeyPathComparator`, plan order first — the `AllBackupsView` precedent);
   a cell's tooltip carries its whole text. Folder is the choosing stage's
   folder string (`StartOfYearPageNaming.folder`), which is what tells a
