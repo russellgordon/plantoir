@@ -177,15 +177,27 @@ public partial class App : Application
 #else
         const bool developmentBuild = false;
 #endif
-        if (Plantoir.Core.Assist.AppUpdates.FeedFor(developmentBuild) is not null)
+        // #632: a DEBUG build has no updater, so a UI test that must drive the
+        // daily check's offer names its own feed and key here. Compiled out of
+        // a Release build: no argument can point a teacher's copy elsewhere.
+        string testFeed = "", testKey = "", testFirstLook = "";
+#if DEBUG
+        testFeed = ArgumentAfter(Environment.GetCommandLineArgs(), args.Arguments ?? "", "--update-feed-for-tests");
+        testKey = ArgumentAfter(Environment.GetCommandLineArgs(), args.Arguments ?? "", "--update-key-for-tests");
+        testFirstLook = ArgumentAfter(Environment.GetCommandLineArgs(), args.Arguments ?? "", "--update-first-look-for-tests");
+#endif
+        bool feedForTests = testFeed.Length > 0 && testKey.Length > 0;
+        if (feedForTests) LogDiagnostic($"update feed for tests: {testFeed}");
+        if (Plantoir.Core.Assist.AppUpdates.FeedFor(developmentBuild) is not null || feedForTests)
         {
             Updater = new Plantoir.Core.Assist.AppUpdater(
-                Plantoir.Core.Assist.AppUpdates.ConfiguredFeed, Plantoir.Core.Assist.AppUpdates.PublicKey,
+                feedForTests ? testFeed : Plantoir.Core.Assist.AppUpdates.ConfiguredFeed,
+                feedForTests ? testKey : Plantoir.Core.Assist.AppUpdates.PublicKey,
                 new Services.UpdatePrompts(), Services.UpdatePrompts.Snapshot,
                 Plantoir.Core.Assist.MachineWork.RunningAssistantServers,
                 Plantoir.Core.Assist.AppUpdates.Spell(
                     (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(App).Assembly).GetName().Version ?? new Version(0, 0)),
-                Plantoir.Core.Assist.AppUpdates.IsPerUserInstall(AppContext.BaseDirectory,
+                feedForTests || Plantoir.Core.Assist.AppUpdates.IsPerUserInstall(AppContext.BaseDirectory,
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)),
                 Settings.SkippedUpdateVersion,
                 skipped => { Settings.SkippedUpdateVersion = skipped; try { Settings.Save(); } catch { } },
@@ -194,6 +206,8 @@ public partial class App : Application
                 () => Settings.LastUpdateCheckUtc,
                 when => { Settings.LastUpdateCheckUtc = when; try { Settings.Save(); } catch { } });
             Updater.Diagnostic = LogDiagnostic;
+            if (int.TryParse(testFirstLook, out int firstLookSeconds) && firstLookSeconds > 0)
+                Updater.FirstLook = TimeSpan.FromSeconds(firstLookSeconds);
             // Started below, once the first window is up (#465) - not here.
         }
 
@@ -246,6 +260,7 @@ public partial class App : Application
         // arrives on a background thread and is carried to this one; a click
         // that STARTED Plantoir is routed once its windows are open.
         var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        _uiThread = dispatcher;
         Services.ScheduledPublishNotifier.Register(argument =>
             dispatcher.TryEnqueue(() => Services.ScheduledPublishNotifier.Route(argument)));
         string? launchedBy = Services.ScheduledPublishNotifier.LaunchedFromAToast();
@@ -379,11 +394,28 @@ public partial class App : Application
     }
 
     /// <summary>The update engine's exit: the installer is already started.</summary>
+    /// <remarks>
+    /// #632: carried to the UI thread when it is called from anywhere else.
+    /// It runs on the thread that started the check (observed; the likely
+    /// mechanism is the download's async continuation resuming on its
+    /// caller's context): the daily check starts on a timer thread, and there
+    /// <c>Current.Exit()</c> returns having done nothing — measured:
+    /// "QuitForUpdate on thread 5, UI thread: no", then "Current.Exit
+    /// returned", and the old window stayed up while the installer met it and
+    /// gave up. On the UI thread (Check for Updates…) the call is the same
+    /// direct one it always was.
+    /// </remarks>
     public static void QuitForUpdate()
     {
-        _installerStarted = true;
-        QuitTime();
+        _installerStarted = true;   // stays true if the quit below never happens; the installer has started either way
+        bool onUiThread = _uiThread is null || _uiThread.HasThreadAccess;
+        LogDiagnostic($"QuitForUpdate on thread {Environment.CurrentManagedThreadId}, UI thread: {(onUiThread ? "yes" : "no, so the quit is handed to it")}");
+        if (onUiThread) QuitTime();
+        else if (!_uiThread!.TryEnqueue(QuitTime)) LogDiagnostic("QuitForUpdate: the UI thread would not take the quit");
     }
+
+    /// <summary>The UI thread's queue, kept by OnLaunched: the quit an update asks for is carried to it (#632).</summary>
+    private static Microsoft.UI.Dispatching.DispatcherQueue? _uiThread;
 
     private static bool _installerStarted;
 
@@ -413,6 +445,8 @@ public partial class App : Application
         WorkspaceViewModel.IsTerminating = true;
         FolderContainers.ReleaseEverythingAtQuit(
             Settings.RememberedWindows.Select(w => w.Path).Distinct().ToList());
+        LogDiagnostic("QuitTime: calling Current.Exit");
         Current.Exit();
+        LogDiagnostic("Current.Exit returned");
     }
 }

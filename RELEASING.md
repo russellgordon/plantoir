@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-22 | Install and Reopen on the update offer that comes by itself once a day now closes Plantoir, installs and opens the new version, as it already did from File ▸ Check for Updates…; before, the window stayed open and nothing was installed. | Windows | [#632](https://github.com/russellgordon/plantoir/issues/632) |
 
 
 ## Warnings the release notes MUST carry
@@ -126,6 +127,7 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-10-22 (#632) | **Windows:** if you choose Install and Reopen on the offer that appears by itself and Plantoir stays open, close Plantoir, open it again, then choose File ▸ Check for Updates… and install from there. | The fix is IN this release, so it takes effect only from the copy after it: a teacher on 1.8.5 or earlier who accepts the daily offer for this release meets the old fault once, and the window it leaves open is half shut down. |
 
 ## Trim the roadmap
 
@@ -476,6 +478,14 @@ the release side.
   every release newer than the teacher's own, so skipping a release never
   loses its warning. A later release keeps the earlier one important for
   teachers still below it, by itself.
+  - **Exception: a warning for the OTHER platform only** (the Windows-only
+    row for #632, 2026-10-22, is the first) is not by itself a reason to pass
+    `--required-warning` here: it would take Skip away from every mac
+    teacher for a sentence that does not apply to them.
+    Nor is it a reason to mark the WINDOWS item critical (`--critical-versions`):
+    a critical offer shows Install and Reopen alone, which would funnel every
+    1.8.5 teacher into exactly the daily-offer path that is broken on their
+    copy. The sentence in the notes is the mitigation; 1.8.6 is not marked.
 
   **The one exception so far was v1.4.0, which carried three warnings and was
   cut WITHOUT the flag.** All three were for a teacher installing v1.4.0 BY
