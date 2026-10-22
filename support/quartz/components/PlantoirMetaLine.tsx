@@ -43,6 +43,11 @@ import figuresScript from "./scripts/figures.inline"
 // reaches the sidebar of every page, folder and tag pages included. It changes
 // no page's HTML; the rows it marks are drawn in the browser.
 import sidebarPageMarkerStyle from "./styles/sidebarPageMarker.scss"
+// Pictures laid out at their real height before they scroll into view (#609)
+// ride along for the same reason: one rule, for every picture on every page
+// (Quartz's own base.scss lays an off-screen picture out at zero height, and
+// Safari then pushes the text down mid-scroll). Changes no page's HTML.
+import picturesStyle from "./styles/pictures.scss"
 // Self-check quizzes (#563) ride along for the same reason as the figures:
 // every content page might hold one. Every style is under a .plantoir-quiz
 // class and the script returns at once on a page with no quiz (ruling Q2:
@@ -235,7 +240,7 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, quizStyle, tasksStyle, progressStyle)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, picturesStyle, quizStyle, tasksStyle, progressStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
   PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript, tasksScript, progressScript, headingAnchorScript)
   return PlantoirMetaLine
