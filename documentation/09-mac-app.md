@@ -10378,6 +10378,171 @@ settles it: 8 skips naming #315 and 0 failures means the key fired; the old
 16 failures mean it did not, and `IOConsoleLocked` is the fallback. Either
 way the result is a failure or a skip with a reason, never a silent pass.
 
+## Testing: the unit test host shows nothing on any display (#633)
+
+Written 2026-10-22, v1.8.6. The mac unit suite runs INSIDE Plantoir: the test
+host is the real app, and until this release it put the app's main window on
+a display at launch, became the frontmost app about two seconds later, took
+the menu bar, and hung every sheet and alert a test raised on that window in
+front of whoever was working at the Mac. Every class-level run did it, not
+only the full suite. Measured on macOS 26.6 with two (later three) displays.
+
+**Why the fix is in the app, not in the tests.** A probe timed the launch.
+The main window is ordered in on a display at **449 ms**, and the test
+bundle's principal class, the earliest code the test target can run, runs at
+**475 ms**. No test-target code can get there first. The app's
+`applicationWillFinishLaunching` can: no window exists yet, and XCTest is
+already loaded (true in every run measured, so `RealHome.isInsideTestBundle`
+reads correctly there).
+
+**What it does.** `UnitTestHostWindows.installIfThisIsTheUnitTestHost()` is
+the first line of `applicationWillFinishLaunching`. When
+`UnitTestHostWindows.quietsThisProcess(...)` says yes, it does two things.
+
+- **The host becomes an accessory app** (`setActivationPolicy(.accessory)`),
+  so it has no Dock tile and no menu bar of its own.
+- **`NSWindow`'s three placement methods get one answer.** These are
+  `constrainFrameRect(_:to:)`, `setFrame(_:display:)` and `setFrameOrigin(_:)`.
+  A window that is not a sheet always sits at ONE origin beyond every display:
+  `offScreenOrigin(for:displays:)`, beyond the bottom-left corner of all the
+  displays together, with 4000 pt to spare. A sheet is moved only if it would
+  overlap a display, so it stays beside its parent. The probe saw all three
+  methods used, by SwiftUI's window, alerts, sheets, popover windows and
+  text-input windows. The replacement is on `NSWindow` itself, so every
+  subclass that calls `super` is covered.
+
+The window is still ordered in, which matters because about twenty classes
+read it. The accessibility tree, `isOnActiveSpace`, presses and
+`cacheDisplay` screenshots all work off every display: a 23-class run, the
+probe's run B with 158 tests, had 0 skips. AppKit simply reports
+`window.screen == nil`.
+
+**Why the origin is pinned, not merely kept off.** "Keep off the displays"
+alone was measured first. AppKit's sheet helper moves the parent after every
+sheet, and over 23 classes the main window drifted from x = -5920 to
+x = -24070. With the pin taken out again during implementation, one sheet and
+one alert moved the main window from (-5512, -5610) to (-15304, -15990). A
+window that drifts is still off every display, so only its origin shows the
+difference, and the live test asserts it.
+
+**The front, handed back.** Off every display, an active host still takes the
+keyboard. Two classes activate it:
+
+- `MenuKeysBehindASheetTests`, on purpose: a window's menu keys reach the
+  menu bar only from the key window of the active app;
+- `AssistRevealsSectionOnScreenTests`, through the product's own
+  `activate(ignoringOtherApps:)`.
+
+`ActivationHandBack`, an `XCTestObservation` registered from the bundle's
+principal class, remembers the last other app at the front, and only an
+ordinary app with a Dock tile (`activationPolicy == .regular`): a background
+agent such as `UserNotificationCenter` activates now and then, and was once
+measured as the remembered app. When a test finishes with the host active, it
+yields activation to that app and asks it forward. If that app has quit or will
+not come forward, it yields to the Finder, which is always running, and asks it
+forward instead. `NSApp.deactivate()` is only the last resort: on its own it
+left the host active and frontmost for the whole 5 s it was watched. It never
+calls `hide`, which would order out the window the next tests read.
+Without the hand-back the host stayed frontmost for the remaining **115 s** of
+a 23-class run. With it, an external watcher measured the host frontmost for
+about **2.5 s in total** over 24 classes and 164 tests: one 2.4 s stretch for
+the class that activates it, and two blinks at launch (68 ms and 45 ms). Both
+classes needed no change: `MenuKeysBehindASheetTests` ran unmodified and
+passed. Starting inactive, its cooperative `activate` is refused, and its own
+`kAXFrontmostAttribute` fallback makes the accessory host key.
+
+**Who it is for, and who it is not.** `quietsThisProcess` answers true ONLY
+when XCTest is loaded into the app, that is, in the unit host. It is
+deliberately NOT `PlantoirDefaults.guardsAppKitBookkeeping`, which also arms
+for a UI test's `--state-dir` launch and for a marketing capture
+(`UITEST_WORKSPACE`). Those apps are driven from outside, by the UI runner or
+by `capture.py`, through windows that must be on a display. Copying the
+broader gate would hide them, so a test pins all eight combinations.
+
+- A teacher's Plantoir has no XCTest in it: the Debug and release app
+  binaries link none (`otool`).
+- Nor does the app a UI test launches: XCTest lives in the runner process.
+- The command-line paths (`--write-contracts` and the rest) `exit` in
+  `QuartzTeachersApp.init`, before `applicationWillFinishLaunching`.
+- The installer's body is `#if DEBUG`, so a release build carries no swizzle
+  at all. Checked with a Release build: its object file for
+  `UnitTestHostWindows` has no `keepEveryWindowOffTheDisplays` or
+  `placedFrame` symbol, and no reference to `method_setImplementation` or
+  `imp_implementationWithBlock`. The Debug object has all four.
+- A placement call off the main thread falls through to the original method
+  rather than tripping `MainActor.assumeIsolated`. None was ever seen; this
+  is a precaution, not a measured fault.
+
+**It chains with the sheet host.** `SheetsHungOffScreenStayThere` (#621)
+replaces `constrainFrameRect(_:to:)` again for sheets hung from a test's own
+`OffScreenWindow`. It is installed later, from the first `SheetHost`, so the
+answer it falls back to is this one, not AppKit's. Tests therefore never call
+the installer: a second install would cut that chain. The off-screen formula
+has one copy, and `TableHost.offScreenOrigin(for:)` asks it.
+
+**The teacher's saved window frame is untouched.** `AppKitBookkeepingGuard`
+(#361) puts AppKit's frame key back after every save. After the runs above,
+`NSWindow Frame main-AppWindow-1` read exactly as before them, never the
+off-screen origin.
+
+**The tests** are `UnitTestHostWindowsTests` and `ActivationHandBackTests`.
+Every live test was red on the old code, except the first hand-back test,
+which passes with the install call removed: its must-fail is the observer
+emptied. The must-fail proofs are recorded in the closing comment.
+
+- **The policy test:** the host is an accessory.
+- **The main-window test:** the main window is ordered in, `screen == nil`,
+  and it is off every display both by AppKit's frame and by the WINDOW
+  SERVER's bounds against `CGDisplayBounds`. It skips in a session with no
+  main window (#315), as `AppKitBookkeepingGuardTests` does.
+- **The sheet-and-alert test:** a sheet and an alert on the main window stay
+  off, and the window's origin does not move.
+- **Pure tests:** placement against three fake displays, one with negative
+  origins; and the gate.
+- **The hand-back test:** it activates the host the way `MenuKeys` does,
+  calls the observer itself, and asserts another app is frontmost within a
+  second. A plain "the host is not active" assertion cannot see a missing
+  hand-back: run alone, the host is never active, so it passes with no
+  hand-back at all (measured in the plan review).
+
+**Not fixed: a Dock tile can flash at launch.** The app's Info.plist has no
+`LSUIElement`, so LaunchServices launches the test host as an ordinary
+`Foreground` app. It stays one until `applicationWillFinishLaunching` makes it
+an accessory. Measured: **728 ms** of `Foreground` before `UIElement` in a
+one-class run (242 ms and 631 ms in the planner's runs). For that long a Dock
+tile can appear, and twice in one run the host was briefly frontmost (68 ms
+and 45 ms). Only `LSUIElement` in the Info.plist would avoid it, and that
+changes the teacher's app: no Dock tile and no menu bar for real. Rejected.
+
+**Rejected, and why.**
+
+- **Suppressing the window at launch** (`defaultLaunchBehavior` and friends).
+  Russell preferred keeping the window. About twenty classes would need a
+  helper to open one. And it reads `isInsideTestBundle` during the scene body,
+  which is exactly the early read the `static let` caveat on
+  `AppKitBookkeepingGuard.armIfATestIsDrivingThisRun` warns about.
+- **`.prohibited` activation:** `MenuKeysBehindASheetTests` could not become
+  key, so it would skip and lose its verification.
+- **`LSUIElement`:** see above.
+- **Fixing it from the test target** (the principal class, or a test helper):
+  26 ms too late, measured.
+- **Isa-swizzling the main window:** it is already
+  `NSKVONotifying_SwiftUI.AppKitWindow`.
+- **A `DYLD_INSERT_LIBRARIES` test dylib:** library validation, signing, and a
+  new target.
+- **Keep-off without the pin:** measured drift, above.
+- **Gating the product's `activate` calls on `isRunningTests`:** the hand-back
+  covers both callers without touching a product path.
+
+**Windows owes nothing.** `dotnet test` does not host the app, and
+`Plantoir.Tests` opens no windows (no `.Show()`, no `.Activate()`). Its UI
+suite owns the foreground by design. This section is the record.
+
+**One sighting worth knowing about.** The external watcher saw one window of
+the host with zero size at (0, 0) for about 200 ms near the end of the
+24-class run. With no area, it shows nothing. Of the 51 windows the host
+ordered in, none with any area ever overlapped a display.
+
 ## A test host that segfaults, and the six levers that look like they should fix it
 
 Written 2026-09-07, for whoever meets a modal that kills a test process rather
