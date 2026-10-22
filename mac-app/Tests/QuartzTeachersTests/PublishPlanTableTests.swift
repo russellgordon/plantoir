@@ -312,10 +312,11 @@ final class PublishPlanTableTests: XCTestCase {
         )
         model.body = outcome.forTheCard
         model.planTable = outcome.planTable
-        let host: TableHost = TableHost(
-            SectionVerbSheet(model: model, pressDefault: {}, cancel: {}),
-            size: NSSize(width: 560, height: 900)
-        )
+        // At the size the sheet opens at: a sheet's table takes any height
+        // it is given since #621, so a host taller than the sheet would be
+        // measuring the host.
+        let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        let host: TableHost = TableHost(sheet, size: PageTablesSheetTests.fittingSize(of: sheet))
         defer {
             host.close()
         }
