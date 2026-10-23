@@ -7414,9 +7414,25 @@ launcher writes for prepare:
 The reasons are the mac's own. `notDownloaded`'s
 "(the first time downloads about {downloadGigabytes} GB)" is filled per
 platform (`swift.downloadGigabytes`: 1.3 on a Mac, 2.3 here), so the mac's
-rendered sentence is byte for byte what it was. A scheduled publish runs
+rendered sentence is byte for byte what it was.
+
+**A scheduled publish can do the first fetch unattended.** It runs
 `preview.ps1 --build-only`, so it gets Swift ready and compiles too (the
-mac's ruling Q4).
+mac's ruling Q4). On a PC where no preview has got Swift ready yet, the
+first scheduled publish of a course with a Swift block downloads the 2.3 GB
+on its own, typically overnight with nobody watching, and the publish waits
+for it (about three minutes here, longer on a slow line). Nobody sees the
+percent lines, which go only to the run's log. What the teacher sees later:
+- the trail line "Swift got ready on this computer" (or "Swift could not
+  be got ready", with the reason), because `TaskScheduling.cs`'s wrapper
+  keeps the `PLANTOIR_SWIFT:` line and `ScheduledHealthFindings` records
+  it, dated to the run;
+- on the published site, every block runnable, or the usual "not ready" for
+  each block, with the `swiftCouldNotBePrepared` folder problem waiting at
+  the next launch, as for any scheduled build's folder problems.
+
+A scheduled run that fails offline tries again at the next run or preview.
+Nothing is downloaded for a course with no Swift.
 
 ### What is fetched, where, and how big
 
@@ -7461,7 +7477,12 @@ elevated):
    needs no second download.
 
 **Downloaded:** 2,301,721,200 B (about 2.3 GB). **Kept:** 898,260,086 B
-(the toolchain 533 MB, the SDK 355 MB, wasm-opt 10 MB). **Peak while
+(the toolchain 533,231,069 B, the SDK 354,685,593 B, wasm-opt
+10,343,424 B; `swiftWindows.keptBytes`). The measurement's hand trim was
+3,268 B smaller, because it also removed `usr/bin/clang-deps-launcher.py`,
+a Python script nothing here runs, which `trim.remove` does not name.
+`keptBytes` is not part of the install digest, so correcting it fetched
+nothing again. **Peak while
 unpacking:** 4,817,697,631 B, sampled every 2 s (the installer, the carved
 cabinet and the extraction overlap). That is inside the shared
 `room.needGigabytes` of 6, which is checked before anything is downloaded.
@@ -7490,8 +7511,8 @@ compiler's folder the moment `msiexec` had written it said "Access is
 denied" (most likely Defender scanning the new files). With the installer
 already deleted, the retry cost a second 2.1 GB download. Now every folder
 move is tried again for up to 20 s (`move`, `rename_into_place`), and the
-installer is kept until Swift is ready, which costs about 0.3 GB more at the
-peak than deleting it after the carve.
+installer is kept until Swift is ready, which makes the measured 4.82 GB
+peak about 0.3 GB higher than deleting it after the carve would.
 
 **Uninstalling Plantoir leaves the 0.9 GB** in `%LOCALAPPDATA%\Plantoir\swift`,
 as it leaves the assistant's models. Delete the folder to reclaim it; the
@@ -7627,8 +7648,12 @@ Arm (not pinned: the app is win-x64 only), and the WebView2 pane.
 
 `activityTrail.mustRecord` has two events: **"Swift got ready on this
 computer"** (seconds, gigabytes) and **"Swift could not be got ready"**,
-with the reason as one of offline, noRoom, damaged, busy or unpack
-(`whyWords`). They are read from the `PLANTOIR_SWIFT:` line by
+with the reason as one of offline, noRoom, damaged, busy, unpack (also
+anything unexpected, such as a signature check that hangs past 300 s:
+`ensure` turns every exception into one, so the console never shows a
+traceback without its marker) or waited (another preview held the fetch for
+longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
+"already ready" prints the marker. They are read from the `PLANTOIR_SWIFT:` line by
 `SwiftGotReady.cs`, in both readers (the console's
 `ScriptRunner.RecordHealthFinding`, and the scheduled publish's
 `ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
