@@ -3859,7 +3859,7 @@ WebKit (playwright-core 1.63.0, WebKit 26.6, kept in the scratchpad only):
   wrap; then print media and a `plantoir-flowing` pre laid out as a plain
   block, and the copy button's text the block as written.
 - **Must-fail, proven by copy-and-restore** (the closing comment has the
-  output): `wrapsText` returning false fails 19 lines of the check script;
+  output): `wrapsText` returning false fails every wrapping case of the check script (19 lines when measured, before the twentieth case was added);
   on a copy of the built site, the CSS rule deleted, the wrapper divs
   stripped, `::before` set back to `position: static`, `::after` content
   `none`, and a real `…` put into a line's text each fail text_wrap.mjs at
