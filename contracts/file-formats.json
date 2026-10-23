@@ -1532,6 +1532,19 @@
     "writtenBy": "the build, in a build for publishing only, and only after the site was built and mirrored - never before, or a build that failed half way would leave a list the site does not match. A preview never writes one; it writes a new .build-id, so a list from an earlier build no longer matches and is not recorded.",
     "why": "The record must say what the uploaded site shows, not what the teacher's pages say now."
   },
+  "pageSourcesList": {
+    "note": "GitHub #518. Which file in the course folder each page of a section's site came from, so Open in Obsidian can open the file behind the page the preview shows (shared-rules.json -> obsidianOpensThePreviewedPage says how the app reads it).",
+    "path": "<the section's built output>/.page-sources.json, beside .visible-pages.json and public/ and never inside public/ - <CODE>/.merged_output/section<N>/ on macOS, PLANTOIR_BUILD_ROOT/<CODE>/section<N>/ on Windows",
+    "keys": {
+      "version": "1 - a reader treats any other version as no list",
+      "course": "the course folder's name",
+      "section": "N",
+      "buildId": "the build that wrote it - for diagnosis only: the app never learns which build a preview shows, so it is never compared",
+      "pages": "{address: entry}, the address being the page's slug as Quartz serves it below the site's root (build_site.page_slug_as_quartz_serves; 'index' for the front page). An entry is {source, hidden} - source the file as a POSIX path below the course folder with its .md, as it is on disk; hidden whether students are kept from it - plus, on the front page only, 'shows': the class page the teacher's front page is nothing but a single ![[...]] embed of, when exactly one page has that name. An address two files make is {collided: true} with no source. A page the build made itself (My Progress, a coverage map), a file no longer there and a file outside the course folder are not listed."
+    },
+    "writtenBy": "the build, in a preview and a publish alike, immediately before Quartz runs - after every pass that adds or removes a page - atomically (a temporary file renamed into place). A failure to write it never fails a build. Never written into public/, so no deploy uploads it.",
+    "why": "Only the build knows which file made a page: a section's page that replaced a shared one, a folder's _index and the names Quartz slugs cannot be worked back from an address."
+  },
   "workLease": {
     "note": "A work lease: a file saying which process is doing what, so other windows, other copies of Plantoir and outside assistants leave that work alone. Windows' WorkLease (Plantoir.Core/Assist/WorkLease.cs) set the shape; the mac matches it and adds a fourth line. The rules a reader applies are shared-rules.json -> workLeases. #245 wrote this block for the import's lease; #156 filled in the kinds it writes (build, preview, publish) here rather than a second block. Which leases stand in the way of what is shared-rules.json -> workLeases.declining.",
     "directory": "courses/.internal/activity/ inside the working folder. Written outside the thing it is about on purpose: removing a staging folder must not remove the claim to it.",
