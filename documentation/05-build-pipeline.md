@@ -1996,7 +1996,13 @@ net fires only when the site carries no Python engine at all (a carried
 engine wraps a block the build did not count as a WORKING block); for Swift
 it fires per block whose key is not in `plantoir-runners/swift.json` — which
 is why verify.sh's end-to-end fixture (Plain Code Fixture) is a Swift block
-after a list fence left open.
+after a list fence left open. **On Windows the call took 180-470 ms** over 16
+runs under load (i5-8365U), and the first check there found the finding's
+611-character machine line split in two by the pseudo console's then
+400-column screen, so no dialog and no trail line: the app's launcher runs
+have a wider screen since #662 (`documentation/12-windows-app.md` → "How wide
+the console is, and why"). A one-block finding is 531-611 characters; ten
+blocks or more (the most it names) about 2,300.
 
 **Rejected:** a Python pass after Quartz (a preview is one
 `quartz build --serve` process that never returns, so it would never run —

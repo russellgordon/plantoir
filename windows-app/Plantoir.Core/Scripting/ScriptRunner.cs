@@ -236,7 +236,9 @@ public sealed class ScriptRunner : INotifyPropertyChanged
 
         try
         {
+            // Wide, so a long machine line is not split on its way (#662).
             _process = ConPtyProcess.Start(commandLine.ToString(), workingDirectory,
+                                           columns: ConPtyProcess.LauncherColumns,
                                            extraEnvironment: extraEnvironment);
         }
         catch (Exception error)
