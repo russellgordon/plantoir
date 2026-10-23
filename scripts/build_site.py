@@ -6163,6 +6163,66 @@ def patch_explorer_inline_expand_on_navigate(inline_path: Path):
     except Exception as e:
         print(f"⚠️ Error patching explorer.inline.ts: {e}")
 
+SIDEBAR_SCROLL_MARKER = "PLANTOIR-SIDEBAR-SCROLL"
+
+# Quartz v4.5.0's own line in explorer.inline.ts, exactly (patches/ keeps it).
+_SIDEBAR_SCROLL_OLD = 'activeElement.scrollIntoView({ behavior: "smooth" })'
+
+# What replaces it. scrollIntoView scrolls EVERY scrollable ancestor, and the
+# sidebar is sticky and as tall as the window, so on a long page it moved the
+# page itself 300-600 px as it opened, and on any page it slid a CLOSED
+# folder's hidden list toward a row nobody could see (#611). This moves only
+# the sidebar's own list, at once, centring the entry, and only when the
+# entry is in an open folder and out of view.
+_SIDEBAR_SCROLL_NEW = """// PLANTOIR-SIDEBAR-SCROLL (#611): bring the current page's entry into view
+        // in the sidebar's own list only, at once, and only when it can be seen.
+        let insideClosedFolder = false
+        let folder = activeElement.closest(".folder-outer")
+        while (folder) {
+          if (!folder.classList.contains("open")) insideClosedFolder = true
+          folder = folder.parentElement ? folder.parentElement.closest(".folder-outer") : null
+        }
+        if (!insideClosedFolder) {
+          const listBox = explorerUl.getBoundingClientRect()
+          const entryBox = activeElement.getBoundingClientRect()
+          const alreadyInView = entryBox.top >= listBox.top && entryBox.bottom <= listBox.bottom
+          if (!alreadyInView) {
+            explorerUl.scrollTop +=
+              entryBox.top - listBox.top - (explorerUl.clientHeight - entryBox.height) / 2
+          }
+        }"""
+
+
+def patch_explorer_scroll_in_sidebar_only(inline_path, printer=print) -> bool:
+    """
+    Stop the sidebar moving the page when a page opens (#611): replace
+    Quartz's scrollIntoView of the current page's entry with a scroll of the
+    sidebar's own list. Every build, so a section staged before the fix heals
+    on its next preview. Idempotent (its own marker). Answers whether the
+    file changed; a file of another shape is said once and left alone.
+    """
+    path = Path(inline_path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
+        printer(f"⚠️ Could not stop the sidebar moving the page: explorer.inline.ts could not be read ({error})")
+        return False
+    if SIDEBAR_SCROLL_MARKER in text:
+        return False
+    if text.count(_SIDEBAR_SCROLL_OLD) != 1:
+        printer("⚠️ Could not stop the sidebar moving the page: explorer.inline.ts has changed shape, "
+                "so a page may still jump as it opens.")
+        return False
+    text = text.replace(_SIDEBAR_SCROLL_OLD, _SIDEBAR_SCROLL_NEW, 1)
+    try:
+        path.write_text(text, encoding="utf-8")
+    except OSError as error:
+        printer(f"⚠️ Could not stop the sidebar moving the page: {error}")
+        return False
+    printer("✅ Patched explorer.inline.ts so the sidebar scrolls only itself")
+    return True
+
+
 def patch_quartz_build_clean(build_ts_path: Path):
     """
     Patches quartz/build.ts so that directory cleaning handles virtiofs / Docker
@@ -8590,6 +8650,7 @@ def build_section_site(
     explorer_inline = output_dir / "quartz" / "components" / "scripts" / "explorer.inline.ts"
     patch_explorer_tsx_expand_behavior(explorer_tsx)
     patch_explorer_inline_expand_on_navigate(explorer_inline)
+    patch_explorer_scroll_in_sidebar_only(explorer_inline)
 
     install_patched_backlinks(output_dir)
     install_quartz_additions(output_dir)

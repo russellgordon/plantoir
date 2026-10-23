@@ -326,6 +326,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-27 | **A folder page's table of contents (#520)** | `quartz.layout.ts` | `_wire_list_page_toc`, one of `wire_quartz_additions`' edits, puts `Component.DesktopOnly(Component.TableOfContents())` — the content layout's own — in `defaultListPageLayout`'s right column, which is `[]` in v4.5.0, and touches nothing else. Quartz renders every `folder/index.md` with that layout (and the tag pages), so a curriculum folder's index with `enableToc: true` and five headings of its own showed no table of contents: the data was computed and placed nowhere. Quartz's own rule then decides, as on any page — shown by default, `enableToc: false` hides it, and only with two or more headings of depth 3 or less on the page itself — so tag pages and folder pages with no headings of their own are unchanged. Measured on the #520 plan by editing a built layout and re-running Quartz: the curriculum index showed "Navigate this page" with its strand headings, while `Concepts/index`, `tags/A1` and the front page stayed at 0; expectation pages had shown a table of contents all along. Idempotent, every build; a list layout of another shape warns and is left alone. **Chosen** (ruling Q2 on the plan): on every folder page with the headings, as Quartz does on every other page — 49 of 1,009 folder index pages across `support/` show one, 9 of them without having asked. **Rejected:** only on folder pages that say `enableToc: true` (a wrapper component of our own, and a rule unlike every other page's). `scripts/test_folder_page_toc.py` drives it through `wire_quartz_additions`; verify.sh 6h reads EXC2O's built `Curriculum/index.html`. |
 | C2-28 | **Every code block's line numbers, hairline and no ligatures (#585)** | `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, carried into `index.css` by `codeRunner.scss`) | Quartz numbers every highlighted line in a 1rem box with no separator. One gutter style for static blocks and the runnable editor: Quartz's own dimmed colour, the code font, a box `--plantoir-digits` wide (3 from line 100, 4 from line 1000, by CSS), a 1 px hairline in `var(--lightgray)`, no fill; no programming ligatures in any code element, inline code in prose included. On paper the hairline runs down each line past wrapped rows, printed even with a browser's background graphics off. Every site, every page with code - I12 says why and what was measured. |
 | C2-29 | **My Progress under the class folder in the sidebar, and its emitter (#545)** | `quartz/components/scripts/explorer.inline.ts`, `quartz.config.ts`, `quartz/plugins/emitters/index.ts` | `pin_my_progress_in_sidebar` adds, once, an import of `progressRules.pinnedOrder` and one data line rewritten on every build (`{slug, after}`: the page's slug, or `""` when this build made none, and the class folders' slug segments), and loops over `pinnedOrder(orderedTopLevel, …)` — `orderedTopLevel` is a `const` (plan review F1). `_wire_emitters_index` exports `PlantoirProgress`; `_wire_progress_emitter` puts it straight before `Plugin.Assets()`. Every build, idempotent; a script or settings file of another shape warns and is left alone (the page then sorts last, or no manifest is written). Section L. |
+| C2-30 | **The sidebar scrolls only itself (#611)** | `quartz/components/scripts/explorer.inline.ts` | `patch_explorer_scroll_in_sidebar_only` (marker `PLANTOIR-SIDEBAR-SCROLL`) replaces Quartz's one `activeElement.scrollIntoView({ behavior: "smooth" })` — which scrolled the PAGE as well as the sidebar, 300-600 px down a long page as it opened — with a scroll of the sidebar's own list: none when the current page's entry is inside a closed folder, none when it is already in view, otherwise `scrollTop` set once, at once, centring it. Every build, idempotent, run straight after C2-3's expand-on-navigate patch; a script of another shape warns and is left alone. `patches/explorer.inline.ts` keeps Quartz's line (A2 unchanged). Section O. |
 
 ### C3. Content-level transformations (every build)
 
@@ -1429,23 +1430,29 @@ the page's:
   sentence. Rejected: waiting for the planted folder's row (it would turn a
   real "the folder is not in the sidebar" into a vague "did not load"), and
   any sleep.
-- **The pairing.** On a full load with no saved `explorerScrollTop`,
-  `explorer.inline.ts` smooth-scrolls the current page's row into view, which
-  moves the WINDOW: `scrollY` 0 to 476 px over about 360 ms, the row moving
-  1 to 41 px a frame (sampled per frame, light and dark alike; the whole-page
-  scroll itself is #611). #601's "0.8 px" miss was one frame of that, not
-  font metrics: a still dot's middle sits 9.79 px below its line's top, and #601's sat
-  18.8 px below, 9.0 px off, so the line's bottom edge only happened to be
-  0.8 px away. So every geometry reading (the long title's lines, content
-  edge and dot; each page row's first line and dot) now comes from
-  `readInOneFrame`: the row's lines, the dot's box from CDP, the lines again,
-  kept only when the two line readings are identical and the dot is drawn;
-  20 tries, 100 ms apart, then a failure that says why. **What it proves:**
-  the line and the dot were read within one frame, because the line is read
-  on both sides of the dot and the scroll only goes one way. It does not
-  prove the sidebar has stopped, and need not: 537 paired reads taken
-  MID-scroll all gave the same 9.79 px offset as a still sidebar (re-run on
-  this piece: 102 light and 410 dark mid-scroll pairs, every one 9.79 px).
+- **The pairing.** Until #611 (section O), on a full load with no saved
+  `explorerScrollTop`, `explorer.inline.ts` smooth-scrolled the current page's
+  row into view, which moved the WINDOW on a long page (`scrollY` 0 to 476 px
+  over about 360 ms, the row moving 1 to 41 px a frame, sampled per frame,
+  light and dark alike) and slid a CLOSED folder's hidden list (157 px on a
+  one-line page). #601's "0.8 px" miss was one frame of that move, not font
+  metrics: a still dot's middle sits 9.79 px below its line's top, and #601's
+  sat 18.8 px below, 9.0 px off, so the line's bottom edge only happened to be
+  0.8 px away. verify.sh's fixture pages are one line long, so the window
+  could not move there; O2 says why the folder's list sliding as the check
+  opened it is the likelier source. So every geometry reading (the long
+  title's lines, content edge and dot; each page row's first line and dot)
+  now comes from `readInOneFrame`: the row's lines, the dot's box from CDP,
+  the lines again, kept only when the two line readings are identical and
+  the dot is drawn; 20 tries, 100 ms apart, then a failure that says why.
+  **What it proves:** the line and the dot were read within one frame,
+  because the line is read on both sides of the dot and that move only ever
+  went one way. It did not prove the sidebar had stopped, and did not need
+  to: 537 paired reads taken MID-scroll all gave the same 9.79 px offset as
+  a still sidebar (re-run on #616: 102 light and 410 dark mid-scroll pairs,
+  every one 9.79 px). Since #611 that scroll is gone; the pairing stays,
+  because a folder still opens with a .3 s transition that moves the rows
+  below it.
   **A wait-for-the-scroll-to-end gate was REJECTED for that reason**: it
   proves nothing the pairing does not, and it cannot defend against a move
   after the gate. The first fix (f12bd11b1) paired only the every-row loop,
@@ -3090,9 +3097,10 @@ Not a My Progress rule: any link with a `#heading`. The browser scrolls to
 the heading as soon as the page is laid out, before the runnable code's
 editors, diagrams, maths faces and pictures above it take their size;
 Chrome re-anchors later, Safari and Arc do not (ICS3U: 1,706 px short at
-+1 s). And the sidebar smooth-scrolls its current entry into view, which
-on a long sidebar drags the window too (measured in the check: without the
-fix the heading ended 4,291 px below the window's top). `headingAnchor.inline.ts`
++1 s). And, until #611 (section O), the sidebar smooth-scrolled its
+current entry into view, which on a long sidebar dragged the window too
+(measured in the check: without the fix the heading ended 4,291 px below the
+window's top). `headingAnchor.inline.ts`
 (riding `PlantoirMetaLine` with the other scripts) scrolls to the heading
 again, at once rather than smoothly, whenever the page's column changes size
 (a ResizeObserver — the one settle signal every late piece shares), when the
@@ -3452,6 +3460,123 @@ makes that 358 x 119`). Green three out of three with everything back.
   its bytes arrive the new picture's shape wins (`height: auto`), but at the
   old width. A page edited during the preview, or a picture ADDED during it,
   is sized right. A publish is always a fresh build and is never affected.
+
+## O. The sidebar never moves the page (#611, v1.9.0)
+
+A student opening a long page on a desktop saw it jump down by itself, 300 to
+600 px, as the sidebar drew. Quartz v4.5.0's `explorer.inline.ts` (and
+upstream's `v4` branch today) brings the current page's entry into view on a
+load with no saved sidebar position:
+
+```ts
+const activeElement = explorerUl.querySelector(".active")
+if (activeElement) activeElement.scrollIntoView({ behavior: "smooth" })
+```
+
+`scrollIntoView` with its default `block: "start"` scrolls EVERY scrollable
+ancestor — `overflow: hidden` ones and the document included — and the
+sidebar is `position: sticky; height: 100vh`, so lining a row up with the
+window's top moves the page. On a first visit the entry is usually inside a
+CLOSED folder (height 0; `elementFromPoint` misses it), so it scrolled the page
+and the folder's hidden list toward a row nobody could see. The intended
+scroller is `ul.explorer-ul` (`overflow-y: auto`), the one that scrolls when
+the rows are taller than the sidebar (656 px of rows in 479 on EXC2O).
+
+### O1. The fix
+
+C2-30, `patch_explorer_scroll_in_sidebar_only` in `scripts/build_site.py`,
+replaces that one line: if any `.folder-outer` around the entry lacks `open`,
+nothing scrolls; if the entry is already inside the list's box, nothing
+scrolls; otherwise the list's own `scrollTop` is set ONCE, instantly, so the
+entry sits in its middle. The saved-position branch above it is untouched.
+
+**It runs on every FULL load until the first in-site page change in a
+tab** — a first visit, or a reload with no page change before it, runs it
+again. Quartz saves the list's `scrollTop` in
+`sessionStorage.explorerScrollTop` on every in-site navigation (`prenav`), and
+from then on the restore branch wins, `"0"` included, since a non-empty
+string is truthy.
+
+**Where it goes is the trap.** `patches/explorer.inline.ts` reaches a
+section's Quartz copy only when the scaffold is staged (`if full_rebuild or
+not output_dir.exists()`), and an existing section keeps its copy (checked
+on a real MCV4U section: the old line was still there); on Windows
+`fetch-runtime.ps1` copies it only into a runtime being fetched. A patch in
+the every-build section reaches every existing section on both platforms on
+its next preview, with no full rebuild and no new runtime.
+
+### O2. Measured (2026-10-22, M4 Pro, macOS 26.6, Chrome for Testing 155, EXC2O)
+
+Old code, 1512 × 900 unless said; with the fix every figure below is 0, except the `#heading` row, which is where the heading is.
+
+| Case | `window.scrollY` | closed folder's list `scrollTop` |
+|---|---|---|
+| Long page, its folder closed (a fresh profile: the usual case) | 0 → **476** over ~360 ms, 17 frames | 336 |
+| Short (one-line) page, folder closed | 0 (cannot scroll) | **157** |
+| Long page, folder saved open | **609** (635 on another page) | — |
+| The same, then a page change in the site and back | **787** | — |
+| The same, then reloaded in the tab | **787** (the plan review saw 1,218) | — |
+| Long page, folder saved open, 1024 × 768 | **477** | — |
+| Long page with a `#heading` | the heading's own place (1,187), held there by L7 both ways | — |
+| 390 × 844 (phone, sidebar collapsed) | 0 | 0 |
+
+With the fix, a saved-open long page's entry is centred in the list
+(1512 × 600: entry at 335 px in a list 246-425 px) or the list stops at its
+end (at 900 px: `scrollTop` 177, the most it can be), and a short page whose
+entry is already visible moves nothing. The one-line page's 157 px
+is the likelier source of #601's 9 px in verify.sh: its fixture pages are one
+line long, so the window cannot move there, but the folder's rows slid as the
+check opened it (a folder's list clamps back to 0 once it opens, so the
+lasting damage was always the page's jump).
+
+### O3. The checks
+
+- `scripts/test_explorer_scroll.py` runs the patch on the real
+  `patches/explorer.inline.ts` after C2-3's: replaced once, no
+  `scrollIntoView` left in the block, the saved-position branch kept, braces
+  still balanced, a second run changes nothing, a reshaped file is said once
+  and left alone, and the call sits in the every-build section. verify.sh step
+  0; Windows' `PythonToolchainTests` discovers it. Must-fail: 7 errors on the
+  old `build_site.py` (copy-and-restore).
+- `browser-checks/picture_heights.mjs` phase B: once Picture Fixture has
+  settled on a fresh visit, `scrollY` must be 0.
+- `browser-checks/sidebar_page_marker.mjs`: on the first load of the fixture
+  page, before any folder is opened, 30 animation frames read the most the
+  page and any `.folder-outer:not(.open) > ul` were scrolled; both must be 0.
+- **Must-fail, both browser checks**, on a copy of verify.sh's own built
+  EXC2O site with the fix's compiled block in `postscript.js` put back to
+  Quartz's `scrollIntoView` (the only difference): picture_heights failed with
+  `scrollY 246 px`, sidebar_page_marker with a closed folder's list at
+  `157 px` (Marker Fixture is one line, in a closed folder); the unaltered
+  copy passed both. On the plan's EXC2O copy the sidebar check also caught a
+  long page in a closed folder: `page 476`, `closedList 105`.
+
+### O4. Rejected
+
+- **`block: "nearest"`**: the window stayed at 0 on this fixture, but it
+  still scrolled the closed folder's list (157 / 336 px) and still moves the
+  window whenever the row is outside the viewport.
+- **`scrollIntoView({ container: "nearest" })`**: Chrome-only and recent;
+  students use Safari.
+- **Nearest edge instead of centred**: leaves the entry on the list's bottom
+  edge (measured: bottom 725 px = the list's bottom), under Quartz's 50 px
+  `gradient-active` fade.
+- **Keeping it smooth**: there is nothing to animate from on a fresh load,
+  and a moving sidebar is exactly what #601 and #616 had to wait out.
+- **Editing `patches/explorer.inline.ts` as well**: it reaches only new
+  sections and full rebuilds (and a Windows runtime only when re-fetched), and
+  two copies of the same block would have to be kept in step. Quartz's line
+  stays there, and `test_explorer_scroll.py` fails if it ever changes, so the
+  patch cannot quietly stop applying.
+
+### O5. Not changed here
+
+`patch_explorer_inline_expand_on_navigate` (C2-3) never sets
+`opts.expandOnNavigate`: its first step adds the field to the interface, so
+its second step's guard (`"expandOnNavigate:" not in src`) is then false and
+the options line is skipped. The current page's folder therefore never
+springs open on a page change. Its own issue; fixing it makes an entry in an
+open folder the common case, which this fix already handles.
 
 ## E. Summary: what is *not* customized
 
