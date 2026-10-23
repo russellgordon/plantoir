@@ -73,6 +73,69 @@
     <Content Include="..\..\contracts\**" Link="Toolchain\contracts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- #559: a manifest of the bundled recipe, Toolchain\.hashes - each file's
+       relative path, length, last-write time (UTC ticks) and SHA-256 - so the
+       app can compare a working folder's .toolchain with the bundle without
+       reading both. A release built from a freshly checked-out tree restamps
+       every file, and comparing by time then read ~12,700 files twice (131.6 s
+       on an i5-8365U, 1.7.1 -> 1.7.2). ToolchainMirror trusts an entry only
+       while the bundled file's length and time still match it, so a stale
+       manifest costs reads, never a missed copy. Written into OutDir on Build
+       (Inputs/Outputs, so a Debug build that changed no recipe file only
+       checks times) and, in full, into PublishDir on Publish, which is the
+       tree the installer and the zip are made from (publish.ps1). -->
+  <UsingTask TaskName="PlantoirWriteToolchainHashes" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Root ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Security.Cryptography" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        string manifest = Path.Combine(Path.GetFullPath(Root), ".hashes");
+        // netstandard2.0, which inline tasks compile against, has no Path.GetRelativePath.
+        string prefix = Path.GetFullPath(Root).TrimEnd('\\') + "\\";
+        var lines = Directory.EnumerateFiles(prefix, "*", SearchOption.AllDirectories)
+            .Where(path => !string.Equals(path, manifest, StringComparison.OrdinalIgnoreCase))
+            // A temporary file a crashed build left behind is never fingerprinted.
+            .Where(path => !(Path.GetFileName(path).StartsWith(".hashes.", StringComparison.OrdinalIgnoreCase)
+                             && path.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)))
+            .Select(path =>
+            {
+                var info = new FileInfo(path);
+                string sha;
+                using (var stream = File.OpenRead(path))
+                using (var hasher = SHA256.Create())
+                    sha = BitConverter.ToString(hasher.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+                return path.Substring(prefix.Length) + "\t" + info.Length + "\t" + info.LastWriteTimeUtc.Ticks + "\t" + sha;
+            })
+            .OrderBy(line => line, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        // Unique per build, so two builds into one tree never share a temporary file.
+        string temporary = manifest + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        File.WriteAllLines(temporary, lines);
+        File.Copy(temporary, manifest, true);
+        File.Delete(temporary);
+        Log.LogMessage(MessageImportance.High, "Plantoir: wrote " + lines.Count + " fingerprints to " + manifest);
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="PlantoirFindBuiltToolchain">
+    <ItemGroup>
+      <_PlantoirBuiltToolchain Include="$(TargetDir)Toolchain\**" Exclude="$(TargetDir)Toolchain\.hashes;$(TargetDir)Toolchain\.hashes.*.tmp" />
+    </ItemGroup>
+  </Target>
+  <Target Name="PlantoirWriteToolchainHashes" AfterTargets="Build" DependsOnTargets="PlantoirFindBuiltToolchain"
+          Inputs="@(_PlantoirBuiltToolchain)" Outputs="$(TargetDir)Toolchain\.hashes">
+    <PlantoirWriteToolchainHashes Root="$(TargetDir)Toolchain" />
+  </Target>
+  <Target Name="PlantoirPublishToolchainHashes" AfterTargets="Publish">
+    <PlantoirWriteToolchainHashes Root="$(PublishDir)Toolchain" />
+  </Target>
+
   <!-- The native llama engine runs on the host for GPU-accelerated local assistant inference -->
   <ItemGroup Condition="Exists('..\Vendor\llama\llama-server.exe')">
     <Content Include="..\Vendor\llama\**" Link="llama\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
