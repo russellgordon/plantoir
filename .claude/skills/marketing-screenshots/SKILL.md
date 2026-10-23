@@ -396,8 +396,8 @@ Plantoir is running, and refuses any scale but 2× (a 4K session at 200%);
 nothing to `site/img`. It promotes nothing: `--promote id,id` marks a shot
 `windows: true` once its pictures pass, and the shot comes off
 `WINDOWS_PICTURE_OWED` by hand in the same (release) commit. The Swift two
-are not taken: Swift stays read-only on Windows until #570 is decided
-(v1.9.0).
+are not taken yet: Swift runs on Windows since v1.8.6 (#570), and the two stay
+owed until their 2x picture is taken.
 
 On Windows the `--app` pass makes and states `~/Teaching` itself (#459): the
 `provision` scene makes folders.json's courses through the New Course panel,

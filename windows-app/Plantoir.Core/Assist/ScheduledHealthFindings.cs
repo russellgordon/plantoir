@@ -132,6 +132,13 @@ public static class ScheduledHealthFindings
                                progress.TrailSentence, progress.Course, progress.Section, writtenAt);
         }
 
+        // PLANTOIR_SWIFT: (#570): a scheduled publish can be the first run
+        // that gets Swift ready on this PC, and nobody watches its console.
+        foreach (var swift in SwiftGotReady.ReportsIn(lines))
+        {
+            swift.Record(writtenAt);
+        }
+
         // The build's PLANTOIR_KEPT_OFF: line (#340), when the wrapper's scan keeps it.
         foreach (var keptOff in HowITeachKeptOffReport.ReportsIn(lines))
         {

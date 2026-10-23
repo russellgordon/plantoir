@@ -20,7 +20,7 @@
       "platform": "Windows",
       "asset": "PlantoirSetup.exe",
       "meta": "Windows 10 or 11, 64-bit",
-      "pinned": "1.8.5"
+      "pinned": null
     }
   ],
   "availability": {
