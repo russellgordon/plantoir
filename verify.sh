@@ -1236,7 +1236,9 @@ fi
 # pageShapes and ids case is run through it in Node; the transformer is run
 # over a page whose engine the site does and does not carry (siteDisagrees);
 # the build's fence reader reads every pageShapes case too; and every typed
-# codeRunner: line goes through the build's own reader.
+# codeRunner: line goes through the build's own reader. Since #653 the same
+# run puts every textFenceWrapping case through textWrapRule.ts and, as a
+# page, through Quartz's own parser and the transformer's second plugin.
 echo ""
 echo "🔎 Checking the runnable-code rules against what the site and the build run…"
 if docker run --rm \
@@ -1245,9 +1247,9 @@ if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/swift-gate" /opt/swift-gate),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/check_runner_rules_against_the_site.py \
   >/tmp/verify_runner_rules_site.log 2>&1; then
-  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, every codeRunner: line reads as the contract says, and the editor's colours agree with the image's own Shiki case for case, colour for colour and over the example content - $(grep '^codeRunnerColour.ts' /tmp/verify_runner_rules_site.log | sed 's/^codeRunnerColour.ts: //') (scripts/check_runner_rules_against_the_site.py, #455, #585)"
+  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, every codeRunner: line reads as the contract says, and the editor's colours agree with the image's own Shiki case for case, colour for colour and over the example content - $(grep '^codeRunnerColour.ts' /tmp/verify_runner_rules_site.log | sed 's/^codeRunnerColour.ts: //'); and every textFenceWrapping case through the site's own textWrapRule.ts and, as a page, Quartz's own parser and the transformer - $(grep '^textWrapRule.ts' /tmp/verify_runner_rules_site.log | sed 's/^textWrapRule.ts: //') (scripts/check_runner_rules_against_the_site.py, #455, #585, #653)"
 else
-  fail "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
+  fail "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, every codeRunner: line reads as the contract says, and every textFenceWrapping case holds (scripts/check_runner_rules_against_the_site.py, #455, #653)"
   cat /tmp/verify_runner_rules_site.log
 fi
 
@@ -2098,6 +2100,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
         "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Progress Fixture.md" \
+        "$HIT_COURSE/Wrap Fixture.md" "$HIT_COURSE/Wrap Plain Twin.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -3118,6 +3121,52 @@ for twin in ("A", "B"):
     "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
     encoding="utf-8")
 TASKPLANTS
+# ---- #653: text blocks that wrap, planted for the same build ----
+# Wrap Fixture: a ```text wrap {2,101} block of 120 lines (a three-digit
+# gutter; long lines 2 and 100; line 101 one unbreakable run, a URL; line 102
+# led by four spaces and 103 by a tab; 2 and 101 highlighted), a ```text and a
+# ```python wrap block that must still scroll, and a flagged block in a folded
+# callout, in a list item and in a self-check quiz's explanation (plan review
+# finding 6). No codeRunner: a page with one would move 6j's count of pages
+# carrying Python. Wrap Plain Twin: the first three blocks with `wrap` taken
+# out of each info string, so 6o can compare them byte for byte.
+# Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE" <<'WRAPPLANTS'
+import sys
+from pathlib import Path
+course = Path(sys.argv[1])
+F = "```"
+sentence = ("This long line of plain text is the kind a teacher pastes, an error message or a paragraph of sample "
+            "output, and it keeps going well past the width of any window so that it has to wrap several times over.")
+assert len(sentence) > 200
+lines = []
+for number in range(1, 121):
+    text = f"line {number}"
+    if number in (2, 100):
+        text = sentence
+    if number == 101:
+        text = "https://example.com/" + "a" * 400
+    if number == 102:
+        text = "    " + sentence
+    if number == 103:
+        text = "\t" + sentence
+    lines.append(text)
+long_block = "\n".join(lines)
+def blocks(flag):
+    return (F + "text" + flag + " {2,101}\n" + long_block + "\n" + F + "\n\n"
+            + "Plain text that scrolls:\n\n" + F + "text\n" + sentence + "\nshort\n" + F + "\n\n"
+            + "Code that scrolls:\n\n" + F + "python" + flag + "\nprint(\"" + sentence + "\")\n" + F + "\n")
+(course / "Wrap Fixture.md").write_text(
+    "---\ntitle: Wrap Fixture\n---\nText blocks that wrap (plantoir-text-wrap-653).\n\n" + blocks(" wrap") + "\n"
+    "> [!note]- Folded\n> " + F + "text wrap\n> " + sentence + "\n> " + F + "\n\n"
+    "- A step in a list:\n\n  " + F + "text wrap\n  " + sentence + "\n  " + F + "\n\n"
+    "> [!quiz] Which line wraps?\n> - [x] The long one\n> - [ ] The short one\n>\n"
+    "> > [!explain]- Why\n> > " + F + "text wrap\n> > " + sentence + "\n> > " + F + "\n",
+    encoding="utf-8")
+(course / "Wrap Plain Twin.md").write_text(
+    "---\ntitle: Wrap Plain Twin\n---\nThe same blocks without the word (plantoir-text-wrap-twin-653).\n\n" + blocks(""),
+    encoding="utf-8")
+WRAPPLANTS
 # ---- #596: every example in the page-authoring skill, planted for the same build ----
 # The skill's examples are read from the skill ITSELF, so an example edited
 # there is the example built here: every ```markdown / ````markdown fence and
@@ -4369,6 +4418,8 @@ claims = [
     ("def slope(x1, y1, x2, y2):", "a coloured code block with line numbers, and code in a sentence",
      lambda a, p: 'data-language="python"' in a and a.count("data-line") >= 4 and "<code>print()</code>" in a
      and "font-variant-ligatures" in (public / "index.css").read_text(encoding="utf-8")),
+    ("text wrap", "a text block that wraps (#653)",
+     lambda a, p: 'class="plantoir-text-wrap"' in a and 'data-language="text"' in a and "FileNotFoundError" in a),
     ("- [ ] Estimate before calculating", "a checklist students tick, one box ticked to start",
      lambda a, p: tasks(a) == 3 and len(re.findall(r'<input type="checkbox" checked class="plantoir-task"', a)) == 1),
     ("## Success criteria", "a page with three success criteria (one ticked) and a checklist under another heading",
@@ -4443,9 +4494,88 @@ print(f"   {len(examples)} examples, {len(claims)} claims")
 sys.exit(1 if problems else 0)
 AUTHORPY
 then
-  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/GeoGebra/PhET, comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
+  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, a text block that wraps (#653), checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/GeoGebra/PhET, comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
 else
   fail "page-authoring skill: an example did not build as the feature it claims, or an example has no claim (#596)"
+fi
+
+# ---- 6o. Text that wraps (#653), as the build left it ----
+# Wrap Fixture's flagged blocks - the top-level one, the folded callout's, the
+# list item's and the quiz explanation's - are each the ONLY content of a
+# div.plantoir-text-wrap, and its ```text and ```python wrap blocks are in
+# none; its first three figures are byte for byte Wrap Plain Twin's (the
+# word changes nothing but the wrapper); the class is on no other page but
+# the page-authoring skill's example; and index.css carries the rule with
+# both of its content declarations (the plain one, then the one with alt
+# text). How the blocks LOOK is browser-checks/text_wrap.mjs, below.
+if python3 - "$SITE_PUBLIC" <<'WRAPPY'
+import re, sys
+from pathlib import Path
+public = Path(sys.argv[1])
+problems = []
+def article(name):
+    path = public / name
+    if not path.is_file():
+        problems.append(f"{name} was not built")
+        return ""
+    found = re.search(r"<article[^>]*>(.*?)</article>", path.read_text(encoding="utf-8"), re.S)
+    return found.group(1) if found else ""
+FIGURE = re.compile(r'(<div class="plantoir-text-wrap">)?(<figure data-rehype-pretty-code-figure[^>]*>.*?</figure>)(</div>)?', re.S)
+fixture, twin = article("Wrap-Fixture.html"), article("Wrap-Plain-Twin.html")
+figures = [(bool(m.group(1)) and bool(m.group(3)), m.group(2)) for m in FIGURE.finditer(fixture)]
+twins = [m.group(2) for m in FIGURE.finditer(twin)]
+wrapped = [inside for inside, _ in figures]
+if wrapped != [True, False, False, True, True, True]:
+    problems.append(f"Wrap Fixture's figures wrapped {wrapped}, expected [True, False, False, True, True, True] "
+                    "(the long block, then text and python wrap unwrapped, then the callout's, the list item's and the quiz's)")
+wrappers = fixture.count('class="plantoir-text-wrap"')
+if wrappers != 4:
+    problems.append(f"Wrap Fixture holds {wrappers} wrappers, expected 4")
+for index, (inside, figure) in enumerate(figures):
+    if inside and 'data-language="text"' not in figure:
+        problems.append(f"Wrap Fixture's figure {index + 1} is wrapped and is not a text block")
+if len(figures) >= 3 and len(twins) == 3:
+    for index in range(3):
+        if figures[index][1] != twins[index]:
+            problems.append(f"Wrap Fixture's figure {index + 1} is not byte for byte Wrap Plain Twin's")
+else:
+    problems.append(f"found {len(figures)} figures on Wrap Fixture and {len(twins)} on Wrap Plain Twin")
+if len(figures) >= 3 and 'data-language="python"' not in figures[2][1]:
+    problems.append("Wrap Fixture's python wrap block is not a python block")
+lines = re.findall(r"<span data-line=\"\"", figures[0][1]) if figures else []
+if len(lines) != 120 or figures[0][1].count("data-highlighted-line") != 2:
+    problems.append(f"the long block has {len(lines)} lines and {figures[0][1].count('data-highlighted-line') if figures else 0} highlighted, expected 120 and 2")
+elsewhere = []
+for page in public.rglob("*.html"):
+    name = str(page.relative_to(public))
+    if "plantoir-text-wrap" in page.read_text(encoding="utf-8", errors="replace"):
+        elsewhere.append(name)
+examples = [name for name in elsewhere if re.fullmatch(r"Authoring-Example-\d\d\.html", name)]
+others = sorted(set(elsewhere) - {"Wrap-Fixture.html"} - set(examples))
+if others or len(examples) != 1:
+    problems.append(f"the wrapper is on {others or 'no other page'} and on {len(examples)} skill examples (expected none, and one)")
+css = (public / "index.css").read_text(encoding="utf-8") if (public / "index.css").is_file() else ""
+rule = re.search(r'\.plantoir-text-wrap pre:not\(\.plantoir-flowing\)>code>\[data-line\]:after\{[^}]*\}', css)
+if rule is None:
+    problems.append("index.css lacks the wrapped line's :after rule")
+else:
+    body = rule.group(0)
+    plain = re.search(r'content:"((?:\\a …)+)";', body)
+    alt = re.search(r'content:"((?:\\a …)+)"/"";', body + ";")
+    if plain is None or alt is None or plain.group(1) != alt.group(1) or body.index(plain.group(0)) > body.index('/""'):
+        problems.append("index.css's :after rule lacks the plain content then the one with alt text, alike")
+    elif plain.group(1).count("…") != 80:
+        problems.append(f"index.css's ellipsis string has {plain.group(1).count('…')} rows, expected 80")
+if "@media screen{:root .plantoir-text-wrap pre:not(.plantoir-flowing)>code{white-space:pre-wrap;overflow-wrap:anywhere}" not in css:
+    problems.append("index.css lacks the screen-only pre-wrap rule")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+WRAPPY
+then
+  pass "text that wraps, as built: Wrap Fixture's four flagged text blocks (the page's own, a folded callout's, a list item's, a quiz explanation's) each in div.plantoir-text-wrap and its text and python wrap blocks in none, its first three blocks byte for byte the unflagged twin's, the class on no other page but the skill's example, and index.css's screen-only rule with 80 rows of ellipses and alt text (#653)"
+else
+  fail "text that wraps: a flagged text block was not wrapped, an unflagged block was, the word changed the block itself, or index.css lacks the rule (#653)"
 fi
 
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
@@ -4663,6 +4793,14 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   else
     fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang, or the page or a closed folder's list scrolled by itself as the sidebar drew (browser-checks/sidebar_page_marker.mjs, #515, #611)"
     cat /tmp/verify_sidebar_page_marker.log
+  fi
+  # #653: a ```text wrap block as a reader sees it.
+  if node browser-checks/text_wrap.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Wrap-Fixture.html" \
+       >/tmp/verify_text_wrap.log 2>&1; then
+    pass "text that wraps, in a browser: Wrap Fixture's text wrap block does not scroll while its text and python wrap blocks do, every line's rows hold its text, every row starts at one x, the URL line's first row is full, each line's number sits on its first row and its ellipses run its full height on one hairline, highlighted lines keep their tint, the folded callout's, the list item's and the quiz explanation's blocks wrap too, in light, dark and at 390 px; on paper and in the handout it is laid out as a plain block, and the copy button copies it as written - $(head -1 /tmp/verify_text_wrap.log | sed 's/^OK: //') (#653, browser-checks/text_wrap.mjs)"
+  else
+    fail "a text wrap block did not wrap as the contract says, or an unflagged block did, or print, the handout or the copy button changed (browser-checks/text_wrap.mjs, #653)"
+    cat /tmp/verify_text_wrap.log
   fi
   # #494: maths offline from the site's own KaTeX, and (#455 review S1)
   # print after a change of page keeps the stylesheets.
