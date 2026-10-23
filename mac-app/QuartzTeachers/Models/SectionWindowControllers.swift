@@ -117,6 +117,14 @@ final class SectionWindowControllers {
             return .nothingToAsk
         }
 
+        /// The address below the preview's root of the page this window's
+        /// preview is showing at this moment, read from its web view — or
+        /// nil when no page is showing (#518, Open in Obsidian). Defaults to
+        /// none, for a window that has no preview.
+        var previewedPage: () -> String? = {
+            return nil
+        }
+
         // MARK: - Functions
 
         /// Whether there is a preview to stop — building or showing, both

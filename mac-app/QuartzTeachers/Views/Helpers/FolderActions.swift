@@ -488,6 +488,12 @@ enum FolderActions {
         components.scheme = "obsidian"
         components.host = "open"
         components.queryItems = [URLQueryItem(name: "path", value: folderURL.path)]
+        // The query encoder leaves '+' raw, and Obsidian reads a raw '+' as a
+        // space (#518): "C++ Basics.md" would be looked for as "C   Basics.md"
+        // and not found. Every other character is already escaped.
+        if let query = components.percentEncodedQuery {
+            components.percentEncodedQuery = query.replacingOccurrences(of: "+", with: "%2B")
+        }
         return components.url
     }
 
