@@ -170,7 +170,11 @@ Three consequences that catch people out:
   runs it. What changed on 2026-09-07 is that this is now SAID rather than
   merely true: `.githooks/pre-commit` names it when a commit touches the
   publishing path (a warning; it never blocks), and `RELEASING.md` requires a
-  run with nothing skipped for a release that changes that path.
+  run with nothing skipped for a release that changes that path. Since 1.8.7
+  (#630) it first mirrors its own checkout's launchers and recipe into the
+  working folder and requires `PLANTOIR_RUNTIME`, defaulting it to
+  `windows-app\Vendor\runtime`. A run judges the checkout it was started
+  from, not whatever the folder last received.
 
   **The Python half of `verify.sh` does run here now.** Every shared
   `scripts/test_*.py` file executes inside `dotnet test` via
@@ -1278,7 +1282,12 @@ dialog has never been seen by anybody checking that it works.
    has been deleted — covered by no automated check. Since 2026-09-09 (issue
    #123) it drives every launcher through `PtyDriver` under a pseudoconsole and
    ANSWERS by prompt text, the way the mac's `verify-deploy.sh` has done through
-   `expect` for months.
+   `expect` for months. Questions are only asked when a section has no site
+   yet, so a run reaches them only with `-FirstPublish` (1.8.7, #623). That
+   flag moves the saved surname and the section's site records aside, and
+   that run is the first one able to pass: until then ConPTY's cursor jumps
+   glued each question to the sentence before it (the "verify-deploy.ps1"
+   section further down).
 
    What it still cannot reach is what this section is about: the **dialog**.
    The harness answers the launcher's console questions; a teacher meets a
@@ -7363,17 +7372,165 @@ asserted passes, so a clean run should now read 148 passed, 0 failed,
 Netlify ("7 file", 182–239 KiB sent) and 20–29 s to Cloudflare ("Uploaded 7
 files (46 already uploaded)", 400–709 KiB) on Ethernet.
 
-**What the first run also found, not fixed here:** on a FIRST publish (no
-saved surname, a new site) two of the harness's answered prompts failed
-`Assert-OnlyExpectedPromptsWereAnswered`, because the line PtyDriver saw
-joined the sentence before it with no line break: "…It is saved on this
-computer and only asked once.First time setup... what is your last name?
-(letters only):" and "…all users across the world.Enter Netlify site name
-[pyt1o-s1-2026-testing]:" (and in the log, "Saved teacher last name for
-future deploys: testingChoose a Website Address."). The answers were the
-right ones and the publishes succeeded; the anchored patterns are what
-refused them. It predates this piece (nothing here touches `deploy.py`'s
-prompts or PtyDriver) and is #623.
+**What the first run also found** (fixed in 1.8.7, #623, below): on a
+FIRST publish (no saved surname, a new site) two of the harness's answered
+prompts failed `Assert-OnlyExpectedPromptsWereAnswered`. The line PtyDriver
+saw had the sentence before it joined on with no line break: "…It is saved
+on this computer and only asked once.First time setup... what is your last
+name? (letters only):" and "…all users across the world.Enter Netlify site
+name [pyt1o-s1-2026-testing]:". The log showed the same join in "Saved
+teacher last name for future deploys: testingChoose a Website Address.".
+
+#### Why the lines joined, and the fix (#623, 1.8.7)
+
+**Measured with PtyDriver's `--bytes-log`**, which writes each read from
+the pseudo console with ESC, CR and LF made visible. The stub printed
+deploy.py's first-publish lines and asked deploy.py's questions, in four
+ways: on a fresh screen, after 60 lines of filler, and each of those with a
+0.4 s pause between lines. The join happened only on a fresh screen with
+the output arriving in one flush. There, ConPTY draws "text, blank line,
+text" by jumping the cursor rather than with CR LF CR LF:
+
+    [read 283] \e[?25l Timestamp TZ offset: -0400\e[4;1HTeacher Surname.\r\nYour surname is used…\r\nconflicts with other classes. It is saved on this computer and only asked once.\e[8;1HFirst time setup... what is your last name? (letters only): \e[?25h
+
+`TranscriptBuilder.StripControlSequences` removes `\e[8;1H`, and with it
+the only thing that separated the lines. Split flushes, and a screen that
+has already scrolled, both came out as plain `\r\n` with no join. That is
+why most of the old log's blank lines survived and the joins all sat in its
+first 30 rows (ConPty.cs makes the screen 30 rows).
+
+**The fix is narrow and is PtyDriver's alone:**
+`Plantoir.Core/Scripting/CursorMoveLineBreaks.cs`. A cursor position
+(`CSI row;1 H`/`f`, or no column) or cursor-next-line (`CSI n E`) that lands
+in column 1 while the current line has text ends that line. A CR LF goes in
+front of the escape, and stripping goes on as before. An escape cut in half
+by a read is held back until it is whole. PtyDriver puts it in front of BOTH
+the `--raw-log` and the transcript its rules read the `# prompt:` line from.
+Tests: `ParsingTests` → `CursorMoveLineBreaksTests`, built from the measured
+bytes.
+
+**Rejected:**
+- *Tracking rows*, inserting one LF per row skipped so the blank line comes
+  back too. It has to model scrolling and repaints to be right, and getting
+  it wrong duplicates lines. A blank line lost harms no reader of these
+  logs; a joined line broke the run.
+- *Loosening `ExpectedQuestions`*. The anchoring is the safety story.
+- *Changing `StripControlSequences` or the app's `TranscriptBuilder` path*.
+  `ScriptRunner`'s question detection reads the same lines, and
+  `transcriptStripping` pins what the console strips. The app's console
+  very probably shows the same joins in a run's first 30 rows. That is
+  #661, to be confirmed in the window first.
+
+#### Running this checkout, with this runtime (#630, 1.8.7)
+
+At the 1.8.5 cut a run from the main checkout gave **59 passed, 89 failed**,
+against a product that was fine. Two things were stale:
+- the working folder's `.toolchain\` dated from a week before, with 79
+  files under `scripts\` that differed from HEAD;
+- with no `PLANTOIR_RUNTIME`, the launchers used the INSTALLED app's
+  runtime, which had no `vendor\pyodide`.
+
+The checks read the checkout's `contracts\`, so the stale mirror read as a
+product failure. The preflight now does three things.
+
+- **Mirrors** the six launchers to the top of the folder, and
+  `ToolchainMirror.RecipeRootFiles` plus `contracts/toolchain.json` →
+  `recipeFolders` into `.toolchain\`. It is a true mirror, as
+  `ToolchainMirror.SyncDirectory` is: files the checkout lacks are deleted,
+  and `__pycache__` is skipped on both sides. The launchers run Python from
+  `.toolchain\`, so deleting its caches made every run count 22 changes and
+  rebuild from scratch: measured on the second run, fixed after it. It
+  copies from the WORKING TREE, because
+  that is what the checks read. A `git archive HEAD` copy would recreate the
+  mismatch whenever the tree has changes. The Result block prints the
+  commit, the count of uncommitted changes and how many files were mirrored.
+  When anything changed, the preview runs with `--full-rebuild`, because
+  some of build_site's edits run only when the scaffold is first copied.
+  *Refusing instead* was rejected: it would hand the person running it the
+  robocopy remedy every time. Mirroring is exactly what the app does to a
+  folder it touches.
+- **Warns, without refusing,** about a running `Plantoir` or
+  `plantoir-mcp`. Either can rewrite `.toolchain\` under the run, but
+  usually serves another folder: a director session runs one of its own.
+- **Requires a runtime.** `PLANTOIR_RUNTIME` defaults to
+  `windows-app\Vendor\runtime` and is exported to the launchers. The run
+  refuses if the runtime has no `manifest.json` or no `vendor\pyodide`.
+
+**Cloudflare propagation** (the second trap at the same cut). Production
+was still serving the previous deployment when the single Cloudflare leg
+was judged: eight failures, all gone two minutes later. Every Cloudflare leg
+now waits until production's front page is byte for byte the `index.html`
+it just uploaded. The folder comes from deploy.py's "Deploying from local
+build:" line. The wait is at most 120 s, and a timeout FAILS rather than
+skips. Comparing against the deployment's own address
+(`<hash>.<project>.pages.dev`) was rejected: on a project's first publish
+that subdomain resolves later than the site does (`Url-FromLog`'s comment).
+
+#### A real first publish: `-FirstPublish` (#623)
+
+Several things are moved aside behind a sentinel,
+`courses\.verify-deploy-first-publish.json`:
+- the saved surname: `courses\.internal\profile.json`, and the old
+  `courses\_secrets\profile.json`;
+- the section's Netlify record (`.netlify_sites\section<N>.json`) and its
+  legacy record (`section<N>\.netlify_site.json`);
+- its Cloudflare record (`.cloudflare_sites\section<N>.json`).
+
+The prompts are answered with a random letters-only surname (`vd` and eight
+letters). Each host therefore gets a NEW site, because deploy.py reuses a
+Netlify site or Cloudflare project that already has the same name.
+
+At the end, on every exit path, the records deploy.py wrote are deleted and
+the originals put back, so the course points at its own sites again. A run
+that is killed is put right by the next run's preflight. The Result block
+lists the addresses published to; for a first-publish run those are sites
+nothing deletes. A plain run asks nothing, so a release needs both runs.
+
+#### The Netlify page-address check (#657, #628)
+
+`Check-PageLinks` runs verify-deploy.sh's own `check_page_links` program.
+It is READ OUT of verify-deploy.sh at run time and written to
+`$work\check_page_links.py`, so the two platforms judge links by one text.
+A PowerShell port would resolve links with .NET's `Uri`, whose escaping
+differs from urllib's exactly where the check looks (`%2C`). It runs with
+the runtime's Python: `-X utf8 -I`, `PYTHONUTF8=1`, and its output read
+from a file, because PowerShell 5.1 reads a child's stdout as ASCII.
+
+It runs six times: on Netlify and Cloudflare alone, and in each pairing.
+Each folder leg also checks two things:
+- the folder carries no `data-plantoir-paths`. That is three legs, a
+  superset of the mac's two.
+- the built `postscript.js` names `plantoirPaths` exactly three times
+  (`Check-ServedCase`). `_wire_served_case` only warns when an anchor has
+  moved, so this is the one place a moved anchor fails anything.
+
+Before these checks were wired in, they were tried against the section's
+existing Netlify site (published before #628). They failed as they should:
+1 of 23 links answered 200, with 22 case 301s and no marker.
+
+**Measured 2026-10-23** (i5-8365U, Windows 11 Pro 26200, Ethernet), from
+this checkout at 11d71b49e, which mirrored 85 files into a folder last
+refreshed 2026-10-15:
+- **The first-publish run: 167 passed, 0 failed, 0 skipped.** It answered
+  exactly two questions, "First time setup... what is your last name?
+  (letters only):" and "Enter Netlify site name
+  [ics3u-s1-2026-vdcbzovnae]:", each on a line of its own. It created
+  `ics3u-s1-2026-vdcbzovnae.netlify.app` and
+  `ics3u-s1-2026-vdcbzovnae.pages.dev`.
+- Every Netlify leg: 23 same-site links, all 23 answering 200.
+- Every Cloudflare leg: 23 links, all 23 answering 200, and the control
+  `/all-classes/unit-4,-day-22` answering 404.
+- Cloudflare production matched the upload after 0–1 s on all three legs.
+- Publishes: Netlify 171 s for the first ("318 file", 20,564 KiB), then
+  208 s ("82 file"). Cloudflare 106 s, then 161 s ("Uploaded 81 files (281
+  already uploaded)"). The PC was running another agent's previews and
+  test suite at the same time.
+- **The plain run straight after, against the section's own sites
+  (`ics3u-s1-2026-gordon`): 166 passed, 0 failed, 0 skipped.** It asked
+  nothing. Every page-link leg read 23 of 23 links answering 200. That
+  Netlify site was published before #628, and on 2026-10-23, before these
+  publishes, it answered 1 of 23. Cloudflare production matched after
+  0–1 s.
 
 ## Runnable Swift on Windows (#570, the mac's #493), v1.8.6
 

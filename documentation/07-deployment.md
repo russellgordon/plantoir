@@ -943,6 +943,13 @@ so the live proof is owed before the merge. Run against today's site
 (before the change) it fails as it should: 14 of 15 same-site links on the
 front page answer a case 301.
 
+On Windows, `verify-deploy.ps1` → `Check-PageLinks` runs the same program
+(#657). It reads it out of verify-deploy.sh at run time and runs it on the
+same six legs. Measured on a Windows-published ICS3U section, 2026-10-23:
+23 of 23 links answered 200 on every Netlify leg, and the built
+`postscript.js` named `plantoirPaths` 3 times
+(`documentation/12-windows-app.md` → "verify-deploy.ps1").
+
 ### Rate limiting
 
 Netlify's API rate-limits aggressively enough that a class-worth of teachers
