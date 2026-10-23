@@ -3545,7 +3545,7 @@ reason (kept by an unpublish, a linked class left as it is, no room for a
 key) — those must be read before Go. The pages already the way they were
 asked to be (`rowsAlreadyRight`: already visible, already hidden, nothing
 else) sit behind a control under the table — a `DisclosureGroup` in 1.8.6,
-a checkbox since 1.8.7 (#654, below) — closed for every new plan, worded `menuPlanShowAlready(count:publishing:)` — four keys,
+a checkbox since 1.8.7 (#654, below) — unticked for every new plan, worded `menuPlanShowAlready(count:publishing:)` — four keys,
 `menuPlanShowAlready`, `…Hiding`, `…OnePage`, `…OnePageHiding`. The
 disclosure has no content of its own: opening it appends those rows to the
 SAME table, in plan order — one table and one sort, as #589 chose. A plan
@@ -3635,14 +3635,23 @@ while that is true the watcher sets the window's height to its
 teacher dragged it to stays 700). Both cases now end at 124. The
 fit runs on the next main-actor turn after the stage changes AND on every
 later change of the minimum, since the new minimum may arrive either side of
-the stage. AppKit keeps the sheet centred on its window through the change
-(measured: the sheet's middle stays where the plan's was), so nothing has to
-move it. WORKING keeps the grow-only rule, so the plan-height sheet holds its
-spinner and the sheet changes size once, to the answer; the answer is the
-last thing the sheet shows, so fitting it takes away no size a teacher still
-needs, and a teacher who resizes the answer keeps that size. `.result`
-sheets (Undo Last Change and the others with no sheet of their own) open at
-their answer already and are unchanged.
+the stage. The shrink is ANIMATED (`setFrame(_:display:animate:)`), about
+the sheet's middle: AppKit keeps a sheet centred on its window through a
+change of size anyway (measured: the middle stays where the plan's was), so
+the middle is kept and AppKit has nothing to correct. (The unit-test host
+suppresses window animation, so the animation itself is seen in the real app,
+not measured by the suite.) WORKING keeps the grow-only rule, so the
+plan-height sheet holds its spinner and the sheet changes size ONCE, to the
+answer — measured by logging every resize through Working → Finished: the
+Working minimum (124 pt) is never above the answer's, and the first fit runs
+with the answer's minimum already in place, both for a one-line answer (454 →
+124, one resize) and an eleven-line one (454 → 284, one resize, then a no-op);
+there is no shrink to a spinner and grow again. The answer is the last thing
+the sheet shows, so fitting it takes away no size a teacher still needs; a
+teacher who resizes the answer keeps that size only until its minimum next
+changes, when it is fitted again. `.result` sheets (Undo Last Change and the
+others with no sheet of their own) are at `.finished` from the start, so they
+fit too — they open at their answer's size already, so nothing moves.
 
 REJECTED: a smaller `.frame` on the answer's view — the view is already 124
 pt (`fittingSize` says so); it is the WINDOW that keeps the height, which is

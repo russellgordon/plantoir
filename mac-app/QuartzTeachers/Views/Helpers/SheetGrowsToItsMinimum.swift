@@ -28,8 +28,8 @@ import SwiftUI
 /// answer kept the plan's height — MEASURED on macOS 26.6
 /// (`PageTablesSheetTests.testTheAnswerAfterAPlanIsFittedToItsSentence`): a
 /// Publish plan of twenty-one pages stayed 454 pt tall, and a Hide plan 292,
-/// to show an answer that needs 124; the worst plan the budget allows
-/// (`CopyPageChecklist.tallestSheet`, 609 pt measured) would leave some 485
+/// to show an answer that needs 124; the worst plan (609 pt measured, under
+/// the 620-pt budget `CopyPageChecklist.tallestSheet`) would leave some 485
 /// pt of empty sheet over OK.
 /// The answer is the last thing the sheet shows, so fitting it takes away
 /// no size the teacher still needs. AppKit keeps the sheet centred on its
@@ -122,7 +122,24 @@ final class SheetMinimumWatcher: NSView {
         if fitsItsContent {
             size = SheetMinimumWatcher.sizeFitted(to: window.contentMinSize, from: current)
         }
-        if size != current {
+        if size == current {
+            return
+        }
+        if fitsItsContent {
+            // Animated, about its middle (#654's review): the answer is one
+            // change of size, 454 to 124 pt for a 21-page plan, and a jump
+            // that large reads as the sheet being replaced. MEASURED: the
+            // fit happens ONCE per Working → Finished — the Working stage's
+            // minimum is already the answer's or below, and the first fit
+            // runs after the answer's minimum is in place — so there is no
+            // shrink to a spinner and grow again. AppKit re-centres a sheet
+            // on its window anyway; the middle is kept so it has nothing
+            // to correct.
+            let content: NSRect = window.contentRect(forFrameRect: window.frame)
+            var target: NSRect = window.frameRect(forContentRect: NSRect(origin: content.origin, size: size))
+            target.origin.y = (window.frame.midY - target.height / 2).rounded()
+            window.setFrame(target, display: true, animate: true)
+        } else {
             window.setContentSize(size)
         }
     }
