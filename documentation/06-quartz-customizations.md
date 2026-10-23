@@ -739,7 +739,9 @@ answer toggles the same class; plan finding C). On Print:
    and the faces' 4 s keep their own caps, inside the same clock. One
    consequence: a page whose faces were held 7 s took 35 s to reach
    `print()` on the Paged.js path in Safari (measured before the change) and
-   printed; under the budget it now says `couldNotPrepare` instead — a hold
+   printed; under the budget it would say `couldNotPrepare` instead (inferred,
+   not measured — in Chrome the same page printed at about 22 s on both
+   versions) — a hold
    far past anything measured on a real network. `restore()` clears every timer and takes
    the listeners off the page's window. **The Safari event order for a print
    WebKit put off is UNMEASURED** (the re-run was stopped on 2026-10-23
