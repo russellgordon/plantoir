@@ -1432,22 +1432,27 @@ the page's:
   any sleep.
 - **The pairing.** Until #611 (section O), on a full load with no saved
   `explorerScrollTop`, `explorer.inline.ts` smooth-scrolled the current page's
-  row into view, which moved the WINDOW: `scrollY` 0 to 476 px over about
-  360 ms, the row moving 1 to 41 px a frame (sampled per frame, light and dark
-  alike). That scroll is gone; the pairing stays, because a folder still opens
-  with a .3 s transition that moves the rows below it. #601's "0.8 px" miss was one frame of that, not
-  font metrics: a still dot's middle sits 9.79 px below its line's top, and #601's sat
-  18.8 px below, 9.0 px off, so the line's bottom edge only happened to be
-  0.8 px away. So every geometry reading (the long title's lines, content
-  edge and dot; each page row's first line and dot) now comes from
-  `readInOneFrame`: the row's lines, the dot's box from CDP, the lines again,
-  kept only when the two line readings are identical and the dot is drawn;
-  20 tries, 100 ms apart, then a failure that says why. **What it proves:**
-  the line and the dot were read within one frame, because the line is read
-  on both sides of the dot and the scroll only goes one way. It does not
-  prove the sidebar has stopped, and need not: 537 paired reads taken
-  MID-scroll all gave the same 9.79 px offset as a still sidebar (re-run on
-  this piece: 102 light and 410 dark mid-scroll pairs, every one 9.79 px).
+  row into view, which moved the WINDOW on a long page (`scrollY` 0 to 476 px
+  over about 360 ms, the row moving 1 to 41 px a frame, sampled per frame,
+  light and dark alike) and slid a CLOSED folder's hidden list (157 px on a
+  one-line page). #601's "0.8 px" miss was one frame of that move, not font
+  metrics: a still dot's middle sits 9.79 px below its line's top, and #601's
+  sat 18.8 px below, 9.0 px off, so the line's bottom edge only happened to be
+  0.8 px away. verify.sh's fixture pages are one line long, so the window
+  could not move there; O2 says why the folder's list sliding as the check
+  opened it is the likelier source. So every geometry reading (the long
+  title's lines, content edge and dot; each page row's first line and dot)
+  now comes from `readInOneFrame`: the row's lines, the dot's box from CDP,
+  the lines again, kept only when the two line readings are identical and
+  the dot is drawn; 20 tries, 100 ms apart, then a failure that says why.
+  **What it proves:** the line and the dot were read within one frame,
+  because the line is read on both sides of the dot and that move only ever
+  went one way. It did not prove the sidebar had stopped, and did not need
+  to: 537 paired reads taken MID-scroll all gave the same 9.79 px offset as
+  a still sidebar (re-run on #616: 102 light and 410 dark mid-scroll pairs,
+  every one 9.79 px). Since #611 that scroll is gone; the pairing stays,
+  because a folder still opens with a .3 s transition that moves the rows
+  below it.
   **A wait-for-the-scroll-to-end gate was REJECTED for that reason**: it
   proves nothing the pairing does not, and it cannot defend against a move
   after the gate. The first fix (f12bd11b1) paired only the every-row loop,
@@ -3485,12 +3490,12 @@ nothing scrolls; if the entry is already inside the list's box, nothing
 scrolls; otherwise the list's own `scrollTop` is set ONCE, instantly, so the
 entry sits in its middle. The saved-position branch above it is untouched.
 
-**It runs only on the FIRST full load in a tab.** Quartz saves the list's
-`scrollTop` in `sessionStorage.explorerScrollTop` on every in-site navigation
-(`prenav`), and from then on the restore branch wins — `"0"` included, since a
-non-empty string is truthy. Later loads in the tab moved before only because
-the browser restores the scroll position the first jump had left; with no
-first jump there is nothing to restore.
+**It runs on every FULL load until the first in-site page change in a
+tab** — a first visit, or a reload with no page change before it, runs it
+again. Quartz saves the list's `scrollTop` in
+`sessionStorage.explorerScrollTop` on every in-site navigation (`prenav`), and
+from then on the restore branch wins, `"0"` included, since a non-empty
+string is truthy.
 
 **Where it goes is the trap.** `patches/explorer.inline.ts` reaches a
 section's Quartz copy only when the scaffold is staged (`if full_rebuild or
