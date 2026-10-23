@@ -14,7 +14,9 @@ namespace Plantoir.Core.Models;
 /// right. Read from the same three places as <see cref="PagesDatedByTheBuild"/>
 /// ought to be: the console of a run the app started (<c>ScriptRunner</c>), a
 /// scheduled publish's own record (<c>ScheduledHealthFindings</c>), and a run
-/// <c>plantoir-mcp</c> started (<c>LauncherRunner</c>).</para>
+/// <c>plantoir-mcp</c> started (<c>LauncherRunner</c>). That the MCP door
+/// reads <see cref="PagesDatedByTheBuild"/> and the other build lines nowhere
+/// yet is #660.</para>
 ///
 /// <para>Not printed when the build could quote only its own copy (a course
 /// kept for reference, a linked page, a locked one), so such a course leaves

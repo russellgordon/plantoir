@@ -100,8 +100,12 @@ public class BuildRepairReportTests : IDisposable
         string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Mcp", "LauncherRunner.cs"));
         int reads = source.IndexOf("BuildRepairReport.Parse(line)", StringComparison.Ordinal);
         int drops = source.IndexOf("TranscriptBuilder.IsMachineLine(line)) return;", StringComparison.Ordinal);
+        int health = source.IndexOf("SiteHealthFinding.Parse(line)", StringComparison.Ordinal);
         int reports = source.IndexOf("progress?.Report(line.Trim());", StringComparison.Ordinal);
         Assert.True(reads >= 0, "LauncherRunner must read PLANTOIR_REPAIRED:");
+        Assert.True(health >= 0, "LauncherRunner must read PLANTOIR_HEALTH:");
+        Assert.True(reads < drops, "the repair must be read before machine lines are dropped");
+        Assert.True(health < drops, "folder problems must be read before machine lines are dropped");
         Assert.True(drops >= 0 && drops < reports, "machine lines must be dropped before progress is reported");
     }
 }
