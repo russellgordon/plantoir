@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 23 October 2026. The current release is **1.8.6** on the Mac and on Windows.*
+*Last updated: 23 October 2026. The current release is **1.8.7** on the Mac and **1.8.6** on Windows.*
 
 A few things to know before you read on:
 
@@ -26,6 +26,36 @@ need to read those to use Plantoir.
 
 ---
 
+## Next: Windows catches up to 1.8.7
+
+Plantoir 1.8.7 is out for the Mac. Windows stays on 1.8.6 until its own 1.8.7
+download joins the release, with what 1.8.7 brought the Mac:
+
+- **Problems with runnable code are shown in the app**, alongside the other
+  things Plantoir tells you about a folder, rather than only on the page
+  ([#650](https://github.com/russellgordon/plantoir/issues/650)).
+- **Print always opens the print window**, even on a long page with many code
+  blocks ([#651](https://github.com/russellgordon/plantoir/issues/651)), and a
+  page no longer jumps down as its sidebar draws
+  ([#646](https://github.com/russellgordon/plantoir/issues/646)).
+- **A curriculum folder renamed** to a name without "curriculum" is still
+  treated as curriculum
+  ([#647](https://github.com/russellgordon/plantoir/issues/647)).
+- **The Publish and Hide sheets:** showing the pages already visible is a
+  checkbox, and the sheet shrinks to its answer when it is done
+  ([#655](https://github.com/russellgordon/plantoir/issues/655)).
+- **Smaller things:** the "System fonts" label
+  ([#648](https://github.com/russellgordon/plantoir/issues/648)), the
+  sentence about Obsidian opening its settings after Trust
+  ([#656](https://github.com/russellgordon/plantoir/issues/656)), and a few
+  checks behind the scenes
+  ([#645](https://github.com/russellgordon/plantoir/issues/645),
+  [#649](https://github.com/russellgordon/plantoir/issues/649),
+  [#652](https://github.com/russellgordon/plantoir/issues/652),
+  [#657](https://github.com/russellgordon/plantoir/issues/657)).
+
+---
+
 ## Version 1.9
 
 - **Open in Obsidian goes to the page you're looking at.** While previewing a
@@ -45,28 +75,21 @@ need to read those to use Plantoir.
   plan is to decide whether to combine them into one place for every kept
   copy of a course, or to give archives the same browsing that backups have.
   ([#573](https://github.com/russellgordon/plantoir/issues/573))
-- **Problems with runnable code are shown in the app**, alongside the other
-  things Plantoir tells you about a folder, rather than only on the page.
-  ([#567](https://github.com/russellgordon/plantoir/issues/567))
 - **GeoGebra on your pages.** Interactive maths with sliders, draggable
   points and constructions, written as a few lines in a note. Students tap
   to load it; nothing loads until then. (Graphs students can move, and TikZ
   diagrams, are already here.)
   ([#578](https://github.com/russellgordon/plantoir/issues/578))
-- **Printing fixes:** Print should always open the print window, even on a
-  long page with many code blocks (today it can stop silently in Safari)
-  ([#576](https://github.com/russellgordon/plantoir/issues/576)), and a
-  handout printed on Windows should look the same as one printed on a Mac
+- **Printing on Windows:** a handout printed on Windows should look the same
+  as one printed on a Mac
   ([#577](https://github.com/russellgordon/plantoir/issues/577)).
 - **Diagrams and fonts served by your own site**, as maths already is in 1.8,
   so pages look right without reaching other websites.
   ([#566](https://github.com/russellgordon/plantoir/issues/566))
-
-- **Decisions and measurements carried over from the Windows 1.8.5 catch-up:** what a
+- **A measurement carried over from the Windows 1.8.5 catch-up:** what a
   scheduled publish does when the computer is asleep
-  ([#554](https://github.com/russellgordon/plantoir/issues/554)), and a
-  curriculum folder renamed to a name without "curriculum"
-  ([#614](https://github.com/russellgordon/plantoir/issues/614)).
+  ([#554](https://github.com/russellgordon/plantoir/issues/554)).
+
 ---
 
 ## Version 2.0 — interactive science

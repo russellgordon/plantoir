@@ -99,7 +99,7 @@ Found while qualifying the mac for v1.1.0. The Windows bundle should adopt
 the same number as its version's fourth field when convenient (its trail
 currently prints the patch digit, which conflates two ideas).
 
-## Landed since v1.8.6 — ships in the next release
+## Landed since v1.8.7 — ships in the next release
 
 Features that are **complete, merged to `dev`, and waiting only for a tag**.
 This is a reading aid, not a source of truth: the release notes are drafted
@@ -112,17 +112,6 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-10-23 | In the Publish and Hide plan sheets, "Show the N pages already visible" is a checkbox that adds those pages to the table above it, not a triangle that seemed to promise a fold below; after Publish or Hide the sheet shrinks to its answer ("Published 5 pages.") instead of keeping the table's height (454 pt to 124 for a 21-page plan). | The mac; Windows owes both | [#654](https://github.com/russellgordon/plantoir/issues/654) |
-| 2026-10-23 | plantoir.app's Code page shows the Swift program on Windows too (its two pictures, light and dark, taken at 2x), and no longer says runnable Swift is on the Mac only; the first-time download is given for both (1.3 GB on a Mac, 2.3 GB on a PC). Ships with the next site deploy, not an installer. | Windows (the site) | [#590](https://github.com/russellgordon/plantoir/issues/590) |
-| 2026-10-23 | Print on a page whose print layout failed to load no longer hangs silently: the fallback waits for the page's fonts and pictures, the print sheet opens (Safari 3 of 3, was 0 of 3), and the page is put back once the print has happened or after 30 s with "could not prepare". The usual print path is unchanged. | The mac; Windows inherits through the shared site code and owes an Edge check | [#576](https://github.com/russellgordon/plantoir/issues/576) |
-| 2026-10-23 | A page no longer jumps down by several hundred pixels as its sidebar draws: the sidebar scrolls only its own list, and only to an entry in an open folder. | The mac; Windows inherits through the shared build and owes a confirmation in Edge | [#611](https://github.com/russellgordon/plantoir/issues/611) |
-| 2026-10-23 | A curriculum folder renamed to a name without the word "curriculum" (Expectations, say) is still treated as curriculum everywhere: its pages are not hidden at the start of the year, not taken down when a class is unpublished, and not listed as already visible. | The mac; Windows owes the same rule and holds eight contract cases as named gaps | [#614](https://github.com/russellgordon/plantoir/issues/614) |
-| 2026-10-23 | A runnable code block that the website can only show as plain code (an unclosed fence above it, say) is now a folder problem in the app, naming the page and the line, instead of a line in a log nobody reads. | Both, through the shared build; Windows owes one check on a real preview | [#567](https://github.com/russellgordon/plantoir/issues/567) |
-| 2026-10-23 | An agent asked for a printed handout in a working folder offers the house style (LaTeX, one source with its answer key, the school's corners) from a new `plantoir-handouts` skill with two starters. | Both (the skill folder is shared); Windows owes a test that pins it | [#631](https://github.com/russellgordon/plantoir/issues/631) |
-| 2026-10-23 | The font choice that used to read "Helvetica, Arial" is labelled "System fonts (each device's own)", which is what it always rendered; every site's font stacks are now valid CSS, one family per entry. The look does not change. | The mac; Windows owes the label | [#629](https://github.com/russellgordon/plantoir/issues/629) |
-| 2026-10-23 | The trail records when Swift got ready on this computer (seconds and GB downloaded) and why it could not, as Windows already does. | The mac (Windows had it in 1.8.6) | [#635](https://github.com/russellgordon/plantoir/issues/635) |
-| 2026-10-23 | The website builder stops trusting the two root certificates Debian distrusted after the October 2026 eMudhra compromise; the image rebuilds one small layer at the next preview. | The mac; Windows owes a check of its own certificate store | [#639](https://github.com/russellgordon/plantoir/issues/639) |
-| 2026-10-22 | A course made before 1.8.1 whose name holds a colon (161 catalogue courses, "Physics: Mechanics" among them) gets its website back on its next preview or publish: the build puts quotes around the front page's title, says so in the console, and the trail records it as `folder problem repaired`. A course kept for reference, or a front page that is linked or locked, has only the website's copy put right, and the console says why. The 1.8.1 notes' hand fix is no longer needed; the next notes can say the next build fixes it. | The mac; Windows inherits the repair and the console sentence through the shared build, and owes only the trail line | [#584](https://github.com/russellgordon/plantoir/issues/584) |
 
 
 ## Warnings the release notes MUST carry
