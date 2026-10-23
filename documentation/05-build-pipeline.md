@@ -1961,7 +1961,9 @@ dialog up mid-edit, and the two apps deduplicate a CHANGED finding
 differently (the mac appends it, Windows drops it by `Identity`).
 
 **Measured.** The call costs **24-31 ms** in the image (the planner's three
-timings of the Python start: 35, 26 and 24 ms; the plan review's 24-31 ms),
+timings of the Python start: 35, 26 and 24 ms; the plan review's 24-31 ms;
+28 ms for the whole first emit in verify.sh's run of
+`check_runner_rules_against_the_site.py` in the image, 2026-10-23),
 **41-43 ms** on the mac host (M-series, Homebrew Python 3.14, the whole emit
 through `check_runner_rules_against_the_site.py`), and nothing on a site
 where no block disagrees, which is every site that is fine. For Python the
