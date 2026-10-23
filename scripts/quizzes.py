@@ -852,16 +852,21 @@ def check_pages(pages: list, printer=print) -> dict:
     The whole folder check over the pages students can see
     (figures.pages_students_see with must_contain="[!"): one `plantoir:
     error:` line per quiz that cannot be checked, and what the site's
-    safety net and the `quizzesNotReady` finding need. Never raises for one
+    safety net and the `quizzesNotReady` finding need - and (#644) `places`,
+    each examined page's place in the course folder by its path in the
+    site's content, so the site's emitter can name a page the safety net
+    prints a line for without reading every page again. Never raises for one
     page: a page that cannot be read is left out, as the site leaves it.
     """
     words = rules()["words"]["problems"]
     problems = []
     examined = []
     by_page = {}
+    places = {}
     for page in pages:
         place = page["place"]
         examined.append(page["path"])
+        places[page["path"]] = place
         quizzes = quizzes_on_page(page["text"])
         if not quizzes:
             continue
@@ -896,7 +901,7 @@ def check_pages(pages: list, printer=print) -> dict:
         by_page[page["path"]] = {"quizzes": top, "problems": reported_top,
                                  "nested": nested, "nestedProblems": reported_nested,
                                  "lines": lines, "nestedLines": nested_lines}
-    return {"problems": problems, "examined": sorted(examined), "pages": by_page}
+    return {"problems": problems, "examined": sorted(examined), "pages": by_page, "places": places}
 
 
 def _write_if_changed(path: Path, content) -> bool:

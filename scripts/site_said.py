@@ -2,7 +2,9 @@
 """
 What the SITE said about a runnable block it showed as plain code, worded as
 one folder problem (#567: contracts/shared-rules.json -> siteHealth.checks ->
-runnableCodeShownAsPlainCode).
+runnableCodeShownAsPlainCode) - and, in the same call, about the self-check
+questions it read differently from the folder check (#644:
+quizzesReadDifferently, the quiz safety net's `plantoir: error:` lines).
 
 Every other folder problem is worked out by build_site.py BEFORE Quartz runs.
 This one cannot be: the site's parser and the build's fence reader disagree
@@ -10,8 +12,8 @@ about a block only once Quartz has parsed the page (codeRunnerBlocks.
 siteDisagrees), and in a preview Quartz is one `quartz build --serve` process
 that never hands control back to build_site.py. So the site's emitter
 (support/quartz/plugins/emitters/plantoirSiteSaid.ts) runs THIS file, once per
-site-building process and only when a block disagrees, with what the site's
-transformer recorded on stdin. It prints the finding with site_health's own
+site-building process and only when a block or a quiz disagrees, with what
+the site's transformers recorded on stdin. It prints the finding with site_health's own
 `announce` - the ⚠️ lines and ONE `PLANTOIR_HEALTH:` line - so both apps, the
 assistant and a scheduled deploy's record read it the way they read every
 other folder problem, with no new reader.
@@ -21,12 +23,14 @@ Two halves:
 * `write_side_file`, called by build_site.py in the ALWAYS section, writes
   quartz/plantoir_site_said.json: which Python and which file to run, the
   course and section, where each opted-in page came from in the course
-  folder, and which Swift blocks swiftCouldNotBePrepared already names (one
-  block, one finding). NOT plantoir_code_runner.json: the page's script
+  folder (and, #644, each page the quiz check examined), and which Swift
+  blocks swiftCouldNotBePrepared already names (one block, one finding). NOT plantoir_code_runner.json: the page's script
   bundles that file, and the build machine's paths must never reach students.
-* `main` (run by the emitter): reads stdin, builds ONLY this one finding and
-  announces it - never `announce_or_stay_quiet`, which would also say every
-  check whose fact is missing here (the plan review's MUST 1).
+* `main` (run by the emitter): reads stdin, builds ONLY these two findings
+  (the code's, then the quizzes') and announces them - never
+  `announce_or_stay_quiet`, which would also say every check whose fact is
+  missing here (the plan review's MUST 1). Each is built in its own try, so
+  one that fails costs only itself.
 
 Its own folder goes on sys.path FIRST (the #358 trap): Windows' embeddable
 Python replaces sys.path with its `._pth` file, so a script run as a file
@@ -63,7 +67,8 @@ def write_side_file(output_dir, course, section, places: dict, swift_named: list
                     content_root, python=None, script=None) -> bool:
     """
     Write quartz/plantoir_site_said.json. `places` maps each opted-in page's
-    path in the site's content (forward slashes, as Quartz names it) to
+    path in the site's content (forward slashes, as Quartz names it) - and
+    each page the quiz check examined (#644) - to
     {"place": its place in the course folder without .md, "source": the
     teacher's own file or None}; `swift_named` is [[place, n]] for every
     Swift block swiftCouldNotBePrepared names. Same input, same bytes;
@@ -183,19 +188,72 @@ def facts_from_site(said: dict, blocks: list) -> list:
     return facts
 
 
+def quiz_facts_from_site(said: dict, quizzes: list) -> list:
+    """
+    The `quiz_disagreements` fact from what the site's quiz safety net
+    recorded (#644): each entry's page as its place in the course folder,
+    with the question's place, its line (the folder check's, carried by the
+    site - never looked up here), the reason, and the problem the site found
+    with its values; pages in path order, each page's entries in the order
+    the site printed them.
+    """
+    places = {}
+    for path, value in (said.get("places") or {}).items():
+        places[nfc(path)] = value or {}
+    ordered = []
+    for position, quiz in enumerate(quizzes):
+        ordered.append((nfc(quiz.get("page") or ""), position, quiz))
+    ordered.sort(key=lambda item: (item[0], item[1]))
+    facts = []
+    for path, _position, quiz in ordered:
+        known = places.get(path) or {}
+        place = known.get("place")
+        if not place:
+            place = path[:-3] if path.lower().endswith(".md") else path
+        n = quiz.get("n")
+        line = quiz.get("line")
+        fact = {
+            "page": nfc(place),
+            "n": int(n) if n is not None else None,
+            "line": int(line) if line is not None else None,
+            "reason": str(quiz.get("reason") or "countedDifferently"),
+        }
+        if quiz.get("problem"):
+            fact["problem"] = str(quiz["problem"])
+            fact["fill"] = dict(quiz.get("fill") or {})
+        facts.append(fact)
+    return facts
+
+
 def say(payload: dict, printer=print) -> None:
-    """Build ONLY this finding and announce it; a failure is one plain line."""
+    """
+    Build ONLY these two findings - the blocks of code, then the quizzes -
+    and announce them together. Each is built in its own try: a failure is
+    one plain line and costs only that finding.
+    """
+    course = payload.get("course", "")
+    section = payload.get("section", "")
+    found = []
     try:
         facts = facts_from_site(payload, payload.get("blocks") or [])
-        if not facts:
-            return
-        found = site_health.site_disagreements_finding(
-            {"site_disagreements": facts}, payload.get("course", ""), payload.get("section", ""),
-            site_health._checks_by_name())
-        site_health.announce([found], printer=printer)
+        if facts:
+            found.append(site_health.site_disagreements_finding(
+                {"site_disagreements": facts}, course, section, site_health._checks_by_name()))
     except Exception as error:
         printer(f"ℹ️  Could not name the blocks of code shown as plain code "
-                f"in {payload.get('course', '')} Section {payload.get('section', '')}: {error}")
+                f"in {course} Section {section}: {error}")
+    try:
+        facts = quiz_facts_from_site(payload, payload.get("quizzes") or [])
+        if facts:
+            found.append(site_health.quizzes_read_differently_finding(
+                {"quiz_disagreements": facts}, course, section, site_health._checks_by_name()))
+    except Exception as error:
+        printer(f"ℹ️  Could not name the self-check questions the website read differently "
+                f"in {course} Section {section}: {error}")
+    try:
+        site_health.announce(found, printer=printer)
+    except Exception as error:
+        printer(f"ℹ️  Could not say what the website found in {course} Section {section}: {error}")
 
 
 def main() -> int:
@@ -210,7 +268,7 @@ def main() -> int:
         if not isinstance(payload, dict):
             raise ValueError("not an object")
     except Exception as error:
-        print(f"ℹ️  Could not name the blocks of code shown as plain code: {error}")
+        print(f"ℹ️  Could not say what the website found: {error}")
         return 0
     say(payload)
     sys.stdout.flush()

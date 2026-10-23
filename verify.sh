@@ -2094,7 +2094,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
         "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
-        "$HIT_COURSE/Quiz One Blank.md" \
+        "$HIT_COURSE/Quiz One Blank.md" "$HIT_COURSE/Quiz Read Differently.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
         "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Progress Fixture.md" \
@@ -2992,7 +2992,12 @@ printf -- '---\ntitle: Z1.1\n---\nA specific expectation planted by verify.sh un
 # see (reported nowhere); Quiz Source and Quiz Host: a quiz transcluded onto
 # a page with its own (review S5); Quiz Playground: every kind for the
 # browser check, with graphs, code to run and an image in choices and
-# explanations. Removed by restore_hit_fixture.
+# explanations; Quiz Read Differently (#644): a quiz the folder check reads
+# as fine and the site as not ready - a quoted `>` in an <img> straight
+# after the title, quizCallouts.knownLimits - which the site's safety net
+# says on its plantoir: error: line and as a quizzesReadDifferently folder
+# problem (named without "Quiz Fixture", which 6k counts lines for).
+# Removed by restore_hit_fixture.
 python3 - "$HIT_COURSE" <<'QUIZPLANTS'
 import json, struct, sys, zlib
 from pathlib import Path
@@ -3037,6 +3042,10 @@ crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]
 (course / "Quiz One Blank.md").write_text(
     "---\ntitle: Quiz One Blank\n---\nOne blank (plantoir-quiz-one-blank-7f3a).\n\n"
     "> [!quiz] The capital of France is `____`.\n> > [!answer]-\n> > Paris\n", encoding="utf-8")
+(course / "Quiz Read Differently.md").write_text(
+    "---\ntitle: Quiz Read Differently\n---\nRead differently by the site (plantoir-quiz-read-differently-644).\n\n"
+    "> [!quiz] Which is the right choice?\n> <img alt=\"x>y\" src=\"Media/plantoir-quiz-choice.png\">\n"
+    "> - [ ] wrong\n> - [x] right\n", encoding="utf-8")
 (course / "Quiz Hidden.md").write_text(
     "---\ntitle: Quiz Hidden\npublish: false\n---\nHidden (plantoir-quiz-hidden-7f3a).\n\n> [!quiz] Broken.\n> - [ ] a\n> - [ ] b\n",
     encoding="utf-8")
@@ -4025,8 +4034,11 @@ for line in lines_said:
 counted = len(re.findall(r"plantoir: error: Quiz Fixture\.md: ", said))
 if counted != len(lines_said):
     problems.append(f"the build said {counted} plantoir: error: lines for Quiz Fixture, expected {len(lines_said)}")
-if rules["words"]["problems"]["readDifferently"] in said:
-    problems.append("the site and the folder check read a quiz differently: " + re.search(r"plantoir: error: [^\n]*" + re.escape(rules["words"]["problems"]["readDifferently"][:30]), said).group(0))
+# Quiz Read Differently is read differently on purpose (#644, checked in
+# 6k's next part); no other page may be.
+elsewhere = "\n".join(line for line in said.splitlines() if "Quiz Read Differently.md" not in line)
+if rules["words"]["problems"]["readDifferently"] in elsewhere:
+    problems.append("the site and the folder check read a quiz differently: " + re.search(r"plantoir: error: [^\n]*" + re.escape(rules["words"]["problems"]["readDifferently"][:30]), elsewhere).group(0))
 markers = [line for line in said.splitlines() if "PLANTOIR_HEALTH:" in line and '"quizzesNotReady"' in line]
 if len(markers) != 1 or f'"sentence": "{len(lines_said)} self-check questions' not in markers[0]:
     problems.append(f"expected one quizzesNotReady finding for {len(lines_said)} questions, got {markers}")
@@ -4104,6 +4116,82 @@ then
   pass "self-check quizzes: every quiz the contract names is read alike by the site and the folder check, each problem said with its line, the look-alikes and the hidden page left alone, no tick and no answer on the site but where a student asks for it (#563)"
 else
   fail "self-check quizzes: one of the checks above failed (#563)"
+fi
+
+# ---- 6k, continued: a quiz the site reads differently is a folder problem (#644) ----
+# Quiz Read Differently: the folder check reads its quiz as fine, the site as
+# not ready (the problem the site found, never assumed). The site prints its
+# safety net's plantoir: error: line while it parses the page, and then -
+# from the site's own build, in the SAME call to scripts/site_said.py as
+# Plain Code Fixture's block - ONE PLANTOIR_HEALTH: line naming it
+# (siteHealth.checks -> quizzesReadDifferently), right after the code's,
+# with the dialog's sentence on the console too; quizzesNotReady is not
+# moved by it.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE" <<'QUIZSAIDPY'
+import html, json, re, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+public, log, course = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+problems = []
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))
+quiz_rules = rules["quizCallouts"]
+check = next(entry for entry in rules["siteHealth"]["checks"] if entry["name"] == "quizzesReadDifferently")
+prefix = rules["siteHealth"]["marker"]["prefix"]
+said = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
+built = public / "Quiz-Read-Differently.html"
+page = built.read_text(encoding="utf-8") if built.is_file() else ""
+kinds = []
+for attributes in re.findall(r'<blockquote class="[^"]*\bplantoir-quiz\b[^"]*"([^>]*)>', page):
+    get = lambda name: (re.search(name + r'="([^"]*)"', attributes) or [None, None])[1]
+    kinds.append((get("data-quiz-kind"), get("data-quiz-problem")))
+if not page:
+    problems.append("Quiz-Read-Differently.html was not built")
+elif kinds != [("notReady", "choicesInHtml")]:
+    problems.append(f"the site did not read Quiz Read Differently's quiz as not ready: {kinds}")
+source = (course / "Quiz Read Differently.md").read_text(encoding="utf-8")
+line = source.splitlines().index("> [!quiz] Which is the right choice?") + 1
+error = f"plantoir: error: Quiz Read Differently.md: quiz 1, line {line}: {quiz_rules['words']['problems']['readDifferently']}"
+if said.count(error) != 1:
+    problems.append(f"the site said {said.count(error)} times, not once: {error}")
+if len(re.findall(r"plantoir: error: Quiz Read Differently\.md: ", said)) != 1:
+    problems.append("the build said another plantoir: error: line for Quiz Read Differently (the folder check must find nothing)")
+markers = [text[text.index(prefix):].strip() for text in said.splitlines()
+           if prefix in text and '"quizzesReadDifferently"' in text]
+sentence = (check["sentence"].replace("{page}", "Quiz Read Differently").replace("{course}", "EXC2O")
+            .replace("{section}", "1"))
+reason = check["reasons"]["shownWithNote"].replace("{problem}", quiz_rules["words"]["problems"]["choicesInHtml"])
+piece = (check["quizLine"].replace("{page}", "Quiz Read Differently").replace("{n}", "1")
+         .replace("{line}", str(line)).replace("{reason}", reason))
+detail = check["detail"].replace("{quizzes}", piece)
+if len(markers) != 1:
+    problems.append(f"{len(markers)} quizzesReadDifferently markers, not one")
+else:
+    finding = json.loads(markers[0][len(prefix):])
+    want = {"name": "quizzesReadDifferently", "sentence": sentence, "detail": detail,
+            "fixable": False, "course": "EXC2O", "section": 1}
+    if finding != want:
+        problems.append(f"the finding is {finding}, not {want}")
+    if said.find(error) > said.find(markers[0]):
+        problems.append("the folder problem came before the site's own plantoir: error: line")
+    # One call: the code's marker and the quizzes' are adjacent, the code's first.
+    health = [text for text in said.splitlines() if prefix in text]
+    names = [json.loads(text[text.index(prefix) + len(prefix):]).get("name") for text in health]
+    at = names.index("quizzesReadDifferently")
+    if at == 0 or names[at - 1] != "runnableCodeShownAsPlainCode":
+        problems.append(f"the two site findings are not one call's, the code's first: {names}")
+if ("⚠️  " + sentence) not in said:
+    problems.append("the console does not show the dialog's sentence: " + sentence)
+not_ready = [text for text in said.splitlines() if prefix in text and '"quizzesNotReady"' in text]
+if len(not_ready) != 1 or "Quiz Read Differently" in not_ready[0]:
+    problems.append(f"the quizzesNotReady finding changed: {not_ready}")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+QUIZSAIDPY
+then
+  pass "a quiz the site reads differently: Quiz Read Differently's quiz is fine to the folder check and not ready on the site, named once on the safety net's plantoir: error: line and then as ONE quizzesReadDifferently folder problem from the site's own build, in the same call as the code's, with the site's own problem, the dialog's sentence and its line in the teacher's file (#644)"
+else
+  fail "a quiz the site reads differently: it is not said as a folder problem (#644)"
 fi
 
 # ---- 6l. Task boxes students tick (#519), as the build left them ----
