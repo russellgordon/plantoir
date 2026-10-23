@@ -355,6 +355,122 @@ PY
                      || no "$1 lacks or changed: $problems"
 }
 
+# Page addresses on Netlify (#628, contracts/shared-rules.json ->
+# netlifyPageAddresses). Every same-site <a href> on the front page and the
+# borrowed page of runnable code, resolved against the page and asked for
+# WITHOUT following a redirect. On Netlify each one must answer 200 and the
+# page must wear the marker the publish adds: a 301 to the same path in lower
+# case is the rewrite failing. Three other redirects are Quartz's own link
+# shapes, not the rewrite, and are counted as their own classes rather than
+# failed: `/index` -> `/`, `%2C` -> `,`, and a file link with a trailing slash.
+# On Cloudflare Pages (case-sensitive) the links stay in the build's mixed case,
+# the page carries no marker, every link answers 200 apart from those classes,
+# and one control - a mixed-case page link asked for in lower case - says what
+# Cloudflare does with an address it does not hold.
+check_page_links() {  # check_page_links <label> <site base url ending in /> <netlify|cloudflare>
+  local said status
+  said=$(python3 - "$2" "$3" <<'PY'
+import html, re, sys, urllib.error, urllib.parse, urllib.request
+base, host_kind = sys.argv[1], sys.argv[2]
+own = urllib.parse.urlsplit(base).netloc.lower()
+class Stay(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+plain = urllib.request.build_opener(Stay)
+def ask(url):
+    try:
+        response = plain.open(urllib.request.Request(url, headers={"User-Agent": "plantoir-verify-deploy"}), timeout=30)
+        return response.status, "", response.read().decode("utf-8", "ignore")
+    except urllib.error.HTTPError as error:
+        return error.code, error.headers.get("Location") or "", ""
+    except Exception as error:
+        return 0, str(error), ""
+def page(url):
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "plantoir-verify-deploy"}), timeout=30) as response:
+        return response.geturl(), response.read().decode("utf-8", "ignore")
+problems, notes, links, marked, mixed = [], {}, {}, [], 0
+for start in (base, base + ("runner-deploy-check" if host_kind == "netlify" else "Runner-Deploy-Check")):
+    try:
+        where, text = page(start)
+    except Exception as error:
+        problems.append(f"could not fetch {start}: {error}")
+        continue
+    marked.append('data-plantoir-paths="lowercase"' in text)
+    for raw in re.findall(r'<a\s[^>]*?href="([^"]*)"', text):
+        href = html.unescape(raw).strip()
+        if not href or href.startswith(("#", "//")) or (re.match(r"^[A-Za-z][A-Za-z0-9+.\-]*:", href) and not href.lower().startswith(("http://", "https://"))):
+            continue
+        absolute = urllib.parse.urljoin(where, href)
+        parts = urllib.parse.urlsplit(absolute)
+        if parts.netloc.lower() != own:
+            continue
+        if re.search(r"[A-Z]", parts.path):
+            mixed += 1
+        links.setdefault(urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, "")), raw)
+answered = 0
+control = ""
+for url, raw in sorted(links.items()):
+    status, location, _ = ask(url)
+    if status == 200:
+        answered += 1
+        continue
+    path = urllib.parse.urlsplit(url).path
+    target = urllib.parse.urlsplit(urllib.parse.urljoin(url, location)).path if location else ""
+    if status in (301, 302, 307, 308) and target == path.lower() and path != path.lower():
+        problems.append(f"{raw} -> {status} to {target} (the capitals were not taken out)")
+    elif status in (301, 302, 307, 308) and path.endswith("/index") and target == path[: -len("index")]:
+        notes.setdefault("/index -> /", []).append(raw)
+    elif status in (301, 302, 307, 308) and target == path.replace("%2C", ",").replace("%2c", ","):
+        notes.setdefault("%2C -> ,", []).append(raw)
+    elif status in (301, 302, 307, 308) and path.endswith("/") and target == path.rstrip("/"):
+        notes.setdefault("a file link with a trailing slash", []).append(raw)
+    else:
+        problems.append(f"{raw} -> HTTP {status}{' to ' + target if target else ''}")
+if host_kind == "netlify":
+    if not all(marked) or not marked:
+        problems.append("a page does not carry data-plantoir-paths, which the Netlify publish adds")
+    if mixed:
+        problems.append(f"{mixed} same-site link(s) still have a capital in their path")
+else:
+    if any(marked):
+        problems.append("a Cloudflare page carries data-plantoir-paths, which only a Netlify publish adds")
+    if not mixed:
+        problems.append("no link has a capital: Cloudflare was sent the Netlify rewrite")
+    for url in sorted(links):
+        path = urllib.parse.urlsplit(url).path
+        if re.search(r"[A-Z]", path):
+            status, location, _ = ask(url.replace(path, path.lower(), 1))
+            control = f"{path.lower()} answers {status}{' to ' + location if location else ''}"
+            if status == 200:
+                problems.append(f"Cloudflare answered 200 for {path.lower()}, so it is not case-sensitive any more and this check's premise has moved")
+            break
+print(f"SUMMARY {len(links)} same-site links, {answered} answered 200" + "".join(f"; {name}: {len(items)}" for name, items in sorted(notes.items())) + (f"; control: {control}" if control else ""))
+for problem in problems:
+    print("PROBLEM " + problem)
+PY
+)
+  status=$?
+  if [ "$status" -ne 0 ] || [ -z "$said" ]; then
+    no "$1's page links could not be checked"
+    return
+  fi
+  if printf '%s\n' "$said" | grep -q '^PROBLEM '; then
+    no "$1's page links: $(printf '%s\n' "$said" | sed -n 's/^SUMMARY //p')"
+    printf '%s\n' "$said" | sed -n 's/^PROBLEM /       /p'
+  else
+    ok "$1's page links: $(printf '%s\n' "$said" | sed -n 's/^SUMMARY //p')"
+  fi
+}
+
+# A folder publish is sent the build's bytes: no marker, links as built.
+check_no_marker_folder() {  # check_no_marker_folder <label> <dir>
+  if grep -rlq 'data-plantoir-paths' "$2" 2>/dev/null; then
+    no "$1 carries data-plantoir-paths, which only a Netlify publish adds (#628)"
+  else
+    ok "$1 carries the build's links as built, with no Netlify marker (#628)"
+  fi
+}
+
 # How long a publish takes, and how many bytes it sends: seconds around the
 # launcher, and the Obytes delta of the interface the default route uses
 # (read on a quiet machine, or it counts everything else too).
@@ -474,6 +590,7 @@ run_deploy "$WORK/deploy-folder.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_T
   && ok "publish to a folder exited 0" || no "publish to a folder failed"
 check_folder "folder" "$FOLDER_TARGET/section$SECTION"
 check_engine_folder "the folder" "$FOLDER_TARGET/section$SECTION"
+check_no_marker_folder "folder" "$FOLDER_TARGET/section$SECTION"
 
 hdr "Destination 2 of 3 — Netlify"
 if [ "$HAVE_NETLIFY" = true ]; then
@@ -484,6 +601,7 @@ if [ "$HAVE_NETLIFY" = true ]; then
   NETLIFY_URL=$(url_from_log "$WORK/deploy-netlify.log")
   [ -n "$NETLIFY_URL" ] && check_url "Netlify" "$NETLIFY_URL" || no "no Netlify address in the output"
   [ -n "$NETLIFY_URL" ] && check_engine "Netlify" "$NETLIFY_URL/"
+  [ -n "$NETLIFY_URL" ] && check_page_links "Netlify" "$NETLIFY_URL/" netlify
 else
   skip "Netlify (no token)"
 fi
@@ -497,6 +615,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   CF_URL=$(url_from_log "$WORK/deploy-cloudflare.log")
   [ -n "$CF_URL" ] && check_url "Cloudflare Pages" "$CF_URL" || no "no Cloudflare address in the output"
   [ -n "$CF_URL" ] && check_engine "Cloudflare Pages" "$CF_URL/"
+  [ -n "$CF_URL" ] && check_page_links "Cloudflare Pages" "$CF_URL/" cloudflare
 else
   skip "Cloudflare (no credentials)"
 fi
@@ -519,6 +638,8 @@ if [ "$HAVE_NETLIFY" = true ] && [ "$HAVE_CLOUDFLARE" = true ]; then
   [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" || no "no Cloudflare address"
   [ -n "$N_URL" ] && check_engine "Netlify (of the pair)" "$N_URL/"
   [ -n "$C_URL" ] && check_engine "Cloudflare (of the pair)" "$C_URL/"
+  [ -n "$N_URL" ] && check_page_links "Netlify (of the pair)" "$N_URL/" netlify
+  [ -n "$C_URL" ] && check_page_links "Cloudflare (of the pair)" "$C_URL/" cloudflare
 else
   skip "Netlify + Cloudflare (credentials missing)"
 fi
@@ -534,7 +655,9 @@ if [ "$HAVE_NETLIFY" = true ]; then
   run_deploy "$WORK/pair-nf2.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_TARGET" \
     && ok "leg 2 (folder) exited 0" || no "leg 2 (folder) failed"
   [ -n "$N_URL" ] && check_url "Netlify (of the pair)" "$N_URL" || no "no Netlify address"
+  [ -n "$N_URL" ] && check_page_links "Netlify (of the pair)" "$N_URL/" netlify
   check_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
+  check_no_marker_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
   check_engine_folder "the folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
 else
   skip "Netlify + folder (no Netlify token)"
@@ -552,6 +675,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   run_deploy "$WORK/pair-cf2.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_TARGET" \
     && ok "leg 2 (folder) exited 0" || no "leg 2 (folder) failed"
   [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" || no "no Cloudflare address"
+  [ -n "$C_URL" ] && check_page_links "Cloudflare (of the pair)" "$C_URL/" cloudflare
   check_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
   check_engine_folder "the folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
 else

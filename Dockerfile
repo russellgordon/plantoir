@@ -252,6 +252,10 @@ COPY scripts/netlify_badge.py /opt/scripts/netlify_badge.py
 # that does it - deploy.py imports it by bare name, so it is baked beside it
 # (test_baked_modules.py).
 COPY scripts/isolation_headers.py /opt/scripts/isolation_headers.py
+# Page addresses on Netlify (#628): a Netlify publish lower-cases each page
+# link's path in memory as it uploads - deploy.py imports it by bare name, so
+# it is baked beside it (test_baked_modules.py).
+COPY scripts/netlify_paths.py /opt/scripts/netlify_paths.py
 
 # Bake the Explorer's hide filter into the image.
 #
