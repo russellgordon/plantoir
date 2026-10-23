@@ -37,11 +37,16 @@
 //  F. Headless Chrome's own print(), not replaced (beforeprint on the frame
 //     inside print(), no afterprint, measured): the page is put back at once
 //     and says nothing. A guard, not a must-fail: the old code passed it.
+//  W. The PRINT LAYOUT (not the fallback) that never finishes: once Print is
+//     pressed, the site's stylesheet Paged.js asks for is never answered. The
+//     budget covers that path too: words.couldNotPrepare by the budget, no
+//     print(), the page put back - not "Preparing to print…" for good.
 //
-// A to E each FAILED on the code before #576 (proven by copy-and-restore of
-// print.inline.ts, 2026-10-23; documentation/06-quartz-customizations.md F3).
+// A to E each FAILED on the code before #576, and W on #576's first version
+// (2bfee8653), proven by copy-and-restore of print.inline.ts, 2026-10-23
+// (documentation/06-quartz-customizations.md F3).
 //
-//   node browser-checks/print_fallback.mjs <chrome> <site folder>
+//   node browser-checks/print_fallback.mjs <chrome> <site folder> [page path]
 
 import { spawn } from "node:child_process"
 import { createServer } from "node:http"
@@ -57,7 +62,7 @@ if (!chromePath || !siteFolder) {
 const PAGES = JSON.parse(readFileSync(new URL("../contracts/shared-rules.json", import.meta.url), "utf-8")).printablePages
 const WORDS = PAGES.words
 const BUDGET = PAGES.printRequest.budgetMs
-const PAGE = "/Discussions/Print-Fallback-Fixture.html"
+const PAGE = process.argv[4] || "/Discussions/Print-Fallback-Fixture.html"
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
   ".json": "application/json", ".wasm": "application/wasm", ".svg": "image/svg+xml", ".png": "image/png",
@@ -205,11 +210,15 @@ async function run(chunk) {
       return answer?.result?.value
     }
     const refused = []
+    let pressed = false
     listeners.set(sessionId, (message) => {
       if (message.method !== "Fetch.requestPaused") return
       const { requestId, request } = message.params
       const path = new URL(request.url).pathname
-      if (/paged\.min\.js$/.test(path)) {
+      // W: the stylesheet the print layout fetches, never answered once
+      // Print is pressed (the page itself has it already).
+      if (hold.layoutAfterPress && pressed && /\/index\.css$/.test(path)) return
+      if (!hold.layoutAfterPress && /paged\.min\.js$/.test(path)) {
         refused.push(path)
         send("Fetch.fulfillRequest", { requestId, responseCode: 404, body: "" })
         return
@@ -234,11 +243,11 @@ async function run(chunk) {
     }
     if (!ready) throw new Error(`${plan}: the fixture's Print button never appeared`)
     await pause(300)
-    const press = () => evaluate(`(() => {
+    const press = () => { pressed = true; return evaluate(`(() => {
       window.__pressedAt = Math.round(performance.now())
       document.querySelector('.plantoir-print button[data-mode="questionsOnly"]').click()
       return window.__pressedAt
-    })()`)
+    })()`) }
     const state = () => evaluate(`({
       now: Math.round(performance.now()), pressedAt: window.__pressedAt,
       status: document.querySelector(".plantoir-print-status")?.textContent ?? "",
@@ -341,7 +350,17 @@ async function run(chunk) {
     await one.close()
   }
 
-  const settled = await Promise.allSettled([caseA(), caseB(), caseC(), caseD(), caseE(), caseF()])
+  async function caseW() {
+    const one = await openCase("prints", { pictures: 0, faces: 0, layoutAfterPress: true })
+    await one.press()
+    const last = await until(one, (state) => state.status === WORDS.couldNotPrepare && state.frames === 0, late)
+    measured.push(`W: ${last.status === WORDS.couldNotPrepare ? "couldNotPrepare " + (last.now - last.pressedAt) + " ms after the press" : "still " + JSON.stringify(last.status)}, print() called ${last.print.calls.length} times`)
+    expect("W: a print layout that never finishes: words.couldNotPrepare by the budget, nothing printed, the page put back",
+      last.status === WORDS.couldNotPrepare && last.print.calls.length === 0 && last.frames === 0 && last.now - last.pressedAt <= late, last)
+    await one.close()
+  }
+
+  const settled = await Promise.allSettled([caseA(), caseB(), caseC(), caseD(), caseE(), caseF(), caseW()])
   for (const outcome of settled) {
     if (outcome.status === "rejected") problems.push("a case could not be run: " + (outcome.reason?.stack ?? outcome.reason))
   }

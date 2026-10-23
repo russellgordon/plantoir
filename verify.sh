@@ -4435,9 +4435,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # loaded before print(), the frame kept for a print put off, the page put
   # back by the 30 s budget, and words.couldNotPrepare only when no print began.
   if node browser-checks/print_fallback.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_print_fallback.log 2>&1; then
-    pass "Print's fallback, the browser laying the handout out itself: every picture and face loaded before print(), a print put off kept until afterprint, one that never comes and pictures that never arrive put back saying couldNotPrepare by the budget, a print with no afterprint put back quietly with the button free, headless Chrome's own print() put back at once - $(head -1 /tmp/verify_print_fallback.log | sed 's/^OK: //') (#576, browser-checks/print_fallback.mjs)"
+    pass "Print's fallback, the browser laying the handout out itself: every picture and face loaded before print(), a print put off kept until afterprint, one that never comes, pictures that never arrive and a print layout that never finishes put back saying couldNotPrepare by the budget, a print with no afterprint put back quietly with the button free, headless Chrome's own print() put back at once - $(head -1 /tmp/verify_print_fallback.log | sed 's/^OK: //') (#576, browser-checks/print_fallback.mjs)"
   else
-    fail "Print's fallback printed with the frame still loading, took the frame away before a print put off, or left Preparing to print… up or said nothing when no print came (browser-checks/print_fallback.mjs, #576)"
+    fail "Print's fallback printed with the frame still loading, took the frame away before a print put off, or left Preparing to print… up (on either path) or said nothing when no print came (browser-checks/print_fallback.mjs, #576)"
     cat /tmp/verify_print_fallback.log
   fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.

@@ -130,6 +130,12 @@ for (const c of pages.completeness.cases) {
   if (got !== c.print) failures.push(`completeness ${JSON.stringify(c)}: ${got}`)
 }
 if (rules.PRINT_BUDGET_MS !== pages.printRequest.budgetMs) failures.push(`printRequest.budgetMs: the site waits ${rules.PRINT_BUDGET_MS} ms`)
+if (rules.PRINT_LAST_WAIT_MS !== pages.printRequest.lastWaitMs) failures.push(`printRequest.lastWaitMs: the site waits ${rules.PRINT_LAST_WAIT_MS} ms`)
+if (JSON.stringify(rules.PRINT_BUDGET_STAGES) !== JSON.stringify(pages.printRequest.budgetStages)) failures.push(`printRequest.budgetStages: the site's are ${JSON.stringify(rules.PRINT_BUDGET_STAGES)}`)
+for (const c of pages.printRequest.beforePrintCases) {
+  const got = rules.outOfTimeBeforePrint(c.stage)
+  if (got !== c.outcome) failures.push(`printRequest.beforePrintCases ${c.stage}: ${got}`)
+}
 for (const c of pages.printRequest.cases) {
   const got = rules.printOutcome(c.moment, c.sawBefore, c.sawAfter)
   if (got !== c.outcome) failures.push(`printRequest ${JSON.stringify(c)}: ${got}`)
@@ -140,7 +146,7 @@ const count = pages.answerCallouts.cases.length + pages.labels.cases.length +
   items.numbering.length + items.partLetters.length + items.columns.length +
   1 + pages.paper.cases.length + pages.footer.cases.length + pages.paperLook.cases.length +
   pages.completeness.cases.length + pages.paperLook.formulas.cases.length + pages.paperLook.tables.cases.length +
-  1 + pages.printRequest.cases.length
+  3 + pages.printRequest.cases.length + pages.printRequest.beforePrintCases.length
 console.log(JSON.stringify({ count, failures }))
 """
 

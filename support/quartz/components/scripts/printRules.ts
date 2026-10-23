@@ -378,9 +378,28 @@ export function mayPrint(expected: number, found: number, overflowing: number): 
 // (measured in Safari 26.6: the sheet opened 39 ms later when the frame was
 // kept; never when it was taken away at once, which is what the page did).
 // So the page is put back only once the print is known to have happened, and
-// "Preparing to print…" is never left up for longer than PRINT_BUDGET_MS
-// from the press, everything before print() included.
+// the waits that could otherwise never end share ONE clock, PRINT_BUDGET_MS
+// from the press, on both paths (PRINT_BUDGET_STAGES): the handout's
+// pictures, the print layout's script, its layout and its pictures, and the
+// fallback frame's faces and pictures. Out of time at any of them, nothing is
+// printed (outOfTimeBeforePrint). After print() returns with nothing sent,
+// the page waits for what is left of the budget, but never less than
+// PRINT_LAST_WAIT_MS, so a print WebKit put off just before the budget ran
+// out is not cut off at once. (The diagrams' 8 s, the stylesheets' 3 s and
+// the faces' 4 s keep their own caps, and are inside the clock as well.)
 export const PRINT_BUDGET_MS = 30000
+export const PRINT_LAST_WAIT_MS = 3000
+
+export type BudgetStage = "pictures" | "printLayoutScript" | "printLayout" | "printLayoutPictures" | "frameSettled"
+export const PRINT_BUDGET_STAGES: BudgetStage[] = ["pictures", "printLayoutScript", "printLayout", "printLayoutPictures", "frameSettled"]
+
+// The budget ran out before print() was called, at `stage`. Every stage is
+// the same answer, and the one the print layout's stages are kept from: NOT
+// trying the fallback with no time left, and never printing a handout whose
+// layout or pictures had not finished.
+export function outOfTimeBeforePrint(_stage: BudgetStage): PrintOutcome {
+  return "putBackCouldNotPrint"
+}
 
 // When the outcome is asked: print() has returned; or, after it returned
 // with nothing sent, an event arrived or the budget ran out.
