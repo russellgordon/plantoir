@@ -30,7 +30,7 @@ interfaces automatically.
 | Deploy | Runs [`deploy.sh`](07-deployment.md) with output streamed into the app (prompts answered inline); if a preview is running or building, stops it and awaits container cleanup first; the finished live-site link wears the section's custom domain when one is set |
 | New Course | Writes the collected answers as `course_config.json`, then runs the real `./setup.sh`, accepting each prompt's default — the wizard re-reads the file as its saved answers, so scaffolding/backups/Quartz patches are all the wizard's own work |
 | Add Section | Context-click a course; scaffolds the new section the way the wizard would, mirroring sibling sections' frontmatter, and gives every course-level page with per-section keys a pair for the new section — found with the build's own fence rule and spliced in by line, so the page's fence, body and line endings never move (#175; `contracts/course-management.json` → `sectionNumbers.addingKeysToAPage`) |
-| Open in Obsidian | Registers the course folder in Obsidian's own vault registry when needed and opens the section at its `index.md`; first asks about, or adds, Obsidian's add-ons for a course's diagrams and graphs (#495) |
+| Open in Obsidian | Registers the course folder in Obsidian's own vault registry when needed and opens the section at its `index.md` — or, pressed for a section whose preview is showing a page, the file behind that page (#518); first asks about, or adds, Obsidian's add-ons for a course's diagrams and graphs (#495) |
 
 Beyond the actions, the app owns delivery and resources:
 
@@ -3831,7 +3831,9 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   — since #495 to ONE call, inside `ObsidianOpening.open`, which every open
   goes through so a test can drive the route without reaching Obsidian; the
   route also asks about Obsidian's add-ons for diagrams and graphs first
-  ("Obsidian's add-ons for diagrams and graphs (#495)").
+  ("Obsidian's add-ons for diagrams and graphs (#495)"). Since #518 a
+  SECTION's press passes `atThePreviewedPage: true` and opens the page its
+  preview shows ("Open in Obsidian opens the page the preview shows (#518)").
 - **Delete removes the selected sidebar row — by asking.** The key runs the
   menu item `contracts/shared-rules.json` → `sidebarDeleteKey` names (Remove
   Course…, Remove Section…, Delete Backup…, Delete Archive…) through
@@ -4464,6 +4466,102 @@ of the Option alternate, Alt read at the click, WebView2's `SourceChanged` and
 `ContentLoading` in place of KVO and didCommit, and the page kept in its own
 file — `12-windows-app.md` → "Preview at Last Viewed on Windows (#514, the
 mac's #504)".
+
+## Open in Obsidian opens the page the preview shows (#518)
+
+A section's Open in Obsidian — the section window's toolbar button, Section ▸
+Open in Obsidian and a section row's context menu — opens the Markdown file
+behind the page that section's preview is showing, instead of the section's
+front page. Course ▸ Open in Obsidian, Course Settings' button, a course row's
+menu and the How I Teach row are unchanged (Russell's ruling 3: the page
+belongs to a section; the course press names the course — this departs from
+the issue's wording, which named the Course menu, by ruling). The rules and
+every case are `contracts/shared-rules.json` → `obsidianOpensThePreviewedPage`;
+the list's format is `file-formats.json` → `pageSourcesList`; when the build
+writes it is `05-build-pipeline.md` → "Which file each page came from (#518)".
+
+### The channel: the section window's own web view, read at the press
+
+The preview is not in Safari: it is the section window's `WKWebView`
+(`WebPreviewController.webView`), and the window already registers what it
+alone can do in `SectionWindowControllers` (the assistant's preview and deploy
+closures). It now registers one more, `previewedPage`, which returns
+`PreviewStartPage.rememberedPath(page: webView.url, previewRoot:)` — the path
+below the run's root, query and fragment stripped — while `previewURL` is set,
+and nil otherwise (building, stopped, Rebuild Preview under way).
+`WorkspaceModel.openInObsidian(course:sectionNumber:atThePreviewedPage:)`
+asks it through `ObsidianOpening.previewedAddress`, so the sidebar and the menu
+bar reach the page as well as the toolbar, and a test replaces the question.
+No new registry: the plan's `PreviewedPages` would have been a second
+folder/course/section-keyed table beside the one that already exists.
+
+Then `PreviewedPageSource.resolve(address:listData:courseFolder:)`: decode
+once, NFC both sides, '' → `index`, an address ending '/' → `<it>index` first
+and then without the slash, any other → itself then `/index`; refuse a
+`collided` entry, a non-`.md` file, a file outside the course folder after
+links are followed, a file that is gone. Anything refused opens what the press
+opened before (the section's `index.md`, or the vault when it has none) — a
+menu item that does nothing is the worse fault. The front page's entry may
+carry `shows`, the class it is only a single `![[…]]` of (ruling 1); that file
+opens while it is there. A hidden page opens anyway (ruling 4).
+
+The page is carried in `LockedPagesNoteRequest.page` and
+`ObsidianAddOnsRequest.page`, so after a reference course's note, the add-ons
+offer or the reopen question it is still the page that opens. Every open in
+the route goes through ONE helper, `openObsidian(_:page:course:)`, which calls
+`ObsidianOpening.openPage` (→ `FolderActions.openPageInObsidian`, the door
+#329 made for the How I Teach page) or `ObsidianOpening.open` (the folder
+door). The folder door cannot be used for a page: `obsidianTarget(forFolder:)`
+looks for `<page>/index.md`, finds nothing and opens the vault — the trap #329
+recorded. `ObsidianFigureAddOnsTests.testEveryRouteIsStillTheOneFunction` was
+updated deliberately to pin one call of each.
+
+### The link, measured
+
+`obsidian://open?path=<absolute path>` stays (a vault name is ambiguous
+across working folders). `FolderActions.obsidianURL` now writes `+` as `%2B`;
+`URLComponents` leaves it raw. The plan said a raw `+` reads as a space — that
+was NOT what was measured: Obsidian 1.13.7's main process (`main.js`, the
+link parser) decodes the query with `decodeURIComponent`, and an isolated
+Obsidian (own `HOME` and `--user-data-dir`, mock keychain, debugging port, a
+scratch vault, the link as its last argument — the path `main.js` takes for a
+link at startup, so nothing reached Russell's running Obsidian; his registry
+byte-identical afterwards) opened `C++ Basics.md` from both spellings, on
+1.13.7 and on 1.14.4. `%2B` is kept because to a form-style parser
+(`URLSearchParams`) a raw `+` IS a space, and it costs nothing. The same run,
+9 links × 2 versions, all opened the right file and none created one: spaces,
+`+` both ways, `&` (`%26`), a comma (a class page), a hidden page, and a
+decomposed (NFD) name reached by a decomposed AND by a composed link. Script
+and results: the session scratchpad (`r518/live/`), summarised in the
+closing comment.
+
+### Trail
+
+`activityTrail.mustRecord` → **"page opened in Obsidian"**, written for every
+SECTION press, never a course press: the file's place without `.md` ("opened
+Unit 1/Lesson 3 in Obsidian, the page the preview shows", with "(hidden from
+students)" when it is), or why the section opened as before — the fallback
+when no preview page was showing included (ruling 5). Words:
+`obsidianOpensThePreviewedPage.trail` and `.fallbacks`.
+
+### Rejected
+
+AppleScript to Safari's front tab (needs the Automation permission, never
+re-asked once denied, and Safari's tab is not this section's preview); the
+live-reload websocket (server to page only); a file written by injected
+script (a second channel to keep in step); the page last viewed (#504 ignores
+the app's own loads on purpose, so after Rebuild Preview or a press of the
+front page it names a page no longer shown — ruling 2); working the file out
+from the address in the app (a section's page over a shared one, `_index` and
+Quartz's slugging can only be undone by the build); `obsidian://open?vault=`;
+an `otherBuild` refusal on `buildId` (the app never learns which build a
+preview shows, and `.build-id` moves on Rebuild before the list does); a new
+`PreviewedPages` registry (above).
+
+**On Windows**: it inherits the list free (shared Python, native build) and
+owes reading `CoreWebView2.Source` at the press through its `PreviewStartPage`
+normaliser, the resolution cases, the page through its Open in Obsidian
+route, and the trail event — the `windows` issue for #518.
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
