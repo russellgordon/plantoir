@@ -417,8 +417,9 @@ folder and run again. Windows takes the same two shots with
 `print_set.py`'s, shared by both): `SCREENSHOTS.md` → "Windows Capture".
 
 **The Code page (v1.8.0, #562, `--code`).** `code-python`, `code-python-error`,
-`code-swift` and `code-quiz` (light and dark, Mac only: `windows: false`, owed
-by name in `test_build_data.py`'s `WINDOWS_PICTURE_OWED`) are taken from
+`code-swift` and `code-quiz` (light and dark; each was Mac only, `windows:
+false` and owed by name in `test_build_data.py`'s `WINDOWS_PICTURE_OWED`,
+until its Windows twin was taken, #590) are taken from
 PREVIEWS of the kept marketing folder (`~/Plantoir Marketing`, not moved: no
 path shows in them) — ICS3U for the Python and the quiz, ICS4U for the Swift.
 First the run gives the folder what they need (`marketing_folder.apply_code_steps`,
@@ -443,11 +444,11 @@ window, and only then is the window photographed; it fails the
 run with its reason, or when `--prepare-timeout` (120 s here) runs out.
 Vision must read each shot's `expectText`. The print set (both platforms)
 takes only scene `print-set`, so these never reach MPM2D's preview. `--code-shots code-python` retakes some of them.
-On Windows, `capture_windows.py --code` takes the four that are not Swift
-from native previews of `~/School Web Space` with the same prepare scripts
-(#590; `website/SCREENSHOTS.md` → "The Code and Quizzes pages' figures on
-Windows"); the Swift two stay Mac only until their 2x picture is taken (Swift
-runs on Windows since v1.8.6, #570). Two things in
+On Windows, `capture_windows.py --code` takes all six from native previews
+of `~/School Web Space` with the same prepare scripts (#590;
+`website/SCREENSHOTS.md` → "The Code and Quizzes pages' figures on
+Windows"); the Swift two since 2026-10-23 (Swift runs on Windows since
+v1.8.6, #570). Two things in
 the pictures are the page's own, not the capture's: `code-python-error`'s
 traceback names `main.py` while the page's prose says `hours.py` (#561's
 known mismatch: that prose is about a program on the student's computer),
