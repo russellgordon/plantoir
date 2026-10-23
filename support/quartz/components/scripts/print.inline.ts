@@ -37,11 +37,13 @@ import {
   partColumns,
   partLetter,
   PRINT_BUDGET_MS,
+  PRINT_LAST_WAIT_MS,
+  outOfTimeBeforePrint,
   printOutcome,
   questionNumber,
   role,
 } from "./printRules"
-import type { Block, Paper, PrintMoment } from "./printRules"
+import type { Block, BudgetStage, Paper, PrintMoment } from "./printRules"
 
 type Mode = "questionsOnly" | "answersOnly" | "withAnswersAtTheEnd"
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
@@ -1288,11 +1290,17 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     const pageTitle =
       (settings.page?.title ?? "").trim() ||
       (document.querySelector(".center h1.article-title")?.textContent ?? "").trim()
+    // The budget ran out at `stage`: nothing is printed (outOfTimeBeforePrint).
+    const gaveUp = (stage: BudgetStage) => {
+      console.warn(`Plantoir: this handout was not printed: ${stage} had not finished after ${PRINT_BUDGET_MS / 1000} s.`)
+      if (outOfTimeBeforePrint(stage) === "putBackCouldNotPrint") {
+        say(status, words.couldNotPrepare)
+      }
+      restore()
+    }
     const handout = buildHandout(mode, settings)
     if (!(await imagesReady(handout, deadline, timers))) {
-      console.warn(`Plantoir: this handout was not printed: its pictures had not arrived after ${PRINT_BUDGET_MS / 1000} s.`)
-      say(status, words.couldNotPrepare)
-      restore()
+      gaveUp("pictures")
       return
     }
     // Counted before the layout sees it (completeness).
@@ -1308,9 +1316,18 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     await fontsReady(doc)
     await fitWideFormulas(doc, handout, paper, indexCss)
 
+    // The print layout runs inside the same budget (#576 review: a page whose
+    // layout never finished left "Preparing to print…" up for good). Running
+    // out of time is NOT a reason to try the fallback: nothing is printed.
     let paginated = false
+    let outOfTime: BudgetStage | null = null
     try {
-      await loadScript(doc, root + "static/pagedjs/paged.min.js")
+      const script = loadScript(doc, root + "static/pagedjs/paged.min.js")
+      if (!(await finishedBy(script, deadline, timers))) {
+        outOfTime = "printLayoutScript"
+        throw new Error("out of time")
+      }
+      await script
       const engine = (frame.contentWindow as unknown as {
         PagedModule?: { Previewer: new () => { preview: Function } }
       }).PagedModule
@@ -1321,18 +1338,30 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
       await fontsReady(doc)
       const previewer = new engine.Previewer()
       const content = doc.importNode(handout, true)
-      await previewer.preview(content, [indexCss, { [location.href]: pagedRules(paper, settings) }], doc.body)
+      const laidOut: Promise<unknown> = previewer.preview(content, [indexCss, { [location.href]: pagedRules(paper, settings) }], doc.body)
+      if (!(await finishedBy(laidOut, deadline, timers))) {
+        outOfTime = "printLayout"
+        throw new Error("out of time")
+      }
+      await laidOut
       labelPages(doc, mode, settings, pageTitle)
       paginated = true
     } catch {
       paginated = false
+    }
+    if (outOfTime !== null) {
+      gaveUp(outOfTime)
+      return
     }
     if (paginated) {
       const pictures: Promise<unknown>[] = []
       for (const image of doc.querySelectorAll("img")) {
         pictures.push((image as HTMLImageElement).decode().catch(() => undefined))
       }
-      await Promise.all(pictures)
+      if (!(await finishedBy(Promise.all(pictures), deadline, timers))) {
+        gaveUp("printLayoutPictures")
+        return
+      }
       const result = checkComplete(doc, expected)
       doc.documentElement.setAttribute("data-plantoir-print-path", "paged")
       doc.documentElement.setAttribute("data-plantoir-expected", String(expected))
@@ -1369,9 +1398,7 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
       doc.documentElement.setAttribute("data-plantoir-print-path", "fallback")
       await stylesheetsLoaded(doc)
       if (!(await frameSettled(doc, deadline, timers))) {
-        console.warn(`Plantoir: this handout was not printed: its faces and pictures had not loaded after ${PRINT_BUDGET_MS / 1000} s.`)
-        say(status, words.couldNotPrepare)
-        restore()
+        gaveUp("frameSettled")
         return
       }
     }
@@ -1421,11 +1448,13 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     settle("printReturned")
     if (!restored) {
       // Returned with nothing sent: a print put off until the frame has
-      // loaded (WebKit), or one that will never come. Wait out the budget.
+      // loaded (WebKit), or one that will never come. Wait out the budget,
+      // and never less than PRINT_LAST_WAIT_MS, so a print put off just
+      // before the budget ran out is not cut off at once.
       const timer = window.setTimeout(() => {
         timers.delete(timer)
         settle("outOfTime")
-      }, Math.max(0, deadline - Date.now()))
+      }, Math.max(PRINT_LAST_WAIT_MS, deadline - Date.now()))
       timers.add(timer)
     }
   } catch {

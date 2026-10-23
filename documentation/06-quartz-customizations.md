@@ -718,18 +718,29 @@ answer toggles the same class; plan finding C). On Print:
    never sends would hold the button. When it returns having sent neither,
    the frame stays and the page waits for the rest of the budget:
    `afterprint` puts it back, `beforeprint` alone keeps it waiting (its sheet
-   may be up), and when the budget runs out it is put back — saying
+   may be up), and when the wait ends it is put back — saying
    `printablePages.words.couldNotPrepare` only if no `beforeprint` ever came.
+   That wait is what is left of the budget but **never less than 3 s**
+   (`PRINT_LAST_WAIT_MS`, `printRequest.lastWaitMs`), so a print WebKit put
+   off just as the budget ran out is not cut off at 0 ms (implementation
+   review); "Preparing to print…" can therefore last up to 33 s.
    **One budget, 30 s from the press** (`PRINT_BUDGET_MS`, `printRequest.budgetMs`),
-   covers everything "Preparing to print…" waits on, not a chain of limits:
-   the pictures of step 3a (a picture that never arrives used to leave the
-   words up until a reload, #576 comment 2; now `couldNotPrepare` and
-   nothing printed), the fallback's settling (below) and the wait after
-   `print()`. The Paged.js steps keep their own limits and are otherwise
-   unchanged — a page whose faces were held 7 s took 35 s to reach `print()`
-   in Safari and still printed, which leaves the budget spent; it prints on
-   (the dialog sends the events), and only a browser that sends nothing then
-   gets `couldNotPrepare` at once. `restore()` clears every timer and takes
+   bounds every wait that could otherwise never end, on BOTH paths, not a
+   chain of limits (`printRequest.budgetStages`): the pictures of step 3a (a
+   picture that never arrives used to leave the words up until a reload,
+   #576 comment 2), the print layout's script, `previewer.preview` and the
+   decode of its pictures (the first version of #576 left these out: a
+   layout that never finished still said "Preparing to print…" at 42.6 s,
+   implementation review case W), the fallback's settling (below) and the
+   wait after `print()`. Out of time at any of them, nothing is printed and
+   the button says `couldNotPrepare` (`outOfTimeBeforePrint`); running out
+   in the print layout does NOT fall back to the browser's layout, which
+   would have no time left either. The diagrams' 8 s, the stylesheets' 3 s
+   and the faces' 4 s keep their own caps, inside the same clock. One
+   consequence: a page whose faces were held 7 s took 35 s to reach
+   `print()` on the Paged.js path in Safari (measured before the change) and
+   printed; under the budget it now says `couldNotPrepare` instead — a hold
+   far past anything measured on a real network. `restore()` clears every timer and takes
    the listeners off the page's window. **The Safari event order for a print
    WebKit put off is UNMEASURED** (the re-run was stopped on 2026-10-23
    because Russell was using Safari): the design assumes the late print
@@ -778,7 +789,12 @@ still there at a late `beforeprint` on the page's window and put back after
 budget; (D) pictures that never arrive — `couldNotPrepare`, no `print()`;
 (E) a late `beforeprint` and no `afterprint` — put back quietly by the budget,
 and the button prints again; (F) headless Chrome's own `print()` — put back
-at once. A to E each FAILED on the code before #576 (copy-and-restore of
+at once; (W) the PRINT LAYOUT never finishing (the stylesheet Paged.js
+fetches never answered once Print is pressed) — `couldNotPrepare` by the
+budget, no `print()`. W failed on #576's first version (2bfee8653: still
+"Preparing to print…" at 34 s) and passed on the fix, by copy-and-restore
+in a scratch build of the ICS3U page (esbuild bundle spliced into a built
+`postscript.js`). A to E each FAILED on the code before #576 (copy-and-restore of
 `print.inline.ts`, 2026-10-23: at the old `print()` fonts were "loading" with
 2 of 2 pictures pending under (A), and "loading" even with nothing held under
 (C) — the Safari finding, reproduced in Chrome's state at the call; the frame
