@@ -106,6 +106,16 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         // runs (#347): this one. In a development build the server is not
         // beside the app, so it could not find it on its own.
         if (Environment.ProcessPath is { } app) info.Environment["PLANTOIR_APP_PATH"] = app;
+        // A run keeping its state somewhere of its own (--state-dir, the UI
+        // tests) hands that to its server too (#641): AppDataRoot is
+        // per-process, so without it every trail line the window's server
+        // wrote (a Section menu backup, a rollover, a launcher's outcome)
+        // went to this PC's REAL trail.
+        if (Plantoir.Core.Models.AppDataRoot.IsRedirected)
+        {
+            info.ArgumentList.Add("--state-dir");
+            info.ArgumentList.Add(Plantoir.Core.Models.AppDataRoot.Current);
+        }
         return info;
     }
 

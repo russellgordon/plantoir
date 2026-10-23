@@ -24,7 +24,12 @@ namespace Plantoir.Core.Models;
 /// and ignores the environment variable entirely.</para>
 ///
 /// <para>Set once, from <c>--state-dir</c>, before anything reads anything.
-/// <b>It does NOT reach other processes.</b> The LAUNCHERS are the sharp edge and are worth
+/// <b>It does NOT reach other processes on its own.</b> The window's own
+/// <c>plantoir-mcp.exe</c> is handed it (<c>McpClient</c> passes
+/// <c>--state-dir</c> when <see cref="IsRedirected"/>, #641), so the server's
+/// trail, settings and build-output root follow the window's. The UI-test
+/// harness redirects ITS OWN process as well, because it sets working folders
+/// up in-process and that copy writes a trail line. The LAUNCHERS are the sharp edge and are worth
 /// naming separately: <c>preview.ps1</c> and <c>deploy.ps1</c> compute the
 /// builds root from the environment themselves, and the scheduled-task
 /// wrapper bakes the same into the script it registers. So a redirected run
@@ -32,8 +37,9 @@ namespace Plantoir.Core.Models;
 /// and one that SCHEDULED a deploy would register a REAL Task Scheduler task
 /// whose sentinels land in the teacher's real pending folder. Since bundle 11
 /// the UI suite DOES preview and publish (into the real builds root, which
-/// <c>DrivenApp</c> deletes afterwards); no test schedules a deploy.
-/// <c>plantoir-mcp.exe</c> resolves its own too.</para>
+/// <c>DrivenApp</c> deletes afterwards); no test schedules a deploy. An
+/// <c>plantoir-mcp.exe</c> started by an outside door (Claude Code, Codex)
+/// resolves its own, from the real folder.</para>
 /// </summary>
 public static class AppDataRoot
 {

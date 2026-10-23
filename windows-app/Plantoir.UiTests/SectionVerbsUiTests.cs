@@ -81,9 +81,9 @@ public class SectionVerbsUiTests
         Assert.Single(MenuCopies(app));
         Assert.Contains($"{Code}/1 · Section ▸ Publish Pages… — carried out, 1 page ticked", MenuBar.Trail(app));
         // The copy's own line ("section menu backed up a course") is written
-        // by the window's plantoir-mcp, which --state-dir does not reach
-        // (AppDataRoot: it does not cross processes), so it lands in this PC's
-        // own trail; SectionMenuServerTests pins it. The zip above is the proof here.
+        // by the window's plantoir-mcp, which the window hands its
+        // --state-dir since #641, so it lands in this run's trail too.
+        Assert.Contains($"{Code}/1 · the Section menu backed up the course as ", MenuBar.Trail(app));
 
         // ---- Undo Last Change is live now, and puts the page back.
         var again = MenuBar.Open(app, "Section", "sectionUndoLastChange");

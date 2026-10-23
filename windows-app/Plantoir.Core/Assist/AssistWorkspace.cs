@@ -2912,9 +2912,10 @@ public sealed partial class AssistWorkspace
     /// <remarks>
     /// One known divergence, inherited rather than introduced:
     /// <c>BuildOutputLocation.BuildsRootFor</c> falls back to
-    /// <c>AppDataRoot</c>, which <c>--state-dir</c> redirects, while the
-    /// launchers compute the same root from the real <c>%LOCALAPPDATA%</c>. So
-    /// a run started with <c>--state-dir</c> looks for the legacy marker
+    /// <c>AppDataRoot</c>, which <c>--state-dir</c> redirects (in the window,
+    /// and since #641 in the window's own <c>plantoir-mcp</c>, which it is
+    /// handed to), while the launchers compute the same root from the real
+    /// <c>%LOCALAPPDATA%</c>. So a run started with <c>--state-dir</c> looks for the legacy marker
     /// somewhere the launcher would never have put one and finds nothing —
     /// the same hazard <c>run-ui-tests.ps1</c> already warns about, and
     /// harmless here because it can only cause a release to be skipped, never

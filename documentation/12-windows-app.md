@@ -498,9 +498,55 @@ construction rather than in `OnLaunched`, which is why they compose with
 exactly how far it reaches. It moves everything under
 `%LOCALAPPDATA%\Plantoir` for that run: settings, the breadcrumb trail, the
 startup log, downloaded models, built sites, scheduled-deploy wrappers and
-their finished sentinels. It does NOT move Credential Manager, and it does not
-reach a CHILD process. **Quote the path**: the raw-argument fallback splits on
-spaces.
+their finished sentinels. It does NOT move Credential Manager, and it reaches
+a CHILD process only when the app hands it on. **Quote the path**: the
+raw-argument fallback splits on spaces.
+
+**Three writers missed it until #641 (2026-10-23), and the trail is how that
+was found.** During the 1.8.6 update proof the REAL trail held "got the working
+folder ready — … — C:\Users\…\Temp\plantoir-ui-*\workspace" lines, written
+the evening before by UI-suite runs that had all been started with
+`--state-dir`. What wrote them, and what each does now:
+
+- **The harness's own process. This wrote the line that was seen.**
+  `DrivenApp` sets the working folder up IN-PROCESS
+  (`ToolchainMirror.InitializeWorkspace`, also used for OpenRecent's second
+  folder). That copy goes through `ToolchainReadiness.Ensure`, which writes
+  the line. `AppDataRoot` is per-process, and only the APP had been
+  redirected. **Now** `DrivenApp` calls `AppDataRoot.RedirectTo(stateDir)` on
+  its own process before the copy, so the line lands in the run's own trail
+  through the same resolver the app uses. It is safe because the tests run
+  one at a time ("drives the real app"). One side effect: the copy starts
+  `StartGuidance` on `Task.Run`, and that pass can finish after the NEXT test
+  has re-pointed the static, so its line can land in the next run's trail.
+  It cannot reach the real one. `RealBuildsRoot` reads `%LOCALAPPDATA%`
+  directly and is not moved.
+- **The window's own `plantoir-mcp.exe`**: Section menu backups, rollovers,
+  `LauncherRunner`'s lines. **Now** `McpClient` passes `--state-dir
+  <AppDataRoot.Current>` when `AppDataRoot.IsRedirected`, and the server
+  applies it before anything resolves a path. That moves the server's
+  `BuildOutputLocation.BuildsRootFor` fallback and its settings (the
+  Cloudflare account among them) too, while the launchers it runs still build
+  into the REAL root. That is the same split the window already had, so the
+  divergence `AssistWorkspace.LegacyMarkerHomes` describes now holds for the
+  server as well. A server started by an outside door (Claude Code, Codex) is
+  never handed it.
+- **The launchers' own refusal lines** (`Write-TrailLine` in `preview.ps1`
+  and `deploy.ps1`; the mac's `note_on_the_trail`) still use the real path.
+  **Not fixed here**: it is a toolchain change on both platforms, #664
+  (`PLANTOIR_TRAIL_DIR`, trail only, never the builds root). No current test
+  triggers a refusal.
+
+**What a driven run must not touch**, and what now checks it: the real trail,
+settings, startup log, scheduled-deploy wrappers and pending sentinels, and
+Task Scheduler. It MAY touch the real builds root (each run's folder is
+deleted by `DrivenApp.Dispose`) and the Swift home (`%LOCALAPPDATA%\Plantoir\swift`,
+resolved by the launcher's Python). `RealTrailUntouchedUiTests` drives both
+fixed writers (a fresh working folder, then Section ▸ Publish Pages…) and fails
+on any line ADDED to the real trail that names the run's temporary folder or
+its one-off course code. It judges by content rather than byte count because
+this PC is shared: another copy or a scheduled publish may append during the
+run, and those lines are printed for information only.
 
 **The LAUNCHERS are the sharp edge, and they are the exception most likely to
 catch somebody out.** `preview.ps1`, `deploy.ps1` and `setup.ps1` compute the
