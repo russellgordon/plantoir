@@ -15,16 +15,40 @@ import SwiftUI
 ///
 /// So this watches the sheet's window: whenever its smallest allowed content
 /// size rises past the size it has, the window is grown to that minimum.
-/// Only grown: a teacher who made the sheet bigger keeps the size they made,
-/// and a stage that needs less leaves the sheet where it is. The disclosure
-/// under the plan table never raises the minimum (the table is counted with
-/// it closed, #622), so opening it moves nothing.
+/// Only grown, while a sheet is still being worked in: a teacher who made the
+/// sheet bigger keeps the size they made, and a stage that needs less leaves
+/// the sheet where it is. The checkbox under the plan table never raises the
+/// minimum (the table is counted with it unticked, #622), so ticking it moves
+/// nothing.
+///
+/// The one exception is the sheet's ANSWER (#654, `fitsItsContent`): the
+/// sentence a tool said when it finished — "Published 5 pages.", a
+/// cancellation, a failure — is shown in a sheet fitted to it, height and
+/// all, keeping only the width the teacher made. Left to the rule above, the
+/// answer kept the plan's height — MEASURED on macOS 26.6
+/// (`PageTablesSheetTests.testTheAnswerAfterAPlanIsFittedToItsSentence`): a
+/// Publish plan of twenty-one pages stayed 454 pt tall, and a Hide plan 292,
+/// to show an answer that needs 124; the worst plan the budget allows
+/// (`CopyPageChecklist.tallestSheet`, 609 pt measured) would leave some 485
+/// pt of empty sheet over OK.
+/// The answer is the last thing the sheet shows, so fitting it takes away
+/// no size the teacher still needs. AppKit keeps the sheet centred on its
+/// window through the change (measured), so nothing else has to move it.
+/// Rejected: an `.id` per stage, or a smaller frame on the answer alone —
+/// the window, not the view, keeps the height (#621's measurement above).
 ///
 /// It watches the window rather than a stage because Start of Year's stage is
 /// not `Equatable`, and because a minimum can rise for reasons no stage names.
 /// The growing is done on the next turn of the main actor, never inside the
 /// notification itself, which arrives in the middle of SwiftUI's own layout.
 struct SheetGrowsToItsMinimum: NSViewRepresentable {
+
+    // MARK: - Stored properties
+
+    /// True while the sheet shows its answer (#654): the sheet is then fitted
+    /// to its content's height, smaller as well as larger, rather than only
+    /// grown.
+    var fitsItsContent: Bool = false
 
     // MARK: - Functions
 
@@ -33,6 +57,7 @@ struct SheetGrowsToItsMinimum: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: SheetMinimumWatcher, context: Context) {
+        nsView.changeFitting(to: fitsItsContent)
     }
 }
 
@@ -47,7 +72,27 @@ final class SheetMinimumWatcher: NSView {
     /// moving to no window empties it.
     var observations: [NSKeyValueObservation] = []
 
+    /// Whether the window is fitted to its minimum height, both ways, rather
+    /// than only grown to it (`SheetGrowsToItsMinimum.fitsItsContent`).
+    var fitsItsContent: Bool = false
+
     // MARK: - Functions
+
+    /// Starts or stops fitting the window to its content (#654). Starting
+    /// fits it on the next turn of the main actor — the new stage's minimum
+    /// may already be in place — and again whenever the minimum changes
+    /// after that, since it may not be yet.
+    func changeFitting(to fits: Bool) {
+        if fits == fitsItsContent {
+            return
+        }
+        fitsItsContent = fits
+        if fits {
+            Task { @MainActor in
+                self.sizeTheWindowToItsMinimum()
+            }
+        }
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -59,24 +104,35 @@ final class SheetMinimumWatcher: NSView {
         // for `contentMinSize`; `minSize` sends nothing.
         let watch: NSKeyValueObservation = window.observe(\.contentMinSize, options: [.new]) { [weak self] (_: NSWindow, _: NSKeyValueObservedChange<NSSize>) in
             Task { @MainActor in
-                self?.growTheWindowToItsMinimum()
+                self?.sizeTheWindowToItsMinimum()
             }
         }
         observations = [watch]
     }
 
     /// Grows this view's window to its minimum content size, if it is smaller
-    /// in either direction. Never shrinks it.
-    func growTheWindowToItsMinimum() {
+    /// in either direction — or, while `fitsItsContent`, gives it exactly its
+    /// minimum height, keeping the width it has.
+    func sizeTheWindowToItsMinimum() {
         guard let window else {
             return
         }
-        let size: NSSize = SheetMinimumWatcher.sizeAtLeast(
-            window.contentMinSize, from: window.contentLayoutRect.size
-        )
-        if size != window.contentLayoutRect.size {
+        let current: NSSize = window.contentLayoutRect.size
+        var size: NSSize = SheetMinimumWatcher.sizeAtLeast(window.contentMinSize, from: current)
+        if fitsItsContent {
+            size = SheetMinimumWatcher.sizeFitted(to: window.contentMinSize, from: current)
+        }
+        if size != current {
             window.setContentSize(size)
         }
+    }
+
+    /// `current`'s width, grown to `least` where it is narrower, and
+    /// `least`'s height exactly (#654).
+    static func sizeFitted(to least: NSSize, from current: NSSize) -> NSSize {
+        var fitted: NSSize = sizeAtLeast(least, from: current)
+        fitted.height = least.height
+        return fitted
     }
 
     /// `current`, grown in each direction to `least` where it is smaller.
