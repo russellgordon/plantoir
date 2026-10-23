@@ -148,8 +148,12 @@ class WiringTests(unittest.TestCase):
                       "the picture sizes' transformer (#612) goes straight after the task boxes', at its indent")
         self.assertEqual(self.text("emitters").count('export { PlantoirProgress } from "./plantoirProgress"'), 1)
         self.assertEqual(config.count("Plugin.PlantoirProgress(),"), 1)
-        self.assertIn("      Plugin.ContentPage(),\n      Plugin.PlantoirProgress(),\n      Plugin.Assets(),", config,
-                      "My Progress's emitter (#545) goes straight before Assets, at its indent")
+        self.assertEqual(self.text("emitters").count('export { PlantoirSiteSaid } from "./plantoirSiteSaid"'), 1)
+        self.assertEqual(config.count("Plugin.PlantoirSiteSaid(),"), 1)
+        self.assertIn("      Plugin.ContentPage(),\n      Plugin.PlantoirProgress(),\n      Plugin.PlantoirSiteSaid(),\n"
+                      "      Plugin.Assets(),", config,
+                      "My Progress's emitter (#545), then the one that says what the site found (#567), "
+                      "straight before Assets, at their indent")
         layout = self.text("layout")
         self.assertIn("afterBody: [Component.CodeRunner()],", layout)
         self.assertIn("Component.PlantoirMetaLine(Component.ContentMeta())", layout)
@@ -174,6 +178,23 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(self.text("components").count('import CodeRunner from "./CodeRunner"'), 1)
         self.assertEqual(self.text("transformers").count("PlantoirFigures"), 1)
         self.assertEqual(self.text("transformers").count("CodeRunnerFences"), 1)
+
+    def test_a_section_wired_before_567_gets_the_site_said_emitter(self):
+        """Plan review amendment 7: the emitters index already exports My
+        Progress's emitter there, and that must not stop the second export."""
+        self.files["emitters"].write_text(
+            EMITTERS_INDEX + 'export { PlantoirProgress } from "./plantoirProgress" // PLANTOIR-ADDITIONS\n',
+            encoding="utf-8")
+        self.files["config"].write_text(CONFIG.replace(
+            "      Plugin.Assets(),\n", "      Plugin.PlantoirProgress(),\n      Plugin.Assets(),\n", 1),
+            encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        emitters = self.text("emitters")
+        self.assertEqual(emitters.count("export { PlantoirProgress }"), 1)
+        self.assertEqual(emitters.count('export { PlantoirSiteSaid } from "./plantoirSiteSaid"'), 1)
+        config = self.text("config")
+        self.assertEqual(config.count("Plugin.PlantoirProgress("), 1)
+        self.assertIn("      Plugin.PlantoirProgress(),\n      Plugin.PlantoirSiteSaid(),\n      Plugin.Assets(),", config)
 
     def test_an_afterbody_that_already_holds_something_keeps_it(self):
         self.files["layout"].write_text(LAYOUT.replace("afterBody: [],", "afterBody: [Component.Comments()],"),
