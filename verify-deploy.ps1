@@ -46,10 +46,13 @@
 
 .PARAMETER FirstPublish
     Publish as a FIRST publish (#123, #623): the saved surname and the
-    section's Netlify and Cloudflare site records are moved aside for the run,
+    section's Netlify and Cloudflare site records are moved aside (renamed,
+    never deleted) once the run has started,
     a random letters-only surname is given when deploy.py asks for one, and so
     each host gets a NEW site with a name nobody has. Everything moved aside is
-    put back at the end and the records this run wrote are deleted, so the
+    put back on every exit path from then on, Ctrl+C included (a run killed
+    outright is put right by the next run's preflight), and the records this
+    run wrote are deleted, so the
     course points at its own sites again. The sites it made are listed in the
     Result block; nothing deletes them. Without it, the run publishes to the
     sites the section already has and asks nothing.
@@ -213,9 +216,19 @@ $script:Dirty = @(& git -C $PSScriptRoot status --porcelain 2>$null).Count
 # What a first publish reads, moved aside so deploy.py asks for a surname and
 # names new sites: the saved surname (and its pre-.internal location), the
 # section's Netlify record (and its legacy per-section one) and its
-# Cloudflare record. A sentinel says what was moved and what was absent, so a
-# run killed half way is put right by the NEXT run's preflight rather than
-# leaving the course pointed at the test's sites.
+# Cloudflare record.
+#
+# THE ORIGINALS ARE NEVER DELETED, only renamed to <path>.verify-deploy-hidden,
+# and the sentinel records, path by path and AFTER each step, whether that
+# path's original was hidden or absent. Restoring deletes what is at a path
+# only when its original is safe beside it (hidden) or there never was one
+# (absent): then it is a record deploy.py wrote for the test's site. Anything
+# else - a move that failed, a kill between a move and the sentinel - is left
+# alone, and a hidden original is always moved back. So a run killed half way
+# is put right by the NEXT run's preflight, and no failure on the way can cost
+# the course its real records. (The first version wrote every path into the
+# sentinel before moving anything and then deleted whatever stood at each: a
+# move that failed would have deleted the real record. Opus review.)
 $script:FirstPublishState = @(
     (Join-Path $WorkingFolder "courses\.internal\profile.json"),
     (Join-Path $WorkingFolder "courses\_secrets\profile.json"),
@@ -225,11 +238,30 @@ $script:FirstPublishState = @(
 )
 $script:Sentinel = Join-Path $WorkingFolder "courses\.verify-deploy-first-publish.json"
 $script:SitesWritten = @()
+$script:HideRecord = @{}
+function Write-HideSentinel {
+    $entries = @(foreach ($key in $script:HideRecord.Keys) { @{ path = $key; original = $script:HideRecord[$key] } })
+    [IO.File]::WriteAllText($script:Sentinel, (ConvertTo-Json -InputObject @{ entries = $entries } -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
+}
+function Test-AnythingHidden {
+    if (Test-Path -LiteralPath $script:Sentinel) { return $true }
+    foreach ($path in $script:FirstPublishState) { if (Test-Path -LiteralPath "$path.verify-deploy-hidden") { return $true } }
+    return $false
+}
 function Restore-FirstPublishState {
-    if (-not (Test-Path -LiteralPath $script:Sentinel)) { return }
-    $said = Get-Content -LiteralPath $script:Sentinel -Raw -Encoding UTF8 | ConvertFrom-Json
-    foreach ($path in @($said.paths)) {
-        if (Test-Path -LiteralPath $path) {
+    if (-not (Test-AnythingHidden)) { return }
+    $recorded = @{}
+    if (Test-Path -LiteralPath $script:Sentinel) {
+        try {
+            $said = Get-Content -LiteralPath $script:Sentinel -Raw -Encoding UTF8 | ConvertFrom-Json
+            foreach ($entry in @($said.entries)) { if ($entry.path) { $recorded[[string]$entry.path] = [string]$entry.original } }
+        } catch { }
+    }
+    foreach ($path in $script:FirstPublishState) {
+        $hidden = "$path.verify-deploy-hidden"
+        $originalIsSafe = Test-Path -LiteralPath $hidden
+        $thereWasNone = $recorded[$path] -eq 'absent'
+        if ((Test-Path -LiteralPath $path) -and ($originalIsSafe -or $thereWasNone)) {
             # What deploy.py wrote for the test's site. Its name is kept for
             # the Result block, then the record goes.
             try {
@@ -239,14 +271,34 @@ function Restore-FirstPublishState {
             } catch { }
             Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
         }
-        if (Test-Path -LiteralPath "$path.verify-deploy-hidden") {
-            Move-Item -LiteralPath "$path.verify-deploy-hidden" -Destination $path -Force
+        if ($originalIsSafe) {
+            try { Move-Item -LiteralPath $hidden -Destination $path -Force -ErrorAction Stop }
+            catch { Write-Host "  [warn] could not put $path back from $hidden - move it back by hand: $($_.Exception.Message)" -ForegroundColor Yellow; return }
+        } elseif ($recorded[$path] -eq 'hidden') {
+            Write-Host "  [warn] $path was recorded as moved aside but $hidden is not there; left as it is" -ForegroundColor Yellow
         }
     }
     Remove-Item -LiteralPath $script:Sentinel -Force -ErrorAction SilentlyContinue
+    $script:HideRecord = @{}
     Write-Host "  put the saved surname and the section's own site records back" -ForegroundColor DarkGray
 }
-if (Test-Path -LiteralPath $script:Sentinel) {
+# Moving them aside happens INSIDE the run's try (below), so the finally that
+# puts them back covers every exit path after it, Ctrl+C included.
+function Hide-FirstPublishState {
+    Write-HideSentinel
+    foreach ($path in $script:FirstPublishState) {
+        if (Test-Path -LiteralPath $path) {
+            try { Move-Item -LiteralPath $path -Destination "$path.verify-deploy-hidden" -Force -ErrorAction Stop }
+            catch { return "could not move $path aside: $($_.Exception.Message)" }
+            $script:HideRecord[$path] = 'hidden'
+        } else {
+            $script:HideRecord[$path] = 'absent'
+        }
+        Write-HideSentinel
+    }
+    return ""
+}
+if (Test-AnythingHidden) {
     Restore-FirstPublishState
     Ok "a FIRST-publish run before this one was stopped half way: its surname and site records were put back first"
     $script:SitesWritten = @()
@@ -255,11 +307,6 @@ $script:Surname = 'Testing'
 if ($FirstPublish) {
     $letters = 'abcdefghijklmnopqrstuvwxyz'.ToCharArray()
     $script:Surname = 'vd' + (-join (1..8 | ForEach-Object { $letters | Get-Random }))
-    [IO.File]::WriteAllText($script:Sentinel, (@{ paths = $script:FirstPublishState } | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
-    foreach ($path in $script:FirstPublishState) {
-        if (Test-Path -LiteralPath $path) { Move-Item -LiteralPath $path -Destination "$path.verify-deploy-hidden" -Force }
-    }
-    Ok "FIRST publish: the surname and the section's site records are moved aside; deploy.py will be told '$($script:Surname)'"
 }
 
 # A page of runnable code and a formula (#455, #494, #583), borrowed into the
@@ -615,7 +662,10 @@ $script:PageLinksProgram = $null
 function Get-PageLinksProgram {
     if ($script:PageLinksProgram) { return $script:PageLinksProgram }
     $sh = Get-Content -LiteralPath (Join-Path $PSScriptRoot "verify-deploy.sh") -Raw -Encoding UTF8
-    $found = [regex]::Match(($sh -replace "`r", ""), "(?ms)^check_page_links\(\) \{.*?<<'PY'\n(.*?)\nPY\n")
+    # Anchored to the function: from its opening line, through lines that
+    # are not its closing `}` at column 0, to its OWN heredoc - so a reshaped
+    # function cannot make this pick up the next <<'PY' in the file.
+    $found = [regex]::Match(($sh -replace "`r", ""), "(?m)^check_page_links\(\) \{[^\n]*\n(?:(?!\}\n)[^\n]*\n)*?[^\n]*<<'PY'\n((?:(?!PY\n)[^\n]*\n)*?)PY\n")
     if (-not $found.Success) { return $null }
     $path = Join-Path $work "check_page_links.py"
     [IO.File]::WriteAllText($path, $found.Groups[1].Value + "`n", (New-Object System.Text.UTF8Encoding($false)))
@@ -933,6 +983,17 @@ function Measure-Deploy([string]$Label, [string]$Script, [string[]]$LauncherArgs
 # so interrupting a run left the course pointed at whichever destination the
 # script had been testing at the time.
 try {
+
+if ($FirstPublish) {
+    $hideProblem = Hide-FirstPublishState
+    if ($hideProblem) {
+        No "FIRST publish: $hideProblem - refusing to publish, and putting back what was moved"
+        Restore-FirstPublishState
+        $script:ReachedTheEnd = $true
+        exit 1
+    }
+    Ok "FIRST publish: the surname and the section's site records are moved aside; deploy.py will be told '$($script:Surname)'"
+}
 
 # --------------------------------------------------- the preview, and the race
 Hdr "Preview - serve mode, which is what a teacher actually uses"

@@ -7421,6 +7421,12 @@ bytes.
   very probably shows the same joins in a run's first 30 rows. That is
   #661, to be confirmed in the window first.
 
+**Accepted cost:** when ConPTY repaints a row in place with `CSI r;1 H`,
+the repainted line now shows up a second time in `--raw-log` and the
+transcript. This was accepted because the `# prompt:` matcher reads only the
+last non-empty line, and `repliedTo` stops the same question being answered
+twice.
+
 #### Running this checkout, with this runtime (#630, 1.8.7)
 
 At the 1.8.5 cut a run from the main checkout gave **59 passed, 89 failed**,
@@ -7480,9 +7486,22 @@ The prompts are answered with a random letters-only surname (`vd` and eight
 letters). Each host therefore gets a NEW site, because deploy.py reuses a
 Netlify site or Cloudflare project that already has the same name.
 
-At the end, on every exit path, the records deploy.py wrote are deleted and
-the originals put back, so the course points at its own sites again. A run
-that is killed is put right by the next run's preflight. The Result block
+The originals are only ever RENAMED, to `<path>.verify-deploy-hidden`. The
+move happens inside the run's `try`, after the preflight and the PtyDriver
+build, so the `finally` puts them back on every exit path from then on,
+Ctrl+C included. The sentinel is rewritten after each step and records, per
+path, whether the original was hidden or absent. Restoring deletes what
+stands at a path only when its original is safe beside it or there never was
+one: in either case it is a record deploy.py wrote for the test's site. A
+hidden original is always moved back. If a move fails, the run refuses and
+puts back whatever it had moved; nothing is deleted. A run that is killed
+outright is put right by the next run's preflight, which also notices a
+hidden file the sentinel never got to record. So the course points at its
+own sites again afterwards.
+
+The first version recorded every path before moving anything, then deleted
+whatever stood at each. A failed move would have deleted the course's real
+record (Opus implementation review). The Result block
 lists the addresses published to; for a first-publish run those are sites
 nothing deletes. A plain run asks nothing, so a release needs both runs.
 
