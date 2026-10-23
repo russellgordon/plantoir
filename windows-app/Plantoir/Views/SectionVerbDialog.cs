@@ -316,7 +316,10 @@ internal sealed class SectionVerbDialog
         }
     }
 
-    private static TextBlock Words(string text) => new() { Text = text, TextWrapping = TextWrapping.Wrap, MaxWidth = 520 };
+    // Left-aligned: a TextBlock narrower than its panel is otherwise centred,
+    // and since #634 the panel is as wide as the window makes the dialog.
+    private static TextBlock Words(string text) =>
+        new() { Text = text, TextWrapping = TextWrapping.Wrap, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left };
 
     private void ShowChoosing(UIElement content)
     {
