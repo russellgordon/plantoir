@@ -772,7 +772,7 @@
       {
         "carries": "the course, and that Course Settings made an EMPTY page (so no counts); or that it could not, and why.",
         "event": "How I Teach page started",
-        "why": "#329: Course Settings' 'Create and Open' puts a page the teacher did not write into the course folder, and the assistant then calls it 'not written yet' (howITeachPage.emptyPageIsNotWritten) - so 'where did this page come from?' is answerable by this line and nothing else. The #209 lines cover reads and ASSISTANT writes, not this door. Opening a page that is there writes nothing, as the toolbar's Open in Obsidian writes nothing. No appliesOn: Windows gets the same row and owes the same line.",
+        "why": "#329: Course Settings' 'Create and Open' puts a page the teacher did not write into the course folder, and the assistant then calls it 'not written yet' (howITeachPage.emptyPageIsNotWritten) - so 'where did this page come from?' is answerable by this line and nothing else. The #209 lines cover reads and ASSISTANT writes, not this door. Opening a page that is there writes nothing, as Course Settings' Open in Obsidian writes nothing (a SECTION's Open in Obsidian writes 'page opened in Obsidian' since #518). No appliesOn: Windows gets the same row and owes the same line.",
         "line": "started an empty How I Teach page from Course Settings / could not start the How I Teach page from Course Settings: {reason}"
       },
       {
@@ -936,6 +936,12 @@
         "carries": "the choice made: the front page or the page last viewed (previewStartPage.setting.values). One line per change, written when the teacher changes it.",
         "line": "Settings ▸ Preview — Preview now opens at the page last viewed",
         "why": "#504. The setting changes what the plain Preview press does in every course, so 'Preview stopped opening the front page' is answered by when it was changed - on the 'assistant model chosen' precedent."
+      },
+      {
+        "event": "page opened in Obsidian",
+        "carries": "the course and section, and EITHER the place in the course folder of the file Open in Obsidian opened for the page the preview showed (without .md), with '(hidden from students)' when the page is hidden, OR why it opened the section as before instead: no preview page was showing, the list of pages could not be read, the page is not one of the course's own files, two files make that address, the file is outside the course folder, or it is gone. The exact words are obsidianOpensThePreviewedPage.trail and .fallbacks. Written for every SECTION press (the section window's button, Section > Open in Obsidian, a section row's menu) - the fallback included (ruling 5) - and never for a course press. NEVER anything written on the page.",
+        "line": "ICS3U/1 · opened Unit 1/Lesson 3 in Obsidian, the page the preview shows",
+        "why": "#518. Which file opened is decided out of sight - the build's list, the address on screen, the front page's embed - so 'I pressed Open in Obsidian and got the wrong page' (or the front page) has its answer only here, and which of the reasons it was says whether anything is wrong at all."
       },
       {
         "event": "obsidian add-ons offered",
@@ -31367,5 +31373,109 @@
       },
       "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_MAPS:)."
     }
+  },
+  "obsidianOpensThePreviewedPage": {
+    "note": "GitHub #518 (v1.9.0, mac first; Russell's rulings of 2026-10-23 on the issue are binding). Open in Obsidian, pressed for a SECTION while that section's preview is showing a page, opens the Markdown file behind the page on screen instead of the section's front page. The build writes which file each page came from (file-formats.json -> pageSourcesList); the app reads the preview's address at the press and looks it up there. documentation/09-mac-app.md -> 'Open in Obsidian opens the page the preview shows (#518)' says what was measured and rejected; documentation/05-build-pipeline.md says when the build writes the list.",
+    "rule": "THE PAGE ON SCREEN, READ AT THE PRESS. The address is the preview's own web view's (the mac's WKWebView, Windows' WebView2) at the moment of the press, through previewStartPage's normaliser (the path below the preview's root, query and fragment stripped, percent-encoded as it arrived; '' for the front page) - NOT the page last viewed (#504), which deliberately ignores the app's own loads and so lags what is shown after Rebuild Preview or a press of the front page. A section press is the section window's toolbar button, Section > Open in Obsidian and a section row's context menu; Course > Open in Obsidian, Course Settings' button, a course row's menu and the How I Teach row open exactly what they opened before (ruling 3: the page belongs to a section, the course press names the course). The address is decoded once (percent-encoding), compared in Unicode NFC on both sides (APFS keeps the form a name was typed in), and looked up in the section's list: '' is 'index'; an address ending '/' is looked up as <address>index first and then without the '/'; any other address as itself and then as <address>/index. An entry marked collided, no entry, a file that is not '.md', a file outside the course folder once links are followed, and a file that is gone all FALL BACK to what the press opened before (the section's front page, or the course when it has none) - a dead menu item is the worse fault. The front page's entry may carry 'shows': the class page the front page is only an embed of (ruling 1), which is opened instead while that file is there. A hidden page opens anyway - the teacher is its author (ruling 4). Every section press writes one trail line (activityTrail -> 'page opened in Obsidian'), including the fallback when no page was showing (ruling 5); a course press writes none. Opening keeps obsidian://open?path=<absolute path> (the vault's name is ambiguous across working folders) with '+' written %2B: the query encoder leaves it raw and Obsidian reads a raw '+' as a space. A reference course's locked-pages note, the add-ons offer and the reopen question all carry the page through, so it is the page that opens once they are answered.",
+    "rejected": [
+      "Asking Safari for its front tab with AppleScript: the preview is not in Safari (it is the app's own web view), and asking would need the Automation permission ('Plantoir wants access to control Safari'), denied once and never asked again.",
+      "The live-reload websocket: it carries messages from the server to the page only; the app is not one of its clients.",
+      "A file written by script injected into the page: a second channel to keep in step with the address the app already sees.",
+      "The page last viewed (previewStartPage.remembering): it ignores the app's own loads on purpose, so it can name a page that is no longer on screen.",
+      "Working the file out from the address in the app: a per-section page replacing a shared one, a folder's _index and the names Quartz slugs (spaces, &, %, ?, #) can only be undone by the build that made the site.",
+      "The vault name in the link (obsidian://open?vault=): two working folders can hold courses with the same name."
+    ],
+    "fallbacks": {
+      "noPageShowing": "no preview page was showing",
+      "noList": "the preview's list of pages could not be read",
+      "notInTheList": "the page on screen is not one of the course's own files",
+      "collided": "two of the course's files make a page at that address",
+      "outsideTheCourse": "the page's file is not inside the course folder",
+      "fileGone": "the page's file is no longer there"
+    },
+    "trail": {
+      "opened": "opened {place} in Obsidian, the page the preview shows",
+      "openedHidden": "opened {place} in Obsidian, the page the preview shows (hidden from students)",
+      "fellBack": "opened the section in Obsidian, not a page of the preview: {why}",
+      "place": "the file's place in the course folder without .md, as every trail line names a page - never anything written on it"
+    },
+    "link": {
+      "note": "What the app hands macOS (or Windows) to open a page; the percent-encoding of everything but '+' is the platform encoder's own (URLComponents, Uri.EscapeDataString).",
+      "cases": [
+        {"path": "/Users/teacher/Class Websites/courses/ICS3U/Unit 1/Lesson 3.md", "link": "obsidian://open?path=/Users/teacher/Class%20Websites/courses/ICS3U/Unit%201/Lesson%203.md"},
+        {"path": "/Users/teacher/Class Websites/courses/ICS3U/Unit 1/C++ Basics.md", "link": "obsidian://open?path=/Users/teacher/Class%20Websites/courses/ICS3U/Unit%201/C%2B%2B%20Basics.md"},
+        {"path": "/Users/teacher/Class Websites/courses/ICS3U/Unit 1/Q&A.md", "link": "obsidian://open?path=/Users/teacher/Class%20Websites/courses/ICS3U/Unit%201/Q%26A.md"}
+      ]
+    },
+    "slugCases": {
+      "note": "build_site.page_slug_as_quartz_serves against Quartz 4.5.0's slugifyFilePath (measured 2026-10-21 on 38 names; scripts/test_page_sources.py runs these, and verify.sh checks every address of a real build against the page Quartz wrote). null: Quartz makes no page of the file.",
+      "cases": [
+        {"file": "index.md", "slug": "index"},
+        {"file": "Unit 1/Lesson 3.md", "slug": "Unit-1/Lesson-3"},
+        {"file": "Unit 1/_index.md", "slug": "Unit-1/index"},
+        {"file": "_index.md", "slug": "index"},
+        {"file": "Unit 1/Q&A.md", "slug": "Unit-1/Q-and-A"},
+        {"file": "Unit 1/100% Done.md", "slug": "Unit-1/100-percent-Done"},
+        {"file": "Unit 1/Lesson?.md", "slug": "Unit-1/Lesson"},
+        {"file": "Unit 1/C# Basics.md", "slug": "Unit-1/C-Basics"},
+        {"file": "Unit 1/C++ Basics.md", "slug": "Unit-1/C++-Basics"},
+        {"file": "Unit 1/Café Notes.md", "slug": "Unit-1/Café-Notes"},
+        {"file": "Gr. 9 Curriculum/B1.md", "slug": "Gr.-9-Curriculum/B1"},
+        {"file": "Unit 1/Notes.MD", "slug": null},
+        {"file": "Unit 1/Picture.png", "slug": null}
+      ]
+    },
+    "fixture": {
+      "note": "The course folder every case below is read against: these files exist (paths below the course folder; 'Café Notes.md' is written in NFD, decomposed, as a Mac may keep it), and Escape.md exists BESIDE the course folder, outside it.",
+      "files": [
+        "section1/index.md",
+        "section1/All Classes/Unit 1, Day 3.md",
+        "Unit 1/Lesson 3.md",
+        "Unit 1/_index.md",
+        "Unit 1/Café Notes.md",
+        "Unit 1/C++ Basics.md",
+        "Unit 1/Homework.md",
+        "Unit 1/Picture.png",
+        "section1/Unit 1/Quiz.md",
+        "section1/Unit 1/Homework.md"
+      ],
+      "outside": "../Elsewhere/Escape.md",
+      "pages": {
+        "index": {"source": "section1/index.md", "hidden": false, "shows": "section1/All Classes/Unit 1, Day 3.md"},
+        "Unit-1/Lesson-3": {"source": "Unit 1/Lesson 3.md", "hidden": false},
+        "Unit-1/index": {"source": "Unit 1/_index.md", "hidden": false},
+        "Unit-1/Café-Notes": {"source": "Unit 1/Café Notes.md", "hidden": false},
+        "Unit-1/C++-Basics": {"source": "Unit 1/C++ Basics.md", "hidden": false},
+        "Unit-1/Homework": {"source": "section1/Unit 1/Homework.md", "hidden": false},
+        "Unit-1/Quiz": {"source": "section1/Unit 1/Quiz.md", "hidden": true},
+        "Unit-1/A-B": {"collided": true},
+        "Unit-1/Gone": {"source": "Unit 1/Gone.md", "hidden": false},
+        "Unit-1/Escape": {"source": "../Elsewhere/Escape.md", "hidden": false},
+        "Unit-1/Picture": {"source": "Unit 1/Picture.png", "hidden": false}
+      }
+    },
+    "cases": [
+      {"name": "the front page that only embeds today's class opens the class", "address": "", "expect": {"opens": "section1/All Classes/Unit 1, Day 3.md", "hidden": false}},
+      {"name": "a front page with more on it opens the front page", "address": "", "pages": {"index": {"source": "section1/index.md", "hidden": false}}, "expect": {"opens": "section1/index.md", "hidden": false}},
+      {"name": "the class a front page embeds is gone: the front page opens", "address": "", "pages": {"index": {"source": "section1/index.md", "hidden": false, "shows": "section1/All Classes/Gone.md"}}, "expect": {"opens": "section1/index.md", "hidden": false}},
+      {"name": "a shared page", "address": "Unit-1/Lesson-3", "expect": {"opens": "Unit 1/Lesson 3.md", "hidden": false}},
+      {"name": "a section's page that replaced a shared one opens the section's file", "address": "Unit-1/Homework", "expect": {"opens": "section1/Unit 1/Homework.md", "hidden": false}},
+      {"name": "an address ending in a slash that names a page", "address": "Unit-1/Lesson-3/", "expect": {"opens": "Unit 1/Lesson 3.md", "hidden": false}},
+      {"name": "a folder's page, with the slash", "address": "Unit-1/", "expect": {"opens": "Unit 1/_index.md", "hidden": false}},
+      {"name": "a folder's page, without it", "address": "Unit-1", "expect": {"opens": "Unit 1/_index.md", "hidden": false}},
+      {"name": "percent-encoding is decoded", "address": "Unit-1/Lesson%2D3", "expect": {"opens": "Unit 1/Lesson 3.md", "hidden": false}},
+      {"name": "a composed accent in the address finds a decomposed name", "address": "Unit-1/Caf%C3%A9-Notes", "expect": {"opens": "Unit 1/Café Notes.md", "hidden": false}},
+      {"name": "a decomposed accent in the address finds it too", "address": "Unit-1/Cafe%CC%81-Notes", "expect": {"opens": "Unit 1/Café Notes.md", "hidden": false}},
+      {"name": "a plus in the name", "address": "Unit-1/C++-Basics", "expect": {"opens": "Unit 1/C++ Basics.md", "hidden": false}},
+      {"name": "a hidden page opens anyway, and says so", "address": "Unit-1/Quiz", "expect": {"opens": "section1/Unit 1/Quiz.md", "hidden": true}},
+      {"name": "two files make the same address", "address": "Unit-1/A-B", "expect": {"fallback": "collided"}},
+      {"name": "the file has gone since the build", "address": "Unit-1/Gone", "expect": {"fallback": "fileGone"}},
+      {"name": "a file outside the course folder is never opened", "address": "Unit-1/Escape", "expect": {"fallback": "outsideTheCourse"}},
+      {"name": "a file that is not a page", "address": "Unit-1/Picture", "expect": {"fallback": "notInTheList"}},
+      {"name": "a page the build made (My Progress, a coverage map)", "address": "My-Progress", "expect": {"fallback": "notInTheList"}},
+      {"name": "no page is showing", "address": null, "expect": {"fallback": "noPageShowing"}},
+      {"name": "no list (a build from before #518)", "address": "Unit-1/Lesson-3", "list": null, "expect": {"fallback": "noList"}},
+      {"name": "a list of another version", "address": "Unit-1/Lesson-3", "list": {"version": 2, "pages": {}}, "expect": {"fallback": "noList"}}
+    ]
   }
 }

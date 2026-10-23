@@ -1176,6 +1176,23 @@ else
   cat /tmp/verify_links_checklist_test.log
 fi
 
+# ---- build_site.py: which file each page came from (#518) ----
+# Every obsidianOpensThePreviewedPage.slugCases case through the build's slug
+# rule, and the list a section's copy makes: a section's page over a shared
+# one, a folder's _index, a decomposed name spelled as it is on disk, two
+# files making one address, a hidden page, the front page's single embed,
+# and the list beside public/, never inside it.
+echo ""
+echo "🔎 Checking the list of which file each page came from…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_page_sources.py" /opt/scripts/test_page_sources.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_page_sources.py >/tmp/verify_page_sources_test.log 2>&1; then
+  pass "build_site.py: the list of which file each page came from says what the contract says (scripts/test_page_sources.py, #518)"
+else
+  fail "build_site.py: the list of which file each page came from does not say what the contract says (scripts/test_page_sources.py, #518)"
+  cat /tmp/verify_page_sources_test.log
+fi
+
 # ---- the published-pages record (#379) ----
 # The build's list of the pages it shows (beside public/, never inside it,
 # written only after the site was built), deploy.py's fragment after each
@@ -3269,6 +3286,18 @@ if [[ -L "courses/EXC2O/.merged_output" && "$LINK_TARGET" == "$EXPECTED_BUILD_RO
   pass "The built site is kept outside the working folder ($LINK_TARGET)"
 else
   fail "courses/EXC2O/.merged_output is not a link to $EXPECTED_BUILD_ROOT/EXC2O (it is: ${LINK_TARGET:-a real folder})"
+fi
+
+# -------------------- 6a2. Which file each page came from (#518) ------
+# The build's .page-sources.json, beside public/, read against what Quartz
+# actually wrote: every address a page students see is listed under must be a
+# page of this site, and every file named must be in the course folder. This
+# measures the build's slug rule against Quartz itself.
+if python3 scripts/test_page_sources.py --site "courses/EXC2O/.merged_output/section1" "courses/EXC2O" >/tmp/verify_page_sources_site.log 2>&1; then
+  pass "The build's list of which file each page came from matches the pages Quartz wrote ($(tail -1 /tmp/verify_page_sources_site.log), #518)"
+else
+  fail "The build's list of which file each page came from does not match the site (#518)"
+  cat /tmp/verify_page_sources_site.log
 fi
 
 # -------------------- 6b. The site wears Plantoir's icon, not Quartz's --------------------
