@@ -285,7 +285,10 @@ public class ScheduledHealthFindingsTests : IDisposable
     /// written as the record, and <see cref="ScheduledHealthFindings.TakeFrom"/>
     /// reads it back. Without the pattern the dated line never reaches the
     /// record, and an overnight publish — the build likeliest to rewrite pages
-    /// — leaves no trail line.
+    /// — leaves no trail line. #584 (mac #645): the build's PLANTOIR_REPAIRED:
+    /// line rides the same scan, glued to the tail of other output as the
+    /// launchers can leave it, and reaches the trail as
+    /// <c>folder problem repaired</c>.
     /// </summary>
     [Fact]
     public void TheWrappersScanKeepsTheDatedLineAndItReachesTheTrail()
@@ -306,6 +309,8 @@ public class ScheduledHealthFindingsTests : IDisposable
                 "Building step 3 of 7",
                 "Gave 1 of your pages the date of the first class that links to them",
                 "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}",
+                "Put quotes around the title of the front page of ICS4U Section 1, so the colon in it no longer stops the page's settings being read and the website has its front page.",
+                "Building PLANTOIR_REPAIRED: {\"course\": \"ICS4U\", \"section\": 1, \"repair\": \"frontPageTitleQuoted\", \"page\": \"section1/index\"}",
                 "done",
             });
             string command = $"$scanned = @('{log}'); {scanLine}; Set-Content -LiteralPath '{record}' -Value $markers -Encoding utf8";
@@ -322,11 +327,13 @@ public class ScheduledHealthFindingsTests : IDisposable
 
             Assert.True(File.Exists(record), "the wrapper's scan selected nothing");
             ScheduledHealthFindings.TakeFrom(folder, "ICS4U", 1);
-            Assert.Contains("the build gave 1 page the date of their class: section1/index", File.ReadAllText(trail));
+            string written = File.ReadAllText(trail);
+            Assert.Contains("the build gave 1 page the date of their class: section1/index", written);
+            Assert.Contains("ICS4U/1 · the build put quotes around the title of the front page (section1/index) so it could be read", written);
         }
         finally
         {
-            ActivityTrail.SetCustomLogPathForTesting(null);
+            ActivityTrail.SetCustomLogPathForTesting(_trailPath);
             try { Directory.Delete(folder, recursive: true); } catch { }
         }
     }

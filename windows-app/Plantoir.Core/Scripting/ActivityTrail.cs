@@ -227,8 +227,11 @@ public static class ActivityTrail
         FolderProblemFound,
         /// <summary>
         /// A folder a feature depends on was put back, at the teacher's
-        /// request. Separate from FolderProblemFound: one says something is
-        /// wrong, the other says somebody acted on it.
+        /// request — or, since #584, a section front page's title the BUILD
+        /// put quotes around without being asked (<c>PLANTOIR_REPAIRED:</c>,
+        /// <see cref="Plantoir.Core.Models.BuildRepairReport"/>). Separate from
+        /// FolderProblemFound: one says something is wrong, the other says
+        /// somebody acted on it.
         /// </summary>
         FolderProblemRepaired,
         /// <summary>
