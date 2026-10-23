@@ -1475,11 +1475,13 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   the section rewritten at every launch. **Files are read with a strict
   UTF-8 decoder**, so a file saved in another encoding is refused, never
   written over (`addCases` "cannot be read again").
-- **The skills are whatever `support\agent_guidance\skills\` holds**, five
+- **The skills are whatever `support\agent_guidance\skills\` holds**, six
   today: `plantoir-page-authoring` (#596, the one the root files name FIRST;
   it routes to the four below, `printablePages.agentGuidance.pageAuthoringSkill`),
-  `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code` and
-  `plantoir-quizzes` (#563). `AgentGuidance.Write` enumerates the folder, so a
+  `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code`,
+  `plantoir-quizzes` (#563) and `plantoir-handouts` (#631, a PDF made from
+  LaTeX rather than a page, with starter `.tex` files in a subfolder;
+  `printablePages.agentGuidance.handoutsSkill`, 09 → "The handouts skill"). `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes
   skill teaches — the `> [!quiz]` callout and what the site does with it — is
   [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and
