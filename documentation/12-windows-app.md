@@ -8138,7 +8138,11 @@ Three edges the predicate now decides on purpose, pinned in
 Not changed here: `LinkGraph.IsCurriculum` and `CurriculumRules.IsCurriculumPage`
 still test the folders of whatever path they are given (they take no course),
 and #614 — a curriculum folder renamed to something without the word, read
-from `course_config.json` — is deferred to v1.9.0.
+from `course_config.json` — landed on the mac first (v1.9.0) and is owed here
+by its `windows` issue: `PagePaths.IsCurriculum` and every caller, including
+these two, have to take the course's declared folders. The rule, what was
+measured and what was rejected are in `10-local-ai-assistant.md` → "A
+curriculum folder is the one the course declares, or one named for it (#614)".
 
 **The publish plan (#617).** What the mac decided and why, including what was
 rejected, is `10-local-ai-assistant.md` → "A curriculum page the walk reaches

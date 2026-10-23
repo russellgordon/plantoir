@@ -2261,9 +2261,11 @@ HIDDEN — so a teacher can hide one, and a publish must still be able to put
 it back up.
 
 **The rule.** On the PUBLISH side only, a curriculum page (by
-`AssistCurriculumMentions.isCurriculum(pageAt:in:)`: any folder segment
-containing "curriculum", case-insensitively — the same test as
-`neverTakenDownByFollowingLinks`) that the walk reached and that is already
+`AssistCurriculumMentions.isCurriculum(pageAt:in:)`: since #614, a page in a
+folder the course declares in `curriculum_folders`, or under any folder
+segment containing "curriculum", case-insensitively — the same test as
+`neverTakenDownByFollowingLinks`; see "A curriculum folder is the one the
+course declares, or one named for it (#614)" below) that the walk reached and that is already
 visible is left out of `alreadyRight`. Three things deliberately stay as they
 were:
 
@@ -2323,6 +2325,105 @@ of 1. With the named-page exception removed,
 `testACurriculumPageTheTeacherNamesIsStillListed` went red. No wording key
 moved, and no trail line: the trail records what was written, and that set
 is unchanged.
+
+#### A curriculum folder is the one the course declares, or one named for it (#614)
+
+**What was wrong.** `AssistCurriculumMentions.isCurriculum(pageAt:in:)` asked
+only whether a folder segment contained "curriculum". It never read
+`curriculum_folders`. A teacher who renames `Curriculum` to `Expectations`
+in Course Settings has that name WRITTEN to `curriculum_folders`
+(`specialNames.renameFolder.materialisesOnRename.curriculumFoldersCases`), and
+the build maps the folder from there (`configured_curriculum_folders`), but the
+assistant forgot it. Seven callers share the predicate, and the plan found
+more damage than the issue named:
+
+| Caller | What a renamed folder got before #614 | Direction |
+|---|---|---|
+| `AssistPublishPlanner.reasonToKeep`, the hide sweep | expectation pages a hidden class links to came DOWN with it | wrongly hidden |
+| `StartOfYearPlanner`'s never set | expectation pages first linked by Day 2 or later were DRAFTED | wrongly hidden, the whole course at once |
+| `leavingOutLinkedCurriculumPages` (#607) | listed as "already visible" rows | noise |
+| `AssistSectionGraph.pagesNeverInTheAudit` | check_section reported them as linked from nowhere | noise |
+| `SectionReDatePlanner` (two calls) | re-dated to whichever class brings them | wrong dates |
+| `AssistCurriculumMentions.expectations(forSection:)` | the MCP curriculum tools offered NO expectations | missing |
+
+A hidden expectation page breaks every visible class that embeds it with
+`![[A1.2]]`, and the coverage map's links to it.
+
+**The rule** (`isCurriculum(folderSegments:declared:)`, pure, so the contract
+cases run without a disk; `isCurriculum(pageAt:in:)` calls it with the
+course's `configuration.curriculumFolders`):
+
+1. Take the page's folder segments relative to the course, file name dropped.
+   A leading section folder (`section<n>`) is set aside.
+2. **Declared:** the first folder left equals a declared name (the list, then
+   the legacy `curriculum_folder`, as `CurriculumFolderRule.declaredFolders`
+   cleans them), ignoring letter case. TOP LEVEL only, because that is the
+   folder the build maps: `_find_curriculum_folders` matches a declared name
+   against the content root's top-level folders.
+3. **By name, kept:** any folder segment contains "curriculum", ignoring
+   letter case.
+4. The file name never counts (#615).
+
+Swift's `==` treats the composed and decomposed forms of an accented name as
+equal, so a declared name matches the folder whichever way the accent was
+typed (`testADeclaredNameMatchesWhicheverWayItsAccentIsWritten`). C#'s
+ordinal comparison does not; the Windows issue says so.
+
+**Why the name rule stays.** The two ways to be wrong are not equal. A page
+wrongly KEPT UP was already visible, so nothing new reaches students, and it
+can still be hidden by name. A page wrongly HIDDEN breaks embeds and the map,
+and the plan reports success. Every course made from scratch declares
+nothing, and the build's own fallback finds its folder BY NAME, so dropping
+the rule would put all of them in the second row. A union is never narrower
+than the old rule, so no course gets worse. A folder named "…Curriculum…" that
+the teacher UNTICKED in Course Settings still counts: unticked and never
+declared are the same state in the configuration (Russell's ruling on the
+plan; a new key only if a teacher asks).
+
+**REJECTED.**
+- *`CurriculumFolderRule.resolvedFolders(for:)`* — it walks the disk (behind a
+  2-second cache) on every call, and it is NARROWER: it leaves out a declared
+  folder that is still empty, and once a declared folder holds pages it drops
+  the name-rule folder.
+- *Matching a declared name at any depth* — wider than the build, and it
+  catches a lesson subfolder that happens to be called "Expectations".
+- *Intersecting with `shared_folders`* — the build does not, and the narrower
+  answer errs toward wrongly hidden.
+- *Dropping the name rule* — above.
+- *Comparing a declared name against `section1` itself* — the section folder
+  is set aside before the comparison, so a course that somehow declared
+  `section1` does not make every page directly in a section curriculum.
+
+The old comments said this "matches build_site.py's own rule exactly". It
+never did: `_is_in_curriculum_folder` has no caller (measured above). The
+build MAPS declared folders; it has no page-by-page rule. This is the
+assistant's own.
+
+**The contract.** `curriculumRules.isCurriculumPage.cases` gained five cases
+(declared, declared in another letter case and deeper inside, undeclared
+without the word, a same-named SUBfolder, and the name rule beside a
+declaration), and `followingLinks.publishing.cases`,
+`followingLinks.unpublishing.cases` and `startOfYear.cases` one each. Every
+new case has a `name` and a `curriculumFolders` field, which a harness writes
+to the course's `course_config.json` as `curriculum_folders` before the course
+is read. The mac's unpublishing harness also began reading a page's `folder`
+(it ignored it before; no earlier unpublishing case carried one) and fails a
+class page that carries one, as the publishing harness does.
+
+**Measured.** With `isCurriculum(pageAt:in:)` put back to the old loop (copy
+and restore), six test methods went red with 9 failures:
+`testCurriculumPagesAreRecognisedAsTheContractSays` (the two declared cases,
+at the top of the course and inside `section1/`),
+`testPublishingFollowsLinksAsTheContractSays` (A1.4 listed as already
+visible), `testUnpublishingStopsAtALinkedClassAsTheContractSays` (A1.4
+written `publishForSection1: false`), `testStartOfYearAsTheContractSays`
+(A1.1 DRAFTED: the worst row of the table, measured rather than reasoned),
+and the two new `AssistCurriculumMentionsTests`: a declared folder's
+expectations (an empty list) and the rename end to end through
+`SpecialFolderRenamer`. No tool description, schema, prompt or wording key
+moved (the local tool digest is unchanged); tool OUTPUT changes, which is the
+fix. No trail line changes: the publish and unpublish events carry counts,
+not reasons.
 
 ### What counts as a link
 
@@ -3049,8 +3150,9 @@ whose links lead somewhere students cannot see — that is the whole point.
   otherwise you create the dead links the publish rule exists to prevent;
 - **never** unpublish, whatever the link count: a folder's landing page
   (`index.md` — Concepts, Investigations…), any page in that section's **Key
-  Links**, or any **Curriculum** page (detect with `build_site.py`'s own
-  rule: any folder segment containing "curriculum");
+  Links**, or any **Curriculum** page (`AssistCurriculumMentions.isCurriculum`:
+  a folder the course declares in `curriculum_folders`, or any folder segment
+  containing "curriculum" — #614);
 - **and never take another CLASS page down by following a link** (#201,
   2026-09-26) — a STOP in the walk rather than a fourth exclusion, the same
   stop publishing makes; a visible class that stays is named in the plan
@@ -3370,10 +3472,10 @@ plan SAYS to a teacher, and how it is offered, is the app's own.
 Since #128 the code rule admits the College Board's `1.A` (skills) and
 `CRD-1.A` (learning objectives) beside `A1.1`, so the assistant offers those
 pages as a course's expectations too — they are what the second coverage map
-counts. What it does NOT yet follow is a declared curriculum folder whose name
-does not mention "curriculum" (an `AP CSP` folder has a map but its pages are
-not offered): `curriculumRules.isCurriculumPage.note` says so, and it is left
-for its own issue.
+counts. Since #614 it also follows a declared curriculum folder whose name
+does not mention "curriculum" (an `AP CSP` folder has a map, and now its pages
+are offered too): "A curriculum folder is the one the course declares, or one
+named for it (#614)" above, and `curriculumRules.isCurriculumPage.note`.
 
 ### The working-folder path bar — reported missing in use, 2026-08-16
 
