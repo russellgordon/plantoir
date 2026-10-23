@@ -925,7 +925,9 @@ prefix: one `PLANTOIR_REPAIRED: {"course", "section", "repair", "page"}` line
 per repair WRITTEN into a teacher's page (`shared-rules.json` →
 `buildRepairs.marker`), which the mac records as `folder problem repaired`
 (`BuildRepairReport`, read in `ScriptRunner` and in
-`ScheduledDeploy.recordFolderProblems` beside `PLANTOIR_DATED:`). A separate
+`ScheduledDeploy.recordFolderProblems` beside `PLANTOIR_DATED:`); Windows
+records it the same (`BuildRepairReport.cs`, read in `ScriptRunner`,
+`ScheduledHealthFindings` and `plantoir-mcp`'s `LauncherRunner`, #645). A separate
 prefix rather than a second use of `PLANTOIR_DATED:` so that a later repair
 joins it under its own `repair` key; a reader that meets a key it does not
 know records nothing. Nothing is printed when only the build's copy was

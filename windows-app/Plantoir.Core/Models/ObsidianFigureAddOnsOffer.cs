@@ -41,7 +41,7 @@ public static class ObsidianFigureAddOnsWording
 {
     public const string OfferTitle = "Show diagrams and graphs in Obsidian too?";
     /// <summary><c>windowsWording.offerMessage</c>: Enter, not Return.</summary>
-    public const string OfferMessage = "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Enter chooses the other button.";
+    public const string OfferMessage = "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Enter chooses the other button. Obsidian then opens its settings in a window of its own, showing the add-ons switched on; close that window and carry on.";
     public const string OfferWhileOpen = "{course} is open in Obsidian now, so Obsidian closes and opens it again to show them. What you've written is kept.";
     public const string OfferAdd = "Add Them";
     public const string OfferNotNow = "Not Now";

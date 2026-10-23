@@ -32,9 +32,15 @@ public static class FontCatalog
         "Source Code Pro", "Inconsolata", "Ubuntu Mono",
     };
 
+    /// <summary>
+    /// The pairing's label. The system choice is STORED as "Helvetica, Arial"
+    /// and stays so, but has never shown Helvetica: the build writes it as the
+    /// system stack, so it is Segoe UI here and San Francisco on a Mac (#629,
+    /// windows #648; documentation/06-quartz-customizations.md → C2-31).
+    /// </summary>
     public static string PairingLabel(string header, string body) =>
         header == "Helvetica, Arial" && body == "Helvetica, Arial"
-            ? "System fonts (Helvetica, Arial)"
+            ? "System fonts (each device's own)"
             : $"{header}  —  {body}";
 
     /// <summary>Bundled TTF base names: the family name with spaces removed.</summary>
