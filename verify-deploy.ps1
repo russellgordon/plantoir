@@ -593,6 +593,77 @@ function Check-Folder {
     else { Ok "$What - no page carries the live-reload client" }
 }
 
+# ------------------------------------------- page addresses on Netlify (#628, #657)
+# verify-deploy.sh's check_page_links, run here as the SAME program: it is
+# read out of verify-deploy.sh at run time (the heredoc inside
+# check_page_links) rather than copied, so the two platforms judge links by
+# one text and cannot drift. Ported to PowerShell it would resolve links with
+# .NET's Uri, whose escaping differs from urllib's exactly where this check
+# looks (`%2C`). It is run by the runtime's own Python, which the preflight
+# has already required. What it asks of each host is in verify-deploy.sh's
+# comment above check_page_links and in contracts/shared-rules.json ->
+# netlifyPageAddresses.
+#
+# Output goes through a FILE: Windows PowerShell 5.1 reads a child's stdout
+# through $OutputEncoding, which is ASCII, and the program prints link text.
+$script:PageLinksProgram = $null
+function Get-PageLinksProgram {
+    if ($script:PageLinksProgram) { return $script:PageLinksProgram }
+    $sh = Get-Content -LiteralPath (Join-Path $PSScriptRoot "verify-deploy.sh") -Raw -Encoding UTF8
+    $found = [regex]::Match(($sh -replace "`r", ""), "(?ms)^check_page_links\(\) \{.*?<<'PY'\n(.*?)\nPY\n")
+    if (-not $found.Success) { return $null }
+    $path = Join-Path $work "check_page_links.py"
+    [IO.File]::WriteAllText($path, $found.Groups[1].Value + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    $script:PageLinksProgram = $path
+    return $path
+}
+function Check-PageLinks([string]$What, [string]$Base, [string]$Kind) {
+    $program = Get-PageLinksProgram
+    if (-not $program) { No "$What's page links could not be checked: check_page_links's program was not found in verify-deploy.sh"; return }
+    $out = Join-Path $work ("page-links-" + [Guid]::NewGuid().ToString('N').Substring(0,6) + ".txt")
+    $err = "$out.err"
+    $env:PYTHONUTF8 = '1'; $env:PYTHONIOENCODING = 'utf-8'
+    try {
+        $p = Start-Process -FilePath $script:RuntimePython -ArgumentList @('-X', 'utf8', '-I', ('"' + $program + '"'), ('"' + $Base + '"'), $Kind) `
+                           -NoNewWindow -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+    } finally { Remove-Item Env:PYTHONUTF8, Env:PYTHONIOENCODING -ErrorAction SilentlyContinue }
+    $said = if (Test-Path -LiteralPath $out) { @(Get-Content -LiteralPath $out -Encoding UTF8) } else { @() }
+    $summary = ($said | Where-Object { $_ -like 'SUMMARY *' } | Select-Object -First 1)
+    if ($p.ExitCode -ne 0 -or -not $summary) {
+        $why = if (Test-Path -LiteralPath $err) { (Get-Content -LiteralPath $err -Raw -Encoding UTF8) } else { "" }
+        No "$What's page links could not be checked (exit $($p.ExitCode)) $why"
+        return
+    }
+    $problems = @($said | Where-Object { $_ -like 'PROBLEM *' })
+    if ($problems.Count -gt 0) {
+        No "$What's page links: $($summary.Substring(8))"
+        foreach ($problem in $problems) { Write-Host "         $($problem.Substring(8))" -ForegroundColor Red }
+    } else { Ok "$What's page links: $($summary.Substring(8))" }
+}
+
+# A folder publish is sent the build's bytes: no marker, links as built. Run
+# on all three folder legs here (the mac runs it on two), so it is a superset.
+function Check-NoMarkerFolder([string]$What, [string]$Site) {
+    $marked = @(Get-ChildItem -LiteralPath $Site -Recurse -File -ErrorAction SilentlyContinue |
+                Select-String -Pattern 'data-plantoir-paths' -SimpleMatch -List | Select-Object -First 1)
+    if ($marked.Count -gt 0) { No "$What carries data-plantoir-paths, which only a Netlify publish adds (#628)" }
+    else { Ok "$What carries the build's links as built, with no Netlify marker (#628)" }
+}
+
+# The build's own half of #628 reached a Windows-built site: the router, the
+# link previews and the search previews each follow the marker, so the built
+# postscript.js names plantoirPaths exactly three times
+# (build_site._wire_served_case, which only WARNS when an anchor has moved -
+# so this is the one place a moved anchor fails anything). Read from a folder
+# publish because the build keeps no scaffold to inspect.
+function Check-ServedCase([string]$What, [string]$Site) {
+    $script = Join-Path $Site "postscript.js"
+    if (-not (Test-Path -LiteralPath $script)) { No "$What has no postscript.js"; return }
+    $count = [regex]::Matches((Get-Content -LiteralPath $script -Raw -Encoding UTF8), 'plantoirPaths').Count
+    if ($count -eq 3) { Ok "$What's postscript.js follows the Netlify marker in all three places (plantoirPaths x3)" }
+    else { No "$What's postscript.js names plantoirPaths $count time(s), not 3 - an anchor in _wire_served_case moved" }
+}
+
 # Cloudflare's production address serves the NEW deployment only after it
 # has propagated (#630's second comment): at the 1.8.5 cut a single
 # Cloudflare leg was judged while production still served the deployment
@@ -959,6 +1030,8 @@ $folderRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Sectio
 if ($folderRun.ExitCode -eq 0) { Ok "publish to a folder exited 0" } else { No "publish to a folder exited $($folderRun.ExitCode)" }
 Check-Folder "folder" (Join-Path $folderTarget "section$Section")
 Check-EngineFolder "the folder" (Join-Path $folderTarget "section$Section")
+Check-NoMarkerFolder "the folder" (Join-Path $folderTarget "section$Section")
+Check-ServedCase "the folder" (Join-Path $folderTarget "section$Section")
 
 Hdr "Destination 2 of 3 - Netlify"
 if ($haveNetlify) {
@@ -970,6 +1043,7 @@ if ($haveNetlify) {
         Note-Site $netlifyUrl
         Check-Url "Netlify" $netlifyUrl -MustEndWith "netlify.app"
         Check-Engine "Netlify" "$($netlifyUrl.TrimEnd('/'))/"
+        Check-PageLinks "Netlify" "$($netlifyUrl.TrimEnd('/'))/" netlify
     } else { No "no Netlify address in the output" }
 } else { Skipped "Netlify (no credentials)" }
 
@@ -989,6 +1063,7 @@ if ($haveCloudflare) {
         Check-Url "Cloudflare Pages" $cloudflareUrl -MustEndWith "pages.dev"
         Wait-CloudflareProduction "Cloudflare Pages" $cloudflareRun.Log $cloudflareUrl
         Check-Engine "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/"
+        Check-PageLinks "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/" cloudflare
     } else { No "no Cloudflare address in the output" }
 } else { Skipped "Cloudflare Pages (no credentials)" }
 
@@ -1011,9 +1086,12 @@ if ($haveNetlify) {
     if ($u) {
         Note-Site $u
         Check-Url "Netlify (paired)" $u -MustEndWith "netlify.app"
+        Check-PageLinks "Netlify (paired with a folder)" "$($u.TrimEnd('/'))/" netlify
     } else { No "no Netlify address in the paired output" }
     Check-Folder "folder (paired)" (Join-Path $folderTarget "section$Section")
     Check-EngineFolder "the folder (paired with Netlify)" (Join-Path $folderTarget "section$Section")
+    Check-NoMarkerFolder "the folder (paired with Netlify)" (Join-Path $folderTarget "section$Section")
+    Check-ServedCase "the folder (paired with Netlify)" (Join-Path $folderTarget "section$Section")
 } else { Skipped "Netlify + folder (no Netlify credentials)" }
 
 Hdr "Pairing 2 of 3 - Cloudflare primary, a folder also"
@@ -1030,10 +1108,13 @@ if ($haveCloudflare) {
         Note-Site $cfPaired
         Check-Url "Cloudflare (paired with a folder)" $cfPaired -MustEndWith "pages.dev"
         Wait-CloudflareProduction "Cloudflare (paired with a folder)" $legOne.Log $cfPaired
+        Check-PageLinks "Cloudflare (paired with a folder)" "$($cfPaired.TrimEnd('/'))/" cloudflare
     }
     else { No "no Cloudflare address in the paired output" }
     Check-Folder "folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
     Check-EngineFolder "the folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
+    Check-NoMarkerFolder "the folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
+    Check-ServedCase "the folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
 } else { Skipped "Cloudflare + folder (no Cloudflare credentials)" }
 
 Hdr "Pairing 3 of 3 - Netlify primary, Cloudflare also"
@@ -1049,6 +1130,7 @@ if ($haveNetlify -and $haveCloudflare) {
         Note-Site $u1
         Check-Url "Netlify (paired with Cloudflare)" $u1 -MustEndWith "netlify.app"
         Check-Engine "Netlify (paired with Cloudflare)" "$($u1.TrimEnd('/'))/"
+        Check-PageLinks "Netlify (paired with Cloudflare)" "$($u1.TrimEnd('/'))/" netlify
     } else { No "no Netlify address in the paired output" }
     $u2 = Url-FromLog $legTwo.Log
     if ($u2) {
@@ -1056,6 +1138,7 @@ if ($haveNetlify -and $haveCloudflare) {
         Check-Url "Cloudflare (paired with Netlify)" $u2 -MustEndWith "pages.dev"
         Wait-CloudflareProduction "Cloudflare (paired with Netlify)" $legTwo.Log $u2
         Check-Engine "Cloudflare (paired with Netlify)" "$($u2.TrimEnd('/'))/"
+        Check-PageLinks "Cloudflare (paired with Netlify)" "$($u2.TrimEnd('/'))/" cloudflare
     } else { No "no Cloudflare address in the paired output" }
 } else { Skipped "Netlify + Cloudflare (needs both sets of credentials)" }
 
