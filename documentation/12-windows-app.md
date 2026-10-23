@@ -8898,12 +8898,19 @@ after, the temp vaults' window files removed):
   sentence are TRUE on Windows.
 - **After "Trust author and enable plugins", Obsidian 1.14.4 opened its
   Settings ▸ Community plugins in a window of its own** — on a first-time
-  trust (a fresh course) and on a trust after Restricted Mode. The contract's
-  `wording.note` says Obsidian "does not open its settings (measured on
-  1.13.7, #582)", and the offer's sentence telling the teacher to close the
-  settings was removed for that reason. Either 1.14 changed it or Windows
-  differs; this is a decision for the mac and Russell, not a Windows-only
-  wording change, so nothing was changed here.
+  trust (a fresh course) and on a trust after Restricted Mode. At the time the
+  contract's `wording.note` said Obsidian "does not open its settings
+  (measured on 1.13.7, #582)", so nothing was changed here and the mac was
+  asked to re-check (#627). **Settled 2026-10-23 (#627):** the mac measured
+  the same thing 8 of 8 times, on 1.13.7 and 1.14.4, first-time trust and
+  after Restricted Mode. #582 was a false negative — its check counted the
+  settings dialog in the main window, and Obsidian opens it in a window of its
+  own while a vault leaves `settingsPopoutWindow` at its default, true. The
+  sentence telling the teacher to close that window is back at the end of
+  `wording.offerMessage` AND `windowsWording.offerMessage`; Windows owes it in
+  its own wording source (the `windows` issue that #627 opened). The detail is
+  in `documentation/09-mac-app.md` → "Obsidian's add-ons for diagrams and
+  graphs (#495)" → "Teacher words".
 - The reopen, with two vaults open, one minimised, a pop-out of the other, and
   text typed 1.2 s before Reopen was pressed: every window gone in about 0.4 s,
   every Obsidian process gone at 0.66 s, the add-on written, MCR3U back at
