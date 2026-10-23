@@ -210,6 +210,12 @@ COPY scripts/figures.py /opt/scripts/figures.py
 # preview.sh through docker exec before the build) and what the build gives
 # the site (`prepare`). Imported by build_site.py by bare name.
 COPY scripts/swift_blocks.py /opt/scripts/swift_blocks.py
+# Windows' half of runnable Swift (#570): getting Swift ready on a PC and the
+# compile wrapper. Never run in this image - swift_blocks.py imports them
+# only for a Windows toolchain id - but baked because it names them
+# (test_baked_modules.py: a module a baked script imports is baked).
+COPY scripts/swift_windows_fetch.py /opt/scripts/swift_windows_fetch.py
+COPY scripts/swift_windows_compile.py /opt/scripts/swift_windows_compile.py
 # Self-check quizzes (#563): the folder check that reads every `> [!quiz]` by
 # the site's own rules and writes the words the site's quizzes use. Imported
 # by build_site.py by bare name (test_baked_modules.py).
