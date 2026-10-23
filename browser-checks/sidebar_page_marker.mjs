@@ -5,6 +5,10 @@
 // holds a row and a text search of the site could not see one: this is why the
 // check needs a browser.
 //
+// First, on a fresh visit to the planted fixture page and before any folder is
+// opened: as the sidebar draws, neither the page nor a closed folder's hidden
+// list scrolls by itself (#611 - only the sidebar's own list may).
+//
 // On the planted fixture page, inside the planted folder and the folder planted
 // inside it, both opened the way a student opens them (a click on the chevron):
 //
@@ -220,14 +224,15 @@ async function connect(chunk) {
     if (box.right - box.left <= 0 || box.bottom - box.top <= 0) return null
     return box
   }
-  // A page row's lines, content edge and dot, read in ONE frame (#601). Quartz
-  // smooth-scrolls the window for about 360 ms after the sidebar draws, to
+  // A page row's lines, content edge and dot, read in ONE frame (#601). Until
+  // #611, Quartz smooth-scrolled for about 360 ms after the sidebar drew, to
   // bring the current page's row into view, so a dot read in one frame and a
-  // line read in the next can be a whole frame's move apart (9 px was seen).
-  // The row's lines are read on BOTH sides of the dot: when the two readings
-  // are identical, nothing moved between them - the scroll only ever goes one
-  // way - so the dot read between them is in that same layout. Up to 20 tries,
-  // 100 ms apart; null (and why) when no try paired.
+  // line read in the next could be a whole frame's move apart (9 px was seen).
+  // That scroll is gone, but a folder still opens with a .3 s transition that
+  // moves rows, so the row's lines are read on BOTH sides of the dot: when the
+  // two readings are identical, nothing moved between them - a move only ever
+  // goes one way - so the dot read between them is in that same layout. Up to
+  // 20 tries, 100 ms apart; null (and why) when no try paired.
   const readInOneFrame = async (index) => {
     const linesNow = `(() => {
       const row = window.__plMarker.rows[${index}]
@@ -291,6 +296,35 @@ async function connect(chunk) {
 
   const problems = []
   const report = {}
+
+  // #611: as the sidebar draws, nothing scrolls but the sidebar's own list.
+  // Quartz brought the current page's row into view with scrollIntoView,
+  // which scrolls every scrollable ancestor: the page itself (300-600 px on a
+  // long page) and, when the row is inside a CLOSED folder - every first
+  // visit - that folder's hidden list (157 px on a one-line page like this
+  // fixture). Read over 30 animation frames right after the rows appear and
+  // before any folder is opened: the most the page and any closed folder's
+  // list were scrolled in any of them.
+  const nothingScrollsAsTheSidebarDraws = async () => {
+    const most = await evaluate(`new Promise((done) => {
+      let page = 0
+      let closedList = 0
+      let frames = 0
+      const read = () => {
+        page = Math.max(page, window.scrollY)
+        for (const list of document.querySelectorAll(".explorer .folder-outer:not(.open) > ul")) {
+          closedList = Math.max(closedList, list.scrollTop)
+        }
+        frames += 1
+        if (frames < 30) requestAnimationFrame(read)
+        else done({ page: Math.round(page), closedList: Math.round(closedList) })
+      }
+      requestAnimationFrame(read)
+    })`)
+    if (most.page !== 0) problems.push(`the page scrolled by itself as the sidebar drew: ${most.page} px (#611)`)
+    if (most.closedList !== 0) problems.push(`a closed folder's hidden list scrolled by itself as the sidebar drew: ${most.closedList} px (#611)`)
+    report.scrolledAsTheSidebarDrew = most
+  }
 
   // One full pass over the open sidebar: steps 1 to 5. `mode` names it in the
   // report and in every problem it finds.
@@ -486,6 +520,7 @@ async function connect(chunk) {
     await send("DOM.enable")
     await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "light" }] })
     if (!(await open(pageUrl))) return finish(1, "FAIL: the page or its sidebar did not load " + pageUrl)
+    await nothingScrollsAsTheSidebarDraws()
     await send("DOM.getDocument", { depth: -1 })
     const lightTheme = await evaluate(`document.documentElement.getAttribute("saved-theme")`)
     if (lightTheme !== "light") problems.push(`light: the page is in ${lightTheme} mode, not light`)
