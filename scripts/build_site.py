@@ -9415,7 +9415,10 @@ def build_section_site(
     # its node_modules/.bin), which needs network and floats the version.
     # The absolute path also puts the section's work dir on the serve
     # process's command line - what the native stop matches on.
-    env = os.environ.copy()
+    # node_environment adds `--disable-warning=DEP0040` to NODE_OPTIONS, so
+    # Quartz on Node 22 does not print its punycode deprecation into the
+    # teacher's console (#640; toolchain_paths says why only that one).
+    env = toolchain_paths.node_environment(os.environ)
     env.setdefault("TZ", "UTC")
     env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # 2024-01-01T00:00:00Z
 
