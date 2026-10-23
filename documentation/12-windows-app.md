@@ -7686,6 +7686,34 @@ found here, where the first preview's `compile-<pid>.log` was gone.
 `LOGS_FOLDER` is now kept; `test_swift_blocks.py` →
 `PruneKeepsTheLogsTests` pins it.
 
+### The Code page's Swift pictures (#590), 2026-10-23
+
+v1.8.6 shipped Swift with its two plantoir.app pictures (`code-swift`,
+`code-swift-live`) still owed: a Windows window capture is taken at exactly
+2x (#557) and no 4K session was open that day, so
+`preview_pages_windows.py` left them out by name (`NOT_ON_WINDOWS`) and
+`site.json` → `availability.features.runnable-swift.windows` stayed false,
+which kept the Code page saying runnable Swift was on the Mac only. On
+2026-10-23 the list was dropped, the pictures taken by `capture_windows.py
+--code code-swift-live,code-swift` and promoted, and the flag set true in
+the same commit. Nothing about the pass changed for them: the marketing
+ICS4U already had `Reading Input in Swift.md` (the steps reported 0 made,
+95 already there), and the Mac's `prepare/code-swift*.js` reached "ready"
+unchanged.
+
+Measured on this PC (i5-8365U, a Remote Desktop session at 3840 x 2160,
+200%, taskbar NOT auto-hidden): the fitted scale was 2.000 with the
+taskbar showing (a 2160-pixel-tall work area fits the 860 DIP window at 2x;
+the 1832-tall screen of the earlier pass did not), so nothing was hidden.
+Swift was already ready (`READY.json`), so no download; the first ICS4U
+preview compiled its one block in 4.73 s (embedded SDK, 49,406 bytes,
+`compile-<pid>.log`), the preview was serving about two minutes after it
+was started, and the second run's preview compiled nothing. Each picture
+is 2560 x 1720 and Windows' OCR read every `expectText`. The Windows twins
+differ from the Mac's only in what is the platform's own: Windows' fonts
+for the Mac's (so a line wraps a little differently and the text sits a
+little lower), and Edge's title bar for the Mac window's frame.
+
 
 ## The trail's first and last lines (#565, the mac's #560), v1.8.0
 
