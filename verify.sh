@@ -1077,6 +1077,26 @@ else
   cat /tmp/verify_unreadable_page_settings_test.log
 fi
 
+# ---- build_site.py: a front page whose title Plantoir wrote unquoted (#584) ----
+# Every case in contracts/shared-rules.json -> buildRepairs.frontPageTitleQuoted
+# through the build's own rule, and the front page copied the way the build
+# copies it: the teacher's page quoted, or only the build's copy for a course
+# kept for reference, a linked page and a read-only one, and a second build
+# that changes nothing. The two other test files are mounted for the helpers
+# it shares with them.
+echo ""
+echo "🔎 Checking that a front page whose title Plantoir wrote unquoted is put right by the build…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_front_page_title_repair.py" /opt/scripts/test_front_page_title_repair.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_dates_follow_the_class.py" /opt/scripts/test_dates_follow_the_class.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_unreadable_page_settings.py" /opt/scripts/test_unreadable_page_settings.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_front_page_title_repair.py >/tmp/verify_front_page_title_repair_test.log 2>&1; then
+  pass "build_site.py: a front page whose title holds an unquoted colon is quoted by the build (scripts/test_front_page_title_repair.py, #584)"
+else
+  fail "build_site.py: a front page whose title holds an unquoted colon is quoted by the build (scripts/test_front_page_title_repair.py, #584)"
+  cat /tmp/verify_front_page_title_repair_test.log
+fi
+
 # ---- build_site.py: links students would find dead (#333) ----
 # Every case in contracts/shared-rules.json -> siteHealth.linksIntoHiddenPages
 # through the build's own reader, in the image because it imports build_site

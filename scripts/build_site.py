@@ -3696,20 +3696,22 @@ def _is_locked(source: Path) -> bool:
     return not os.access(source, os.W_OK)
 
 
-def _replace_the_page_safely(source: Path, original: str, rewritten: str) -> bool:
+def _replace_the_page_safely(source: Path, original: str, rewritten: str,
+                             suffix: str = ".plantoir-dating") -> bool:
     """
     Puts `rewritten` in place of the teacher's page without ever leaving a
     half-written file: the new text goes to a hidden file beside the page, is
     flushed to disk, and is renamed over the page in one step — but only if
-    the page still holds exactly the text the date was worked out from. A
+    the page still holds exactly the text the change was worked out from. A
     Stop partway through leaves the old page or the new one, never an empty
     one; an Obsidian save that lands after the page was read is kept, and the
-    next build dates it.
+    next build tries again. Used by the date pass (#275, #276) and by the
+    front page's title repair (#584), whose hidden file ends `suffix`.
     """
     folder = source.parent
     try:
         handle_number, temporary_name = tempfile.mkstemp(
-            dir=folder, prefix=f".{source.name}.", suffix=".plantoir-dating")
+            dir=folder, prefix=f".{source.name}.", suffix=suffix)
     except OSError:
         return False
     temporary = Path(temporary_name)
@@ -3808,6 +3810,260 @@ def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
     if not _replace_the_page_safely(source, text, rewritten):
         return None
     return "written"
+
+
+# === #584: a front page whose title Plantoir wrote unquoted ==================
+# Until 1.8.1 setup, the mac's SectionAdder and SiteHealthRepair wrote a
+# section's front page as `title: Grade 12 Physics: Mechanics, Section 1`, and
+# a course name holding ": " made it a page the build cannot read (#575), so the
+# section had no website. The build puts that ONE shape right, on every build:
+# `shared-rules.json` -> `buildRepairs.frontPageTitleQuoted`, whose cases
+# `scripts/test_front_page_title_repair.py` runs through the functions below.
+
+# The fallbacks are only for a contract that cannot be read at all; a test
+# pins each one to the contract's own value, so they cannot drift quietly.
+_FALLBACK_REPAIRED_PREFIX = "PLANTOIR_REPAIRED:"
+_FALLBACK_TITLE_QUOTED_SENTENCE = (
+    "🔧 Put quotes around the title of the front page of {course} Section {section}, "
+    "so the colon in it no longer stops the page's settings being read and the "
+    "website has its front page."
+)
+_FALLBACK_TITLE_LEFT_SENTENCE = (
+    "🔧 The title of the front page of {course} Section {section} has a colon that "
+    "stops the page's settings being read. The website reads it in quotes, so it has "
+    "its front page, but the page itself was left as it was, because {reason}."
+)
+_FALLBACK_TITLE_LEFT_REASONS = {
+    "reference": "the course is kept for reference",
+    "linked": "it also lives somewhere else",
+    "locked": "it is locked or set so it cannot be changed",
+}
+
+
+def _settings_can_be_read(text: str) -> bool:
+    """Whether the build's reader reads this page's settings."""
+    try:
+        frontmatter.loads(text)
+    except Exception:
+        return False
+    return True
+
+
+def _as_the_build_reads_it(text: str) -> str:
+    """The page as `frontmatter.load(path)` sees it: the file is opened with
+    universal newlines, so a Windows line ending and a lone carriage return
+    both arrive as "\n". Testing the raw text instead would disagree with the
+    build about a page saved on Windows."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _front_page_title_quoted(raw: str) -> str | None:
+    """
+    The front page with its title in double quotes — or None, when this is not
+    the one shape Plantoir itself wrote wrong (#584).
+
+    `raw` is the file as read with `newline=""`, so its line endings are kept.
+    Every condition must hold, in this order
+    (`buildRepairs.frontPageTitleQuoted.rule`):
+
+    1. it does not start with a byte-order mark (the date pass refuses those
+       too);
+    2. the build's reader REFUSES its settings, read as the build reads them;
+    3. line 1 is exactly `---`, and a later line exactly `---` closes the
+       settings;
+    4. exactly one line between them starts `title:` at the left edge;
+    5. that line is `title:`, one or more spaces, and a value that is not
+       empty and does not start with a quote;
+    6. the value holds ": " and neither " #" nor a tab and "#" (a comment);
+    7. the next line in the settings does not start with a space or a tab (the
+       value does not go on below);
+    8. the rewrite changes only that line, to `title: ` and the value as
+       `setup_course.frontmatter_title` quotes it, keeping its line ending;
+    9. the rewritten settings READ, and their title is exactly the value.
+
+    Anything else is left to the finding that already names it
+    (`pageSettingsUnreadable`): a page that is wrong in some other way, or
+    whose meaning would have to be guessed, is never rewritten.
+    """
+    if frontmatter is None:
+        return None
+    if raw.startswith("﻿"):
+        return None
+    if _settings_can_be_read(_as_the_build_reads_it(raw)):
+        return None
+    lines = raw.splitlines(keepends=True)
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        return None
+    closing_line = None
+    for index in range(1, len(lines)):
+        if lines[index].rstrip("\r\n") == "---":
+            closing_line = index
+            break
+    if closing_line is None:
+        return None
+    title_lines = []
+    for index in range(1, closing_line):
+        if lines[index].startswith("title:"):
+            title_lines.append(index)
+    if len(title_lines) != 1:
+        return None
+    title_line = title_lines[0]
+    line = lines[title_line]
+    without_ending = line.rstrip("\r\n")
+    ending = line[len(without_ending):]
+    after_the_key = without_ending[len("title:"):]
+    if not after_the_key.startswith(" "):
+        return None
+    value = after_the_key.strip(" \t")
+    if value == "" or value[0] in "\"'":
+        return None
+    if ": " not in value:
+        return None
+    if " #" in value or "\t#" in value:
+        return None
+    if title_line + 1 < closing_line and lines[title_line + 1][:1] in (" ", "\t"):
+        return None
+    quoted_line = "title: " + json.dumps(value, ensure_ascii=False) + ending
+    rewritten = "".join(lines[:title_line]) + quoted_line + "".join(lines[title_line + 1:])
+    try:
+        read_back = frontmatter.loads(_as_the_build_reads_it(rewritten))
+    except Exception:
+        return None
+    if read_back.metadata.get("title") != value:
+        return None
+    return rewritten
+
+
+def _quote_the_front_page_title(section_index: Path, copy: Path, frozen_course: bool) -> str | None:
+    """
+    Quotes the front page's title (#584) in the BUILD'S copy, always, so the
+    site has its front page, and in the teacher's own page when it may be
+    changed. Runs just after the copy is made and before its settings are
+    read, so a page put right is never hidden.
+
+    Returns "written" when the teacher's page was rewritten too; "reference",
+    "linked" or "locked" when only the copy was, because the course is kept
+    for reference, the page also lives somewhere else, or it is locked or
+    read-only (the date pass leaves the same three alone); "not written" when
+    the rewrite was refused at the last step — the page changed after it was
+    read, or the host would not let it be replaced (Finder's Locked, which the
+    container cannot see; a file held open on Windows) — and the next build
+    tries again; or None when there was nothing to put right.
+    """
+    try:
+        with open(copy, "r", encoding="utf-8", newline="") as handle:
+            raw = handle.read()
+    except Exception:
+        return None
+    quoted = _front_page_title_quoted(raw)
+    if quoted is None:
+        return None
+    # `shutil.copy2` carries a read-only page's mode into the copy.
+    _writable(copy)
+    try:
+        with open(copy, "w", encoding="utf-8", newline="") as handle:
+            handle.write(quoted)
+    except Exception:
+        return None
+    if frozen_course:
+        return "reference"
+    if _reaches_the_page_through_a_link(section_index):
+        return "linked"
+    if _is_locked(section_index):
+        return "locked"
+    # The copy holds what `shutil.copy2` read from the teacher's page, so
+    # `raw` is that page's text: a save that landed since is kept.
+    if not _replace_the_page_safely(section_index, raw, quoted, suffix=".plantoir-quoting"):
+        return "not written"
+    return "written"
+
+
+def _build_repair_rule(*keys, fallback):
+    """One value out of `shared-rules.json` -> `buildRepairs`."""
+    try:
+        value = contracts.section("shared-rules", "buildRepairs", *keys)
+    except Exception:
+        return fallback
+    if isinstance(fallback, str) and not isinstance(value, str):
+        return fallback
+    if isinstance(fallback, dict) and not isinstance(value, dict):
+        return fallback
+    return value
+
+
+def _filled_in(template: str, values: dict) -> str:
+    """Every {name} in ONE pass, so a value that itself holds braces is kept
+    as it is."""
+    return re.sub(r"\{(\w+)\}",
+                  lambda match: str(values.get(match.group(1), match.group(0))),
+                  template)
+
+
+def announce_front_page_title_quoted(outcome: str | None, course: str, section_number: int,
+                                     page: str, printer=print) -> None:
+    """
+    Says what the title repair did (#584): a sentence for the teacher and, only
+    when the teacher's own page was rewritten, one machine-readable line the
+    app puts on its activity trail (`buildRepairs.marker`) — the page's NAME,
+    never anything written on it. When only the build's copy was put right the
+    console says why and nothing goes on the trail, as the date pass's linked
+    and locked pages; when the rewrite was refused at the last step nothing is
+    said at all, since the next build tries again.
+    """
+    values = {"course": course, "section": section_number}
+    if outcome == "written":
+        sentence = _build_repair_rule("frontPageTitleQuoted", "sentence",
+                                      fallback=_FALLBACK_TITLE_QUOTED_SENTENCE)
+        printer(_filled_in(sentence, values))
+        prefix = _build_repair_rule("marker", "prefix", fallback=_FALLBACK_REPAIRED_PREFIX)
+        payload = {"course": course, "section": section_number,
+                   "repair": "frontPageTitleQuoted", "page": page}
+        printer(f"{prefix} {json.dumps(payload, ensure_ascii=False)}")
+        return
+    reasons = _build_repair_rule("frontPageTitleQuoted", "reasons",
+                                 fallback=_FALLBACK_TITLE_LEFT_REASONS)
+    reason = reasons.get(outcome) if outcome else None
+    if not isinstance(reason, str):
+        return
+    sentence = _build_repair_rule("frontPageTitleQuoted", "sentenceLeftAsItWas",
+                                  fallback=_FALLBACK_TITLE_LEFT_SENTENCE)
+    values["reason"] = reason
+    printer(_filled_in(sentence, values))
+
+
+def copy_the_section_front_page(course_dir: Path, section_dir: Path, content_root: Path, config,
+                                section_number: int, show_marker, course_code: str,
+                                frozen_course: bool) -> bool:
+    """
+    Copies the section's front page into the build and prepares it: the title
+    repair above (#584), its settings read (#246), the landing title, and its
+    links to section pages. Returns whether there was a front page to copy.
+    Factored out of `build_section_site` so the test drives exactly what the
+    build runs; `forget_vault_sources(course_dir)` must already have been
+    called, since the repair asks where the page lives.
+    """
+    section_index = section_dir / "index.md"
+    if not section_index.exists():
+        print("⚠️ Section index.md not found — site may not render correctly.")
+        return False
+    dest = content_root / "index.md"
+    shutil.copy2(section_index, dest)
+    remember_vault_source(dest, section_index, is_section_page=True)
+    outcome = _quote_the_front_page_title(section_index, dest, frozen_course)
+    announce_front_page_title_quoted(outcome, course_code, section_number,
+                                     _name_in_the_course(section_index))
+    process_frontmatter(dest, section_number)
+
+    # The landing title comes from the current settings, not from
+    # whatever was baked in at scaffold time.
+    set_landing_title(dest, config, section_number, show_marker)
+
+    # rewrite section-path wikilinks in the section index
+    print("🔍 Checking for wikilinks to rewrite in content/index.md...")
+    rewrite_section_wikilinks(dest)
+    print(f"  🏠 Copied section index.md to content/index.md")
+    return True
+# ===========================================================================
 
 
 def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
@@ -8356,23 +8612,12 @@ def build_section_site(
 
     forget_vault_sources(course_dir)
     forget_unreadable_pages()
-    section_index = section_dir / "index.md"
-    if section_index.exists():
-        dest = content_root / "index.md"
-        shutil.copy2(section_index, dest)
-        remember_vault_source(dest, section_index, is_section_page=True)
-        process_frontmatter(dest, section_number)
-
-        # The landing title comes from the current settings, not from
-        # whatever was baked in at scaffold time.
-        set_landing_title(dest, config, section_number, show_marker)
-
-        # rewrite section-path wikilinks in the section index
-        print("🔍 Checking for wikilinks to rewrite in content/index.md...")
-        rewrite_section_wikilinks(dest)
-        print(f"  🏠 Copied section index.md to content/index.md")
-    else:
-        print("⚠️ Section index.md not found — site may not render correctly.")
+    # A course kept for reference is last year's, frozen on purpose: the build
+    # puts right its site copy (the date pass, #275/#276; the front page's
+    # title, #584) but never rewrites its files.
+    frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
+    copy_the_section_front_page(course_dir, section_dir, content_root, config, section_number,
+                                show_marker, course_code, frozen_course)
 
     # Copy shared folders
     print(f"\n📥 Copying shared folders into {content_root}...")
@@ -8583,8 +8828,8 @@ def build_section_site(
     # (#275, #276) — on every build, whichever way the class was published,
     # in the build's copy AND in the teacher's own files.
     # A course kept for reference is last year's, frozen on purpose: its site
-    # copy is dated the same way, but its files are never rewritten.
-    frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
+    # copy is dated the same way, but its files are never rewritten
+    # (`frozen_course`, worked out once before the front page was copied).
     dating = _date_pages_from_their_classes(content_root, section_number, write_back=not frozen_course)
     # Not said of a front page hidden because its settings could not be read
     # (#246): only the build's hidden copy was dated, and the teacher's page
