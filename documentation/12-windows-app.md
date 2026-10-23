@@ -8131,8 +8131,10 @@ popup.
 
 The mac fixed two faults in the Publish Pages… / Hide Pages… plan sheet in
 v1.8.7 (`documentation/09-mac-app.md` → "v1.8.7: one table, one checkbox; the
-answer fitted to its sentence (#654)"). Windows had the first and NOT the
-second, and had a third the mac's fix also covers.
+answer fitted to its sentence (#654)"). On Windows the first fault was
+there; the second was not (the answer already fitted its sentence); and a
+third, at Working, was — the mac's fix covers it too, because its Working
+never shrinks.
 
 **1. One table, one checkbox.** The control under the plan table is a
 `CheckBox` (`SectionVerbDialog.AlreadyRightBox`), the same
@@ -8178,11 +8180,18 @@ ContentDialog's "NoneVisible" state collapses that row, and holding the host
 alone still shrank the box by the row (MEASURED: 422 → 342). `SetContent`
 clears the hold for every other stage, so the plan and the answer fit their
 own content. It applies after Choose and after the question about classes
-dated later too (grow-only Working, as the mac), and to the three page items
-only (gated as `SizeTheHost` is), so Re-date and Make Room are untouched. A
-window resized while Working lets go of the hold (`_refit`): nothing relays a
-spinner out, and `ContentDialogMaxHeight` is wide open here, so a hold taller
-than a shrunken window would clip the box.
+dated later too (grow-only Working, as the mac; the test asserts the picker's
+417 held at Working as well as the plan's), and to the three page items only
+(gated as `SizeTheHost` is), so Re-date and Make Room are untouched. The hold
+is CLAMPED to what the window leaves room for — the window's height less what
+the box carries outside the host — when Working starts and again whenever the
+window changes size (`ApplyTheHold`), because `ContentDialogMaxHeight` is
+wide open here and a hold past the window would clip the box. REJECTED (the
+implementation review): dropping the hold on a resize, which shrank the dialog
+to the spinner when a teacher minimised and restored the window mid-publish.
+The spinner and its words sit at the TOP of the held space
+(`VerticalAlignment.Top`): stretched, the 20-epx ring centred in the held
+height while the words drew at the top.
 
 **How it is measured.** The dialog's box is not in the UI Automation tree (its
 element is the whole overlay), and the elements inside it misled: the title's
@@ -8191,6 +8200,11 @@ picture of the screen showed the box centred and shrunk (258 → 189 epx, which
 is what the app logged). So the app writes the box it laid out — its
 template's `BackgroundElement` — to its diagnostic log whenever the box or the
 content changes size ("Section menu dialog at Plan: box 769x422, …"), and
+once more, after a forced layout, the moment Working starts (a call that
+answers before the next layout pass would otherwise log no Working box at
+all). Only in a `--state-dir` run (`AppDataRoot.IsRedirected`, the UI tests'):
+a teacher dragging the window would otherwise write a synchronous line, and
+walk the dialog's template, on every frame. And
 `PageTablesUiTests.TheAnswerAfterAPublishPlanIsFittedToItsSentence` /
 `…AHidePlan…` read those lines: every Working box equals the plan's (±1), the
 answer is more than 32 epx shorter, the width is equal, and OK is inside the
