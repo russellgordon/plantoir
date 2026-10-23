@@ -236,7 +236,9 @@ public class PlanTableUiTests
                      WaitFor(app, "sectionVerbPlanRow0", "the first row").Name);
         string measured = AssertItAllFits(app, table);
 
-        // Scrolls inside itself, and lists every page — no "…and N more".
+        // Since #634 the page already visible is folded under the table;
+        // opened, the table lists every page — no "…and N more".
+        OpenTheFold(app, table, 1);
         Assert.True(table.Patterns.Scroll.IsSupported && table.Patterns.Scroll.Pattern.VerticallyScrollable.Value,
                     "the table does not scroll: " + measured);
         table.Patterns.Scroll.Pattern.SetScrollPercent(-1, 100);
@@ -318,6 +320,7 @@ public class PlanTableUiTests
         Assert.True(window.BoundingRectangle.Height <= before || tableAfter > tableBefore,
                     $"the window grew ({before} -> {window.BoundingRectangle.Height}) and the table did not ({tableBefore} -> {tableAfter})");
 
+        OpenTheFold(app, table, 1);   // so the page already visible is a row to sort (#634)
         var sort = WaitFor(app, "sectionVerbPlanSortChange", "the What changes header");
         Assert.Equal($"Sort by {AssistWording.MenuPlanChangeColumn}", sort.Name);
         sort.AsButton().Invoke();
@@ -386,6 +389,21 @@ public class PlanTableUiTests
         Assert.True(areaBox.Bottom <= window.Bottom,
                     $"scrolled to the end, the notes area ({areaBox}) is not inside the window");
         MenuBar.CloseDialog(app);
+    }
+
+    /// <summary>
+    /// #634 (the mac's #622): open the disclosure that folds the pages already
+    /// right, checking its words and that the table's edges do not move.
+    /// </summary>
+    private static void OpenTheFold(DrivenApp app, AutomationElement table, int already)
+    {
+        var fold = WaitFor(app, "sectionVerbPlanAlreadyRight", "the disclosure under the table");
+        Assert.Equal(AssistWording.MenuPlanShowAlready(already, publishing: true), fold.Name);
+        var before = table.BoundingRectangle;
+        if (fold.Patterns.Toggle.Pattern.ToggleState.Value != FlaUI.Core.Definitions.ToggleState.On)
+            fold.Patterns.Toggle.Pattern.Toggle();
+        Thread.Sleep(400);
+        Assert.Equal(before, table.BoundingRectangle);
     }
 
     private static AutomationElement FirstRow(AutomationElement table) =>

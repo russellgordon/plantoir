@@ -59,10 +59,35 @@ public class PageTablesUiTests
                         TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(250)).Result
         ?? throw new Xunit.Sdk.XunitException($"{what} never appeared ({automationId}).");
 
-    private static AutomationElement OpenThePicker(DrivenApp app)
+    private AutomationElement OpenThePicker(DrivenApp app)
     {
         app.SelectSection(Code, 1);
-        EndToEnd.PressMenuBarItem(app, "Section", "sectionPublishPages");
+        // The menus re-read what is live when the pointer enters a title or the
+        // menu bar takes the focus (MainWindow.Menus); a dialog greys them all
+        // (#457), and UI Automation's Expand does neither, so after a dialog the
+        // pointer is moved over the Section title first, as a teacher's is.
+        var started = DateTime.Now;
+        for (int attempt = 1; ; attempt++)
+        {
+            if (app.Window.FindFirstDescendant(cf => cf.ByName("Section").And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.MenuItem))) is { } title)
+            {
+                app.BringToFront();
+                Mouse.MoveTo(DrivenApp.MiddleOf(title, app.Window.BoundingRectangle));
+                Thread.Sleep(300);
+            }
+            try
+            {
+                EndToEnd.PressMenuBarItem(app, "Section", "sectionPublishPages");
+                break;
+            }
+            catch (FlaUI.Core.Exceptions.ElementNotEnabledException) when (DateTime.Now - started < TimeSpan.FromSeconds(30))
+            {
+                MenuBar.Close();
+                Thread.Sleep(500);
+            }
+        }
+        if (DateTime.Now - started > TimeSpan.FromSeconds(2))
+            _output.WriteLine($"Publish Pages… was greyed for {(DateTime.Now - started).TotalSeconds:0.0} s after the last dialog");
         return WaitFor(app, "sectionVerbPickerTable", "the picker's table");
     }
 
@@ -83,6 +108,24 @@ public class PageTablesUiTests
         row.Focus();
         Thread.Sleep(300);
         return row;
+    }
+
+    /// <summary>A measurement, to the test's output and to %TEMP%\plantoir-634-measured.txt (a passing test's output is not shown).</summary>
+    private void Note(string line)
+    {
+        _output.WriteLine(line);
+        try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "plantoir-634-measured.txt"), $"{DateTime.Now:yyyy-MM-dd HH:mm} {line}{Environment.NewLine}"); }
+        catch (IOException) { }
+    }
+
+    /// <summary>A picture of the window for judging the banding, into %TEMP% (never the site's images).</summary>
+    private void Picture(DrivenApp app, string name)
+    {
+        Thread.Sleep(500);
+        string theme = Environment.GetEnvironmentVariable("PLANTOIR_634_THEME") ?? "system";
+        string path = Path.Combine(Path.GetTempPath(), $"plantoir-634-{name}-{theme}.png");
+        try { FlaUI.Core.Capturing.Capture.Screen().ToFile(path);   // the whole screen: an element's rectangle is in the wrong units at 200% _output.WriteLine("picture: " + path); }
+        catch (Exception error) { _output.WriteLine("no picture: " + error.Message); }
     }
 
     private static string Status(AutomationElement row) => row.Properties.ItemStatus.ValueOrDefault ?? "";
@@ -125,6 +168,16 @@ public class PageTablesUiTests
         var table = OpenThePicker(app);
         int before = table.BoundingRectangle.Height;
         _output.WriteLine($"picker table {before} tall for 4 pages offered");
+        // The chrome PageTableLayout.PickerChrome estimates: the dialog's box
+        // (title top − 24 to the buttons' bottom + 24, as PlanTableUiTests reads
+        // it) less the table's border-box.
+        var box = MenuBar.Dialog(app, "Publish Pages…");
+        var title = box.FindFirstDescendant(cf => cf.ByName(AssistWording.MenuPublishPagesTitle(Code, "1")))?.BoundingRectangle;
+        var continueButton = box.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.BoundingRectangle;
+        if (title is { } t)
+            Note($"MEASURED picker: dialog box {continueButton.Bottom + 24 - (t.Top - 24)} tall, table {before}, " +
+                              $"chrome {continueButton.Bottom + 24 - (t.Top - 24) - before} (PickerChrome {PageTableLayout.PickerChrome}); " +
+                              $"window {app.Window.BoundingRectangle.Width}x{app.Window.BoundingRectangle.Height}; table width {table.BoundingRectangle.Width}");
         Assert.True(Retry.WhileFalse(() => table.FindAllChildren().Length == 4, TimeSpan.FromSeconds(5)).Result,
                     "the picker does not show the four pages offered");
 
@@ -134,15 +187,31 @@ public class PageTablesUiTests
         Keyboard.Type("Day 1 ");
         Thread.Sleep(600);
         Assert.Equal("Day 1 ", find.AsTextBox().Text);
-        Assert.False(Enumerable.Range(0, 4).Any(i => Ticked(app, i)), "Space typed in Find a Page ticked a page");
         Assert.True(Retry.WhileFalse(() => table.FindAllChildren().Length == 1, TimeSpan.FromSeconds(5)).Result,
                     "the search did not leave one row");
+        Assert.False(Ticked(app, 0), "Space typed in Find a Page ticked the row the search left");
         Assert.Equal(before, table.BoundingRectangle.Height);
+
+        Picture(app, "picker-searched");
+        // The search cleared: every row back, none ticked, the height unmoved.
+        find.AsTextBox().Text = "";
+        Assert.True(Retry.WhileFalse(() => table.FindAllChildren().Length == 4, TimeSpan.FromSeconds(5)).Result,
+                    "clearing the search did not bring the four rows back");
+        Assert.False(Enumerable.Range(0, 4).Any(i => Ticked(app, i)), "Space typed in Find a Page ticked a page");
+        Assert.Equal(before, table.BoundingRectangle.Height);
+        Picture(app, "picker");
         MenuBar.CloseDialog(app);
     }
 
+    /// <summary>
+    /// Return with a row selected reaches Continue (the list keeps Return for
+    /// itself, so the table passes it on). Each key in an app of its own: the
+    /// Section menu, opened through UI Automation, is read again only when the
+    /// pointer enters a title or the menu bar takes the focus, and after a
+    /// dialog it was measured greyed for 30 s under a moved pointer too.
+    /// </summary>
     [UiFact]
-    public void ReturnContinuesAndEscapeCancels_WithARowSelected()
+    public void ReturnContinues_WithARowSelected()
     {
         using var app = new DrivenApp(WriteCourse);
         OpenThePicker(app);
@@ -152,7 +221,12 @@ public class PageTablesUiTests
         Keyboard.Press(VirtualKeyShort.RETURN);
         WaitFor(app, "sectionVerbPlanTable", "the plan, after Return with a row selected");
         MenuBar.CloseDialog(app);
+    }
 
+    [UiFact]
+    public void EscapeCancels_WithARowSelected()
+    {
+        using var app = new DrivenApp(WriteCourse);
         OpenThePicker(app);
         SelectAndFocus(app, "sectionVerbPageRow0");
         CopyAPageEscapeUiTests.Front(app);
@@ -189,12 +263,15 @@ public class PageTablesUiTests
         _output.WriteLine($"closed: table {tableBefore.Height} tall (row {pitch}); Publish at {publishBefore.Top}");
         Assert.InRange(tableBefore.Height, 5 * 31, 5 * 33 + 2);           // five rows' worth, one drawn
 
+        Note($"MEASURED fold: disclosure {fold.BoundingRectangle.Height} tall, its top {fold.BoundingRectangle.Top - tableBefore.Bottom} under the table " +
+                          $"(FoldHeight {PlanTableLayout.FoldHeight} counts both)");
         fold.Patterns.Toggle.Pattern.Toggle();
         Assert.True(Retry.WhileFalse(() => table.FindAllChildren().Length == 1 + Seen, TimeSpan.FromSeconds(5)).Result,
                     $"open, the table draws {table.FindAllChildren().Length} rows, not {1 + Seen}");
         Assert.Equal(FlaUI.Core.Definitions.ToggleState.On, fold.Patterns.Toggle.Pattern.ToggleState.Value);
         Assert.Equal(tableBefore, table.BoundingRectangle);
         Assert.Equal(publishBefore, publish.BoundingRectangle);
+        Picture(app, "plan-open");
         Assert.EndsWith(AssistWording.MenuPlanAlreadyVisible, WaitFor(app, $"sectionVerbPlanRow{Seen}", "the last row").Name);
 
         fold.Patterns.Toggle.Pattern.Toggle();
@@ -228,13 +305,13 @@ public class PageTablesUiTests
                                      TimeSpan.FromMilliseconds(200)).Result,
                     $"the window widened ({narrowWindow} -> {window.BoundingRectangle.Width}) and the table stayed {narrowTable} wide");
         int wideTable = table.BoundingRectangle.Width;
-        _output.WriteLine($"window {narrowWindow} -> {window.BoundingRectangle.Width}; table {narrowTable} -> {wideTable}");
+        Note($"MEASURED width: window {narrowWindow} -> {window.BoundingRectangle.Width}; table {narrowTable} -> {wideTable}");
         Assert.True(wideTable - narrowTable <= 300 * 2 + 4, "the dialog grew past its cap");   // pixels or epx, at up to 200%
         try
         {
             foreach (string line in File.ReadAllLines(Path.Combine(app.StateDirectory, "startup.log"))
                                         .Where(line => line.Contains("Plan table:")).TakeLast(2))
-                _output.WriteLine("the app's own sizing: " + line);
+                Note("the app's own sizing: " + line);
         }
         catch (IOException) { }
         MenuBar.CloseDialog(app);
