@@ -7927,13 +7927,21 @@ two steps of one flow look alike). Ids: the boxes keep `sectionVerbPage<i>` and
   the box.
 - Space ticks the row with the focus, else the selected row: the list's
   tunnelling `PreviewKeyDown`. A held Space's repeats are ignored
-  (`KeyStatus.WasKeyDown`), so holding it ticks once rather than flickering. The plan review (amendment 2) asked whether a
-  focused `CheckBox`, which clicks on key-UP, would then flip twice. MEASURED:
-  Space after a mouse click on a box flipped it once with a key-up handler,
-  and once with that handler's key renamed away — so the handler was taken
-  out. (A box whose key-down never arrives has nothing to click on key-up;
-  the test did not read where the focus sat after the click, so that part is
-  reasoning.)
+  (`KeyStatus.WasKeyDown`), so holding it ticks once rather than flickering.
+  MEASURED in the window (2026-10-22, `PageTablesUiTests`, three runs green):
+  six downs and one up — what a held key sends — ticked the row once; with
+  the guard taken out the same test failed, the six flips leaving it
+  unticked. The plan review (amendment 2) asked whether a focused
+  `CheckBox`, which clicks on key-UP, would then flip twice. MEASURED: Space
+  (down and up) after a mouse click on a box flipped it once, with no key-up
+  handler — so there is none. (A box whose key-down never arrives has nothing
+  to click on key-up; the test did not read where the focus sat after the
+  click, so that part is reasoning.) **The first measurement of both was
+  void, and a harness trap:** FlaUI's `Keyboard.Press` sends the key DOWN
+  only (`GetAsyncKeyState(VK_SPACE)` still read down 400 ms later), so the
+  test's "two Spaces" were one held Space to the app — the second arrived
+  with `WasKeyDown` — no key-up was ever sent, and the guard, once added,
+  rightly swallowed it. A key the test means to type is `Keyboard.Type`.
 - Space typed in Find a Page ticks nothing: the field is the list's sibling,
   so its keys never reach the list's handler.
 - Return with a row selected reaches Continue — when Continue is live —
