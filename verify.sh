@@ -480,6 +480,13 @@ else
   cat /tmp/verify_sidebar_page_marker_test.log
 fi
 
+if (cd scripts && python3 test_explorer_scroll.py) >/tmp/verify_explorer_scroll_test.log 2>&1; then
+  pass "the sidebar scrolls only itself when a page opens: Quartz's scrollIntoView replaced on every build, once, skipping an entry in a closed folder (scripts/test_explorer_scroll.py, #611)"
+else
+  fail "the sidebar may still move the page as it opens: the build patch did not apply, applied twice, or explorer.inline.ts changed shape (scripts/test_explorer_scroll.py, #611)"
+  cat /tmp/verify_explorer_scroll_test.log
+fi
+
 if (cd scripts && python3 test_code_lines_style.py) >/tmp/verify_code_lines_style_test.log 2>&1; then
   pass "every code block's line numbers: one gutter style with its hairline for static and runnable blocks, no ligatures in code, the editor's colour categories the contract's, and a handout's wrapped line hung under its code (scripts/test_code_lines_style.py, #585)"
 else
@@ -4342,9 +4349,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
        "Marker Fixture Page With A Title Long Enough To Wrap Onto A Second Line" >/tmp/verify_sidebar_page_marker.log 2>&1; then
-    pass "the sidebar's page dot: every page row in an open folder and a folder inside it has its dot, no folder row and no page at the top level does, a wrapped title's second line starts under its first letter, every dot is level with its title's first line (a too-wide first word included), the current page and a hovered link keep Quartz's colours, in light and dark, on a folder page, and every dot at least 3:1 under forced colours - $(head -1 /tmp/verify_sidebar_page_marker.log | sed 's/^OK: //') against the sidebar (#515, browser-checks/sidebar_page_marker.mjs)"
+    pass "the sidebar's page dot: every page row in an open folder and a folder inside it has its dot, no folder row and no page at the top level does, a wrapped title's second line starts under its first letter, every dot is level with its title's first line (a too-wide first word included), the current page and a hovered link keep Quartz's colours, in light and dark, on a folder page, and every dot at least 3:1 under forced colours - $(head -1 /tmp/verify_sidebar_page_marker.log | sed 's/^OK: //') against the sidebar; and as the sidebar drew, neither the page nor a closed folder's list scrolled by itself (#515, #611, browser-checks/sidebar_page_marker.mjs)"
   else
-    fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang (browser-checks/sidebar_page_marker.mjs, #515)"
+    fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang, or the page or a closed folder's list scrolled by itself as the sidebar drew (browser-checks/sidebar_page_marker.mjs, #515, #611)"
     cat /tmp/verify_sidebar_page_marker.log
   fi
   # #494: maths offline from the site's own KaTeX, and (#455 review S1)
@@ -4402,9 +4409,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # layout is the same in Chrome, which is asked here), and a sized picture
   # keeps its own shape in a phone's width.
   if node browser-checks/picture_heights.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_picture_heights.log 2>&1; then
-    pass "pictures keep their place before their bytes arrive and before they are scrolled to, so the text below them does not jump: Picture Fixture with its two PNGs' downloads held, then every picture arrived and nothing scrolled, then a 390 px window - $(head -1 /tmp/verify_picture_heights.log | sed 's/^OK: //') (#612, #609, browser-checks/picture_heights.mjs)"
+    pass "pictures keep their place before their bytes arrive and before they are scrolled to, so the text below them does not jump: Picture Fixture with its two PNGs' downloads held, then every picture arrived and nothing scrolled, the page not even by itself as it opened, then a 390 px window - $(head -1 /tmp/verify_picture_heights.log | sed 's/^OK: //') (#612, #609, #611, browser-checks/picture_heights.mjs)"
   else
-    fail "a picture had no height until its bytes arrived or until it was scrolled to, the page grew when it did, or a sized picture lost its shape in a narrow window (browser-checks/picture_heights.mjs, #612, #609)"
+    fail "a picture had no height until its bytes arrived or until it was scrolled to, the page grew when it did, a sized picture lost its shape in a narrow window, or the page moved by itself as it opened (browser-checks/picture_heights.mjs, #612, #609, #611)"
     cat /tmp/verify_picture_heights.log
   fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.
