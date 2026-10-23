@@ -150,6 +150,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
    gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional.
+1a. **Minor releases (x.y.0) only: is Cloudflare Pages still safe?** Check
+   Cloudflare's changelog for a Pages end-of-life date and whether Workers now
+   takes custom domains with outside nameservers. Checklist step 1a says what
+   to look for and what to do.
 2. **Check the version** in `windows-app/Plantoir/Plantoir.csproj` and
    `mac-app/project.yml`: **every platform whose asset this cut attaches must
    read the tag's number**, set BEFORE its bundle is built; a platform that
@@ -214,6 +218,40 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 1. **Version.** `<Version>` in `windows-app/Plantoir/Plantoir.csproj` and
    `MARKETING_VERSION` in `mac-app/project.yml`. `project.yml` is the source on
    the mac side, so re-run `xcodegen generate` after changing it.
+1a. **Cloudflare Pages vs Workers — every minor release (x.y.0), skip for
+   patches.** Plantoir publishes to Cloudflare **Pages** (the default
+   destination for new courses since #668). Cloudflare steers new projects
+   towards **Workers with Static Assets**, but as of 2026-10-23 its
+   [migration guide](https://developers.cloudflare.com/workers/static-assets/migrate-from-pages/)
+   does not deprecate Pages, static-asset requests are free on both, and
+   Workers has one blocker for teachers: **it does not support custom
+   domains whose nameservers are outside Cloudflare.** On Pages a teacher
+   keeps their domain at Hover or their school's DNS and adds a CNAME; on
+   Workers they would have to move the whole domain to Cloudflare, which most
+   school domains cannot do. None of the extra Workers features matter for a
+   static class site. So we stay on Pages until one of these changes. Check:
+
+   - Cloudflare's changelog and blog: any Pages deprecation, end-of-life
+     date, or new free-plan limits.
+   - Whether Workers now supports custom domains with **external**
+     nameservers (CNAME setup). If yes, the main blocker is gone.
+   - Free-plan terms for static assets on Pages and Workers: still free and
+     unlimited?
+   - `wrangler pages deploy` still works with the `wrangler` version pinned
+     in the image.
+
+   Record the outcome in one line in the release notes' internal checklist
+   (or the cut-release session), even when nothing changed. **If a migration
+   becomes necessary, open an issue for it** — its rough shape: replace the
+   Pages path in `deploy.py` with `wrangler deploy` and a generated
+   `wrangler.jsonc` (`assets.directory`, `not_found_handling: "404-page"`,
+   `workers_dev: true`); keep `_headers`/`_redirects` (Workers supports
+   them), the 25 MB per-file check and the per-section markers; update the
+   token permissions in `contracts/app-rules.json`; keep the
+   `cloudflare_pages` config spelling working for existing courses on both
+   platforms; and plan for `*.pages.dev` addresses becoming `*.workers.dev`,
+   which breaks students' bookmarks unless the course has a custom domain
+   (a teacher-facing message, and probably a period of publishing to both).
 2. **Full test pass**: `dotnet test Plantoir.Tests` and the mac unit suite, plus
    a hand smoke of create → preview → publish on a real course.
 
