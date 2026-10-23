@@ -8203,6 +8203,7 @@ removed again (copy-and-restore), the #607 case and two
 trail records what a publish or unpublish WROTE. A publish writes the same
 pages as before (#607's reasoning), and an unpublish that now hides one page
 more still says truthfully how many it hid.
+
 ## A folder the course declares is curriculum, whatever it is called (#647, the mac's #614)
 
 **What a teacher sees.** A teacher who renames `Curriculum` to `Expectations`
@@ -8221,10 +8222,10 @@ function, `CurriculumRules.IsCurriculum(folderSegments, declared)`, the twin
 of `AssistCurriculumMentions.isCurriculum(folderSegments:declared:)`:
 
 1. A leading section folder is set aside first. The check is
-   `HowITeachPage.IsASectionFolderName`: case-sensitive, ASCII digits only,
-   as on the mac. `GradedFolderChoices.IsSectionFolder` ignores case, and
-   `SectionPublishState`'s `\d` regex accepts any Unicode digit, so neither
-   was used.
+   `HowITeachPage.IsASectionFolderName`: case-sensitive like the mac's
+   `SectionPublishState.isSectionFolderName`, with digits 0–9 only (the mac
+   accepts any Unicode numeric; see the accepted differences below).
+   `GradedFolderChoices.IsSectionFolder` ignores case, so it was not used.
 2. **Declared:** the FIRST folder left equals a declared name. Both sides
    are `.Normalize()`d (NFC), then compared with `OrdinalIgnoreCase`.
    Swift's `==` treats a composed é and an e plus a combining accent as
@@ -8251,7 +8252,8 @@ how a renamed folder lost its protection. The callers:
 | `AssistWorkspace.ProtectedFromHiding` | pages a draft flag must never be set on |
 | `AssistWorkspace.IsCurriculumPage` (planned page) → `ReasonToKeep` and the #617 publish trim | the hide sweep keeps it; the publish plan leaves it out of "already visible" |
 | `AssistWorkspace.ReferenceDates` | rolled-over reference pages dated to the first day |
-| the Start of Year plan's `CurriculumCount` and `StartOfYearPages` (`StartOfYearKind.Curriculum`) | never drafted, and counted on the card |
+| the Start of Year plan's `StartOfYearPages` (`StartOfYearKind.Curriculum`) | never drafted |
+| `PlanReDate`'s `CurriculumCount` (`ReDatePlan`, the mac's `SectionReDatePlanner`) | the curriculum pages a re-date counts on its card |
 | `AssistWorkspace.CurriculumExpectations` | the curriculum tools' list of expectations |
 | `LinkGraph.Unreferenced` → `IsExcludedFromSweep` | `check_section`'s "linked from nowhere" list (plantoir-mcp) |
 
@@ -8288,11 +8290,23 @@ Windows run. No trail line changes, because the publish and unpublish events
 carry counts, not reasons. No tool description, schema or wording moved.
 Tool OUTPUT changes, and that is the fix.
 
-**Known, accepted difference.** `OrdinalIgnoreCase` folds case per character
-(invariant upper-casing), while Swift's `lowercased()` is full Unicode
-lower-casing. The two can disagree on rare letters (ß against "SS", say) in a
-folder name. No real curriculum folder has been seen with one, so no
-contract case was added.
+**Known, accepted differences.**
+- `OrdinalIgnoreCase` folds case per character (invariant upper-casing),
+  while Swift's `lowercased()` is full Unicode lower-casing. The two can
+  disagree on rare letters (ß against "SS", say) in a folder name.
+- A section folder is `section` plus digits 0–9 on Windows
+  (`HowITeachPage.IsASectionFolderName`). The mac accepts any character
+  Swift calls `isNumber`, so `section١` (an Arabic-Indic one) is a section
+  folder there and the top folder here.
+
+No real course has been seen with either, so no contract case was added.
+
+**A name that cannot be normalised.** NTFS allows a lone surrogate in a
+folder name, and `string.Normalize()` throws `ArgumentException` on one.
+`ProtectedFromHiding` and the `ReferenceDates` loop do not catch around the
+predicate, so a throw there would have failed the whole plan. The rule
+therefore normalises inside a try and falls back to comparing the names as
+they are (`CurriculumPredicateTests.AFolderNameThatCannotBeNormalisedIsComparedAsItIs`).
 
 ## A folder added later, and titles YAML can read (#580, #586; the mac's #506, #575), v1.8.0 / v1.8.1
 

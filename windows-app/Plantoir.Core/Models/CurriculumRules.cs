@@ -99,12 +99,24 @@ public static class CurriculumRules
         if (folders.Count > 0 && HowITeachPage.IsASectionFolderName(folders[0])) folders.RemoveAt(0);
         if (folders.Count == 0) return false;
 
-        string top = folders[0].Normalize();
+        string top = Normalised(folders[0]);
         foreach (string name in declared)
-            if (!string.IsNullOrEmpty(name) && string.Equals(name.Normalize(), top, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(name) && string.Equals(Normalised(name), top, StringComparison.OrdinalIgnoreCase))
                 return true;
 
         return folders.Any(folder => folder.Contains("curriculum", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// NFC, or the name as it is when it cannot be normalised. NTFS allows a
+    /// lone surrogate in a folder name and <see cref="string.Normalize()"/>
+    /// throws on one; several callers loop over a whole course with no catch,
+    /// so a throw here would fail the plan rather than one comparison.
+    /// </summary>
+    private static string Normalised(string name)
+    {
+        try { return name.Normalize(); }
+        catch (ArgumentException) { return name; }
     }
 
     /// <summary>

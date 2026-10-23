@@ -2433,14 +2433,17 @@ above:
 - `ReasonToKeep` and the #617 publish trim, through
   `AssistWorkspace.IsCurriculumPage`;
 - `ProtectedFromHiding`;
-- the Start of Year plan's kinds and `CurriculumCount`;
+- the Start of Year plan's kinds;
+- `PlanReDate`'s `CurriculumCount` (the mac's `SectionReDatePlanner`);
 - `ReferenceDates`;
 - `CurriculumExpectations`;
 - `LinkGraph.Unreferenced`, which is `check_section`'s orphan list.
 
 The section folder is set aside with `HowITeachPage.IsASectionFolderName`
-(case-sensitive, ASCII digits, as on the mac). Both names are NFC-normalised
-before an `OrdinalIgnoreCase` comparison. Before #647, two of those callers
+(case-sensitive, as on the mac, but digits 0–9 only where the mac accepts
+any Unicode numeric, an accepted difference). Both names are NFC-normalised
+before an `OrdinalIgnoreCase` comparison, falling back to the names as they
+are when one cannot be normalised (a lone surrogate). Before #647, two of those callers
 (the expectations list and the orphan list) tested the FULL path, working
 folder included; they read folders inside the course now. Details:
 `12-windows-app.md` → "A folder the course declares is curriculum, whatever

@@ -137,6 +137,25 @@ public class CurriculumPredicateTests : IDisposable
     }
 
     /// <summary>
+    /// NTFS allows a lone surrogate in a folder name, and string.Normalize()
+    /// throws on one. The rule must answer rather than throw, because
+    /// ProtectedFromHiding and ReferenceDates loop over a whole course with no
+    /// catch: the name is compared as it is.
+    /// </summary>
+    [Fact]
+    public void AFolderNameThatCannotBeNormalisedIsComparedAsItIs()
+    {
+        string root = @"C:\work\courses\ICS3U";
+        string broken = "Expect\uD800ations";                       // a high surrogate with no partner
+        Assert.Throws<ArgumentException>(() => broken.Normalize());
+
+        Assert.True(PagePaths.IsCurriculum(root, Path.Combine(root, broken, "A1.1.md"), new[] { broken }));
+        Assert.False(PagePaths.IsCurriculum(root, Path.Combine(root, broken, "A1.1.md"), new[] { "Expectations" }));
+        Assert.False(PagePaths.IsCurriculum(root, Path.Combine(root, "Expectations", "A1.1.md"), new[] { broken }));
+        Assert.True(PagePaths.IsCurriculum(root, Path.Combine(root, "Expectations", "A1.1.md"), new[] { broken, "Expectations" }));
+    }
+
+    /// <summary>
     /// The section folder is set aside, never compared: a course that somehow
     /// declared "section1" does not make every section page curriculum, and a
     /// declared name below the top (after the section folder) does not count.
