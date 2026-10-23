@@ -1768,7 +1768,7 @@
           "expectVisible": ["Unit 2, Day 3", "A1.5"],
           "expectUntouched": ["A1.4", "Glossary"],
           "expectAlreadyRight": ["Glossary"],
-          "why": "#607. A curriculum page is visible because nothing marks it hidden - the build has no rule that keeps it so - and a class citing six expectations listed six 'already visible' rows above the ones a teacher needs to read, and counted them in the plan's summary. So the publish plan leaves a curriculum page the walk reached out of its already-visible list, by the same folder test as neverTakenDownByFollowingLinks (any folder segment containing 'curriculum', so 'Ontario Curriculum' counts). Only that list: A1.5 is hidden, so it is still a change and still goes up, or the class would link to a page students cannot open; Glossary shows the list is trimmed, not emptied. A curriculum page the teacher NAMED stays listed - they asked about it. The hide plan is unchanged."
+          "why": "#607. A curriculum page is visible because nothing marks it hidden - the build has no rule that keeps it so - and a class citing six expectations listed six 'already visible' rows above the ones a teacher needs to read, and counted them in the plan's summary. So the publish plan leaves a curriculum page the walk reached out of its already-visible list, by the same folder test as neverTakenDownByFollowingLinks (any folder segment containing 'curriculum', so 'Ontario Curriculum' counts; since #614 also a folder the course declares in curriculum_folders, curriculumRules.isCurriculumPage). Only that list: A1.5 is hidden, so it is still a change and still goes up, or the class would link to a page students cannot open; Glossary shows the list is trimmed, not emptied. A curriculum page the teacher NAMED stays listed - they asked about it. The hide plan is unchanged."
         },
         {
           "name": "a curriculum page in a renamed folder is not listed as already visible",
@@ -1906,7 +1906,7 @@
             "Unit 2, Day 3",
             "Curriculum Coverage"
           ],
-          "why": "#615. neverTakenDownByFollowingLinks keeps a curriculum page up by its FOLDER: any folder segment containing 'curriculum'. The file name is never part of the test (curriculumRules.isCurriculumPage says the same), so a page that is merely CALLED 'Curriculum Coverage', in an ordinary folder and linked only from the class being hidden, goes down with that class like any other page. Windows used to match the file name as well and kept it up, which the mac never did."
+          "why": "#615. neverTakenDownByFollowingLinks keeps a curriculum page up by its FOLDER: any folder segment containing 'curriculum' (and, since #614, a folder the course declares in curriculum_folders - curriculumRules.isCurriculumPage). The file name is never part of the test (curriculumRules.isCurriculumPage says the same), so a page that is merely CALLED 'Curriculum Coverage', in an ordinary folder and linked only from the class being hidden, goes down with that class like any other page. Windows used to match the file name as well and kept it up, which the mac never did."
         },
         {
           "name": "a page in a curriculum folder renamed without the word stays up",
