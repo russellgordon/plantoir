@@ -353,7 +353,7 @@ characters, and the most it names (ten blocks, then "and N more") about
 2,300; `site_said.py` packs every block into ONE finding. But no width is a
 cure: `PLANTOIR_DATED:` names every page the build rewrote and
 `PLANTOIR_MAPS:` every map, with no cap, so a line longer than 8,192 splits
-exactly as before. The follow-up issue proposes a cap in the shared Python.
+exactly as before. The follow-up issue (#666) proposes a cap in the shared Python.
 (`PLANTOIR_LINKS_CHECKLIST:` carries counts only, not links.)
 
 **Rejected: joining a split line back together before the readers.** The
