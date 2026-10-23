@@ -1,0 +1,142 @@
+% Plantoir house style: a handout, worksheet or review sheet.
+% Compile this file for the questions, or "Handout - Answers.tex" (which
+% defines \showanswers) for the answer key. Copy BOTH files to where the
+% teacher keeps handouts, rename them to the handout's name, and change the
+% \input line in the answers file to match. Fill in the three lines marked
+% "Fill in" below.
+\documentclass[11pt]{article}
+\usepackage[letterpaper, left=0.75in, right=0.75in, top=1.05in, bottom=0.9in,
+            headheight=14pt, headsep=0.3in]{geometry}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tasks}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{pgfplots}
+\usepackage{array}
+\usepackage{needspace}
+\usepackage[most]{tcolorbox}
+\pgfplotsset{compat=1.18}
+
+% ---------- Fill in ----------
+\newcommand{\schoolname}{School Name}   % print_school_name in the course's settings
+\newcommand{\coursecode}{COURSE}        % the course code, in capitals
+\newcommand{\handouttitle}{Handout Title}
+
+% ---------- Questions or answers ----------
+\newif\ifanswers
+\ifdefined\showanswers \answerstrue \fi
+\newcommand{\qa}[2]{\ifanswers #2\else #1\fi}
+\newcommand{\onlyq}[1]{\ifanswers\else #1\fi}
+\newcommand{\onlya}[1]{\ifanswers #1\fi}
+
+\ifanswers
+  \newcommand{\doctitle}{\handouttitle\ --- Answers}
+\else
+  \newcommand{\doctitle}{\handouttitle}
+\fi
+
+% ---------- Header and footer (matches pages printed from the class website) ----------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\newcommand{\fillblank}[2]{#1 \rule[-0.15em]{#2}{0.4pt}}
+\fancyhead[L]{\small\sffamily\color{gray}\schoolname}
+\fancyhead[R]{\small\sffamily\color{gray}\fillblank{Name}{3.2cm}\quad\fillblank{Date}{2.2cm}\quad\fillblank{Class \#}{1.4cm}}
+\fancyfoot[L]{\small\sffamily\color{gray}\doctitle\ $\cdot$ \coursecode}
+\fancyfoot[R]{\small\sffamily\color{gray}Page \thepage\ of \pageref{LastPage}}
+\setlength{\parindent}{0pt}
+
+% ---------- Colours and boxes ----------
+\definecolor{why}{gray}{0.4}
+\definecolor{peach}{RGB}{253,244,233}
+\definecolor{peachframe}{RGB}{226,160,96}
+\definecolor{exampletitle}{RGB}{176,38,30}
+
+% Section heading for the answer key, where the worked examples are hidden
+\newcommand{\strand}[1]{\bigskip{\large\bfseries\sffamily #1}\par\smallskip}
+
+% Worked example box
+\newtcolorbox{example}[1]{
+  enhanced, breakable=false,
+  colback=peach, colframe=peachframe, boxrule=0.8pt, arc=3mm,
+  left=3mm, right=3mm, top=2mm, bottom=2mm,
+  before skip=0.9em, after skip=0.6em,
+  fontupper=\normalsize,
+  title={#1}, coltitle=exampletitle, colbacktitle=peach,
+  fonttitle=\large\bfseries\sffamily,
+  titlerule=0pt, toptitle=1mm, bottomtitle=-1mm,
+}
+
+% Numbered questions
+\newenvironment{questions}
+  {\begin{list}{}{\setlength{\leftmargin}{2.2em}\setlength{\labelwidth}{1.8em}
+                  \setlength{\labelsep}{0.4em}\setlength{\itemsep}{0.7em}}}
+  {\end{list}}
+% Optional argument: lines to keep together so a question is never split from its parts
+\newcommand{\q}[2][5]{\needspace{#1\baselineskip}\item[\textbf{#2.}]}
+
+\settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
+
+% ---------- Graph style ----------
+\pgfplotsset{
+  gridgraph/.style={
+    axis lines=middle, grid=both,
+    major grid style={gray!35}, minor grid style={gray!18},
+    minor tick num=1,
+    tick label style={font=\scriptsize, fill=white, fill opacity=0.85, text opacity=1, inner sep=1pt},
+    xlabel=$x$, ylabel=$y$,
+    xlabel style={anchor=west}, ylabel style={anchor=south},
+    axis line style={-latex},
+    clip mode=individual,
+  },
+  lineA/.style={blue!70!black, thick, samples=2},
+}
+
+\begin{document}
+
+{\LARGE\bfseries\sffamily \doctitle}\par
+\medskip
+\ifanswers
+  {\color{why} Final answers only.}
+\else
+  {\color{why} Read the worked example, then try the questions that follow it.
+  Show all your work.}
+\fi
+
+% =====================================================================
+\ifanswers
+\strand{A worked example's topic}
+\else
+\begin{example}{A Worked Example}
+Evaluate $3x + 2$ when $x = 4$.
+\begin{align*}
+  & 3x + 2 \\
+  ={} & 3(4) + 2 \\
+  ={} & 14
+\end{align*}
+\end{example}
+\fi
+
+\begin{questions}
+\q{1} \onlyq{Evaluate each expression when $x = -2$.}
+\begin{tasks}(3)
+  \task \qa{$3x + 4$}{$-2$}
+  \task \qa{$5 - x$}{$7$}
+  \task \qa{$x^2 + 1$}{$5$}
+\end{tasks}
+
+\q[12]{2} \qa{Graph the line $y = 2x - 1$.}{$y = 2x - 1$:}
+\onlya{%
+\begin{center}
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
+    xmin=-5, xmax=5, ymin=-6, ymax=6, xtick={-4,-2,...,4}, ytick={-6,-4,...,6}]
+  \addplot[lineA, domain=-2.4:3.4]{2*x - 1};
+\end{axis}\end{tikzpicture}
+\end{center}}
+\end{questions}
+
+\end{document}
