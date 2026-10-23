@@ -273,6 +273,23 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > It needs three credentials, the network and about twenty minutes, and it
    > **creates real, globally unique sites that nothing deletes** — so no suite
    > runs it and none should. Delete the sites it made when you are done.
+   >
+   > **On Windows, run it from the checkout being released, and once with
+   > `-FirstPublish`** (#630, #623). It mirrors that checkout's launchers and
+   > recipe into the working folder's `.toolchain\` before anything runs,
+   > deleting files the checkout no longer has, and rebuilds the section from
+   > scratch when anything changed. It requires `PLANTOIR_RUNTIME`, which
+   > defaults to `windows-app\Vendor\runtime`, and refuses a runtime with no
+   > `vendor\pyodide`. Until 1.8.7 it ran whatever the folder last received,
+   > and against the installed app's runtime. At the 1.8.5 cut that read as
+   > 59 passed and 89 failed, for a product that was fine. `-FirstPublish`
+   > publishes as a new teacher would: a new surname, new sites and both
+   > questions answered. The ordinary run reuses the section's sites and asks
+   > nothing, so a cut needs both: the first-publish run, then a plain run
+   > against the sites the section already has. The Result block lists the
+   > sites the first-publish run made, so they can be deleted. Cloudflare
+   > reuses a project of the same name, which is why the surname is random
+   > on each run.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503):
