@@ -71,7 +71,8 @@ Three halves:
    they were. Then one page holding a flagged block at the top level, in a
    list item, a quote, a callout and a quiz's explanation (every one wrapped,
    nothing else), and a `codeRunner: true` page whose ```python run wrap block
-   is a runner and is not wrapped.
+   is a runner and is not wrapped, and whose ```text run wrap block is wrapped
+   and is not a runner (`text` is not a runner language).
 """
 import json
 import os
@@ -421,6 +422,18 @@ for (const c of wrapping.fence.cases) {
   process.chdir(home)
   const dump = JSON.stringify(tree)
   if (!dump.includes('"plantoirRunner"') || dump.includes('"plantoirTextWrap"')) failures.push(`textFenceWrapping, python run wrap: ${dump.slice(0, 300)}`)
+  // text is not a runner language: the same page's ```text run wrap is
+  // wrapped and gets no runner.
+  count += 1
+  const textRun = "```text run wrap\nx\n```\n"
+  const textTree = parse(textRun)
+  const textFile = { value: textRun, data: { frontmatter: { codeRunner: true }, slug: "Units/Run", relativePath: "Units/Run.md" } }
+  process.chdir(site)
+  transform(textTree, textFile)
+  wrapPages(textTree, textFile)
+  process.chdir(home)
+  const textDump = JSON.stringify(textTree)
+  if (textDump.includes('"plantoirRunner"') || textTree.children[0]?.type !== "plantoirTextWrap") failures.push(`textFenceWrapping, text run wrap: ${textDump.slice(0, 300)}`)
 }
 console.log(JSON.stringify({ count, failures, siteSaidRuns, wrapCases }))
 """
@@ -517,7 +530,7 @@ def run_the_rules_in_node(folder: Path) -> list:
     result = json.loads(output.strip().splitlines()[-1])
     print(f"codeRunnerRule.ts: {result['count']} contract cases run in Node over Quartz's own parser")
     print(f"textWrapRule.ts: {result.get('wrapCases', 0)} textFenceWrapping cases through the rule and through "
-          f"Quartz's own parser and the transformer, every place a block sits, and python run wrap a runner (#653)")
+          f"Quartz's own parser and the transformer, every place a block sits, python run wrap a runner and text run wrap not one (#653)")
     return result["failures"] + check_what_the_site_said(result.get("siteSaidRuns") or [])
 
 
