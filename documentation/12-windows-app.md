@@ -5172,6 +5172,116 @@ on its own and the window says so); and doing nothing and recording the gap,
 the other answer #484 allowed — the mac waits, and the difference would have
 been one more thing to explain.
 
+### Comparing without reading (#559, 2026-10-23)
+
+**What was wrong.** `ToolchainMirror.SyncFile` trusted a copy when its length
+AND time matched the bundled file. When only the length matched, it read BOTH
+files in full, compared them, restamped the copy, and counted nothing. So the
+cost of a pass followed how many TIMES differed, not how many files changed.
+The release tree's times are git's: the csproj's `Content … PreserveNewest`
+copy keeps each file's checkout time, and the installer keeps the build's. A
+release built from a freshly checked-out tree therefore restamps the whole
+recipe. v1.7.1's `Toolchain\` had 12,759 of 12,783 entries stamped
+2026-10-15 08:51, so the 1.7.1 → 1.7.2 first launch read about 12,700 files
+twice: **131.6 s for 14 changed files**, 102–132 s cold (Defender scanning
+freshly installed files on first open) and 11.2 s warm (Lenovo 20QES70500,
+i5-8365U, 16 GB, Windows 11 Pro 26200; the issue's comment of 2026-10-22 has
+the whole table).
+
+**What it does now.**
+- **The build writes a manifest.** `Toolchain\.hashes` holds one line per
+  bundled file: relative path, length, last-write time in UTC ticks and
+  SHA-256, written by `Plantoir.csproj` → `PlantoirWriteToolchainHashes`.
+  - On Build it writes into OutDir, with Inputs/Outputs, so a Debug build
+    that changed no recipe file only checks times (the second x64 build here
+    wrote nothing).
+  - On Publish it writes in full into `$(PublishDir)Toolchain\`
+    (`PlantoirPublishToolchainHashes`), the way `PublishNativeRuntime`
+    writes the runtime. That is the tree `publish.ps1` packages: the
+    installer takes `{#PublishDir}\*` recursively. Checked on 2026-10-23: a
+    `dotnet publish` to a scratch folder carried 12,909 lines for 12,909
+    recipe files.
+  - It sits at the recipe's root, which is neither a `RecipeRootFiles` entry
+    nor inside a `RecipeFolders` folder, so it is never mirrored.
+- **Each working folder gets an index.** It is the manifest last applied to
+  that folder, with each copy's OWN length and time read back from the disk
+  after stamping (`CopyModificationDate` swallows a failure, so the time is
+  never assumed).
+  - It lives at `AppDataRoot\toolchain-index\<FolderContainers.FolderIdentifier>.hashes`,
+    so the teacher never sees it, it does not travel with a copied folder,
+    and a `--state-dir` run keeps its own.
+  - It is written whole (a temporary file, then a rename), and only when the
+    pass failed nothing and the index changed.
+- **The comparison** (`MirrorPass`). Length and time equal → identical, as
+  before. Otherwise, at the same length:
+  - the manifest still describes the bundled file AND the index still
+    describes the copy → the hashes are compared and nothing is read;
+  - only the manifest is trusted → the copy alone is hashed (one read, not
+    two);
+  - otherwise → both are read, exactly as before.
+
+  A fingerprint is trusted only while its file's length and time still match
+  it (the same 2 ms `FilesLookIdentical` allows). So a stale manifest or a
+  copy edited in place costs reads, never a missed copy
+  (`ToolchainFingerprintTests.AStaleManifestDoesNotSkipTheCopy`, where the
+  stale manifest's hash IS the copy's: trusting it would have left the old
+  script in place).
+- **`AgentGuidance`'s skills** go through `SyncDirectory` with no manifest,
+  so they take exactly the pre-#559 path.
+
+**Measured** (same PC, 2026-10-23, warm cache, a scratch working folder
+filled from the x64 Debug build's `Toolchain\`, 12,909 files). The harness
+called `ToolchainMirror.RefreshToolchain` directly. "Before" is the same
+build with the manifest hidden, which is exactly the old code path. Three
+runs each, in the order they ran:
+
+| Pass | Before (read both) | After | Read in full |
+|---|---|---|---|
+| Every BUNDLE file restamped (the release case), index present | 8.2 / 6.7 / 10.8 s | **5.1 / 4.5 / 4.5 s** | 12,909 → **0** |
+| Every `.toolchain` file restamped | 195.5 (the first, cold) / 7.1 / 7.7 s | 9.3 / 6.3 / 11.3 s | 12,909 → 12,909 (the copy only, not both) |
+| Index deleted, bundle restamped | — | 13.2 / 6.6 / 6.1 s | 12,909 (the copy only); the next such pass reads 0 |
+| Ordinary pass (times match): the same code either way | 2.2 s | 0.9–2.1 s | 0 |
+
+Read it carefully, because the warm numbers undersell it.
+- **The release case now reads nothing.** Its remaining ~4.5 s is restamping
+  12,909 copies (one `SetLastWriteTimeUtc` each), not reading.
+- **The cold cost the issue measured was the reads.** 102–132 s, with
+  Defender scanning each freshly installed bundle file on first open. With
+  the manifest, the bundle is not opened at all.
+- **A cold first-launch-after-install could not be reproduced here without
+  a reboot**, so that number is argued from the read count, not measured.
+  The director checks it at the next cut: the first launch's trail line
+  should say "(0 read in full)", or carry no reads at all.
+- **A copy whose own time moved is still read.** Nothing can tell it from an
+  edit; with the manifest, though, it is read once rather than twice.
+
+**What the director must check at the cut.** The INSTALLED `{app}\Toolchain`
+must keep the manifest's times (Inno records each file's time by default).
+The **zip** does not: `Compress-Archive` stores DOS times, at a resolution of
+2 s, so a copy unpacked from `Plantoir-win-x64.zip` has times no manifest
+entry matches. It falls back to today's reads, which is safe and only slow.
+
+**Rejected:**
+- **Building releases from a tree whose files keep their times (the issue's
+  option a).** It is a release-process promise that breaks silently:
+  director runs use a worktree per stack, any new clone restamps
+  everything, and a branch switch restamps every file it touches. It also
+  does nothing for a copy someone else restamped.
+- **Copying on every time mismatch.** Writing 12.9k files costs more than
+  reading them, with Defender scanning each write.
+- **Hashing the bundle lazily on first launch and caching that.** That IS
+  the cold read.
+- **Keeping the index beside `.toolchain`.** The teacher sees it, and it
+  travels with a copied folder.
+- **Not restamping a copy the hashes show identical.** It would save most of
+  the remaining 4.5 s, but `.toolchain`'s times would no longer be the
+  bundle's, and the build scripts read file times. Deferred until measured
+  cold, not done.
+
+The mac's mirror has the same design and the same flaw
+(`WorkspaceModel.filesLookIdentical` / `syncFile`); GitHub #663 asks it to
+match, counts on the trail included.
+
 ### What was rejected
 
 - **Copy into a temporary folder and rename it into place.** Atomic, but it
@@ -5200,6 +5310,11 @@ been one more thing to explain.
 - **A modal "please wait" dialog.** It would block exactly what the teacher
   can safely do meanwhile (read and edit pages, settings) and is the shape of
   the freeze this fixes.
+- **Trusting length and time alone, and reading both files when only the
+  length matched** — the comparison #473 shipped with. Correct, but its cost
+  follows the bundle's timestamps, and a release built from a fresh tree made
+  it read about 12,700 files twice (131.6 s). Replaced by fingerprints in #559
+  ("Comparing without reading", above).
 - **A contract key** for the banner states: window mechanics are not contract
   (`contracts/README.md`). The state → enabled and state → banner mappings are
   pure functions in Core (`ToolchainReadiness.RefusalFor`, `BannerFor`,
@@ -5210,12 +5325,23 @@ been one more thing to explain.
 `working folder tools copied` (`ActivityTrail.Event.WorkingFolderToolsCopied`;
 `shared-rules.json` → `activityTrail.mustRecord` — `appliesOn: ["windows"]`
 until the mac's #476 wrote it too) is written once per copy that changed or
-failed something, never for the ordinary pass:
+failed something — and, since #559, once per copy that had to READ any file
+to compare it — never for the ordinary pass:
 
 ```
 … · got the working folder ready — 2389 files brought up to date in 5.3 s — C:\…\workspace
-… · could not finish getting the working folder ready — 2 files could not be copied or removed (first: .toolchain\scripts\build_site.py, <its error>), 40 files brought up to date in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
+… · got the working folder ready — 14 files brought up to date, 12889 compared (12745 read in full) in 131.6 s — C:\…\workspace
+… · could not finish getting the working folder ready — 2 files could not be copied or removed (first: .toolchain\scripts\build_site.py, <its error>), 40 files brought up to date, 12860 compared in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
 ```
+
+Since #559 the line says how many files were **compared** with a copy that
+was already there, and in brackets how many of those had to be **read in
+full** to answer; each is said only when it is above 0, so a folder filled
+from nothing reads exactly as it did. The second line above is what 1.7.1 →
+1.7.2 would have written: the old line said "14 files" and nothing about the
+twelve thousand it read twice, which is why #559 took a measurement session
+to explain. Windows-only for now — the mac's line lacks the counts (GitHub
+#663).
 
 Since #477 the scheduled run's own copy writes it with the course and
 section, "got the working folder ready for a scheduled deploy — …", and a
@@ -5228,14 +5354,18 @@ scheduled run gave up), not on the trail: the run's own `scheduled publish
 waited for the course` line carries that.
 
 It does not say "after an update": the same copy fills a folder the picker sets
-up from nothing, and refreshes any stale one. And a pass that changed NOTHING
-but still took more than a second (a slow disk comparing 12,753 files) shows
-the banner and writes no line — which is fine: the banner was true while it
-was up, and a line saying "0 files" on every slow launch would bury the one
-that explains a real copy; the `startup.log` lines below still time it.
+up from nothing, and refreshes any stale one. A pass that changed nothing and
+READ nothing — every file answered by length and time, or by fingerprint —
+writes no line however long the disk took, because a line on every slow launch
+would bury the one that explains a real copy; the `startup.log` lines below
+still time it. A pass that changed nothing but had to read files DOES write
+one since #559 ("0 files brought up to date, 12903 compared (12903 read in
+full) in 11.2 s"): until then the 11.2 s pass #559 measured left no trace at
+all, and the reads are the whole story of a slow first launch.
 
 For a developer, `startup.log` brackets it: `tools copy started for '<folder>'`
-and `tools copy finished for '<folder>': Ready, N changed, M failed, S s`. Time
+and `tools copy finished for '<folder>': Ready, N changed, M failed, C
+compared, R read in full, S s`. Time
 from launch to window is `App.OnLaunched starting` (or `Program.Main starting`)
 to `MainWindow.Activate called`; launch to a usable Preview is the same start to
 `tools copy finished`.

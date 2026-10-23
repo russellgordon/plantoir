@@ -257,7 +257,7 @@ public sealed class ToolchainReadinessTests : IDisposable
     [Fact]
     public async Task ACopyThatChangedSomethingLeavesALineOnTheTrail()
     {
-        var copy = new HeldCopy { Result = new(1234, 0) };
+        var copy = new HeldCopy { Result = new(1234, 0) { Compared = 11500, ReadInFull = 12 } };
         copy.LetGo();
         ToolchainReadiness.Copier = copy.Copy;
 
@@ -269,7 +269,7 @@ public sealed class ToolchainReadinessTests : IDisposable
         finally { ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
 
         string trail = File.ReadAllText(ownTrail);
-        Assert.Contains("got the working folder ready — 1234 files brought up to date in", trail);
+        Assert.Contains("got the working folder ready — 1234 files brought up to date, 11500 compared (12 read in full) in", trail);
         Assert.Equal("working folder tools copied", ActivityTrail.KeyFor(ActivityTrail.Event.WorkingFolderToolsCopied));
     }
 
@@ -287,6 +287,33 @@ public sealed class ToolchainReadinessTests : IDisposable
         Assert.StartsWith("got the working folder ready — 1 file brought up to date in 0.5 s", ToolchainReadiness.TrailLine(@"C:\work", ready));
         // Written for a folder set up from nothing too, so it never says "update".
         Assert.DoesNotContain("update", ToolchainReadiness.TrailLine(@"C:\work", ready));
+
+        // #559: the files compared, and how many had to be read, when there were any.
+        var reread = new ToolchainReadiness.Status(ToolchainReadiness.State.Ready, 14, 0, 131.6, null,
+                                                   FilesCompared: 12889, FilesReadInFull: 12745);
+        Assert.StartsWith("got the working folder ready — 14 files brought up to date, 12889 compared (12745 read in full) in 131.6 s — ",
+                          ToolchainReadiness.TrailLine(@"C:\work", reread));
+        var onlyCompared = new ToolchainReadiness.Status(ToolchainReadiness.State.Ready, 0, 0, 11.2, null,
+                                                         FilesCompared: 12903, FilesReadInFull: 12903);
+        Assert.StartsWith("got the working folder ready — 0 files brought up to date, 12903 compared (12903 read in full) in 11.2 s",
+                          ToolchainReadiness.TrailLine(@"C:\work", onlyCompared));
+        var noReads = new ToolchainReadiness.Status(ToolchainReadiness.State.Ready, 3, 0, 0.7, null, FilesCompared: 12900);
+        Assert.StartsWith("got the working folder ready — 3 files brought up to date, 12900 compared in 0.7 s",
+                          ToolchainReadiness.TrailLine(@"C:\work", noReads));
+        var failedAfterReading = failed with { FilesCompared = 100, FilesReadInFull = 3 };
+        Assert.Contains(@"(first: .toolchain\scripts\build_site.py, access denied), 40 files brought up to date, 100 compared (3 read in full) in 12.3 s; ",
+                        ToolchainReadiness.TrailLine(@"C:\work", failedAfterReading));
+    }
+
+    [Fact]
+    public void APassThatOnlyReadFilesToCompareThemStillLeavesALine()
+    {
+        // #559's 11.2 s pass re-read every file, changed none, and left no line at all.
+        Assert.True(ToolchainReadiness.WritesATrailLine(new ToolchainMirror.CopyResult(0, 0) { Compared = 12903, ReadInFull = 12903 }));
+        Assert.True(ToolchainReadiness.WritesATrailLine(new ToolchainMirror.CopyResult(1, 0)));
+        Assert.True(ToolchainReadiness.WritesATrailLine(new ToolchainMirror.CopyResult(0, 1)));
+        // The ordinary launch: every file compared by length and time, nothing read, nothing to say.
+        Assert.False(ToolchainReadiness.WritesATrailLine(new ToolchainMirror.CopyResult(0, 0) { Compared = 12903 }));
     }
 
     // ---- What the window shows: state → buttons and banner ----------------
@@ -661,6 +688,9 @@ public sealed class ToolchainReadinessTests : IDisposable
         var ready = new ToolchainReadiness.Status(ToolchainReadiness.State.Ready, 12, 0, 15.2, null);
         Assert.StartsWith("got the working folder ready for a scheduled deploy — 12 files brought up to date in 15.2 s — ",
                           ToolchainReadiness.TrailLine(@"C:\work", ready, forAScheduledDeploy: true));
+        Assert.StartsWith("got the working folder ready for a scheduled deploy — 12 files brought up to date, 900 compared (40 read in full) in 15.2 s — ",
+                          ToolchainReadiness.TrailLine(@"C:\work", ready with { FilesCompared = 900, FilesReadInFull = 40 },
+                                                       forAScheduledDeploy: true));
         var failed = new ToolchainReadiness.Status(ToolchainReadiness.State.Failed, 3, 1, 2.0, "denied", @".toolchain\x.py");
         string line = ToolchainReadiness.TrailLine(@"C:\work", failed, forAScheduledDeploy: true);
         Assert.Contains("could not finish getting the working folder ready for a scheduled deploy", line);
