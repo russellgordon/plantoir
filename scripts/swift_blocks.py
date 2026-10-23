@@ -651,9 +651,11 @@ def _log_lines(text: str) -> list:
     return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
 
 
-def downloaded_bytes(text: str, steps=None, pins=None) -> int:
-    """What the build downloaded: the pinned bytes of every download step
-    whose header is in the log and that has no `#N CACHED` line."""
+def download_steps_in_log(text: str, steps=None, pins=None) -> list:
+    """Each download step whose header is in the log, in `downloadSteps`
+    order: (the step, its number, whether it ran, its architecture or None).
+    A step whose header is not there is left out, so a caller can tell a
+    build that downloaded nothing from a log this could not read."""
     steps = steps if steps is not None else _mac_rules()["downloadSteps"]
     pins = pins if pins is not None else _swift_image_pins()
     headers = {}
@@ -667,7 +669,7 @@ def downloaded_bytes(text: str, steps=None, pins=None) -> int:
             cached.add(number)
         elif _STEP_HEADER.match(rest) and number not in headers:
             headers[number] = rest
-    total = 0
+    found = []
     for step in steps:
         urls = []
         for name in step["foundBy"]:
@@ -677,13 +679,22 @@ def downloaded_bytes(text: str, steps=None, pins=None) -> int:
         for number, header in headers.items():
             if not any(url in header for url in urls):
                 continue
-            if number in cached:
-                break
             arch = _ARCH_WORD.search(header)
-            names = step["counts"].get(arch.group(1)) if arch else None
-            for name in names or []:
-                total += int((pins.get(name) or {}).get("bytes") or 0)
+            found.append((step, number, number not in cached, arch.group(1) if arch else None))
             break
+    return found
+
+
+def downloaded_bytes(text: str, steps=None, pins=None) -> int:
+    """What the build downloaded: the pinned bytes of every download step
+    whose header is in the log and that has no `#N CACHED` line."""
+    pins = pins if pins is not None else _swift_image_pins()
+    total = 0
+    for step, _number, ran, arch in download_steps_in_log(text, steps, pins):
+        if not ran:
+            continue
+        for name in step["counts"].get(arch) or []:
+            total += int((pins.get(name) or {}).get("bytes") or 0)
     return total
 
 
