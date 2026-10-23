@@ -308,7 +308,9 @@ likewise its own opt-in: `> [!quiz]` at the left edge of a page is a
 self-check question (multiple choice, select all, short answer, fill in the
 blank), with `> > [!answer]` and `> > [!explain]` inside it. One that cannot
 be checked shows its question with a short note, and is reported as the
-folder problem `quizzesNotReady`, beside `figuresCouldNotBeDrawn`. The rules
+folder problem `quizzesNotReady`, beside `figuresCouldNotBeDrawn`; one the
+website reads differently from the folder check is reported, from the
+site's build, as `quizzesReadDifferently` (#644). The rules
 and every case are in `contracts/shared-rules.json` → `quizCallouts`; the
 reasons are in [05](05-build-pipeline.md#self-check-quizzes-what-the-build-does-563-v180)
 and [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180).

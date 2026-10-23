@@ -8443,7 +8443,10 @@ window, `AssistSiteWork`) finishes: an answer is never raced by it. It is
 said on the FIRST build of a site-building process only, so a page broken
 while a preview runs is not reported by the assistant until the next
 preview — the same as the dialog (05 → "The safety net becomes a folder
-problem").
+problem"). Since #644 the same emitter says a second name in the same call,
+`quizzesReadDifferently` (a self-check question the site read differently
+from the folder check), on the same line and with the same timing, so it
+reaches the assistant the same way.
 
 ### check_section's third group, "linked but missed"
 

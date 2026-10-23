@@ -1935,8 +1935,10 @@ safety net's `plantoir: error:` line above told an assistant and nobody
 else. Since #567 the same blocks are one folder problem,
 `siteHealth.checks` → `runnableCodeShownAsPlainCode`, with the dialog, the
 assistant's answer and the trail line every other folder problem gets. It is
-the ONE check said from the site's build rather than before it
-(`siteHealth.whereItRuns`), and that is the whole design:
+one of the TWO checks said from the site's build rather than before it
+(`siteHealth.whereItRuns`; the other is the quiz safety net's, #644, in the
+next section, said by the same emitter in the same call), and that is the
+whole design:
 
 1. **The transformer records.** `codeRunner.ts`, in the branch that prints
    the line (and only for a page students can see), also pushes
@@ -2015,6 +2017,77 @@ section, #246); piping node's output through Python to catch the line (it
 would change the terminal the app's progress markers come through); and
 reusing `words.blockNotPrepared`'s words in the dialog ("if this line comes
 back" has no line there — the check has `reasons` of its own).
+
+### …and the quiz safety net (#644, v1.9.0)
+
+The self-check quizzes have a safety net of their own (below, "The safety
+net", `quizCallouts.safetyNet`): where the site and the folder check read a
+question differently, the site prints `plantoir: error: <page>: <where>:
+<readDifferently>`. Like the code runner's line, a teacher previewing in the
+app never saw it. Worse, in the direction that matters the teacher was told
+NOTHING: the site shows a short note in place of Check, and
+`quizzesNotReady`, worked out before the site exists, has nothing to say,
+because the folder check found nothing wrong. Since #644 those lines are a
+second site-said folder problem, `siteHealth.checks` →
+`quizzesReadDifferently`, on #567's path with no new reader:
+
+1. **The transformer records what it prints.** `plantoirQuizzes.ts`'s
+   `sayDisagreement` pushes `{page, n, line, reason, problem?, fill?}` onto
+   `file.data.plantoirQuizDisagreements` inside the branch that prints, so
+   there is exactly one record per line, and a site without its words
+   prints nothing and records nothing. The printed line is byte for byte
+   what it was. The four places it is called give the four `reasons` keys:
+   `shownWithNote` (a quiz the site shows as not ready that the check
+   passed, carrying the problem the SITE found and its values, never an
+   assumed `choicesInHtml`), `shownWorking` (the other way round),
+   `countedDifferently` (the top-level counts differ) and
+   `nestedReadDifferently` (only the quizzes inside a list or callout
+   differ, or their problems do). `line` is the one the folder check already
+   wrote into `plantoir_quiz_pages.json`: `lines[n-1]`, the first of
+   `lines`, or the first of `nestedLines`. Python never looks a line up
+   again, unlike #567's blocks.
+2. **One emitter, one call.** `plantoirSiteSaid.ts` gathers both lists
+   (`gathered` and `gatheredQuizzes`, the same rule: NFC, pages in path
+   order, hidden pages left out) and makes ONE `execFileSync` when either is
+   non-empty, with `{…, blocks, quizzes}` on stdin, the same once-mark and
+   the same 20 s timeout. Its `ℹ️` failure line no longer names blocks of
+   code ("Could not say what the website found: …").
+3. **Python says both.** `site_said.say` builds the code's finding, then the
+   quizzes' (`quiz_facts_from_site`, then
+   `site_health.quizzes_read_differently_finding`), each in its own `try`,
+   so one that fails costs only itself and one `ℹ️` line, and announces them
+   together, the code's first. It is still never `announce_or_stay_quiet`.
+4. **Places without a second scan.** `quizzes.check_pages` returns `places`,
+   each EXAMINED page's place by its path in the site's content (recorded
+   before the page's quizzes are read, so a page the site counts quizzes on
+   and the check does not still has one). `_check_quizzes` hands them on,
+   and `_write_site_said` adds `{"place", "source": None}` for each path not
+   already there, so a code page keeps its `source`.
+
+**Measured** (2026-10-23, Quartz's own ObsidianFlavoredMarkdown, GFM and
+the transformer, bundled in the scratchpad over a course folder's own Quartz 4.5.0, the plan review's harness; confirmed in the image by verify.sh): `<img
+alt="x>y" …>` on the line straight after the quiz's title reads as `single`
+and fine to the folder check, and as `notReady` / `choicesInHtml` to the
+site. That is direction `shownWithNote`, and verify.sh's end-to-end fixture
+(Quiz Read Differently) uses it. With an empty `>` line on either side of
+the `<img>` the two agree (`single`), which matches the advice
+`words.problems.choicesInHtml` gives. An open `<pre>` straight after the
+title fires the same way. The extra call costs nothing: it is the same
+Python start, made only when something disagrees.
+
+**Rejected:** merging into `quizzesNotReady` (both apps key a finding on
+name, course and section, #246, so the two would replace each other, and
+that check is said before the site exists); a second emitter or a second
+call to `site_said.py` (a second Python start and a second once-mark); a
+second `pages_students_see` scan to place the quiz pages (the folder check
+already reads each page it examines); Python finding the lines again (the
+folder check already found them, and the printed line already uses them);
+assuming the site's problem is `choicesInHtml`. `shownWorking` is kept
+although it contradicts `quizzesNotReady`'s own words: in that direction the
+folder check over-reported, the contradiction is honest, and the finding
+stays one piece per console line (director's ruling). The nested `reasons`
+are swept for machinery words by `test_site_disagreements.py`, not by the
+apps' sweeps, which read top-level strings only.
 
 ### Live input: what the build adds (#583, v1.8.1)
 
@@ -2312,7 +2385,11 @@ where they differ (the line from the pages file's `lines`; when the
 top-level counts differ, "the quiz at line L" of the first quiz the check
 found; when only the quizzes in a list or callout differ, "a quiz inside a
 list or another callout at line L" from `nestedLines`) - quiet otherwise. It relies on `build --concurrency 1` (the line
-reaches the build's output from the one parsing thread, review N1).
+reaches the build's output from the one parsing thread, review N1). Since
+#644 each line is also recorded, and the site's emitter says them all as
+ONE `quizzesReadDifferently` folder problem, after any
+`runnableCodeShownAsPlainCode` and in the same call (above, "…and the quiz
+safety net").
 Measured: a `- [ ] ` choice with nothing after the box was read as a box
 here and as text by the site, and the net said so on its first build; the
 rule was then corrected on both sides and pinned (`aBoxNeedsWordsAfterIt`).
