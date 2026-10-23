@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import QuartzTeachers
 
@@ -30,6 +31,20 @@ final class BundledFontTests: XCTestCase {
             let matched: NSFontDescriptor? = descriptor.matchingFontDescriptor(withMandatoryKeys: [.family])
             XCTAssertNotNil(matched, "Font family should be registered and available: \(familyName)")
         }
+    }
+
+    // MARK: - The system pairing (#629)
+
+    /// A site with the system pairing shows the reader's own system font
+    /// (San Francisco on a Mac, Segoe UI on Windows), never Helvetica, so
+    /// neither the label nor the preview may say Helvetica.
+    @MainActor
+    func testTheSystemPairingIsNotLabelledOrPreviewedAsHelvetica() {
+        let label: String = FontCatalog.pairingLabel(header: "Helvetica, Arial", body: "Helvetica, Arial")
+        XCTAssertTrue(label.hasPrefix("System fonts"), label)
+        XCTAssertFalse(label.contains("Helvetica"), label)
+        XCTAssertFalse(label.contains("Arial"), label)
+        XCTAssertEqual(FontChoiceEditorView.previewFont(family: "Helvetica, Arial", size: 13), Font.system(size: 13))
     }
 
     // MARK: - Sample headline
