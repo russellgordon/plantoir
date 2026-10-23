@@ -3,8 +3,8 @@
 
 The Windows twins of capture.py's `capture_code_set` and `capture_quiz_set`:
 every `preview-page` shot whose `capture.scene` is `code` or `quizzes`, except
-the two Swift ones (`NOT_ON_WINDOWS`: Swift stays read-only on Windows until #570 is decided (v1.9.0),
-so code-swift and code-swift-live stay owed).
+the two Swift ones (`NOT_ON_WINDOWS`: code-swift and code-swift-live stay owed until
+their 2x picture is taken; Swift runs on Windows since v1.8.6, #570).
 
 Each is a page of a NATIVE preview (print_set_windows.Preview, the bundled
 runtime) of the folder its `capture.workspace` names:
@@ -76,8 +76,8 @@ PREPARE_DIR = HERE / "prepare"
 PREPARE_TIMEOUT_MS = 120000
 
 SCENES = ("code", "quizzes")
-# Swift stays read-only on Windows until #570 is decided (v1.9.0): its two figures
-# stay owed, and no pass here takes them meanwhile.
+# The two Swift figures stay owed until their 2x picture is taken (Swift runs on
+# Windows since v1.8.6, #570), and no pass here takes them meanwhile.
 NOT_ON_WINDOWS = ("code-swift", "code-swift-live")
 
 # #557: a Windows window capture is never scaled, and stands beside the Mac's
@@ -448,7 +448,7 @@ def capture_preview_pages(selection: dict[str, list[str] | None], dry_run: bool 
             unknown = [identifier for identifier in only if identifier not in [shot["id"] for shot in chosen]]
             if unknown:
                 raise SystemExit(f"Not a Windows {scene} figure: {', '.join(unknown)}"
-                                 + (" (Swift stays read-only on Windows until #570 is decided, v1.9.0)"
+                                 + (" (the Swift two stay owed until their 2x picture is taken)"
                                     if set(unknown) & set(NOT_ON_WINDOWS) else ""))
         for shot in chosen:
             if shot not in shots:

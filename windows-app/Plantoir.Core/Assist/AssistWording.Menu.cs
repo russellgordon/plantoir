@@ -178,6 +178,12 @@ public static partial class AssistWording
 
     public const string MenuFindAPage = "Find a page";
 
+    /// <summary>
+    /// The picker's and the later-classes list's Date column (#634, the mac's
+    /// #608): a class's day, as <see cref="LaterClassesDay"/> says it.
+    /// </summary>
+    public const string MenuPickDateColumn = "Date";
+
     public const string MenuContinueButton = "Continue";
     public const string MenuPublishButton = "Publish";
     public const string MenuHideButton = "Hide";

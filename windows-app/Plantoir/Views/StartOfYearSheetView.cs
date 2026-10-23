@@ -21,16 +21,18 @@ namespace Plantoir.Views;
 /// </summary>
 internal static class StartOfYearSheetView
 {
-    /// <summary>The sheet's width, as the Section menu's plan table (#548).</summary>
-    private const double SheetWidth = 680;
+    /// <summary>
+    /// The sheet's width at the window's 900-epx minimum, as the Section menu's
+    /// plan table (#548); since #634 (the mac's #621, the sheets resize) it
+    /// follows a wider window up to 300 more (<see cref="PageTableLayout.DialogWidth"/>),
+    /// and the Page column takes the width (Why capped at 300, the mac's).
+    /// </summary>
+    private const double SheetWidth = PageTableLayout.PageSheetWidth;
 
     /// <summary>ContentDialog's padding at each side of its content.</summary>
-    private const double DialogPadding = 24;
+    private const double DialogPadding = PageTableLayout.DialogPadding;
 
-    /// <summary>What the dialog leaves of the window at each side when the window is narrower.</summary>
-    private const double Margin = 24;
-
-    private const double PageColumn = 170, FolderColumn = 140, ColumnSpacing = 12, RowPadding = 12;
+    private const double ColumnSpacing = PageTableLayout.ColumnSpacing, RowPadding = PageTableLayout.RowPadding;
 
     /// <summary>A row is at least this tall (<c>ListViewItem.MinHeight</c>, measured 32 epx for #548).</summary>
     private const double OneLineRow = PlanTableLayout.RowPitch;
@@ -40,9 +42,11 @@ internal static class StartOfYearSheetView
 
     public static void Build(ContentDialog dialog, StartOfYearSheet sheet)
     {
-        double width = SheetWidth;
-        dialog.Resources["ContentDialogMinWidth"] = width;
-        dialog.Resources["ContentDialogMaxWidth"] = width;
+        // The template reads these once, so they are opened wide and the
+        // content carries the width, which follows the window (#634). Every
+        // fit is #619's up to 756 epx; a taller window gives the table rows.
+        dialog.Resources["ContentDialogMaxWidth"] = 100000.0;
+        dialog.Resources["ContentDialogMaxHeight"] = 100000.0;
 
         // ---- Above the table: the warnings first, then the intro.
         var above = new StackPanel { Spacing = 8 };
@@ -69,13 +73,23 @@ internal static class StartOfYearSheetView
         }
 
         // ---- The table.
+        var grids = new List<Grid>();
         Grid Columns()
         {
             var grid = new Grid { ColumnSpacing = ColumnSpacing };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(PageColumn) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(FolderColumn) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grids.Add(grid);
             return grid;
+        }
+        void SizeTheColumns(double sheetWidth)
+        {
+            var (page, folder, why) = PageTableLayout.StartOfYearColumns(sheetWidth);
+            foreach (var grid in grids)
+            {
+                grid.ColumnDefinitions[0].Width = new GridLength(page);
+                grid.ColumnDefinitions[1].Width = new GridLength(folder);
+                grid.ColumnDefinitions[2].Width = new GridLength(why);
+            }
         }
         var list = new ListView
         {
@@ -126,9 +140,10 @@ internal static class StartOfYearSheetView
             list.Items.Clear();
             foreach (var row in PlanTableOrder.Sorted(sheet.Rows, order.Column, order.Ascending))
                 list.Items.Add(rowItems[row.Position]);
+            TickTable.Band(list);
         }
         var header = Columns();
-        header.Margin = new Thickness(RowPadding + 1, 0, RowPadding + 1, 0);
+        header.Margin = new Thickness(RowPadding + PageTableLayout.TableBorder, 0, RowPadding + PageTableLayout.TableBorder, 0);
         var sortButtons = new List<(Button Button, string Title, PlanTableOrder.Column Column)>();
         void TitleTheHeaders()
         {
@@ -197,14 +212,18 @@ internal static class StartOfYearSheetView
         // whenever the window changes size while the sheet is up.
         StartOfYearSheetLayout.Fit? fitted = null;
         double measuredChrome = StartOfYearSheetLayout.Chrome;
-        double contentWidth = width;
+        double fittedWidth = 0;
+        SizeTheColumns(SheetWidth);
+        panel.Width = SheetWidth - 2 * DialogPadding;
         void Refit()
         {
             if (dialog.XamlRoot is not { } root) return;
             double windowHeight = root.Size.Height > 0 ? root.Size.Height : StartOfYearSheetLayout.DialogMaxHeight;
-            double sheetWidth = root.Size.Width > 0 ? Math.Min(SheetWidth, root.Size.Width - 2 * Margin) : SheetWidth;
-            contentWidth = sheetWidth - 2 * DialogPadding;
-            double whyWidth = contentWidth - 2 - 2 * RowPadding - PageColumn - FolderColumn - 2 * ColumnSpacing;
+            double sheetWidth = root.Size.Width > 0 ? PageTableLayout.DialogWidth(SheetWidth, root.Size.Width) : SheetWidth;
+            double contentWidth = sheetWidth - 2 * DialogPadding;
+            panel.Width = contentWidth;
+            SizeTheColumns(sheetWidth);
+            double whyWidth = PageTableLayout.StartOfYearColumns(sheetWidth).Why;
 
             double Height(UIElement element)
             {
@@ -227,8 +246,9 @@ internal static class StartOfYearSheetView
 
             var fit = StartOfYearSheetLayout.For(windowHeight, measuredChrome, warningsHeight, aboveHeight,
                                                  mustReadHeight, notesHeight, rowHeights);
-            if (fit == fitted) return;
+            if (fit == fitted && fittedWidth == sheetWidth) return;
             fitted = fit;
+            fittedWidth = sheetWidth;
             aboveScroller.MaxHeight = fit.AboveCap;
             list.MaxHeight = fit.TableHeight;
             notesScroller.MaxHeight = fit.NotesCap;

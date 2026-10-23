@@ -211,6 +211,7 @@ computing its own path (see "The flags the app answers"):
 | `scheduled\folder-problems\` | What last night's build found wrong with a course's folders, for the next time there is somebody to tell. |
 | `assist\`, `models\` | The assistant's MCP configuration (`mcp-<CODE>.json`) and the model weights it downloads. |
 | `WebView2\` | The embedded preview's user-data folder. |
+| `swift\` | Since v1.8.6 (#570): `6.4.0\` is Swift, about 0.9 GB, fetched by the first preview with a Swift block (`READY.json` says which pins it is); `work\` is the per-block compile folder; `download\` and `staging-*` exist only while getting Swift ready; `fetch.lock` and `fetch.log` beside them. Resolved by the LAUNCHER's Python from `%LOCALAPPDATA%` (`swift_windows_fetch.home()`, `PLANTOIR_SWIFT_HOME` for a test), so `--state-dir` does NOT move it. Uninstalling leaves it. |
 | `settings.json` | The app's own settings — and, since Windows has no system window restoration, the remembered-windows list IS the restoration mechanism. (`AssistWindowPlacements`, beside it, is deliberately NOT replayed: restoring an assistant window would load a multi-gigabyte model unasked, so it remembers placement only and is a separate type.) |
 
 **The folder id is a hash, and it must never be derived twice.** The launcher
@@ -5927,8 +5928,11 @@ stage's `MenuPage.Folder` gives "" for a root page. Left as it is.
 13 = the table's 1-epx border plus the rows' 12 of padding), columns Page 170,
 Folder 150, What changes the rest, each cell trimmed with its whole text in a
 tooltip (as the mac), each row `sectionVerbPlanRow<plan position>` and named
-"title, folder, what changes" for Narrator. No alternating backgrounds.
-REJECTED: `ItemsView` (no columns or header either, and no precedent here);
+"title, folder, what changes" for Narrator. No alternating backgrounds
+until #634, which banded it (and the picker before it, which since #634 is a
+`SelectionMode = Single` table of its own — "The picker as a table, the plan
+folds, the dialogs follow the window", below); since #634 too the column
+widths are set from the dialog's width rather than fixed. REJECTED: `ItemsView` (no columns or header either, and no precedent here);
 a toolkit DataGrid (no toolkit package is in the project, and a dependency
 in the self-contained bundle for one read-only list that the app already
 draws by hand buys nothing a teacher can see — and would be Russell's call).
@@ -5942,7 +5946,10 @@ precedent), so the dialog is the same width at every stage — the mac rejected
 widening mid-flow because the sheet jumps. On a window narrower than 680 + 2 ×
 24 epx it takes the window's width less 24 at each side (at 175% and 200% a
 1920-pixel screen's default window is about 680 and 595 epx wide). The panel
-stretches to it.
+stretched to it. **Superseded by #634:** the width now follows the window
+(680 at its 900-epx minimum, up to 980), carried by a host `Grid` inside the
+dialog at every stage, because the template reads those two resources once —
+see "The picker as a table, the plan folds, the dialogs follow the window".
 
 **Height: what fits the window — a deliberate departure from the mac's fixed
 12 rows.** ContentDialog's content `ScrollViewer` has its vertical scrolling
@@ -5958,11 +5965,14 @@ cap is clamp(min(H, 756) − 230 − 2 − 8 − 4 × 32, 40, 120) epx, and it i
 notes scroller's `MaxHeight`, so a note cut short scrolls into view. Then the
 ROWS: clamp(floor((min(H, 756) − 230 − 2 − shown notes − 8) / 32), 2, 12)
 (`FewestRows` 2), after which the table scrolls inside itself. 756 is
-ContentDialog's own maximum height; 230 is everything else on the stage
+ContentDialog's own maximum height (since #634 the page dialogs raise it, and a
+window taller than 756 gives every further 32 epx to the table as one more
+row — `PlanTableLayout.ExtraRows`; under 756 every count here holds); 230 is everything else on the stage
 (measured 220–222). The counts are made again on `XamlRoot.Changed` while the
 plan shows, so a window resized under the plan does not clip what was counted
-for its old size; the handler is on the WINDOW's XamlRoot, so it is taken off
-in the dialog's `Closed` as well as when the stage moves on — a close at the
+for its old size; the handler is on the WINDOW's XamlRoot, so it is attached on
+`Opened` and taken off in the dialog's `Closed` (since #634 `SetContent` swaps the
+relayout for each stage instead) — a close at the
 plan changes neither, and it would otherwise stay for the window's life
 (the third review). No unit test reaches that: it is window code.
 `PlanTableTests.EverythingFitsWheneverTwoRowsAndTwoLinesOfNotesCan` pins the
@@ -7319,16 +7329,19 @@ file 200 with a runnable type, a worker CSP that allows wasm, the borrowed
 page's runnable block, COOP/COEP on that page and COEP on both engine
 folders, none on the front page, KaTeX's stylesheet as `text/css` and a
 face, no CSP naming jsdelivr, and the folder publishes' engine and KaTeX
-files against the contract's hashes. Swift is checked as far as Windows
-carries it — `static/swift/plantoir-swift-worker.js` and `plantoir-wasi.mjs`
-as JavaScript with COEP, and the overlay byte for byte — and the borrowed
-page's ```` ```swift run ```` fence is EXPECTED to be reported as not ready
-(`swift.reasons.notOnWindows` on a `plantoir: error:` line, and the
-`swiftCouldNotBePrepared` folder problem) by the preview and by the publish
-that rebuilds; and the compiled program, which Windows cannot make (#570),
-is asserted ABSENT — a program found on a Windows-built site fails the run —
-rather than skipped, so a Windows run can be the "nothing skipped" run
-`RELEASING.md` asks for (the #568 implementation review). It also times each Netlify and Cloudflare publish and counts the
+files against the contract's hashes. Swift is checked as
+verify-deploy.sh checks it — `static/swift/plantoir-swift-worker.js` and
+`plantoir-wasi.mjs` as JavaScript with COEP, the overlay byte for byte, and
+since v1.8.6 (#570) the borrowed page's compiled program: the page carries
+`data-runner-wasm`, the program answers 200 and starts with `\0asm`, the
+folder publishes carry it in `static/swift-wasm/`, and the preview and the
+publish that rebuilds say the block is ready (no `plantoir: error:` line,
+no `swiftCouldNotBePrepared`). The first run on a PC gets Swift ready
+through the preview, the product path (about 2.3 GB, a few minutes). Until
+v1.8.6 the program was asserted ABSENT and the not-ready line EXPECTED
+(`swift.reasons.notOnWindows`), rather than skipped, so a Windows run could
+be the "nothing skipped" run `RELEASING.md` asks for (the #568
+implementation review). It also times each Netlify and Cloudflare publish and counts the
 bytes sent on the interface the default route uses (route metric plus
 interface metric: sorting on the route's alone read a Wi-Fi counter that
 never moved beside the wired adapter).
@@ -7360,38 +7373,311 @@ right ones and the publishes succeeded; the anchored patterns are what
 refused them. It predates this piece (nothing here touches `deploy.py`'s
 prompts or PtyDriver) and is #623.
 
-## Runnable Swift (#493), v1.8.0: Windows compiles none of it yet
+## Runnable Swift on Windows (#570, the mac's #493), v1.8.6
 
-The mac compiles a course's ` ```swift run ` blocks in a SECOND container
-image, started by the launcher before the build (05 → Runnable Swift, 02 →
-The Swift image). Windows has had no container since 2026-08-19, so there is
-nothing to start, and in v1.8.x **Windows compiles no Swift** (#493 option
-(b), Russell's ruling). What reaches this side unchanged, and works today:
-the site's code (the transformer, `SwiftWasmRuntime`, the worker and the
-WASI shim in `support/gated/swift/` - so a site published from a Mac runs its
-Swift blocks in any browser, Edge and the WebView2 pane included), the shared
-Python (`swift_blocks.py`'s prepare runs in every build here, finds no
-programs, and - because it is chosen in the shared Python on `os.name`
-(review N2) - says each block is not ready with
-`codeRunnerBlocks.swift.reasons.notOnWindows`, as a `plantoir: error:` line
-and as the `swiftCouldNotBePrepared` folder problem), the contract cases
-(`swift.reasonCases` carry `appliesOn`), and the skill's Swift section, which
-tells an assistant Windows cannot make Swift runnable yet. The Swift engine
-needs no vendor folder (`page_features.OVERLAY_IS_THE_ENGINE`), so a Windows
-site carries the thread and shows each block with Run off and
-`words.notReady` - never a broken Run button.
+Since v1.8.6 a ` ```swift run ` block built on Windows is a program a student
+runs, exactly as one built on a Mac. Until then (v1.8.0–1.8.5, #493 option
+(b)) Windows compiled nothing and every block said
+`swift.reasons.notOnWindows`; that reason and the 1.8.5 stopgap are gone.
+The site's half (the transformer, `SwiftWasmRuntime`, the worker and the
+WASI shim in `support/gated/swift/`) was never platform-specific and is
+unchanged. The mac compiles in a second container image (05 → Runnable
+Swift, 02 → The Swift image); Windows has no container, so what replaced the
+image is a one-time fetch of the swift.org **Windows** toolchain, and what
+runs `compile.py` is a small wrapper.
 
-**What Windows must decide** is in the `windows` issue for #493: (a) a native
-swift.org Windows toolchain and the same wasm SDK fetched on demand into the
-runtime (size, the wasm cross-compile on Windows and byte-for-byte agreement
-with the mac's programs are all unmeasured; `swift-gate/` is the test), or
-(c) programs carried in the course folder so a Mac-compiled course works
-here (rejected so far: build output stays out of the vault). Until then
-`preview.ps1` has no Swift step. Nothing here should go red: no Windows
-test reads `codeRunnerBlocks.swift` or `swiftImage` yet, and
-`RepairIsOfferedForExactlyTheContractsChecks` finds the new
-`swiftCouldNotBePrepared` check in `siteHealth.repair.neverOffered`, where
-review S8 put it so this suite and the mac's stay green.
+### What happens at a preview
+
+`preview.ps1`'s `Invoke-RunnableSwift`, just after "Running the website
+builder on this PC" and before `build_site.py`. It is the order of
+`preview.sh`'s `prepare_runnable_swift`:
+
+1. **Plan**: `swift_blocks.py plan --course=C --format=lines`, with the
+   bundled Python (the shared plan; the cache is
+   `%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>\.swift-cache\<toolchain id>`).
+   If nothing is waiting, nothing else happens, so a teacher who never
+   writes Swift never downloads Swift.
+2. **Get Swift ready**: `swift_windows_fetch.py ensure`, IN THE FOREGROUND,
+   as the mac builds its image in the foreground. If Swift is already ready
+   it says nothing. If not, it prints `codeRunnerBlocks.swift.windows.printed`
+   in this order: `gettingReady`, then `gettingReadyPercent` about every ten
+   per cent (the mac goes quiet for its minutes; a school line takes about
+   six here), `unpacking`, then `ready`, followed by a `PLANTOIR_SWIFT:`
+   line for the trail.
+3. **Compile**: `🦅 Making N Swift programs ready to run…`, then
+   `swift_windows_compile.py <jobs> <cache> --log=<.swift-cache\logs\compile-<pid>.log>`.
+4. **Prepare**: the build, unchanged. It reports `🦅 6 of 7 Swift programs
+   on this site ready to run`, a `plantoir: error:` line for each block that
+   has no program, and the `swiftCouldNotBePrepared` folder problem.
+
+Exit codes of `ensure` (`windows.ensureExit`), and the `state.json` the
+launcher writes for prepare:
+
+| Exit | State | Cause |
+|---|---|---|
+| 0 | none | Ready. |
+| 10 | `noRoom` | Too little room. |
+| 11 | `notDownloaded` | Offline, or a download that was not what was pinned. |
+| 12 | none, so the build says `notCompiled` | Another installation running, an unpack that failed, or the wait for another launcher gave up. |
+
+The reasons are the mac's own. `notDownloaded`'s
+"(the first time downloads about {downloadGigabytes} GB)" is filled per
+platform (`swift.downloadGigabytes`: 1.3 on a Mac, 2.3 here), so the mac's
+rendered sentence is byte for byte what it was.
+
+**A scheduled publish can do the first fetch unattended.** It runs
+`preview.ps1 --build-only`, so it gets Swift ready and compiles too (the
+mac's ruling Q4). On a PC where no preview has got Swift ready yet, the
+first scheduled publish of a course with a Swift block downloads the 2.3 GB
+on its own, typically overnight with nobody watching, and the publish waits
+for it (about three minutes here, longer on a slow line). Nobody sees the
+percent lines, which go only to the run's log. What the teacher sees later:
+- the trail line "Swift got ready on this computer" (or "Swift could not
+  be got ready", with the reason), because `TaskScheduling.cs`'s wrapper
+  keeps the `PLANTOIR_SWIFT:` line and `ScheduledHealthFindings` records
+  it, dated to the run;
+- on the published site, every block runnable, or the usual "not ready" for
+  each block, with the `swiftCouldNotBePrepared` folder problem waiting at
+  the next launch, as for any scheduled build's folder problems.
+
+A scheduled run that fails offline tries again at the next run or preview.
+Nothing is downloaded for a course with no Swift.
+
+### What is fetched, where, and how big
+
+Everything is pinned in `contracts/toolchain.json` → `swiftWindows`, and
+everything is non-admin. Measured 2026-10-22 on this PC (Lenovo 20QES70500,
+i5-8365U, 4 cores / 8 threads, 16 GB, Windows 11 Pro 26200, Ethernet, not
+elevated):
+
+1. The swift.org installer,
+   `swift-6.4.0-RELEASE-windows10.exe` (2,097,914,680 B). The download
+   resumes with HTTP Range. Its SHA-256 is checked, then its Authenticode
+   signer: Windows' own `Get-AuthenticodeSignature` must say `Valid`, with
+   `CN=Apple Inc.` and `O=Apple Inc.` in the subject. It is the only Windows
+   artifact swift.org publishes; there is no checksum entry and no `.sig`.
+   So the pinned SHA-256 is the check, and the signature is defence in
+   depth.
+2. The bundle's payloads sit in ONE solid LZX cabinet attached at byte
+   1,312,800. The fetch checks for `MSCF` there, a cbCabinet of
+   2,096,591,258 (pinned), and that the cabinet ends inside the file
+   (10,622 B before its end, where the signature is). Then it copies the
+   cabinet out.
+3. Windows' own `expand.exe container.cab -F:<id>` takes out `a1`
+   `bld.noasserts.msi`, `a14` `bld.noasserts.cab`, `a10` `rtl.amd64.msi`
+   and `a23` `rtl.amd64.cab`. Each is checked against the **SHA-512 in the
+   bundle's own Burn manifest** (`Payload/@Hash`, Apple's), so no second
+   2.1 GB download was needed to take hashes.
+4. `msiexec /a <msi> TARGETDIR=<dir> /qn` (an administrative extraction: no
+   UAC, not elevated) for the compiler and the runtime. Exit 1618 (another
+   installation running) waits 30 s, three times, then gives up as `busy`.
+5. A trim to the measured set (`trim.remove` / `mustKeep`): from
+   1,874,323,927 B to 533,231,069 B. The VC++ runtime DLLs from the runtime
+   MSI (`trim.vcRuntime`) go beside the tools, because a PC without the
+   redistributable lacks VCRUNTIME140, VCRUNTIME140_1 and MSVCP140.
+6. The mac's own wasm SDK pin (92,760,992 B), unpacked with `tar.exe`, and
+   binaryen version_133 x86_64-windows (111,045,528 B), of which only
+   `wasm-opt.exe` is kept, OUTSIDE the toolchain's `bin`.
+7. A smoke compile of one tiny program through the real wrapper. An install
+   that cannot compile is never marked ready. Then `READY.json` (the pins'
+   digest, the bytes kept and the seconds per step) is written, and the
+   staging folder is renamed to `%LOCALAPPDATA%\Plantoir\swift\6.4.0`. The
+   installer and the tarballs go only then, so a step that fails late
+   needs no second download.
+
+**Downloaded:** 2,301,721,200 B (about 2.3 GB). **Kept:** 898,260,086 B
+(the toolchain 533,231,069 B, the SDK 354,685,593 B, wasm-opt
+10,343,424 B; `swiftWindows.keptBytes`). The measurement's hand trim was
+3,268 B smaller, because it also removed `usr/bin/clang-deps-launcher.py`,
+a Python script nothing here runs, which `trim.remove` does not name.
+`keptBytes` is not part of the install digest, so correcting it fetched
+nothing again. **Peak while
+unpacking:** 4,817,697,631 B, sampled every 2 s (the installer, the carved
+cabinet and the extraction overlap). That is inside the shared
+`room.needGigabytes` of 6, which is checked before anything is downloaded.
+
+| Run | Download | Check (hashes + signature) | Expand | msiexec + trim | SDK + wasm-opt | Smoke | Total |
+|---|---|---|---|---|---|---|---|
+| `ensure` on its own | 21.5 s | 40.1 s | 31.3 s | 56.0 s | 7.6 s | 6.8 s | **164 s** |
+| `ensure` resumed after a kill 6 s in (478 MB already there) | 22.7 s | 47.4 s | 15.4 s | 29.0 s | 4.1 s | 6.2 s | **126 s** |
+| inside the first `preview.ps1 EXC2O 1 --build-only` | | | | | | | **127 s** (preview 263 s in all, 7 blocks compiled) |
+
+The download ran at about 100 MB/s here. A 50 Mbit/s school line would take
+about six minutes, which is why the percent line exists.
+
+**A kill is safe.** Stop Preview ends the fetch with the launcher. The
+partial `.part` is resumed with Range the next time (measured above). Once
+the next fetch holds the lock it deletes every `staging-*` and `old-*`
+folder, and prunes a version folder for other pins, as the mac prunes
+superseded images. One fetch at a time per PC: `fetch.lock` is held with
+`msvcrt.locking` for the life of the process, so a killed holder releases
+it by dying. A second launcher prints `waitingForAnother` and waits up to
+1,200 s, the mac's `take_the_swift_build_lock` limit, then
+`stillGettingReady`.
+
+**The first real run failed, and that changed two things.** Renaming the
+compiler's folder the moment `msiexec` had written it said "Access is
+denied" (most likely Defender scanning the new files). With the installer
+already deleted, the retry cost a second 2.1 GB download. Now every folder
+move is tried again for up to 20 s (`move`, `rename_into_place`), and the
+installer is kept until Swift is ready, which makes the measured 4.82 GB
+peak about 0.3 GB higher than deleting it after the carve would.
+
+**Uninstalling Plantoir leaves the 0.9 GB** in `%LOCALAPPDATA%\Plantoir\swift`,
+as it leaves the assistant's models. Delete the folder to reclaim it; the
+next Swift preview fetches again.
+
+### The compile wrapper: compile.py unchanged, adjusted for this PC
+
+`scripts/swift_windows_compile.py` sets `PLANTOIR_SWIFTC`,
+`PLANTOIR_SWIFT_SDK` and `PLANTOIR_WASM_OPT` to the install, then imports
+`support/swift/compile.py` from the working folder's `.toolchain` without
+writing `__pycache__` beside it. It then changes these names, each checked
+to exist by `test_swift_windows.py` (`PATCHED`), so a rename in compile.py
+fails a test instead of silently going unpatched:
+
+- **`environment()`.** `PATH` is the toolchain's `bin` plus System32, with
+  `SystemRoot`, and `TEMP`/`TMP`/`USERPROFILE`/`HOME` in
+  `swift\work\tmp`. compile.py's own environment (`…:/usr/bin:/bin`,
+  `HOME=/tmp`, no `SystemRoot`) made every block "compile" in 1.8 s as
+  `error: permissionDenied`, cached as the code's fault.
+- **`CLANG`** is `clang.exe`.
+- **`OBJECT_ROOT`** is `%LOCALAPPDATA%\Plantoir\swift\work`, a fixed
+  folder per block. Measured: the same code in the same folder gave the same
+  bytes (01-greeting compiled again was byte-identical to the preview's
+  program). Programs from two different homes differ in 16 bytes, the
+  module hash (spike G4). Two previews compiling one block would share its
+  folder, so each block is taken under a lock file of its own, and a
+  preview that finds the lock held leaves that job to the other.
+- **`-nonlib-dependency-scanner`** on both compiles
+  (`windows.compile.extraCompileFlags`). Without it, the libSwiftScan
+  warning was the first line of every cached diagnostic.
+- **`tidy()`** strips the work folder in both separators, and keeps a
+  failure's words ONLY when they carry `error:`. The guard is the
+  environment fix, plus the preflight below, plus this rule: a failure with
+  no `error:` in it goes down compile.py's own "stopped without saying why"
+  path and is not cached. `run()` turns a missing program (`OSError`) into
+  `NotTheCompilers`, also not cached.
+- **`JOB_SECONDS`** is `compile.jobSecondsOnWindows` (600), and at most
+  `mostFullAtOnce` (2) full-library compiles run at once. The worker count
+  is compile.py's `main`'s local, so the wrapper runs its own loop with one
+  worker per CPU and holds a semaphore around the full-library
+  `compile_one_way`.
+- **A preflight before any job**: the tools, the SDK and one tiny program.
+  If it fails, the wrapper exits 3, touches no job and caches nothing.
+
+**The toolchain id on Windows** (`cache.toolchainIdFromOnWindows`) hashes
+the four recipe files with their CR LF made LF (this checkout writes CR LF;
+the id must not differ by accident), the wrapper, and the canonical JSON of
+the pins' HASHES (installer SHA-256, payload SHA-512s, configuration, SDK,
+binaryen). A Windows cache and a Mac cache
+therefore never share an id, a moved Windows pin compiles everything again,
+and a `why` edit compiles nothing. The mac's id is unchanged byte for byte:
+its branch normalises nothing, and a test recomputes the old formula.
+
+### Measured: the gate and the product path
+
+- **swift-gate, through the product wrapper.** The 15 fragments compiled in
+  **165 s** wall. The measurement's bare loop, eight full-library compiles
+  at once, took 153 s; two at a time costs about the same wall time and
+  keeps every wasm-opt step near its 50 s alone. The program sizes and
+  libraries are the mac's README table exactly (01 = 62,347 embedded,
+  05 = 3,453,463 full, 15 = 39,652). `node browser-checks/wasi_run.mjs` on
+  an LF copy printed `OK: 15 fragments and the shim's own checks`,
+  including the G5 must-fail and live input.
+- **A course (EXC2O) with verify.sh's 7-block Swift Playground page.**
+  - Getting ready plus the build: 263 s.
+  - A preview with the cache emptied took 91 s. Its compile log: embedded
+    blocks 4.7–12.5 s each, the full-library block 60.3 s (almost all of it
+    wasm-opt), and the broken block's compile error in 3.4 s.
+  - The build then said `🦅 6 of 7 Swift programs on this site ready to run`
+    and one `plantoir: error: Exercises/Swift Playground.md: swift block 5,
+    line 64: Swift found an error in it: cannot find 'nmae' in scope`.
+  - **The next preview took 28 s and compiled nothing.**
+- **`browser-checks/swift_runner.mjs` in headless Edge 155.0.4283.60**
+  (Node 20 with `--experimental-websocket`, against that build):
+  `OK: {"embeddedFirstRun":{"ms":70,"bytes":62347},"fullFirstRun":{"ms":123,"bytes":3453463},"stopMs":7}`.
+  The WebView2 pane (the same Chromium) was not driven.
+- **`verify-deploy.ps1`**, against `~/Desktop/plantoir-deploy-verify` (ICS3U,
+  with Swift already ready on the PC), took 14 minutes:
+  **148 passed, 0 failed, 0 skipped**. Those are the totals the earlier
+  measurement predicted for a clean run once the eight standing Swift skips
+  became checks. The page's program (45,844 B) answered HTTP 200 as
+  `application/wasm` from Netlify, Cloudflare and both pairings; every folder
+  publish carried it in `static/swift-wasm/`; and the preview and the
+  publish that rebuilt said nothing was wrong with the block.
+- **A trap for whoever runs these here:** with `core.autocrlf=true`,
+  swift-gate's `.expected` and `.stdin` are CR LF. `wasi_run.mjs` and
+  `swift_runner.mjs` both FAIL on line endings alone (the full-library
+  block's output "does not match"). Run them against LF copies of the files.
+
+### The wasm-opt risk
+
+On this i5-8365U a full-library block costs about 50 s, against the mac's
+7–10 s. wasm-opt `-Os` is 48.9 s of it: 105.4 s with one thread, 48.1 s with
+eight, and identical output every time. The likely cause is that wasm-opt
+uses the MSVC CRT's allocator where the Swift tools load mimalloc; that is
+unproven. 600 s per step and two at a time leave a slow PC about ten times
+the margin. A block that still passes the limit is not cached, so it is
+tried again at every preview, and the build says `notCompiled` meanwhile.
+The cure for a teacher is the one the skill already gives: a one-argument
+`print` stays Embedded (5–12 s). **Not measured:** a slower PC, Windows on
+Arm (not pinned: the app is win-x64 only), and the WebView2 pane.
+
+### Where Windows deliberately differs from the mac
+
+| The mac | Windows | Why |
+|---|---|---|
+| A second container image, built by Docker from `support/swift/Dockerfile` | The swift.org Windows installer, unpacked without elevation | No container on Windows since 2026-08-19 |
+| `docker run --network none` isolates the compile | The compile runs as the teacher, with the network there | No container to isolate in; the job is the teacher's own code |
+| The image tag hashes `support/swift`; the Docker layer cache holds it | `READY.json` carries the pins' digest; a version folder for other pins is pruned | Nothing is built, so nothing is tagged |
+| The image build goes quiet for its minutes | A percent line about every 10% | A 2.3 GB download on a school line |
+| `/tmp/plantoir-swift/<key>`, a different `/tmp` per container | `swift\work\<key>`, shared by every preview, under a per-block lock | One host, one folder |
+| 1.3 GB downloaded, 2.24 GB kept | 2.3 GB downloaded, 0.9 GB kept | Each platform's smallest working form |
+| GPG signature, plus a SHA-256 per tarball | SHA-256 on the installer, Apple's SHA-512 per payload, Authenticode as defence in depth | swift.org publishes no Windows `.sig` |
+
+**Rejected** (`swiftWindows.rejected`):
+
+- Carrying Swift in the installer: 0.9 GB for every teacher.
+- `swift sdk install`: it needs MSVC's `link.exe`.
+- `installer.exe /layout`: it copies only itself.
+- An HTTP Range fetch of just the payloads: one solid LZX folder, measured
+  MISMATCH.
+- The default asserts toolchain.
+- WiX's `wix burn extract`: a .NET tool to ship, where `expand.exe` comes
+  with Windows.
+- cabinet.dll FDI in-process, to avoid carving: the next step if the peak
+  ever matters.
+- **A background fetch with a progress banner**: planned first, and
+  replaced on plan review by matching the mac (the preview waits). It needed
+  a reason the mac never shows, a window, and a status file the app polls,
+  for a once-per-PC wait.
+
+### Recorded on the trail
+
+`activityTrail.mustRecord` has two events: **"Swift got ready on this
+computer"** (seconds, gigabytes) and **"Swift could not be got ready"**,
+with the reason as one of offline, noRoom, damaged, busy, unpack (also
+anything unexpected, such as a signature check that hangs past 300 s:
+`ensure` turns every exception into one, so the console never shows a
+traceback without its marker) or waited (another preview held the fetch for
+longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
+"already ready" prints the marker. They are read from the `PLANTOIR_SWIFT:` line by
+`SwiftGotReady.cs`, in both readers (the console's
+`ScriptRunner.RecordHealthFinding`, and the scheduled publish's
+`ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
+(`TaskScheduling.cs`). A wrapper written before this change keeps no
+`PLANTOIR_SWIFT:` line until that deploy is scheduled again, as for
+`PLANTOIR_MY_PROGRESS:`. Neither event carries `appliesOn`: the mac owes
+both (its own issue).
+
+### Shared fix the mac inherits
+
+`swift_blocks.prune` deleted the launcher's `logs\` folder with every older
+toolchain's folder, so a compile log never survived its own build. That was
+found here, where the first preview's `compile-<pid>.log` was gone.
+`LOGS_FOLDER` is now kept; `test_swift_blocks.py` →
+`PruneKeepsTheLogsTests` pins it.
 
 
 ## The trail's first and last lines (#565, the mac's #560), v1.8.0
@@ -7551,7 +7837,9 @@ names exactly the pages Go will leave as they are. The MCP text
 **The height rule** (`StartOfYearSheetLayout.For`, pure). The mac's fixed
 620 pt budget cannot be copied: this window's minimum height is 600 epx, and
 a ContentDialog cannot scroll content it clips. So the budget is the window's
-height (at most `ContentDialogMaxHeight`, 756) less the measured chrome, and
+height (at most `ContentDialogMaxHeight`, 756 — since #634 a taller window
+gives the table its added height, row by measured row, and the sheet's width
+follows the window as the Section menu's does) less the measured chrome, and
 the parts give way in an order, each scrolling inside itself rather than
 being cut:
 
@@ -7597,6 +7885,210 @@ list 30-odd pages long):
 tables, rows for the staying pages, and a table in the MCP text (the mac's
 rejections, `09-mac-app.md` → "The pages as a table (#589)"). The
 start-of-year picture on plantoir.app is retaken separately.
+
+## The picker as a table, the plan folds, the dialogs follow the window (#634, the mac's #608, #621, #622), v1.8.6
+
+The mac's v1.8.6 changed three things in the Section menu's page sheets
+(`documentation/09-mac-app.md` → "The plan as a table (#524)" → "v1.8.6",
+which has its measurements and what it rejected). This is what Windows did
+with each, and where it could not be the same.
+
+**The wording.** Five keys: `menuPickDateColumn` is the constant
+`AssistWording.MenuPickDateColumn`; the other four are ONE mac method,
+`menuPlanShowAlready(count:publishing:)`. The contract walk resolves every key
+to a member of its own name, so Windows has the dispatcher
+`MenuPlanShowAlready(count, publishing)` — what the dialog calls — and the
+three members it returns (`MenuPlanShowAlreadyHiding(count)`,
+`MenuPlanShowAlreadyOnePage`, `MenuPlanShowAlreadyOnePageHiding`), the shape
+`MenuPlanSummary` set. `ContractTests` asserts all five by hand, through the
+dispatcher, with the generator's samples. No ledger entry, no contract edit.
+
+### 1. The picker and the later-classes question are tables
+
+`Views/TickTable` draws all three: Publish Pages… and Hide Pages…'s first stage
+(Page, Folder, Date) and #475's question at Publish Pages… and at Deploy (Page,
+Date). One builder, so the three cannot drift. A `ListView` with
+`SelectionMode = Single` — there has to BE a selected row for Space to tick —
+1-epx border, a plain header (the mac's picker does not sort, so neither does
+this), each row a `CheckBox` whose content IS the title (trimmed, the whole
+title in its tooltip), the folder, and the date cell: a class's day as
+`AssistWording.LaterClassesDay` says it, empty for a page that is not a class.
+Rows are banded (`SubtleFillColorSecondaryBrush` on alternate rows), counted
+by the rows SHOWN, so a search or a sort never puts two bands together; the
+plan table and Start of Year are banded the same way (the mac's reason: the
+two steps of one flow look alike). Ids: the boxes keep `sectionVerbPage<i>` and
+`laterClass<i>`, the rows are `sectionVerbPageRow<i>` and `laterClassRow<i>`.
+
+**The tick rules, and how each is made:**
+
+- A click on a box ticks it — and a click on its title, which is the box's
+  content (the mac's Xcode-membership shape). Native.
+- Selecting a row ticks nothing. Native: `ListView` selection never touches
+  the box.
+- Space ticks the row with the focus, else the selected row: the list's
+  tunnelling `PreviewKeyDown`. A held Space's repeats are ignored
+  (`KeyStatus.WasKeyDown`), so holding it ticks once rather than flickering.
+  MEASURED in the window (2026-10-22, `PageTablesUiTests`, three runs green):
+  six downs and one up — what a held key sends — ticked the row once; with
+  the guard taken out the same test failed, the six flips leaving it
+  unticked. The plan review (amendment 2) asked whether a focused
+  `CheckBox`, which clicks on key-UP, would then flip twice. MEASURED: Space
+  (down and up) after a mouse click on a box flipped it once, with no key-up
+  handler — so there is none. (A box whose key-down never arrives has nothing
+  to click on key-up; the test did not read where the focus sat after the
+  click, so that part is reasoning.) **The first measurement of both was
+  void, and a harness trap:** FlaUI's `Keyboard.Press` sends the key DOWN
+  only (`GetAsyncKeyState(VK_SPACE)` still read down 400 ms later), so the
+  test's "two Spaces" were one held Space to the app — the second arrived
+  with `WasKeyDown` — no key-up was ever sent, and the guard, once added,
+  rightly swallowed it. A key the test means to type is `Keyboard.Type`.
+- Space typed in Find a Page ticks nothing: the field is the list's sibling,
+  so its keys never reach the list's handler.
+- Return with a row selected reaches Continue — when Continue is live —
+  because a `ListView` keeps Return for itself (measured for #548), so the
+  table catches it. At Deploy, a plain `ContentDialog`, Return records "the
+  main button" and hides the dialog, and the answer is read as Hide Ticked and
+  Deploy. Escape needs nothing: it reaches the dialog.
+- **Narrator** hears each row's state: `AutomationProperties.ItemStatus`
+  "ticked" / "not ticked", set on every change (the plan review's amendment 1).
+  A box is named by its title — "title — folder" for two pages of one title —
+  and its row "title, folder, date". **The later-classes box was named
+  "title — day"** while the day was in its words; it is the title now, and the
+  row carries the day.
+
+**The height counts every page offered**, never the search's leftovers, so
+the dialog stays still while the teacher types: `PageTableLayout.PickerRows`
+— up to 12 (the mac's `mostPickerRowsShown`) within 756 epx, fewer on a short
+window, never fewer than two (one for one page), never more than offered — as
+a fixed `Height`.
+
+### 2. The plan folds the pages already right
+
+`PlanTable.RowsToRead` (every change, and every page that stays for a reason:
+kept by an unpublish, a linked class left as it is, no room for a key),
+`RowsAlreadyRight` (already visible, already hidden — those two only),
+`FoldsAlreadyRight` (both non-empty, the mac's `foldsAlreadyRight`),
+`DrawnRows(open)` and `FoldLabel` are pure and unit-tested. The dialog draws
+`DrawnRows(open)` through the ONE sort: one table, one sort. Opened, the
+folded rows are drawn in that sort among the rows to read — in plan order
+they come where the plan puts them (the pages already right are its last
+group), under any other sort mixed among the rest; never a second list. The disclosure is a borderless
+`ToggleButton` with a chevron, 4 epx under the table, closed for every new plan
+(`sectionVerbPlanAlreadyRight`; its Toggle pattern tells Narrator its state).
+REJECTED: `Expander` (a 48-epx header on a card background, with an animation:
+a second panel where the mac's is a line of the table's — the plan review).
+
+**Opening it never grows the dialog** (Russell's ruling on the mac): the
+table's height is FIXED at `PlanTable.RowsWhenClosed` — the rows to read,
+never fewer than five while pages are folded (or every row, when there are
+fewer) — within what the window fits, and the opened rows scroll inside.
+REJECTED: `MaxHeight`, which #548 used: a short list shrinks to its rows and
+grows when the folded ones arrive, which is the mac's measured failure (316 →
+484). The window wins over the five-row floor: on a window that holds two
+rows, two. `PlanTableLayout.For(…, folds)` reserves the disclosure's line
+(`FoldHeight`).
+
+### 3. "Resizable": the window is the dialog's resize handle
+
+A `ContentDialog` has no edge to drag. REJECTED: a drag grip in its corner (no
+Windows dialog has one; the dialog is centred, so a corner grip moves at half
+the pointer's speed; and it would reach into the template). So the teacher
+makes the WINDOW bigger, and the page dialogs — the Section menu's three page
+items, the Deploy question and Start of Year — grow with it, while at any
+window up to the one they were designed for they are exactly the dialogs they
+were: the mac's "opens at its old size, which is its minimum".
+
+- **Width** (`PageTableLayout.DialogWidth`): the old width (680; 548 for the
+  Deploy question, ContentDialog's own) at the window's 900-epx minimum, one
+  epx of dialog per epx of window past it, **at most 300 more (980 and 848)**,
+  never wider than the window less 24 a side. The XAML root is about 14 epx
+  narrower than the window's outer edge, so growth starts about 14 epx past the
+  900 outer minimum. **The 300-epx cap is a Windows-only choice** — the
+  director's ruling of 2026-10-22, pending Russell; the mac's sheets have no
+  maximum, but they open at 560 and grow only when dragged, where a maximised
+  window here would make a 1,700-epx table. It is one constant,
+  `PageTableLayout.MostAdded`.
+- **Live**: the template reads `ContentDialogMinWidth`/`MaxWidth` once, so
+  they are set wide open and a host `Grid` inside the dialog carries the width,
+  every stage drawn in it (so the dialog is one width at every stage, as #548
+  wanted), reset on `XamlRoot.Changed`. The plan's notes are re-measured at
+  the live width on every fit.
+- **Columns**: the plan's Page and What changes share what Folder (150) leaves
+  in #548's proportion — exactly 170 / 150 / 262 at 680 — until What changes
+  reaches 320 (the mac's cap); past that Page takes every epx. Start of Year
+  the same: 170 / 140 / 272 at 680, Why capped at 300. The picker's Folder
+  (140) and Date (170) are fixed; Page takes the rest.
+- **Height**: every fit is #548's and #619's up to 756 epx, ContentDialog's
+  old maximum; a window taller than that gives every further 32 epx to the
+  table as one more row (`PlanTableLayout.ExtraRows`; Start of Year row by
+  measured row), with `ContentDialogMaxHeight` raised so the dialog can use
+  them. Nothing a window up to 756 tall shows has moved
+  (`PlanTableTests.UpTo756TheFitIs548s_AndATallerWindowGivesTheTableRows`
+  compares every height against #548's formula). On this PC (1920 × 1080 at
+  150%) the root is never taller than about 690 epx, so this half is seen only
+  at 100–125%.
+- **"Grows to a taller stage, never shrinks"**: the first half is free — a
+  ContentDialog re-measures at every stage, where the mac's `.fitted` sheet
+  never re-fits and needed `SheetGrowsToItsMinimum`. The second half exists on
+  the mac to keep a size the TEACHER dragged to, and nobody drags here.
+  REJECTED: a `MinHeight` ratchet, which would add jumps nobody asked for.
+
+**Testing it.** Unit: `PageTablesTests` (the fold, its words and its closed
+height; the picker's rows; the widths and columns), `PlanTableTests` (the fit
+with the disclosure, identical to #548 up to 756), `StartOfYearSheetTests`
+(rows above 756), `ContractTests` (the five keys). Through the window
+(`PageTablesUiTests`, opt-in): the tick rules, Space in Find a Page and the
+table's height across a search, Return and Escape with a row selected, the
+fold on a plan of 1 change + 4 already visible (five rows tall, unchanged when
+opened), a wider window; `LaterClassesAtDeployUiTests.TheQuestionIsATable_AndSpaceTicksTheSelectedRow`.
+The trail is unchanged, as on the mac: this is how the choice is shown, not
+what Publish does.
+
+**Measured through the window** (2026-10-22, this PC over a remote session at
+200%: the screen 3024 × 1832 pixels, the main window about 937 × 625 epx, a
+XAML root of 565–590 epx; `PageTablesUiTests`, which writes its numbers to
+`%TEMP%\plantoir-634-measured.txt`):
+
+- **The picker's chrome: 285 epx** against `PageTableLayout.PickerChrome` 300
+  (the dialog box 415 epx tall over a 130-epx table of 4 rows, 4 × 32 + 2), so
+  the estimate keeps a 15-epx margin and was left.
+- **The disclosure: 27 epx tall, 4 epx under the table** — 31 against
+  `PlanTableLayout.FoldHeight` 36, a 5-epx margin, left.
+- **The width:** at a 900-epx window the plan's dialog is 680 wide; widened by
+  400 epx (900 → 1300), the table went from 632 to 932 epx — exactly the
+  300-epx cap — and the app's log read "dialog 980 wide".
+- **The fold:** a plan of 1 change + 4 already visible draws one row in a
+  table five rows tall; opened, five rows, with the table's and Publish's
+  rectangles unchanged to the pixel. #548's 19-row fixture: 18 rows to read,
+  1 folded, the table 8–9 rows tall at a root of 565–590.
+- **Banding**, in light and dark (pictures kept out of the site; the test
+  takes them only with `PLANTOIR_634_PICTURES=1`): the
+  alternate rows read in both themes; in light the band is faint but visible.
+- **Must-fails**, each a one-line change run against its test: Space's key in
+  `TickTable`'s `PreviewKeyDown` renamed (Space → Scroll) — "Space on the
+  selected row did not tick it"; the plan table's `Height` renamed to
+  `MaxHeight` — the table measured 34 epx (one row) instead of five rows'
+  worth; the picker's rows counted from the search's leftovers — 34 epx
+  against 130.
+- **Found on the way:** the sentences above the picker and the question were
+  CENTRED in the wider dialog (a `TextBlock` with a `MaxWidth` narrower than
+  its panel is centred), so `Words` is left-aligned now; at 680 it had been
+  centred by 56 epx since #548. The sentences keep their 520-epx `MaxWidth`
+  in every one of these dialogs — the Deploy question's too, which lost it in
+  the first cut and had its lines run the dialog's whole width — so they read
+  at a book's width even in a 980-epx dialog, and the two later-classes
+  questions lay out alike (the implementation review).
+
+**UI totals:** `PageTablesUiTests` 6 of 6; with `PlanTableUiTests` 10 of 10;
+`LaterClassesAtDeployUiTests` (3, the new table test among them) and
+`SectionVerbsUiTests` passed in the combined run. Two `PlanTableUiTests` were
+corrected for the fold: they open the disclosure before reading the page
+already visible (`OpenTheFold`, which also checks the table does not move).
+UI Automation's Expand does not make the menus re-read what is live (a real
+click or Alt does), so the tests open a fresh app per key; and
+`RunSectionVerb` now queues one more `ApplyMenuEnablement` after its dialog
+has finished closing, since `ShowAsync` returns while the dialog is still a
+popup.
 
 ## One curriculum test, folder segments only (#615), and a linked curriculum page is not "already visible" (#617, the mac's #607)
 
@@ -7858,7 +8350,7 @@ normalise CR LF before reading.
   Figures Fixture's deliberately broken drawings (functionplot block 3 and
   tikz block 6, `\foo`), and 12 are "Swift programs cannot be made ready"
   lines (Swift Playground 7, Runner Fixture 3, Quiz Playground 2), because
-  Windows compiles no Swift (#570).
+  Windows compiled no Swift then (#570, fixed in v1.8.6).
   Neither log contained the `readDifferently` sentence ("the site and the
   folder check read this question differently…").
 - **The two builds read alike, to the byte.** All four pages gave identical
@@ -8074,7 +8566,7 @@ FAIL: Swift run in a choice prints its output: {"status":"This program isn't rea
 ```
 
 That is its whole problem list: the two Swift lines and nothing else.
-Windows compiles no Swift (#570), and the build reported
+Windows compiled no Swift then (#570, fixed in v1.8.6), and the build reported
 `swiftCouldNotBePrepared` for 12 blocks on 3 pages. A copy whose only change
 expects those two runs to be "not ready" printed:
 

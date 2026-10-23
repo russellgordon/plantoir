@@ -1819,8 +1819,11 @@ round passed it).
   (`rebuild_for_production`, review N1), which runs `build_site.py
   --build-only` inside the container: it uses whatever a preview compiled,
   and a block it finds no program for ships not ready, said the same way.
-  `preview.ps1` has no such step: Windows compiles no Swift in v1.8 (12 →
-  "Runnable Swift").
+  `preview.ps1` has the same step since v1.8.6 (#570), natively:
+  `Invoke-RunnableSwift` plans, gets Swift ready the first time
+  (`swift_windows_fetch.py ensure`, in the foreground, with a percent
+  line) and compiles (`swift_windows_compile.py`) before `build_site.py`
+  (12 → "Runnable Swift on Windows").
 - Runs `build_site.py`, which (by default) ends by serving the site on
   the requested container port (8081–8084), with Quartz's live-reload
   websocket on port + 1000 (`--wsPort`) — the reason the container

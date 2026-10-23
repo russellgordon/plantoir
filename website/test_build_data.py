@@ -205,7 +205,7 @@ class DownloadTests(unittest.TestCase):
         # cut unpins it again.
         # PlantoirSetup.exe joined v1.8.5 on 2026-10-22 (the Windows catch-up),
         # which unpinned it again.
-        self.assertIsNone(pins["Windows"])
+        self.assertIsNone(pins["Windows"])  # PlantoirSetup.exe joined v1.8.6 on 2026-10-23, which unpinned it again
 
 
 class ShortcutTests(unittest.TestCase):
@@ -436,10 +436,11 @@ WINDOWS_PICTURE_OWED: dict = {
     # commit that marks it `windows: true` (`capture_windows.py --promote`
     # checks the pictures first), which is the release commit whose installer
     # has the feature. The reasons below are what each one still waits on.
-    # code-swift and code-swift-live stay owed: Swift stays read-only on
-    # Windows until #570 is decided (v1.9.0).
-    "code-swift-live": "Swift stays read-only on Windows until #570 is decided (v1.9.0)",
-    "code-swift": "Swift stays read-only on Windows until #570 is decided (v1.9.0)",
+    # code-swift and code-swift-live stay owed until their 2x picture is
+    # taken: Swift runs on Windows since v1.8.6 (#570), and site.json's
+    # runnable-swift stays windows: false until those pictures exist.
+    "code-swift-live": "the 2x picture, taken in a 4K session (#590)",
+    "code-swift": "the 2x picture, taken in a 4K session (#590)",
     "quiz-math": "too tall for the 1280 x 860 window at 2x: quiz-math.js refuses it (767 pt) (#590)",
     "quiz-code-run": "too tall for the 1280 x 860 window at 2x: quiz-code-run.js refuses it (744 pt) (#590)",
 }
@@ -533,7 +534,7 @@ class PreviewPageSceneTests(unittest.TestCase):
     def test_the_windows_code_and_quiz_passes_take_only_their_own(self):
         # #590: capture_windows.py --code / --quizzes (preview_pages_windows.py)
         # take each scene's own pages and not the Swift two, which stay
-        # read-only on Windows until #570 is decided (v1.9.0). Plain Python,
+        # owed until their 2x picture is taken. Plain Python,
         # so it runs on either machine.
         sys.path.insert(0, str(build.WEBSITE / "shots"))
         import preview_pages_windows
