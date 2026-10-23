@@ -108,9 +108,9 @@ public static partial class AssistWording
     }
 
     /// <summary>
-    /// The disclosure under the plan table (#634, the mac's #622), closed to
-    /// begin with: opening it adds the pages already the way they were asked
-    /// to be to the same table. The mac's <c>menuPlanShowAlready(count:publishing:)</c>;
+    /// The checkbox under the plan table (#655, the mac's #654; a disclosure
+    /// since #634, the mac's #622), unticked to begin with: ticking it adds
+    /// the pages already the way they were asked to be to the same table. The mac's <c>menuPlanShowAlready(count:publishing:)</c>;
     /// it returns <see cref="MenuPlanShowAlreadyHiding"/>,
     /// <see cref="MenuPlanShowAlreadyOnePage"/> and <see cref="MenuPlanShowAlreadyOnePageHiding"/>,
     /// the members the contract's other three keys name.

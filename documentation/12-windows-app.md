@@ -893,6 +893,13 @@ and not reopening it — that part is the teacher's).
 It does **not** judge anything visual: colour, contrast, dark-mode legibility,
 how a long name wraps. That is a screenshot pass, not this.
 
+**Some things on screen are not in the UI Automation tree at all** — a
+`ContentDialog`'s box is one (its element is the whole overlay, and the
+rectangles inside it read stale): for those the app logs what it laid out,
+in a `--state-dir` run only, and the test reads the run's `startup.log`
+(`PageTablesUiTests.TheAnswerAfterA…PlanIsFittedToItsSentence`, #655 →
+"The plan's checkbox, and the answer fitted to its sentence").
+
 **One of them now reads a FILE rather than the screen**, and it is worth
 knowing why that belongs here. `MarksPoolRemovalUiTests` removes a folder in
 Course Settings — the row's own button, the confirmation, Save — and then
@@ -8072,7 +8079,7 @@ were: the mac's "opens at its old size, which is its minimum".
 
 **Testing it.** Unit: `PageTablesTests` (the fold, its words and its closed
 height; the picker's rows; the widths and columns), `PlanTableTests` (the fit
-with the disclosure, identical to #548 up to 756), `StartOfYearSheetTests`
+with the disclosure — the checkbox since #655 — identical to #548 up to 756), `StartOfYearSheetTests`
 (rows above 756), `ContractTests` (the five keys). Through the window
 (`PageTablesUiTests`, opt-in): the tick rules, Space in Find a Page and the
 table's height across a search, Return and Escape with a row selected, the
@@ -8119,8 +8126,8 @@ XAML root of 565–590 epx; `PageTablesUiTests`, which writes its numbers to
 **UI totals:** `PageTablesUiTests` 6 of 6; with `PlanTableUiTests` 10 of 10;
 `LaterClassesAtDeployUiTests` (3, the new table test among them) and
 `SectionVerbsUiTests` passed in the combined run. Two `PlanTableUiTests` were
-corrected for the fold: they open the disclosure before reading the page
-already visible (`OpenTheFold`, which also checks the table does not move).
+corrected for the fold: they open the disclosure (tick the checkbox, since
+#655) before reading the page already visible (`OpenTheFold`, which also checks the table does not move).
 UI Automation's Expand does not make the menus re-read what is live (a real
 click or Alt does), so the tests open a fresh app per key; and
 `RunSectionVerb` now queues one more `ApplyMenuEnablement` after its dialog
