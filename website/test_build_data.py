@@ -429,18 +429,16 @@ class ReleaseReadinessTests(unittest.TestCase):
 # --print-set` on the first unlocked desktop after the 1.7.1 catch-up.
 WINDOWS_PICTURE_OWED: dict = {
     # The Code page (#562) and the Quizzes page (#587). Since #590,
-    # capture_windows.py --code / --quizzes takes every one of these but the
-    # two Swift figures, from native previews of ~/School Web Space and
+    # capture_windows.py --code / --quizzes takes every one of these, from
+    # native previews of ~/School Web Space and
     # ~/Teaching (preview_pages_windows.py) -- at exactly 2x only (#557), so
     # they are taken in a 4K session at 200%. A shot leaves this list in the
     # commit that marks it `windows: true` (`capture_windows.py --promote`
     # checks the pictures first), which is the release commit whose installer
     # has the feature. The reasons below are what each one still waits on.
-    # code-swift and code-swift-live stay owed until their 2x picture is
-    # taken: Swift runs on Windows since v1.8.6 (#570), and site.json's
-    # runnable-swift stays windows: false until those pictures exist.
-    "code-swift-live": "the 2x picture, taken in a 4K session (#590)",
-    "code-swift": "the 2x picture, taken in a 4K session (#590)",
+    # code-swift and code-swift-live left this list on 2026-10-23, their 2x
+    # pictures taken in a 4K session (Swift runs on Windows since v1.8.6,
+    # #570), and site.json's runnable-swift became windows: true with them.
     "quiz-math": "too tall for the 1280 x 860 window at 2x: quiz-math.js refuses it (767 pt) (#590)",
     "quiz-code-run": "too tall for the 1280 x 860 window at 2x: quiz-code-run.js refuses it (744 pt) (#590)",
 }
@@ -533,19 +531,18 @@ class PreviewPageSceneTests(unittest.TestCase):
 
     def test_the_windows_code_and_quiz_passes_take_only_their_own(self):
         # #590: capture_windows.py --code / --quizzes (preview_pages_windows.py)
-        # take each scene's own pages and not the Swift two, which stay
-        # owed until their 2x picture is taken. Plain Python,
-        # so it runs on either machine.
+        # take each scene's own pages -- the Swift two as well since their 2x
+        # pictures were taken on 2026-10-23 (they were left out until then).
+        # Plain Python, so it runs on either machine.
         sys.path.insert(0, str(build.WEBSITE / "shots"))
         import preview_pages_windows
         self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("code")],
-                         ["code-python", "code-python-live", "code-python-error", "code-quiz"])
+                         ["code-python", "code-python-live", "code-python-error", "code-swift-live", "code-swift",
+                          "code-quiz"])
         self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("quizzes")],
                          ["quiz-math", "quiz-chemistry", "quiz-english", "quiz-code-run"])
-        self.assertEqual(preview_pages_windows.preview_page_shots("code", ["code-swift"]), [])
-        # The two left out are real shots, so leaving them out is a decision
-        # rather than a stale name.
-        identifiers = [shot["id"] for shot in self.manifest_shots()]
+        self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("code", ["code-swift"])],
+                         ["code-swift"])
         # Each figure's page, named as the planting steps name it, so the
         # changed-page guard can match their report: a page planted from
         # CODE_PAGES or folders.json, or one of the ready-made course's.
@@ -566,9 +563,6 @@ class PreviewPageSceneTests(unittest.TestCase):
                     self.assertTrue(label in known or shared.is_file(), label)
         self.assertEqual(preview_pages_windows.page_label({"course": "ICS3U", "path": "/Warm-Ups/Spot-the-Bug"}),
                          "ICS3U/Warm-Ups/Spot the Bug.md")
-        for excluded in preview_pages_windows.NOT_ON_WINDOWS:
-            with self.subTest(excluded=excluded):
-                self.assertIn(excluded, identifiers)
         for shot in preview_pages_windows.preview_page_shots("code") + preview_pages_windows.preview_page_shots("quizzes"):
             with self.subTest(shot=shot["id"]):
                 self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).exists())

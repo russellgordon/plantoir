@@ -29,10 +29,13 @@ enum FontCatalog {
 
     // MARK: - Functions
 
-    /// A display label for a header/body pairing.
+    /// A display label for a header/body pairing. The system pairing is
+    /// stored as "Helvetica, Arial", but a reader sees their own device's
+    /// font (San Francisco on a Mac, Segoe UI on Windows), so the label
+    /// says that rather than naming Helvetica (#629).
     static func pairingLabel(header: String, body: String) -> String {
         if header == "Helvetica, Arial" && body == "Helvetica, Arial" {
-            return "System fonts (Helvetica, Arial)"
+            return "System fonts (each device's own)"
         }
         return "\(header)  —  \(body)"
     }

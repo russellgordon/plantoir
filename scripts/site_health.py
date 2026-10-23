@@ -390,6 +390,54 @@ def quizzes_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
+def site_disagreements_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every runnable block the SITE showed as plain code
+    (#567: codeRunnerBlocks.siteDisagrees), never one per block. The one check
+    said from the site's build rather than before it: scripts/site_said.py
+    hands the blocks the site's transformer recorded to this function, and
+    the result is printed with `announce`. Each block is named through
+    blockLine or blockLineNoLine, its language by the table row's displayName
+    and its reason through the check's own `reasons`, both filled with
+    {language}; every value is filled in one pass.
+    """
+    entry = table["runnableCodeShownAsPlainCode"]
+    blocks = facts.get("site_disagreements") or []
+    names = {}
+    for row in contracts.section(CONTRACT_FILE, "codeRunnerBlocks", "languages"):
+        names[row["fence"]] = row["displayName"]
+    reasons = entry["reasons"]
+    named = []
+    for block in blocks[:MOST_PAGES_NAMED]:
+        language = names.get(block.get("language") or "", block.get("language") or "")
+        reason_text = reasons.get(block.get("reason") or "", reasons["blockNotPrepared"])
+        fill = {
+            "page": block.get("page", ""),
+            "language": language,
+            "block": block.get("block", 1),
+            "reason": filled(reason_text, {"language": language}),
+        }
+        if block.get("line") is not None:
+            fill["line"] = block["line"]
+            piece = entry["blockLine"]
+        else:
+            piece = entry["blockLineNoLine"]
+        named.append(filled(piece, fill))
+    if len(blocks) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(blocks) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": blocks[0].get("page", "") if blocks else "",
+        "count": len(blocks),
+        # "; " rather than ", ": a reason holds commas.
+        "blocks": "; ".join(named),
+    }
+    return finding(
+        "runnableCodeShownAsPlainCode", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(blocks) == 1 else "sentenceForSeveral",
+    )
+
+
 def findings(facts: dict, course: str, section) -> list:
     """
     Every finding for one section's build.
@@ -434,6 +482,13 @@ def findings(facts: dict, course: str, section) -> list:
                                n or None, "reason": quizCallouts.words.problems
                                key, "fill": its values}], each a self-check
                                question that cannot be checked (#563)
+    * `site_disagreements`   — [{"page": place, "language": fence, "block": n
+                               as the site counts it, "line": n or None,
+                               "reason": the check's reasons key}], each a
+                               runnable block the SITE showed as plain code
+                               (#567). Never given by build_site.py: only
+                               scripts/site_said.py, from the site's build,
+                               says this finding - and says it alone.
     """
     table = _checks_by_name()
     found = []
@@ -503,6 +558,10 @@ def findings(facts: dict, course: str, section) -> list:
     # After everything above, so the existing examples keep their order (#563).
     if facts.get("quiz_problems"):
         found.append(quizzes_finding(facts, course, section, table))
+    # After everything above, so the existing examples keep their order
+    # (#567). In practice it arrives alone, from scripts/site_said.py.
+    if facts.get("site_disagreements"):
+        found.append(site_disagreements_finding(facts, course, section, table))
 
     return found
 

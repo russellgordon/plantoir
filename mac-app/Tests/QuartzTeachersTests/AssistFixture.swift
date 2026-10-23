@@ -49,13 +49,17 @@ enum AssistFixture {
     ///   with sections 1 and 2. Added for the window-binding tests, which need
     ///   a course a window is not for; defaulted to none, so every existing
     ///   caller gets exactly the folder it always got.
+    /// - Parameter curriculumFolders: written as the course's
+    ///   `curriculum_folders` before the course is read, for the contract
+    ///   cases that carry `curriculumFolders` (#614). Nil leaves the key out.
     @MainActor
     static func makeRunner(hasDeployedBefore: Bool = false,
                             registeringPreview: Bool = false,
                             alsoCourse: String? = nil,
                             clock: TestClock? = nil,
                             openMainWindow: (@MainActor () -> Void)? = nil,
-                            surface: AssistToolRunner.Surface = .local) throws
+                            surface: AssistToolRunner.Surface = .local,
+                            curriculumFolders: [String]? = nil) throws
         -> (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork) {
         let fileManager: FileManager = FileManager.default
         let root: URL = fileManager.temporaryDirectory
@@ -88,7 +92,7 @@ enum AssistFixture {
             )
         }
 
-        let configuration: [String: Any] = [
+        var configuration: [String: Any] = [
             "course_code": "ICS3U",
             "course_name": "Introduction to Computer Science",
             "section_numbers": [1],
@@ -96,6 +100,9 @@ enum AssistFixture {
             "per_section_folders": ["All Classes"],
             "per_section_files": [],
         ]
+        if let curriculumFolders {
+            configuration["curriculum_folders"] = curriculumFolders
+        }
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
 

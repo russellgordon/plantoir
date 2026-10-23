@@ -200,13 +200,20 @@ enum AssistCurriculumMentions {
         return found
     }
 
-    /// True when a page is curriculum reference material.
+    /// True when a page is curriculum reference material: inside a folder the
+    /// course DECLARES in `curriculum_folders`, or under a folder named for the
+    /// curriculum (#614).
     ///
-    /// Matches `build_site.py`'s own rule exactly — any FOLDER segment
-    /// containing "curriculum", case-insensitively, with the file name ignored.
-    /// That is what makes it work for a course whose folders are called
-    /// "Ontario Curriculum" and "College Board Curriculum" rather than plain
-    /// "Curriculum", which is the normal case outside the example content.
+    /// This is the assistant's own rule, not a copy of the build's. The build
+    /// MAPS a declared folder (`configured_curriculum_folders` in
+    /// `scripts/build_site.py`); `_is_in_curriculum_folder` there has no
+    /// caller, so nothing in the build answers this question page by page.
+    /// The folders are read from the course's configuration as written — not
+    /// `CurriculumFolderRule.resolvedFolders(for:)`, which walks the disk and
+    /// is NARROWER (it leaves out a declared folder that is still empty).
+    /// `contracts/shared-rules.json` → `curriculumRules.isCurriculumPage`, and
+    /// `documentation/10-local-ai-assistant.md` → "A curriculum folder is the
+    /// one the course declares, or one named for it (#614)".
     static func isCurriculum(pageAt pageURL: URL, in course: Course) -> Bool {
         let root: String = course.directoryURL.standardizedFileURL.path + "/"
         let full: String = pageURL.standardizedFileURL.path
@@ -217,7 +224,40 @@ enum AssistCurriculumMentions {
         if !segments.isEmpty {
             segments.removeLast()
         }
-        for segment in segments where segment.lowercased().contains("curriculum") {
+        return isCurriculum(folderSegments: segments, declared: course.configuration.curriculumFolders)
+    }
+
+    /// The rule itself, without a disk: the page's FOLDER segments relative to
+    /// the course (its file name already dropped) and the names the course
+    /// declares.
+    ///
+    /// - A leading section folder (`section2`) is set aside first, because a
+    ///   section's contents are merged into the site and its own name never
+    ///   appears there.
+    /// - DECLARED: the first folder that is left equals a declared name,
+    ///   ignoring letter case. Top level only, because that is the folder the
+    ///   build maps; a lesson subfolder that happens to share the name is not it.
+    /// - BY NAME, kept beside it: any folder segment contains "curriculum",
+    ///   ignoring letter case. A course made from scratch declares nothing, and
+    ///   a page wrongly kept up costs nothing students did not already see,
+    ///   while a page wrongly hidden breaks every class that embeds it.
+    /// - The file name never counts (#615).
+    ///
+    /// Swift's `==` treats the composed and decomposed forms of an accented
+    /// name as equal, so a folder typed one way and declared the other still
+    /// matches.
+    nonisolated static func isCurriculum(folderSegments: [String], declared: [String]) -> Bool {
+        var folders: [String] = folderSegments
+        if let first = folders.first, SectionPublishState.isSectionFolderName(first) {
+            folders.removeFirst()
+        }
+        if let topFolder = folders.first {
+            let lowercasedTopFolder: String = topFolder.lowercased()
+            for name in declared where name.lowercased() == lowercasedTopFolder {
+                return true
+            }
+        }
+        for folder in folders where folder.lowercased().contains("curriculum") {
             return true
         }
         return false

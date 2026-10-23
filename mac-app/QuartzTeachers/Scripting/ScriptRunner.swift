@@ -840,9 +840,15 @@ class ScriptRunner {
         // The helper programs installed and the website builder created on
         // a first run, and where each came from (#312).
         HelperBootstrapReport.noteOnTheTrail(from: text)
+        // How getting Swift ready ended, when this preview built the Swift
+        // image or could not (#635).
+        SwiftGotReadyReport.noteOnTheTrail(from: text)
         // A How I Teach page the course had listed for the website, kept off
         // it by this build (#209).
         HowITeachKeptOffReport.noteOnTheTrail(from: text)
+        // Something the build put right in the teacher's own files, such as
+        // a front page's title it quoted (#584).
+        BuildRepairReport.noteOnTheTrail(from: text)
         for marker in LinksChecklistMarker.markers(in: text) {
             linksChecklistMarkers.append(marker)
         }

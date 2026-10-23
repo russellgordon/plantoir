@@ -192,7 +192,8 @@ Run on each block. If a block shows as ordinary code with no Run button,
 check that the page says `codeRunner: true` and the block's first line is
 ` ```python run `. When the site is built, a block it could not set up is
 named on a line that starts `plantoir: error:`, with the page, the block's
-number and what to change.
+number and what to change - and as a folder problem in Plantoir, with the
+page, the block and its line in the teacher's file.
 
 ## Swift
 
@@ -338,8 +339,9 @@ Fix the code and preview again. Check every Swift block you write compiles
 - `%%`, adding blocks after existing ones, printing and opening the site as
   files work exactly as for Python (sections 5-7 above).
 - If a Swift block shows as plain code with no Run button and no "not
-  ready", the build's `plantoir: error:` line names it: start its ```` ``` ````
-  on a line of its own and indent every line of the block alike.
+  ready", the build's `plantoir: error:` line names it, and so does a folder
+  problem in Plantoir: start its ```` ``` ```` on a line of its own and indent
+  every line of the block alike.
 
 ### 6. Check it
 

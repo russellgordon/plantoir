@@ -20,6 +20,14 @@ that matches the task before writing:
   any page "students will print", or a page that should hand out an existing
   PDF: `.agents/skills/plantoir-printing/SKILL.md` (the same file is at
   `.claude/skills/plantoir-printing/SKILL.md`).
+- **Handouts made as a PDF** - "make me a worksheet", a warmup, a review
+  sheet, a quiz or test for marks, an answer key or solutions, anything to
+  print and hand out, in any course: offer the house style first (a LaTeX
+  source, the PDF and its answer key from one file), where the files go,
+  and how every answer is checked are in
+  `.agents/skills/plantoir-handouts/SKILL.md` (the same file is at
+  `.claude/skills/plantoir-handouts/SKILL.md`). It says when a printable
+  page is the better fit.
 - **Graphs and diagrams** - a graph of a function (a parabola beside its
   parent, two lines meeting), a geometry or similar-triangles figure, a
   number line, a probability tree, a circuit, anything to be "plotted" or

@@ -368,6 +368,73 @@ export function mayPrint(expected: number, found: number, overflowing: number): 
   return expected > 0 && found >= expected && overflowing === 0
 }
 
+// ---- Asking the browser to print, and putting the page back (#576) ----------
+// print() does not always print before it returns. Chrome, Edge and Safari's
+// paged path block in it with their dialog up, and send beforeprint (and
+// usually afterprint) inside it. Headless Chrome sends beforeprint on the
+// frame inside it and never afterprint. And WebKit, asked to print a frame
+// still fetching a face or a picture, returns at once with NOTHING sent and
+// prints later, when the frame has loaded - if the frame is still there
+// (measured in Safari 26.6: the sheet opened 39 ms later when the frame was
+// kept; never when it was taken away at once, which is what the page did).
+// So the page is put back only once the print is known to have happened, and
+// the waits that could otherwise never end share ONE clock, PRINT_BUDGET_MS
+// from the press, on both paths (PRINT_BUDGET_STAGES): the handout's
+// pictures, the print layout's script, its layout and its pictures, and the
+// fallback frame's faces and pictures. Out of time at any of them, nothing is
+// printed (outOfTimeBeforePrint). After print() returns with nothing sent,
+// the page waits for what is left of the budget, but never less than
+// PRINT_LAST_WAIT_MS, so a print WebKit put off just before the budget ran
+// out is not cut off at once. (The diagrams' 8 s, the stylesheets' 3 s and
+// the faces' 4 s keep their own caps, and are inside the clock as well.)
+export const PRINT_BUDGET_MS = 30000
+export const PRINT_LAST_WAIT_MS = 3000
+
+export type BudgetStage = "pictures" | "printLayoutScript" | "printLayout" | "printLayoutPictures" | "frameSettled"
+export const PRINT_BUDGET_STAGES: BudgetStage[] = ["pictures", "printLayoutScript", "printLayout", "printLayoutPictures", "frameSettled"]
+
+// The budget ran out before print() was called, at `stage`. Every stage is
+// the same answer, and the one the print layout's stages are kept from: NOT
+// trying the fallback with no time left, and never printing a handout whose
+// layout or pictures had not finished.
+export function outOfTimeBeforePrint(_stage: BudgetStage): PrintOutcome {
+  return "putBackCouldNotPrint"
+}
+
+// When the outcome is asked: print() has returned; or, after it returned
+// with nothing sent, an event arrived or the budget ran out.
+export type PrintMoment = "printReturned" | "beforeprint" | "afterprint" | "outOfTime"
+// keepWaiting: leave the frame (and the words on the button) as they are.
+// putBack: the print happened, or is happening: put the page back, quietly.
+// putBackCouldNotPrint: no print ever began: put the page back and say
+// words.couldNotPrepare, rather than leave the reader with no answer.
+export type PrintOutcome = "keepWaiting" | "putBack" | "putBackCouldNotPrint"
+
+export function printOutcome(moment: PrintMoment, sawBefore: boolean, sawAfter: boolean): PrintOutcome {
+  if (moment === "printReturned") {
+    // Either event inside print() means it printed then: put back at once.
+    if (sawBefore || sawAfter) {
+      return "putBack"
+    }
+    return "keepWaiting"
+  }
+  if (moment === "beforeprint") {
+    // A print put off has begun: its sheet may be up, so the frame stays
+    // until afterprint, or until the budget runs out.
+    return "keepWaiting"
+  }
+  if (moment === "afterprint") {
+    return "putBack"
+  }
+  // Out of time. A print that began and never said it ended is not a
+  // failure the reader should be told of (headless Chrome sends no
+  // afterprint); one that never began is.
+  if (sawBefore || sawAfter) {
+    return "putBack"
+  }
+  return "putBackCouldNotPrint"
+}
+
 // ---- The page box, as CSS text (#454, #499) ---------------------------------
 // Shared by ⌘P (PlantoirMetaLine writes it into the page) and the handout
 // (print.inline.ts hands it to the print layout), so the two cannot drift.

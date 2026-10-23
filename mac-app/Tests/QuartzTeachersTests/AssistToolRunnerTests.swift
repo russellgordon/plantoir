@@ -968,7 +968,7 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertTrue(
             text(ofCourseLevelPage: "A1.1", inFolder: "Curriculum", in: made.course)
                 .contains("publishForSection1: true"),
-            "A curriculum page stays — build_site.py's own rule, any folder named for curriculum."
+            "A curriculum page stays — any folder the course declares, or one named for curriculum (#614)."
         )
 
         XCTAssertTrue(outcome.detail.contains("folder's landing page"), outcome.detail)
@@ -3345,8 +3345,9 @@ final class AssistToolRunnerTests: XCTestCase {
         ) {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let pages: [[String: Any]] = try XCTUnwrap(testCase["pages"] as? [[String: Any]])
+            let declared: [String]? = try declaredCurriculumFolders(of: testCase, named: name)
 
-            let made = try makeRunner()
+            let made = try makeRunner(curriculumFolders: declared)
             defer { try? FileManager.default.removeItem(at: made.root) }
 
             var isAClass: [String: Bool] = [:]
@@ -3390,7 +3391,7 @@ final class AssistToolRunnerTests: XCTestCase {
             // the one surface whose plan carries rows to read it from.
             if let expectedAlreadyRight = testCase["expectAlreadyRight"] as? [String] {
                 let listed: [String] = try await alreadyVisibleRowsOfThePlan(
-                    publishing: asked, pages: pages
+                    publishing: asked, pages: pages, curriculumFolders: declared
                 )
                 XCTAssertEqual(
                     listed.sorted(), expectedAlreadyRight.sorted(),
@@ -3443,9 +3444,9 @@ final class AssistToolRunnerTests: XCTestCase {
     /// a course of their own, so the publish being tested is not disturbed.
     @MainActor
     private func alreadyVisibleRowsOfThePlan(
-        publishing asked: [String], pages: [[String: Any]]
+        publishing asked: [String], pages: [[String: Any]], curriculumFolders: [String]?
     ) async throws -> [String] {
-        let menu = try AssistFixture.makeRunner(surface: .menu)
+        let menu = try AssistFixture.makeRunner(surface: .menu, curriculumFolders: curriculumFolders)
         defer { try? FileManager.default.removeItem(at: menu.root) }
         for page in pages {
             try writeContractPage(
@@ -3981,31 +3982,42 @@ final class AssistToolRunnerTests: XCTestCase {
         ) {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let pages: [[String: Any]] = try XCTUnwrap(testCase["pages"] as? [[String: Any]])
+            let declared: [String]? = try declaredCurriculumFolders(of: testCase, named: name)
 
-            let made = try makeRunner()
+            let made = try makeRunner(curriculumFolders: declared)
             defer { try? FileManager.default.removeItem(at: made.root) }
 
             var isAClass: [String: Bool] = [:]
+            var folders: [String: String] = [:]
             for page in pages {
                 let title: String = try XCTUnwrap(page["title"] as? String)
                 let classPage: Bool = page["isClassPage"] as? Bool ?? false
                 let visible: Bool = page["visible"] as? Bool ?? false
                 let written: String? = page["body"] as? String
+                let folder: String? = page["folder"] as? String
                 if written != nil && page["links"] != nil {
                     XCTFail("\(name): “\(title)” carries both `links` and `body`")
                     continue
                 }
+                if classPage && folder != nil {
+                    XCTFail("\(name): “\(title)” is a class and carries a `folder`")
+                    continue
+                }
                 isAClass[title] = classPage
+                if let folder {
+                    folders[title] = folder
+                }
                 try writeContractPage(
                     title: title, isClassPage: classPage, visible: visible,
-                    links: page["links"] as? [String] ?? [], body: written, in: made.course
+                    links: page["links"] as? [String] ?? [], body: written,
+                    inFolder: folder, in: made.course
                 )
             }
 
             var before: [String: String] = [:]
             for (title, classPage) in isAClass {
                 before[title] = contractPageText(
-                    title: title, isClassPage: classPage, in: made.course
+                    title: title, isClassPage: classPage, inFolder: folders[title], in: made.course
                 )
             }
 
@@ -4057,7 +4069,8 @@ final class AssistToolRunnerTests: XCTestCase {
 
             for title in testCase["expectHidden"] as? [String] ?? [] {
                 let after: String = contractPageText(
-                    title: title, isClassPage: isAClass[title] ?? false, in: made.course
+                    title: title, isClassPage: isAClass[title] ?? false,
+                    inFolder: folders[title], in: made.course
                 )
                 XCTAssertEqual(
                     PageVisibilityReader.answer(in: after, forSection: 1), .hidden,
@@ -4066,7 +4079,8 @@ final class AssistToolRunnerTests: XCTestCase {
             }
             for title in testCase["expectUntouched"] as? [String] ?? [] {
                 let after: String = contractPageText(
-                    title: title, isClassPage: isAClass[title] ?? false, in: made.course
+                    title: title, isClassPage: isAClass[title] ?? false,
+                    inFolder: folders[title], in: made.course
                 )
                 XCTAssertEqual(
                     after, before[title],
@@ -4207,6 +4221,17 @@ final class AssistToolRunnerTests: XCTestCase {
     }
 
     // MARK: - Contract-case fixtures
+
+    /// A case's `curriculumFolders` (#614): the names written to the course's
+    /// `curriculum_folders` before it is read, or nil when the case declares
+    /// none. A field of any other shape fails the case rather than being
+    /// read as "none".
+    private func declaredCurriculumFolders(of testCase: [String: Any], named name: String) throws -> [String]? {
+        guard let field = testCase["curriculumFolders"] else {
+            return nil
+        }
+        return try XCTUnwrap(field as? [String], "\(name): curriculumFolders is a list of folder names")
+    }
 
     /// The `cases` array of one key inside one contract file.
     private static func cases(
@@ -4981,10 +5006,12 @@ final class AssistToolRunnerTests: XCTestCase {
 
     @MainActor
     private func makeRunner(hasDeployedBefore: Bool = false,
-                            registeringPreview: Bool = false) throws
+                            registeringPreview: Bool = false,
+                            curriculumFolders: [String]? = nil) throws
         -> (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork) {
         return try AssistFixture.makeRunner(
-            hasDeployedBefore: hasDeployedBefore, registeringPreview: registeringPreview
+            hasDeployedBefore: hasDeployedBefore, registeringPreview: registeringPreview,
+            curriculumFolders: curriculumFolders
         )
     }
 
