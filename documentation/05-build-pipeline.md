@@ -1631,9 +1631,11 @@ the first tick never drops the map the scan found. A rename of any of them mater
 - `1.A.1`/`CRD-1.A.1` (essential knowledge): not measured on a real course.
 
 **Known limits.** A code in two folders counts on both maps (matching is by
-page name). The assistant still recognises curriculum pages by a folder name
-mentioning "curriculum", so a declared `AP CSP` folder's pages have a map but
-are not offered by the assistant (`isCurriculumPage.note`). Russell's own
+page name). (This used to say the assistant recognised curriculum pages only
+by a folder name mentioning "curriculum"; since #614 it reads the declared
+folders too, so a declared `AP CSP` folder's pages are offered and protected —
+`10-local-ai-assistant.md` → "A curriculum folder is the one the course
+declares, or one named for it (#614)".) Russell's own
 College Board layout was not measured (the working folders are his); the two
 read-only commands for him are in the #128 hand-over.
 
