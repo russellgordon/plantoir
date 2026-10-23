@@ -721,7 +721,7 @@ public static class ActivityTrail
         SwiftGotReady,
         /// <summary>
         /// Getting Swift ready failed, and why (offline, noRoom, damaged, busy,
-        /// unpack): every Swift block then says it is not ready, and this line
+        /// unpack, waited): every Swift block then says it is not ready, and this line
         /// says whether it was the network, the disk or the download.
         /// </summary>
         SwiftCouldNotBeGotReady,

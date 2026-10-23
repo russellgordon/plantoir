@@ -912,7 +912,7 @@ Write-Host "Running the website builder on this PC ..."
 # prepare_runnable_swift does on a Mac - but with no container: this PC
 # compiles with the swift.org Windows toolchain, which the first preview with
 # a block to compile gets ready, in the foreground as the Mac builds its
-# Swift image (about 2.1 GB downloaded once, about 0.9 GB kept in
+# Swift image (about 2.3 GB downloaded once, about 0.9 GB kept in
 # %LOCALAPPDATA%\Plantoir\swift; contracts/toolchain.json -> swiftWindows).
 #
 #   1. ask which blocks the course's cache does not hold yet (the shared
