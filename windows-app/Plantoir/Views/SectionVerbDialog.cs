@@ -77,16 +77,12 @@ internal sealed class SectionVerbDialog
         AutomationProperties.SetAutomationId(_dialog, "sectionVerbDialog");
         // The dialog's box at every stage, for #655's measurements: the box is
         // not in the UI Automation tree (its element is the whole overlay), so
-        // the size it was laid out at is written to the diagnostic log.
-        // Logged when the box OR the content changes size: a hold that keeps
+        // the size it was laid out at is written to the diagnostic log —
+        // when the box OR the content changes size, since a hold that keeps
         // the content's height while the buttons' row collapses changes only
-        // the box.
-        void LogTheBox()
-        {
-            string box = Named(_dialog, "BackgroundElement") is FrameworkElement b ? $"{b.ActualWidth:0}x{b.ActualHeight:0}" : "?";
-            App.LogDiagnostic($"Section menu dialog at {_stage}: box {box}, content {_host.ActualWidth:0}x{_host.ActualHeight:0} (held at least {_host.MinHeight:0})");
-        }
-        if (ShowsAPlanTable(item))
+        // the box. In a --state-dir run only (the UI tests'): a teacher
+        // dragging the window would otherwise write a line per frame.
+        if (LogsTheBox)
         {
             _host.SizeChanged += (_, _) => LogTheBox();
             _dialog.Opened += (_, _) =>
@@ -355,18 +351,30 @@ internal sealed class SectionVerbDialog
     {
         // Measured BEFORE the buttons go: their row collapses with them.
         double held = HeightToHoldWhileWorking();
+        double box = Named(_dialog, "BackgroundElement") is FrameworkElement b ? b.ActualHeight : 0;
         _stage = Stage.Working;
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, MinWidth = 420 };
+        // At the top of a held host (#655's implementation review): stretched,
+        // the ring would centre in the held height while the words sat on top.
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, MinWidth = 420, VerticalAlignment = VerticalAlignment.Top };
         panel.Children.Add(new ProgressRing { IsActive = true, Width = 20, Height = 20 });
         var words = Words(said);
         _workingWords = words;
         AutomationProperties.SetAutomationId(words, "sectionVerbWorking");
         panel.Children.Add(words);
         SetContent(panel);
-        _host.MinHeight = held;
-        if (held > 0) App.LogDiagnostic($"Section menu working: held at {held:0} epx (the stage before, its buttons' row included)");
+        _held = held;
+        _heldChrome = held > 0 && box > held ? box - held : 0;
+        ApplyTheHold();
         _dialog.PrimaryButtonText = "";
         _dialog.CloseButtonText = "";
+        if (LogsTheBox)
+        {
+            // Laid out now, so Working's box is logged even when the call
+            // answers before the next layout pass.
+            if (held > 0) App.LogDiagnostic($"Section menu working: held at {_host.MinHeight:0} epx of {held:0} (the stage before, its buttons' row included)");
+            _dialog.UpdateLayout();
+            LogTheBox();
+        }
     }
 
     /// <summary>
@@ -386,6 +394,34 @@ internal sealed class SectionVerbDialog
         if (Named(_dialog, "CommandSpace") is FrameworkElement row && row.Visibility == Visibility.Visible)
             commands = row.ActualHeight + row.Margin.Top + row.Margin.Bottom;
         return _host.ActualHeight + commands;
+    }
+
+    /// <summary>Whether the dialog's box is logged (#655): a --state-dir run, the UI tests', and the three page items.</summary>
+    private bool LogsTheBox => AppDataRoot.IsRedirected && ShowsAPlanTable(_item);
+
+    private void LogTheBox()
+    {
+        if (!LogsTheBox) return;
+        string box = Named(_dialog, "BackgroundElement") is FrameworkElement b ? $"{b.ActualWidth:0}x{b.ActualHeight:0}" : "?";
+        App.LogDiagnostic($"Section menu dialog at {_stage}: box {box}, content {_host.ActualWidth:0}x{_host.ActualHeight:0} (held at least {_host.MinHeight:0})");
+    }
+
+    /// <summary>Working's hold: the stage before's height (0 for none), and what the box carries outside it.</summary>
+    private double _held;
+    private double _heldChrome;
+
+    /// <summary>
+    /// The hold, never taller than the window leaves room for: the box is the
+    /// host plus <see cref="_heldChrome"/>, and ContentDialogMaxHeight is wide
+    /// open here, so a hold past the window would clip the box. Clamped, not
+    /// dropped, when the window changes size mid-call (the implementation
+    /// review): restoring or growing the window gives the height back.
+    /// </summary>
+    private void ApplyTheHold()
+    {
+        if (_held <= 0) { _host.MinHeight = 0; return; }
+        double room = WindowHeight - _heldChrome;
+        _host.MinHeight = Math.Max(0, Math.Min(_held, room));
     }
 
     private static DependencyObject? Named(DependencyObject root, string name)
@@ -452,11 +488,8 @@ internal sealed class SectionVerbDialog
         if (_dialog.XamlRoot is not { } root) return;
         _refit = (_, _) =>
         {
-            // A window changed size mid-call lets go of Working's hold (#655):
-            // ContentDialogMaxHeight is wide open here and nothing relays out
-            // a spinner, so a hold taller than a shrunken window would clip
-            // the dialog off its bottom.
-            if (_stage == Stage.Working) _host.MinHeight = 0;
+            // A window changed size mid-call re-clamps Working's hold (#655).
+            if (_stage == Stage.Working) ApplyTheHold();
             SizeTheHost(root);
             _relayout?.Invoke();
         };
@@ -481,6 +514,7 @@ internal sealed class SectionVerbDialog
     /// </summary>
     private void SetContent(UIElement content, Action? relayout = null)
     {
+        _held = 0;
         _host.MinHeight = 0;
         _host.Children.Clear();
         _host.Children.Add(content);

@@ -389,6 +389,11 @@ public class PageTablesUiTests
         dialog.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.CheckBox))
               .First(element => element.Name == pick).AsCheckBox().Toggle();
         dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
+        // Working after Choose lasts about two seconds (the plan is read), long
+        // enough for a picture of the spinner in the held dialog.
+        if (Retry.WhileNull(() => app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId("sectionVerbWorking")),
+                            TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(50)).Result is not null)
+            Picture(app, publishing ? "655-publish-working" : "655-hide-working");
         WaitFor(app, "sectionVerbPlanTable", "the plan's table");
         Thread.Sleep(600);
         Picture(app, publishing ? "655-publish-plan" : "655-hide-plan");
@@ -404,6 +409,13 @@ public class PageTablesUiTests
         int planAt = boxes.FindLastIndex(box => box.Stage == "Plan");
         Assert.True(planAt >= 0, "the app never logged the plan's box");
         var plan = boxes[planAt];
+        // Working after Choose keeps the picker's height too (grow-only Working, as the mac).
+        int chooseAt = boxes.FindLastIndex(planAt, box => box.Stage == "Choose");
+        Assert.True(chooseAt >= 0, "the app never logged the picker's box");
+        var choose = boxes[chooseAt];
+        var workingAfterChoose = boxes.Skip(chooseAt + 1).Take(planAt - chooseAt - 1).Where(box => box.Stage == "Working").ToList();
+        Assert.NotEmpty(workingAfterChoose);
+        Assert.All(workingAfterChoose, box => Assert.InRange(box.Height, choose.Height - 1, choose.Height + 1));
         var after = boxes.Skip(planAt + 1).ToList();
         var working = after.Where(box => box.Stage == "Working").ToList();
         var answers = after.Where(box => box.Stage == "Result").ToList();
