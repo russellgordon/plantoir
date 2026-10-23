@@ -18,7 +18,8 @@ and not only on a missing name: `_copy_the_front_page` below falls back to
 the steps the build ran before.
 
 `build_site` imports `frontmatter`, which lives only inside the container on
-the mac, so this CANNOT be run on the mac host. verify.sh runs it in the image:
+the mac, so this cannot be run on the mac host's own Python (a venv with
+python-frontmatter 1.3.0 and PyYAML 6.0.3 runs it). verify.sh runs it in the image:
 
     docker run --rm \\
       -v "$(pwd)/scripts/test_front_page_title_repair.py:/opt/scripts/test_front_page_title_repair.py:ro" \\
