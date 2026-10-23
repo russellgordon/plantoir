@@ -151,6 +151,94 @@ final class AssistCurriculumMentionsTests: XCTestCase {
         XCTAssertTrue(nothing.detail.contains("No curriculum expectation in ICS3U matches"))
     }
 
+    // MARK: - A curriculum folder the course declares (#614)
+
+    /// A curriculum folder renamed to a name without the word is still the
+    /// course's curriculum folder once `curriculum_folders` names it, so the
+    /// curriculum tools offer its expectations. Before #614 they offered none:
+    /// the rule asked only whether a folder was NAMED for the curriculum.
+    @MainActor
+    func testADeclaredCurriculumFolderWithoutTheWordOffersItsExpectations() throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let courseURL: URL = made.course.directoryURL
+        try FileManager.default.moveItem(
+            at: courseURL.appendingPathComponent("Curriculum"),
+            to: courseURL.appendingPathComponent("Expectations")
+        )
+        made.course.configuration.curriculumFolders = ["Expectations"]
+
+        let found: [AssistCurriculumExpectation] = AssistCurriculumMentions.expectations(
+            forSection: 1, in: made.course, workspaceURL: made.root
+        )
+        var codes: [String] = []
+        for expectation in found {
+            codes.append(expectation.code)
+        }
+        XCTAssertEqual(codes, ["A1.1", "A2.2"])
+    }
+
+    /// The issue's own scenario, end to end: a course that declares NOTHING
+    /// has its `Curriculum` folder renamed to `Expectations` the way Course
+    /// Settings does it — the move, then the configuration the rename writes —
+    /// and, read again, its expectation pages are still curriculum. This is
+    /// the materialised key and the predicate working together.
+    @MainActor
+    func testRenamingTheCurriculumFolderKeepsItsPagesCurriculum() throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try made.course.configuration.recordOnDisk({ values in
+            var changed: [String: Any] = values
+            changed["shared_folders"] = ["Curriculum", "Concepts"]
+            return changed
+        }, at: made.course.configFileURL)
+
+        let before: Course = try courseReadAgain(from: made.root)
+        XCTAssertEqual(before.configuration.curriculumFolders, [], "the course starts declaring nothing")
+        let withPages: [String] = CurriculumFolderRule.foldersWithPages(for: before)
+        let withLetterFirstPages: [String] = CurriculumFolderRule.foldersWithLetterFirstPages(for: before)
+        try SpecialFolderRenamer.rename(
+            "Curriculum", to: "Expectations", scope: .shared,
+            courseDirectory: before.directoryURL, sectionNumbers: before.configuration.sectionNumbers
+        )
+        try before.configuration.recordOnDisk({ values in
+            return SpecialFolderRenamer.renaming(
+                "Curriculum", to: "Expectations", scope: .shared, in: values,
+                foldersWithPages: withPages, foldersWithLetterFirstPages: withLetterFirstPages
+            )
+        }, at: before.configFileURL)
+
+        let after: Course = try courseReadAgain(from: made.root)
+        XCTAssertEqual(after.configuration.curriculumFolders, ["Expectations"])
+        let expectation: URL = after.directoryURL.appendingPathComponent("Expectations/A1.1.md")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: expectation.path))
+        XCTAssertTrue(
+            AssistCurriculumMentions.isCurriculum(pageAt: expectation, in: after),
+            "A renamed curriculum folder lost its pages' protection"
+        )
+    }
+
+    /// A declared name matches the folder whichever way its accent was typed:
+    /// composed (NFC) on one side, decomposed (NFD) on the other, as a name
+    /// typed in one app and read back from the disk by another can be.
+    func testADeclaredNameMatchesWhicheverWayItsAccentIsWritten() {
+        let composed: String = "Attentes r\u{00E9}vis\u{00E9}es"
+        let decomposed: String = "Attentes re\u{0301}vise\u{0301}es"
+        XCTAssertTrue(AssistCurriculumMentions.isCurriculum(folderSegments: [decomposed], declared: [composed]))
+        XCTAssertTrue(AssistCurriculumMentions.isCurriculum(folderSegments: ["section2", composed, "B"],
+                                                            declared: [decomposed.uppercased()]))
+        XCTAssertFalse(AssistCurriculumMentions.isCurriculum(folderSegments: ["section1"], declared: ["section1"]),
+                       "A section folder is set aside before a declared name is compared")
+    }
+
+    /// The course as a fresh window would read it from disk.
+    @MainActor
+    private func courseReadAgain(from root: URL) throws -> Course {
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        workspace.chooseWorkspace(at: root)
+        return try XCTUnwrap(workspace.courses.first)
+    }
+
     // MARK: - Where the transclusions land
 
     /// Inside the markers the page already has, and nowhere else.
