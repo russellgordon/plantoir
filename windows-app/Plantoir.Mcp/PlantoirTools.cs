@@ -1572,10 +1572,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// the app would miss every request arriving from a terminal. (The mac
     /// records the same two events from its own runner, which on that platform
     /// IS the app.) This server already wrote the trail before these two
-    /// events — <c>LauncherRunner</c> does — so the known limit that comes
-    /// with it is pre-existing rather than introduced here:
-    /// <c>AppDataRoot</c> is per-process, so a run started with
-    /// <c>--state-dir</c> does not redirect this server's copy.
+    /// events — <c>LauncherRunner</c> does. <c>AppDataRoot</c> is
+    /// per-process, so a window started with <c>--state-dir</c> passes it on
+    /// to this server (<c>McpClient</c>, #641), and these lines land in that
+    /// run's trail rather than this PC's real one.
     /// </remarks>
     private static void NoteTheWebsiteOnTheTrail(
         AssistWorkspace.SiteRelease released, string courseCode, int sectionNumber)

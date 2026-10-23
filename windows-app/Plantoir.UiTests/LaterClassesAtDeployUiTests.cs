@@ -168,7 +168,7 @@ public class LaterClassesAtDeployUiTests
         row.Focus();
         Thread.Sleep(300);
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.SPACE);
+        Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.SPACE);
         Thread.Sleep(400);
         Assert.False(rows[0].AsCheckBox().IsChecked, "Space on the selected row did not untick it (or flipped it twice)");
         Assert.True(rows[1].AsCheckBox().IsChecked, "Space unticked a row that was not selected");

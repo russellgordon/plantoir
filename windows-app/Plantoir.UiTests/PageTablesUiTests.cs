@@ -267,7 +267,7 @@ public class PageTablesUiTests
         WaitFor(app, "sectionVerbPage1", "box 1").AsCheckBox().Toggle();
         SelectAndFocus(app, "sectionVerbPageRow1");
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.RETURN);
+        Keyboard.Type(VirtualKeyShort.RETURN);
         WaitFor(app, "sectionVerbPlanTable", "the plan, after Return with a row selected");
         MenuBar.CloseDialog(app);
     }
@@ -279,7 +279,7 @@ public class PageTablesUiTests
         OpenThePicker(app);
         SelectAndFocus(app, "sectionVerbPageRow0");
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         Assert.True(Retry.WhileFalse(() => app.OpenDialog() is null, TimeSpan.FromSeconds(10)).Result,
                     "Escape with a row selected did not cancel the picker");
     }

@@ -62,6 +62,7 @@ public sealed class DrivenApp : IDisposable
     private readonly Application? _app;
     private readonly UIA3Automation _automation;
     private readonly string _root;
+    private readonly string _test = "an unnamed test";
 
     public Window Window { get; } = null!;
 
@@ -191,6 +192,15 @@ public sealed class DrivenApp : IDisposable
     /// app keeps its settings, trail and any test-run record (#191).</summary>
     public string StateDirectory { get; }
 
+    /// <summary>This run's temporary folder's own name (<c>plantoir-ui-&lt;run&gt;-&lt;id&gt;</c>):
+    /// what a line about this run's folders carries, even after the trail redacts the path around it (#641).</summary>
+    public string RunFolderName => Path.GetFileName(_root);
+
+    /// <summary>This PC's REAL trail, by its literal path: never through
+    /// <c>AppDataRoot</c>, which this harness redirects (#641).</summary>
+    public static string RealTrailPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "Logs", "activity.txt");
+
     /// <summary>How long to wait for the interface to catch up. Generous: a
     /// cold first launch loads the Windows App SDK, and a machine under load
     /// is slow rather than broken.</summary>
@@ -233,6 +243,14 @@ public sealed class DrivenApp : IDisposable
     public DrivenApp(Action<string> buildCourses, Action<string>? beforeLaunch = null, bool waitUntilReady = true,
                      bool restoreWindows = false, IEnumerable<string>? extraArguments = null)
     {
+        _test = HeldKeys.CallingTest();
+        // A key left down by whatever ran before (a run that crashed, a
+        // person, a remote-desktop modifier) is released before this test
+        // types anything (#638). Said, not failed: it is not this test's.
+        var downBefore = HeldKeys.ReleaseAll();
+        if (downBefore.Count > 0)
+            Console.WriteLine($"Released keys already held down before {_test} started: {HeldKeys.Names(downBefore)}.");
+
         // Closed rather than refused: two copies would fight over the
         // foreground, and a physical click meant for the sidebar would land in
         // whichever window happened to be in front.
@@ -272,6 +290,18 @@ public sealed class DrivenApp : IDisposable
         StateDirectory = stateDir;
         Directory.CreateDirectory(WorkspacePath);
         Directory.CreateDirectory(stateDir);
+
+        // THIS process too (#641). The harness sets working folders up
+        // in-process (below, and a test's second folder through Scratch),
+        // and that copy of the tools writes "got the working folder ready"
+        // to the trail. Without this it went to this PC's REAL trail, since
+        // only the app was started with --state-dir. One test at a time
+        // ("drives the real app"), so re-pointing the static per run is safe;
+        // a guidance pass the copy starts on Task.Run can still finish after
+        // the NEXT run has re-pointed it, and lands in that run's trail
+        // (documentation/12-windows-app.md, "The flags the app answers").
+        // RealBuildsRoot reads %LOCALAPPDATA% directly and is not moved.
+        AppDataRoot.RedirectTo(stateDir);
 
         // A folder is only a working folder once it carries the launchers —
         // Workspace.Classify looks for preview.ps1 — so a fixture of nothing
@@ -772,6 +802,16 @@ public sealed class DrivenApp : IDisposable
 
     public void Dispose()
     {
+        // Keys first (#638), so whatever happens below cannot leave one held
+        // for the next test. Released and RECORDED, never thrown from here:
+        // a throw would replace the test's own failure. HeldKeyLedger fails
+        // the collection's cleanup instead.
+        var held = HeldKeys.ReleaseAll();
+        if (held.Count > 0)
+        {
+            Console.WriteLine($"Keys still held down when {_test} ended, released: {HeldKeys.Names(held)}.");
+            HeldKeys.Record(_test, held);
+        }
         try { _automation.Dispose(); } catch { }
         // Ours by pid, not everything called Plantoir. The constructor closes
         // whatever was running when it STARTED; a copy opened during the run is
