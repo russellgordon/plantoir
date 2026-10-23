@@ -558,9 +558,9 @@ fi
 # says, and that the Swift image's recipe holds every pin and flag the
 # contract names. Stdlib only; the compiler itself is the Swift gate below.
 if (cd scripts && python3 test_swift_blocks.py) >/tmp/verify_swift_blocks_test.log 2>&1; then
-  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, and the trail's PLANTOIR_SWIFT: line from a real build log (scripts/test_swift_blocks.py, #493, #635)"
+  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, the trail's PLANTOIR_SWIFT: line from a real build log, and what a failed build tells the teacher and leaves in state.json (scripts/test_swift_blocks.py, #493, #635, #642)"
 else
-  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, and the trail's PLANTOIR_SWIFT: line from a real build log (scripts/test_swift_blocks.py, #493, #635)"
+  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, the trail's PLANTOIR_SWIFT: line from a real build log, and what a failed build tells the teacher and leaves in state.json (scripts/test_swift_blocks.py, #493, #635, #642)"
   cat /tmp/verify_swift_blocks_test.log
 fi
 
@@ -568,9 +568,9 @@ fi
 # "already there" (#635): its block cut out and run with bash 3.2 against a
 # stand-in docker that runs the real swift_blocks.py got-ready.
 if (cd scripts && python3 test_swift_launcher_marker.py) >/tmp/verify_swift_launcher_marker_test.log 2>&1; then
-  pass "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence (scripts/test_swift_launcher_marker.py, #635)"
+  pass "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence, which for a failure is the one its reason calls for, and the state.json that reason writes (scripts/test_swift_launcher_marker.py, #635, #642)"
 else
-  fail "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence (scripts/test_swift_launcher_marker.py, #635)"
+  fail "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence, which for a failure is the one its reason calls for, and the state.json that reason writes (scripts/test_swift_launcher_marker.py, #635, #642)"
   cat /tmp/verify_swift_launcher_marker_test.log
 fi
 
