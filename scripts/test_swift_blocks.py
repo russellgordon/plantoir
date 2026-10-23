@@ -132,7 +132,7 @@ class Course:
         return path
 
     def cache(self) -> Path:
-        return self.cache_root / swift_blocks.toolchain_id()
+        return self.cache_root / swift_blocks.toolchain_id(windows=False)
 
     def compiled(self, body: str, sdk="embedded", data=b"\0asm\1\0\0\0"):
         key = swift_blocks.key_of(body)
@@ -180,7 +180,7 @@ class PlanTests(unittest.TestCase):
         self.space.remove()
 
     def plan(self, now=None):
-        return swift_blocks.plan(self.space.course, self.space.cache_root, now=now)
+        return swift_blocks.plan(self.space.course, self.space.cache_root, now=now, windows=False)
 
     def test_every_block_on_a_page_that_opts_in_becomes_one_job(self):
         self.space.page("Strings.md", OPTED + f"```swift run\n{BLOCK_ONE}\n```\n\n```swift run stdin\n{BLOCK_TWO}\n```\n"
@@ -318,7 +318,8 @@ class PrepareTests(unittest.TestCase):
 
     def test_a_block_with_no_program_says_why(self):
         for state, windows, reason in ((None, False, "notCompiled"), ({"state": "noRoom"}, False, "noRoom"),
-                                       (None, True, "notOnWindows")):
+                                       ({"state": "notDownloaded"}, True, "notDownloaded"),
+                                       (None, True, "notCompiled")):
             with self.subTest(reason=reason):
                 shutil.rmtree(self.space.cache_root, ignore_errors=True)
                 if state is not None:
@@ -394,8 +395,11 @@ class GroupingNotesAndCacheCaseTests(unittest.TestCase):
         self.assertGreaterEqual(len(check["groupingCases"]), 3)
         for case in check["groupingCases"]:
             with self.subTest(case=case["name"]):
+                # A case that says which platform it is on is rendered there
+                # (downloadGigabytes, #570); the others read the same on both.
+                windows = None if "on" not in case else case["on"] == "windows"
                 found = site_health.swift_finding({"swift_problems": case["problems"]}, "ICS4U", 1,
-                                                  site_health._checks_by_name())
+                                                  site_health._checks_by_name(), windows=windows)
                 self.assertEqual(found.detail, case["detail"])
 
     def test_every_cache_case_holds(self):
@@ -408,7 +412,7 @@ class GroupingNotesAndCacheCaseTests(unittest.TestCase):
                     self.space.cache().mkdir(parents=True, exist_ok=True)
                     (self.space.cache() / f"{key}.json").write_text(json.dumps(case["entry"]))
                 planned = swift_blocks.plan(self.space.course, self.space.cache_root,
-                                            full_rebuild=case["fullRebuild"])
+                                            full_rebuild=case["fullRebuild"], windows=False)
                 self.assertEqual(planned["count"] == 1, case["compiledAgain"])
 
     def test_a_large_program_is_named_on_a_note_line(self):
@@ -667,6 +671,21 @@ class CompileStepTests(unittest.TestCase):
         broken = self.entry(failed)
         self.assertIsNotNone(broken, "an error naming killedCount was taken for a kill and not cached")
         self.assertIn("cannot find 'killedCount' in scope", broken["diagnostics"])
+
+
+class PruneKeepsTheLogsTests(unittest.TestCase):
+    def test_a_prune_keeps_the_launchers_logs(self):
+        # #570: every prune used to remove logs/ with the old toolchains'
+        # folders, so a launcher's compile log never survived its own build.
+        root = Path(tempfile.mkdtemp(prefix="plantoir-swift-prune-"))
+        try:
+            for name in ("0123456789abcdef", "fedcba9876543210", swift_blocks.LOGS_FOLDER, swift_blocks.JOBS_FOLDER):
+                (root / name).mkdir()
+            swift_blocks.prune(root, "fedcba9876543210", time.time())
+            self.assertEqual(sorted(path.name for path in root.iterdir()),
+                             sorted(["fedcba9876543210", swift_blocks.LOGS_FOLDER, swift_blocks.JOBS_FOLDER]))
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
 
 
 if __name__ == "__main__":

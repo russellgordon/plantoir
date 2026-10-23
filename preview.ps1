@@ -905,5 +905,69 @@ if (-not $BUILD_ONLY) {
 $py = Enter-NativeRuntime
 $env:HOST_TZ_OFFSET = (Get-Date).ToString('zzz').Replace(':','')
 Write-Host "Running the website builder on this PC ..."
+
+# ---- Runnable Swift (#570; the mac's #493) ----
+# A ```swift run block runs in the student's browser as a small program
+# compiled AHEAD of time, before the build, as preview.sh's
+# prepare_runnable_swift does on a Mac - but with no container: this PC
+# compiles with the swift.org Windows toolchain, which the first preview with
+# a block to compile gets ready, in the foreground as the Mac builds its
+# Swift image (about 2.3 GB downloaded once, about 0.9 GB kept in
+# %LOCALAPPDATA%\Plantoir\swift; contracts/toolchain.json -> swiftWindows).
+#
+#   1. ask which blocks the course's cache does not hold yet (the shared
+#      scripts/swift_blocks.py plan, with the bundled Python);
+#   2. none: nothing more - a course with no Swift never downloads Swift;
+#   3. otherwise get Swift ready if it is not (swift_windows_fetch.py ensure:
+#      room first, then the download, resumed if a stopped preview left half
+#      of it), saying how far it has got;
+#   4. compile the jobs (swift_windows_compile.py: compile.py, unchanged,
+#      adjusted for this PC).
+#
+# Nothing here ever stops the preview: whatever could not be compiled is said
+# by the build, block by block, as one folder problem (codeRunnerBlocks.swift
+# in contracts/shared-rules.json; the words printed here are
+# codeRunnerBlocks.swift.windows.printed).
+function Invoke-RunnableSwift([string]$Py) {
+    $scripts = $env:PLANTOIR_SCRIPTS_DIR
+    $planArgs = @('-u', (Join-Path $scripts 'swift_blocks.py'), 'plan', "--course=$COURSE", '--format=lines')
+    if ($FULL_REBUILD) { $planArgs += '--full-rebuild' }
+    $planned = @(& $Py @planArgs 2>$null)
+    if ($LASTEXITCODE -ne 0) { return }
+    $root = ''; $cache = ''; $jobs = ''; $count = '0'
+    foreach ($line in $planned) {
+        $at = ([string]$line).IndexOf('=')
+        if ($at -lt 1) { continue }
+        $key = ([string]$line).Substring(0, $at); $value = ([string]$line).Substring($at + 1).Trim()
+        switch ($key) { 'root' { $root = $value } 'cache' { $cache = $value } 'jobs' { $jobs = $value } 'count' { $count = $value } }
+    }
+    if (-not $jobs -or -not $root -or $count -eq '0') { return }
+    $logs = Join-Path $root 'logs'
+    try { $null = New-Item -ItemType Directory -Force -Path $logs } catch {}
+    $noBom = New-Object System.Text.UTF8Encoding($false)
+
+    & $Py -u (Join-Path $scripts 'swift_windows_fetch.py') ensure "--course=$COURSE" "--section=$SECTION"
+    $ready = $LASTEXITCODE
+    if ($ready -ne 0) {
+        # 10 too little room, 11 not downloaded; anything else leaves no
+        # state, so the build says "preview the course again" (notCompiled).
+        $state = $null
+        if ($ready -eq 10) { $state = '{"state": "noRoom"}' }
+        elseif ($ready -eq 11) { $state = '{"state": "notDownloaded"}' }
+        if ($state) { try { [IO.File]::WriteAllText((Join-Path $root 'state.json'), $state + "`n", $noBom) } catch {} }
+        Remove-Item -LiteralPath $jobs -Recurse -Force -ErrorAction SilentlyContinue
+        return
+    }
+
+    $noun = if ($count -eq '1') { 'program' } else { 'programs' }
+    Write-Host ("{0} Making {1} Swift {2} ready to run{3}" -f [char]::ConvertFromUtf32(0x1F985), $count, $noun, [char]0x2026)
+    & $Py -u (Join-Path $scripts 'swift_windows_compile.py') $jobs $cache "--log=$(Join-Path $logs "compile-$PID.log")"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ("{0}{1}  Could not make the Swift programs ready to run this time; the build will say which ones." -f [char]0x26A0, [char]0xFE0F)
+    }
+    Remove-Item -LiteralPath $jobs -Recurse -Force -ErrorAction SilentlyContinue
+}
+try { Invoke-RunnableSwift $py } catch {}
+
 & $py -u (Join-Path $env:PLANTOIR_SCRIPTS_DIR 'build_site.py') @argList
 exit $LASTEXITCODE

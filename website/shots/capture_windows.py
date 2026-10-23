@@ -283,7 +283,7 @@ def main() -> int:
                            ~/Plantoir Print (print_set_windows.py)
         --code [id,id]     the Code page's figures (code-python,
                            code-python-live, code-python-error, code-quiz;
-                           not the Swift two until #570 is decided), from previews of
+                           not the Swift two until their 2x picture), from previews of
                            ~/School Web Space (preview_pages_windows.py)
         --quizzes [id,id]  the Quizzes page's figures (quiz-math,
                            quiz-chemistry, quiz-english from ~/Teaching,

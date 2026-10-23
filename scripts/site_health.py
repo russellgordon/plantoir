@@ -29,6 +29,7 @@ reads has one home like every other sentence in this product.
 """
 
 import json
+import os
 import re
 
 import contracts
@@ -267,7 +268,7 @@ def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
-def swift_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def swift_finding(facts: dict, course: str, section, table: dict, windows=None) -> Finding:
     """
     ONE finding for every runnable Swift block this build has no program
     for (#493: codeRunnerBlocks.swift), never one per block. A compile error
@@ -281,10 +282,14 @@ def swift_finding(facts: dict, course: str, section, table: dict) -> Finding:
     swift = contracts.section(CONTRACT_FILE, "codeRunnerBlocks", "swift")
     reasons = swift["reasons"]
     gigabytes = swift["room"]["needGigabytes"]
+    # What the first download is, on the platform the build runs on (#570).
+    windows = (os.name == "nt") if windows is None else windows
+    download = swift.get("downloadGigabytes", {}).get("windows" if windows else "mac", "")
 
     def reason_text(problem):
         return filled(reasons.get(problem.get("reason") or "", reasons["notCompiled"]),
-                      {"said": problem.get("said") or "", "gigabytes": gigabytes})
+                      {"said": problem.get("said") or "", "gigabytes": gigabytes,
+                       "downloadGigabytes": download})
 
     def counted(nouns, count):
         return filled(nouns["one"] if count == 1 else nouns["several"], {"count": count})
@@ -316,7 +321,8 @@ def swift_finding(facts: dict, course: str, section, table: dict) -> Finding:
                 pages.append(problem.get("page"))
         several = entry["reasonsForSeveral"].get(reason)
         pieces.append(filled(entry["oneReasonForSeveral"], {
-            "reason": filled(several, {"gigabytes": gigabytes}) if several else reason_text(sharing[0]),
+            "reason": filled(several, {"gigabytes": gigabytes, "downloadGigabytes": download})
+            if several else reason_text(sharing[0]),
             "blocks": counted(entry["blockCount"], len(sharing)),
             "pages": counted(entry["pageCount"], len(pages)),
         }))

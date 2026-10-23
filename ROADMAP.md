@@ -62,9 +62,7 @@ need to read those to use Plantoir.
   so pages look right without reaching other websites.
   ([#566](https://github.com/russellgordon/plantoir/issues/566))
 
-- **Decisions and measurements carried over from the Windows 1.8.5 catch-up:** how Swift
-  programs will ever run on Windows
-  ([#570](https://github.com/russellgordon/plantoir/issues/570)), what a
+- **Decisions and measurements carried over from the Windows 1.8.5 catch-up:** what a
   scheduled publish does when the computer is asleep
   ([#554](https://github.com/russellgordon/plantoir/issues/554)), and a
   curriculum folder renamed to a name without "curriculum"
