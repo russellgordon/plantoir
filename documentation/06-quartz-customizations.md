@@ -2042,8 +2042,9 @@ pinned in `code_runner.mjs`; red against the unpatched router).
 **The served case (#628).** Two more marker edits (`PLANTOIR-SERVED-CASE`,
 `_wire_served_case`, ALWAYS, idempotent) put one function,
 `plantoirServedCase`, into the router (`spa.inline.ts`: `getOpts` and the
-top of `navigate`) and the link previews (`popover.inline.ts`: the URL
-`fetchCanonical` is asked for). On a page whose `<html>` carries
+top of `navigate`), the link previews (`popover.inline.ts`: the URL
+`fetchCanonical` is asked for) and search's result previews
+(`search.inline.ts`: the URL `fetchContent` fetches). On a page whose `<html>` carries
 `data-plantoir-paths="lowercase"` - which only a Netlify publish adds - it
 lower-cases a same-origin URL's pathname (ASCII, %-escapes kept, query and
 fragment untouched), so the explorer's, search's and the graph's links ask

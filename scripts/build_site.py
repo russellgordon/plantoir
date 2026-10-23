@@ -1789,7 +1789,12 @@ def _wire_isolation_nav(spa_ts: Path) -> None:
 # before. Same origin only; the query and the fragment are kept.
 SERVED_CASE_MARKER = "PLANTOIR-SERVED-CASE"
 
-_SERVED_CASE_IMPORT = 'import { fetchCanonical } from "./util"\n'
+# Each file's own import of ./util: the function is written straight after it.
+_SERVED_CASE_IMPORTS = {
+    "spa.inline.ts": 'import { fetchCanonical } from "./util"\n',
+    "popover.inline.ts": 'import { fetchCanonical } from "./util"\n',
+    "search.inline.ts": 'import { registerEscapeHandler, removeAllChildren } from "./util"\n',
+}
 _SERVED_CASE_FUNCTION = (
     "// " + SERVED_CASE_MARKER + " (#628, netlifyPageAddresses): on a page a Netlify publish marked,\n"
     "// ask for a page at the lower-case address Netlify serves it from. Unmarked: unchanged.\n"
@@ -1820,13 +1825,22 @@ _SERVED_CASE_EDITS = {
             "  const targetUrl = plantoirServedCase(new URL(link.href))\n",
         ),
     ),
+    # A search result's preview fetches the page itself (fetchContent), not
+    # through the router, so it is asked for the served address too.
+    "search.inline.ts": (
+        (
+            "    const targetUrl = resolveUrl(slug).toString()\n",
+            "    const targetUrl = plantoirServedCase(resolveUrl(slug)).toString()\n",
+        ),
+    ),
 }
 
 
 def _wire_served_case(script_ts: Path) -> None:
     """The router (spa.inline.ts: the link a click follows, and every
-    navigation, which the graph and search reach through spaNavigate) and the
-    link previews (popover.inline.ts) ask for a page at the lower-case address
+    navigation, which the graph and search reach through spaNavigate), the
+    link previews (popover.inline.ts) and search's result previews
+    (search.inline.ts, fetchContent) ask for a page at the lower-case address
     on a page a Netlify publish marked (#628). Idempotent: the marker is
     written once. All of a file's anchors or none: one that has moved warns
     and leaves the file as Quartz wrote it, which costs a redirect, never a
@@ -1837,14 +1851,15 @@ def _wire_served_case(script_ts: Path) -> None:
     text = script_ts.read_text(encoding="utf-8")
     if SERVED_CASE_MARKER in text:
         return
-    anchors = [_SERVED_CASE_IMPORT] + [old for old, _ in edits]
+    import_anchor = _SERVED_CASE_IMPORTS[script_ts.name]
+    anchors = [import_anchor] + [old for old, _ in edits]
     for anchor in anchors:
         if text.count(anchor) != 1:
             print("⚠️ Could not let the site's links ask Netlify for each page's own address: the page router has changed shape.")
             return
     for old, new in edits:
         text = text.replace(old, new)
-    at = text.index(_SERVED_CASE_IMPORT) + len(_SERVED_CASE_IMPORT)
+    at = text.index(import_anchor) + len(import_anchor)
     text = text[:at] + "\n" + _SERVED_CASE_FUNCTION + text[at:]
     script_ts.write_text(text, encoding="utf-8")
 
@@ -2017,8 +2032,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
     folder pages' table of contents (#520), and
     live input's two (#583: the preview's server sends the isolation
     headers, and Quartz's router loads a page whole across the isolation
-    line), and the served case's two (#628: the router and the link
-    previews ask Netlify for a page's lower-case address, only on a page a
+    line), and the served case's three (#628: the router, the link
+    previews and search's result previews ask Netlify for a page's lower-case address, only on a page a
     Netlify publish marked).
     Idempotent; an anchor that has moved warns and leaves the file alone.
 
@@ -2043,6 +2058,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz" / "components" / "scripts" / "spa.inline.ts", _wire_isolation_nav),
         (output_dir / "quartz" / "components" / "scripts" / "spa.inline.ts", _wire_served_case),
         (output_dir / "quartz" / "components" / "scripts" / "popover.inline.ts", _wire_served_case),
+        (output_dir / "quartz" / "components" / "scripts" / "search.inline.ts", _wire_served_case),
     ):
         try:
             wire(path)

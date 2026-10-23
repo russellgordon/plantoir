@@ -404,7 +404,8 @@ for start in (base, base + ("runner-deploy-check" if host_kind == "netlify" else
         parts = urllib.parse.urlsplit(absolute)
         if parts.netloc.lower() != own:
             continue
-        if re.search(r"[A-Z]", parts.path):
+        # %-escapes' hex digits are not capitals (`%2C`): as test_netlify_paths.path_has_capitals.
+        if re.search(r"[A-Z]", re.sub(r"%[0-9A-Fa-f]{2}", "", parts.path)):
             mixed += 1
         links.setdefault(urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, "")), raw)
 answered = 0
