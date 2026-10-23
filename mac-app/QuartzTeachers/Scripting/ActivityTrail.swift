@@ -262,10 +262,12 @@ nonisolated enum ActivityTrail {
         /// not to whenever somebody next opens the section.
         case folderProblemFound = "folder problem found"
         /// A folder a feature depends on was put back, at the teacher's
-        /// request. Separate from `folderProblemFound` because it is a
-        /// different event: one records that something is wrong, the other that
-        /// somebody acted on it — and a trail that could not tell them apart
-        /// would leave "did they ever fix it?" unanswerable.
+        /// request — or, since #584, something the build put right in the
+        /// teacher's own files by itself (`BuildRepairReport`: a front page's
+        /// title Plantoir wrote unquoted). Separate from `folderProblemFound`
+        /// because it is a different event: one records that something is
+        /// wrong, the other that somebody acted on it — and a trail that could
+        /// not tell them apart would leave "did they ever fix it?" unanswerable.
         case folderProblemRepaired = "folder problem repaired"
         /// A repair the teacher ASKED for did not happen. Carries the course,
         /// the section, and what was in the way — never anything from inside
