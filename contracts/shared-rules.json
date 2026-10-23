@@ -23623,6 +23623,20 @@
           "plantoir-runnable-code"
         ]
       },
+      "handoutsSkill": {
+        "rule": "The skill `plantoir-handouts` (#631) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so a new skill needs no code on either platform: both apps enumerate the folder. It carries the house style for paper made OUTSIDE the site - a LaTeX source compiled with tectonic to `Name.pdf`, with `Name - Answers.pdf` (`- Solutions` for a quiz or test) from the same source behind the \\qa/\\onlyq/\\onlya switch - and tells an assistant to OFFER it first whenever a teacher asks for something to print, in any course, beside `plantoir-printing` for a page that prints. The header and footer are the corners the site prints; the school's name is the course's `print_school_name`, and when that is empty the assistant asks. Sources and answer keys are kept OUT of `courses/`, because every file in a course folder that is not a page is copied to the website (Quartz's Assets emitter). It ships the starters listed here, compiled and looked at when they were written. It is NOT in pageAuthoringSkill.routesTo: that table routes the parts of a PAGE, and a handout made as a PDF is not one; `plantoir-printing` and `plantoir-page-authoring` each name it in a sentence instead (mentionedBy). The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
+        "skill": "plantoir-handouts",
+        "starters": [
+          "starters/Handout.tex",
+          "starters/Handout - Answers.tex",
+          "starters/Quiz.tex",
+          "starters/Quiz - Solutions.tex"
+        ],
+        "mentionedBy": [
+          "plantoir-printing",
+          "plantoir-page-authoring"
+        ]
+      },
       "rootFileCases": {
         "rule": "`existing` is the file as found (null: no file), with {start} and {end} standing for sectionStart and sectionEnd; the section's words are \"NEW\". `declined` is the Not Now on record for this file: \"thisSection\" (for these very words), \"earlierSection\" (for words that have since changed) or null. `expect` is write, replace, unchanged, ask or leave; `result` is the file afterwards - for ask, the file after the teacher says Add.",
         "cases": [

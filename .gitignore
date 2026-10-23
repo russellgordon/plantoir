@@ -25,6 +25,7 @@ website/shots/windowshot/obj/
 # The graphs skill (#485 E1) was missed until Windows #496 (2026-10-15).
 .claude/skills/plantoir-printing/
 .claude/skills/plantoir-math-graphs/
+.claude/skills/plantoir-handouts/
 /.agents/
 
 # Release bundles (publish output)

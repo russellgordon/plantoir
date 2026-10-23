@@ -1,6 +1,6 @@
 ---
 name: plantoir-printing
-description: Use when writing or changing a Plantoir course page that students will print - a worksheet, handout, practice set, review sheet, quiz, answer key or anything "printable". Says how to mark the page printable, how to write answers so they move to an answer key, how hints and self-checks print, and how to hand out an existing PDF instead.
+description: Use when writing or changing a Plantoir course page that students will print - a worksheet, handout, practice set, review sheet, quiz, answer key or anything "printable". Says how to mark the page printable, how to write answers so they move to an answer key, how hints and self-checks print, and how to hand out an existing PDF instead. A handout made as a PDF rather than a page, and any quiz or test for marks, is plantoir-handouts.
 ---
 
 # Making a Plantoir page printable
@@ -18,6 +18,12 @@ Portrait or Landscape, then **Questions only**, **Answers only** or
 separately: "Answers 1 of 2"). Nothing prints until one is chosen. This
 file is managed by Plantoir and is replaced when Plantoir updates; do not
 edit it.
+
+When a teacher asks for something to print, offer the house style too: a
+handout made as a PDF from a LaTeX source, with its answer key from the
+same file, is the `plantoir-handouts` skill
+(`.claude/skills/plantoir-handouts/SKILL.md`). A quiz or test for marks is
+always made that way - it must never be a page on the class website.
 
 ## 1. Mark the page printable
 
