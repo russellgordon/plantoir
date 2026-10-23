@@ -3875,8 +3875,8 @@ def _front_page_title_quoted(raw: str) -> str | None:
     5. that line is `title:`, one or more spaces, and a value that is not
        empty and does not start with a quote;
     6. the value holds ": " and neither " #" nor a tab and "#" (a comment);
-    7. the next line in the settings does not start with a space or a tab (the
-       value does not go on below);
+    7. the next line in the settings does not start with a space or a tab (else
+       the value would go on below);
     8. the rewrite changes only that line, to `title: ` and the value as
        `setup_course.frontmatter_title` quotes it, keeping its line ending;
     9. the rewritten settings READ, and their title is exactly the value.
@@ -4513,7 +4513,7 @@ def _hide_a_page_whose_settings_cannot_be_read(file_path: Path, error: Exception
     hidden and named.
 
     The teacher's own file is never touched: this runs on the copy in
-    `content/`, and `_write_the_date_back` refuses a source that cannot be
+    `content/`, and `_write_date_into_the_teachers_page` refuses a source that cannot be
     parsed.
 
     Hiding must not depend on anything that can fail for another reason — the

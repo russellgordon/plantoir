@@ -26,7 +26,10 @@ the mac, so this CANNOT be run on the mac host. verify.sh runs it in the image:
       -v "$(pwd)/scripts/test_unreadable_page_settings.py:/opt/scripts/test_unreadable_page_settings.py:ro" \\
       quartz-teacher:dev-test python3 /opt/scripts/test_front_page_title_repair.py
 
-(the other two are mounted for the helpers it shares with them). Windows'
+(the other two are mounted for the helpers it shares with them). The image
+runs it as root, which writes a read-only copy anyway, so verify.sh cannot
+prove the `_writable` step: only an ordinary-user run proves it — this file on
+the mac host, and Windows'
 `PythonToolchainTests` discovers it, and needs python-frontmatter 1.3.0 and
 PyYAML 6.0.3 on that interpreter: what the build cannot read is the reader's.
 """
@@ -301,6 +304,20 @@ class FrontPageTitleRepairTests(unittest.TestCase):
         self.assertTrue(hidden)
         self.assertIn("🙈 Hidden from students until its settings can be read: section1/index", printed)
         self.assertEqual(_read_exactly(course_dir / "section1" / "index.md"), page)
+        self.assertEqual(self._marker_lines(printed), [])
+        self.assertNotIn("🔧", printed)
+
+    def test_a_front_page_that_is_not_utf8_is_left_hidden_without_failing(self):
+        """A page saved in another encoding cannot be read as UTF-8: the
+        repair steps aside rather than raising, and the page is hidden as
+        before, its bytes unchanged."""
+        course_dir = self._course(WIZARD_PAGE)
+        page = course_dir / "section1" / "index.md"
+        latin_1 = "---\ntitle: Français: Élan, Section 1\npublish: true\n---\n".encode("latin-1")
+        page.write_bytes(latin_1)
+        printed, hidden, _ = self._build(course_dir)
+        self.assertTrue(hidden, printed)
+        self.assertEqual(page.read_bytes(), latin_1)
         self.assertEqual(self._marker_lines(printed), [])
         self.assertNotIn("🔧", printed)
 
