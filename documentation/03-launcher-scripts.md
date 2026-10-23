@@ -1813,8 +1813,23 @@ round passed it).
   (offline), too little room, or a compile that failed all leave the build to
   say, block by block, that a program is not ready (05 → Runnable Swift). No
   new progress marker (ruling Q3: it would move generated contract keys and
-  Windows' suite); the app shows its usual building state. A scheduled
-  publish runs the same step (ruling Q4). The one build that does NOT pass
+  Windows' suite); the app shows its usual building state. **It does print
+  one trail line** (#635, v1.9.0), which is not a progress marker: after the
+  teacher's sentence on every ending but "already there" - built, too little
+  room, a wait for another launcher that gave up after its 1,200 s, or a
+  failed build - `say_how_swift_got_ready` runs `swift_blocks.py got-ready`
+  in the website builder, which reads this run's `swift-build-<pid>.log` and
+  prints the `PLANTOIR_SWIFT:` line Windows prints
+  (`codeRunnerBlocks.swift.mac`); the app records it as "Swift got ready on
+  this computer" or "Swift could not be got ready" (`SwiftGotReadyReport`).
+  Nothing is printed when the image was there, when another launcher built
+  it during the wait, or when this copy carries no `support/swift`; `busy`
+  is never printed on a Mac. If the website builder cannot be asked, the line
+  is lost and the preview carries on. Only the build is timed, not the wait.
+  `scripts/test_swift_launcher_marker.py` cuts this block out and runs every
+  ending with bash 3.2 and a stand-in `docker`. A scheduled
+  publish runs the same step (ruling Q4), so its log carries the line too and
+  `ScheduledDeploy.recordFolderProblems` records it. The one build that does NOT pass
   through it is `deploy.py`'s own rebuild for a different web address
   (`rebuild_for_production`, review N1), which runs `build_site.py
   --build-only` inside the container: it uses whatever a preview compiled,
