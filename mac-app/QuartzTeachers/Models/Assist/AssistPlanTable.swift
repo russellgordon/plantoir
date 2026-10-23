@@ -12,7 +12,7 @@ import Foundation
 /// whose settings have no room for a key, and the pages already the way they
 /// were asked to be. The card stopped at fifteen ("…and N more"); the table
 /// does not stop. Since #622 the sheet draws `rowsToRead` and folds
-/// `rowsAlreadyRight` behind a disclosure; the rows themselves, and the plan
+/// `rowsAlreadyRight` behind a checkbox (#654); the rows themselves, and the plan
 /// they come from, are unchanged.
 ///
 /// `nonisolated`: a plain value carried on `AssistToolOutcome`.
@@ -91,7 +91,7 @@ nonisolated struct AssistPlanTable: Sendable, Equatable {
     }
 
     /// The pages already visible (or already hidden): what the sheet folds
-    /// away behind a disclosure, and what the summary counts as "already".
+    /// away behind a checkbox, and what the summary counts as "already".
     var rowsAlreadyRight: [Row] {
         var already: [Row] = []
         for row in rows where AssistPlanTable.isAlreadyRight(row.change) {

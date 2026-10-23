@@ -5,8 +5,10 @@ import XCTest
 
 /// The Section menu's page sheets and Start of Year (v1.8.6: #608, #621,
 /// #622): the picker and the later-classes list as tables, the plan listing
-/// only the pages that change with the rest behind a disclosure, and every
-/// one of these sheets resizable from the size it opened at before.
+/// only the pages that change with the rest behind a checkbox (a disclosure
+/// until #654), and every one of these sheets resizable from the size it
+/// opened at before — and, since #654, the answer after a plan fitted to its
+/// sentence rather than left at the plan's height.
 ///
 /// Sentences are named by their `AssistWording` member, never quoted.
 @MainActor
@@ -248,11 +250,13 @@ final class PageTablesSheetTests: XCTestCase {
     }
 
     /// The plan sheet opens with the pages already visible folded away
-    /// under a disclosure that wears `menuPlanShowAlready`; a click on it
-    /// adds every one of them to the same table, which stays the height it
-    /// was. A Hide plan does the same with `menuPlanShowAlready(publishing:
-    /// false)`, and a plan with nothing already right has no disclosure.
-    func testThePlanFoldsThePagesAlreadyRightUntilTheDisclosureIsOpened() async throws {
+    /// under a CHECKBOX that wears `menuPlanShowAlready` (#654: a disclosure
+    /// promised a fold below it, and the rows go into the table above); a
+    /// click on it adds every one of them to the same table, which stays the
+    /// height it was, and a second click takes them out again. A Hide plan
+    /// does the same with `menuPlanShowAlready(publishing: false)`, and a
+    /// plan with nothing already right has no checkbox.
+    func testThePlanFoldsThePagesAlreadyRightUntilTheCheckboxIsTicked() async throws {
         var made: [URL] = []
         defer {
             for root in made {
@@ -280,14 +284,19 @@ final class PageTablesSheetTests: XCTestCase {
                 host.close()
             }
             let table: NSTableView = try XCTUnwrap(host.tables().first, name)
-            XCTAssertFalse(model.showsAlreadyRight, "\(name): the disclosure is open to begin with")
+            XCTAssertFalse(model.showsAlreadyRight, "\(name): the checkbox is ticked to begin with")
             XCTAssertEqual(table.numberOfRows, closedRows, "\(name): the folded rows are drawn")
             let tableHeight: CGFloat? = table.enclosingScrollView?.frame.height
-            let triangle: NSView = try XCTUnwrap(PageTablesSheetTests.disclosureTriangle(under: table, in: host.window), name)
-            PageTablesSheetTests.click(triangle, in: host)
-            XCTAssertTrue(model.showsAlreadyRight, "\(name): a click did not open the disclosure")
-            XCTAssertEqual(table.numberOfRows, openRows, "\(name): opening it did not add the folded rows")
-            XCTAssertEqual(table.enclosingScrollView?.frame.height, tableHeight, "\(name): the table grew when it opened")
+            let checkbox: NSButton = try XCTUnwrap(
+                PageTablesSheetTests.checkbox(in: host.window),
+                "\(name): no checkbox under the table (still a disclosure?)"
+            )
+            XCTAssertEqual(checkbox.state, .off, "\(name): the checkbox is drawn ticked")
+            PageTablesSheetTests.click(checkbox, in: host)
+            XCTAssertTrue(model.showsAlreadyRight, "\(name): a click did not tick the checkbox")
+            XCTAssertEqual(checkbox.state, .on, "\(name): the checkbox is not drawn ticked")
+            XCTAssertEqual(table.numberOfRows, openRows, "\(name): ticking it did not add the folded rows")
+            XCTAssertEqual(table.enclosingScrollView?.frame.height, tableHeight, "\(name): the table grew when it was ticked")
             var last: [AssistPlanTable.Change] = []
             for row in sheet.drawnPlanRows.suffix(openRows - closedRows) {
                 last.append(row.change)
@@ -296,6 +305,9 @@ final class PageTablesSheetTests: XCTestCase {
             for change in last {
                 XCTAssertTrue(AssistPlanTable.isAlreadyRight(change), "\(name): a folded row is not already right")
             }
+            PageTablesSheetTests.click(checkbox, in: host)
+            XCTAssertFalse(model.showsAlreadyRight, "\(name): a second click did not untick the checkbox")
+            XCTAssertEqual(table.numberOfRows, closedRows, "\(name): unticking it did not take the rows out")
         }
 
         let nothingFolded = try AssistFixture.makeRunner(surface: .menu)
@@ -303,7 +315,7 @@ final class PageTablesSheetTests: XCTestCase {
         let twentyOne: AssistToolOutcome = try await PublishPlanTableTests.planAClassLinkingTwentyPages(in: nothingFolded)
         let plain: SectionVerbSheetModel = PageTablesSheetTests.plannedModel(twentyOne, kind: .publishPages, course: nothingFolded.course)
         let plainSheet: SectionVerbSheet = SectionVerbSheet(model: plain, pressDefault: {}, cancel: {})
-        XCTAssertNil(plainSheet.alreadyRightLabel, "a disclosure with nothing under it")
+        XCTAssertNil(plainSheet.alreadyRightLabel, "a checkbox with nothing to add")
         XCTAssertEqual(plainSheet.drawnPlanRows.count, 21)
     }
 
@@ -387,7 +399,74 @@ final class PageTablesSheetTests: XCTestCase {
         XCTAssertFalse(host.reachedAScreen, "the sheet reached a display")
     }
 
-    /// Russell's rulings on R8: opening the disclosure moves neither the
+    /// #654: the answer after a plan — "Published 5 pages." and the like —
+    /// is shown in a sheet fitted to it, not left at the plan's height. A
+    /// Publish plan of twenty-one rows and a Hide plan, each presented for
+    /// real, run for real, then shown finished: the sheet is the height the
+    /// answer needs (`fittingSize(of:)` of the finished sheet), far below the
+    /// plan's, still centred on its window, and the width a teacher dragged
+    /// it to kept. Before #654 it stayed at the plan's height.
+    func testTheAnswerAfterAPlanIsFittedToItsSentence() async throws {
+        var made: [URL] = []
+        defer {
+            for root in made {
+                try? FileManager.default.removeItem(at: root)
+            }
+        }
+        let publishing = try AssistFixture.makeRunner(surface: .menu)
+        made.append(publishing.root)
+        let publish: AssistToolOutcome = try await PublishPlanTableTests.planAClassLinkingTwentyPages(in: publishing)
+        let hiding = try AssistFixture.makeRunner(surface: .menu)
+        made.append(hiding.root)
+        let hide: AssistToolOutcome = try await PageTablesSheetTests.planHidingAClassLinkingHiddenPages(in: hiding)
+        let names: [String] = ["section1/All Classes/Unit 1, Day 1"]
+        let cases: [(String, AssistToolOutcome, SectionVerbSheetModel.Kind, AssistFixture.Made, AssistToolCall, CGFloat)] = [
+            ("Publish", publish, .publishPages, publishing,
+             SectionVerbs.publishPages(course: "ICS3U", section: 1, names: names, planning: false), 560),
+            ("Hide", hide, .hidePages, hiding,
+             SectionVerbs.hidePages(course: "ICS3U", section: 1, names: names, planning: false), 700),
+        ]
+        for (name, outcome, kind, fixture, call, width) in cases {
+            let model: SectionVerbSheetModel = PageTablesSheetTests.plannedModel(outcome, kind: kind, course: fixture.course)
+            let host: SheetHost = SheetHost(SectionVerbSheet(model: model, pressDefault: {}, cancel: {}))
+            defer {
+                host.close()
+            }
+            let sheet: NSWindow = try XCTUnwrap(host.sheet, "\(name): no sheet was presented")
+            if width != sheet.contentLayoutRect.width {
+                host.resizeSheet(to: NSSize(width: width, height: sheet.contentLayoutRect.height))
+            }
+            let planHeight: CGFloat = sheet.frame.height
+            let planMiddle: CGFloat = sheet.frame.midY
+
+            model.stage = .working
+            await host.settle()
+            let done: AssistToolOutcome = await fixture.runner.run(call: call)
+            model.body = done.summary
+            model.stage = .finished
+            await host.settle()
+
+            let needed: CGFloat = PageTablesSheetTests.fittingSize(
+                of: SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+            ).height
+            XCTAssertEqual(sheet.contentLayoutRect.height, needed, accuracy: 0.5,
+                           "\(name): the answer needs \(needed) pt and the sheet kept \(sheet.contentLayoutRect.height)")
+            XCTAssertLessThan(sheet.frame.height, planHeight - 80,
+                              "\(name): the answer's sheet is \(sheet.frame.height) pt against the plan's \(planHeight)")
+            XCTAssertLessThan(sheet.frame.height, CopyPageChecklist.tallestSheet / 2,
+                              "\(name): the answer's sheet is \(sheet.frame.height) pt")
+            // MEASURED on macOS 26.6: AppKit keeps a sheet centred on the
+            // window it hangs from, through a change of size, so the answer
+            // sits where the plan's middle was.
+            XCTAssertEqual(sheet.frame.midY, planMiddle, accuracy: 0.5, "\(name): the sheet moved off the middle of its window")
+            XCTAssertEqual(sheet.contentLayoutRect.width, width, accuracy: 0.5, "\(name): the width the teacher made was lost")
+            XCTAssertGreaterThanOrEqual(sheet.frame.height, sheet.minSize.height - 0.5, "\(name): under its minimum")
+            XCTAssertFalse(host.reachedAScreen, "\(name): the sheet reached a display")
+            print("PageTablesSheetTests: \(name) plan \(planHeight) pt, answer \(sheet.frame.height) pt (needs \(needed))")
+        }
+    }
+
+    /// Russell's rulings on R8: ticking the checkbox moves neither the
     /// sheet nor its minimum; the folded rows go into the table, which
     /// scrolls inside the sheet; the last row can be scrolled to; and the
     /// table is inside the sheet, not hanging off its edge.
@@ -412,10 +491,10 @@ final class PageTablesSheetTests: XCTestCase {
         model.showsAlreadyRight = true
         await host.settle()
         XCTAssertEqual(table.numberOfRows, 21, "opening it did not add the folded rows")
-        XCTAssertEqual(sheet.frame.size, frame.size, "the sheet changed size when the disclosure opened")
-        XCTAssertEqual(sheet.minSize, smallest, "the sheet's smallest size rose when the disclosure opened")
+        XCTAssertEqual(sheet.frame.size, frame.size, "the sheet changed size when the checkbox was ticked")
+        XCTAssertEqual(sheet.minSize, smallest, "the sheet's smallest size rose when the checkbox was ticked")
         XCTAssertGreaterThanOrEqual(sheet.frame.height, sheet.minSize.height - 0.5)
-        XCTAssertEqual(table.enclosingScrollView?.frame.height, tableHeight, "the table grew when the disclosure opened")
+        XCTAssertEqual(table.enclosingScrollView?.frame.height, tableHeight, "the table grew when the checkbox was ticked")
 
         let scroll: NSScrollView = try XCTUnwrap(table.enclosingScrollView)
         let document: CGFloat = scroll.documentView?.frame.height ?? 0
@@ -534,7 +613,7 @@ final class PageTablesSheetTests: XCTestCase {
 
     /// The tallest plan stage — twelve rows to read, pages folded under them
     /// and the notes at their cap — still fits a 13-inch screen
-    /// (`CopyPageChecklist.tallestSheet`) with the disclosure, and every part
+    /// (`CopyPageChecklist.tallestSheet`) with the checkbox, and every part
     /// is really there.
     func testTheTallestPlanStaysOnTheScreen() throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
@@ -562,12 +641,12 @@ final class PageTablesSheetTests: XCTestCase {
         )
         model.planTable = table
         let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
-        XCTAssertNotNil(sheet.alreadyRightLabel, "the case has no disclosure")
+        XCTAssertNotNil(sheet.alreadyRightLabel, "the case has no checkbox")
         let height: CGFloat = PageTablesSheetTests.fittingSize(of: sheet).height
         XCTAssertLessThanOrEqual(height, CopyPageChecklist.tallestSheet, "the tallest plan is \(height) pt")
         let parts: CGFloat = ListTableMetrics.height(forRowCount: SectionVerbSheet.mostPlanRowsShown, showsHeader: true)
             + SectionVerbSheet.tallestPlanNotes + 20
-        XCTAssertGreaterThanOrEqual(height, parts + 120, "only \(height) pt: the table, the disclosure or the notes collapsed")
+        XCTAssertGreaterThanOrEqual(height, parts + 120, "only \(height) pt: the table, the checkbox or the notes collapsed")
         print("PageTablesSheetTests: tallest plan \(height) pt against \(CopyPageChecklist.tallestSheet)")
     }
 
@@ -946,25 +1025,29 @@ final class PageTablesSheetTests: XCTestCase {
         ))
     }
 
-    /// The disclosure's triangle: SwiftUI draws it, and the one AppKit view
-    /// it leaves is the small key-loop stand-in at its place — the first one
-    /// below the table, at the sheet's leading margin.
-    static func disclosureTriangle(under table: NSTableView, in window: NSWindow) -> NSView? {
-        guard let content = window.contentView, let scroll = table.enclosingScrollView else {
+    /// The checkbox anywhere in `window` (#654). MEASURED on macOS 26.6:
+    /// SwiftUI draws a checkbox-style `Toggle` as a 16-point AppKit button
+    /// with no title of its own (the label beside it is SwiftUI's), no
+    /// accessibility role, a mixed state allowed, and the bezel a switch
+    /// button carries — `.flexiblePush`, raw value 2, the old
+    /// `.regularSquare`; a disclosure's triangle is not one.
+    static func checkbox(in window: NSWindow) -> NSButton? {
+        guard let content = window.contentView else {
             return nil
         }
-        let tableBottom: CGFloat = scroll.convert(scroll.bounds, to: nil).minY
-        var best: NSView?
-        for view in content.subviews {
-            let frame: NSRect = view.convert(view.bounds, to: nil)
-            let isSmall: Bool = frame.width < 16 && frame.height < 16
-            if isSmall && frame.maxY <= tableBottom {
-                if best == nil || frame.maxY > best!.convert(best!.bounds, to: nil).maxY {
-                    best = view
-                }
+        return checkbox(under: content)
+    }
+
+    static func checkbox(under view: NSView) -> NSButton? {
+        if let button = view as? NSButton, button.bezelStyle == .flexiblePush, button.allowsMixedState {
+            return button
+        }
+        for subview in view.subviews {
+            if let found = checkbox(under: subview) {
+                return found
             }
         }
-        return best
+        return nil
     }
 
     /// A click at the middle of a view, as `TableHost.clickCell` clicks.
