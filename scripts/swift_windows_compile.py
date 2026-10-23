@@ -49,6 +49,7 @@ import os
 import shutil
 import sys
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -122,6 +123,13 @@ def load(install: Path, work_root: Path, source=None):
     original_tidy = module.tidy
 
     def tidy(said: str, work: Path) -> str:
+        # Only words carrying `error:` are cached as a compile error. That
+        # rule alone would still cache an ENVIRONMENT failure that prints
+        # `error:` (measured: "error: permissionDenied" for every block under
+        # compile.py's own environment) as the student's mistake: what keeps
+        # that out is the environment fix above and the preflight smoke
+        # compile in main(), which stops the run before any job when nothing
+        # can compile. Do not remove the preflight.
         text = said.replace(str(work) + "\\", "").replace(str(work).replace("\\", "/") + "/", "")
         text = original_tidy(text, work)
         return text if "error:" in text else ""
@@ -178,8 +186,11 @@ def smoke_compile(install: Path, work_root: Path) -> str:
             return f"{paths[name].name} is missing"
     if not paths["sdk"].is_dir():
         return "the SDK is missing"
-    work = work_root / "_smoke"
-    shutil.rmtree(work, ignore_errors=True)
+    # This process's own folder: two previews starting together each make
+    # one, and neither can delete the other's half way through its compile
+    # (implementation review). A killed run's leftover is harmless litter
+    # in the work folder, which nothing else reads.
+    work = work_root / f"_smoke-{os.getpid()}-{uuid.uuid4().hex[:8]}"
     try:
         work.mkdir(parents=True)
         main = work / "main.swift"

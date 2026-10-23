@@ -32,6 +32,7 @@ public sealed record SwiftGotReady(bool Ready, int Seconds, long DownloadedBytes
         ["damaged"] = "the download was not what was expected and was thrown away",
         ["busy"] = "another installation was running",
         ["unpack"] = "it could not be unpacked",
+        ["waited"] = "another preview was still getting it ready after 20 minutes",
     };
 
     public ActivityTrail.Event Event => Ready

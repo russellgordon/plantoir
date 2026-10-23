@@ -970,7 +970,7 @@
       },
       {
         "event": "Swift could not be got ready",
-        "carries": "why, as one of: offline (no internet connection, or the download stopped), noRoom (too little free space), damaged (the download was not what was pinned and was thrown away), busy (another installation was running), unpack (it could not be unpacked); and the course and section",
+        "carries": "why, as one of: offline (no internet connection, or the download stopped), noRoom (too little free space), damaged (the download was not what was pinned and was thrown away), busy (another installation was running), unpack (it could not be unpacked, or anything else went wrong), waited (another preview held the fetch for longer than windows.waitSeconds); and the course and section",
         "marker": "PLANTOIR_SWIFT: with ready false and its reason (codeRunnerBlocks.swift.windows.marker)",
         "line": "{course}/{section} · Swift could not be got ready on this computer: {why}",
         "whyWords": {
@@ -978,7 +978,8 @@
           "noRoom": "not enough free space",
           "damaged": "the download was not what was expected and was thrown away",
           "busy": "another installation was running",
-          "unpack": "it could not be unpacked"
+          "unpack": "it could not be unpacked",
+          "waited": "another preview was still getting it ready after 20 minutes"
         },
         "why": "#570. Recording only the success hides exactly the case worth seeing (the assistant model download's reasoning): every Swift block on the site then says it is not ready, and the trail is what tells a helper whether that was the network, the disk or the download."
       }
@@ -26449,7 +26450,7 @@
         "printed": {
           "gettingReady": "🧱 Getting Swift ready on this PC for this course's runnable code — the first time downloads about 2.3 GB and takes a few minutes…",
           "gettingReadyPercent": "   Getting Swift ready: {percent}% of about 2.3 GB downloaded…",
-          "unpacking": "   Unpacking Swift on this PC (about a minute)…",
+          "unpacking": "   Unpacking Swift on this PC (a few minutes)…",
           "ready": "✅ Swift is ready.",
           "waitingForAnother": "⏳ Swift is being got ready on this PC for another course; waiting for it to finish…",
           "stillGettingReady": "⚠️  Swift is still being got ready for another course; preview again in a few minutes to make these programs runnable.",
@@ -26464,7 +26465,7 @@
         "printedRule": "Printed by swift_windows_fetch.py (and the last two by preview.ps1) on the preview's console, which is what a teacher sees in Plantoir's console and in a terminal; pinned word for word by scripts/test_swift_windows.py. ready, offline, noRoom, stillGettingReady, compiling and couldNotCompile are the Mac's own sentences (preview.sh prepare_runnable_swift), with 'on this PC' and 2.3 GB where the Mac's are about it. gettingReadyPercent is NEW: the Mac's image build goes quiet for its minutes, and a 2.3 GB download on a school line takes about six, so Windows says how far it has got about every ten per cent.",
         "marker": {
           "prefix": "PLANTOIR_SWIFT:",
-          "shape": "PLANTOIR_SWIFT: {\"ready\": true, \"seconds\": N, \"downloadedBytes\": B, \"course\": C, \"section\": S} or {\"ready\": false, \"reason\": offline | noRoom | damaged | busy | unpack, \"course\": C, \"section\": S}",
+          "shape": "PLANTOIR_SWIFT: {\"ready\": true, \"seconds\": N, \"downloadedBytes\": B, \"course\": C, \"section\": S} or {\"ready\": false, \"reason\": offline | noRoom | damaged | busy | unpack | waited, \"course\": C, \"section\": S}",
           "examples": [
             "PLANTOIR_SWIFT: {\"course\": \"ICS3U\", \"downloadedBytes\": 2301721200, \"ready\": true, \"seconds\": 92, \"section\": 1}",
             "PLANTOIR_SWIFT: {\"course\": \"ICS3U\", \"ready\": false, \"reason\": \"offline\", \"section\": 1}"
@@ -26573,7 +26574,7 @@
       "`Int` is 32 bits here (wasm32): it holds up to 2,147,483,647, so `13!`, Fibonacci(47) or a large running total overflows - and an overflow stops the program with words.crashed and NO `Fatal error:` line, in both libraries (measured 2026-10-17: `-assert-config Debug` keeps preconditions' messages, but an arithmetic overflow check compiles to a bare trap - even with `-Onone` (7.4 MB unoptimised, the full library), which is therefore no cheap way to a message; swift-gate 15 pins the silent trap). On a Mac or an iPad the same program runs, because Int is 64 bits there. Use `Int64` (or `Double`) for factorials and large totals, or check the range.",
       "A Swift block whose code the build's fence reader and the site's parser read differently (a lazy line in a list item: pageShapes) has two different keys; the site shows it as plain code with a `plantoir: error:` line naming it (siteDisagrees, words.blockNotCompiled). A Swift fence the build's reader cannot see is never compiled, for the same reason.",
       "Swift is compiled by the launcher, before the build: on a Mac in the Swift image, on Windows (since v1.8.6, #570) with the swift.org Windows toolchain fetched on first use (swift.windows). deploy.py's own rebuild for a different web address uses only what a preview already compiled.",
-      "The first preview with a Swift block downloads about 1.3 GB on a Mac and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once. On Windows the first time downloads about 2.3 GB (about 30 s on a fast line, about 6 minutes at 50 Mbit/s) and keeps about 0.9 GB; a new block then takes about 5-10 s (Embedded) or about 50 s (the full library, almost all of it wasm-opt), measured on an i5-8365U.",
+      "The first preview with a Swift block downloads about 1.3 GB on a Mac and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once. On Windows the first time downloads about 2.3 GB (about 30 s on a fast line, about 6 minutes at 50 Mbit/s) and keeps about 0.9 GB; a new block then takes about 5-12 s (Embedded) or about 50 s (the full library, almost all of it wasm-opt), measured on an i5-8365U.",
       "Live input (#583) needs a page its host sends the isolation headers for (isolation): a folder publish, a host that strips headers, a page shown inside a learning platform's frame, a preview opened from another device over the network (not a secure context) and Safari or iPadOS before 15.2 all get the input box, with words.inputAhead.",
       "A runner page that also shows a frame, or a picture, script or stylesheet from another website, keeps the input box (isolation.notLive, ruling Q1); Media PDF frames count as frames (ruling Q4 - COEP on /Media/* was measured to fix the frame in Safari, and is not done in v1.8.1). The rule reads the built page's own HTML, not the stylesheets it links: a picture from another website named only inside a linked stylesheet is not seen (none of Plantoir's own does).",
       "An autorun that asks for input holds the page's one run until the student answers, and queued autoruns wait (liveInput.stop).",

@@ -329,7 +329,7 @@ Fix the code and preview again. Check every Swift block you write compiles
   the first time leaves the blocks "not ready" until the next preview online.
 - On Windows (since Plantoir 1.8.6) the first preview with Swift downloads
   about 2.3 GB, once, and keeps about 0.9 GB; the preview says how far it has
-  got. A new block then takes about 5-10 s to compile, or about a minute when
+  got. A new block then takes about 5-12 s to compile, or about a minute when
   it needs the full standard library - one more reason to prefer
   `print("Total: \(total)")` to `print("Total:", total)`.
 - After Plantoir is updated, the next preview makes every Swift program

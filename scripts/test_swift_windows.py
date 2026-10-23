@@ -79,7 +79,7 @@ class PinTests(unittest.TestCase):
         self.assertIn("x86_64-windows", self.pins["binaryen"]["url"])
 
     def test_what_is_kept_adds_up(self):
-        self.assertEqual(self.pins["keptBytes"], 533227801 + 354685593 + 10343424)
+        self.assertEqual(self.pins["keptBytes"], 533231069 + 354685593 + 10343424)
         total = self.pins["installer"]["bytes"] + fetch.sdk_pin()["bytes"] + self.pins["binaryen"]["bytes"]
         self.assertEqual(contracts.section("shared-rules", "codeRunnerBlocks", "swift", "downloadGigabytes")["windows"],
                          f"{total / 1e9:.1f}")
@@ -276,6 +276,25 @@ class CompileWrapperTests(unittest.TestCase):
             self.module.subprocess.run = original
         self.assertIn("not kept", line)
         self.assertEqual(list(cache.iterdir()), [])
+
+    def test_the_smoke_folder_is_this_processs_own_and_goes(self):
+        made = []
+        original = self.module.compile_one_way
+
+        def watch(sources, compile_flags, link_flags, work, extra_objects=()):
+            made.append(work)
+            return None, "main.swift:1:1: error: stub"
+        self.module.compile_one_way = watch
+        loader = swift_windows_compile.load
+        swift_windows_compile.load = lambda install, work_root: self.module
+        try:
+            swift_windows_compile.smoke_compile(self.space.install, self.space.work)
+        finally:
+            swift_windows_compile.load = loader
+            self.module.compile_one_way = original
+        self.assertEqual(len(made), 1)
+        self.assertIn(f"_smoke-{os.getpid()}-", made[0].name)
+        self.assertFalse(made[0].exists())
 
     def test_a_preflight_that_fails_touches_nothing(self):
         jobs = self.space.root / "jobs3"
@@ -620,7 +639,29 @@ class EnsureTests(unittest.TestCase):
         finally:
             held.give_back()
         self.assertEqual(status, fetch.NOT_FINISHED)
-        self.assertEqual(self.said, [fetch.printed("waitingForAnother"), fetch.printed("stillGettingReady")])
+        self.assertEqual(self.said[:2], [fetch.printed("waitingForAnother"), fetch.printed("stillGettingReady")])
+        self.assertEqual(self.markers(), [{"ready": False, "reason": "waited"}])
+
+    def test_anything_unexpected_is_a_failure_with_its_marker_not_a_traceback(self):
+        def broken(root, say):
+            raise subprocess.TimeoutExpired("powershell.exe", 300)
+        status = fetch.ensure(self.space.root, self.said.append, fetcher=broken)
+        self.assertEqual(status, fetch.NOT_FINISHED)
+        self.assertIn(fetch.printed("unpack"), self.said)
+        self.assertEqual(self.markers(), [{"ready": False, "reason": "unpack"}])
+
+    def test_a_signature_check_that_hangs_is_a_failure(self):
+        original = fetch.subprocess.run
+
+        def hangs(*arguments, **options):
+            raise subprocess.TimeoutExpired("powershell.exe", 300)
+        fetch.subprocess.run = hangs
+        try:
+            with self.assertRaises(fetch.Failed) as raised:
+                fetch.authenticode(self.space.root / "x.exe")
+        finally:
+            fetch.subprocess.run = original
+        self.assertEqual(raised.exception.reason, "unpack")
 
 
 class WordsTests(unittest.TestCase):
@@ -647,7 +688,7 @@ class WordsTests(unittest.TestCase):
         events = {entry["event"]: entry for entry in contracts.section("shared-rules", "activityTrail", "mustRecord")}
         self.assertIn("Swift got ready on this computer", events)
         failed = events["Swift could not be got ready"]
-        self.assertEqual(set(failed["whyWords"]), {"offline", "noRoom", "damaged", "busy", "unpack"})
+        self.assertEqual(set(failed["whyWords"]), {"offline", "noRoom", "damaged", "busy", "unpack", "waited"})
         for example in windows_rules("marker", "examples"):
             self.assertTrue(example.startswith(fetch.MARKER))
             json.loads(example[len(fetch.MARKER):])

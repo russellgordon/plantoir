@@ -116,7 +116,8 @@ def printed(name: str, **values) -> str:
     return text
 
 
-_PROSE = re.compile(r"(^note$|^why$|Why$|^measured$|^rejected$)")
+# Prose, and keptBytes (a measurement of an install, not part of what it is).
+_PROSE = re.compile(r"(^note$|^why$|Why$|^measured$|^rejected$|^keptBytes$)")
 
 
 def install_digest(block=None, sdk=None) -> str:
@@ -364,8 +365,11 @@ def authenticode(path: Path) -> tuple:
     script = ("$s = Get-AuthenticodeSignature -LiteralPath $env:PLANTOIR_SIGNED_FILE; "
               "[string]$s.Status; if ($s.SignerCertificate) { $s.SignerCertificate.Subject } else { '' }")
     environment = dict(os.environ, PLANTOIR_SIGNED_FILE=str(path))
-    done = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
-                          capture_output=True, text=True, env=environment, timeout=300)
+    try:
+        done = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+                              capture_output=True, text=True, env=environment, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise Failed("unpack", f"the signature could not be read: {error}") from error
     lines = (done.stdout or "").strip().splitlines() + ["", ""]
     return lines[0].strip(), lines[1].strip()
 
@@ -591,7 +595,7 @@ def fetch(root: Path, say=print, signature_reader=authenticode, smoke=None) -> d
         # The installer stays until Swift is ready: a step that fails after
         # this point is tried again without downloading 2.1 GB again (it was,
         # once, measured: a folder that could not be renamed). The peak is
-        # then about 4.5 GB, inside room.needGigabytes.
+        # then 4.82 GB (measured), inside room.needGigabytes.
         cabinet = carve_cabinet(installer, staging / "container.cab", installer_pin["containerOffset"],
                                 installer_pin["cabinetBytes"])
         payloads = staging / "payloads"
@@ -677,6 +681,7 @@ def ensure(root=None, say=print, wait_seconds=WAIT_SECONDS, fetcher=fetch, cours
     lock = Lock(root)
     if not lock.take(wait_seconds, waited=lambda: say(printed("waitingForAnother"))):
         say(printed("stillGettingReady"))
+        say(marker(dict(where, ready=False, reason="waited")))
         return NOT_FINISHED
     try:
         clean_up(root, pins()["version"])
@@ -690,7 +695,12 @@ def ensure(root=None, say=print, wait_seconds=WAIT_SECONDS, fetcher=fetch, cours
             return NO_ROOM
         say(printed("gettingReady"))
         try:
-            ready = fetcher(root, say)
+            try:
+                ready = fetcher(root, say)
+            except Failed:
+                raise
+            except Exception as error:  # never a traceback on the teacher's console
+                raise Failed("unpack", f"{type(error).__name__}: {error}") from error
         except Failed as failure:
             say(printed(failure.reason))
             say(marker(dict(where, ready=False, reason=failure.reason)))
