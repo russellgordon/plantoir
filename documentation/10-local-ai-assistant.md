@@ -2411,7 +2411,7 @@ is read. The mac's unpublishing harness also began reading a page's `folder`
 class page that carries one, as the publishing harness does.
 
 **Measured.** With `isCurriculum(pageAt:in:)` put back to the old loop (copy
-and restore), five tests went red with 9 failures:
+and restore), six test methods went red with 9 failures:
 `testCurriculumPagesAreRecognisedAsTheContractSays` (the two declared cases,
 at the top of the course and inside `section1/`),
 `testPublishingFollowsLinksAsTheContractSays` (A1.4 listed as already
