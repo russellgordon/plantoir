@@ -373,6 +373,15 @@ key deliberately NOT under `pins` - both apps' pin tests read every pin as a
 line the ROOT Dockerfile must contain; `scripts/test_swift_blocks.py` checks
 these against `support/swift/Dockerfile` instead (Python, so Windows runs it).
 
+**Windows has no Swift image** (#570, v1.8.6): it fetches the swift.org
+Windows toolchain once and runs `compile.py` itself
+([12 → Runnable Swift on Windows](12-windows-app.md#runnable-swift-on-windows-570-the-macs-493-v186)).
+Its own files live in `scripts/` (`swift_windows_fetch.py`,
+`swift_windows_compile.py`) and its pins in `toolchain.json` →
+`swiftWindows`, deliberately NOT in `support/swift/`: a file added there
+would change this image's tag and rebuild a 2 GB image on every Mac for a
+change that is not theirs.
+
 **What it holds** (spike, 2026-10-16, and its corrections):
 
 | Layer | What | Pinned by |
