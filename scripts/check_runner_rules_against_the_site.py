@@ -59,6 +59,19 @@ Three halves:
    of every ```python and ```swift block in support/example_content,
    scripts/fixtures/runner-colour and the Swift gate's programs (verify.sh
    mounts both folders).
+6. Text that wraps (#653, contracts/shared-rules.json -> textFenceWrapping):
+   `support/quartz/plugins/transformers/textWrapRule.ts` is bundled with the
+   rest, and every `fence.cases` case is run twice in Node - through
+   wrapsText(lang, meta), and as a page: "```" + fence + "\\nx\\n```\\n" is
+   parsed by Quartz's own remark-parse and remark-gfm, whose code node must
+   carry exactly the case's `lang` and `meta` (so a case that is not what the
+   parser makes of its fence fails, rather than passing on data no page can
+   produce), and codeRunner.ts's second markdown plugin must then wrap it in
+   div.plantoir-text-wrap exactly when `wraps`, leaving `lang` and `meta` as
+   they were. Then one page holding a flagged block at the top level, in a
+   list item, a quote, a callout and a quiz's explanation (every one wrapped,
+   nothing else), and a `codeRunner: true` page whose ```python run wrap block
+   is a runner and is not wrapped.
 """
 import json
 import os
@@ -77,6 +90,7 @@ import toolchain_paths  # noqa: E402
 
 RULE_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunnerRule.ts"
 TRANSFORMER_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunner.ts"
+WRAP_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "textWrapRule.ts"
 SITE_SAID_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "emitters" / "plantoirSiteSaid.ts"
 ISOLATION_MJS = toolchain_paths.SUPPORT_DIR / "quartz" / "cli" / "plantoirIsolation.mjs"
 COLOUR_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "components" / "scripts" / "codeRunnerColour.ts"
@@ -100,6 +114,7 @@ import remarkGfm from "remark-gfm"
 import { createHash } from "crypto"
 import { LANGUAGES, runnerFor, findRunners, filled, normaliseProgram, asksFor } from "RULE_TS"
 import { CodeRunnerFences, programKey } from "TRANSFORMER_TS"
+import { wrapsText } from "WRAP_TS"
 import { PlantoirSiteSaid, forgetWhatWasSaid } from "SITE_SAID_TS"
 import { pageVerdict, headersFor, PAGE_HEADERS, ENGINE_HEADERS, ENGINE_FOLDERS, ALLOWED_HOSTS } from "ISOLATION_MJS"
 
@@ -341,7 +356,73 @@ const siteSaidRuns = []
     siteSaidRuns.push({ name: run.name, lines, printed, ms })
   }
 }
-console.log(JSON.stringify({ count, failures, siteSaidRuns }))
+// Text that wraps (#653): every case through the rule, then as a page
+// through Quartz's own parser and the transformer's second plugin.
+const wrapping = JSON.parse(readFileSync(process.argv[4], "utf-8"))
+const wrapPages = CodeRunnerFences().markdownPlugins()[1]()
+let wrapCases = 0
+for (const c of wrapping.fence.cases) {
+  count += 1
+  wrapCases += 1
+  if (wrapsText(c.lang, c.meta) !== c.wraps) failures.push(`textFenceWrapping ${c.name}: wrapsText says ${!c.wraps}`)
+  const text = "```" + c.fence + "\nx\n```\n"
+  const tree = parse(text)
+  const node = tree.children[0]
+  if (!node || node.type !== "code" || node.lang !== c.lang || (node.meta ?? null) !== c.meta) {
+    failures.push(`textFenceWrapping ${c.name}: Quartz's parser reads ${JSON.stringify(c.fence)} as ${JSON.stringify([node?.lang, node?.meta])}, not the case's lang and meta`)
+    continue
+  }
+  wrapPages(tree, { value: text, data: { frontmatter: {}, slug: "Units/Wrap", relativePath: "Units/Wrap.md" } })
+  const top = tree.children[0]
+  const wrapped = top.type === "plantoirTextWrap" && top.data?.hName === "div"
+    && JSON.stringify(top.data?.hProperties) === JSON.stringify({ className: ["plantoir-text-wrap"] })
+    && top.children.length === 1 && top.children[0] === node
+  if (wrapped !== c.wraps || (!c.wraps && top !== node)) failures.push(`textFenceWrapping ${c.name}: the transformer ${wrapped ? "wrapped" : "did not wrap"} it`)
+  if (node.lang !== c.lang || (node.meta ?? null) !== c.meta) failures.push(`textFenceWrapping ${c.name}: the transformer changed lang or meta`)
+}
+// Where a flagged block can sit: every one wrapped, nothing else.
+{
+  count += 1
+  const F = "```"
+  const body = "x " + "y ".repeat(60)
+  const page = [
+    F + "text wrap", body, F, "",
+    "- a list item", "", "  " + F + "text wrap", "  " + body, "  " + F, "",
+    "> a quote", ">", "> " + F + "text wrap", "> " + body, "> " + F, "",
+    "> [!note]- Folded", "> " + F + "text wrap", "> " + body, "> " + F, "",
+    "> [!quiz] Which?", "> - [x] a", "> - [ ] b", ">", "> > [!explain]- Why", "> > " + F + "text wrap", "> > " + body, "> > " + F, "",
+    F + "text", body, F, "",
+    F + "python wrap", "print(1)", F, "",
+  ].join("\n")
+  const tree = parse(page)
+  wrapPages(tree, { value: page, data: { frontmatter: {}, slug: "Units/Wrap", relativePath: "Units/Wrap.md" } })
+  const seen = []
+  const walk = (node, inside) => {
+    if (node.type === "code") seen.push([node.lang, node.meta ?? null, inside])
+    for (const child of node.children ?? []) walk(child, inside || node.type === "plantoirTextWrap")
+  }
+  walk(tree, false)
+  const want = [["text", "wrap", true], ["text", "wrap", true], ["text", "wrap", true], ["text", "wrap", true], ["text", "wrap", true], ["text", null, false], ["python", "wrap", false]]
+  if (JSON.stringify(seen) !== JSON.stringify(want)) failures.push(`textFenceWrapping, where a block sits: ${JSON.stringify(seen)}`)
+}
+// A runnable block keeps its runner and is never wrapped, whichever plugin runs.
+{
+  count += 1
+  const site = mkdtempSync(join(tmpdir(), "plantoir-runner-site-"))
+  mkdirSync(join(site, "quartz"))
+  writeFileSync(join(site, "quartz", "plantoir_code_runner.json"), JSON.stringify({ words, carried: ["pyodide"], limits: {} }))
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25)
+  process.chdir(site)
+  const text = "```python run wrap\nprint(1)\n```\n"
+  const tree = parse(text)
+  const file = { value: text, data: { frontmatter: { codeRunner: true }, slug: "Units/Run", relativePath: "Units/Run.md" } }
+  transform(tree, file)
+  wrapPages(tree, file)
+  process.chdir(home)
+  const dump = JSON.stringify(tree)
+  if (!dump.includes('"plantoirRunner"') || dump.includes('"plantoirTextWrap"')) failures.push(`textFenceWrapping, python run wrap: ${dump.slice(0, 300)}`)
+}
+console.log(JSON.stringify({ count, failures, siteSaidRuns, wrapCases }))
 """
 
 
@@ -418,6 +499,7 @@ def check_what_the_site_said(runs: list) -> list:
 def run_the_rules_in_node(folder: Path) -> list:
     entry = folder / "runner.mjs"
     entry.write_text(RUNNER.replace("RULE_TS", str(RULE_TS)).replace("TRANSFORMER_TS", str(TRANSFORMER_TS))
+                     .replace("WRAP_TS", str(WRAP_TS))
                      .replace("SITE_SAID_TS", str(SITE_SAID_TS))
                      .replace("ISOLATION_MJS", str(ISOLATION_MJS)), encoding="utf-8")
     bundle = folder / "runner.bundle.mjs"
@@ -428,10 +510,14 @@ def run_the_rules_in_node(folder: Path) -> list:
     rules.write_text(json.dumps(contracts.section("shared-rules", "codeRunnerBlocks")), encoding="utf-8")
     said = folder / "site_said.json"
     said.write_text(json.dumps(site_said_payload()), encoding="utf-8")
-    output = subprocess.run(["node", str(bundle), str(rules), str(said)], check=True, capture_output=True,
-                            text=True).stdout
+    wrapping = folder / "textFenceWrapping.json"
+    wrapping.write_text(json.dumps(contracts.section("shared-rules", "textFenceWrapping")), encoding="utf-8")
+    output = subprocess.run(["node", str(bundle), str(rules), str(said), str(wrapping)], check=True,
+                            capture_output=True, text=True).stdout
     result = json.loads(output.strip().splitlines()[-1])
     print(f"codeRunnerRule.ts: {result['count']} contract cases run in Node over Quartz's own parser")
+    print(f"textWrapRule.ts: {result.get('wrapCases', 0)} textFenceWrapping cases through the rule and through "
+          f"Quartz's own parser and the transformer, every place a block sits, and python run wrap a runner (#653)")
     return result["failures"] + check_what_the_site_said(result.get("siteSaidRuns") or [])
 
 
