@@ -7,7 +7,7 @@ using Plantoir.Core.Scripting;
 // launchers, exercising the same ConPtyProcess the app uses.
 //
 // Usage:
-//   PtyDriver --cwd DIR [--log FILE] [--raw-log FILE] [--rule "regex=>reply"]...
+//   PtyDriver --cwd DIR [--log FILE] [--raw-log FILE] [--bytes-log FILE] [--rule "regex=>reply"]...
 //             [--timeout SEC] [--settle MS] -- COMMAND LINE...
 //
 // TWO logs, and which one a caller wants is not obvious:
@@ -31,7 +31,7 @@ using Plantoir.Core.Scripting;
 // text (sent + Enter), {ENTER}, {RIGHT} (ESC[C), {Q}. Safety valve: 300 replies.
 
 var rules = new List<(Regex Pattern, string Reply)>();
-string? cwd = null, logPath = null, rawLogPath = null;
+string? cwd = null, logPath = null, rawLogPath = null, bytesLogPath = null;
 int timeoutSeconds = 3600, settleMs = 1200;
 var command = new List<string>();
 for (int i = 0; i < args.Length; i++)
@@ -42,6 +42,7 @@ for (int i = 0; i < args.Length; i++)
         case "--cwd": cwd = args[++i]; break;
         case "--log": logPath = args[++i]; break;
         case "--raw-log": rawLogPath = args[++i]; break;
+        case "--bytes-log": bytesLogPath = args[++i]; break;
         case "--timeout": timeoutSeconds = int.Parse(args[++i]); break;
         case "--settle": settleMs = int.Parse(args[++i]); break;
         case "--rule":
@@ -63,6 +64,7 @@ if (cwd is null || command.Count == 0)
 string commandLine = string.Join(" ", command.Select(c => c.Contains(' ') ? $"\"{c}\"" : c));
 using var log = logPath is null ? null : new StreamWriter(logPath, append: false, Encoding.UTF8) { AutoFlush = true };
 using var rawLog = rawLogPath is null ? null : new StreamWriter(rawLogPath, append: false, Encoding.UTF8) { AutoFlush = true };
+using var bytesLog = bytesLogPath is null ? null : new StreamWriter(bytesLogPath, append: false, Encoding.UTF8) { AutoFlush = true };
 
 // Whatever has arrived since the last newline. The raw log is written a
 // COMPLETE LINE AT A TIME rather than chunk by chunk, because stripping ANSI
@@ -105,6 +107,12 @@ Note($"# cwd: {cwd}");
 
 using var pty = ConPtyProcess.Start(commandLine, cwd);
 var transcript = new TranscriptBuilder();
+// ConPTY draws "text, blank line, text" as a cursor jump rather than CR LF
+// until its screen scrolls, and stripping the jump joined the two lines - so a
+// first publish's prompt was matched with the sentence before it glued on
+// (#623). Applied here, before BOTH the raw log and the transcript the rules
+// read; the app's own console does not use it.
+var lineBreaks = new CursorMoveLineBreaks();
 var decoder = Encoding.UTF8.GetDecoder();
 var outputLock = new object();
 DateTime lastOutputAt = DateTime.UtcNow;
@@ -122,8 +130,10 @@ var reader = new Thread(() =>
         var text = new string(chars, 0, charCount);
         lock (outputLock)
         {
-            WriteRaw(text);
-            transcript.Append(text);
+            bytesLog?.WriteLine("[read " + charCount + "] " + EscapeForBytesLog(text));
+            string shaped = lineBreaks.Process(text);
+            WriteRaw(shaped);
+            transcript.Append(shaped);
             lastOutputAt = DateTime.UtcNow;
             DrainTranscriptToLog();
         }
@@ -200,11 +210,32 @@ lock (outputLock)
 {
     DrainTranscriptToLog();
     if (transcript.CurrentLine.Length > 0) log?.WriteLine(transcript.CurrentLine);
+    string heldBack = lineBreaks.Flush();
+    if (heldBack.Length > 0) { WriteRaw(heldBack); transcript.Append(heldBack); }
     FlushRaw();
 }
 int exit = pty.ExitCode ?? -1;
 Note($"# exit: {exit}");
 return exit;
+
+// --bytes-log: each read from the pseudo console on a line of its own, as it
+// arrived, with ESC, CR, LF and the other control characters made visible
+// (\e \r \n \xNN). Added for #623, to see what ConPTY sends between two
+// lines: the other two logs strip control sequences, which is the very thing
+// that was being investigated.
+static string EscapeForBytesLog(string text)
+{
+    var escaped = new StringBuilder(text.Length + 16);
+    foreach (char c in text)
+    {
+        if (c == (char)27) escaped.Append(@"\e");
+        else if (c == (char)13) escaped.Append(@"\r");
+        else if (c == (char)10) escaped.Append(@"\n");
+        else if (c < ' ' || c == (char)127) escaped.Append(@"\x").Append(((int)c).ToString("x2"));
+        else escaped.Append(c);
+    }
+    return escaped.ToString();
+}
 
 // Copy whatever the transcript has gained into --log.
 //

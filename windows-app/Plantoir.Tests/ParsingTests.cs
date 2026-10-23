@@ -219,6 +219,74 @@ public class FailureExplainerTests
             FailureExplainer.Explanation("icacls: Access is denied.")!);
 }
 
+/// <summary>
+/// #623: the cursor jump ConPTY draws in place of "CR LF, blank line" before
+/// its screen scrolls. The inputs are the bytes PtyDriver's --bytes-log
+/// recorded from a stub printing deploy.py's first-publish lines, 2026-10-23.
+/// </summary>
+public class CursorMoveLineBreaksTests
+{
+    private const string E = "\u001b";
+
+    private static TranscriptBuilder Through(params string[] reads)
+    {
+        var breaks = new CursorMoveLineBreaks();
+        var transcript = new TranscriptBuilder();
+        foreach (string read in reads) transcript.Append(breaks.Process(read));
+        transcript.Append(breaks.Flush());
+        return transcript;
+    }
+
+    [Fact]
+    public void TheMeasuredFirstPublishFrameKeepsThePromptOnALineOfItsOwn()
+    {
+        var transcript = Through(
+            E + "[?25l Timestamp TZ offset: -0400" + E + "[4;1HTeacher Surname.\r\n"
+            + "conflicts with other classes. It is saved on this computer and only asked once."
+            + E + "[8;1HFirst time setup... what is your last name? (letters only): " + E + "[?25h");
+        Assert.Equal(new[]
+        {
+            " Timestamp TZ offset: -0400",
+            "Teacher Surname.",
+            "conflicts with other classes. It is saved on this computer and only asked once.",
+        }, transcript.Lines);
+        Assert.Equal("First time setup... what is your last name? (letters only): ", transcript.CurrentLine);
+    }
+
+    [Fact]
+    public void AnEscapeCutByAReadIsHeldUntilItIsWhole()
+    {
+        var transcript = Through("all users across the world." + E + "[1", "4;1HEnter Netlify site name [x]: ");
+        Assert.Equal(new[] { "all users across the world." }, transcript.Lines);
+        Assert.Equal("Enter Netlify site name [x]: ", transcript.CurrentLine);
+    }
+
+    [Fact]
+    public void CursorNextLineEndsALineToo()
+    {
+        var transcript = Through("one" + E + "[2Etwo\r\n");
+        Assert.Equal(new[] { "one", "two" }, transcript.Lines);
+    }
+
+    [Fact]
+    public void AJumpOnAnEmptyLineOrToAnotherColumnAddsNothing()
+    {
+        // The screen-clear home at the start, a jump after a line that has
+        // already ended, a jump to column 40, and cursor show/hide.
+        var transcript = Through(E + "[2J" + E + "[m" + E + "[HHost\r\n" + E + "[5;1Hnext" + E + "[5;40Hmore" + E + "[?25l\r\n");
+        Assert.Equal(new[] { "Host", "nextmore" }, transcript.Lines);
+    }
+
+    [Fact]
+    public void OrdinaryOutputPassesThroughUnchanged()
+    {
+        var breaks = new CursorMoveLineBreaks();
+        string text = "hello\r\n" + E + "]0;title\u0007spinner |\rspinner done\r\n";
+        Assert.Equal(text, breaks.Process(text));
+        Assert.Equal("", breaks.Flush());
+    }
+}
+
 public class TranscriptBuilderTests
 {
     [Fact]
