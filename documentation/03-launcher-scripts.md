@@ -1797,8 +1797,20 @@ round passed it).
   minutes…") after asking the website builder for its free space (`df` of its
   root; under 6 GB it builds nothing, writes `{state: noRoom}` into the
   cache's `state.json` and says so - review S9; the check runs before ANY
-  missing-image build, even one that would reuse cached layers; a build that
-  fails writes `{state: notDownloaded}`), under a lock in
+  missing-image build, even one that would reuse cached layers, and it is
+  the only thing that writes `freeGigabytes`, which nothing reads; a build
+  that fails asks `swift_blocks.py got-ready --outcome=failed
+  --state=<cache root>/state.json`, which reads the build log once and from
+  that reading writes `state.json`, prints the teacher's sentence and then
+  the marker - `{state: noRoom}` for a disk that filled part way,
+  `{state: notDownloaded}` for no internet or a damaged download, no state
+  for anything else, each beside `{reason: …}` (`codeRunnerBlocks.swift.mac`
+  → `printed`, `stateForReason`, #642; until v1.9.0 every failure wrote
+  notDownloaded and blamed the internet); when the website builder prints
+  nothing a teacher can read - it could not be asked, or its copy predates
+  `--state` and prints only the marker - preview.sh prints `mac.printed.unpack`
+  itself, a literal the launcher test holds equal to the contract, and writes
+  no state, so the blocks say "preview the course again"), under a lock in
   `/tmp/plantoir-swift-build-<uid>.lock` so two launchers never download it
   side by side (review S3; a lock whose holder has gone is taken over, and a
   wait longer than 20 minutes gives up with a line) - then compiles with one

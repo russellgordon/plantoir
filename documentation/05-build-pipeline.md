@@ -2129,9 +2129,9 @@ block shares was said ten times and "and 7 more";
 | Reason | When |
 |---|---|
 | `compileError` | Swift found an error; the line is the first error's, in the teacher's file, and the words carry the compiler's own message. The block shows its code with Run off ("This program isn't ready to run yet."). |
-| `noRoom` | the launcher found less than 6 GB free for the Swift image (`state.json` beside the cache says so; plan removes it at the start of every run). |
-| `notDownloaded` | the launcher could not get Swift ready - on a Mac, build the Swift image (about 1.3 GB the first time); on Windows, fetch it (about 2.3 GB; offline, or a download that was not what was pinned) (`state.json`: `{state: notDownloaded}`); the sentence names the download, filled per platform from `swift.downloadGigabytes`, and the internet. |
-| `notCompiled` | nothing recorded, and the sentence says only "preview the course again" (implementation review N1: it used to blame the internet for causes that have nothing to do with it): a compile that did not finish (killed, too slow, wasm-opt failed - none is cached, so the next preview tries again), a wait for another launcher's download that gave up, or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
+| `noRoom` | the launcher found less than 6 GB free for the Swift image, or the disk filled part way through getting Swift ready (`state.json` beside the cache says so; plan removes it at the start of every run). |
+| `notDownloaded` | the launcher could not get Swift ready because it had no internet connection or its download was not what was pinned - on a Mac, building the Swift image (about 1.3 GB the first time; since #642 only these two causes, `mac.stateForReason`); on Windows, fetching it (about 2.3 GB) (`state.json`: `{state: notDownloaded}`); the sentence names the download, filled per platform from `swift.downloadGigabytes`, and the internet. |
+| `notCompiled` | nothing recorded, and the sentence says only "preview the course again" (implementation review N1: it used to blame the internet for causes that have nothing to do with it): a compile that did not finish (killed, too slow, wasm-opt failed - none is cached, so the next preview tries again), a wait for another launcher's download that gave up, a Mac image build that failed for any other cause (#642: `state.json` then holds only `{reason: unpack}`), or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
 
 Until v1.8.6 a fifth reason, `notOnWindows`, said Windows could not compile
 Swift (#493 option (b)); it went when Windows began compiling (#570), and the
@@ -2184,7 +2184,7 @@ app reads from the console and from a scheduled publish's log. On a Mac,
 | the build lock was held for longer than 1,200 s (`windows.waitSeconds`) | `waited` |
 | the build failed, and its failed step or BuildKit's summary says "no space left" (any case) or `curl: (23)` | `noRoom` |
 | ... says `computed checksum did NOT match` or `.tar.gz: FAILED` (sha256sum against the pin) | `damaged` |
-| ... names a curl network failure ((6), (7), (18), (28), (35), (52), (56)), a name that could not be resolved, `dial tcp`, or a timeout | `offline` |
+| ... names a curl network failure ((6), (7), (16), (18), (28), (35), (52), (55), (56), (92)), a name that could not be resolved, `dial tcp`, or a timeout | `offline` |
 | any other failure: a moved pin's HTTP 404 (`curl: (22)`), a certificate curl could not check (`curl: (60)`), a crashed SDK install, a daemon error | `unpack` |
 
 `busy` (another installation running) is Windows' alone. **The reason is read
@@ -2224,12 +2224,60 @@ second copy of the pins); a new script for it (it would need its own baked
 copy check and verify line for nothing `swift_blocks.py` cannot carry, and
 that file is not in the toolchain id).
 
-**Known gap:** the block-level reason is unchanged - a Mac build that failed
-for any cause still writes `{state: notDownloaded}`, whose sentence names the
-internet, so a `damaged`, `noRoom`-mid-build or `unpack` failure tells the
-teacher it could not be downloaded while the trail says why. Windows maps its
-reasons to states (`windows.ensureExit`); the mac adopting that is its own
-issue.
+**What the teacher is told when the build fails** (#642, v1.9.0). Until
+then `preview.sh` printed the sentence that is now `mac.printed.offline` and
+wrote `{state: notDownloaded}` for EVERY failed build, so a full disk or a
+damaged download was blamed on the internet in all three places a teacher
+reads it, while the trail line alone said why. Now the one reading of the log
+decides all of it: `swift_blocks.py got-ready --outcome=failed
+--state=<cache root>/state.json` writes the state, prints the sentence before
+the marker, and names the same reason in the marker.
+
+| The build's reason | `state.json` | each block, and the folder problem | the console (`mac.printed`) |
+|---|---|---|---|
+| `noRoom` (the disk filled part way) | `{reason: noRoom, state: noRoom}` | `reasons.noRoom` | `noRoom`: this Mac ran out of space part way, free some and preview again |
+| `offline` | `{reason: offline, state: notDownloaded}` | `reasons.notDownloaded` | `offline`: the sentence it always printed, byte for byte |
+| `damaged` | `{reason: damaged, state: notDownloaded}` | `reasons.notDownloaded` | `damaged`: Windows' own sentence, true here too |
+| `unpack` (anything else) | `{reason: unpack}` | `reasons.notCompiled` | `unpack`: it could not be got ready on this Mac, preview again |
+
+The mapping is Windows' `ensureExit` exactly (10, 11, 12), and
+`test_swift_blocks.py` holds the two equal by running `ensure` with a failing
+fetch for each reason. `reason` is a record for a helper reading the cache
+folder; nothing reads it. When the website builder prints nothing a teacher
+can read (it could not be asked, or an older copy printed only the marker),
+`preview.sh` prints `mac.printed.unpack` itself, from a literal the launcher
+test holds equal to the contract, and writes no state. The page students see
+does not change: `codeRunner.ts` shows `words.notReady` whatever the reason.
+The trail's event is unchanged (rule 5): its line already names the reason,
+and that reason is now what chooses the sentence.
+
+**Measured** with the dev tree's Python, before the change: `curl: (16)`,
+`(55)`, `(92)` and `(60)` all read as `unpack`. (16) is an HTTP/2 framing
+error, (55) a failure sending, (92) an HTTP/2 stream not closed cleanly -
+each a connection that dropped, which `offline`'s trail words already
+cover - so they are `offline` now, each with a
+`mac.reasonCases` case. **(60), a certificate curl could not check, stays
+`unpack` on purpose**, with a case pinning it: neither "go online" nor "try
+again" fixes it, and a network that intercepts encrypted connections is a
+real case at a school.
+
+**Known limit.** A content filter that answers 403 for download.swift.org is
+`curl: (22)`, so `unpack`, and the teacher is told to preview again - when the
+real fix is a network the filter does not block. A 404 from a moved pin is the
+same code, whose fix is a Plantoir update; neither is told apart from the log.
+
+**Rejected:** bash reading the reason out of the marker and choosing the
+sentence (JSON parsed by `case` patterns, and a second copy of four sentences
+that only a text test would keep in step); new block reasons `damaged` and
+`unpack` (new folder-problem words both platforms render, and Windows would
+have to write new states to reach them, when the three existing reasons
+already name the right fix for each cause); `damaged` → `notCompiled` (it
+would differ from Windows, and at a school the likeliest cause of a download
+that is not what was pinned is a portal or filter answering in place of the
+real server, for which "while it is connected to the internet" is the right
+advice); `(60)` as `offline` or a reason of its own (above); moving the
+free-space check's and the wait's sentences into the contract too (correct,
+and not needed: they already say the right thing).
 
 **Known limit.** The build's fence reader and Quartz's parser read a lazy line
 in a list item differently (`fences.pageShapes`): the build compiles the body
