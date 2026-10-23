@@ -939,8 +939,9 @@ a teacher can see it rather than merely held in a constant.
 carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
 `dotnet test` builds them and runs none of those — only
 `AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
-and need no desktop (bundle 11), and `HarnessSourceRuleTests`, three more that
-keep a bare key-down out of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
+and need no desktop (bundle 11), and `HarnessSourceRuleTests`, five more that
+keep a bare key-down, a discarded `Keyboard.Pressing` and an unwatched key out
+of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)

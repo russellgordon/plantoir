@@ -12,6 +12,25 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 8d2f1145f — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
+## 2026-10-23 — a driven run leaves the real trail alone, and every key sent down is sent up (#641, #638, v1.8.7)
+
+Branch `issue/641-ui-harness`.
+
+- **#641:** UI tests started with `--state-dir` still wrote "got the working folder ready" lines to the REAL trail.
+  - The writer was the harness's OWN process: `DrivenApp` sets the working folder up in-process, and only the app was redirected. It now redirects itself first.
+  - The window's `plantoir-mcp` is now handed `--state-dir` too (`AppDataRoot.ArgumentsToHandOn` / `StateDirFrom`, pinned by `StateDirHandOnTests`).
+  - `RealTrailUntouchedUiTests` drives both writers. It fails on an added real-trail line that names the run's folder or its one-off course code.
+  - The launchers' refusal lines still bypass it: #664 (both platforms, v1.9.0).
+- **#638:** 24 FlaUI key-downs had no key-up. They are now `Keyboard.Type`, or `using (Keyboard.Pressing(...))` for a held modifier.
+  - `HarnessSourceRuleTests` (plain facts) keeps them out. The one exception, allowed by name, is `PageTablesUiTests.HeldSpace`.
+  - `HeldKeys` releases any key still down. `DrivenApp.Dispose` records it without throwing, and the `HeldKeyLedger` collection fixture fails the cleanup naming the keys and tests. This was seen working when F2 was put back to a bare key-down.
+- **Measured** (i5-8365U, RDP session, other worktrees' unit runs on the PC at times):
+  - Full UI run 1: **101/101**, 51 m 13 s, OpenRecentUiTests and PreviewStartPageUiTests included.
+  - Full UI run 2: **100/101**, 57 m 21 s. `AcceleratorUnderDialogUiTests` failed: "the second window would not close". It failed again in five runs alone, one of them with the F2 change reverted, so it is not this piece. The new dump shows a real WinUI window ignoring `WindowPattern.Close`, not a tooltip; it is recorded as a known flake in `documentation/12-windows-app.md`, and the idle RDP session with LogonUI running is the unproven suspect.
+  - Real trail across both runs and every re-run: **0** lines naming a `plantoir-ui-` folder.
+  - Unit suite: Failed 6, Passed 2989, Total 2995. One was a load timeout that passed alone; five are #614's unimplemented curriculum contract cases.
+- `documentation/12-windows-app.md` → "The flags the app answers" and "A key sent DOWN must be sent UP".
+
 ## 2026-10-23 — the Code page's Swift pictures on Windows (#590)
 
 Branch `issue/590-swift-pictures`. `preview_pages_windows.py` no longer leaves `code-swift` and `code-swift-live` out (`NOT_ON_WINDOWS` is gone); both were taken at 2x by `capture_windows.py --code code-swift-live,code-swift` (fitted scale 2.000 in a 3840 x 2160 Remote Desktop session at 200%, taskbar showing), read back against `expectText`, promoted to `windows: true`, and taken off `WINDOWS_PICTURE_OWED`; `site.json` → `runnable-swift` is `windows: true`, so the Code page drops its Mac-only line, and its download sentence gives both sizes. The first ICS4U preview compiled its one block in 4.73 s (Swift already ready). `documentation/12-windows-app.md` → "The Code page's Swift pictures (#590)". Gates: `website/test_build_data.py` and `build.py --check`.
