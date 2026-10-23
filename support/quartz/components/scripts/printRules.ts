@@ -368,6 +368,54 @@ export function mayPrint(expected: number, found: number, overflowing: number): 
   return expected > 0 && found >= expected && overflowing === 0
 }
 
+// ---- Asking the browser to print, and putting the page back (#576) ----------
+// print() does not always print before it returns. Chrome, Edge and Safari's
+// paged path block in it with their dialog up, and send beforeprint (and
+// usually afterprint) inside it. Headless Chrome sends beforeprint on the
+// frame inside it and never afterprint. And WebKit, asked to print a frame
+// still fetching a face or a picture, returns at once with NOTHING sent and
+// prints later, when the frame has loaded - if the frame is still there
+// (measured in Safari 26.6: the sheet opened 39 ms later when the frame was
+// kept; never when it was taken away at once, which is what the page did).
+// So the page is put back only once the print is known to have happened, and
+// "Preparing to print…" is never left up for longer than PRINT_BUDGET_MS
+// from the press, everything before print() included.
+export const PRINT_BUDGET_MS = 30000
+
+// When the outcome is asked: print() has returned; or, after it returned
+// with nothing sent, an event arrived or the budget ran out.
+export type PrintMoment = "printReturned" | "beforeprint" | "afterprint" | "outOfTime"
+// keepWaiting: leave the frame (and the words on the button) as they are.
+// putBack: the print happened, or is happening: put the page back, quietly.
+// putBackCouldNotPrint: no print ever began: put the page back and say
+// words.couldNotPrepare, rather than leave the reader with no answer.
+export type PrintOutcome = "keepWaiting" | "putBack" | "putBackCouldNotPrint"
+
+export function printOutcome(moment: PrintMoment, sawBefore: boolean, sawAfter: boolean): PrintOutcome {
+  if (moment === "printReturned") {
+    // Either event inside print() means it printed then: put back at once.
+    if (sawBefore || sawAfter) {
+      return "putBack"
+    }
+    return "keepWaiting"
+  }
+  if (moment === "beforeprint") {
+    // A print put off has begun: its sheet may be up, so the frame stays
+    // until afterprint, or until the budget runs out.
+    return "keepWaiting"
+  }
+  if (moment === "afterprint") {
+    return "putBack"
+  }
+  // Out of time. A print that began and never said it ended is not a
+  // failure the reader should be told of (headless Chrome sends no
+  // afterprint); one that never began is.
+  if (sawBefore || sawAfter) {
+    return "putBack"
+  }
+  return "putBackCouldNotPrint"
+}
+
 // ---- The page box, as CSS text (#454, #499) ---------------------------------
 // Shared by ⌘P (PlantoirMetaLine writes it into the page) and the handout
 // (print.inline.ts hands it to the print layout), so the two cannot drift.

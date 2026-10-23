@@ -584,7 +584,12 @@ async function checkHandout(url, pageUrl) {
   await send("Page.enable")
   await send("Page.addScriptToEvaluateOnNewDocument", {
     source: `new MutationObserver((changes) => { for (const change of changes) for (const node of change.addedNodes) {
-      if (node.tagName === "IFRAME") node.contentWindow.print = () => { window.__handout = node.contentDocument.body.innerText } } })
+      // A real print sends these (#576): the page puts itself back only once it has seen one.
+      if (node.tagName === "IFRAME") node.contentWindow.print = () => {
+        node.contentWindow.dispatchEvent(new Event("beforeprint"))
+        window.__handout = node.contentDocument.body.innerText
+        node.contentWindow.dispatchEvent(new Event("afterprint"))
+      } } })
       .observe(document, { childList: true, subtree: true })`,
   })
   await send("Page.navigate", { url: pageUrl })
