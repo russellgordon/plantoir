@@ -2137,7 +2137,8 @@ Q4). In practice a preview has already filled the cache.
 in a list item differently (`fences.pageShapes`): the build compiles the body
 IT read and the site looks for the key of a shorter body, finds none, and
 shows the block as plain code with a `plantoir: error:` line
-(`words.blockNotCompiled`). The fence reader was deliberately NOT changed to
+(`words.blockNotCompiled`) and, since #567, as the
+`runnableCodeShownAsPlainCode` folder problem. The fence reader was deliberately NOT changed to
 follow lazy lines (the brief keeps the fence rule as #455 left it; the safety
 net names the block). A Swift block the build's reader cannot see at all is
 never compiled, and is named the same way.
