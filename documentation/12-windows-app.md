@@ -5209,7 +5209,9 @@ the whole table).
   never assumed).
   - It lives at `AppDataRoot\toolchain-index\<FolderContainers.FolderIdentifier>.hashes`,
     so the teacher never sees it, it does not travel with a copied folder,
-    and a `--state-dir` run keeps its own.
+    and a `--state-dir` run keeps its own. Like `builds\<id>`, one index
+    (about 2 MB) accumulates per folder id and nothing deletes it; accepted,
+    since a working folder is rarely abandoned and the cost is a file.
   - It is written whole (a temporary file, then a rename), and only when the
     pass failed nothing and the index changed.
 - **The comparison** (`MirrorPass`). Length and time equal → identical, as
@@ -5277,13 +5279,15 @@ Read it carefully, because the warm numbers undersell it.
 - **A cold first-launch-after-install could not be reproduced here without
   a reboot**, so that number is argued from the read count, not measured.
   The director checks it at the next cut: the first launch's trail line
-  should say "(0 read in full)", or carry no reads at all.
+  should read "N files brought up to date, M compared in S s", with NO
+  bracket (the "(K read in full)" bracket is left out when K is 0).
 - **A copy whose own time moved is still read.** Nothing can tell it from an
   edit; with the manifest, though, it is read once rather than twice.
 
 **What the director must check at the cut.** After installing the cut
 build over the previous one, the first launch's `working folder tools
-copied` line should say "(0 read in full)" or name no reads, and
+copied` line should read "N files brought up to date, M compared in S s",
+with no "(K read in full)" bracket (it is left out when K is 0), and
 `startup.log`'s `tools copy finished` should say `0 read in full`. If it
 reads every file, the installed times are not within 2 s below the
 manifest's. Look at one file: `.hashes` holds its UTC ticks, and
