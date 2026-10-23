@@ -368,7 +368,8 @@ problem — **nobody answers a question at 6 a.m.**
   The **folder keeps the name `unanswered`** though it now holds successes.
   Renaming it was implemented and reverted: a task scheduled before that date
   points at a wrapper `.ps1` already on disk that writes the old path, and
-  nothing rewrites that wrapper until the section is scheduled again — so a
+  nothing rewrote that wrapper before bundle 3 (since then it is written
+  afresh at each run, but a task set earlier still runs its own) — so a
   rename costs a second directory read for ever, on pain of the first
   overnight run after an update going silent. A one-line record from such a
   wrapper is still read, as the question it was.
@@ -3949,8 +3950,13 @@ legacy `curriculum_folder` naming the primary.
 `PLANTOIR_MAPS:` is read from the console (`ScriptRunner`) and from a scheduled
 publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
 `Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
-reader would never see the line. The wrapper is written afresh by `ScheduledRun` at the moment each run starts (since bundle 3), so a deploy already scheduled scans for a new marker from its next run, once the `Plantoir.exe` it was registered with (`TaskScheduling.RunnerExecutable`) has been updated in place, with no need to schedule it again. Only a task set before bundle 3 runs its own baked wrapper, once, and misses it. `PLANTOIR_MY_PROGRESS:` (#599)
-and `PLANTOIR_REPAIRED:` (#645) ride the same three places — the console
+reader would never see the line. The wrapper is written afresh by
+`ScheduledRun` at the moment each run starts (since bundle 3), so a deploy
+already scheduled scans for a new marker from its next run, once the
+`Plantoir.exe` it was registered with (`TaskScheduling.RunnerExecutable`) has
+been updated in place, with no need to schedule it again. Only a task set
+before bundle 3 runs its own baked wrapper, once, and misses it.
+`PLANTOIR_MY_PROGRESS:` (#599) and `PLANTOIR_REPAIRED:` (#645) ride the same three places — the console
 reader, the record reader and the wrapper's scan — the same way ("My
 Progress: the trail line and the two readers (#599)" below). (This said a
 wrapper "keeps its old scan until its schedule is set again" until
