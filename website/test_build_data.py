@@ -429,18 +429,16 @@ class ReleaseReadinessTests(unittest.TestCase):
 # --print-set` on the first unlocked desktop after the 1.7.1 catch-up.
 WINDOWS_PICTURE_OWED: dict = {
     # The Code page (#562) and the Quizzes page (#587). Since #590,
-    # capture_windows.py --code / --quizzes takes every one of these but the
-    # two Swift figures, from native previews of ~/School Web Space and
+    # capture_windows.py --code / --quizzes takes every one of these, from
+    # native previews of ~/School Web Space and
     # ~/Teaching (preview_pages_windows.py) -- at exactly 2x only (#557), so
     # they are taken in a 4K session at 200%. A shot leaves this list in the
     # commit that marks it `windows: true` (`capture_windows.py --promote`
     # checks the pictures first), which is the release commit whose installer
     # has the feature. The reasons below are what each one still waits on.
-    # code-swift and code-swift-live stay owed until their 2x picture is
-    # taken: Swift runs on Windows since v1.8.6 (#570), and site.json's
-    # runnable-swift stays windows: false until those pictures exist.
-    "code-swift-live": "the 2x picture, taken in a 4K session (#590)",
-    "code-swift": "the 2x picture, taken in a 4K session (#590)",
+    # code-swift and code-swift-live left this list on 2026-10-23, their 2x
+    # pictures taken in a 4K session (Swift runs on Windows since v1.8.6,
+    # #570), and site.json's runnable-swift became windows: true with them.
     "quiz-math": "too tall for the 1280 x 860 window at 2x: quiz-math.js refuses it (767 pt) (#590)",
     "quiz-code-run": "too tall for the 1280 x 860 window at 2x: quiz-code-run.js refuses it (744 pt) (#590)",
 }
