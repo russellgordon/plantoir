@@ -1252,6 +1252,22 @@ nonisolated enum ActivityTrail {
         case obsidianReopenedForAddOns = "obsidian reopened for add-ons"
         /// Settings ▸ Obsidian turned the add-ons on or off (#495).
         case obsidianAddOnsSettingChanged = "obsidian add-ons setting changed"
+
+        // ---- Runnable Swift (#493, #570, #635) ----
+
+        /// The first preview (or scheduled publish) that had Swift blocks to
+        /// compile built the Swift image on this Mac (#635): how many seconds
+        /// the build took and how much it downloaded — 0.0 GB when Docker
+        /// reused the download layers after an update — read from
+        /// preview.sh's `PLANTOIR_SWIFT:` line by `SwiftGotReadyReport`. It
+        /// dates when this Mac's website builder gained about 2.24 GB.
+        case swiftGotReady = "Swift got ready on this computer"
+        /// Building the Swift image failed or was not attempted (#635): why,
+        /// as offline, noRoom, damaged, unpack or waited (busy is a Windows
+        /// reason only). Every Swift block on the site then says it is not
+        /// ready, and this says whether that was the network, the disk or
+        /// the download.
+        case swiftCouldNotBeGotReady = "Swift could not be got ready"
     }
 
     // MARK: - Stored properties

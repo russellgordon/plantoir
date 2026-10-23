@@ -964,14 +964,14 @@
       {
         "event": "Swift got ready on this computer",
         "carries": "how many seconds getting Swift ready took and how much was downloaded, and the course and section whose preview needed it",
-        "marker": "PLANTOIR_SWIFT: with ready true (codeRunnerBlocks.swift.windows.marker)",
+        "marker": "PLANTOIR_SWIFT: with ready true (codeRunnerBlocks.swift.windows.marker; printed on a Mac by preview.sh since #635, codeRunnerBlocks.swift.mac)",
         "line": "{course}/{section} · got Swift ready on this computer in {seconds} s ({gigabytes} GB downloaded, once)",
-        "why": "#570. A 2.3 GB download on a school line is the likeliest thing in a first Swift preview to take minutes or to fail, and 'my first preview took ten minutes' or 'my disk filled up' is asked about days later; the line dates when the computer gained about 0.9 GB, which otherwise looks like it has nothing to do with Plantoir (the assistant model's reasoning). Recorded from the printed marker, so a typed preview and a scheduled publish that are read by the app leave it too."
+        "why": "#570, #635. A first download of a gigabyte or more on a school line is the likeliest thing in a first Swift preview to take minutes or to fail, and 'my first preview took ten minutes' or 'my disk filled up' is asked about days later; the line dates when the computer gained what Swift keeps, which otherwise looks like it has nothing to do with Plantoir (the assistant model's reasoning). The figures differ by platform: on Windows about 2.3 GB downloaded and about 0.9 GB kept in %LOCALAPPDATA%\\Plantoir\\swift; on a Mac about 1.3 GB downloaded the first time (0.0 after an update that reused the download layers) and a Swift image of about 2.24 GB on the website builder's disk (#635, codeRunnerBlocks.swift.mac). Recorded from the printed marker, so a typed preview and a scheduled publish that are read by the app leave it too."
       },
       {
         "event": "Swift could not be got ready",
         "carries": "why, as one of: offline (no internet connection, or the download stopped), noRoom (too little free space), damaged (the download was not what was pinned and was thrown away), busy (another installation was running), unpack (it could not be unpacked, or anything else went wrong), waited (another preview held the fetch for longer than windows.waitSeconds); and the course and section",
-        "marker": "PLANTOIR_SWIFT: with ready false and its reason (codeRunnerBlocks.swift.windows.marker)",
+        "marker": "PLANTOIR_SWIFT: with ready false and its reason (codeRunnerBlocks.swift.windows.marker; printed on a Mac by preview.sh since #635, codeRunnerBlocks.swift.mac, which never prints busy)",
         "line": "{course}/{section} · Swift could not be got ready on this computer: {why}",
         "whyWords": {
           "offline": "no internet connection, or the download stopped",
@@ -8575,6 +8575,11 @@
         {
           "line": "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 1, \"maps\": []}",
           "hidden": true
+        },
+        {
+          "line": "PLANTOIR_SWIFT: {\"course\": \"ICS3U\", \"downloadedBytes\": 1300864747, \"ready\": true, \"seconds\": 80, \"section\": 1}",
+          "hidden": true,
+          "why": "#570, #635: how getting Swift ready ended (codeRunnerBlocks.swift.windows.marker), printed by both platforms' launchers for the trail."
         },
         {
           "line": "PLANTOIR_WAITING_FOR: publish MPM2D/2 claude",
@@ -26470,8 +26475,212 @@
             "PLANTOIR_SWIFT: {\"course\": \"ICS3U\", \"downloadedBytes\": 2301721200, \"ready\": true, \"seconds\": 92, \"section\": 1}",
             "PLANTOIR_SWIFT: {\"course\": \"ICS3U\", \"ready\": false, \"reason\": \"offline\", \"section\": 1}"
           ],
-          "why": "Printed once when getting Swift ready finished or failed - never when it was already ready - and read by the app from the console of a run it starts and from a scheduled publish's record, the PLANTOIR_MY_PROGRESS: pattern (activityTrail.mustRecord: 'Swift got ready on this computer', 'Swift could not be got ready')."
+          "why": "Printed once when getting Swift ready finished or failed - never when it was already ready - and read by the app from the console of a run it starts and from a scheduled publish's record, the PLANTOIR_MY_PROGRESS: pattern (activityTrail.mustRecord: 'Swift got ready on this computer', 'Swift could not be got ready'). preview.sh prints the same line after building the Swift image on a Mac (#635, codeRunnerBlocks.swift.mac)."
         }
+      },
+      "mac": {
+        "rule": "#635, v1.9.0: preview.sh prints the same PLANTOIR_SWIFT: line as Windows (windows.marker) after building the Swift image, on every ending but 'already there': the build succeeded (ready true); the free-space check refused it (noRoom, before anything was downloaded); the wait for another launcher's build gave up after the build lock's 1200 s, which is windows.waitSeconds (waited); or the build failed (the reason read from its log, reasonsFromTheBuildLog). Not printed when the image was already there, when another launcher built it while this one waited, nor when this copy of Plantoir carries no support/swift (nothing was attempted). busy is never printed on a Mac: it is Windows' other installation. The line is written by `swift_blocks.py got-ready` in the website builder, which reads this run's build log at its own path (the builds folder is mounted there), after the sentence a teacher reads. seconds is the image build alone, in whole seconds, not the wait for the lock.",
+        "downloadedBytesRule": "The image build prints nothing about bytes (every download is curl -fsSL inside a RUN), so downloadedBytes is the sum of toolchain.json -> swiftImage.pins `bytes` for the download steps that RAN, for the architecture the build used. A step is found by a pin's URL in its BuildKit header (`#N [i/n] RUN ...`, the whole command with every ARG already expanded, so the URL is there and `$WASM_SDK_URL` is not); the architecture is the word in the header's `case \"<arch>\" in`; a step that ran is one with no `#N CACHED` line, matched by its number N (BuildKit numbers steps in the order it reaches them, not the Dockerfile's). 0 when Docker reused both download layers: measured 2026-10-22 on this Mac's four teaching-quartz-swift:src-* images, whose first seven layers are identical, so an update that changes only compile.py rebuilds in seconds downloading nothing, and the pins' 1.3 GB there would be false. apt's packages and the base image (the website builder's own) are not counted, the scope of swiftImage.measured.",
+        "downloadedBytesRejected": "Making the Dockerfile print what curl downloaded (curl -w '%{size_download}'): support/swift/Dockerfile is in compile.toolchainIdFrom, so the edit would compile every cached Swift program on every Mac again and download 1.3 GB once more, for a number on the trail. `docker image inspect` .Size (2.24 GB on disk, 504 MB compressed): neither is what was downloaded. A fixed 1.3 GB: false on the cached rebuild above, and a second copy of the pins.",
+        "downloadSteps": [
+          {
+            "step": "the toolchain and the Wasm SDK (one RUN)",
+            "foundBy": ["wasmSdk"],
+            "counts": {"arm64": ["swiftToolchainArm64", "wasmSdk"], "amd64": ["swiftToolchainAmd64", "wasmSdk"]},
+            "why": "Found by the SDK's URL, the one URL only this step carries; its header names BOTH architectures' toolchain URLs (the case statement), so those cannot tell it apart from a step that merely mentions them."
+          },
+          {
+            "step": "binaryen (one RUN)",
+            "foundBy": ["binaryenArm64", "binaryenAmd64"],
+            "counts": {"arm64": ["binaryenArm64"], "amd64": ["binaryenAmd64"]},
+            "why": "Its header names both architectures' URLs; which one was downloaded is the header's case word."
+          }
+        ],
+        "bytesCases": [
+          {
+            "name": "the first build on Apple silicon: both download steps ran",
+            "log": [
+              "#6 [3/6] RUN set -e;     case \"arm64\" in       arm64) url=\"https://download.swift.org/swift-6.4.0-release/debian13-aarch64/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13-aarch64.tar.gz\" ;;       amd64) url=\"https://download.swift.org/swift-6.4.0-release/debian13/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13.tar.gz\" ;;     esac;     curl -fsSL \"$url\" -o /tmp/swift.tar.gz;     curl -fsSL \"https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz\" -o /tmp/wasm-sdk.tar.gz",
+              "#6 61.20 swift-driver version: 1.148.6 Apple Swift version 6.4",
+              "#6 DONE 61.4s",
+              "#9 [4/6] RUN set -e;     case \"arm64\" in       arm64) url=\"https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-aarch64-linux.tar.gz\" ;;       amd64) url=\"https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-x86_64-linux.tar.gz\" ;;     esac;     curl -fsSL \"$url\" -o /tmp/binaryen.tar.gz",
+              "#9 DONE 4.1s"
+            ],
+            "downloadedBytes": 1300864747
+          },
+          {
+            "name": "an update that changed only compile.py: both download steps CACHED",
+            "log": [
+              "#6 [3/6] RUN set -e;     case \"arm64\" in       arm64) url=\"https://download.swift.org/swift-6.4.0-release/debian13-aarch64/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13-aarch64.tar.gz\" ;;     esac;     curl -fsSL \"https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz\" -o /tmp/wasm-sdk.tar.gz",
+              "#6 CACHED",
+              "#9 [4/6] RUN set -e;     case \"arm64\" in       arm64) url=\"https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-aarch64-linux.tar.gz\" ;;     esac",
+              "#9 CACHED",
+              "#8 [5/6] COPY compile.py ReadLineShim.swift FlushBeforeRead.c /opt/plantoir-swift/",
+              "#8 DONE 0.0s"
+            ],
+            "downloadedBytes": 0
+          },
+          {
+            "name": "only binaryen ran (its pin moved)",
+            "log": [
+              "#6 [3/6] RUN set -e;     case \"arm64\" in       arm64) url=\"https://download.swift.org/swift-6.4.0-release/debian13-aarch64/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13-aarch64.tar.gz\" ;;     esac;     curl -fsSL \"https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz\" -o /tmp/wasm-sdk.tar.gz",
+              "#6 CACHED",
+              "#9 [4/6] RUN set -e;     case \"arm64\" in       arm64) url=\"https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-aarch64-linux.tar.gz\" ;;     esac",
+              "#9 DONE 3.9s"
+            ],
+            "downloadedBytes": 105577739
+          },
+          {
+            "name": "the first build on an Intel Mac: the amd64 pins",
+            "log": [
+              "#6 [3/6] RUN set -e;     case \"amd64\" in       arm64) url=\"https://download.swift.org/swift-6.4.0-release/debian13-aarch64/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13-aarch64.tar.gz\" ;;       amd64) url=\"https://download.swift.org/swift-6.4.0-release/debian13/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13.tar.gz\" ;;     esac;     curl -fsSL \"https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz\" -o /tmp/wasm-sdk.tar.gz",
+              "#6 DONE 70.2s",
+              "#9 [4/6] RUN set -e;     case \"amd64\" in       arm64) url=\"https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-aarch64-linux.tar.gz\" ;;       amd64) url=\"https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-x86_64-linux.tar.gz\" ;;     esac",
+              "#9 DONE 4.4s"
+            ],
+            "downloadedBytes": 1326607137
+          },
+          {
+            "name": "steps numbered out of the Dockerfile's order: a CACHED line belongs to its own number",
+            "log": [
+              "#9 [3/6] RUN set -e;     case \"arm64\" in       arm64) url=\"https://download.swift.org/swift-6.4.0-release/debian13-aarch64/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13-aarch64.tar.gz\" ;;     esac;     curl -fsSL \"https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz\" -o /tmp/wasm-sdk.tar.gz",
+              "#6 [4/6] RUN set -e;     case \"arm64\" in       arm64) url=\"https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-aarch64-linux.tar.gz\" ;;     esac",
+              "#6 CACHED",
+              "#9 DONE 60.8s"
+            ],
+            "downloadedBytes": 1195287008
+          }
+        ],
+        "reasonsFromTheBuildLog": {
+          "rule": "Read only when the build failed, and only from the lines of every step that ended `#N ERROR` (each line starting `#N `) and the lines that belong to no step (BuildKit's closing summary, from `------` to `ERROR: failed to solve:`, and anything docker itself printed) - never a step that succeeded, whose output can say anything. The first entry of `order` with a needle in those lines wins, so a full disk (which makes curl and tar fail too) is noRoom, and a checksum that failed after a whole download is damaged rather than offline; anything else is unpack, the contract's 'or anything else went wrong' (a moved pin's HTTP 404, curl (22); a certificate curl could not check, curl (60); a crashed `swift sdk install`; a daemon error). The Swift Dockerfile carries none of the needles, so its excerpt in the summary decides nothing (scripts/test_swift_blocks.py checks it).",
+          "order": [
+            {"reason": "noRoom", "ignoreCase": true, "anyOf": ["no space left", "curl: (23)"]},
+            {"reason": "damaged", "ignoreCase": false, "anyOf": ["computed checksum did NOT match", ".tar.gz: FAILED"]},
+            {"reason": "offline", "ignoreCase": false, "anyOf": ["curl: (6)", "curl: (7)", "curl: (18)", "curl: (28)", "curl: (35)", "curl: (52)", "curl: (56)", "Could not resolve host", "Temporary failure resolving", "dial tcp", "i/o timeout", "TLS handshake timeout", "no such host"]}
+          ],
+          "otherwise": "unpack"
+        },
+        "reasonCases": [
+          {
+            "name": "the disk filled while the toolchain was unpacked",
+            "log": [
+              "#6 [3/6] RUN set -e;     case \"arm64\" in ...",
+              "#6 48.10 tar: usr/bin/swift-frontend: Cannot write: No space left on device",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 2"
+            ],
+            "reason": "noRoom"
+          },
+          {
+            "name": "curl could not write the download: (23)",
+            "log": [
+              "#6 30.42 curl: (23) Failure writing output to destination, passed 16384 returned 0",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 23"
+            ],
+            "reason": "noRoom"
+          },
+          {
+            "name": "exporting the image ran out of room, said only in the summary",
+            "log": [
+              "#11 exporting to image",
+              "#11 ERROR: write /var/lib/docker/buildkit/content/ingest/x/data: no space left on device",
+              "------",
+              "ERROR: failed to solve: failed to copy: write /var/lib/docker/buildkit/content/ingest/x/data: no space left on device"
+            ],
+            "reason": "noRoom"
+          },
+          {
+            "name": "the download was not what was pinned",
+            "log": [
+              "#6 45.01 /tmp/swift.tar.gz: FAILED",
+              "#6 45.01 sha256sum: WARNING: 1 computed checksum did NOT match",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 1"
+            ],
+            "reason": "damaged"
+          },
+          {
+            "name": "no internet: curl could not find download.swift.org",
+            "log": [
+              "#6 0.31 curl: (6) Could not resolve host: download.swift.org",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 6",
+              "------",
+              " > [3/6] RUN set -e; ...:",
+              "0.31 curl: (6) Could not resolve host: download.swift.org",
+              "------",
+              "ERROR: failed to solve: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 6"
+            ],
+            "reason": "offline"
+          },
+          {
+            "name": "the download stopped part way",
+            "log": [
+              "#6 212.80 curl: (56) Recv failure: Connection reset by peer",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 56"
+            ],
+            "reason": "offline"
+          },
+          {
+            "name": "no internet for apt",
+            "log": [
+              "#7 [2/6] RUN apt-get update && apt-get install -y --no-install-recommends curl",
+              "#7 0.52 W: Failed to fetch http://deb.debian.org/debian/dists/trixie/InRelease  Temporary failure resolving 'deb.debian.org'",
+              "#7 0.60 E: Unable to locate package curl",
+              "#7 ERROR: process \"/bin/sh -c apt-get update ...\" did not complete successfully: exit code: 100"
+            ],
+            "reason": "offline"
+          },
+          {
+            "name": "no internet for the base image",
+            "log": [
+              "#2 [internal] load metadata for docker.io/library/python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff",
+              "#2 ERROR: failed to do request: Head \"https://registry-1.docker.io/v2/library/python/manifests/sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff\": dial tcp: lookup registry-1.docker.io on 192.168.5.3:53: no such host"
+            ],
+            "reason": "offline"
+          },
+          {
+            "name": "a pin that moved: HTTP 404 is not the network",
+            "log": [
+              "#9 0.80 curl: (22) The requested URL returned error: 404",
+              "#9 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 22"
+            ],
+            "reason": "unpack"
+          },
+          {
+            "name": "a crashed SDK install",
+            "log": [
+              "#6 70.02 error: Swift SDK bundle at /tmp/wasm-sdk.tar.gz is invalid",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 1"
+            ],
+            "reason": "unpack"
+          },
+          {
+            "name": "a full disk wins over the network it also broke",
+            "log": [
+              "#6 0.31 curl: (6) Could not resolve host: download.swift.org",
+              "#6 0.40 mkdir: cannot create directory '/opt/swift': No space left on device",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 1"
+            ],
+            "reason": "noRoom"
+          },
+          {
+            "name": "a step that succeeded decides nothing",
+            "log": [
+              "#7 [2/6] RUN apt-get update && apt-get install -y --no-install-recommends curl",
+              "#7 3.10 W: Temporary failure resolving 'security.debian.org', no space left in the old index",
+              "#7 DONE 9.2s",
+              "#9 0.80 curl: (22) The requested URL returned error: 404",
+              "#9 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 22"
+            ],
+            "reason": "unpack"
+          },
+          {
+            "name": "docker said it outside any step",
+            "log": [
+              "ERROR: Cannot connect to the Docker daemon at unix:///Users/teacher/.colima/default/docker.sock. Is the docker daemon running?"
+            ],
+            "reason": "unpack"
+          }
+        ],
+        "example": "PLANTOIR_SWIFT: {\"course\": \"ICS3U\", \"downloadedBytes\": 1300864747, \"ready\": true, \"seconds\": 80, \"section\": 1}"
       },
       "notes": {
         "rule": "Lines an assistant and a teacher read in the build's output that are NOT folder problems (implementation review S2 and N2): `fromBefore` when prepare served programs compiled by the PREVIOUS recipe because this recipe has not compiled them yet (an offline preview, or too little room, after Plantoir was updated) - the site keeps working, and the next preview that can compile replaces them; `large` for each block whose program is over `largeBytes` (a full-library program is about 3.4 MB; `import Foundation` with formatters or JSON measured 46,073,957 bytes), because every student downloads it on that block's first Run. Each is one line `plantoir: note: ` + the words; `large` names the block as `<page>.md: swift block <n>: `. `noteCases` pin both.",
