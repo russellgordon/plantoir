@@ -688,5 +688,151 @@ class PruneKeepsTheLogsTests(unittest.TestCase):
             shutil.rmtree(root, ignore_errors=True)
 
 
+
+class GotReadyMarkerTests(unittest.TestCase):
+    """#635: the PLANTOIR_SWIFT: line preview.sh asks for after building the
+    Swift image - its bytes, its reason and its shape - against
+    codeRunnerBlocks.swift.mac and a real BuildKit log of the image's build
+    (fixtures/swift-image-build/cached.log: support/swift built on this Mac's
+    Colima 2026-10-22, every step CACHED)."""
+
+    REAL_LOG = Path(__file__).resolve().parent / "fixtures" / "swift-image-build" / "cached.log"
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contract()
+        cls.mac = swift_rules("mac")
+        cls.pins = {}
+        for pin in contracts.section("toolchain", "swiftImage", "pins"):
+            cls.pins[pin["pin"]] = pin
+
+    def real_log(self) -> str:
+        return self.REAL_LOG.read_text(encoding="utf-8")
+
+    def pin_sum(self, *names) -> int:
+        total = 0
+        for name in names:
+            total += self.pins[name]["bytes"]
+        return total
+
+    def parse(self, line: str) -> dict:
+        self.assertTrue(line.startswith(swift_blocks.SWIFT_MARKER + " "), line)
+        return json.loads(line[len(swift_blocks.SWIFT_MARKER) + 1:])
+
+    def test_the_prefix_is_windows_marker(self):
+        self.assertEqual(swift_blocks.SWIFT_MARKER, swift_rules("windows", "marker", "prefix"))
+
+    def test_every_bytes_case_holds(self):
+        self.assertGreaterEqual(len(self.mac["bytesCases"]), 5)
+        for case in self.mac["bytesCases"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(swift_blocks.downloaded_bytes("\n".join(case["log"])), case["downloadedBytes"])
+
+    def test_every_reason_case_holds(self):
+        self.assertGreaterEqual(len(self.mac["reasonCases"]), 10)
+        for case in self.mac["reasonCases"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(swift_blocks.reason_from_build_log("\n".join(case["log"])), case["reason"])
+
+    def test_every_reason_is_one_the_trail_words_and_busy_is_never_one(self):
+        why_words = None
+        for entry in contracts.section("shared-rules", "activityTrail", "mustRecord"):
+            if entry["event"] == "Swift could not be got ready":
+                why_words = entry["whyWords"]
+        self.assertIsNotNone(why_words)
+        rules = self.mac["reasonsFromTheBuildLog"]
+        reasons = [entry["reason"] for entry in rules["order"]] + [rules["otherwise"], "noRoom", "waited"]
+        for reason in reasons:
+            self.assertIn(reason, why_words)
+        self.assertNotIn("busy", reasons)
+
+    def test_the_real_cached_log_downloaded_nothing_and_names_both_steps(self):
+        text = self.real_log()
+        self.assertEqual(swift_blocks.downloaded_bytes(text), 0)
+        # Every header the steps are found by is in the real log, so a
+        # DONE in place of each CACHED is the first build's full pin sum.
+        fresh = text.replace("#6 CACHED", "#6 DONE 61.4s").replace("#9 CACHED", "#9 DONE 4.1s")
+        self.assertEqual(swift_blocks.downloaded_bytes(fresh),
+                         self.pin_sum("swiftToolchainArm64", "wasmSdk", "binaryenArm64"))
+        only_binaryen = text.replace("#9 CACHED", "#9 DONE 4.1s")
+        self.assertEqual(swift_blocks.downloaded_bytes(only_binaryen), self.pin_sum("binaryenArm64"))
+        # The COPY step's CACHED line belongs to #8 and changes nothing.
+        no_copy = text.replace("#8 CACHED", "#8 DONE 0.0s")
+        self.assertEqual(swift_blocks.downloaded_bytes(no_copy), 0)
+
+    def test_a_failed_real_log_is_read_from_its_failed_step(self):
+        text = self.real_log().replace(
+            "#9 CACHED",
+            "#9 0.42 curl: (6) Could not resolve host: github.com\n"
+            "#9 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 6")
+        self.assertEqual(swift_blocks.reason_from_build_log(text), "offline")
+        self.assertEqual(swift_blocks.reason_from_build_log(self.real_log()), "unpack",
+                         "a log with no needle is the catch-all")
+
+    def test_the_needles_are_not_in_the_recipe(self):
+        """The summary quotes the Dockerfile around the failed line, so a
+        needle in the recipe would decide every failure."""
+        recipe = (REPO / "support" / "swift" / "Dockerfile").read_text(encoding="utf-8")
+        for entry in self.mac["reasonsFromTheBuildLog"]["order"]:
+            for needle in entry["anyOf"]:
+                haystack = recipe.lower() if entry["ignoreCase"] else recipe
+                wanted = needle.lower() if entry["ignoreCase"] else needle
+                self.assertNotIn(wanted, haystack, needle)
+
+    def test_the_recipe_still_carries_every_url_a_step_is_found_by(self):
+        """A reworded download step would otherwise read as 0 bytes, silently."""
+        recipe = (REPO / "support" / "swift" / "Dockerfile").read_text(encoding="utf-8")
+        for step in self.mac["downloadSteps"]:
+            for name in step["foundBy"]:
+                self.assertIn(self.pins[name]["url"], recipe, name)
+            for names in step["counts"].values():
+                for name in names:
+                    self.assertIsInstance(self.pins[name]["bytes"], int, name)
+
+    def test_the_example_is_what_the_marker_writes(self):
+        fresh = self.real_log().replace("#6 CACHED", "#6 DONE 61.4s").replace("#9 CACHED", "#9 DONE 4.1s")
+        line = swift_blocks.got_ready_marker("built", "ICS3U", 1, 80, fresh)
+        self.assertEqual(line, self.mac["example"])
+        shape = self.parse(line)
+        self.assertEqual(list(shape.keys()), sorted(shape.keys()))
+
+    def test_every_ending_has_its_shape(self):
+        self.assertEqual(self.parse(swift_blocks.got_ready_marker("noRoom", "ICS3U", 2)),
+                         {"course": "ICS3U", "section": 2, "ready": False, "reason": "noRoom"})
+        self.assertEqual(self.parse(swift_blocks.got_ready_marker("waited", "ICS3U", 2)),
+                         {"course": "ICS3U", "section": 2, "ready": False, "reason": "waited"})
+        failed = self.parse(swift_blocks.got_ready_marker(
+            "failed", "ICS3U", 2, log_text="#6 0.3 curl: (7) Failed to connect\n#6 ERROR: exit code: 7"))
+        self.assertEqual(failed, {"course": "ICS3U", "section": 2, "ready": False, "reason": "offline"})
+        self.assertEqual(self.parse(swift_blocks.got_ready_marker("built", "ICS3U", 2, 6, self.real_log())),
+                         {"course": "ICS3U", "section": 2, "ready": True, "seconds": 6, "downloadedBytes": 0})
+        self.assertEqual(swift_blocks.got_ready_marker("failed", "ICS3U", 2, log_text=""),
+                         swift_blocks.got_ready_marker("failed", "ICS3U", 2, log_text="nothing to see"))
+
+    def test_the_command_line_prints_one_line(self):
+        import contextlib
+        import io
+        folder = Path(tempfile.mkdtemp(prefix="plantoir-swift-got-ready-"))
+        try:
+            log = folder / "swift-build-1.log"
+            log.write_text(self.real_log(), encoding="utf-8")
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                status = swift_blocks.main(["swift_blocks.py", "got-ready", "--outcome=built", "--course=ICS3U",
+                                            "--section=1", "--seconds=5", f"--log={log}"])
+            self.assertEqual(status, 0)
+            lines = printed.getvalue().splitlines()
+            self.assertEqual(len(lines), 1, lines)
+            self.assertEqual(self.parse(lines[0])["downloadedBytes"], 0)
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                swift_blocks.main(["swift_blocks.py", "got-ready", "--outcome=failed", "--course=ICS3U",
+                                   "--section=1", f"--log={folder / 'not-there.log'}"])
+            self.assertEqual(self.parse(printed.getvalue().strip())["reason"], "unpack")
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(swift_blocks.main(["swift_blocks.py", "got-ready", "--outcome=maybe"]), 2)
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
 if __name__ == "__main__":
     unittest.main()

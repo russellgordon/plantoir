@@ -617,6 +617,162 @@ def health_finding_facts(outcome: dict) -> list:
     return list(outcome.get("problems") or [])
 
 
+# ---- How getting Swift ready ended, for the trail (#635) -------------------------
+#
+# preview.sh builds the Swift image on the host and then asks this, in the
+# website builder, for the one PLANTOIR_SWIFT: line Windows' fetch prints
+# (codeRunnerBlocks.swift.windows.marker): the app reads it onto the activity
+# trail. The image build says nothing about bytes, so they are the pins of the
+# download steps that RAN, read from BuildKit's plain log
+# (codeRunnerBlocks.swift.mac.downloadedBytesRule), and a failure's reason is
+# read from the failed step's own lines (reasonsFromTheBuildLog).
+
+SWIFT_MARKER = "PLANTOIR_SWIFT:"
+
+_STEP_LINE = re.compile(r"^#(\d+) (.*)$")
+_STEP_HEADER = re.compile(r"^\[[^\]]*\] ")
+_ARCH_WORD = re.compile(r'case "([A-Za-z0-9_]+)" in')
+
+
+def _mac_rules() -> dict:
+    import contracts
+    return contracts.section("shared-rules", "codeRunnerBlocks", "swift", "mac")
+
+
+def _swift_image_pins() -> dict:
+    import contracts
+    found = {}
+    for pin in contracts.section("toolchain", "swiftImage", "pins"):
+        found[pin["pin"]] = pin
+    return found
+
+
+def _log_lines(text: str) -> list:
+    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+
+def downloaded_bytes(text: str, steps=None, pins=None) -> int:
+    """What the build downloaded: the pinned bytes of every download step
+    whose header is in the log and that has no `#N CACHED` line."""
+    steps = steps if steps is not None else _mac_rules()["downloadSteps"]
+    pins = pins if pins is not None else _swift_image_pins()
+    headers = {}
+    cached = set()
+    for line in _log_lines(text):
+        match = _STEP_LINE.match(line.strip())
+        if not match:
+            continue
+        number, rest = match.group(1), match.group(2)
+        if rest.strip() == "CACHED":
+            cached.add(number)
+        elif _STEP_HEADER.match(rest) and number not in headers:
+            headers[number] = rest
+    total = 0
+    for step in steps:
+        urls = []
+        for name in step["foundBy"]:
+            url = (pins.get(name) or {}).get("url")
+            if url:
+                urls.append(url)
+        for number, header in headers.items():
+            if not any(url in header for url in urls):
+                continue
+            if number in cached:
+                break
+            arch = _ARCH_WORD.search(header)
+            names = step["counts"].get(arch.group(1)) if arch else None
+            for name in names or []:
+                total += int((pins.get(name) or {}).get("bytes") or 0)
+            break
+    return total
+
+
+def _lines_that_can_say_why(text: str) -> list:
+    """The failed steps' lines and the lines of no step, never a step that
+    succeeded (reasonsFromTheBuildLog.rule)."""
+    lines = _log_lines(text)
+    failed = set()
+    for line in lines:
+        match = _STEP_LINE.match(line.strip())
+        if match and match.group(2).startswith("ERROR"):
+            failed.add(match.group(1))
+    kept = []
+    for line in lines:
+        match = _STEP_LINE.match(line.strip())
+        if match is None or match.group(1) in failed:
+            kept.append(line)
+    return kept
+
+
+def reason_from_build_log(text: str, rules=None) -> str:
+    """Why the Swift image's build failed: the first reason in the contract's
+    order with a needle in the lines that can say why, else `otherwise`."""
+    rules = rules if rules is not None else _mac_rules()["reasonsFromTheBuildLog"]
+    said = "\n".join(_lines_that_can_say_why(text))
+    for entry in rules["order"]:
+        haystack = said.lower() if entry.get("ignoreCase") else said
+        for needle in entry["anyOf"]:
+            wanted = needle.lower() if entry.get("ignoreCase") else needle
+            if wanted in haystack:
+                return entry["reason"]
+    return rules["otherwise"]
+
+
+def got_ready_marker(outcome: str, course=None, section=None, seconds=None, log_text=None) -> str:
+    """The one PLANTOIR_SWIFT: line for an ending of preview.sh's Swift step:
+    `built`, `failed`, `noRoom` or `waited` (codeRunnerBlocks.swift.mac.rule),
+    in windows.marker's shape, keys sorted as swift_windows_fetch.marker."""
+    data = {}
+    if course:
+        data["course"] = course
+    if section is not None:
+        data["section"] = section
+    if outcome == "built":
+        data["ready"] = True
+        data["seconds"] = max(0, int(seconds or 0))
+        try:
+            data["downloadedBytes"] = downloaded_bytes(log_text or "")
+        except Exception:  # noqa: BLE001 - a number on the trail is never worth a crash
+            data["downloadedBytes"] = 0
+    else:
+        data["ready"] = False
+        if outcome in ("noRoom", "waited"):
+            data["reason"] = outcome
+        else:
+            try:
+                data["reason"] = reason_from_build_log(log_text or "")
+            except Exception:  # noqa: BLE001
+                data["reason"] = "unpack"
+    return SWIFT_MARKER + " " + json.dumps(data, sort_keys=True)
+
+
+def _got_ready_main(argv: list) -> int:
+    outcome = _argument(argv, "outcome")
+    if outcome not in ("built", "failed", "noRoom", "waited"):
+        print("usage: swift_blocks.py got-ready --outcome=built|failed|noRoom|waited "
+              "--course=CODE --section=N [--seconds=N] [--log=PATH]", file=sys.stderr)
+        return 2
+    section = None
+    try:
+        section = int(_argument(argv, "section") or "")
+    except ValueError:
+        section = None
+    seconds = 0
+    try:
+        seconds = int(_argument(argv, "seconds") or "0")
+    except ValueError:
+        seconds = 0
+    log_text = ""
+    log = _argument(argv, "log")
+    if log:
+        try:
+            log_text = Path(log).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            log_text = ""
+    print(got_ready_marker(outcome, _argument(argv, "course"), section, seconds, log_text))
+    return 0
+
+
 # ---- The command line (the launcher's) --------------------------------------------
 
 def _argument(argv: list, name: str):
@@ -629,6 +785,8 @@ def _argument(argv: list, name: str):
 
 
 def main(argv: list) -> int:
+    if len(argv) >= 2 and argv[1] == "got-ready":
+        return _got_ready_main(argv)
     if len(argv) < 2 or argv[1] != "plan":
         print("usage: swift_blocks.py plan --course=CODE [--format=lines]", file=sys.stderr)
         return 2

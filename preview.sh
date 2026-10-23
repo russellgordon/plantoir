@@ -3609,6 +3609,19 @@ give_back_the_swift_build_lock() {
   fi
 }
 
+# The machine-readable line the app reads onto the activity trail (#635):
+# how getting Swift ready ended - built, failed, noRoom or waited - in the
+# shape Windows prints (codeRunnerBlocks.swift.mac in
+# contracts/shared-rules.json). Written by swift_blocks.py in the website
+# builder, which reads this run's build log at its own path, so the bytes and
+# the reason are worked out in the shared Python both test suites run. Prints
+# nothing when the builder cannot be asked: the trail line is lost, the
+# preview is not.
+say_how_swift_got_ready() {
+  docker exec "$CONTAINER_NAME" python3 /opt/scripts/swift_blocks.py got-ready \
+    --course="$COURSE" --section="$SECTION" "$@" 2>/dev/null || true
+}
+
 # How many whole gigabytes the website builder's disk has free, or nothing.
 free_gigabytes_for_builders() {
   docker exec "$CONTAINER_NAME" df -Pk / 2>/dev/null | awk 'NR == 2 { print int($4 / 1048576) }'
@@ -3648,11 +3661,13 @@ prepare_runnable_swift() {
     if [[ -n "$free" && "$free" -lt "$SWIFT_ROOM_GB" ]]; then
       printf '{"state": "noRoom", "freeGigabytes": %s}\n' "$free" > "$root/state.json" 2>/dev/null || true
       echo "⚠️  Not enough free space to get Swift ready (about ${SWIFT_ROOM_GB} GB is needed, ${free} GB is free), so the Swift programs on this site will not run yet."
+      say_how_swift_got_ready --outcome=noRoom
       rm -rf "$jobs"
       return 0
     fi
     if ! take_the_swift_build_lock; then
       echo "⚠️  Swift is still being got ready for another course; preview again in a few minutes to make these programs runnable."
+      say_how_swift_got_ready --outcome=waited
       rm -rf "$jobs"
       return 0
     fi
@@ -3662,13 +3677,17 @@ prepare_runnable_swift() {
       if ! docker buildx version >/dev/null 2>&1; then
         build_cmd=(env DOCKER_BUILDKIT=1 docker build)
       fi
+      # The build alone is timed, not the wait for the lock (#635).
+      local started=$SECONDS
       if "${build_cmd[@]}" --progress=plain -t "$swift_image" "$context" >"$logs/swift-build-$$.log" 2>&1; then
         echo "✅ Swift is ready."
+        say_how_swift_got_ready --outcome=built --seconds="$((SECONDS - started))" --log="$logs/swift-build-$$.log"
         prune_superseded_swift_images "$swift_image"
       else
         give_back_the_swift_build_lock
         printf '{"state": "notDownloaded"}\n' > "$root/state.json" 2>/dev/null || true
         echo "⚠️  Could not get Swift ready — the first time needs an internet connection. The rest of the site builds as usual; preview again once online to make its Swift programs runnable."
+        say_how_swift_got_ready --outcome=failed --log="$logs/swift-build-$$.log"
         rm -rf "$jobs"
         return 0
       fi
