@@ -1049,7 +1049,7 @@ def _print_font_pair_menu(default_idx: int | None = None):
         print(f"  {i}. {hdr}  —  {body}{marker}")
     marker7 = "  ← default" if default_idx == 7 else ""
     marker8 = "  ← default" if default_idx == 8 else ""
-    print(f"  7. System fonts (Helvetica, Arial){marker7}")
+    print(f"  7. System fonts (each device's own){marker7}")
     print(f"  8. Enter a custom pair (e.g., 'DM Sans, Inter'){marker8}")
 
 def _print_code_font_menu(default_idx: int | None = None):

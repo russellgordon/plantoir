@@ -571,6 +571,16 @@ else
   fail "maths: KaTeX's stylesheet, copy-tex and faces copied into every site, and latex.ts linking them instead of a CDN (scripts/test_katex_assets.py, #494)"
   cat /tmp/verify_katex_assets_test.log
 fi
+# Font variables quote one family at a time, and the "System fonts" choice
+# gets the system stack first (#629). The generated-CSS cases need a node of
+# 22.6 or later and skip without one; 6h's index.css check below reads the
+# real built stylesheet either way. Stdlib only.
+if (cd scripts && python3 test_font_variables.py) >/tmp/verify_font_variables_test.log 2>&1; then
+  pass "font variables: each family in a stack quoted on its own, the system-font choice on the system stack, a single family byte for byte as before (scripts/test_font_variables.py, #629)"
+else
+  fail "font variables: each family in a stack quoted on its own, the system-font choice on the system stack, a single family byte for byte as before (scripts/test_font_variables.py, #629)"
+  cat /tmp/verify_font_variables_test.log
+fi
 if (cd scripts && python3 test_quartz_additions_wiring.py) >/tmp/verify_quartz_wiring_test.log 2>&1; then
   pass "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
 else
@@ -4418,6 +4428,39 @@ then
   pass "the sidebar's page dot is in the site's one stylesheet, and the sidebar's row templates are still the ones it tells apart (#515)"
 else
   fail "the sidebar's page dot is missing from index.css, or the sidebar's row templates changed under it (#515)"
+fi
+
+# ---- 6h, continued: the font variables, by the built text (#629) ----
+# The Example Course uses the "System fonts" choice, stored as
+# "Helvetica, Arial". Quartz quoted that as ONE family, which no machine has;
+# the build now gives it the system stack itself, system-ui first, so the
+# site keeps the face it always showed (San Francisco on a Mac, Segoe UI on
+# Windows). The code font is a single family and must be as Quartz wrote it.
+if python3 - "$SITE_PUBLIC" <<'FONTVARPY'
+import re
+import sys
+from pathlib import Path
+public = Path(sys.argv[1])
+problems = []
+stylesheet = public / "index.css"
+css = stylesheet.read_text(encoding="utf-8") if stylesheet.is_file() else ""
+if not css:
+    problems.append("index.css was not built")
+if '"Helvetica, Arial"' in css:
+    problems.append('index.css still quotes "Helvetica, Arial" as one family')
+for variable in ("--headerFont", "--bodyFont"):
+    if not re.search(variable + r':\s*system-ui,\s*"Segoe UI",\s*Roboto,\s*Helvetica,\s*Arial,\s*sans-serif', css):
+        problems.append(f"index.css lacks {variable}: system-ui, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif")
+if not re.search(r'--codeFont:\s*"IBM Plex Mono",\s*ui-monospace', css):
+    problems.append('index.css lacks --codeFont: "IBM Plex Mono", ui-monospace')
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+FONTVARPY
+then
+  pass "the system-font choice is written as the system stack, system-ui first, and the code font as Quartz wrote it, in the built index.css (#629)"
+else
+  fail "the built index.css quotes a font stack as one family, or the system-font choice is not on the system stack (#629)"
 fi
 
 # ---- #612: pictures carry their real width and height, by the built text ----

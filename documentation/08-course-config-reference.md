@@ -1280,7 +1280,9 @@ Keys the Windows settings UI must round-trip (per-section maps use
 - `emojis.sections` — header emoji per section (system emoji panel: Win+.)
 - `color_schemes` — flat map sectionN → scheme id (`support/colour_schemes.json`)
 - `fonts.sections` — header/body/code display names (files in `support/fonts/`,
-  name → file by stripping spaces; "Helvetica, Arial" means system default)
+  name → file by stripping spaces; "Helvetica, Arial" means the reader's own
+  system font — the build writes it as the system stack, system-ui first,
+  and the label says "System fonts (each device's own)", #629)
 - `show_section_marker.sections` — the "S1" in the site header
 - `show_grade_in_title.sections` — grade prefix on the landing title
   (legacy: a single course-wide bool; honour it). LITERAL behaviour: the
