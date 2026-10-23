@@ -365,6 +365,7 @@ public class SpecialFoldersHelpUiTests
                         TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250)).Result;
 }
 
-/// <summary>One real application at a time.</summary>
+/// <summary>One real application at a time. Its fixture fails the
+/// collection's cleanup if a test left a key held down (#638, <see cref="HeldKeys"/>).</summary>
 [CollectionDefinition("drives the real app", DisableParallelization = true)]
-public class DrivesTheRealAppCollection { }
+public class DrivesTheRealAppCollection : ICollectionFixture<HeldKeyLedger> { }

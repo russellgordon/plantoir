@@ -96,7 +96,7 @@ public class GuidanceAskUiTests
         Assert.Contains("CLAUDE.md", string.Join(" ", DrivenApp.TextsUnder(dialog!)));
 
         app.BringToFront();
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         Assert.True(Retry.WhileFalse(() => app.FindOrNull("guidanceAskDialog", TimeSpan.Zero) is null, TimeSpan.FromSeconds(5)).Result);
 
         Assert.Equal(Own, File.ReadAllText(claude));

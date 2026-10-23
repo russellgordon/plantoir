@@ -88,8 +88,8 @@ public class CopyAPageDialogUiTests
         app.ClickMiddleOf(picker);
         Keyboard.Type("Big");
         Thread.Sleep(500);
-        Keyboard.Press(VirtualKeyShort.DOWN);
-        Keyboard.Press(VirtualKeyShort.ENTER);
+        Keyboard.Type(VirtualKeyShort.DOWN);
+        Keyboard.Type(VirtualKeyShort.ENTER);
 
         var copy = app.Find(CopyAPageDialogIds.Primary, "the Copy button").AsButton();
         Assert.True(Retry.WhileFalse(() => copy.IsEnabled, TimeSpan.FromSeconds(5)).Result, "Copy is offered once a page is chosen");

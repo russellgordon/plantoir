@@ -928,7 +928,8 @@ a teacher can see it rather than merely held in a constant.
 carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
 `dotnet test` builds them and runs none of those — only
 `AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
-and need no desktop (bundle 11). The project is in the solution so a SOLUTION build compiles it —
+and need no desktop (bundle 11), and `HarnessSourceRuleTests`, three more that
+keep a bare key-down out of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -1055,6 +1056,40 @@ test. `grep -n "\.Click()\|\.RightClick()" Plantoir.UiTests/*.cs` should
 find only the comment in `DrivenApp.cs` that explains why. Built, NOT run
 through the window when this was written (the UI suite needs the whole
 machine; the director schedules it).
+
+### A key sent DOWN must be sent UP: `Keyboard.Type`, never a bare key-down (#638, 2026-10-23)
+
+FlaUI's `Keyboard.Press` sends the key going DOWN and nothing else. Measured
+while fixing #634: `GetAsyncKeyState(VK_SPACE)` still read down 400 ms after
+one. Twenty-four calls in thirteen UI test files never sent the up, for
+Escape, Return, Tab, Down, Delete, F2 and Space. Each left its key held at the
+operating-system level for the REST OF THE RUN, so every later test typed
+into a keyboard with a key already down. That may explain failures seen only
+under the full suite (OpenRecentUiTests and PreviewStartPageUiTests failed in
+the 2026-10-23 full run and passed alone).
+
+- **A key to type is `Keyboard.Type(key)`**, down and up. A key to HOLD
+  around something else (Ctrl-click, Alt held, Shift+Tab) is
+  `using (Keyboard.Pressing(key)) { … }`, which sends the up on dispose, a
+  failing assert included. `PlanTable`'s Shift+Tab had called `Pressing` and
+  thrown the disposable away; it is a `using` now.
+- **`HarnessSourceRuleTests`** (plain facts, no desktop) fails on any
+  `Keyboard.Press(` in the UI test sources. The exception is one method,
+  allowed by name: `PageTablesUiTests.HeldSpace`, which imitates
+  auto-repeat (several downs, then one up in a `finally`) and must keep
+  its release.
+- **`HeldKeys` sweeps for a key held any other way.** It reads
+  `GetAsyncKeyState` for every modifier (generic and left/right, Windows
+  keys included) and every key the suite sends. `DrivenApp`'s constructor
+  releases anything already down, and says so. `DrivenApp.Dispose` releases
+  what the test left down, says so, and RECORDS it. It does not throw:
+  `Dispose` runs in a `using`, and a throw there would REPLACE the test's own
+  exception, so a real failure would be reported as a stuck key. The
+  collection fixture `HeldKeyLedger` (on `DrivesTheRealAppCollection`)
+  throws at the end of the collection instead, and xUnit reports that as a
+  separate cleanup failure naming the keys and the tests that left them. A
+  key a person is holding, or a modifier stuck by a remote-desktop session,
+  reads exactly the same, and the message says so.
 
 ### A test that runs a launcher (bundle 11, 2026-10-01)
 
