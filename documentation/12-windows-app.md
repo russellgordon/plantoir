@@ -8223,8 +8223,12 @@ taken as written. One difference from the mac, kept: Windows reads only the
 FIRST `title:` line of the sibling and stops (the `break`), where the mac's
 loop reads on; they differ only for a front page with two title lines, which
 no Plantoir writer produces. `SiteHealthRepair.RestoreIndex` quotes the course name it
-puts back. Courses already made with a plain colon title are left alone, as on
-the mac (a one-click repair is a v1.9.0 follow-on).
+puts back. Courses already made with a plain colon title are put right by
+their next build from 1.9.0 (#584): the shared `build_site.py` quotes the
+front page's title itself, so Windows inherits the repair and its console
+sentence, and owes only the `PLANTOIR_REPAIRED:` trail line —
+[04 → "A course made before 1.8.1 is put right by its next
+build"](04-course-setup.md).
 
 **Not on disk, on purpose.** The contract's seventh folder case is `Unit 1:
 Kinematics`, and NTFS refuses `:` in a name, so every case runs IN MEMORY
