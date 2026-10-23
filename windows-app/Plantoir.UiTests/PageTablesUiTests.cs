@@ -124,7 +124,8 @@ public class PageTablesUiTests
         Thread.Sleep(500);
         string theme = Environment.GetEnvironmentVariable("PLANTOIR_634_THEME") ?? "system";
         string path = Path.Combine(Path.GetTempPath(), $"plantoir-634-{name}-{theme}.png");
-        try { FlaUI.Core.Capturing.Capture.Screen().ToFile(path);   // the whole screen: an element's rectangle is in the wrong units at 200% _output.WriteLine("picture: " + path); }
+        // The whole screen: an element's rectangle is in the wrong units at 200%.
+        try { FlaUI.Core.Capturing.Capture.Screen().ToFile(path); _output.WriteLine("picture: " + path); }
         catch (Exception error) { _output.WriteLine("no picture: " + error.Message); }
     }
 
