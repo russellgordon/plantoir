@@ -3956,8 +3956,9 @@ already scheduled scans for a new marker from its next run, once the
 `Plantoir.exe` it was registered with (`TaskScheduling.RunnerExecutable`) has
 been updated in place, with no need to schedule it again. Only a task set
 before bundle 3 runs its own baked wrapper, once, and misses it.
-`PLANTOIR_MY_PROGRESS:` (#599) and `PLANTOIR_REPAIRED:` (#645) ride the same three places — the console
-reader, the record reader and the wrapper's scan — the same way ("My
+`PLANTOIR_MY_PROGRESS:` (#599) and `PLANTOIR_REPAIRED:` (#645) ride the same
+three places — the console reader, the record reader and the wrapper's scan —
+the same way ("My
 Progress: the trail line and the two readers (#599)" below). (This said a
 wrapper "keeps its old scan until its schedule is set again" until
 2026-10-23, which has not been true of a task set since bundle 3.)
