@@ -621,6 +621,55 @@ final class PrintablePagesTests: XCTestCase {
         }
     }
 
+    /// #631: the handouts skill travels the same way, with its starter
+    /// sources, and both root files name it - so an assistant asked for "a
+    /// worksheet" or "a quiz to print" offers the house style. The printing
+    /// and page-authoring skills name it too, and it stays OUT of the page
+    /// routing table, since a handout made as a PDF is not part of a page.
+    func testTheHandoutsSkillIsWrittenWithItsStartersAndEveryRouteToItNamesIt() throws {
+        let contract: [String: Any] = try agentGuidanceContract()
+        let guidance: [String: Any] = try XCTUnwrap(contract["handoutsSkill"] as? [String: Any])
+        let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        let starters: [String] = try XCTUnwrap(guidance["starters"] as? [String])
+        let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
+        let pageAuthoring: [String: Any] = try XCTUnwrap(contract["pageAuthoringSkill"] as? [String: Any])
+        let routesTo: [String] = try XCTUnwrap(pageAuthoring["routesTo"] as? [String])
+        XCTAssertFalse(routesTo.contains(skillName), "a handout made as a PDF is not part of a page")
+        XCTAssertFalse(starters.isEmpty)
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        for home in [".claude", ".agents"] {
+            let skillFolder: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)")
+            let skill: String = try String(
+                contentsOf: skillFolder.appendingPathComponent("SKILL.md"), encoding: .utf8)
+            XCTAssertTrue(skill.contains("name: \(skillName)"), home)
+            XCTAssertTrue(skill.contains("tectonic"), home)
+            XCTAssertTrue(skill.contains("\\qa"), home)
+            XCTAssertTrue(skill.contains("- Answers"), home)
+            XCTAssertTrue(skill.contains("- Solutions"), home)
+            XCTAssertTrue(skill.contains("print_school_name"), home)
+            XCTAssertTrue(skill.contains("pdftoppm"), home)
+            XCTAssertTrue(skill.contains("never inside `courses/`"), home)
+            XCTAssertTrue(skill.contains("`plantoir-printing`"), home)
+            for starter in starters {
+                XCTAssertTrue(skill.contains("`" + starter + "`"), "\(home): the skill must name \(starter)")
+                let source: String = try String(
+                    contentsOf: skillFolder.appendingPathComponent(starter), encoding: .utf8)
+                XCTAssertTrue(source.contains("\\showanswers"), "\(home): \(starter)")
+            }
+            for mentioning in mentionedBy {
+                let other: String = try String(
+                    contentsOf: folder.appendingPathComponent("\(home)/skills/\(mentioning)/SKILL.md"), encoding: .utf8)
+                XCTAssertTrue(other.contains("`\(skillName)`"), "\(home): \(mentioning) must name \(skillName)")
+            }
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertTrue(text.contains(skillName), "\(name) must name the \(skillName) skill")
+        }
+    }
+
     func testATeachersOwnFileIsAskedAboutNotWrittenAndTheirSkillsAreLeftAlone() throws {
         let fileManager: FileManager = FileManager.default
         let own: String = "# My own notes for Claude\n\nAlways use British spelling.\n"

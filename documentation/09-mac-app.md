@@ -3023,6 +3023,72 @@ build's four How I Teach places — the shape Russell's P1 ruling rejected
 folder a git repository (or adding a `.git` marker) was rejected outright —
 it changes what other tools think the folder is.
 
+**The handouts skill (#631, v1.9.0): paper made OUTSIDE the site.** A
+teacher asking for "a worksheet" or "a quiz to print" was routed only to
+`plantoir-printing`, which makes a page of the site that prints. The house
+style for paper made as a PDF - LaTeX compiled with `tectonic`, one source
+and two outputs behind the `\qa`/`\onlyq`/`\onlya` switch with a two-line
+`- Answers` (`- Solutions` for a quiz or test) wrapper, the look, the four
+corners laid out as the course's print settings lay out the site's, the quiz and test conventions, every answer
+verified independently, a second agent reviewing any new question set,
+every page rendered with `pdftoppm` and looked at, no build files left -
+lived only in Russell's own `~/.claude/CLAUDE.md` and the MPM2DE course
+folder's, so only Claude Code on his Mac knew it. `plantoir-handouts`
+carries it for every assistant and every teacher, and tells the assistant
+to OFFER it first whenever something is to be printed, beside
+`plantoir-printing` for a page that prints. The rule is
+`printablePages.agentGuidance.handoutsSkill`. What was decided, and why:
+
+- **A skill of its own, not a section of `plantoir-printing`.** Both reach
+  every working folder the same way - both apps enumerate
+  `support/agent_guidance/skills/`, so a new folder there needs no code on
+  either platform - but the two teach different things (a Markdown page
+  the build turns into paper; a LaTeX file an assistant compiles) and a
+  printing skill twice as long is read less carefully for both.
+  `plantoir-printing` and `plantoir-page-authoring` each name it in one
+  sentence (`mentionedBy`), and it is deliberately NOT in
+  `pageAuthoringSkill.routesTo`: that table routes the parts of a page, and
+  a PDF handout is not one.
+- **Sources and answer keys are kept OUT of `courses/`.** Every file in a
+  course folder that is not a page is copied to the site (Quartz's Assets
+  emitter globs everything but `*.md`), so an answer key kept beside the
+  pages is one students can download. The skill suggests a
+  `handouts/<CODE>/` folder beside `courses/` when the teacher has no place
+  of their own, and the student copy alone goes into `Media` when it should
+  also be handed out from the site (`printPdf:`).
+- **The corners follow the course's print settings** - `print_school_name`,
+  `print_school_name_at`, `print_course_code_at` and `print_blanks`, read as
+  `scripts/print_settings.py` reads them - because the issue's fixed layout
+  (Class # always, school always top left) matches the site only for a
+  course set up that way: by default the site prints Name and Date alone
+  (implementation review). When the school's name is empty the assistant
+  ASKS, and says where in Course Settings it can be set once. REJECTED: the
+  issue's school name as a default, which would print one school's name on
+  every teacher's paper.
+- **Whether a quiz or test goes on the website is the teacher's call.** The
+  first version said a quiz or test "must never be on the class website";
+  nothing in the issue said so, and the director softened it to "usually
+  printed - ask" (put to Russell to confirm).
+- **Starters ship with the skill** (`starters/Handout.tex` and
+  `starters/Quiz.tex`, each with its wrapper), generic rather than Russell's
+  MPM2D templates, which carry one course's questions. Both were compiled
+  with tectonic and every page looked at when they were written (Tectonic
+  0.17.0 left only the PDFs). The quiz starter's marks column (`\score{K 4}`
+  in a reversed margin note), category totals and dark-blue working with
+  light-red balancing steps are this piece's reading of the style, since no
+  quiz source existed to copy.
+- **Changing the root files' words re-asks** a teacher who said Not Now to
+  the old section (`rootFileCases`), as every skill added so far has.
+
+**Measured, 2026-10-22**, a scratch working folder with the guidance as the
+app mirrors it and `courses/MPM2D/course_config.json` holding a school name,
+one run each:
+
+| Launcher | Prompt | Result |
+|---|---|---|
+| `claude -p` (2.1.309, `--permission-mode acceptEdits`), working folder root | `Make me a short warmup worksheet on solving one-step linear equations for MPM2D, with an answer key.` | PASS - built from the skill's starter in `handouts/MPM2D/`, the school's name from the course's settings, `- Answers` wrapper, both PDFs rendered and looked at, a separate reviewer re-solved every answer, no build files left. **Confounded:** Russell's own `~/.claude/CLAUDE.md` carries the same style, so this run says the skill was followed, not that it alone was enough |
+| `codex exec` (0.162.0, `-s workspace-write --skip-git-repo-check`), working folder root | `Make me a short quiz on factoring for MPM2D that I can print, with solutions.` | PASS - read `plantoir-handouts` (and `plantoir-printing`), wrote `Factoring Quiz.tex` with `- Solutions`, `\score` marks and `\work` in the solutions, in `handouts/MPM2D/`; all five answers re-checked by hand here and right. No global instructions on this side, so this is the clean run |
+
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
 Russell, 2026-10-07/08: Plantoir did things a teacher could reach only by
