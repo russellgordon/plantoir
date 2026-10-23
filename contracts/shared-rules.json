@@ -23826,6 +23826,29 @@
         { "expected": 0, "found": 0, "overflowing": 0, "print": false, "why": "Nothing to print is not a handout." }
       ]
     },
+    "printRequest": {
+      "rule": "#576 (v1.9.0): after the Print button asks the browser to print the handout's frame, the page (its theme, the frame, the button) is put back only once the print is known to have happened. The waits that could otherwise never end share ONE clock, budgetMs from the press, on BOTH paths (budgetStages): the handout's pictures, the print layout's script, its layout (previewer.preview) and its pictures, and the fallback frame's faces and pictures (the browser's own layout, used when the print layout cannot be, waits for those before print()). Out of time at any stage, nothing is printed and the button says words.couldNotPrepare (outOfTimeBeforePrint, beforePrintCases) - running out of time in the print layout is NOT a reason to try the fallback. The diagrams' 8 s, the stylesheets' 3 s and the faces' 4 s keep their own caps, inside the same clock. beforeprint and afterprint are heard on the page's window AND the frame's; words.preparing goes on beforeprint. When print() returns having sent either event, the page is put back at once. When it returns having sent neither, it waits for what is left of the budget but never less than lastWaitMs (a print WebKit put off just before the budget ran out is not cut off at once): afterprint puts it back, beforeprint alone keeps it waiting, and when the wait ends it is put back - saying words.couldNotPrepare only if no beforeprint ever came. printOutcome and outOfTimeBeforePrint in printRules.ts are the rule; scripts/check_print_rules_against_the_site.py runs these cases through them, and browser-checks/print_fallback.mjs drives it in Chrome.",
+      "budgetMs": 30000,
+      "lastWaitMs": 3000,
+      "budgetStages": ["pictures", "printLayoutScript", "printLayout", "printLayoutPictures", "frameSettled"],
+      "beforePrintCases": [
+        { "stage": "pictures", "outcome": "putBackCouldNotPrint", "why": "A picture of the handout that never arrives (#576 comment 2: Preparing to print… until a reload)." },
+        { "stage": "printLayout", "outcome": "putBackCouldNotPrint", "why": "A print layout that never finishes (#576 implementation review, case W: still Preparing to print… at 42.6 s on the first version). Not the fallback: with no time left it would print nothing either." },
+        { "stage": "printLayoutPictures", "outcome": "putBackCouldNotPrint" },
+        { "stage": "frameSettled", "outcome": "putBackCouldNotPrint", "why": "The fallback's faces or pictures never loaded: WebKit would put the print off for good." }
+      ],
+      "cases": [
+        { "moment": "printReturned", "sawBefore": true, "sawAfter": true, "outcome": "putBack", "why": "Chrome, Edge and Safari's paged path: print() blocks with the dialog up and sends both inside it." },
+        { "moment": "printReturned", "sawBefore": true, "sawAfter": false, "outcome": "putBack", "why": "Headless Chrome: beforeprint on the frame inside print(), and never afterprint (measured 3 of 3). Waiting for an afterprint that never comes would hold the button for the whole budget." },
+        { "moment": "printReturned", "sawBefore": false, "sawAfter": true, "outcome": "putBack" },
+        { "moment": "printReturned", "sawBefore": false, "sawAfter": false, "outcome": "keepWaiting", "why": "WebKit, asked to print a frame still loading, returns at once with nothing sent and prints when the frame has loaded - if the frame is still there (measured in Safari 26.6: the sheet opened 39 ms later when the frame was kept, never when it was removed at once)." },
+        { "moment": "beforeprint", "sawBefore": true, "sawAfter": false, "outcome": "keepWaiting", "why": "The print that was put off has begun: its sheet may be up, so the frame stays until afterprint." },
+        { "moment": "afterprint", "sawBefore": true, "sawAfter": true, "outcome": "putBack" },
+        { "moment": "afterprint", "sawBefore": false, "sawAfter": true, "outcome": "putBack" },
+        { "moment": "outOfTime", "sawBefore": true, "sawAfter": false, "outcome": "putBack", "why": "A print began and never said it ended: the reader saw it begin, so nothing is said." },
+        { "moment": "outOfTime", "sawBefore": false, "sawAfter": false, "outcome": "putBackCouldNotPrint", "why": "No print ever began: words.couldNotPrepare, rather than words.preparing and then nothing (the #576 report)." }
+      ]
+    },
     "pdfLink": {
       "rule": "When a page names its own PDF (pageOptIns → printPdf) and it resolves, the Print button is a plain link to `Media/` plus the site's own slug of the file name as the Media folder spells it, relative to the site's root, opening in a new window: no menu, no script, no print engine. ⌘P on that page is unchanged: it prints questions only when the page is also printable, and as before #454 otherwise.",
       "why": "Quartz already copies every Media file to the site at that address, so the build copies nothing; the link is made with Quartz's own path functions so the two cannot disagree (measured: a real course's Media PDFs, `&` and spaces included, reach the site at exactly that slug)."
