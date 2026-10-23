@@ -21,6 +21,7 @@ Measured (i5-8365U, 16 GB, Ethernet):
 - **The swift-gate** through the wrapper: 165 s, the mac's sizes exactly, `wasi_run.mjs` OK.
 - **The 7-block Swift Playground preview:** a full-library block took 60 s (wasm-opt), embedded blocks 5–12 s. The second preview compiled nothing (28 s).
 - **`swift_runner.mjs` in headless Edge 155:** OK.
+- **`verify-deploy.ps1`:** 148 passed, 0 failed, 0 skipped (14 min).
 
 The two Swift marketing pictures stay owed (the 2x picture); `site.json` `runnable-swift` stays false. `documentation/12-windows-app.md` → "Runnable Swift on Windows". Gate: `dotnet test` once, alone: Failed 2, Passed 2959, Skipped 0, Total 2961 (9 m 35 s). `ContractTests.AssistWording_MatchesContract` is the five #634 assist-wording keys on `dev` (not this piece). `test_baked_modules.py` was this piece, fixed by baking the two new scripts into the Dockerfile; after the fix, `PythonToolchainTests` passed 78 of 78.
 
