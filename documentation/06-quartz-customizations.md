@@ -1434,7 +1434,7 @@ the page's:
   moves the WINDOW: `scrollY` 0 to 476 px over about 360 ms, the row moving
   1 to 41 px a frame (sampled per frame, light and dark alike; the whole-page
   scroll itself is #611). #601's "0.8 px" miss was one frame of that, not
-  font metrics: a still dot sits 9.79 px below its line's top, and #601's sat
+  font metrics: a still dot's middle sits 9.79 px below its line's top, and #601's sat
   18.8 px below, 9.0 px off, so the line's bottom edge only happened to be
   0.8 px away. So every geometry reading (the long title's lines, content
   edge and dot; each page row's first line and dot) now comes from
@@ -1461,9 +1461,10 @@ the page's:
   `the folder "Tasks" is not in the sidebar`, the new one passed 3 of 3
   (`OK: light 5.63:1, dark 9.45:1, forced colours 10.41:1`, the same at
   0 ms). A 9 px instant move of the sidebar's list injected at the start of
-  the geometry step: the old check failed 3 of 3 with `the dot's middle
-  (693.9 px) is not beside the title's first line (675.1-693.1 px)`, the new
-  one passed 3 of 3 at 0 ms and at 600 ms; a dot really moved 14 px still
+  the geometry step: the old check failed 3 of 3 at 0 ms with `the dot's
+  middle (693.9 px) is not beside the title's first line (675.1-693.1 px)`
+  (at 600 ms it fails earlier, on the folder sentence); the new one passed
+  3 of 3 at 0 ms and at 600 ms; a dot really moved 14 px still
   fails the new one. The injection is not shipped: a test hook in a gate is a
   second code path.
 
