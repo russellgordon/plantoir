@@ -48,10 +48,16 @@ The image is layered as follows (in order):
    already has it downloads nothing new, and BuildKit keys the base layer on
    the resolved digest, not on the line's text. The tag had moved on by the
    day it was pinned (`sha256:e41613…`). **The cost:** security fixes to the
-   base arrive only when somebody bumps the line on purpose —
-   `docker buildx imagetools inspect python:3.11-slim` names the current
-   index digest; bump it, run `verify.sh`, and expect every teacher to pay
-   one full rebuild (a new base invalidates every layer above it).
+   packages the BASE ITSELF installed arrive only when somebody bumps the
+   line on purpose — `docker buildx imagetools inspect python:3.11-slim`
+   names the current index digest; bump it, run `verify.sh`, and expect every
+   teacher to pay one full rebuild (a new base invalidates every layer above
+   it). A package an apt line below NAMES comes from Debian's live
+   `trixie-security` instead (it is in the base's sources), but only when that
+   line's layer is rebuilt, which on a Mac that has built before it never is.
+   The certificate store could not wait for either, so it has a late layer of
+   its own (item 6 below, and
+   [The certificate store](#the-certificate-store-639-v190)).
 2. **`pip install python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0`** —
    the Python dependencies, all three PINNED since 2026-09-18 (issue #140) at
    the versions the image already carried, so the pin changed nothing about
@@ -114,7 +120,20 @@ The image is layered as follows (in order):
    baked into the image layers, completely eliminating the need to run `npm install`
    across slow host filesystem mounts (9P on WSL2 or virtiofs on macOS) when
    setting up or building course sections.
-6. **Overwrite five Quartz source files with patched versions** from
+6. **The certificate store, at least `ca-certificates 20250419+deb13u1`
+   (#639, v1.9.0)** — its own layer, after the tikz engine and before the
+   patches, so a teacher who has built before re-runs only it (10.4 MB,
+   4 s, measured) rather than the apt line and everything below it:
+   ```dockerfile
+   RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' ca-certificates)" ge 20250419+deb13u1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+   ```
+   A floor, not an exact version, and the floor is in the line's text, so
+   raising it re-runs the layer. Why, what was measured and what was
+   rejected: [The certificate store](#the-certificate-store-639-v190).
+7. **Overwrite five Quartz source files with patched versions** from
    [`patches/`](../patches/) — three components and two filter files:
    - `patches/Explorer.tsx` → `quartz/components/Explorer.tsx`
    - `patches/FolderContent.tsx` → `quartz/components/pages/FolderContent.tsx`
@@ -129,7 +148,7 @@ The image is layered as follows (in order):
    logic — and would be fragile to express as regex edits. They implement the
    *expandable vs. plain-link folder* behaviour in the sidebar; the details
    are in [customizations §A](06-quartz-customizations.md#a-components-replaced-at-image-build-time).
-7. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
+8. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
    2026-09-18: `toolchain_paths.py`, `contracts.py`, `site_health.py`,
    `class_pages.py`, `page_visibility.py`, `stop_preview.py`,
    `setup_course.py`, `build_site.py`, `deploy.py`, `social_card.py` and
@@ -151,7 +170,7 @@ The image is layered as follows (in order):
    with `ast` and fails if one is missing. `verify.sh` runs it BEFORE the image
    build, because it answers in a tenth of a second what the build answers in
    three minutes.
-8. **Copy `support/` → `/opt/support/`** — data files consumed by the
+9. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to
      formal and short names, so the wizard can auto-fill "ICS3U →
@@ -192,7 +211,7 @@ The image is layered as follows (in order):
    Together these are most of the recipe's file count (11,378 files as of
    August 2026), which is why the launchers' image-tag hash has to batch
    its work — see [launcher scripts](03-launcher-scripts.md).
-9. **Bake the launcher scripts into `/opt/export/`** and register an
+10. **Bake the launcher scripts into `/opt/export/`** and register an
    `export-scripts` command:
    ```bash
    docker run --rm -v "$PWD:/out" teaching-quartz:src-<hash8> export-scripts
@@ -204,7 +223,7 @@ The image is layered as follows (in order):
    converts the `.bat` and `.ps1` files to CRLF line endings — `cmd.exe` can
    misparse LF-only batch files, and the repo itself stores everything with
    LF.
-10. **Default state**: working directory `/teaching`, command `/bin/bash`.
+11. **Default state**: working directory `/teaching`, command `/bin/bash`.
 
 **Gone since #334: `cp -r /opt/quartz /opt/quartz-site`**, which used to be
 step 7 — a spare copy of the scaffold that nothing read (the build copies
@@ -448,6 +467,91 @@ block (about 1 s more each, Phase 0); Ubuntu's toolchain build (Debian 13 is
 the base's own); Swift 6.4.1 (released 2026-10-12 after Phase 0 measured
 6.4.0: a toolchain move re-runs the swift-gate first, swift-gate/README.md).
 
+### The certificate store (#639, v1.9.0)
+
+**Why.** eMudhra reported six TLS intermediate certificates compromised
+([oss-security, 2026-10-20](https://www.openwall.com/lists/oss-security/2026/10/20/1));
+the roots they chain to are "AAA Certificate Services" (Comodo), "emSign
+Root TLS CA - G3" (not in Debian's store at all) and "emSign ECC Root CA -
+G3". Debian's answer, the same day, is `ca-certificates 20250419+deb13u1` in
+`trixie-security`, which stops trusting the two of those it carried
+(research on #636). It matters here because **Python's `urllib` trusts this store** —
+`_ssl` links Debian's OpenSSL 3.5.6, whose default paths lead to
+`/etc/ssl/certs/ca-certificates.crt` and the hashed folder `/usr/lib/ssl/certs`
+— and `urllib` is every Netlify publish and `deploy.py`'s own Cloudflare calls
+([07](07-deployment.md)). OpenSSL checks no revocation, so a chain to a
+compromised intermediate is refused only once its root is no longer trusted.
+
+**Measured, 2026-10-23, Colima on Apple silicon:**
+
+- The images built so far (`teaching-quartz:src-c3c0841b`, 2026-10-22, and
+  `quartz-teacher:dev-test`) carry `20250419`: **150** certificates, both
+  roots in the bundle, in Python's default context and in `/etc/ssl/certs`.
+- After the layer: `20250419+deb13u1`, **148** certificates, and
+  `/etc/ca-certificates.conf` gains `!mozilla/Comodo_AAA_Services_root.crt`
+  and `!mozilla/emSign_ECC_Root_CA_-_G3.crt`. Neither subject is left in any
+  of the three places. The layer received 10.4 MB (mostly apt's lists) in 4 s.
+- **The fleet is mixed today.** NodeSource's `setup_20.x` itself runs
+  `apt install … ca-certificates`, so a build with NO cache — a brand-new
+  teacher — already got deb13u1 before this change. Every Mac that has built
+  before holds the apt line's layer cached (here, built 2026-10-17 and reused
+  since), with 20250419. Hence an explicit install AND a check, rather than
+  relying on a third party's script.
+- **Three other eMudhra roots stay trusted** after deb13u1: "emSign Root CA -
+  G1", "emSign Root CA - C1" and "emSign ECC Root CA - C3". Debian removed
+  exactly the two above. That is a finding, not a gate: the
+  check names the two removed subjects and does not curate trust of its own.
+- **Node 20's built-in store** (v20.20.2 in the image, 144 roots, used by
+  wrangler for Cloudflare) does NOT read this file: it already lacks AAA
+  Certificate Services but still trusts emSign ECC Root CA - G3 and the three
+  above. That exposure belongs to the Node 22 piece, #640, not to this layer.
+- **The Swift image is not changed and does not pick this up.**
+  `teaching-quartz-swift:src-747b0982` carries 20250419 (150 certificates).
+  `ca-certificates` is on its FIRST apt line (`support/swift/Dockerfile`), so
+  a later recipe change leaves that layer cached and the old store in place;
+  only a base-digest bump or an edit to that line would re-run it. The risk
+  is low: it compiles with `--network none`, and every download its build
+  makes is checked by SHA-256.
+
+**The check.** `verify.sh` section 4 reads `contracts/toolchain.json` →
+`pins` → `caCertificates` and checks, in the fresh image: the version is at
+least `value` (`dpkg --compare-versions … ge`); no `mustNotTrust` subject is
+in the bundle (loaded into its own context), in Python's
+`ssl.create_default_context().get_ca_certs()`, or among the subjects of the
+hashed `*.0` files; and the default context holds more than 100
+certificates, so an empty store — which trusts nothing — cannot pass for one
+that distrusts the right two. Run against the 2026-10-22 image it fails on
+all four counts; against a store cut to 50 certificates it fails on the
+count. (The first draft matched `CN = ` in `openssl x509 -subject` output;
+OpenSSL 3.5 prints `CN=`, so that half would have passed on the old image —
+caught by running it there.) A real "urllib refuses a chain to that root"
+test is not possible offline, since nobody holds the roots' keys to mint one;
+the trust list the default context loads is the thing urllib actually uses.
+
+**Rejected:**
+
+- an exact `ca-certificates=20250419+deb13u1`: Debian's security archive
+  serves only its newest version, so the build breaks the day deb13u2 ships;
+  a later version only distrusts more;
+- bumping the base digest: not needed (deb13u1 is reachable from the live
+  `trixie-security` the base already names), a full rebuild for every
+  teacher, it moves Python's patch release, and the Swift image shares it;
+- `apt-get upgrade`: unbounded — the image would become that day's Debian;
+- snapshot.debian.org: a new, rate-limited dependency on a teacher's first
+  build;
+- adding it to the main apt line: about 330 MB once for every teacher who
+  has built (apt, wrangler, the clone, Quartz's npm install), the cost for
+  which `--no-install-recommends` was already rejected below;
+- distrusting the other emSign roots ourselves: a hand-curated trust store
+  is a job we would own forever;
+- relying on NodeSource's script to keep installing it: third-party, and a
+  cached layer never re-runs it.
+
+**Not in this piece:** the image has other Debian security updates waiting,
+among them OpenSSL itself (`libssl3t64` 3.5.6 → 3.5.7), which is the library
+`urllib` runs on — a follow-up issue decides between a digest bump and
+naming the package.
+
 ### What the first build downloads (measured for #334)
 
 Per container (`/sys/class/net/eth0/statistics/rx_bytes` inside each
@@ -462,6 +566,7 @@ measurement), on an M4 Pro with Colima at 6 CPUs / 12 GiB, 2026-09-26:
 | `npm install -g wrangler@4.80.0` | 65.1 MB | |
 | `git clone` of Quartz | 42.0 MB → **2.3 MB** at depth 1 | |
 | Quartz's `npm install` | 128.0 MB | the largest |
+| certificate store (#639, added 2026-10-23) | 10.4 MB | mostly apt's lists; an install that changes nothing for a no-cache build, which NodeSource's script already upgraded |
 | **Total** | **≈382 MB → ≈342 MB** | #312's VM counter read 389.8 MB in a fresh VM |
 
 Time here: 49–52 s cold with the base cached; an incremental rebuild after a

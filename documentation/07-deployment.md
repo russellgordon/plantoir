@@ -39,6 +39,9 @@ Netlify. It deliberately does **not** use the Netlify CLI — it speaks the
 Netlify REST API directly with Python's standard library (`urllib`), which
 keeps the container free of another Node toolchain and gives precise control
 over the deploy method.
+It trusts the image's Debian certificate store, which since #639 is held at
+least at `ca-certificates 20250419+deb13u1` by its own layer and checked by
+`verify.sh` ([02 → The certificate store](02-docker-image.md#the-certificate-store-639-v190)).
 
 ## Prerequisites and inputs
 
