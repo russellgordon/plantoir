@@ -541,6 +541,18 @@ else
   cat /tmp/verify_isolation_headers_test.log
 fi
 
+# Page addresses on Netlify (#628): a Netlify publish lower-cases the path of
+# each same-site link in memory (never public/), leaving references, %-escapes,
+# the query, the fragment, data-slug, <guid> and every script alone; the bytes
+# uploaded are the bytes the manifest names; the router and link previews
+# follow only on a marked page. Reads the contract; stdlib only.
+if (cd scripts && python3 test_netlify_paths.py) >/tmp/verify_netlify_paths_test.log 2>&1; then
+  pass "page addresses on Netlify: every netlifyPageAddresses case, page links lower-cased in memory and nothing else moved (data-slug, the feed's guid, scripts and the CSP's hashes kept, alias pages still found by fetchCanonical), the bytes uploaded are the bytes the manifest names, public/ never written, and the router's edit made once (scripts/test_netlify_paths.py, #628)"
+else
+  fail "page addresses on Netlify: the netlifyPageAddresses rule does not hold (scripts/test_netlify_paths.py, #628)"
+  cat /tmp/verify_netlify_paths_test.log
+fi
+
 # Runnable Swift (#493): the key a block is cached by, the toolchain id, what
 # the launcher's plan writes and what the build's prepare gives the site and
 # says, and that the Swift image's recipe holds every pin and flag the
@@ -1638,6 +1650,7 @@ check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py
 check_baked scripts/netlify_badge.py      /opt/scripts/netlify_badge.py
+check_baked scripts/netlify_paths.py      /opt/scripts/netlify_paths.py
 check_baked patches/Explorer.tsx          /opt/quartz/quartz/components/Explorer.tsx
 check_baked patches/FolderContent.tsx     /opt/quartz/quartz/components/pages/FolderContent.tsx
 check_baked patches/explorer.inline.ts    /opt/quartz/quartz/components/scripts/explorer.inline.ts
@@ -3933,6 +3946,23 @@ then
   pass "live input: the publish's rule and the preview's agree on the built pages - code that can ask is isolated (Python, Swift, a printable page), a page with a frame keeps the box and is named on a note line, plain pages get nothing, the engine folders get their own header - and the site's router carries the isolation check (#583)"
 else
   fail "live input: the built pages are not isolated as codeRunnerBlocks.isolation says (#583)"
+fi
+
+# ---- 6j, continued: page addresses on Netlify (#628), as the build left them ----
+# The REAL built site, transformed as a Netlify publish would send it: every
+# page keeps its inline scripts' hashes, changes nothing on a second pass,
+# keeps every data-slug and wears the marker once, no same-site page link
+# keeps a capital in its path, and no page the BUILD wrote carries the marker.
+# The site's script carries the router's, the link previews' and search's
+# edit once each (the function reads dataset.plantoirPaths once per file; a
+# doubled edit would read it six times). The build keeps no scaffold beside public/, so the
+# script is where the edit is seen; test_netlify_paths.py pins the marker.
+if (cd scripts && python3 test_netlify_paths.py --site "../$SITE_PUBLIC") >/tmp/verify_netlify_paths_site.log 2>&1 \
+   && [ "$(grep -o 'plantoirPaths' "$SITE_PUBLIC/postscript.js" 2>/dev/null | wc -l | tr -d ' ')" = "3" ]; then
+  pass "page addresses on Netlify: the built site's links lower-case as a Netlify publish sends them with nothing else moved - $(tail -1 /tmp/verify_netlify_paths_site.log) - and the router and link previews carry the edit once (#628)"
+else
+  fail "page addresses on Netlify: the built site does not take the netlifyPageAddresses rule, or the router's edit is missing or doubled (#628)"
+  cat /tmp/verify_netlify_paths_site.log
 fi
 
 # ---- 6k. Self-check quizzes (#563), as the build left them ----
