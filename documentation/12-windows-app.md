@@ -337,23 +337,32 @@ given:
 | 2 MB local download through `Invoke-WebRequest`'s progress (one run) | 86 s, 0.39 MB | 108 s, 3.1 MB | 218 s, 6.5 MB | over 280 s (stopped) |
 | Host errors at any step, or writing one line as wide as the screen | none | none | none | none |
 
-Two things in that table decide the width. ConPTY repaints the SPINNER
-cheaply at any width (`ESC[K`, not spaces), so the screen's width costs a build
-nothing. But **Windows PowerShell 5.1 pads every progress frame to the full
-width** (runs of 4,096 and 16,384 spaces in the captured bytes), so
-`Invoke-WebRequest`'s progress costs bytes and time in proportion to it. The
-launchers' only web calls are three tiny API requests in `deploy.ps1`, which
-measured the same at every width; a large download through
-`Invoke-WebRequest` from a launcher would be the first thing to notice it
-(set `$ProgressPreference = 'SilentlyContinue'` around it). 8,192 is the
-widest that kept every PowerShell number close to 400's.
+What the table says, and why 8,192 anyway. ConPTY repaints the SPINNER
+cheaply at any width (`ESC[K`, not spaces), so the width costs a build
+nothing. **Windows PowerShell 5.1 does pay for width**: it pads every progress
+frame to the full screen (runs of 4,096 and 16,384 spaces in the captured
+bytes), and a full-screen repaint grows with it too. At 8,192 a 2 MB download
+through `Invoke-WebRequest` took 218 s against 86 s at 400, and ten coloured
+repaints 945-1088 ms against 531-770 ms. **That cost lands on nothing a
+teacher runs:** the launchers draw no progress (no `Expand-Archive`, no
+`Write-Progress`, no download under the app's console), and their only web
+calls — the three tiny API requests in `deploy.ps1` — measured the same at
+every width. A launcher that ever downloads something large through
+`Invoke-WebRequest` should set `$ProgressPreference = 'SilentlyContinue'`
+around it. What 8,192 buys over 4,096 is room: at about 40 characters a page,
+a `PLANTOIR_DATED:` line passes 4,096 at roughly 100 re-dated pages and 8,192
+at roughly 200, and a full year's course nears 100. 32,767 would buy more room
+at four times 400's repaint time.
 
 **The lengths it has to hold.** A one-block plain-code finding is 531-611
 characters, and the most it names (ten blocks, then "and N more") about
 2,300; `site_said.py` packs every block into ONE finding. But no width is a
 cure: `PLANTOIR_DATED:` names every page the build rewrote and
-`PLANTOIR_MAPS:` every map, with no cap, so a line longer than 8,192 splits
-exactly as before. The follow-up issue (#666) proposes a cap in the shared Python.
+`PLANTOIR_MAPS:` every map, with no cap, so a line longer than 8,192 MAY split
+the same way. That is not measured: Python prints those lines before Quartz
+starts its spinner, and whether the split needs the spinner or only a full
+screen and a wrap on the bottom row is not known. The follow-up issue (#666)
+proposes a cap in the shared Python.
 (`PLANTOIR_LINKS_CHECKLIST:` carries counts only, not links.)
 
 **Rejected: joining a split line back together before the readers.** The
