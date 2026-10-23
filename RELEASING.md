@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-22 | A course made before 1.8.1 whose name holds a colon (161 catalogue courses, "Physics: Mechanics" among them) gets its website back on its next preview or publish: the build puts quotes around the front page's title, says so in the console, and the trail records it as `folder problem repaired`. A course kept for reference, or a front page that is linked or locked, has only the website's copy put right, and the console says why. The 1.8.1 notes' hand fix is no longer needed; the next notes can say the next build fixes it. | The mac; Windows inherits the repair and the console sentence through the shared build, and owes only the trail line | [#584](https://github.com/russellgordon/plantoir/issues/584) |
 
 
 ## Warnings the release notes MUST carry

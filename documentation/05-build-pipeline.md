@@ -309,11 +309,18 @@ page's own body, byte for byte (split off by python-frontmatter's own
 `YAMLHandler().split`, which does no YAML), records the page, and prints one
 line: `🙈 Hidden from students until its settings can be read: <page> (near
 line N)`. `publish: false` is the one key every section reads as hidden, so
-the page is hidden in every section whatever it said. The teacher's own file
-is never touched — this runs on the copy in `content/`, which is deleted and
-re-copied on every build, so the rule is ALWAYS-section by construction and
-existing course folders pick it up without `--full-rebuild`; and
-`_write_the_date_back` already refuses a source it cannot parse.
+the page is hidden in every section whatever it said. The hiding never
+touches the teacher's own file — it runs on the copy in `content/`, which is
+deleted and re-copied on every build, so the rule is ALWAYS-section by
+construction and existing course folders pick it up without `--full-rebuild`;
+and `_write_date_into_the_teachers_page` already refuses a source it cannot
+parse. **One shape never reaches it (#584):** a section front page whose title
+Plantoir wrote with an unquoted `: ` before 1.8.1 is quoted first, by
+`copy_the_section_front_page`, in the copy always and in the teacher's page
+when it may be changed — `contracts/shared-rules.json` → `buildRepairs`, and
+[04 → "A course made before 1.8.1 is put right by its next
+build"](04-course-setup.md) for the rule, what was measured and what was
+rejected.
 
 Then, once per section build, ONE `pageSettingsUnreadable` site-health finding
 names every such page (at most ten, then "and N more"), each with the line the
@@ -324,8 +331,11 @@ the cases are `unreadablePageSettings.cases`, run by
 `process_frontmatter`, and by `check_visibility_against_the_site.py` on down
 through Quartz's own reader to the site. It is never offered a repair
 (`siteHealth.repair.neverOffered`): rewriting a teacher's settings means
-guessing what they meant. It reaches the trail through the existing `folder
-problem found` line, which carries the check's NAME and never a page's.
+guessing what they meant. The front-page title above is the one exception,
+because Plantoir wrote it and there is nothing to guess — and it is the BUILD
+that puts it right, unasked, not a button. It reaches the trail through the
+existing `folder problem found` line, which carries the check's NAME and never
+a page's.
 
 **Why: Russell, 2026-09-21, option B.** "A page that wrongly DISAPPEARS is
 noticed and harmless; one that wrongly APPEARS cannot be undone." A page
@@ -909,6 +919,17 @@ was not reading that console — wrong, since the scheduled run IS Plantoir
 is often the first build after a class goes visible, so the likeliest to rewrite
 files. The sentence the build prints is "Gave N of your page(s) the date of the
 first class that links to them".
+
+The front page's title repair (#584) reports the same way under its own
+prefix: one `PLANTOIR_REPAIRED: {"course", "section", "repair", "page"}` line
+per repair WRITTEN into a teacher's page (`shared-rules.json` →
+`buildRepairs.marker`), which the mac records as `folder problem repaired`
+(`BuildRepairReport`, read in `ScriptRunner` and in
+`ScheduledDeploy.recordFolderProblems` beside `PLANTOIR_DATED:`). A separate
+prefix rather than a second use of `PLANTOIR_DATED:` so that a later repair
+joins it under its own `repair` key; a reader that meets a key it does not
+know records nothing. Nothing is printed when only the build's copy was
+quoted.
 
 
 **"Get Ready for the Start of the Year" (#96) deliberately does NOT read these

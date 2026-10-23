@@ -846,6 +846,9 @@ class ScriptRunner {
         // A How I Teach page the course had listed for the website, kept off
         // it by this build (#209).
         HowITeachKeptOffReport.noteOnTheTrail(from: text)
+        // Something the build put right in the teacher's own files, such as
+        // a front page's title it quoted (#584).
+        BuildRepairReport.noteOnTheTrail(from: text)
         for marker in LinksChecklistMarker.markers(in: text) {
             linksChecklistMarkers.append(marker)
         }

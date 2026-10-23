@@ -547,15 +547,100 @@ wizard.
 **Rejected:** refusing such a name in the wizard with a plain sentence (#575's
 other option) — a quoted title IS the title, so there is nothing to refuse,
 and refusing would turn away the catalogue's own name for 161 courses.
-**Left alone, for this release:** a course already made with a plain colon
-title. Its build names the front page as a folder problem near line 2; the
-hand fix is to put double quotes around the title on line 2 of
-`sectionN/index.md`, and the 1.8.1 release notes say so (a one-click repair
-is a v1.9.0 follow-on). A section added beside such a front page is written
-quoted, since the swap reads the broken line's words. Also left alone: other
-plain writers whose title comes from a word the teacher chose rather than the
-course name — `ClubStart`'s first page, the class page skeletons,
-`PageFrontmatter`'s renamed titles.
+**A course made before 1.8.1 is put right by its next build (#584).** Until
+1.9.0 a course already written with a plain colon title kept a hidden front
+page: its build named it as a folder problem near line 2, and the 1.8.1
+release notes gave the hand fix (put double quotes around the title on line 2
+of `sectionN/index.md`). Those notes stay as history. Now `build_site.py`
+quotes that one shape itself, on every build, just after it copies the front
+page and before it reads it (`copy_the_section_front_page` →
+`_quote_the_front_page_title`), so it is ALWAYS-section by construction and
+needs no `--full-rebuild`. The rule, the console sentences, the trail line
+and 23 cases are `contracts/shared-rules.json` → `buildRepairs`;
+`scripts/test_front_page_title_repair.py` runs them through the build's own
+functions (in the image by `verify.sh`, on Windows by `PythonToolchainTests`).
+
+- **What counts.** `_front_page_title_quoted` rewrites only when all nine of
+  `buildRepairs.frontPageTitleQuoted.rule` hold: no byte-order mark; the
+  build's reader REFUSES the settings, read as it reads them (a Windows line
+  ending or a lone carriage return taken as a newline — testing the raw text
+  would disagree with the build about a page saved on Windows); `---` fences;
+  exactly one `title:` line at the left edge; a space after the colon and a
+  value that is not empty and not already quoted; `: ` in it and no ` #`
+  comment; no continuation line below it; only that line changes, to the
+  value as a JSON string (setup's own `frontmatter_title` quoting) with its
+  own line ending; and the rewritten settings READ, with the title exactly
+  the value. Anything else — a page wrong in some other way as well, two
+  titles, a comment, a byte-order mark — is left as it was and hidden as
+  before, named by `pageSettingsUnreadable`.
+- **Where it writes.** Always in the build's copy, so the site has its front
+  page. In the teacher's own `sectionN/index.md` too, through the date pass's
+  `_replace_the_page_safely` (a hidden `.plantoir-quoting` file beside the
+  page, flushed and renamed over it, only if the page still holds what was
+  read) — unless the course is kept for reference (or cannot be told), the
+  page is a link to a file kept elsewhere, or it is locked or read-only: the
+  same three the date pass leaves alone. Then only the copy is quoted and the
+  console says why (`sentenceLeftAsItWas`, with `reasons`). A rewrite refused
+  at its last step — the page saved in Obsidian after the build read it,
+  Finder's Locked (which the container cannot see, so the host refuses the
+  rename), a file held open on Windows — leaves the copy quoted and says
+  nothing at all, and the next build tries again. The copy is made writable
+  first (`_writable`), since `shutil.copy2` carries a read-only page's mode.
+- **What it says.** When the teacher's page was rewritten, the console prints
+  `buildRepairs.frontPageTitleQuoted.sentence` and one `PLANTOIR_REPAIRED:`
+  line (`buildRepairs.marker`) naming course, section, repair and page; the
+  mac puts it on the trail as `folder problem repaired` with the repair's
+  `trailLine` (`BuildRepairReport`, from the console in `ScriptRunner` and
+  from a scheduled run's log in `ScheduledDeploy.recordFolderProblems`). The
+  line is hidden from the console by the one rule for every `PLANTOIR_` line
+  (`transcriptStripping.machineLines`). A build that could quote only its
+  copy prints no marker and leaves no trail line, as the date pass's linked
+  and locked pages leave none, so a course kept for reference does not leave
+  a line on every build. A second build reads the page, so it writes and
+  prints nothing (one extra preview rebuild the first time, #265, as the
+  date pass already causes).
+
+**Measured** (2026-10-22, python-frontmatter 1.3.0 / PyYAML 6.0.3, the
+image's pins): every short name in `support/ontario_secondary_courses.json`
+and `british_columbia_secondary_courses.json`, written as the wizard wrote it
+with and without the grade prefix — 2,047 codes, 4,094 titles, **322
+unreadable (161 codes × 2), 322 quoted by the rule, 0 refused**; no catalogue
+title is unreadable for any other reason. The plan's review ran 2,964 further
+variants (line endings, quotes, comments, fences, spacing) and found 0
+rewritten that should not have been; `'Tis:`, a form feed or NEL in the
+line, and `--- ` or `----` fences are refused, safely. Through the real copy
+on an SPH4U front page: before, `section1/index` hidden near line 2 and no
+website; after, the teacher's page carries `title: "Grade 12 Physics:
+Mechanics, Section 1"`, the copy is not hidden, no hidden file is left beside
+the page, and a second build changes no file. A read-only CRLF page, through
+the real code path as an ordinary user: the copy quoted, the page
+byte-identical — and with the `_writable` step taken out, the copy could not
+be written and the front page stayed hidden. The landing title is worked out
+again from the course's settings on every build (`set_landing_title`), so
+quoting changes nothing a student reads except bringing the page back, and
+removing the two quotes undoes it.
+
+**Rejected** (Russell's rulings, 2026-10-22, on the plan in #584): a backup
+before the rewrite — the write is one line, checked, atomic, refused if the
+page changed, and a zip would need a backup name older apps do not list
+(`course-management.json` → `zipNames`); the issue's premise that the
+site-health repairs take one was wrong, since `SiteHealthRepair` only creates
+files. A Fix button beside the finding — it cannot reach a scheduled publish,
+a Windows teacher or the MCP door, and the build reaches all three. Skipping a
+course kept for reference, a linked page or a locked page entirely, as the
+first plan did — reference courses are last year's, the likeliest to carry
+the old shape, and would have no front page. Quoting only the build's copy
+everywhere — the teacher's page would stay unreadable in Obsidian's
+properties and to every reader in the apps. Restricting it to the exact
+wizard shape (", Section N") — the landing title is recomputed anyway, so a
+hand-edited front-page title is quoted as safely. A permanent real-build
+check in `verify.sh` — the image test drives the same function the build
+calls. **Still left alone:** other plain writers whose title comes from a word
+the teacher chose rather than the course name — `ClubStart`'s first page, the
+class page skeletons, `PageFrontmatter`'s renamed titles — and folder index
+pages written plain before #506, which lose a sidebar entry rather than the
+website. A section added beside an unquoted front page is written quoted,
+since the swap reads the broken line's words.
 
 Each app writes them itself, natively: a Settings click does not run this
 script (it would start the website builder, and no app runs Python on the
