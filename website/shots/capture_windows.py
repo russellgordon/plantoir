@@ -282,9 +282,10 @@ def main() -> int:
                            print-handout, from a preview of MPM2D in
                            ~/Plantoir Print (print_set_windows.py)
         --code [id,id]     the Code page's figures (code-python,
-                           code-python-live, code-python-error, code-quiz;
-                           not the Swift two until their 2x picture), from previews of
-                           ~/School Web Space (preview_pages_windows.py)
+                           code-python-live, code-python-error, code-quiz
+                           from ICS3U; code-swift, code-swift-live from
+                           ICS4U), from previews of ~/School Web Space
+                           (preview_pages_windows.py)
         --quizzes [id,id]  the Quizzes page's figures (quiz-math,
                            quiz-chemistry, quiz-english from ~/Teaching,
                            quiz-code-run from ~/School Web Space)

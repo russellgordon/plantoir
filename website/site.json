@@ -58,7 +58,7 @@
         "windows": true
       },
       "runnable-swift": {
-        "windows": false
+        "windows": true
       },
       "quizzes": {
         "windows": true

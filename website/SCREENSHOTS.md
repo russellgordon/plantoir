@@ -273,12 +273,12 @@ python3 website/shots/capture.py --quizzes  # the Quizzes page's figures (v1.8.1
   loaded (until #562 that minute ran from launch and was never cancelled, so a
   page photographed after 60 s was reported as "had not finished loading" —
   measured: a settle of 62 s failed that way, and passes now). On Windows
-  `capture_windows.py --code` takes the four Python and quiz figures from
-  native previews of `~/School Web Space` (#590, "The Code and Quizzes pages'
-  figures on Windows" below); the two Swift ones stay Mac only until their 2x
-  picture is taken (Swift runs on Windows since v1.8.6, #570). All are `windows: false`
-  and owed by name until their 2× pictures are taken and promoted; the print
-  set takes only scene `print-set`. `website/README.md` → "The Code page" has
+  `capture_windows.py --code` takes all six from native previews of
+  `~/School Web Space` (#590, "The Code and Quizzes pages' figures on Windows"
+  below): the four Python and quiz figures first, and the two Swift ones since
+  2026-10-23 (Swift runs on Windows since v1.8.6, #570). Each was `windows:
+  false` and owed by name until its 2× pictures were taken and promoted; the
+  print set takes only scene `print-set`. `website/README.md` → "The Code page" has
   the run.
 - **The Quizzes page's figures** (#587: `quiz-math`, `quiz-chemistry`,
   `quiz-english`, `quiz-code-run`) are taken the same way, by `capture.py
@@ -395,10 +395,12 @@ there and says so.
 
 **The Code and Quizzes pages' figures on Windows (`--code`, `--quizzes`, #590).**
 `preview_pages_windows.py` takes every `preview-page` shot of scene `code` or
-`quizzes` except `code-swift` and `code-swift-live` (`NOT_ON_WINDOWS`; owed
-until their 2x picture is taken - Swift runs on Windows since v1.8.6, #570): `code-python`,
-`code-python-live`, `code-python-error`, `code-quiz` and `quiz-code-run` from
-ICS3U in the marketing folder, which on Windows is `~/School Web Space`
+`quizzes` — the two Swift ones (`code-swift`, `code-swift-live`) included
+since 2026-10-23, when their 2x pictures were taken (Swift runs on Windows
+since v1.8.6, #570; until then a `NOT_ON_WINDOWS` list left them out):
+`code-python`, `code-python-live`, `code-python-error`, `code-quiz` and
+`quiz-code-run` from ICS3U in the marketing folder, the Swift two from its
+ICS4U, which on Windows is `~/School Web Space`
 (`app_scenes_windows.MARKETING`), and `quiz-math`, `quiz-chemistry`,
 `quiz-english` from the demo folder, `~/Teaching`. `capture.workspace` says
 which. Each folder is refused unless it is THAT folder by resolved path and
