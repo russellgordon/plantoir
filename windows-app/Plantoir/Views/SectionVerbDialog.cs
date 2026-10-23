@@ -75,6 +75,26 @@ internal sealed class SectionVerbDialog
             DefaultButton = ContentDialogButton.Primary,
         };
         AutomationProperties.SetAutomationId(_dialog, "sectionVerbDialog");
+        // The dialog's box at every stage, for #655's measurements: the box is
+        // not in the UI Automation tree (its element is the whole overlay), so
+        // the size it was laid out at is written to the diagnostic log.
+        // Logged when the box OR the content changes size: a hold that keeps
+        // the content's height while the buttons' row collapses changes only
+        // the box.
+        void LogTheBox()
+        {
+            string box = Named(_dialog, "BackgroundElement") is FrameworkElement b ? $"{b.ActualWidth:0}x{b.ActualHeight:0}" : "?";
+            App.LogDiagnostic($"Section menu dialog at {_stage}: box {box}, content {_host.ActualWidth:0}x{_host.ActualHeight:0} (held at least {_host.MinHeight:0})");
+        }
+        if (ShowsAPlanTable(item))
+        {
+            _host.SizeChanged += (_, _) => LogTheBox();
+            _dialog.Opened += (_, _) =>
+            {
+                if (Named(_dialog, "BackgroundElement") is FrameworkElement background)
+                    background.SizeChanged += (_, _) => LogTheBox();
+            };
+        }
         _dialog.Content = _host;
         if (ShowsAPlanTable(item))
         {
@@ -333,6 +353,8 @@ internal sealed class SectionVerbDialog
 
     private void ShowWorking(string said)
     {
+        // Measured BEFORE the buttons go: their row collapses with them.
+        double held = HeightToHoldWhileWorking();
         _stage = Stage.Working;
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, MinWidth = 420 };
         panel.Children.Add(new ProgressRing { IsActive = true, Width = 20, Height = 20 });
@@ -341,8 +363,41 @@ internal sealed class SectionVerbDialog
         AutomationProperties.SetAutomationId(words, "sectionVerbWorking");
         panel.Children.Add(words);
         SetContent(panel);
+        _host.MinHeight = held;
+        if (held > 0) App.LogDiagnostic($"Section menu working: held at {held:0} epx (the stage before, its buttons' row included)");
         _dialog.PrimaryButtonText = "";
         _dialog.CloseButtonText = "";
+    }
+
+    /// <summary>
+    /// Working keeps the height of the stage before it (#655, the mac's #654):
+    /// the dialog changes size ONCE, to the answer, rather than shrinking to a
+    /// spinner and growing again. Holding the host's own height is not enough:
+    /// Working clears both buttons, ContentDialog's "NoneVisible" state
+    /// collapses the button row (<c>CommandSpace</c>), and the dialog would
+    /// still shrink by that row — so the row's height is added to the host's.
+    /// The three page items only, as <see cref="SizeTheHost"/>: Re-date and
+    /// Make Room are untouched. 0 is no hold.
+    /// </summary>
+    private double HeightToHoldWhileWorking()
+    {
+        if (!ShowsAPlanTable(_item) || _host.ActualHeight <= 0) return 0;
+        double commands = 0;
+        if (Named(_dialog, "CommandSpace") is FrameworkElement row && row.Visibility == Visibility.Visible)
+            commands = row.ActualHeight + row.Margin.Top + row.Margin.Bottom;
+        return _host.ActualHeight + commands;
+    }
+
+    private static DependencyObject? Named(DependencyObject root, string name)
+    {
+        int count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is FrameworkElement { Name: var found } && found == name) return child;
+            if (Named(child, name) is { } deeper) return deeper;
+        }
+        return null;
     }
 
     private void ShowPlan(string card)
@@ -397,6 +452,11 @@ internal sealed class SectionVerbDialog
         if (_dialog.XamlRoot is not { } root) return;
         _refit = (_, _) =>
         {
+            // A window changed size mid-call lets go of Working's hold (#655):
+            // ContentDialogMaxHeight is wide open here and nothing relays out
+            // a spinner, so a hold taller than a shrunken window would clip
+            // the dialog off its bottom.
+            if (_stage == Stage.Working) _host.MinHeight = 0;
             SizeTheHost(root);
             _relayout?.Invoke();
         };
@@ -414,9 +474,14 @@ internal sealed class SectionVerbDialog
         _refitRoot = null;
     }
 
-    /// <summary>A stage's content, in the host; the last stage's relayout is dropped with it.</summary>
+    /// <summary>
+    /// A stage's content, in the host; the last stage's relayout is dropped
+    /// with it, and so is Working's hold — the answer is fitted to its
+    /// sentence (#655), keeping the width.
+    /// </summary>
     private void SetContent(UIElement content, Action? relayout = null)
     {
+        _host.MinHeight = 0;
         _host.Children.Clear();
         _host.Children.Add(content);
         _relayout = relayout;
@@ -425,9 +490,11 @@ internal sealed class SectionVerbDialog
     /// <summary>The window's height, or ContentDialog's old maximum before it is known.</summary>
     private double WindowHeight => _dialog.XamlRoot is { Size.Height: > 0 } root ? root.Size.Height : PlanTableLayout.DialogMaxHeight;
 
+    /// <summary>
     /// The plan stage of the three page items: the summary, a read-only table
     /// of the pages a teacher reads before Go (sortable by its headers), the
-    /// pages already right folded under it (#634, the mac's #622), and the
+    /// pages already right left out of it until the checkbox under it is ticked
+    /// (#634, the mac's #622; a checkbox since #655), and the
     /// card's other sentences under that. Built from the rows the menu's
     /// server sent, never by parsing the card. Return still presses the verb's
     /// button and Escape Cancel while the table has focus (measured, doc 12).
@@ -522,8 +589,9 @@ internal sealed class SectionVerbDialog
             rowItems[row.Position] = item;
         }
 
-        // The pages already right are folded away, closed for every new plan
-        // (#622); opening adds them to the SAME table, through the one sort.
+        // The pages already right are left out, unticked for every new plan
+        // (#622, a checkbox since #655); ticking adds them to the SAME table,
+        // through the one sort, and a second click takes them out.
         bool open = false;
         var order = PlanTableOrder.Opening;
         void Fill()
@@ -583,12 +651,12 @@ internal sealed class SectionVerbDialog
         SizeTheColumns();
         panel.Children.Add(header);
 
-        // The table and its disclosure as one part, 4 epx apart: the
-        // disclosure reads as the table's (the mac's 6-pt reason).
+        // The table and its checkbox as one part, 4 epx apart: the checkbox
+        // reads as the table's (the mac's 6-pt reason).
         var tablePart = new StackPanel { Spacing = 4 };
         tablePart.Children.Add(list);
         if (table.FoldLabel is { } label)
-            tablePart.Children.Add(Disclosure(label, isOpen =>
+            tablePart.Children.Add(AlreadyRightBox(label, isOpen =>
             {
                 open = isOpen;
                 Fill();
@@ -607,8 +675,8 @@ internal sealed class SectionVerbDialog
         // and again whenever the window changes size while the plan shows —
         // counted once, a window made shorter would clip what was counted. The
         // notes are measured at the dialog's LIVE width, which follows the window.
-        // The table's height is FIXED — counted with the disclosure closed —
-        // so opening it never grows the dialog (Russell's ruling on the mac):
+        // The table's height is FIXED — counted with the checkbox unticked —
+        // so ticking it never grows the dialog (Russell's ruling on the mac):
         // a MaxHeight would let a short table shrink to its rows and grow when
         // the folded rows arrive, the mac's measured 316 → 484.
         PlanTableLayout.Fit? fitted = null;
@@ -665,45 +733,23 @@ internal sealed class SectionVerbDialog
     }
 
     /// <summary>
-    /// The plan's disclosure (#634, the mac's <c>DisclosureGroup</c>): a
-    /// borderless toggle with a chevron and the words, closed to begin with.
-    /// A <c>ToggleButton</c>, so Narrator hears its state through the Toggle
-    /// pattern. REJECTED: <c>Expander</c>, whose header is 48 epx on a card
-    /// background with an animation — a second panel, where the mac's is one
-    /// line of the table's (the plan review).
+    /// The checkbox under the plan's table (#655, the mac's #654): ticked, the
+    /// pages already right are rows of the table ABOVE it. Unticked for every
+    /// new plan. It was a chevron <c>ToggleButton</c> (#634) — a disclosure
+    /// promises a fold BELOW it, and none ever appeared there (Russell, from
+    /// the mac's ICS3U sheet). REJECTED before that: <c>Expander</c>, whose
+    /// header is 48 epx on a card background with an animation. The platform's
+    /// 32-epx height is kept (the hit target); <see cref="PlanTableLayout.FoldHeight"/>
+    /// reserves it.
     /// </summary>
-    private static ToggleButton Disclosure(string label, Action<bool> toggled)
+    private static CheckBox AlreadyRightBox(string label, Action<bool> toggled)
     {
-        var chevron = new FontIcon { Glyph = "", FontSize = 10 };
-        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-        content.Children.Add(chevron);
-        content.Children.Add(new TextBlock { Text = label });
-        var button = new ToggleButton
-        {
-            Content = content,
-            Padding = new Thickness(2, 4, 6, 4),
-            BorderThickness = new Thickness(0),
-            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            TabIndex = 3,
-        };
-        // A toggle that is on keeps the look of one that is off: the chevron
-        // says the state, as a disclosure's does.
-        var clear = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-        foreach (string key in new[] { "ToggleButtonBackgroundChecked", "ToggleButtonBackgroundCheckedPointerOver",
-                                       "ToggleButtonBackgroundCheckedPressed", "ToggleButtonBorderBrushChecked",
-                                       "ToggleButtonBorderBrushCheckedPointerOver", "ToggleButtonBorderBrushCheckedPressed",
-                                       "ToggleButtonBackground", "ToggleButtonBorderBrush" })
-            button.Resources[key] = clear;
-        if (Application.Current.Resources.TryGetValue("TextFillColorPrimaryBrush", out var primary) && primary is Brush text)
-            foreach (string key in new[] { "ToggleButtonForegroundChecked", "ToggleButtonForegroundCheckedPointerOver",
-                                           "ToggleButtonForegroundCheckedPressed" })
-                button.Resources[key] = text;
-        AutomationProperties.SetAutomationId(button, "sectionVerbPlanAlreadyRight");
-        AutomationProperties.SetName(button, label);
-        button.Checked += (_, _) => { chevron.Glyph = ""; toggled(true); };
-        button.Unchecked += (_, _) => { chevron.Glyph = ""; toggled(false); };
-        return button;
+        var box = new CheckBox { Content = label, IsChecked = false, TabIndex = 3 };
+        AutomationProperties.SetAutomationId(box, "sectionVerbPlanAlreadyRight");
+        AutomationProperties.SetName(box, label);
+        box.Checked += (_, _) => toggled(true);
+        box.Unchecked += (_, _) => toggled(false);
+        return box;
     }
 
     private void ShowResult(string said)
