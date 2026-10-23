@@ -76,8 +76,9 @@
 //   sit beside. Rejected: an SVG ellipsis repeated as a background - no web
 //   font, a colour of its own per theme, and a repeat period that would be a
 //   guess at the line-height. 80 rows rather than 200 (plan review): WebKit
-//   relays the whole string out for every line, and at 1,002 lines on a
-//   phone's width 200 rows cost about 130 ms a relayout against 1 ms before.
+//   lays the whole string out for every line - a 1,002-line block at 390 px
+//   relays out in 63.5 ms with 80 rows, 132 ms with 200, 0.9 ms unwrapped
+//   (documentation/06 -> P3).
 //   A line longer than 81 rows shows its ellipses on its first 80
 //   continuation rows only (textFenceWrapping.knownLimits).
 // * `content: ... / ""` hides them from a screen reader (Chrome's tree held

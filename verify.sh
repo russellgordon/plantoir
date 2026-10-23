@@ -4542,20 +4542,21 @@ else:
     problems.append(f"found {len(figures)} figures on Wrap Fixture and {len(twins)} on Wrap Plain Twin")
 if len(figures) >= 3 and 'data-language="python"' not in figures[2][1]:
     problems.append("Wrap Fixture's python wrap block is not a python block")
-lines = re.findall(r"<span data-line=\"\"", figures[0][1]) if figures else []
+lines = re.findall(r"<span data-line[ >]", figures[0][1]) if figures else []
 if len(lines) != 120 or figures[0][1].count("data-highlighted-line") != 2:
     problems.append(f"the long block has {len(lines)} lines and {figures[0][1].count('data-highlighted-line') if figures else 0} highlighted, expected 120 and 2")
 elsewhere = []
 for page in public.rglob("*.html"):
     name = str(page.relative_to(public))
-    if "plantoir-text-wrap" in page.read_text(encoding="utf-8", errors="replace"):
+    if 'class="plantoir-text-wrap"' in page.read_text(encoding="utf-8", errors="replace"):
         elsewhere.append(name)
 examples = [name for name in elsewhere if re.fullmatch(r"Authoring-Example-\d\d\.html", name)]
 others = sorted(set(elsewhere) - {"Wrap-Fixture.html"} - set(examples))
 if others or len(examples) != 1:
     problems.append(f"the wrapper is on {others or 'no other page'} and on {len(examples)} skill examples (expected none, and one)")
 css = (public / "index.css").read_text(encoding="utf-8") if (public / "index.css").is_file() else ""
-rule = re.search(r'\.plantoir-text-wrap pre:not\(\.plantoir-flowing\)>code>\[data-line\]:after\{[^}]*\}', css)
+# The :after rule of its own (the rule before it names :before and :after together).
+rule = re.search(r'\.plantoir-text-wrap pre:not\(\.plantoir-flowing\)>code>\[data-line\]:after\{[^}]*content:[^}]*\}', css)
 if rule is None:
     problems.append("index.css lacks the wrapped line's :after rule")
 else:
