@@ -102,6 +102,8 @@ const PROBE = `
       for (const node of change.addedNodes) {
         if (node.tagName !== "IFRAME") continue
         node.contentWindow.print = () => {
+          // A real print sends these (#576): the page puts itself back only once it has seen one.
+          node.contentWindow.dispatchEvent(new Event("beforeprint"))
           const frame = node.contentDocument
           const view = node.contentWindow
           const at = (name) => frame.documentElement.getAttribute(name)
@@ -176,6 +178,7 @@ const PROBE = `
             boxes, icons, headingOnly, numbers, code, hang,
             example: !!frame.querySelector('blockquote.callout[data-callout="example"]'),
           }
+          node.contentWindow.dispatchEvent(new Event("afterprint"))
         }
       }
     }

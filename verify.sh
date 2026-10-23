@@ -2072,7 +2072,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Anchor Fixture.md" "$HIT_COURSE/Picture Fixture.md" \
-        "$HIT_COURSE/Discussions/Runner Printable.md" \
+        "$HIT_COURSE/Discussions/Runner Printable.md" "$HIT_COURSE/Discussions/Print Fallback Fixture.md" \
         "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" "$HIT_COURSE/Plain Code Fixture.md" \
         "$HIT_COURSE/Live Plain Link.md" "$HIT_COURSE/Live Framed.md" "$HIT_COURSE/Live Autorun.md" "$HIT_COURSE/Live Box.md" \
         "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
@@ -2645,6 +2645,29 @@ open(sys.argv[1], "w", encoding="utf-8").write(
     + paragraphs(31, 15) + "![[plantoir-hazard-viewbox.svg]]\n\n"
     + paragraphs(46, 15) + "![[plantoir-hazard-tall.png]]\n\n"
     + paragraphs(61, 10))
+PY
+
+# #576: Print Fallback Fixture - a printable page one folder down, with
+# headings for a table of contents, 16 code blocks and two of the pictures
+# above, for browser-checks/print_fallback.mjs (which refuses the print
+# layout's script, so the browser lays the handout out itself). Removed by
+# restore_hit_fixture.
+python3 - "$HIT_COURSE/Discussions/Print Fallback Fixture.md" <<'PY'
+import sys
+lines = ["---", "title: Print Fallback Fixture", "printable: true", "---",
+         "A printable page for the print fallback check (plantoir-print-fallback-576).", ""]
+block = 0
+for part in range(1, 5):
+    lines += [f"## Part {part}", "", f"Question {part}: read each program and say what it prints.", ""]
+    for _ in range(4):
+        block += 1
+        lines += ["```python", f"total = {block}", f'print("block {block}:", total * 2)', "```", ""]
+    if part == 2:
+        lines += ["![[plantoir-hazard-wide.png|600]]", ""]
+    if part == 3:
+        lines += ["![[plantoir-hazard-tall.png]]", ""]
+lines += ["> [!answer]- Answer 1", ">", "> Each block prints twice its number (plantoir-print-fallback-answer-576).", ""]
+open(sys.argv[1], "w", encoding="utf-8").write("\n".join(lines))
 PY
 
 # ---- #485 E1: diagrams and graphs, planted for the same build ----
@@ -4671,6 +4694,16 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "a picture had no height until its bytes arrived or until it was scrolled to, the page grew when it did, a sized picture lost its shape in a narrow window, or the page moved by itself as it opened (browser-checks/picture_heights.mjs, #612, #609, #611)"
     cat /tmp/verify_picture_heights.log
   fi
+  # #576: the Print button's fallback (the print layout's script refused),
+  # asked to print the way each browser answers print(): faces and pictures
+  # loaded before print(), the frame kept for a print put off, the page put
+  # back by the 30 s budget, and words.couldNotPrepare only when no print began.
+  if node browser-checks/print_fallback.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_print_fallback.log 2>&1; then
+    pass "Print's fallback, the browser laying the handout out itself: every picture and face loaded before print(), a print put off kept until afterprint, one that never comes, pictures that never arrive and a print layout that never finishes put back saying couldNotPrepare by the budget, a print with no afterprint put back quietly with the button free, headless Chrome's own print() put back at once - $(head -1 /tmp/verify_print_fallback.log | sed 's/^OK: //') (#576, browser-checks/print_fallback.mjs)"
+  else
+    fail "Print's fallback printed with the frame still loading, took the frame away before a print put off, or left Preparing to print… up (on either path) or said nothing when no print came (browser-checks/print_fallback.mjs, #576)"
+    cat /tmp/verify_print_fallback.log
+  fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.
   if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
     pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, the fixture's row at 1 / 4 on a fresh profile (the teacher's [x]), every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
@@ -4679,8 +4712,8 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_my_progress.log
   fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before their bytes arrive and before they are scrolled to (#612, #609): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before their bytes arrive and before they are scrolled to (#612, #609): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
