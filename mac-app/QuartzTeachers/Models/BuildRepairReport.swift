@@ -20,6 +20,12 @@ struct BuildRepairReport: Equatable {
 
     // MARK: - Stored properties
 
+    /// `buildRepairs.marker.prefix`.
+    nonisolated static let markerPrefix: String = "PLANTOIR_REPAIRED:"
+
+    /// The key of the front page's title repair in `buildRepairs`.
+    nonisolated static let frontPageTitleQuoted: String = "frontPageTitleQuoted"
+
     let course: String
     let section: Int
 
@@ -43,12 +49,6 @@ struct BuildRepairReport: Equatable {
     }
 
     // MARK: - Functions
-
-    /// `buildRepairs.marker.prefix`.
-    nonisolated static let markerPrefix: String = "PLANTOIR_REPAIRED:"
-
-    /// The key of the front page's title repair in `buildRepairs`.
-    nonisolated static let frontPageTitleQuoted: String = "frontPageTitleQuoted"
 
     /// Every report in a stretch of output, read from the prefix onward, as
     /// `PagesDatedByTheBuild.reports(in:)` reads its own: a marker glued to
