@@ -3538,9 +3538,13 @@ lasting damage was always the page's jump).
 - `browser-checks/sidebar_page_marker.mjs`: on the first load of the fixture
   page, before any folder is opened, 30 animation frames read the most the
   page and any `.folder-outer:not(.open) > ul` were scrolled; both must be 0.
-  Must-fail on the old bundle (the plan's EXC2O copy, one substitution in
-  `postscript.js`): `closedList 157` on a one-line page in Tasks, and
-  `page 476`, `closedList 105` on a long one; 0 and 0 with the fix.
+- **Must-fail, both browser checks**, on a copy of verify.sh's own built
+  EXC2O site with the fix's compiled block in `postscript.js` put back to
+  Quartz's `scrollIntoView` (the only difference): picture_heights failed with
+  `scrollY 246 px`, sidebar_page_marker with a closed folder's list at
+  `157 px` (Marker Fixture is one line, in a closed folder); the unaltered
+  copy passed both. On the plan's EXC2O copy the sidebar check also caught a
+  long page in a closed folder: `page 476`, `closedList 105`.
 
 ### O4. Rejected
 
