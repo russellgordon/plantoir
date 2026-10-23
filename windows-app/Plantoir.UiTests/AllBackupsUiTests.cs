@@ -62,14 +62,12 @@ public class AllBackupsUiTests
         // that far); with the pauses it was a Ctrl-click in every run since. WinUI 3 takes the pointer in
         // through its own input-site window, so the key and the click are not
         // guaranteed to be read in the order they were sent.
-        Keyboard.Press(VirtualKeyShort.CONTROL);
-        try
+        using (Keyboard.Pressing(VirtualKeyShort.CONTROL))
         {
             Thread.Sleep(150);
             app.ClickMiddleOf(second);
             Thread.Sleep(150);
         }
-        finally { Keyboard.Release(VirtualKeyShort.CONTROL); }
 
         // Read in the dialog itself, not a whole-desktop query by name.
         var button = Retry.WhileNull(
@@ -156,7 +154,7 @@ public class AllBackupsUiTests
         Assert.True(menuItems[0].IsEnabled, "Restore… was greyed with one backup chosen by the right-click");
         Assert.True(app.Find("allBackups-" + Names[1], "the middle backup's line").AsListBoxItem().IsSelected,
                     "the right-click did not select the row it was on");
-        Keyboard.Press(VirtualKeyShort.ESCAPE);   // the menu
+        Keyboard.Type(VirtualKeyShort.ESCAPE);   // the menu
         Thread.Sleep(500);
         if (app.OpenDialog()?.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton")) is { Name: "Done" } done) done.AsButton().Invoke();
     }

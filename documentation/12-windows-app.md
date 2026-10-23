@@ -605,9 +605,66 @@ construction rather than in `OnLaunched`, which is why they compose with
 exactly how far it reaches. It moves everything under
 `%LOCALAPPDATA%\Plantoir` for that run: settings, the breadcrumb trail, the
 startup log, downloaded models, built sites, scheduled-deploy wrappers and
-their finished sentinels. It does NOT move Credential Manager, and it does not
-reach a CHILD process. **Quote the path**: the raw-argument fallback splits on
-spaces.
+their finished sentinels. It does NOT move Credential Manager, and it reaches
+a CHILD process only when the app hands it on. **Quote the path**: the
+raw-argument fallback splits on spaces.
+
+**Three writers missed it until #641 (2026-10-23), and the trail is how that
+was found.** During the 1.8.6 update proof the REAL trail held "got the working
+folder ready — … — C:\Users\…\Temp\plantoir-ui-*\workspace" lines, written
+the evening before by UI-suite runs that had all been started with
+`--state-dir`. What wrote them, and what each does now:
+
+- **The harness's own process. This wrote the line that was seen.**
+  `DrivenApp` sets the working folder up IN-PROCESS
+  (`ToolchainMirror.InitializeWorkspace`, also used for OpenRecent's second
+  folder). That copy goes through `ToolchainReadiness.Ensure`, which writes
+  the line. `AppDataRoot` is per-process, and only the APP had been
+  redirected. **Now** `DrivenApp` calls `AppDataRoot.RedirectTo(stateDir)` on
+  its own process before the copy, so the line lands in the run's own trail
+  through the same resolver the app uses. It is safe because the tests run
+  one at a time ("drives the real app"). One side effect: the copy starts
+  `StartGuidance` on `Task.Run`, and that pass can finish after the NEXT test
+  has re-pointed the static, so its line can land in the next run's trail.
+  It cannot reach the real one. A second side effect, from the same static:
+  after a test's `Dispose` deletes its folder, and after the LAST test, the
+  harness still points at the deleted state folder. A late guidance write in
+  that gap recreates `%TEMP%\plantoir-ui-…\state\Logs\` holding one trail
+  line. That is litter under TEMP, never the real trail, and if it lands
+  before the script's last step `run-ui-tests.ps1` lists it as "Kept this
+  run's files", which is the folder to delete. It was left as
+  is rather than adding a production-side "reset" to `AppDataRoot` for the
+  harness alone. `RealBuildsRoot` reads `%LOCALAPPDATA%` directly and is not
+  moved.
+- **The window's own `plantoir-mcp.exe`**: Section menu backups, rollovers,
+  `LauncherRunner`'s lines. **Now** `McpClient` passes `--state-dir
+  <AppDataRoot.Current>` when the run is redirected
+  (`AppDataRoot.ArgumentsToHandOn`), and the server reads it with
+  `AppDataRoot.StateDirFrom` and applies it before anything resolves a path.
+  Only the space-separated form is read; `--state-dir=<dir>` is not, since
+  nothing writes it. `StateDirHandOnTests` pins both halves. That moves the server's
+  `BuildOutputLocation.BuildsRootFor` fallback and its settings (the
+  Cloudflare account among them) too, while the launchers it runs still build
+  into the REAL root. That is the same split the window already had, so the
+  divergence `AssistWorkspace.LegacyMarkerHomes` describes now holds for the
+  server as well. A server started by an outside door (Claude Code, Codex) is
+  never handed it.
+- **The launchers' own refusal lines** (`Write-TrailLine` in `preview.ps1`
+  and `deploy.ps1`; the mac's `note_on_the_trail`) still use the real path.
+  **Not fixed here**: it is a toolchain change on both platforms, #664
+  (`PLANTOIR_TRAIL_DIR`, trail only, never the builds root). No current test
+  triggers a refusal.
+
+**What a driven run must not touch**, and what now checks it: the real trail,
+settings, startup log, scheduled-deploy wrappers and pending sentinels, and
+Task Scheduler. It MAY touch the real builds root (each run's folder is
+deleted by `DrivenApp.Dispose`) and the Swift home (`%LOCALAPPDATA%\Plantoir\swift`,
+resolved by the launcher's Python). `RealTrailUntouchedUiTests` drives both
+fixed writers (a fresh working folder, then Section ▸ Publish Pages…) and fails
+on any line ADDED to the real trail that names the run's temporary folder or
+its one-off course code. It judges by content rather than byte count because
+this PC is shared: another copy or a scheduled publish may append during the
+run, and those lines are printed for information only.
 
 **The LAUNCHERS are the sharp edge, and they are the exception most likely to
 catch somebody out.** `preview.ps1`, `deploy.ps1` and `setup.ps1` compute the
@@ -989,7 +1046,9 @@ a teacher can see it rather than merely held in a constant.
 carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
 `dotnet test` builds them and runs none of those — only
 `AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
-and need no desktop (bundle 11). The project is in the solution so a SOLUTION build compiles it —
+and need no desktop (bundle 11), and `HarnessSourceRuleTests`, five more that
+keep a bare key-down, a discarded `Keyboard.Pressing` and an unwatched key out
+of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -1123,6 +1182,40 @@ test. `grep -n "\.Click()\|\.RightClick()" Plantoir.UiTests/*.cs` should
 find only the comment in `DrivenApp.cs` that explains why. Built, NOT run
 through the window when this was written (the UI suite needs the whole
 machine; the director schedules it).
+
+### A key sent DOWN must be sent UP: `Keyboard.Type`, never a bare key-down (#638, 2026-10-23)
+
+FlaUI's `Keyboard.Press` sends the key going DOWN and nothing else. Measured
+while fixing #634: `GetAsyncKeyState(VK_SPACE)` still read down 400 ms after
+one. Twenty-four calls in thirteen UI test files never sent the up, for
+Escape, Return, Tab, Down, Delete, F2 and Space. Each left its key held at the
+operating-system level for the REST OF THE RUN, so every later test typed
+into a keyboard with a key already down. That may explain failures seen only
+under the full suite (OpenRecentUiTests and PreviewStartPageUiTests failed in
+the 2026-10-23 full run and passed alone).
+
+- **A key to type is `Keyboard.Type(key)`**, down and up. A key to HOLD
+  around something else (Ctrl-click, Alt held, Shift+Tab) is
+  `using (Keyboard.Pressing(key)) { … }`, which sends the up on dispose, a
+  failing assert included. `PlanTable`'s Shift+Tab had called `Pressing` and
+  thrown the disposable away; it is a `using` now.
+- **`HarnessSourceRuleTests`** (plain facts, no desktop) fails on any
+  `Keyboard.Press(` in the UI test sources. The exception is one method,
+  allowed by name: `PageTablesUiTests.HeldSpace`, which imitates
+  auto-repeat (several downs, then one up in a `finally`) and must keep
+  its release.
+- **`HeldKeys` sweeps for a key held any other way.** It reads
+  `GetAsyncKeyState` for every modifier (generic and left/right, Windows
+  keys included) and every key the suite sends. `DrivenApp`'s constructor
+  releases anything already down, and says so. `DrivenApp.Dispose` releases
+  what the test left down, says so, and RECORDS it. It does not throw:
+  `Dispose` runs in a `using`, and a throw there would REPLACE the test's own
+  exception, so a real failure would be reported as a stuck key. The
+  collection fixture `HeldKeyLedger` (on `DrivesTheRealAppCollection`)
+  throws at the end of the collection instead, and xUnit reports that as a
+  separate cleanup failure naming the keys and the tests that left them. A
+  key a person is holding, or a modifier stuck by a remote-desktop session,
+  reads exactly the same, and the message says so.
 
 ### A test that runs a launcher (bundle 11, 2026-10-01)
 
@@ -5795,6 +5888,21 @@ delivered (the dialog kept it); control (no dialog): all four arrived at
 their handlers" (2026-10-15). One of three runs that day failed on its own
 Ctrl+N control ("the second window would not close") and passed twice since,
 alone and paired — recorded as a flake, not chased.
+**It came back on 2026-10-23 (#638's branch) and stayed.** The test passed in
+that branch's first full run (101/101), then failed in the second and in
+five runs alone after it, one of them with F2 put back to the bare key-down,
+so the key change is not the cause. The failure message now lists the
+process's top-level windows, and the dump rules out the tooltip-or-popup
+idea: "Before Ctrl+N the process had 1 top-level element(s); closed:
+[WinUIDesktopWin32WindowClass "Plantoir" 0x25704A2 Window]; the main window
+is 0x3200732. Now: [… 0x25704A2 Window]; [… 0x3200732 Window]". So the right
+window was chosen, a real WinUI window, and UI Automation's
+`WindowPattern.Close` was ignored by it. A UIA probe at the same moment read
+both windows as `ReadyForUserInteraction`, not modal, with no dialog up, and
+the close handler returns at once for a window that is not the last one. The
+PC was an RDP session left idle for hours with LogonUI running, which is the
+suspect but not proven. Not chased further: re-run it with the session in
+use before believing it.
 The neighbouring UI tests the change touches (reference courses, Copy a Page,
 import for reference, Course Settings' Save, the sidebar's names) ran 13 of
 14; `ImportForReferenceUiTests.AnOldWorkingFolderIsImportedShelvedByYearAndLocked`
@@ -6101,8 +6209,11 @@ out, 1 page ticked"; endings carried out, changed nothing, took the last change
 back, took part of the last change back (#550), cancelled at the plan,
 rebuilt, not rebuilt, opened) and
 `SectionMenuBackedUpACourse`. The second is written by the window's
-`plantoir-mcp`, which `--state-dir` does not reach (`AppDataRoot` does not
-cross processes), so a UI test's copy line lands in the PC's own trail.
+`plantoir-mcp`. Until #641 (2026-10-23) `--state-dir` did not reach that
+server (`AppDataRoot` does not cross processes), so a UI test's copy line
+landed in the PC's own trail. The window now hands it on, the line lands in
+the run's trail, and `SectionVerbsUiTests` asserts it there (see "The flags
+the app answers").
 
 **Testing it**: unit — `SectionVerbsTests` (calls, the runner entry, Undo's
 place, the trail, the claim, Rebuild's two answers), `SectionMenuServerTests`
