@@ -1924,13 +1924,13 @@ def _wire_site_said_emitter(config_ts: Path) -> None:
         return
     anchor = "Plugin.Assets(),"
     if text.count(anchor) != 1:
-        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        print("⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): the site's settings have changed shape.")
         return
     at = text.index(anchor)
     line_start = text.rfind("\n", 0, at) + 1
     indent = text[line_start:at]
     if indent.strip():
-        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        print("⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): the site's settings have changed shape.")
         return
     text = text[:line_start] + indent + "Plugin.PlantoirSiteSaid(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
@@ -2336,7 +2336,7 @@ def _write_site_said(output_dir: Path, content_root: Path, course_code, section_
         site_said.write_side_file(output_dir, course_code, section_number, places, swift_named,
                                   content_root)
     except Exception as error:
-        print(f"⚠️ Could not let the website say which blocks of code show as plain code: {error}")
+        print(f"⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): {error}")
 
 
 LOCALES_SRC_CANDIDATES = [
