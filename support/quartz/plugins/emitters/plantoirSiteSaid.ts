@@ -1,6 +1,7 @@
 // What the SITE found, said as a folder problem (#567): the site's half of
 // contracts/shared-rules.json -> siteHealth.checks ->
-// runnableCodeShownAsPlainCode.
+// runnableCodeShownAsPlainCode - and (#644) of quizzesReadDifferently, the
+// quiz safety net's lines, said in the same call.
 //
 // The runnable-code transformer (transformers/codeRunner.ts) shows a block it
 // cannot run as plain code and prints a `plantoir: error:` line for it
@@ -9,7 +10,11 @@
 // the page's file.data.plantoirSiteDisagreements, and this emitter gathers
 // every page's on its FIRST emit and hands them to scripts/site_said.py, run
 // by the build's own Python, which words ONE finding through site_health and
-// prints it as the `PLANTOIR_HEALTH:` line both apps already read.
+// prints it as the `PLANTOIR_HEALTH:` line both apps already read. The quiz
+// transformer (transformers/plantoirQuizzes.ts) records each line its safety
+// net prints on file.data.plantoirQuizDisagreements the same way (#644), and
+// both lists go to site_said.py in ONE call, which words a finding for each
+// (the code's first) - one Python start, one once-mark.
 //
 // An EMITTER, not a pass in Python after the build, for My Progress's reason
 // (plantoirProgress.ts): a preview is one `quartz build --serve` process, and
@@ -19,7 +24,7 @@
 // Python words it, rather than this file from prepared words, so a finding's
 // assembly has ONE implementation, tested on both platforms (#567 ruling 1).
 // The call costs 24-31 ms in the image (measured), and is made only when a
-// block disagrees.
+// block or a quiz disagrees.
 //
 // ONCE per process: Quartz 4.5.0 runs an emitter with no `partialEmit` again,
 // with every page, on each rebuild a preview makes (quartz/build.ts). Saying
@@ -38,6 +43,7 @@ import { readFileSync } from "fs"
 import { join } from "path"
 import { QuartzEmitterPlugin } from "../types"
 import type { SiteDisagreement } from "../transformers/codeRunner"
+import type { QuizDisagreement } from "../transformers/plantoirQuizzes"
 
 const SAID_FILE = join("quartz", "plantoir_site_said.json")
 const ONCE = "__plantoirSiteSaidOnce"
@@ -55,36 +61,47 @@ function isHidden(frontmatter: Record<string, unknown> | undefined): boolean {
   return flag === false || flag === "false"
 }
 
-// Every block the transformer recorded, pages in the order of their paths
-// (NFC), each page's blocks in the order the site found them.
-export function gathered(content: Content): SiteDisagreement[] {
-  const pages: Array<{ path: string; blocks: SiteDisagreement[] }> = []
+// Every entry a transformer recorded under `key`, pages in the order of their
+// paths (NFC), each page's entries in the order the site recorded them;
+// hidden pages left out.
+function gatheredUnder<T extends { page: string }>(content: Content, key: string): T[] {
+  const pages: Array<{ path: string; entries: T[] }> = []
   for (const [, file] of content) {
-    const recorded = file.data.plantoirSiteDisagreements as SiteDisagreement[] | undefined
+    const recorded = file.data[key] as T[] | undefined
     if (!Array.isArray(recorded) || recorded.length === 0) {
       continue
     }
     if (isHidden(file.data.frontmatter as Record<string, unknown> | undefined)) {
       continue
     }
-    const blocks: SiteDisagreement[] = []
-    for (const block of recorded) {
-      blocks.push({ ...block, page: String(block.page).normalize("NFC") })
+    const entries: T[] = []
+    for (const entry of recorded) {
+      entries.push({ ...entry, page: String(entry.page).normalize("NFC") })
     }
-    pages.push({ path: blocks[0].page, blocks })
+    pages.push({ path: entries[0].page, entries })
   }
   pages.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
-  const all: SiteDisagreement[] = []
+  const all: T[] = []
   for (const page of pages) {
-    for (const block of page.blocks) {
-      all.push(block)
+    for (const entry of page.entries) {
+      all.push(entry)
     }
   }
   return all
 }
 
-// Hand the blocks to the build's Python and pass on what it prints. Answers
-// whether it was called. Never throws.
+// Every block the code runner recorded (#567).
+export function gathered(content: Content): SiteDisagreement[] {
+  return gatheredUnder<SiteDisagreement>(content, "plantoirSiteDisagreements")
+}
+
+// Every line the quiz safety net printed (#644).
+export function gatheredQuizzes(content: Content): QuizDisagreement[] {
+  return gatheredUnder<QuizDisagreement>(content, "plantoirQuizDisagreements")
+}
+
+// Hand the blocks and the quizzes to the build's Python, in ONE call, and
+// pass on what it prints. Answers whether it was called. Never throws.
 export function sayWhatTheSiteFound(
   content: Content,
   folder: string = process.cwd(),
@@ -94,7 +111,8 @@ export function sayWhatTheSiteFound(
 ): boolean {
   try {
     const blocks = gathered(content)
-    if (blocks.length === 0) {
+    const quizzes = gatheredQuizzes(content)
+    if (blocks.length === 0 && quizzes.length === 0) {
       return false
     }
     const said = JSON.parse(readFileSync(join(folder, SAID_FILE), "utf-8")) as Said
@@ -103,7 +121,7 @@ export function sayWhatTheSiteFound(
     }
     const { python, script, ...rest } = said
     const printed = execFileSync(python, [script], {
-      input: JSON.stringify({ ...rest, blocks }),
+      input: JSON.stringify({ ...rest, blocks, quizzes }),
       encoding: "utf-8",
       timeout: TIMEOUT_MILLISECONDS,
       windowsHide: true,
@@ -114,7 +132,7 @@ export function sayWhatTheSiteFound(
     }
     return true
   } catch (error) {
-    write(`ℹ️  Could not name the blocks of code shown as plain code: ${String((error as Error)?.message ?? error).split("\n")[0]}\n`)
+    write(`ℹ️  Could not say what the website found: ${String((error as Error)?.message ?? error).split("\n")[0]}\n`)
     return false
   }
 }
