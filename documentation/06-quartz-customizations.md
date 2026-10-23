@@ -1844,7 +1844,9 @@ never shows "isn't on this site yet" for ever because of it. So:
   `plantoirSiteSaid.ts` says them as ONE folder problem
   (`runnableCodeShownAsPlainCode`) through `scripts/site_said.py`, on the
   first build of the process only — 05 → "The safety net becomes a folder
-  problem".
+  problem". Since #644 the same emitter, in the same call, also says the
+  quiz safety net's lines (`file.data.plantoirQuizDisagreements`, J2) as
+  `quizzesReadDifferently`, after the code's finding.
 - both sides split the info string on the SAME separators (`INFO_SPACE`:
   tab, space and Unicode's space separators, NBSP — Option-Space — among
   them; review N2: micromark leaves `python<NBSP>run` all in `lang`, and the
@@ -2583,7 +2585,17 @@ other five, which differ between two builds of the same image).
   task list renders `<input checked disabled>`, the answer key on screen).
   A `$...$` answer is shown through the page's own parser (`this.parse`):
   only a parsed formula node carries what rehype-katex renders (review S9;
-  measured, the revealed answer holds `.katex`).
+  measured, the revealed answer holds `.katex`). Then the safety net
+  (`quizCallouts.safetyNet`, 05 → "The safety net"): for a published page
+  the folder check examined, it compares the site's reading with
+  `quartz/plantoir_quiz_pages.json` and prints a `plantoir: error:` line
+  where the two differ. Since #644 each printed line is also RECORDED on the
+  page's `file.data.plantoirQuizDisagreements` (`QuizDisagreement`: page,
+  place, the folder check's line, a `quizzesReadDifferently.reasons` key and,
+  for `shownWithNote`, the problem the site found), inside the same branch,
+  so one line is one record. The emitter `plantoirSiteSaid.ts` says them as
+  ONE `quizzesReadDifferently` folder problem (05 → "…and the quiz safety
+  net").
 * **HTML** (after Description, before Latex). The question's id, the
   choices' `aria-labelledby` and `aria-describedby`, blanks
   (`<code>____</code>`, M4) made into boxes, and the page's search text and
