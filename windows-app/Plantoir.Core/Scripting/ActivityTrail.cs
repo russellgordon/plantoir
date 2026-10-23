@@ -709,6 +709,22 @@ public static class ActivityTrail
         ObsidianReopenedForAddOns,
         /// <summary>File ▸ Settings ▸ Obsidian turned the add-ons on or off — the only way back from "Don't ask again".</summary>
         ObsidianAddOnsSettingChanged,
+
+        // ---- Runnable Swift on Windows (#570; the mac's #493) ----
+        /// <summary>
+        /// The first preview with a Swift block got Swift ready on this PC:
+        /// how many seconds it took and how much was downloaded, read from
+        /// <c>swift_windows_fetch.py</c>'s <c>PLANTOIR_SWIFT:</c> line by
+        /// <see cref="Plantoir.Core.Models.SwiftGotReady"/>. Dates when the PC
+        /// gained about 0.9 GB.
+        /// </summary>
+        SwiftGotReady,
+        /// <summary>
+        /// Getting Swift ready failed, and why (offline, noRoom, damaged, busy,
+        /// unpack): every Swift block then says it is not ready, and this line
+        /// says whether it was the network, the disk or the download.
+        /// </summary>
+        SwiftCouldNotBeGotReady,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -841,6 +857,8 @@ public static class ActivityTrail
         Event.ObsidianAddOnsAdded => "obsidian add-ons added",
         Event.ObsidianReopenedForAddOns => "obsidian reopened for add-ons",
         Event.ObsidianAddOnsSettingChanged => "obsidian add-ons setting changed",
+        Event.SwiftGotReady => "Swift got ready on this computer",
+        Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

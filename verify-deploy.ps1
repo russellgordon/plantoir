@@ -91,9 +91,10 @@ $folderTarget = Join-Path $work "published"
 # section so every destination carries the Python engine, the site's own
 # KaTeX and the isolation headers; removed on EVERY exit path (the finally at
 # the bottom). The same page as verify-deploy.sh's, Swift fence included:
-# Windows compiles no Swift (#493, #570), so that fence is EXPECTED to be
-# reported as not ready (codeRunnerBlocks.swift.reasons.notOnWindows) rather
-# than dropped - a Windows-built site carries Swift's thread with Run off.
+# since v1.8.6 (#570) Windows compiles Swift too, so the preview gets Swift
+# ready on this PC the way a teacher's first Swift preview does (the product
+# path, preview.ps1 -> swift_windows_fetch.py: about 2.3 GB the first time,
+# nothing after) and every site must carry the page's compiled program.
 $runnerPage = Join-Path $WorkingFolder "courses\$Course\section$Section\Runner Deploy Check.md"
 $runnerPageText = @'
 ---
@@ -539,21 +540,24 @@ function Check-Engine([string]$What, [string]$Base) {
     if ($r.Code -eq 200 -and $html -match 'class="plantoir-runner"') { Ok "$What's page of runnable code carries its runnable block" }
     else { No "$What's page of runnable code answered HTTP $($r.Code) or carries no runnable block" }
 
-    # Runnable Swift (#493): the thread and its WASI shim ride support/ into
-    # every Windows-built site, so they are checked as the mac checks them.
-    # The PROGRAM is not: Windows compiles none (#570), so there is no
-    # static/swift-wasm/ to fetch. Its ABSENCE is asserted (a program found
-    # here fails the run), not skipped: RELEASING.md asks for a run with
-    # nothing skipped, and eight standing skips would make that impossible on
-    # Windows (the #568 implementation review).
+    # Runnable Swift (#493, #570): the thread and its WASI shim, and the
+    # page's compiled program, checked as verify-deploy.sh checks them.
     foreach ($name in @('plantoir-swift-worker.js', 'plantoir-wasi.mjs')) {
         $r = Get-Response "${Base}static/swift/$name"
         $type = ([string]$r.Headers['content-type']).ToLowerInvariant()
         if ($r.Code -eq 200 -and $type.Contains('javascript')) { Ok "$What sends static/swift/$name (HTTP 200, $type)" }
         else { No "$What answered HTTP $($r.Code), '$type' for static/swift/$name (a module worker needs JavaScript)" }
     }
-    if ($html -match 'data-runner-wasm="static/swift-wasm/') { No "$What's page carries a Swift program, which a Windows build cannot make (#570) - where did it come from?" }
-    else { Ok "$What's page carries no Swift program, as a Windows build cannot make one (#493 / #570; the block shows with Run off)" }
+    $program = [regex]::Match($html, 'data-runner-wasm="(static/swift-wasm/[0-9a-f]{64}\.wasm)"')
+    if (-not $program.Success) { No "$What's page of runnable code carries no Swift program" }
+    else {
+        $programFile = Join-Path $work "program.wasm"
+        $r = Get-Response "${Base}$($program.Groups[1].Value)" -SaveTo $programFile
+        $head = if (Test-Path -LiteralPath $programFile) { [IO.File]::ReadAllBytes($programFile) | Select-Object -First 4 } else { @() }
+        if ($r.Code -eq 200 -and (($head | ForEach-Object { $_.ToString('x2') }) -join '') -eq '0061736d') {
+            Ok "$What sends the page's Swift program (HTTP 200, $([string]$r.Headers['content-type']), $((Get-Item -LiteralPath $programFile).Length) bytes)"
+        } else { No "$What answered HTTP $($r.Code) for $($program.Groups[1].Value), or not a WebAssembly program" }
+    }
 
     # Live input (#583), following the host's redirect (Netlify answers an
     # address with capitals with a 301 to its lower-case form).
@@ -594,34 +598,29 @@ function Check-EngineFolder([string]$What, [string]$Site) {
         if (-not (Test-Path -LiteralPath $path) -or (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant() -ne $entry.Value) { $problems += "static/katex/$relative" }
     }
     if (-not (Test-Path -LiteralPath (Join-Path $Site "static\pyodide\plantoir-worker.js"))) { $problems += "static/pyodide/plantoir-worker.js" }
-    # Swift's thread, as it is in support/gated/swift. Not the program: there
-    # is none on Windows (#570).
+    # Swift's thread, as it is in support/gated/swift, and the page's program.
     foreach ($item in Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot "support\gated\swift") -File) {
         $copy = Join-Path $Site "static\swift\$($item.Name)"
         if (-not (Test-Path -LiteralPath $copy) -or (Get-FileHash -LiteralPath $copy).Hash -ne (Get-FileHash -LiteralPath $item.FullName).Hash) { $problems += "static/swift/$($item.Name)" }
     }
     if ($problems.Count -eq 0) { Ok "$What carries the pinned Python engine, KaTeX and Swift's thread, byte for byte" }
     else { No "$What lacks or changed: $($problems -join ', ')" }
-    if (Test-Path -LiteralPath (Join-Path $Site "static\swift-wasm")) { No "$What carries static/swift-wasm, which a Windows build cannot make (#570)" }
-    else { Ok "$What carries no static/swift-wasm, as a Windows build cannot make one (#493 / #570)" }
+    $programs = @(Get-ChildItem -LiteralPath (Join-Path $Site "static\swift-wasm") -Filter '*.wasm' -File -ErrorAction SilentlyContinue)
+    $notPrograms = @($programs | Where-Object { ((([IO.File]::ReadAllBytes($_.FullName) | Select-Object -First 4) | ForEach-Object { $_.ToString('x2') }) -join '') -ne '0061736d' })
+    if ($programs.Count -gt 0 -and $notPrograms.Count -eq 0) { Ok "$What carries the page's Swift program in static/swift-wasm ($($programs.Count))" }
+    else { No "$What carries no Swift program in static/swift-wasm, or one that is not a WebAssembly program" }
 }
 
-# The borrowed page's Swift fence, said the way the contract says it: on
-# Windows its one sentence (codeRunnerBlocks.swift.reasons.notOnWindows) on a
-# `plantoir: error:` line, and the swiftCouldNotBePrepared folder problem.
-# EXPECTED here, so its absence is the failure.
-$script:NotOnWindows = ""
-try {
-    $script:NotOnWindows = [string](Get-Content -LiteralPath (Join-Path $script:ContractsDir "shared-rules.json") -Raw -Encoding UTF8 |
-        ConvertFrom-Json).codeRunnerBlocks.swift.reasons.notOnWindows
-} catch { $script:NotOnWindows = "" }
-function Check-SwiftSaidNotOnWindows([string]$What, [string]$Log) {
-    if (-not $script:NotOnWindows) { No "contracts/shared-rules.json carries no swift.reasons.notOnWindows to look for"; return }
-    $line = ($Log -split "`r?`n" | Where-Object { $_ -match '^plantoir: error: .*Runner Deploy Check\.md: swift block 1' } | Select-Object -First 1)
-    if ($line -and $line.Contains($script:NotOnWindows)) { Ok "$What said the Swift block cannot be made ready on Windows, in the contract's words" }
-    else { No "$What did not say, on a plantoir: error: line, that the Swift block cannot be made ready on Windows" }
-    if ($Log -match 'PLANTOIR_HEALTH: \{"name": "swiftCouldNotBePrepared"') { Ok "$What reported the swiftCouldNotBePrepared folder problem" }
-    else { No "$What did not report the swiftCouldNotBePrepared folder problem" }
+# The borrowed page's Swift fence was made ready to run (#570): the build's
+# count says so, and no `plantoir: error:` line or swiftCouldNotBePrepared
+# folder problem names it.
+function Check-SwiftWasMadeReady([string]$What, [string]$Log) {
+    if ($Log -match 'Swift programs? on this site ready to run' -and $Log -notmatch '0 of \d+ Swift program') { Ok "$What made the page's Swift program ready to run" }
+    else { No "$What did not make the page's Swift program ready to run" }
+    $line = ($Log -split "`r?`n" | Where-Object { $_ -match '^plantoir: error: .*Runner Deploy Check\.md: swift block' } | Select-Object -First 1)
+    if ($line) { No "$What said the Swift block is not ready: $line" }
+    elseif ($Log -match 'PLANTOIR_HEALTH: \{"name": "swiftCouldNotBePrepared"') { No "$What reported the swiftCouldNotBePrepared folder problem" }
+    else { Ok "$What said nothing is wrong with the Swift block" }
 }
 
 # How long a publish takes and how many bytes it sends: seconds around the
@@ -696,7 +695,7 @@ if (-not $port) {
         # rule (build_site._wire_isolation_serve on the section's copy of
         # Quartz's handlers.js, which the native preview runs - #591).
         Check-Engine "the preview" "http://localhost:$port/"
-        Check-SwiftSaidNotOnWindows "the preview" (Get-Content -LiteralPath $previewLog -Raw -Encoding UTF8)
+        Check-SwiftWasMadeReady "the preview" (Get-Content -LiteralPath $previewLog -Raw -Encoding UTF8)
     }
 }
 
@@ -741,7 +740,7 @@ if ($afterPreview.Log -match 'Killed existing process on port') {
 Check-Folder "folder (after a preview)" (Join-Path $folderTarget "section$Section")
 # The publish that REBUILDS (the preview's site is never shipped), so the one
 # that says what its build found; the folder publish below reuses that build.
-Check-SwiftSaidNotOnWindows "the publish after a preview" $afterPreview.Log
+Check-SwiftWasMadeReady "the publish after a preview" $afterPreview.Log
 
 # ----------------------------------------------- each destination on its own
 Hdr "Destination 1 of 3 - a folder on this PC"

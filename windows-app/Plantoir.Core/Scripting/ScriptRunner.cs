@@ -684,6 +684,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             !Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(_unscannedHealthOutput) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.CoverageMapsBuilt.Marker, StringComparison.Ordinal) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.MyProgressBuilt.Marker, StringComparison.Ordinal) &&
+            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SwiftGotReady.Marker, StringComparison.Ordinal) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Assist.LinksChecklistMarker.Prefix, StringComparison.Ordinal))
             _unscannedHealthOutput = "";
     }
@@ -719,6 +720,14 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         if (Plantoir.Core.Models.MyProgressBuilt.Parse(line) is { } progress)
         {
             ActivityTrail.Note(ActivityTrail.Event.MyProgressPageBuilt, progress.TrailSentence, progress.Course, progress.Section);
+            return;
+        }
+
+        // swift_windows_fetch.py's PLANTOIR_SWIFT: line (#570): Swift got
+        // ready on this PC for the first preview that needed it, or why not.
+        if (Plantoir.Core.Models.SwiftGotReady.Parse(line) is { } swift)
+        {
+            swift.Record();
             return;
         }
 
