@@ -124,6 +124,8 @@ public class PageTablesUiTests
     /// <summary>A picture of the window for judging the banding, into %TEMP% (never the site's images).</summary>
     private void Picture(DrivenApp app, string name)
     {
+        // Only when asked: a full-screen picture on every run is litter.
+        if (Environment.GetEnvironmentVariable("PLANTOIR_634_PICTURES") != "1") return;
         Thread.Sleep(500);
         string theme = Environment.GetEnvironmentVariable("PLANTOIR_634_THEME") ?? "system";
         string path = Path.Combine(Path.GetTempPath(), $"plantoir-634-{name}-{theme}.png");
@@ -221,10 +223,10 @@ public class PageTablesUiTests
 
     /// <summary>
     /// Return with a row selected reaches Continue (the list keeps Return for
-    /// itself, so the table passes it on). Each key in an app of its own: the
-    /// Section menu, opened through UI Automation, is read again only when the
-    /// pointer enters a title or the menu bar takes the focus, and after a
-    /// dialog it was measured greyed for 30 s under a moved pointer too.
+    /// itself, so the table passes it on). Each key in an app of its own: UI
+    /// Automation's Expand does not make the menus re-read what is live (a
+    /// real click or Alt does), and after a dialog Publish Pages… was measured
+    /// greyed for 30 s that way.
     /// </summary>
     [UiFact]
     public void ReturnContinues_WithARowSelected()

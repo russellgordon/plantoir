@@ -819,7 +819,7 @@ internal sealed class SectionVerbDialog
         void Rows()
         {
             int rows = PageTableLayout.PickerRows(WindowHeight, flagged.Count);
-            table.SetRows(rows);
+            if (!table.SetRows(rows)) return;   // unchanged: a window move, say
             App.LogDiagnostic($"Later classes at Publish Pages: window {WindowHeight:0} epx tall, {rows} rows tall of {flagged.Count}");
         }
         Rows();
@@ -917,7 +917,7 @@ internal sealed class SectionVerbDialog
         void Rows()
         {
             int rows = PageTableLayout.PickerRows(WindowHeight, pages.Count);
-            table.SetRows(rows);
+            if (!table.SetRows(rows)) return;   // unchanged: a window move, say
             App.LogDiagnostic($"Pages to tick: window {WindowHeight:0} epx tall, dialog {_planWidth:0} wide, {rows} rows tall of {pages.Count}");
         }
         Rows();

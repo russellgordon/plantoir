@@ -2073,13 +2073,15 @@ public sealed partial class SectionDetailView : UserControl
         content.Children.Add(new TextBlock
         {
             Text = meeting ? AssistWording.LaterClassesAtDeployForAMeeting(nextDay) : AssistWording.LaterClassesAtDeploy(nextDay),
-            TextWrapping = TextWrapping.Wrap,
+            // A book's width in a dialog that may be 848 wide, left-aligned, as
+            // the Section menu's question says it (SectionVerbDialog.Words).
+            TextWrapping = TextWrapping.Wrap, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left,
         });
         content.Children.Add(table.Panel);
         content.Children.Add(new TextBlock
         {
             Text = meeting ? AssistWording.LaterClassesKeptNoteForAMeeting : AssistWording.LaterClassesKeptNote,
-            TextWrapping = TextWrapping.Wrap, Opacity = 0.8,
+            TextWrapping = TextWrapping.Wrap, Opacity = 0.8, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left,
         });
         var dialog = new ContentDialog
         {

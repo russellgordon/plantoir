@@ -293,17 +293,20 @@ public class PlanTableTests
     [Fact]
     public void UpTo756TheFitIs548s_AndATallerWindowGivesTheTableRows()
     {
-        static int Old(double height, double notes)
+        static (int Rows, double NotesCap) Old(double height, double notes)
         {
             double room = Math.Min(height, 756) - 230 - 2;
             int Rows(double r) => (int)Math.Clamp(Math.Floor(r / 32), 2, 12);
-            if (notes <= 0) return Rows(room);
+            if (notes <= 0) return (Rows(room), 0);
             double cap = Math.Clamp(room - 8 - 4 * 32, 40, 120);
-            return Rows(room - (Math.Min(notes, cap) + 8));
+            return (Rows(room - (Math.Min(notes, cap) + 8)), cap);
         }
         for (double height = 300; height <= 756; height += 1)
             foreach (double notes in new double[] { 0, 18, 128 })
-                Assert.Equal(Old(height, notes), PlanTableLayout.For(height, notes).Rows);
+            {
+                var fit = PlanTableLayout.For(height, notes);
+                Assert.Equal(Old(height, notes), (fit.Rows, fit.NotesCap));
+            }
         Assert.Equal(12, PlanTableLayout.For(787, 0).Rows);
         Assert.Equal(13, PlanTableLayout.For(788, 0).Rows);
         Assert.Equal(12 + 7, PlanTableLayout.For(1000, 0).Rows);
