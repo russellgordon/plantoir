@@ -256,28 +256,60 @@ public class PlanTableTests
 
     // ---- How much is shown (the #548 implementation review, finding 1) ----------
 
-    private static double Needs(PlanTableLayout.Fit fit, double notesNatural) =>
-        PlanTableLayout.Chrome + fit.TableHeight
+    private static double Needs(PlanTableLayout.Fit fit, double notesNatural, bool folds = false) =>
+        PlanTableLayout.Chrome + fit.TableHeight + (folds ? PlanTableLayout.FoldHeight : 0)
         + (notesNatural > 0 ? Math.Min(notesNatural, fit.NotesCap) + PlanTableLayout.NotesSpacing : 0);
 
     /// <summary>
     /// Whenever the window can hold the chrome, the fewest rows and two lines
     /// of notes, everything fits — so nothing is clipped from outside, where
     /// the notes' own scroll bar could not reach it. Long notes give way first.
+    /// Since #634 also with the disclosure under the table, and above 756 epx,
+    /// where the window's added height goes to the rows.
     /// </summary>
-    [Fact]
-    public void EverythingFitsWheneverTwoRowsAndTwoLinesOfNotesCan()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EverythingFitsWheneverTwoRowsAndTwoLinesOfNotesCan(bool folds)
     {
         double least = PlanTableLayout.Chrome + PlanTableLayout.TableBorder + PlanTableLayout.FewestRows * PlanTableLayout.RowPitch
-                       + PlanTableLayout.NotesSpacing + PlanTableLayout.NotesFewest;
-        for (double height = least; height <= 1000; height += 7)
+                       + PlanTableLayout.NotesSpacing + PlanTableLayout.NotesFewest + (folds ? PlanTableLayout.FoldHeight : 0);
+        for (double height = least; height <= 1400; height += 7)
             foreach (double notes in new double[] { 0, 18, 40, 88, 128, 300 })
             {
-                var fit = PlanTableLayout.For(height, notes);
-                Assert.True(Needs(fit, notes) <= Math.Min(height, PlanTableLayout.DialogMaxHeight),
-                            $"at {height} epx with {notes} epx of notes the stage needs {Needs(fit, notes)}");
-                Assert.InRange(fit.Rows, PlanTableLayout.FewestRows, PlanTableLayout.MostRows);
+                var fit = PlanTableLayout.For(height, notes, folds);
+                Assert.True(Needs(fit, notes, folds) <= height,
+                            $"at {height} epx with {notes} epx of notes the stage needs {Needs(fit, notes, folds)}");
+                Assert.InRange(fit.Rows, PlanTableLayout.FewestRows, PlanTableLayout.MostRows + PlanTableLayout.ExtraRows(height));
             }
+    }
+
+    /// <summary>
+    /// Up to ContentDialog's old 756, the fit is #548's to the row (#634 changed
+    /// nothing a window that short can show); above it, every further 32 epx is
+    /// one more row. Must-fail: dropping the min(window, 756) split moves rows
+    /// at every height between the #548 cap and 756.
+    /// </summary>
+    [Fact]
+    public void UpTo756TheFitIs548s_AndATallerWindowGivesTheTableRows()
+    {
+        static (int Rows, double NotesCap) Old(double height, double notes)
+        {
+            double room = Math.Min(height, 756) - 230 - 2;
+            int Rows(double r) => (int)Math.Clamp(Math.Floor(r / 32), 2, 12);
+            if (notes <= 0) return (Rows(room), 0);
+            double cap = Math.Clamp(room - 8 - 4 * 32, 40, 120);
+            return (Rows(room - (Math.Min(notes, cap) + 8)), cap);
+        }
+        for (double height = 300; height <= 756; height += 1)
+            foreach (double notes in new double[] { 0, 18, 128 })
+            {
+                var fit = PlanTableLayout.For(height, notes);
+                Assert.Equal(Old(height, notes), (fit.Rows, fit.NotesCap));
+            }
+        Assert.Equal(12, PlanTableLayout.For(787, 0).Rows);
+        Assert.Equal(13, PlanTableLayout.For(788, 0).Rows);
+        Assert.Equal(12 + 7, PlanTableLayout.For(1000, 0).Rows);
     }
 
     [Fact]
@@ -314,11 +346,11 @@ public class PlanTableTests
     }
 
     [Fact]
-    public void ATallWindowShowsTwelveRowsAndTheWholeNotesCap()
+    public void AWindow756TallShowsTwelveRowsAndTheWholeNotesCap()
     {
-        Assert.Equal(new PlanTableLayout.Fit(PlanTableLayout.MostRows, 0), PlanTableLayout.For(1000, 0));
+        Assert.Equal(new PlanTableLayout.Fit(PlanTableLayout.MostRows, 0), PlanTableLayout.For(756, 0));
         Assert.Equal(PlanTableLayout.NotesMost, PlanTableLayout.For(1000, 300).NotesCap);
-        Assert.Equal(PlanTableLayout.MostRows, PlanTableLayout.For(1000, 300).Rows);
+        Assert.Equal(PlanTableLayout.MostRows, PlanTableLayout.For(756, 300).Rows);
     }
 
     // ---- Sorting ---------------------------------------------------------------

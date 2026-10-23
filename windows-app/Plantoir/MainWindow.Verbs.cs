@@ -204,6 +204,11 @@ public sealed partial class MainWindow
         finally
         {
             ApplyMenuEnablement();
+            // ShowAsync completes as the dialog BEGINS to close, while it is
+            // still a popup, so the line above reads the menus greyed; once
+            // more on the dispatcher, after the close, puts them right without
+            // waiting for a pointer or the menu bar's focus (#634's review).
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => { if (!IsClosed) ApplyMenuEnablement(); });
         }
     }
 

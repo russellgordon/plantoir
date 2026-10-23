@@ -1,5 +1,6 @@
 using Plantoir.Core.Assist;
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Input;
 using FlaUI.Core.Tools;
 using Xunit.Abstractions;
 
@@ -143,6 +144,38 @@ public class LaterClassesAtDeployUiTests
         string kept = File.ReadAllText(Path.Combine(app.WorkspacePath, "courses", Code, ".publish_state", "section1.later-classes-kept.json"));
         Assert.Contains("section1/All Classes/Unit 1, Day 4", kept);
         Assert.DoesNotContain("Unit 1, Day 3", kept);
+    }
+
+    /// <summary>
+    /// #634 (the mac's #608): the question is a table — Page with its box, and
+    /// Date — and Space ticks the selected row exactly once, which the row
+    /// tells Narrator. Cancelled, so nothing is deployed.
+    /// </summary>
+    [UiFact]
+    public void TheQuestionIsATable_AndSpaceTicksTheSelectedRow()
+    {
+        var (app, fixture) = Launch();
+        using var running = app;
+        app.SelectSection(Code, 1);
+
+        var rows = DeployAndMeetTheQuestion(app);
+        Assert.Equal("Unit 1, Day 3", rows[0].Name);
+        var row = app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId("laterClassRow0"))
+                  ?? throw new Xunit.Sdk.XunitException("the question's first row has no laterClassRow0");
+        Assert.StartsWith("Unit 1, Day 3, ", row.Name);
+        Assert.Equal("ticked", row.Properties.ItemStatus.ValueOrDefault);
+        row.Patterns.SelectionItem.Pattern.Select();
+        row.Focus();
+        Thread.Sleep(300);
+        CopyAPageEscapeUiTests.Front(app);
+        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.SPACE);
+        Thread.Sleep(400);
+        Assert.False(rows[0].AsCheckBox().IsChecked, "Space on the selected row did not untick it (or flipped it twice)");
+        Assert.True(rows[1].AsCheckBox().IsChecked, "Space unticked a row that was not selected");
+        Assert.Equal("not ticked", row.Properties.ItemStatus.ValueOrDefault);
+        Press(app, "CloseButton");
+        Thread.Sleep(2000);
+        Assert.False(File.Exists(SiteIndex(fixture)), "Cancel deployed the section");
     }
 
     [UiFact]

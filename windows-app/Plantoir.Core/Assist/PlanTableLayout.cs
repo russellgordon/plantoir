@@ -17,9 +17,13 @@ namespace Plantoir.Core.Assist;
 /// note cut short is scrolled into view, never cut off out of reach (the #548
 /// implementation review, finding 1).</para>
 ///
-/// <para>The mac shows a fixed 12 rows; this departs from it deliberately,
-/// because a Windows window is often much shorter (documentation/12-windows-app.md
-/// → "The plan as a table").</para>
+/// <para>The mac opens at 12 rows and the teacher may drag the sheet taller
+/// (#621); this follows the WINDOW instead, because a ContentDialog has no
+/// edge to drag and a Windows window is often much shorter
+/// (documentation/12-windows-app.md → "The plan as a table" and, since #634,
+/// "The picker as a table, the plan folds, the dialogs follow the window").
+/// When the plan folds the pages already right, the dialog fixes the table at
+/// <see cref="PlanTable.RowsWhenClosed"/> within these rows.</para>
 /// </remarks>
 public static class PlanTableLayout
 {
@@ -54,7 +58,12 @@ public static class PlanTableLayout
     /// <summary>The least the notes are given: about two lines, enough to see that there is more to scroll.</summary>
     public const double NotesFewest = 40;
 
-    /// <summary>ContentDialog's <c>ContentDialogMaxHeight</c>: it is never taller than this, whatever the window.</summary>
+    /// <summary>
+    /// ContentDialog's own <c>ContentDialogMaxHeight</c>, which #548 laid out
+    /// within. Since #634 the page dialogs raise that resource and give a
+    /// taller window's height to the table (<see cref="ExtraRows"/>); this is
+    /// still the height up to which every fit is #548's.
+    /// </summary>
     public const double DialogMaxHeight = 756;
 
     /// <summary>Rows shown before the table scrolls, and the notes' cap (0 when there are none).</summary>
@@ -63,17 +72,36 @@ public static class PlanTableLayout
         public double TableHeight => Rows * RowPitch + TableBorder;
     }
 
+    /// <summary>
+    /// The disclosure under the table when the plan folds the pages already
+    /// right (#634, the mac's #622): its row and the gap above it.
+    /// </summary>
+    public const double FoldHeight = 36;
+
     /// <param name="windowHeight">The XAML root's height, epx.</param>
     /// <param name="notesNatural">The notes' height laid out at the dialog's width, uncapped; 0 for none.</param>
-    public static Fit For(double windowHeight, double notesNatural)
+    /// <param name="folds">Whether the disclosure shows under the table.</param>
+    /// <remarks>
+    /// Up to <see cref="DialogMaxHeight"/> this is the #548 fit, unchanged.
+    /// A window taller than that gives every further <see cref="RowPitch"/>
+    /// to the table (#634, the mac's #621: the sheet resizes, and the table
+    /// takes the height added): on Windows the window is the dialog's resize
+    /// handle, and 756 epx is the most the dialog ever used before.
+    /// </remarks>
+    public static Fit For(double windowHeight, double notesNatural, bool folds = false)
     {
-        double room = Math.Min(windowHeight, DialogMaxHeight) - Chrome - TableBorder;
+        double room = Math.Min(windowHeight, DialogMaxHeight) - Chrome - TableBorder - (folds ? FoldHeight : 0);
+        int added = ExtraRows(windowHeight);
         if (notesNatural <= 0)
-            return new Fit(Rows(room), 0);
+            return new Fit(Rows(room) + added, 0);
         double cap = Math.Clamp(room - NotesSpacing - PreferredRows * RowPitch, NotesFewest, NotesMost);
         double notes = Math.Min(notesNatural, cap) + NotesSpacing;
-        return new Fit(Rows(room - notes), cap);
+        return new Fit(Rows(room - notes) + added, cap);
     }
+
+    /// <summary>The rows a window taller than <see cref="DialogMaxHeight"/> adds to the table.</summary>
+    public static int ExtraRows(double windowHeight) =>
+        windowHeight > DialogMaxHeight ? (int)Math.Floor((windowHeight - DialogMaxHeight) / RowPitch) : 0;
 
     private static int Rows(double room) =>
         (int)Math.Clamp(Math.Floor(room / RowPitch), FewestRows, MostRows);
