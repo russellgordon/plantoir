@@ -960,6 +960,27 @@
         "carries": "on or off, written when the teacher changes Settings > Obsidian (obsidianAddOnsForFigures.trail.settingChanged). The offer's answers are the other event's.",
         "line": "Settings ▸ Obsidian — add-ons for diagrams and graphs on",
         "why": "#495. The toggle is the only way back from \"Don't ask again\" and changes what happens in every course, on the 'preview start page chosen in Settings' precedent."
+      },
+      {
+        "event": "Swift got ready on this computer",
+        "carries": "how many seconds getting Swift ready took and how much was downloaded, and the course and section whose preview needed it",
+        "marker": "PLANTOIR_SWIFT: with ready true (codeRunnerBlocks.swift.windows.marker)",
+        "line": "{course}/{section} · got Swift ready on this computer in {seconds} s ({gigabytes} GB downloaded, once)",
+        "why": "#570. A 2.3 GB download on a school line is the likeliest thing in a first Swift preview to take minutes or to fail, and 'my first preview took ten minutes' or 'my disk filled up' is asked about days later; the line dates when the computer gained about 0.9 GB, which otherwise looks like it has nothing to do with Plantoir (the assistant model's reasoning). Recorded from the printed marker, so a typed preview and a scheduled publish that are read by the app leave it too."
+      },
+      {
+        "event": "Swift could not be got ready",
+        "carries": "why, as one of: offline (no internet connection, or the download stopped), noRoom (too little free space), damaged (the download was not what was pinned and was thrown away), busy (another installation was running), unpack (it could not be unpacked); and the course and section",
+        "marker": "PLANTOIR_SWIFT: with ready false and its reason (codeRunnerBlocks.swift.windows.marker)",
+        "line": "{course}/{section} · Swift could not be got ready on this computer: {why}",
+        "whyWords": {
+          "offline": "no internet connection, or the download stopped",
+          "noRoom": "not enough free space",
+          "damaged": "the download was not what was expected and was thrown away",
+          "busy": "another installation was running",
+          "unpack": "it could not be unpacked"
+        },
+        "why": "#570. Recording only the success hides exactly the case worth seeing (the assistant model download's reasoning): every Swift block on the site then says it is not ready, and the trail is what tells a helper whether that was the network, the disk or the download."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -4867,9 +4888,8 @@
         "oneReasonForSeveral": "{blocks} on {pages}: {reason}",
         "reasonsForSeveral": {
           "notCompiled": "not made ready to run - preview the course again",
-          "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about 1.3 GB)",
-          "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run",
-          "notOnWindows": "Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable"
+          "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about {downloadGigabytes} GB)",
+          "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run"
         },
         "blockCount": { "one": "1 block", "several": "{count} blocks" },
         "pageCount": { "one": "1 page", "several": "{count} pages" },
@@ -5008,16 +5028,30 @@
             "detail": "Students see the code with no working Run button until it is put right: “Unit 1”, Swift block 1, line 9: Swift found an error in it: cannot find 'nmae' in scope; 2 blocks on 2 pages: this computer needs about 6 GB of free space before it can make Swift programs ready to run."
           },
           {
-            "name": "one block on one page",
+            "name": "one block on one page, not downloaded on Windows",
+            "on": "windows",
             "problems": [
               {
                 "page": "Unit 1",
                 "block": 1,
                 "line": null,
-                "reason": "notOnWindows"
+                "reason": "notDownloaded"
               }
             ],
-            "detail": "Students see the code with no working Run button until it is put right: 1 block on 1 page: Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable."
+            "detail": "Students see the code with no working Run button until it is put right: 1 block on 1 page: Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about 2.3 GB)."
+          },
+          {
+            "name": "the same block, not downloaded on a Mac",
+            "on": "mac",
+            "problems": [
+              {
+                "page": "Unit 1",
+                "block": 1,
+                "line": null,
+                "reason": "notDownloaded"
+              }
+            ],
+            "detail": "Students see the code with no working Run button until it is put right: 1 block on 1 page: Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about 1.3 GB)."
           }
         ],
         "andMore": "and {count} more",
@@ -26182,6 +26216,8 @@
         "wasmOpt": "/opt/binaryen/bin/wasm-opt -Os --strip-debug --strip-producers",
         "maxMemoryBytes": 268435456,
         "jobSeconds": 180,
+        "jobSecondsOnWindows": 600,
+        "jobSecondsOnWindowsWhy": "Each step's limit (compile.py's run timeout), raised on Windows (#570): wasm-opt -Os on a full-library program took 48.9 s alone on an i5-8365U and 104-168 s with eight blocks compiling at once, against 180 s; a slower PC would pass the limit and lose the block for ever (it is not cached, so every preview tries again and fails again). windows.compile.mostFullAtOnce is the other half.",
         "mustContain": [
           "\"-Osize\"",
           "\"-O\"",
@@ -26271,12 +26307,26 @@
           "support/swift/ReadLineShim.swift",
           "support/swift/FlushBeforeRead.c"
         ],
+        "toolchainIdFromOnWindows": [
+          "support/swift/Dockerfile",
+          "support/swift/compile.py",
+          "support/swift/ReadLineShim.swift",
+          "support/swift/FlushBeforeRead.c",
+          "scripts/swift_windows_compile.py",
+          "toolchain.json -> swiftWindows: the hashes (installer.sha256, every payload's sha512, configuration, binaryen.sha256) and swiftImage's wasmSdk sha256"
+        ],
+        "toolchainIdOnWindowsRule": "On Windows (#570) the id is the first 16 hex of SHA-256 over the same name, NUL, bytes, NUL sequence for each FILE above with its CR LF made LF (a Windows checkout writes CR LF; the id must not differ by accident), then `swiftWindows`, NUL, the canonical JSON of the hashes, NUL. So a Windows cache and a Mac cache never share an id for different compilers, a moved Windows pin compiles every block again, and a `why` edit compiles nothing. The Mac's id is unchanged byte for byte (it never normalises: its files are LF).",
         "pruneDays": 90,
         "orphanJobSeconds": 86400
       },
       "room": {
         "rule": "Before building the Swift image the launcher asks the website builder how much room its disk has (review S9). Below `needGigabytes` it builds nothing, writes {state: noRoom} into the cache's state.json, and the build says each block is not ready with reasons.noRoom: a full disk would otherwise take the whole preview down, not only Swift. Measured 2026-10-17 (Colima on an M4 Pro): the trimmed image is 2.24 GB on disk (504 MB compressed); building it holds the 1.1 GB download and the 3.7 GB unpacked toolchain at once before the trim, so 6 GB leaves room for that and for the site.",
         "needGigabytes": 6
+      },
+      "downloadGigabytes": {
+        "mac": "1.3",
+        "windows": "2.3",
+        "rule": "What reasons.notDownloaded (and swiftCouldNotBePrepared.reasonsForSeveral.notDownloaded) says the first download is, by the platform the build runs on: the Mac's Swift image (about 1.30 GB: swiftImage.measured), Windows' installer, SDK and wasm-opt (2,301,721,200 B: swiftWindows). Filled by the shared Python on os.name, one pass with the other values."
       },
       "site": {
         "rule": "What the build gives the site: quartz/static/swift-wasm/<key>.wasm for every block on a page students can see whose program exists (and nothing else: the folder is synced every build, so a program no page uses any more is removed - the garbage collection), and quartz/plantoir-runners/swift.json, {<key>: {ok: true, file, sdk} | {ok: false, reason}}. The transformer wraps a Swift block as any runnable block, plus data-runner-wasm=\"static/swift-wasm/<key>.wasm\" (joined to the page's path to the site root by the page's script) when its key is ok, or data-runner-unready=\"<reason>\" when it is not: then the block shows its code with Run disabled and words.notReady. The engine folder static/swift/ holds the overlay only: plantoir-swift-worker.js and plantoir-wasi.mjs."
@@ -26326,11 +26376,10 @@
       "reasons": {
         "compileError": "Swift found an error in it: {said}",
         "notCompiled": "it was not made ready to run - preview the course again",
-        "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about 1.3 GB)",
-        "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run",
-        "notOnWindows": "Swift programs cannot be made ready to run on Windows yet - preview this course on a Mac to make them runnable"
+        "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about {downloadGigabytes} GB)",
+        "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run"
       },
-      "reasonsRule": "Why a block has no program, said on its `plantoir: error:` line and in siteHealth -> swiftCouldNotBePrepared (each reason filled in ONE pass): compileError - the cache holds the compiler's diagnostics, and {said} is the message of its first `error:` (the line it names is mapped to the teacher's file); notCompiled - no program and no reason recorded (a compile that did not finish - killed, too slow, wasm-opt failed - which the next preview tries again, a wait for another launcher's download that gave up, or no launcher ran, as in deploy.py's own rebuild); notDownloaded - the launcher could not build the Swift image, which downloads about 1.3 GB the first time (`state.json` says so: {state: notDownloaded}); noRoom - the launcher found less than room.needGigabytes free ({gigabytes}); notOnWindows - the build ran on Windows, which has no container and cannot compile Swift in v1.8 (#493 option (b); the windows issue owns the decision). `reasonCases` pin which one applies.",
+      "reasonsRule": "Why a block has no program, said on its `plantoir: error:` line and in siteHealth -> swiftCouldNotBePrepared (each reason filled in ONE pass): compileError - the cache holds the compiler's diagnostics, and {said} is the message of its first `error:` (the line it names is mapped to the teacher's file); notCompiled - no program and no reason recorded (a compile that did not finish - killed, too slow, wasm-opt failed - which the next preview tries again, a wait for another launcher's download that gave up, or no launcher ran, as in deploy.py's own rebuild); notDownloaded - the launcher could not get Swift ready: on a Mac it could not build the Swift image, on Windows (since v1.8.6, #570) the fetch was offline or its download was not what was pinned (`state.json` says so: {state: notDownloaded}); {downloadGigabytes} is downloadGigabytes for the platform the build runs on (1.3 on a Mac, 2.3 on Windows), so the Mac's sentence is unchanged; noRoom - the launcher found less than room.needGigabytes free ({gigabytes}). Until v1.8.6 a fifth reason, notOnWindows, said Windows could not compile Swift (#493 option (b)); it is gone with that limit. `reasonCases` pin which one applies, on each platform.",
       "reasonCases": [
         {
           "name": "no program and nothing recorded, on a Mac",
@@ -26355,20 +26404,74 @@
           "reason": "notDownloaded"
         },
         {
-          "name": "no program, on Windows",
+          "name": "no program and nothing recorded, on Windows",
           "state": null,
           "appliesOn": "windows",
-          "reason": "notOnWindows"
+          "reason": "notCompiled"
         },
         {
-          "name": "Windows says Windows even with a state left by a Mac",
+          "name": "the launcher found too little room, on Windows",
           "state": {
             "state": "noRoom"
           },
           "appliesOn": "windows",
-          "reason": "notOnWindows"
+          "reason": "noRoom"
+        },
+        {
+          "name": "Swift could not be downloaded, on Windows",
+          "state": {
+            "state": "notDownloaded"
+          },
+          "appliesOn": "windows",
+          "reason": "notDownloaded"
         }
       ],
+      "windows": {
+        "rule": "#570, v1.8.6: Windows makes Swift blocks runnable, as the Mac has since v1.8.0. Windows has no container, so where preview.sh builds the Swift image and runs compile.py in it, preview.ps1 runs scripts/swift_windows_fetch.py ensure (getting Swift ready the first time, IN THE FOREGROUND, as the Mac builds its image; pins in toolchain.json -> swiftWindows) and then scripts/swift_windows_compile.py, which runs compile.py itself, unchanged, adjusted for a Windows host (compile below). Plan and prepare are the shared Python, as on the Mac; prepare serves whatever the cache holds and states the same reasons. The first time downloads about 2.3 GB (the 2.1 GB installer, the SDK and wasm-opt) and keeps about 0.9 GB in %LOCALAPPDATA%\\Plantoir\\swift\\6.4.0; a teacher who never writes Swift never downloads it. One fetch at a time per PC: a second launcher waits up to waitSeconds, as the Mac's build lock does, then gives up (notCompiled). Stopping a preview mid-fetch kills the fetch; the next one resumes the download with HTTP Range and removes what the killed one left half unpacked.",
+        "home": "%LOCALAPPDATA%\\Plantoir\\swift",
+        "waitSeconds": 1200,
+        "ensureExit": {
+          "0": "ready",
+          "10": "noRoom (state.json {state: noRoom})",
+          "11": "notDownloaded (state.json {state: notDownloaded}): offline, or a download that was not what was pinned",
+          "12": "not finished (no state, so notCompiled): another installation running, an unpack that failed, or the wait for another launcher gave up"
+        },
+        "compile": {
+          "rule": "What swift_windows_compile.py changes in compile.py, every name checked to exist (scripts/test_swift_windows.py): environment() is PATH = the toolchain's bin;System32, SystemRoot, and TEMP/TMP/USERPROFILE/HOME in the work folder (compile.py's own gave 'error: permissionDenied' for every block on Windows, cached as the code's fault - measured 2026-10-22); CLANG is clang.exe; OBJECT_ROOT is the fixed work folder (the same code gives the same bytes; a different folder changed 16 bytes, the module hash), each block's folder taken under a lock of its own; extraCompileFlags on both compiles; tidy() takes the work folder off in both separators and keeps a failure's words only when they carry `error:`, so only the compiler's own verdict is cached; JOB_SECONDS is compile.jobSecondsOnWindows; at most mostFullAtOnce full-library compiles at once. Before any job, a preflight compiles one tiny program; if it fails nothing is compiled and nothing is cached (exit 3).",
+          "workFolder": "%LOCALAPPDATA%\\Plantoir\\swift\\work",
+          "extraCompileFlags": [
+            "-nonlib-dependency-scanner"
+          ],
+          "extraCompileFlagsWhy": "Without it every compile warns 'Unable to locate libSwiftScan' (or, with the cli MSI's DLL, 'incompatible libSwiftScan ... Specify -nonlib-dependency-scanner'), and the warning was the first line of every cached compile error; 01-greeting compiled to the same bytes with and without it.",
+          "mostFullAtOnce": 2,
+          "mostFullAtOnceWhy": "Each wasm-opt already uses every core (48.1 s at 8 threads, 105.4 s at 1, identical output): eight at once only make each slower."
+        },
+        "printed": {
+          "gettingReady": "🧱 Getting Swift ready on this PC for this course's runnable code — the first time downloads about 2.3 GB and takes a few minutes…",
+          "gettingReadyPercent": "   Getting Swift ready: {percent}% of about 2.3 GB downloaded…",
+          "unpacking": "   Unpacking Swift on this PC (about a minute)…",
+          "ready": "✅ Swift is ready.",
+          "waitingForAnother": "⏳ Swift is being got ready on this PC for another course; waiting for it to finish…",
+          "stillGettingReady": "⚠️  Swift is still being got ready for another course; preview again in a few minutes to make these programs runnable.",
+          "noRoom": "⚠️  Not enough free space to get Swift ready (about {gigabytes} GB is needed, {free} GB is free), so the Swift programs on this site will not run yet.",
+          "offline": "⚠️  Could not get Swift ready — the first time needs an internet connection. The rest of the site builds as usual; preview again once online to make its Swift programs runnable.",
+          "damaged": "⚠️  Swift's download was not what was expected, so it was thrown away. The rest of the site builds as usual; preview again to download it once more.",
+          "busy": "⚠️  Another installation is running on this PC, so Swift could not be got ready. The rest of the site builds as usual; preview again when it has finished.",
+          "unpack": "⚠️  Swift could not be unpacked on this PC. The rest of the site builds as usual; preview again to try once more.",
+          "compiling": "🦅 Making {count} Swift {noun} ready to run…",
+          "couldNotCompile": "⚠️  Could not make the Swift programs ready to run this time; the build will say which ones."
+        },
+        "printedRule": "Printed by swift_windows_fetch.py (and the last two by preview.ps1) on the preview's console, which is what a teacher sees in Plantoir's console and in a terminal; pinned word for word by scripts/test_swift_windows.py. ready, offline, noRoom, stillGettingReady, compiling and couldNotCompile are the Mac's own sentences (preview.sh prepare_runnable_swift), with 'on this PC' and 2.3 GB where the Mac's are about it. gettingReadyPercent is NEW: the Mac's image build goes quiet for its minutes, and a 2.3 GB download on a school line takes about six, so Windows says how far it has got about every ten per cent.",
+        "marker": {
+          "prefix": "PLANTOIR_SWIFT:",
+          "shape": "PLANTOIR_SWIFT: {\"ready\": true, \"seconds\": N, \"downloadedBytes\": B, \"course\": C, \"section\": S} or {\"ready\": false, \"reason\": offline | noRoom | damaged | busy | unpack, \"course\": C, \"section\": S}",
+          "examples": [
+            "PLANTOIR_SWIFT: {\"course\": \"ICS3U\", \"downloadedBytes\": 2301721200, \"ready\": true, \"seconds\": 92, \"section\": 1}",
+            "PLANTOIR_SWIFT: {\"course\": \"ICS3U\", \"ready\": false, \"reason\": \"offline\", \"section\": 1}"
+          ],
+          "why": "Printed once when getting Swift ready finished or failed - never when it was already ready - and read by the app from the console of a run it starts and from a scheduled publish's record, the PLANTOIR_MY_PROGRESS: pattern (activityTrail.mustRecord: 'Swift got ready on this computer', 'Swift could not be got ready')."
+        }
+      },
       "notes": {
         "rule": "Lines an assistant and a teacher read in the build's output that are NOT folder problems (implementation review S2 and N2): `fromBefore` when prepare served programs compiled by the PREVIOUS recipe because this recipe has not compiled them yet (an offline preview, or too little room, after Plantoir was updated) - the site keeps working, and the next preview that can compile replaces them; `large` for each block whose program is over `largeBytes` (a full-library program is about 3.4 MB; `import Foundation` with formatters or JSON measured 46,073,957 bytes), because every student downloads it on that block's first Run. Each is one line `plantoir: note: ` + the words; `large` names the block as `<page>.md: swift block <n>: `. `noteCases` pin both.",
         "fromBefore": "{count} Swift programs on this site are the ones made before Plantoir was updated; they work, and the next preview that can make them again replaces them",
@@ -26469,8 +26572,8 @@
       "A Swift program that recurses deeply hits the BROWSER's stack before its own: about 5,000 calls in Chrome 155 and only about 2,000 in Safari 26.6 and the iPadOS 26.5 simulator (fine at 2,000, crashing at 3,000, both libraries - implementation review), and it ends with words.crashed and no `Fatal error:` line (review S5). Write recursive examples that stay well under 1,000 calls deep.",
       "`Int` is 32 bits here (wasm32): it holds up to 2,147,483,647, so `13!`, Fibonacci(47) or a large running total overflows - and an overflow stops the program with words.crashed and NO `Fatal error:` line, in both libraries (measured 2026-10-17: `-assert-config Debug` keeps preconditions' messages, but an arithmetic overflow check compiles to a bare trap - even with `-Onone` (7.4 MB unoptimised, the full library), which is therefore no cheap way to a message; swift-gate 15 pins the silent trap). On a Mac or an iPad the same program runs, because Int is 64 bits there. Use `Int64` (or `Double`) for factorials and large totals, or check the range.",
       "A Swift block whose code the build's fence reader and the site's parser read differently (a lazy line in a list item: pageShapes) has two different keys; the site shows it as plain code with a `plantoir: error:` line naming it (siteDisagrees, words.blockNotCompiled). A Swift fence the build's reader cannot see is never compiled, for the same reason.",
-      "Swift is compiled by the launcher on a Mac. Windows has no container and compiles nothing in v1.8 (swift.reasons.notOnWindows); deploy.py's own rebuild for a different web address uses only what a preview already compiled.",
-      "The first preview with a Swift block downloads about 1.3 GB and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once.",
+      "Swift is compiled by the launcher, before the build: on a Mac in the Swift image, on Windows (since v1.8.6, #570) with the swift.org Windows toolchain fetched on first use (swift.windows). deploy.py's own rebuild for a different web address uses only what a preview already compiled.",
+      "The first preview with a Swift block downloads about 1.3 GB on a Mac and takes a few minutes (the Swift image, built once per Mac and kept); after that a new block takes about 1-2 s to compile (Embedded) or 7-10 s (the full library, most of it wasm-opt), several at once. On Windows the first time downloads about 2.3 GB (about 30 s on a fast line, about 6 minutes at 50 Mbit/s) and keeps about 0.9 GB; a new block then takes about 5-10 s (Embedded) or about 50 s (the full library, almost all of it wasm-opt), measured on an i5-8365U.",
       "Live input (#583) needs a page its host sends the isolation headers for (isolation): a folder publish, a host that strips headers, a page shown inside a learning platform's frame, a preview opened from another device over the network (not a secure context) and Safari or iPadOS before 15.2 all get the input box, with words.inputAhead.",
       "A runner page that also shows a frame, or a picture, script or stylesheet from another website, keeps the input box (isolation.notLive, ruling Q1); Media PDF frames count as frames (ruling Q4 - COEP on /Media/* was measured to fix the frame in Safari, and is not done in v1.8.1). The rule reads the built page's own HTML, not the stylesheets it links: a picture from another website named only inside a linked stylesheet is not seen (none of Plantoir's own does).",
       "An autorun that asks for input holds the page's one run until the student answers, and queued autoruns wait (liveInput.stop).",

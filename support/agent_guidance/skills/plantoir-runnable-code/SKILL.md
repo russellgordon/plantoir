@@ -327,8 +327,11 @@ Fix the code and preview again. Check every Swift block you write compiles
   and takes a few minutes, once, to get Swift ready; later previews compile
   only blocks that changed (a second or two each). Previewing while offline
   the first time leaves the blocks "not ready" until the next preview online.
-- Plantoir on Windows cannot make Swift blocks runnable yet: they show "not
-  ready". Preview the course on a Mac.
+- On Windows (since Plantoir 1.8.6) the first preview with Swift downloads
+  about 2.3 GB, once, and keeps about 0.9 GB; the preview says how far it has
+  got. A new block then takes about 5-10 s to compile, or about a minute when
+  it needs the full standard library - one more reason to prefer
+  `print("Total: \(total)")` to `print("Total:", total)`.
 - After Plantoir is updated, the next preview makes every Swift program
   again; until it can (offline, or not enough free space), the site keeps the
   programs from before, and the build says so on a `plantoir: note:` line.

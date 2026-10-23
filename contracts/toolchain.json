@@ -249,5 +249,110 @@
       }
     ],
     "rejected": "The toolchain in the website builder's image (every teacher would download 1.3 GB for a language most never use); a Docker socket in the main container so the build could start this one (a container that can start containers can do anything on the Mac); SwiftPM per block (about 1 s more each, Phase 0); one module per course with every block an entry point (Path B: the full library is 0.9 MB brotli per block, not the 17 MB once feared, and Path B would rewrite top-level code into functions, changing what `main.swift` means); a hand-bumped version in the cache key instead of hashing the recipe (#485's reason)."
+  },
+  "swiftWindows": {
+    "note": "#570, v1.8.6: what Windows fetches to compile a course's ```swift run blocks (shared-rules.json -> codeRunnerBlocks.swift.windows), the counterpart of the mac's swiftImage. A top-level key of its own, NOT under `pins`, for swiftImage's reason: both apps' pin tests read every pin as a line of the root Dockerfile. Windows has no container (since 2026-08-19), so there is no image: preview.ps1 runs scripts/swift_windows_fetch.py, in the foreground as the mac builds its image, the first time a preview has a block to compile. It downloads the swift.org Windows installer, checks it, takes out only the compiler and its runtime without administrator rights, and keeps about 0.9 GB under %LOCALAPPDATA%\\Plantoir\\swift\\6.4.0. A teacher who never writes Swift never downloads it. scripts/test_swift_windows.py reads every value here.",
+    "version": "6.4.0",
+    "home": "%LOCALAPPDATA%\\Plantoir\\swift\\6.4.0",
+    "configuration": "noasserts",
+    "configurationWhy": "The bundle installs the ASSERTS toolchain by default (OptionsInstallAssertsToolchain = 1). noasserts (bld.noasserts) is the release configuration, the one closest to the Linux tarball the mac's image carries; every swift-gate fragment compiled with it to exactly the mac's sizes (2026-10-22). The asserts build was not measured.",
+    "installer": {
+      "url": "https://download.swift.org/swift-6.4.0-release/windows10/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-windows10.exe",
+      "bytes": 2097914680,
+      "sha256": "76169a85bcba82854a0cd8f9655ffb74b3758d60c35a245457510095f2823c03",
+      "authenticodeSubjectContains": [
+        "CN=Apple Inc.",
+        "O=Apple Inc."
+      ],
+      "containerOffset": 1312800,
+      "cabinetBytes": 2096591258,
+      "cabinetFiles": 33,
+      "why": "The ONLY Windows artifact swift.org publishes (releases.json lists no Windows checksum; .zip, .exe.sig and .msi all answer 404 - probed 2026-10-22), so the SHA-256 here, taken from the file itself, is the check that matters; the Authenticode signature (Apple Inc.) is defence in depth, the one signature Windows has (there is no GPG .sig). The bundle's payloads sit in ONE solid LZX cabinet attached at containerOffset: 'MSCF' there, cbCabinet = cabinetBytes, 33 files, and offset + cabinetBytes ends 10,622 bytes before the end of the file (the signature). /layout copies only installer.exe, and an HTTP Range fetch of just the payloads cannot be decoded (a solid folder: measured MISMATCH for all four), so the 2.1 GB download is unavoidable."
+    },
+    "payloads": [
+      {
+        "id": "a1",
+        "name": "bld.noasserts.msi",
+        "bytes": 670027,
+        "sha512": "460A71E166F02D0969E73F81FE4C5743BAECF890341AA9DA8B5EEE8FE574A1C7799925C53E8CA6C881E33B18D134794C5392BB86AC79944E011029823C91B049"
+      },
+      {
+        "id": "a14",
+        "name": "bld.noasserts.cab",
+        "bytes": 380990566,
+        "sha512": "03644C0C321B2D6D0758D6AFABFBD92E9C6743FA8414D0FEAD67F3D3D7395665F7CD2CD40D84660ADAA1C3229D82882B82507BDC465B7C7B0140D3ECBACBCBAC"
+      },
+      {
+        "id": "a10",
+        "name": "rtl.amd64.msi",
+        "bytes": 450560,
+        "sha512": "CB8D7D58D8246F3AB7622EC8CB9F7BC98BEA1696EB202FAAD6143BDF3FDA5FCAC17C6810FAF5EF8BCAC51B642BAB7D5A778757F6C69795C17C76BA9A8ABE21DE"
+      },
+      {
+        "id": "a23",
+        "name": "rtl.amd64.cab",
+        "bytes": 37273685,
+        "sha512": "8E4A63D838246E47E4C06D5FB24BDC080C32B24DFA4CEE89206F6A76002DA07C0E8745E892B30DA25CF52053B7957FDE00BE76A7AD9DB1E2E29091F4BA93807E"
+      }
+    ],
+    "payloadsWhy": "The compiler, clang and wasm-ld (bld.noasserts) and the Swift runtime DLLs with the VC++ runtime (rtl.amd64), by their ids in the attached cabinet. The SHA-512s are Apple's own, from the bundle's Burn manifest (Payload/@Hash), so a payload that is not the one Apple built is refused. Each is taken out with Windows' own expand.exe -F:<id> and installed into a folder with `msiexec /a <msi> TARGETDIR=<dir> /qn`, an administrative extraction that needs no elevation (measured: exit 0, no UAC, not elevated).",
+    "wasmSdk": "swiftImage -> pins -> wasmSdk",
+    "wasmSdkWhy": "The SAME artifact bundle as the mac's image, by its pin (one url, one SHA-256), unpacked with Windows' own tar.exe. `swift sdk install` is NOT used: it needs MSVC's link.exe (Visual Studio) and a side-by-side folder only the IDE MSI carries (measured), and installing is only unpacking.",
+    "binaryen": {
+      "value": "version_133 x86_64-windows",
+      "url": "https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-x86_64-windows.tar.gz",
+      "bytes": 111045528,
+      "sha256": "17a2cbeac6b5693c5fbafab3838d3c65fd9c1eb38b05f5baec6c657e8c84995b",
+      "member": "binaryen-version_133/bin/wasm-opt.exe",
+      "why": "wasm-opt only (10,343,424 B, fully static: KERNEL32 and SHELL32), the mac's version. Kept OUTSIDE the compiler's bin, because clang runs any wasm-opt it finds on PATH (Phase 0 trap 1). Matches GitHub's asset digest. arm64-windows exists and is not pinned: Plantoir for Windows is win-x64 only."
+    },
+    "trim": {
+      "remove": [
+        "usr/lib/swift",
+        "usr/lib/swift_static",
+        "usr/include",
+        "usr/share",
+        "usr/bin/clang++.exe",
+        "usr/bin/clang-cl.exe",
+        "usr/bin/clang-cpp.exe",
+        "usr/bin/clang-scan-deps.exe",
+        "usr/bin/lld.exe",
+        "usr/bin/ld.lld.exe",
+        "usr/bin/ld64.lld.exe",
+        "usr/bin/lld-link.exe",
+        "usr/bin/swift.exe",
+        "usr/bin/swift-help.exe",
+        "usr/bin/swift-api-digester.exe",
+        "usr/bin/swift-symbolgraph-extract.exe",
+        "usr/bin/swift-demangle.exe",
+        "usr/bin/dsymutil.exe",
+        "usr/bin/llvm-*.exe",
+        "usr/bin/LTO.dll",
+        "usr/lib/clang/*/lib"
+      ],
+      "mustKeep": [
+        "usr/bin/swiftc.exe",
+        "usr/bin/swift-frontend.exe",
+        "usr/bin/swift-autolink-extract.exe",
+        "usr/bin/clang.exe",
+        "usr/bin/wasm-ld.exe",
+        "usr/bin/swift-plugin-server.exe"
+      ],
+      "vcRuntime": [
+        "vcruntime140.dll",
+        "vcruntime140_1.dll",
+        "vcruntime140_threads.dll",
+        "msvcp140.dll",
+        "msvcp140_1.dll",
+        "msvcp140_2.dll",
+        "msvcp140_atomic_wait.dll",
+        "msvcp140_codecvt_ids.dll"
+      ],
+      "why": "Measured 2026-10-22: the extracted noasserts toolchain is 1,874,323,927 B; with the host libraries, headers, docs, duplicate executables and llvm-* tools removed it is 533,227,801 B and compiles every swift-gate fragment to the same bytes. The tools load VCRUNTIME140, VCRUNTIME140_1 and MSVCP140, which a PC without the VC++ redistributable lacks, so the rtl MSI's copies are put beside them. usr/lib/clang/<v>/include stays: clang needs it for FlushBeforeRead.c."
+    },
+    "keptBytes": 898256818,
+    "keptBytesWhy": "toolchain 533,227,801 + SDK 354,685,593 + wasm-opt 10,343,424 (measured 2026-10-22). Uninstalling Plantoir leaves it in %LOCALAPPDATA%\\Plantoir\\swift, as it leaves the assistant's models.",
+    "measured": "2026-10-22, Lenovo 20QES70500 (Intel i5-8365U, 4 cores / 8 threads, 16 GB, Windows 11 Pro 26200, Ethernet), not elevated: the installer downloads in 24.2 s here (about 87 MB/s; a 50 Mbit/s school line would take about 6 min); everything after the download about 45 s; all 15 swift-gate fragments compile to the mac's exact sizes and pass wasi_run.mjs; the compiled block runs in headless Edge 155 (swift_runner.mjs unmodified). The product path's own first-fetch timings are in documentation/12-windows-app.md.",
+    "rejected": "Carrying Swift in the installer (0.9 GB for every teacher, most of whom never write Swift); `swift sdk install` (needs Visual Studio's link.exe); installer.exe /layout (copies only itself); HTTP Range for just the needed payloads (one solid LZX folder); the asserts toolchain (the bundle's default, larger, not measured); WiX's `wix burn extract` (a .NET tool to ship, where expand.exe is part of Windows); cabinet.dll FDI in-process to avoid carving the cabinet out (the next step if the 4.2 GB moment ever matters); a container or WSL2 (Windows has had neither since 2026-08-19)."
   }
 }

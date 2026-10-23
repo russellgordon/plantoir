@@ -9,7 +9,10 @@ SECOND image, `teaching-quartz-swift:src-<hash>` (support/swift), which the
 launcher on the host starts only when a preview has blocks no earlier build
 compiled - a teacher who never writes Swift never downloads it. The build
 itself never compiles: it runs in the main container, which has no way to
-start another one.
+start another one. On Windows (#570), which has no container, preview.ps1
+runs `plan` with the bundled Python, gets Swift ready the first time with
+swift_windows_fetch.py and compiles with swift_windows_compile.py - the same
+compile.py, adjusted for the host - and the build's `prepare` is this one.
 
 So there are two halves, and this module is both:
 
@@ -129,14 +132,35 @@ def key_of(body: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def toolchain_id(swift_dir=None) -> str:
-    """16 hex: SHA-256 over the recipe files' names and bytes, in order."""
+# On Windows (#570) the id also hashes the compile wrapper and the pins of
+# what is fetched (codeRunnerBlocks.swift.cache.toolchainIdFromOnWindows).
+WINDOWS_RECIPE_FILE = "swift_windows_compile.py"
+
+
+def toolchain_id(swift_dir=None, windows=None, scripts_dir=None) -> str:
+    """16 hex: SHA-256 over the recipe files' names and bytes, in order.
+
+    On Windows each file's CR LF is made LF first (a Windows checkout writes
+    CR LF, and the id must not differ by accident), and the Windows compile
+    wrapper and the hashes of what swift_windows_fetch.py fetches follow, so
+    a Windows cache and a Mac cache never share an id for different
+    compilers. The Mac's id is exactly what it was: nothing is normalised
+    there."""
+    windows = (os.name == "nt") if windows is None else windows
     folder = Path(swift_dir) if swift_dir is not None else toolchain_paths.SUPPORT_DIR / "swift"
     digest = hashlib.sha256()
-    for name in RECIPE_FILES:
+
+    def add(name: str, data: bytes) -> None:
         digest.update(name.encode("utf-8") + b"\0")
-        digest.update((folder / name).read_bytes())
+        digest.update(data.replace(b"\r\n", b"\n") if windows else data)
         digest.update(b"\0")
+    for name in RECIPE_FILES:
+        add(name, (folder / name).read_bytes())
+    if windows:
+        scripts = Path(scripts_dir) if scripts_dir is not None else Path(__file__).resolve().parent
+        add(WINDOWS_RECIPE_FILE, (scripts / WINDOWS_RECIPE_FILE).read_bytes())
+        import swift_windows_fetch
+        digest.update(b"swiftWindows\0" + swift_windows_fetch.id_digest() + b"\0")
     return digest.hexdigest()[:16]
 
 
@@ -231,7 +255,7 @@ def clear_failures(cache: Path) -> int:
     return cleared
 
 
-def plan(course_dir, cache_root, swift_dir=None, now=None, full_rebuild=False) -> dict:
+def plan(course_dir, cache_root, swift_dir=None, now=None, full_rebuild=False, windows=None) -> dict:
     """
     Write a job for every Swift block the cache does not hold, into a job
     folder of this run's own. Answers {"root", "cache", "jobs", "count"}:
@@ -241,7 +265,7 @@ def plan(course_dir, cache_root, swift_dir=None, now=None, full_rebuild=False) -
     """
     now = time.time() if now is None else now
     root = Path(cache_root)
-    cache = root / toolchain_id(swift_dir)
+    cache = root / toolchain_id(swift_dir, windows)
     if full_rebuild:
         clear_failures(cache)
     texts = []
@@ -298,13 +322,12 @@ def _reasons() -> dict:
 
 
 def missing_reason(state, windows: bool) -> str:
-    """Why a block has no binary (codeRunnerBlocks.swift.reasonCases): Windows
-    cannot compile Swift yet (option (b), #493); the launcher found too little
-    free space; the Swift builder could not be downloaded; or no program and
-    nothing recorded (a compile that did not finish, or no launcher ran, as
-    in deploy.py's own rebuild)."""
-    if windows:
-        return "notOnWindows"
+    """Why a block has no binary (codeRunnerBlocks.swift.reasonCases), the
+    same on both platforms since Windows compiles Swift too (#570): the
+    launcher found too little free space; Swift could not be downloaded; or
+    no program and nothing recorded (a compile that did not finish, or no
+    launcher ran, as in deploy.py's own rebuild). `windows` decides only
+    what the sentence says the download is (downloadGigabytes)."""
     if isinstance(state, dict) and state.get("state") == "noRoom":
         return "noRoom"
     if isinstance(state, dict) and state.get("state") == "notDownloaded":
@@ -346,19 +369,32 @@ def _file_line_of(block: dict, key: str, source_text):
     return None
 
 
-def reason_sentence(problem: dict, gigabytes) -> str:
+def download_gigabytes(windows=None) -> str:
+    """codeRunnerBlocks.swift.downloadGigabytes for the platform the build
+    runs on: what the first download is, in notDownloaded's sentence."""
+    windows = (os.name == "nt") if windows is None else windows
+    try:
+        import contracts
+        sizes = contracts.section("shared-rules", "codeRunnerBlocks", "swift", "downloadGigabytes")
+        return sizes["windows" if windows else "mac"]
+    except Exception:
+        return ""
+
+
+def reason_sentence(problem: dict, gigabytes, windows=None) -> str:
     import site_health
     reasons = _reasons()
     text = reasons.get(problem["reason"]) or reasons["notCompiled"]
-    return site_health.filled(text, {"said": problem.get("said") or "", "gigabytes": gigabytes})
+    return site_health.filled(text, {"said": problem.get("said") or "", "gigabytes": gigabytes,
+                                     "downloadGigabytes": download_gigabytes(windows)})
 
 
-def error_line(problem: dict, gigabytes) -> str:
+def error_line(problem: dict, gigabytes, windows=None) -> str:
     """`plantoir: error: Units/Loops.md: swift block 2, line 14: ...`."""
     where = f"{problem['page']}.md: swift block {problem['block']}"
     if problem.get("line") is not None:
         where += f", line {problem['line']}"
-    return f"plantoir: error: {where}: {reason_sentence(problem, gigabytes)}"
+    return f"plantoir: error: {where}: {reason_sentence(problem, gigabytes, windows)}"
 
 
 def _write_if_changed(path: Path, data: bytes) -> bool:
@@ -384,7 +420,7 @@ def prepare(pages: list, output_dir, cache_root, swift_dir=None, windows=None, p
     windows = (os.name == "nt") if windows is None else windows
     root = Path(cache_root)
     try:
-        cache = root / toolchain_id(swift_dir)
+        cache = root / toolchain_id(swift_dir, windows)
     except OSError:
         cache = None
     state = _read_json(root / STATE_FILE)
@@ -478,7 +514,7 @@ def prepare(pages: list, output_dir, cache_root, swift_dir=None, windows=None, p
         printer(f"🦅 {ready} of {blocks} Swift {noun} on this site ready to run"
                 + (f" ({copied} copied in)." if copied else "."))
     for problem in problems:
-        printer(error_line(problem, gigabytes))
+        printer(error_line(problem, gigabytes, windows))
     if from_before and notes:
         printer("plantoir: note: " + notes["fromBefore"].replace("{count}", str(from_before)))
     for item in large:
@@ -561,7 +597,8 @@ def prune(root: Path, keep: str, now: float) -> None:
     except OSError:
         return
     for folder in folders:
-        if folder.is_dir() and folder.name not in (keep, JOBS_FOLDER):
+        # The launcher's logs stay (#570: they were removed by every prune).
+        if folder.is_dir() and folder.name not in (keep, JOBS_FOLDER, LOGS_FOLDER):
             shutil.rmtree(folder, ignore_errors=True)
     try:
         entries = list((root / keep).iterdir())
