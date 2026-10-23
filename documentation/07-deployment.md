@@ -818,8 +818,10 @@ another website the headers would break, is sent
 
 - **Netlify** - before the badge rule's block, which keeps lines it did not
   write; Netlify applies every matching rule, so a page gets the `/*` policy
-  and its own. Paths as a browser asks, lower-cased (Netlify 301s capitals);
-  no rule cap.
+  and its own. Paths as a browser asks, lower-cased (Netlify 301s a PAGE
+  asked for with capitals to its lower case; every other file it serves in
+  any case with a 200, measured 2026-10-23 - see "Page addresses on
+  Netlify" below); no rule cap.
 - **Cloudflare Pages** - before wrangler uploads. Paths fully
   percent-encoded, case-sensitive. **At most 100 rules** per `_headers`:
   input pages first; the rest keep the box, and the publish prints one
@@ -836,6 +838,110 @@ publish (and the preview) on a `plantoir: note:` line with why
 (`words.notLiveBecause`). `verify-deploy.sh`'s `check_engine` reads the
 headers back on the preview and both hosts. Windows publishes through the
 same `deploy.py`, so it writes the same block.
+
+### Page addresses on Netlify: lower case at upload (#628, v1.9.0)
+
+**The problem.** Netlify answers a page asked for with any capital letter
+with a 301 to the same path in lower case, and Quartz writes every page link
+with the page's own capitals (`./All-Classes/Thread-1,-Day-6/../../Concepts/
+Functions`), so every click on a Netlify site paid one redirect before the
+page came back. Measured 2026-10-23 from this Mac
+against `ics3u-s2-2026-27.russellgordon.ca`, built by 1.8.5, HEAD and GET
+only:
+
+| Asked for | Netlify answers |
+|---|---|
+| `/Concepts/Functions`, `/concepts/Functions`, `/CONCEPTS/FUNCTIONS`, `/Concepts/Functions.html` | **301** to `/concepts/functions` |
+| `/concepts/functions`, `/concepts/functions.html` | 200 |
+| `/All-Classes/Thread-1,-Day-6`, `/Key-Links` | 301 to the lower-case path, commas unchanged |
+| `/Media/Functions---Scope-Highlight.png`, `/MEDIA/...`, `/media/...` | **200 in every case** |
+| `/Index.css`, `/index.CSS`, `/static/contentindex.json` | **200 in every case** |
+| `/concepts` (folder, no slash) / `/key-links/` (file, slash) | 301 to `/concepts/` / 301 to `/key-links` |
+| a query string | survives the 301 |
+| timing, five cache-busted pairs | the 301 hop 0.12-0.17 s; the lower-case 200 0.19-0.30 s |
+
+So only links that lead to a PAGE pay, and every one of the home page's 17
+same-site links, lower-cased, answered 200 (17/17). Netlify does not let a
+site opt out of the redirect for static files. Cloudflare Pages is
+case-sensitive (06 → I11: a lower-case request is a 404), so nothing there
+may change; nor in a folder publish or the preview, which serve the files as
+named.
+
+**What happens, in two halves** (`contracts/shared-rules.json` →
+`netlifyPageAddresses`, run by `scripts/test_netlify_paths.py`):
+
+1. **At upload, in memory, Netlify only.** `deploy.py`'s
+   `_build_files_manifest` passes each `.html` file, the root `sitemap.xml`
+   and the root `index.xml` (RSS) through `netlify_paths.served_file` before
+   the SHA-1 is taken; `_upload_required_files` (signature unchanged) sends
+   the bytes that digest names, kept by digest in
+   `_SERVED_BYTES_BY_DIGEST`. `public/` is NEVER written, so a Cloudflare
+   destination in the same publish, a folder publish and the preview get the
+   build's bytes. What moves: the path of `href` on `<a>` and `<area>`, of
+   `<link rel=canonical>` and `<meta http-equiv=refresh>` (Quartz's alias
+   pages), of every sitemap `<loc>` and every feed `<link>` - ASCII A-Z to
+   a-z, in the RAW attribute text, in place. Never a character reference
+   (`&Eacute;` lower-cased would be `&eacute;`, a different letter), never
+   a %-escape's hex digits, never the query or the fragment (heading ids are
+   case-sensitive), never `data-slug` (eight on a typical page; Quartz's
+   explorer and graph key on it), never the feed's `<guid>` or
+   `<description>`, never a script, a style, `src` or another host. Because
+   only letters change and only inside link values, every inline script and
+   so the CSP's hash list is byte-identical (pinned), and the alias page's
+   `<link rel="canonical" href="...">` is still found by Quartz's
+   `fetchCanonical` regex (pinned). Each page's `<html>` tag gains
+   `data-plantoir-paths="lowercase"`; a file with no `<html>` tag (a
+   teacher's own HTML under `Media/`) has its links rewritten and no marker,
+   and a page with a `<base>` keeps its links.
+2. **At build, every build, idempotent** (`build_site._wire_served_case`,
+   marker `PLANTOIR-SERVED-CASE`, in `wire_quartz_additions` beside the
+   isolation edits): the router (`spa.inline.ts`, in `getOpts` so
+   `isSamePage` compares like with like, and at the top of `navigate`, which
+   the graph and search reach through `spaNavigate`), the link previews
+   (`popover.inline.ts`) and search's result previews (`search.inline.ts`,
+   whose `fetchContent` fetches the page itself) lower-case a same-origin URL's pathname, keeping its
+   query, fragment and %-escapes, ONLY when the page carries the marker. No
+   marker - the preview, a folder, Cloudflare - and nothing changes. The
+   script lands in `postscript.js`, a file, so the CSP does not move. An
+   anchor that moved warns and leaves the file as Quartz wrote it.
+
+**Failure direction: today's behaviour, never a broken link.** Netlify
+answers a page in any case (a 301 at worst) and every other file in any case
+(a 200), so a link this misses, or lower-cases needlessly (a picture, a
+PDF), costs at most the hop that exists now. ASCII only for the same reason:
+a fold Netlify does not make (Python's `'İ'.lower()` is two characters) can
+never be produced; what Netlify does with a non-ASCII capital it does today.
+
+**One-time cost.** Deterministic and idempotent, so "Why determinism
+matters" above still holds: the first Netlify publish after updating
+re-uploads every page once (about 206 HTML files on the ICS3U section
+above), and every later delta deploy is as small as before.
+
+**Rejected.**
+
+- *Lower-case the slugs at build* (patch Quartz's slugify): changes every
+  address on every host. Cloudflare is case-sensitive, so every bookmark and
+  pasted link to a Cloudflare section would 404, and the content index,
+  aliases, tags, the explorer's saved folders, the preview, the folder
+  publish and every page address Plantoir derives (isolation rules, today's
+  class for the front page #397, the published-pages record #379) would move
+  with it - for a Netlify-only latency.
+- *Netlify configuration so mixed case serves 200*: Netlify offers no
+  opt-out for static files (its staff on answers.netlify.com: "an intended
+  feature of our platform from which you cannot opt out"); a `_redirects`
+  `200` rule per page is unmeasured, needs hundreds of rules and leaves the
+  address bar mixed case; an Edge Function per request costs more than the
+  hop.
+- *Writing the lower-cased links into `public/`*: a Netlify + Cloudflare
+  pairing uploads the same `public/` to a case-sensitive host.
+- *Rebuilding each value from the parser's decoded attribute*: moves bytes
+  outside the path and turns `&Eacute;` into another letter (plan review).
+
+**Checked live** by `verify-deploy.sh` → `check_page_links` (below). Not
+run at the time of writing: it needs the Netlify and Cloudflare credentials,
+so the live proof is owed before the merge. Run against today's site
+(before the change) it fails as it should: 14 of 15 same-site links on the
+front page answer a case 301.
 
 ### Rate limiting
 
@@ -1333,6 +1439,21 @@ by running that same sequence, which tests the launcher half; that the app
 produces exactly those argument lists is pinned separately by
 `app-rules.json` → `deployArguments`, which both suites run. Between the
 two the pairing is covered; neither half covers it alone.
+
+**Page links (#628), `check_page_links`.** On each Netlify and Cloudflare
+site (alone and in every pairing) it reads every same-site `<a href>` on the
+front page and the borrowed page of runnable code - `<a href>` only, since
+that is what a student clicks - resolves each against its page and asks for
+it WITHOUT following a redirect. Netlify: every one answers 200 and the page
+carries `data-plantoir-paths`; a 301 to the same path in lower case is the
+rewrite failing. Three other redirects are Quartz's own link shapes rather
+than the rewrite, and are COUNTED as their own classes, not failed: `/index`
+→ `/`, `%2C` → `,`, and a file link with a trailing slash. Cloudflare: the
+links keep the build's capitals, no marker, every link 200 apart from those
+classes, and one control - a mixed-case page link asked for in lower case -
+must NOT answer 200 (it prints what Cloudflare does answer, so this file can
+record it). A folder publish is checked to carry no marker
+(`check_no_marker_folder`).
 
 ## The scheduled task never refuses over FOLDER PROBLEMS
 

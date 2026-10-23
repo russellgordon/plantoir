@@ -1167,8 +1167,8 @@ nonisolated enum AssistWording {
     static let menuPlanAlreadyVisible: String = "already visible"
     static let menuPlanAlreadyHidden: String = "already hidden"
 
-    /// The disclosure under the plan table (#622), closed to begin with:
-    /// opening it adds the pages already the way they were asked to be to
+    /// The checkbox under the plan table (#622; a disclosure until #654),
+    /// unticked to begin with: ticking it adds the pages already the way they were asked to be to
     /// the same table. "Show the 16 pages already visible", "Show the 2
     /// pages already hidden", "Show the page already visible". The summary
     /// above the table counts the same pages.

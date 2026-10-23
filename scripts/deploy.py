@@ -27,6 +27,7 @@ import toolchain_paths
 import reference_course
 import contracts
 import isolation_headers
+import netlify_paths
 from collections import Counter
 
 # ---- Host OS signaling & example command helper -----------------------------
@@ -959,27 +960,51 @@ def _remote_path_for(root: Path, file_path: Path) -> str:
     rel = file_path.relative_to(root).as_posix()
     return "/" + rel  # Netlify expects leading slash
 
-def _build_files_manifest(root: Path) -> tuple[dict, dict]:
+# Page addresses on Netlify (#628, contracts/shared-rules.json ->
+# netlifyPageAddresses): the bytes Netlify is sent for a page, sitemap or feed
+# whose links were lower-cased in memory, by the digest the manifest named
+# them with. Content-addressed, so an entry can never hand over the wrong
+# bytes; _upload_required_files reads it, and a file not in it is sent as it
+# is on disk. public/ itself is never written, so a Cloudflare destination in
+# the same publish, a folder publish and the preview get the build's bytes.
+_SERVED_BYTES_BY_DIGEST: dict[str, bytes] = {}
+
+
+def _build_files_manifest(root: Path, own_host: str = "") -> tuple[dict, dict]:
     """
     Return:
       - files_map: { "/path/on/site": "sha1digest" }
       - sha_to_pairs: { "sha1": [(remote_path, relative_local_path), ...] }
+
+    Netlify only. A page's digest is of the bytes Netlify is SENT: its
+    same-site page links lower-cased (#628, netlify_paths.served_file, with
+    `own_host` the section's address for its absolute links).
     """
     files_map: dict[str, str] = {}
     sha_to_pairs: dict[str, list[tuple[str, str]]] = {}
+    _SERVED_BYTES_BY_DIGEST.clear()
+    host = netlify_paths.own_host_of(own_host)
     for f in _iter_public_files(root):
         remote = _remote_path_for(root, f)
-        digest = _sha1_file(f)
+        relative = f.relative_to(root).as_posix()
+        if netlify_paths.rewrites(relative):
+            on_disk = f.read_bytes()
+            served = netlify_paths.served_file(relative, on_disk, host)
+            digest = _sha1_bytes(served)
+            if served != on_disk:
+                _SERVED_BYTES_BY_DIGEST[digest] = served
+        else:
+            digest = _sha1_file(f)
         files_map[remote] = digest
         sha_to_pairs.setdefault(digest, []).append((remote, f.relative_to(root).as_posix()))
     return files_map, sha_to_pairs
 
-def create_delta_deploy(site_id: str, token: str, root: Path, draft: bool = False, async_req: bool = False) -> dict:
+def create_delta_deploy(site_id: str, token: str, root: Path, draft: bool = False, async_req: bool = False, own_host: str = "") -> dict:
     """
     Step 1: POST /sites/{site_id}/deploys with {"files": { "/path": "sha1", ... }}
     Returns a list of "required" digests to upload via PUTs.
     """
-    files_map, sha_to_pairs = _build_files_manifest(root)
+    files_map, sha_to_pairs = _build_files_manifest(root, own_host)
     payload = {"files": files_map}
     if draft:
         payload["draft"] = True
@@ -1010,7 +1035,10 @@ def _upload_required_files(deploy_id: str, token: str, root: Path, required_shas
             print(f"⚠️ Missing local file for {remote_path}; skipping.", flush=True)
             continue
         encoded_path = urllib.parse.quote(remote_path.lstrip("/"), safe="/")
-        items_to_upload.append((encoded_path, local_file))
+        # The bytes the manifest's digest was taken of (#628): a page whose
+        # links were lower-cased for Netlify goes up as that, never as the
+        # file on disk, or Netlify would hold content its digest does not name.
+        items_to_upload.append((encoded_path, local_file, _SERVED_BYTES_BY_DIGEST.get(sha)))
 
     uploaded = 0
     total = len(items_to_upload)
@@ -1027,9 +1055,12 @@ def _upload_required_files(deploy_id: str, token: str, root: Path, required_shas
         # deploy. A 429 (or a transient 5xx/timeout) is therefore an expected
         # event here, not an error: back off — honouring Retry-After when
         # Netlify names a wait — and try that file again.
-        enc_path, loc_file = item
-        with loc_file.open("rb") as f:
-            data = f.read()
+        enc_path, loc_file, served = item
+        if served is not None:
+            data = served
+        else:
+            with loc_file.open("rb") as f:
+                data = f.read()
         headers = {"Content-Type": "application/octet-stream"}
         delay = 1.0
         last_error: Exception | None = None
@@ -1507,7 +1538,9 @@ def main():
     # Always delta deploy to PRODUCTION (as requested)
     print(" Preparing delta deploy manifest…")
     try:
-        manifest_resp = create_delta_deploy(site_id, netlify_token, public_dir, draft=False, async_req=False)
+        # Its page links lower-cased on the way up (#628): the section's own
+        # address is what an absolute link, the sitemap and the feed name.
+        manifest_resp = create_delta_deploy(site_id, netlify_token, public_dir, draft=False, async_req=False, own_host=target_domain)
         deploy_id = manifest_resp.get("id")
         required = manifest_resp.get("required") or []
         sha_to_pairs = manifest_resp.get("_sha_to_pairs") or {}

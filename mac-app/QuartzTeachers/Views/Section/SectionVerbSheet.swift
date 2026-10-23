@@ -127,9 +127,9 @@ final class SectionVerbSheetModel: Identifiable {
     /// `.planned` in place of `body`.
     var planTable: AssistPlanTable?
 
-    /// Whether the plan's disclosure is open (#622): the pages already the
-    /// way they were asked to be, added to the table. Closed for every new
-    /// plan.
+    /// Whether the plan's checkbox is ticked (#622; a checkbox since #654):
+    /// the pages already the way they were asked to be, added to the table.
+    /// Unticked for every new plan.
     var showsAlreadyRight: Bool = false
 
     /// The call waiting on the default button at the plan.
@@ -520,14 +520,14 @@ struct SectionVerbSheet: View {
 
     /// The fewest rows the plan table is tall enough for when pages are
     /// folded under it (#622, the director's ruling on R8): the table is as
-    /// tall as the rows a teacher reads, and opening the disclosure adds the
-    /// rest INSIDE it — the sheet never grows when it opens — so a plan of
+    /// tall as the rows a teacher reads, and ticking the checkbox adds the
+    /// rest INSIDE it — the sheet never grows when it is ticked — so a plan of
     /// one or two changes keeps room for the folded rows to scroll in. Five,
     /// Start of Year's own budget (`StartOfYearSheet.mostPlanRowsShown`).
     static let fewestPlanRowsUnderAFold: Int = 5
 
-    /// The gap between the plan table and the disclosure under it (#622):
-    /// 6 pt, so the disclosure reads as the table's, and so the worst plan
+    /// The gap between the plan table and the checkbox under it (#622, #654):
+    /// 6 pt, so the checkbox reads as the table's, and so the worst plan
     /// stays within `CopyPageChecklist.tallestSheet` (`planTable`).
     static let foldSpacing: CGFloat = 6
 
@@ -535,7 +535,7 @@ struct SectionVerbSheet: View {
 
     /// The plan table's rows as drawn (#622): the rows to read, and the
     /// pages already the way they were asked to be only while the
-    /// disclosure is open. They come last in plan order, so opening it
+    /// checkbox is ticked. They come last in plan order, so ticking it
     /// appends them. A plan with nothing else to read shows every row.
     var drawnPlanRows: [AssistPlanTable.Row] {
         guard let table = model.planTable else {
@@ -553,7 +553,7 @@ struct SectionVerbSheet: View {
         return drawn
     }
 
-    /// The words of the disclosure under the plan table (#622) — "Show the
+    /// The words of the checkbox under the plan table (#622, #654) — "Show the
     /// 16 pages already visible" — or nil when the plan folds nothing away.
     var alreadyRightLabel: String? {
         guard let table = model.planTable, SectionVerbSheet.foldsAlreadyRight(table) else {
@@ -572,9 +572,9 @@ struct SectionVerbSheet: View {
 
     /// The table's height: the rows a teacher reads up to
     /// `mostPlanRowsShown`, then it scrolls inside itself. A `Table` has no
-    /// natural height. It is counted with the disclosure CLOSED, and never
+    /// natural height. It is counted with the checkbox UNTICKED, and never
     /// fewer than `fewestPlanRowsUnderAFold` (or every row, when there are
-    /// fewer) while pages are folded under it, so opening the disclosure
+    /// fewer) while pages are folded under it, so ticking the checkbox
     /// changes neither the table's height nor the sheet's (#622).
     var planTableHeight: CGFloat {
         guard let table = model.planTable else {
@@ -652,7 +652,9 @@ struct SectionVerbSheet: View {
             // takes the height added (`flexibleTableHeight`), its Page column
             // the width.
             .frame(minWidth: SectionVerbSheet.width, idealWidth: SectionVerbSheet.width, maxWidth: .infinity)
-            .background(SheetGrowsToItsMinimum().accessibilityHidden(true))
+            // Grown to every stage's minimum, and fitted to the answer once
+            // there is one (#654): the plan's height is the plan's alone.
+            .background(SheetGrowsToItsMinimum(fitsItsContent: model.stage == .finished).accessibilityHidden(true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("sectionVerbSheet")
             // `.fitted` is what makes a sheet resizable at all — the default
@@ -703,7 +705,7 @@ struct SectionVerbSheet: View {
 
     /// The page plan (#524): the summary, a read-only table with a row for
     /// every page a teacher reads before Go, the pages already the way they
-    /// were asked to be behind a disclosure under it (#622), and the card's
+    /// were asked to be behind a checkbox under it (#622, #654), and the card's
     /// other sentences.
     @ViewBuilder
     var planTable: some View {
@@ -711,26 +713,30 @@ struct SectionVerbSheet: View {
             Text(table.summary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("sectionVerbSheetPlanSummary")
-            // The table and the disclosure under it as one part, 6 pt apart
-            // rather than 12: the disclosure belongs to the table, and the
-            // worst plan (twelve rows, the disclosure and the notes at their
-            // cap) is 616 pt that way and 622 with a full spacing, over the
-            // 620 a 13-inch screen allows (`CopyPageChecklist.tallestSheet`).
+            // The table and the checkbox under it as one part, 6 pt apart
+            // rather than 12: the checkbox belongs to the table, and the
+            // worst plan (twelve rows, the checkbox and the notes at their
+            // cap) is 609 pt that way — 616 with the disclosure #654
+            // replaced, which was 622 with a full spacing, over the 620 a
+            // 13-inch screen allows (`CopyPageChecklist.tallestSheet`). The
+            // cap is the PLAN's: the answer after it is fitted to its own
+            // sentence (`SheetGrowsToItsMinimum.fitsItsContent`).
             VStack(alignment: .leading, spacing: SectionVerbSheet.foldSpacing) {
                 planRowsTable
                 if let alreadyRightLabel {
-                    // No content of its own: opening it adds the rows to the
-                    // table above (`drawnPlanRows`), one table and one sort,
-                    // as #589 chose one table over two.
-                    DisclosureGroup(
+                    // A checkbox, not a disclosure (#654): ticking it adds
+                    // the rows to the table ABOVE it (`drawnPlanRows`), one
+                    // table and one sort, as #589 chose one table over two —
+                    // so a triangle promised a fold that never opened below
+                    // it.
+                    Toggle(
                         alreadyRightLabel,
-                        isExpanded: Binding(
+                        isOn: Binding(
                             get: { return model.showsAlreadyRight },
-                            set: { isOpen in model.showsAlreadyRight = isOpen }
+                            set: { isTicked in model.showsAlreadyRight = isTicked }
                         )
-                    ) {
-                        EmptyView()
-                    }
+                    )
+                    .toggleStyle(.checkbox)
                     .accessibilityIdentifier("sectionVerbSheetPlanAlreadyRight")
                 }
             }
