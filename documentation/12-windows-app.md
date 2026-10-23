@@ -8009,7 +8009,11 @@ launcher writes for prepare:
 | 11 | `notDownloaded` | Offline, or a download that was not what was pinned. |
 | 12 | none, so the build says `notCompiled` | Another installation running, an unpack that failed, or the wait for another launcher gave up. |
 
-The reasons are the mac's own. `notDownloaded`'s
+The reasons are the mac's own, and since #642 (v1.9.0) the mac maps its
+image build's reasons to these same states (`codeRunnerBlocks.swift.mac` →
+`stateForReason`, held equal to this table by `test_swift_blocks.py`), writing
+`{reason: …}` beside `state` - a record nothing reads, which Windows may copy
+but need not. `notDownloaded`'s
 "(the first time downloads about {downloadGigabytes} GB)" is filled per
 platform (`swift.downloadGigabytes`: 1.3 on a Mac, 2.3 here), so the mac's
 rendered sentence is byte for byte what it was.
