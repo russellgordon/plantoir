@@ -1775,7 +1775,8 @@ block's first line; add `readonly`, `stdin` or (sparingly) `autorun` after
 it. Write instructions that work whether the page asks as the program runs
 or uses the box ("when it asks, type your name"), never "type in the box".
 Preview and press Run on each block; a block that shows as plain code is
-named on a `plantoir: error:` line. The skill `plantoir-runnable-code`
+named on a `plantoir: error:` line and, since #567, as a folder problem in
+the app (`runnableCodeShownAsPlainCode`). The skill `plantoir-runnable-code`
 (support/agent_guidance) carries the whole of this for an assistant.
 
 **Rejected** (with the reasons above and in 02 and 05): Skulpt; Custom
@@ -1826,7 +1827,8 @@ exists, `data-runner-unready="<reason>"` when the build said why not (then
 Run is off and `words.notReady` shows), and when the key is not listed at
 all - the build's reader and Quartz's read the block differently, or the
 page changed under a running preview - plain code and a `plantoir: error:`
-line with `words.blockNotCompiled` (review S2's safety net, extended).
+line with `words.blockNotCompiled` (review S2's safety net, extended), and
+the `runnableCodeShownAsPlainCode` folder problem since #567.
 
 **The thread** is `static/swift/plantoir-swift-worker.js`, a module worker
 like Python's, with the hand-rolled WASI shim beside it
