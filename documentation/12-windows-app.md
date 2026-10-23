@@ -7568,6 +7568,14 @@ its branch normalises nothing, and a test recomputes the old formula.
   (Node 20 with `--experimental-websocket`, against that build):
   `OK: {"embeddedFirstRun":{"ms":70,"bytes":62347},"fullFirstRun":{"ms":123,"bytes":3453463},"stopMs":7}`.
   The WebView2 pane (the same Chromium) was not driven.
+- **`verify-deploy.ps1`**, against `~/Desktop/plantoir-deploy-verify` (ICS3U,
+  with Swift already ready on the PC), took 14 minutes:
+  **148 passed, 0 failed, 0 skipped**. Those are the totals the earlier
+  measurement predicted for a clean run once the eight standing Swift skips
+  became checks. The page's program (45,844 B) answered HTTP 200 as
+  `application/wasm` from Netlify, Cloudflare and both pairings; every folder
+  publish carried it in `static/swift-wasm/`; and the preview and the
+  publish that rebuilt said nothing was wrong with the block.
 - **A trap for whoever runs these here:** with `core.autocrlf=true`,
   swift-gate's `.expected` and `.stdin` are CR LF. `wasi_run.mjs` and
   `swift_runner.mjs` both FAIL on line endings alone (the full-library
