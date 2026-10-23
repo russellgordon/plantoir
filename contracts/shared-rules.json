@@ -1146,9 +1146,44 @@
         {
           "expect": false,
           "path": "All Classes/Unit 1, Day 1.md"
+        },
+        {
+          "name": "a renamed curriculum folder the course declares is curriculum",
+          "expect": true,
+          "path": "Expectations/B2.1.md",
+          "curriculumFolders": ["Expectations"],
+          "why": "#614. A curriculum folder renamed to a name without the word is still the course's curriculum folder, because the rename wrote curriculum_folders and the build maps the folder from there."
+        },
+        {
+          "name": "a declared folder matches in any letter case, at any depth inside it",
+          "expect": true,
+          "path": "expectations/Strand B/B2.1.md",
+          "curriculumFolders": ["Expectations"],
+          "why": "#614. A declared name matches in any letter case, and everything inside the folder counts, as the build's recursive map does."
+        },
+        {
+          "name": "an undeclared folder without the word is not curriculum",
+          "expect": false,
+          "path": "Expectations/B2.1.md",
+          "curriculumFolders": [],
+          "why": "#614. Not declared and not named for the curriculum: the rule is not widened to guess."
+        },
+        {
+          "name": "a declared name is a top-level folder, not a subfolder that shares it",
+          "expect": false,
+          "path": "Concepts/Expectations/B2.1.md",
+          "curriculumFolders": ["Expectations"],
+          "why": "#614. A declared name is a TOP-LEVEL folder (after a section folder, if the page is in one), the one the build maps. A lesson subfolder that happens to share the name is not it."
+        },
+        {
+          "name": "the name rule is kept beside the declared folders",
+          "expect": true,
+          "path": "Ontario Curriculum/B2.1.md",
+          "curriculumFolders": ["Expectations"],
+          "why": "#614. A course made from scratch declares nothing, and the build's own fallback finds its folder by name. A page wrongly kept up costs nothing students did not already see; a page wrongly hidden breaks every class that embeds it and the coverage map that links it."
         }
       ],
-      "note": "Which pages the ASSISTANT offers as a course's expectations: any page under a FOLDER segment containing 'curriculum', case-insensitive; the FILE name is ignored. It used to say it matched build_site.py's own rule exactly. Since #128 it does not quite: the build maps the curriculum folders a course DECLARES (curriculum_folders), and a declared folder need not say 'curriculum' - a College Board folder renamed 'AP CSP' still has its map, while this rule stops offering its pages. That gap is the assistant's, is known, and is left for its own issue rather than widened here."
+      "note": "Which pages the ASSISTANT treats as curriculum - offered as a course's expectations, never taken down or drafted by following links (followingLinks.neverTakenDownByFollowingLinks), and left out of the already-visible list (#607). Since #614 a page is curriculum when EITHER (1) its first folder, after a section folder (`section<n>`) if the page is in one, equals a name the course declares in curriculum_folders (the list, then the legacy curriculum_folder), ignoring letter case; OR (2) any of its FOLDER segments contains 'curriculum', ignoring letter case. The FILE name is never part of it (#615). A case may carry `curriculumFolders`: write it to the course's course_config.json as `curriculum_folders` before the course is read; absent or empty means the course declares none. Paths are relative to the course, and a harness may put them inside `section1/`. Until #614 only (2) applied: a curriculum folder renamed without the word (the rename writes curriculum_folders, and the build maps it from there) lost its protection, so hiding a class took its expectation pages down and Get Ready for the Start of the Year drafted them. The name rule was KEPT because the two errors are not equal: a page wrongly kept up was already visible, while a page wrongly hidden breaks every class that embeds it. REJECTED: the disk-walking resolved folders (narrower: an empty declared folder is left out, and the name-rule folder drops once a declared one holds pages); matching a declared name at any depth (wider than the build); intersecting with shared_folders (the build does not). This is the assistant's own rule; build_site.py's `_is_in_curriculum_folder` has no caller."
     },
     "isExpectationCode": {
       "cases": [
@@ -1576,7 +1611,7 @@
       "transitive": true,
       "disclosedInThePlan": true,
       "why": "Publishing a page whose links lead somewhere students cannot see is the one thing publishing must never do, so it always takes what it links to, and what those link to in turn. The plan names every page that will become visible, so a teacher agreeing to publish one class can see the four pages going with it. These three stay TRUE alongside stopsAtAClassPage below: the walk is still transitive and still takes what a page links to, it has ONE stop, and the plan names the classes it stopped at as well as the pages it took.",
-      "casesNote": "Run through a REAL publish on a course laid out from `pages`, the same harness as stopsAtAClassPage.cases. A page is written with frontmatter (a title and whether students see it) and then a BODY: a page carrying `links` gets a one-sentence body and then one `See [[name]].` paragraph per link (an empty list: the sentence alone); a page carrying `body` gets that text EXACTLY as written instead, byte for byte, so a link can sit in a table with its pipe escaped. A page carries one or the other, never both - a harness given both must fail the case rather than choose. After the publish, each page's body - the text after its frontmatter - must be byte-identical to what was written: a publish changes whether students see a page, never what the page says, and a publish that 'tidied' a table's `\\|` would split the cell. Added by #294; what counts as a link is readingALink. A page that is not a class may carry `folder`: it is then written as a course-level page inside a folder of that name (relative to the course) rather than wherever the harness keeps such pages, so a folder test like isCurriculum can see it; a class page never carries one, and a harness given one on a class must fail the case rather than ignore it. A case may carry `expectAlreadyRight`: lay the same pages out again, ask for the PLAN of the same publish, and the titles it reports as already visible must be exactly this list, in any order - an empty list means none. A case without the field asserts nothing about that list. Added by #607.",
+      "casesNote": "Run through a REAL publish on a course laid out from `pages`, the same harness as stopsAtAClassPage.cases. A page is written with frontmatter (a title and whether students see it) and then a BODY: a page carrying `links` gets a one-sentence body and then one `See [[name]].` paragraph per link (an empty list: the sentence alone); a page carrying `body` gets that text EXACTLY as written instead, byte for byte, so a link can sit in a table with its pipe escaped. A page carries one or the other, never both - a harness given both must fail the case rather than choose. After the publish, each page's body - the text after its frontmatter - must be byte-identical to what was written: a publish changes whether students see a page, never what the page says, and a publish that 'tidied' a table's `\\|` would split the cell. Added by #294; what counts as a link is readingALink. A page that is not a class may carry `folder`: it is then written as a course-level page inside a folder of that name (relative to the course) rather than wherever the harness keeps such pages, so a folder test like isCurriculum can see it; a class page never carries one, and a harness given one on a class must fail the case rather than ignore it. A case may carry `expectAlreadyRight`: lay the same pages out again, ask for the PLAN of the same publish, and the titles it reports as already visible must be exactly this list, in any order - an empty list means none. A case without the field asserts nothing about that list. Added by #607. A case may carry `curriculumFolders`: write it to the course's course_config.json as `curriculum_folders` before the course is read, and lay out every page of the case (the plan's too) in that course; absent means none declared (curriculumRules.isCurriculumPage). Added by #614.",
       "cases": [
         {
           "name": "links in a table, with aliases, are followed - and still stop at a class",
@@ -1734,6 +1769,20 @@
           "expectUntouched": ["A1.4", "Glossary"],
           "expectAlreadyRight": ["Glossary"],
           "why": "#607. A curriculum page is visible because nothing marks it hidden - the build has no rule that keeps it so - and a class citing six expectations listed six 'already visible' rows above the ones a teacher needs to read, and counted them in the plan's summary. So the publish plan leaves a curriculum page the walk reached out of its already-visible list, by the same folder test as neverTakenDownByFollowingLinks (any folder segment containing 'curriculum', so 'Ontario Curriculum' counts). Only that list: A1.5 is hidden, so it is still a change and still goes up, or the class would link to a page students cannot open; Glossary shows the list is trimmed, not emptied. A curriculum page the teacher NAMED stays listed - they asked about it. The hide plan is unchanged."
+        },
+        {
+          "name": "a curriculum page in a renamed folder is not listed as already visible",
+          "curriculumFolders": ["Expectations"],
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "links": ["A1.4", "Glossary"]},
+            {"title": "A1.4", "folder": "Expectations", "isClassPage": false, "visible": true, "links": []},
+            {"title": "Glossary", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3"],
+          "expectVisible": ["Unit 2, Day 3"],
+          "expectUntouched": ["A1.4", "Glossary"],
+          "expectAlreadyRight": ["Glossary"],
+          "why": "#614, the #607 case for a folder the course declares in curriculum_folders whatever it is called (curriculumRules.isCurriculumPage). The rename wrote the key and the build maps the folder from it, so the plan leaves A1.4 out of its already-visible list exactly as it leaves out a page in a folder named 'Curriculum'. Glossary shows the list is trimmed, not emptied."
         }
       ]
     },
@@ -1741,7 +1790,7 @@
       "takesALinkedPageOnlyWhenNothingElseNeedsIt": true,
       "aReferrerCountsOnlyWhenVisible": true,
       "why": "'X still links to it' is a reason to keep a page published only when students can SEE X. Counting hidden referrers left pages visible and reachable from nothing, held up by drafts nobody had published - kept alive by a page that is not there. Safe in one direction because of the other: publishing is transitive, so a page taken down here comes back the moment anything visible needs it again. That argument had ONE exception from 2026-09-19 (issue #173), when publishing began to stop at a class page: a CLASS this sweep took down did not come back by republishing the page that referred to it. Issue #201 closed it on 2026-09-26 by making this sweep stop at a class too (stopsAtAClassPage.appliesTo), so the argument now holds without an exception.",
-      "casesNote": "Run through a REAL unpublish on a course laid out from `pages`, the same layout as publishing.casesNote (`links` or `body`, never both - a harness given both must fail the case rather than choose). Ask for the plan first (the plan twin, or the plan the tool shows before it acts), then carry out the unpublish of the pages named in `unpublish`. `expectPlanSays` / `expectPlanDoesNotSay` name assist-wording.json keys whose rendered sentence must or must not appear in that plan - looked up in the wording file, never retyped; every key named renders a page title, and a harness must FAIL a case that has no page of that title, or a renamed case would pass by never matching. Every `expectHidden` page must read hidden for section 1 afterwards, and every `expectUntouched` page must be BYTE-IDENTICAL to what was written: a page that stayed visible but was re-written is not untouched. Added by #201.",
+      "casesNote": "Run through a REAL unpublish on a course laid out from `pages`, the same layout as publishing.casesNote (`links` or `body`, never both - a harness given both must fail the case rather than choose). Ask for the plan first (the plan twin, or the plan the tool shows before it acts), then carry out the unpublish of the pages named in `unpublish`. `expectPlanSays` / `expectPlanDoesNotSay` name assist-wording.json keys whose rendered sentence must or must not appear in that plan - looked up in the wording file, never retyped; every key named renders a page title, and a harness must FAIL a case that has no page of that title, or a renamed case would pass by never matching. Every `expectHidden` page must read hidden for section 1 afterwards, and every `expectUntouched` page must be BYTE-IDENTICAL to what was written: a page that stayed visible but was re-written is not untouched. Added by #201. A page that is not a class may carry `folder`, exactly as publishing.casesNote says (a harness given one on a class must fail the case rather than ignore it), and a case may carry `curriculumFolders`, written to the course's course_config.json as `curriculum_folders` before the course is read (curriculumRules.isCurriculumPage). Both added by #614.",
       "cases": [
         {
           "name": "a visible class linked from the class being hidden stays, and the plan says why",
@@ -1858,6 +1907,19 @@
             "Curriculum Coverage"
           ],
           "why": "#615. neverTakenDownByFollowingLinks keeps a curriculum page up by its FOLDER: any folder segment containing 'curriculum'. The file name is never part of the test (curriculumRules.isCurriculumPage says the same), so a page that is merely CALLED 'Curriculum Coverage', in an ordinary folder and linked only from the class being hidden, goes down with that class like any other page. Windows used to match the file name as well and kept it up, which the mac never did."
+        },
+        {
+          "name": "a page in a curriculum folder renamed without the word stays up",
+          "curriculumFolders": ["Expectations"],
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": true, "links": ["A1.4", "Worksheet"]},
+            {"title": "A1.4", "folder": "Expectations", "isClassPage": false, "visible": true, "links": []},
+            {"title": "Worksheet", "isClassPage": false, "visible": true, "links": []}
+          ],
+          "unpublish": ["Unit 2, Day 3"],
+          "expectHidden": ["Unit 2, Day 3", "Worksheet"],
+          "expectUntouched": ["A1.4"],
+          "why": "#614. neverTakenDownByFollowingLinks keeps a curriculum page up, and a folder the course declares in curriculum_folders is a curriculum folder whatever it is called (curriculumRules.isCurriculumPage). Before #614 a curriculum folder renamed 'Expectations' lost that protection, so hiding a class took down the expectation pages every other visible class embeds. Worksheet shows the sweep still runs."
         }
       ]
     },
@@ -1913,8 +1975,8 @@
         "why": "It is the way IN to a folder rather than a page anything links to, so following links must never take it down."
       },
       {
-        "kind": "a curriculum page: any page with a folder segment containing 'curriculum'",
-        "why": "build_site.py's own rule, so a course whose folder is called 'Ontario Curriculum' is covered exactly as a plain one is. In a real course this is every expectation page, the folder's own index, and the page explaining them."
+        "kind": "a curriculum page: any page inside a folder the course declares in curriculum_folders, or under a folder segment containing 'curriculum'",
+        "why": "curriculumRules.isCurriculumPage, the assistant's own rule: the build maps the declared folders, so a curriculum folder renamed 'Expectations' is covered exactly as one called 'Ontario Curriculum' or plain 'Curriculum' is (#614). In a real course this is every expectation page, the folder's own index, and the page explaining them."
       }
     ],
     "markdownStyleLinks": {
@@ -19880,7 +19942,7 @@
       "mcp": "undo_last_change, for as long as that MCP session lasts.",
       "separate": "The app's undo, the assistant window's 'undo that' and an outside assistant's undo_last_change are three stores; none reaches another."
     },
-    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page; `embeds` writes one `![[name]]` line per entry (the front page's class embed). `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `expectFrontPageEmbeds` names the one class the section's front page must embed afterwards; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written. `folder` puts a `page` in that course-level folder instead of Concepts; `shownAs` writes that as the page's `title:` while the file keeps `title` as its name (and as the case's key). `visible` defaults to true when it is left out, but every case writes it. `expectPlanNames`: for each entry, the plan's text carries a line beginning `• ` then wording.pageName with {page} (or wording.pageNameInFolder with {page} and {folder} when `folder` is given) then ` — `; and no line of the plan contains `.md` or `courses/`.",
+    "howToRunACase": "Lay the course out from `pages`, one section, section 1. kind: class (a class page in the section's classes folder, `publish:`), page (a course-level page, `publishForSection1:`), keyLinks (the section's Key Links page), folderIndex (the index.md of a course-level folder named by the title), curriculum (a page in a course-level folder named Curriculum), sectionFrontPage (the section's own index.md). `visible` sets the flag; `links` are written as `See [[name]].` paragraphs; `date` sets the page's date (default the same day for every page) and `undated` writes none; `strayPublishForSection` adds `publishForSection1: true` to a class page; `embeds` writes one `![[name]]` line per entry (the front page's class embed). `naming` sets the course's unit word, scheme and noun. Then plan and write through the MCP pair, passing the plan's code. Every page in expectDraft must read HIDDEN for section 1 by the built site's reading and keep its body byte for byte; every page in expectUntouched must be byte-identical. `expectWarnings` names warnings the plan must carry; `expectIntroContains` a fragment of the plan's intro; `expectFrontPageEmbeds` names the one class the section's front page must embed afterwards; `runTwice` runs the pair again and expects wording.nothingToDo with nothing written. `folder` puts a `page` in that course-level folder instead of Concepts; `shownAs` writes that as the page's `title:` while the file keeps `title` as its name (and as the case's key). `curriculumFolders` is written to the course's course_config.json as `curriculum_folders` before the course is read (curriculumRules.isCurriculumPage; absent means none declared, #614). `visible` defaults to true when it is left out, but every case writes it. `expectPlanNames`: for each entry, the plan's text carries a line beginning `• ` then wording.pageName with {page} (or wording.pageNameInFolder with {page} and {folder} when `folder` is given) then ` — `; and no line of the plan contains `.md` or `courses/`.",
     "cases": [
       {
         "name": "the plain year",
@@ -20484,6 +20546,52 @@
           }
         ],
         "why": "#362: the plan showed `(courses/ICS3U/Warm-Ups/Predict the Output.md)` after every page's title. Predict the Output's title is its own, so it is named by the title alone. The Notes in Zeta shares its shown title with the Notes that STAYS (Day 1 links it), so it is named with its folder: deciding \"shares a title\" across the section's pages, not within the list shown, is what makes it possible to tell which Notes goes. The staying twin is the point of the case."
+      },
+      {
+        "name": "a curriculum folder renamed without the word is never drafted",
+        "curriculumFolders": [
+          "Expectations"
+        ],
+        "pages": [
+          {
+            "title": "Unit 1, Day 1",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "Ohm's Law"
+            ]
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "kind": "class",
+            "visible": true,
+            "links": [
+              "A1.1"
+            ]
+          },
+          {
+            "title": "Ohm's Law",
+            "kind": "page",
+            "visible": true,
+            "links": []
+          },
+          {
+            "title": "A1.1",
+            "kind": "page",
+            "visible": true,
+            "folder": "Expectations",
+            "links": []
+          }
+        ],
+        "expectDraft": [
+          "Unit 1, Day 2"
+        ],
+        "expectUntouched": [
+          "Unit 1, Day 1",
+          "Ohm's Law",
+          "A1.1"
+        ],
+        "why": "#614. Curriculum pages are never drafted (the never set, as for kind curriculum), and a folder the course declares in curriculum_folders is a curriculum folder whatever it is called (curriculumRules.isCurriculumPage). Before #614 a curriculum folder renamed 'Expectations' lost that protection, so getting ready for the year drafted every expectation page first linked after Day 1, and every visible class that embeds one."
       }
     ],
     "wordingNote": "Every sentence the app's sheet says, and the plan an outside assistant is shown. Placeholders: {course} {section} {first} (the first class's name) {noun} {nouns} (\"class\"/\"classes\", or \"meeting\"/\"meetings\" in a club) {page} {pages} (a number with its word: \"1 page\", \"12 pages\") {classes} (the same, with the noun) {links} (\"1 link\", \"3 links\") {name} (a page as named by pageName or pageNameInFolder) {folder} (the folder a page is in, within the course: its segments joined with \"/\", or the course code for a page at the top of the course folder) {reason} (one of the reason clauses) {moment} {backup} (a backup's file name) {code}. The mac pins StartOfYearWording to these key by key (StartOfYearPlannerTests); the two refusals only an outside assistant meets are AssistWording's, in assist-wording.json (startOfYearNeedsItsPlan, startOfYearPlanHasChanged, startOfYearNeedsABackup).",
