@@ -205,7 +205,7 @@ class DownloadTests(unittest.TestCase):
         # cut unpins it again.
         # PlantoirSetup.exe joined v1.8.5 on 2026-10-22 (the Windows catch-up),
         # which unpinned it again.
-        self.assertIsNone(pins["Windows"])
+        self.assertIsNone(pins["Windows"])  # PlantoirSetup.exe joined v1.8.6 on 2026-10-23, which unpinned it again
 
 
 class ShortcutTests(unittest.TestCase):
