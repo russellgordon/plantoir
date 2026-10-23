@@ -757,9 +757,12 @@ The image carries **wrangler**, Cloudflare's own deploy CLI, used by
 `scripts/deploy.py` for the Cloudflare Pages destination (their upload protocol
 — BLAKE3 hashing, short-lived JWT, batched uploads — is undocumented enough that
 reimplementing it would break teachers' publishing whenever Cloudflare changed
-it). It is pinned *below* 4.100 deliberately: from that version wrangler needs
-Node 22, while the image ships Node 20 because that is what Quartz v4.5.0 is
-known-good against. **If you raise Node, revalidate Quartz before chasing a
+it). It is pinned at 4.80.0, *below* 4.87 deliberately: 4.87.0 is the first
+wrangler whose engines need Node 22 (this said 4.100 until #640, which was
+never a boundary). The image ships Node 22.23.4, pinned exactly, since #640,
+with Quartz v4.5.0 revalidated on it; but the pin is shared with Windows,
+whose runtime stays on Node 20 until its own issue lands, so the CLI moves
+only after that. **If you raise Node, revalidate Quartz before chasing a
 newer CLI.**
 
 First-run bootstrap: if Docker isn't available, the launchers install pinned

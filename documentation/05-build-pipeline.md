@@ -2458,7 +2458,11 @@ wrong section on one platform.
 - The environment sets `TZ=UTC` and a fixed `SOURCE_DATE_EPOCH`
   (2024-01-01), nudging build tooling toward reproducible output —
   part of the [determinism strategy](07-deployment.md#why-determinism-matters)
-  that keeps Netlify uploads small.
+  that keeps Netlify uploads small. It is built by
+  `toolchain_paths.node_environment`, which also adds
+  `--disable-warning=DEP0040` to `NODE_OPTIONS` (#640): on Node 22 Quartz
+  v4.5.0 prints a `punycode` deprecation on every build, and only that one
+  warning is silenced ([02](02-docker-image.md) → "Node 22 (#640)").
 - **Preview mode (default):** kills any process holding the requested
   port (`lsof`, that port only — several previews can run at once). This is
   the one place a port is still the right handle, because here the port is
