@@ -3342,6 +3342,63 @@ worth checking on any platform that moves build output.
 
 [◀ Previous: Course Setup](04-course-setup.md) · [Back to index](README.md) · [Next: Quartz Customizations ▶](06-quartz-customizations.md)
 
+## Which file each page came from (#518)
+
+Every build of a section — a preview AND a publish — writes
+`.page-sources.json` into the section's built output, beside `public/` and
+`.visible-pages.json`, never inside `public/`, so no deploy uploads it. It
+maps each address Quartz serves (the page's slug below the site's root) to the
+file in the course folder it was made from, as a POSIX path with its `.md`,
+and whether students see it. Open in Obsidian reads it to open the page a
+section's preview shows (`09-mac-app.md` → "Open in Obsidian opens the page
+the preview shows (#518)"). Format: `contracts/file-formats.json` →
+`pageSourcesList`.
+
+**Where and when.** `_write_page_sources` runs immediately before the
+`if build_only:` branch that either builds for publishing or serves the
+preview — after My Progress, the How I Teach sweep, the #246 hiding and every
+other pass that adds or removes a page — so the list matches what Quartz
+reads. It has to be before the branch: the serve branch never reaches the
+publish-only `_write_visible_places`, and a preview is exactly when the list
+is wanted. Atomic (`_write_json_atomically`), and a failure to write it
+prints a warning and never fails the build: without it the app opens the
+section as before. In the ALWAYS part of the build, so every existing folder
+gets it on its next build.
+
+**What it is made from.** `_vault_sources`, which the content copy already
+fills for the date pass (#275). Per entry: `page_slug_as_quartz_serves`
+(`_quartz_page_slug`, plus Quartz 4.5.0's two departures measured 2026-10-21
+on 38 names — only an exact `.md` is a page, and a last segment `_index` is
+`index`; `obsidianOpensThePreviewedPage.slugCases`); two files making one
+address are written `{collided: true}` with no file; a page the build made
+(My Progress, a coverage map), a file no longer there and one outside the
+course folder after links are followed are left out; `hidden` is the build's
+own `_is_draft`. The front page's entry gains `shows` when the teacher's
+`section<N>/index.md` — read from the teacher's file, not the build's copy,
+which gains a title and may gain the section marker — is nothing but a single
+`![[…]]` line below its settings, naming exactly one page (Russell's ruling
+1: open the class the front page shows).
+
+**One correction, one trap left alone.** The per-section folder copy credits
+EVERY file under a folder it copied to the section, so when a folder name is
+both shared and per-section, a shared page copied there first is credited to
+a section file that does not exist. The list names the shared file at the
+same place instead. The record itself (`_vault_sources`, which the date pass
+also writes back through) is unchanged; that trap is a toolchain issue of its
+own (#518's plan, recommended for v2.0.0).
+
+**Measured against Quartz itself.** `scripts/test_page_sources.py` runs the
+slug cases and a course copied the way the build copies it, in the image
+under `verify.sh`; then `verify.sh` reads the real EXC2O build's list back
+(`--site`) and requires a `public/<slug>.html` for every listed page students
+see, and every listed file in the course folder.
+
+**Rejected:** writing it only in a publish (a preview is the case it is for);
+comparing its `buildId` with the preview's (the app never learns which build
+a preview shows, and `.build-id` moves on Rebuild Preview before the list
+does — diagnosis only); keeping it inside `public/` (every deploy route ships
+`public/`).
+
 ## `Media` is mirrored WHOLE, so a picture is uploaded before its page is
 
 Every build copies the course's `Media` folder into the build tree entire —
