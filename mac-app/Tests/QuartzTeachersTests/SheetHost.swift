@@ -26,10 +26,11 @@ import XCTest
 ///   one that overlaps a display is ordered out at once and recorded in
 ///   `reachedAScreen`, which every test using this host asserts is false.
 ///
-/// One window this cannot keep off the screen is the test host's own main
-/// window: the unit suite runs inside Plantoir, which opens its window at
-/// launch, before any test bundle code runs (`SheetAnimationSuppressor`
-/// says the same of the alerts some tests raise on it).
+/// The test host's own main window, and anything hung from it, is not this
+/// host's to keep off: the unit suite runs inside Plantoir, which opens that
+/// window at launch, before any test bundle code runs. Since #633 the app
+/// keeps it off every display itself (`UnitTestHostWindows`), and the
+/// replacement below is chained on top of that one.
 @MainActor
 final class SheetHost {
 
@@ -196,8 +197,11 @@ struct SheetHostRoot: View {
 /// method of `NSWindow` is given
 /// an answer of its own for exactly one kind of window — one whose
 /// `sheetParent` is an `OffScreenWindow` — and every other window in the
-/// test host, the main window included, gets AppKit's own answer through
-/// the original implementation. Installed once, from the first `SheetHost`.
+/// test host gets the answer that was in place before this was installed.
+/// In the unit test host that is `UnitTestHostWindows`' (#633), installed by
+/// the app at launch, which keeps the main window and its sheets off every
+/// display; it is NOT AppKit's own. Installed once, from the first
+/// `SheetHost`.
 enum SheetsHungOffScreenStayThere {
 
     // MARK: - Stored properties
@@ -216,7 +220,7 @@ enum SheetsHungOffScreenStayThere {
             return
         }
         typealias Constrain = @convention(c) (NSWindow, Selector, NSRect, NSScreen?) -> NSRect
-        let appKitsAnswer: Constrain = unsafeBitCast(method_getImplementation(method), to: Constrain.self)
+        let answerBefore: Constrain = unsafeBitCast(method_getImplementation(method), to: Constrain.self)
         let answer: @convention(block) (NSWindow, NSRect, NSScreen?) -> NSRect = { (window: NSWindow, frame: NSRect, screen: NSScreen?) in
             let hungOffScreen: Bool = MainActor.assumeIsolated {
                 return window.sheetParent is OffScreenWindow
@@ -224,7 +228,7 @@ enum SheetsHungOffScreenStayThere {
             if hungOffScreen {
                 return frame
             }
-            return appKitsAnswer(window, selector, frame, screen)
+            return answerBefore(window, selector, frame, screen)
         }
         method_setImplementation(method, imp_implementationWithBlock(answer))
         isInstalled = true
