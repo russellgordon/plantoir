@@ -27,7 +27,9 @@ this skill automates its steps 5–6 and the note-writing.
    updated" line and current release number, and check its issue numbers
    against the open milestones (`RELEASING.md` → "Trim the roadmap").
 3. The bundle(s) to attach:
-   - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `mac-app/publish.sh -Sign`)
+   - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer mac-app/publish.sh -Sign`
+     — name the Xcode: `xcode-select` points at 27.0 here, and releases are built with 26.6.
+     Check the `Xcode:` line publish.sh prints in its step 3 says 26.6; `RELEASING.md` step 4, #613)
    - `windows-app/dist/PlantoirSetup.exe` (freshly built & signed by `publish.ps1 -Sign`)
    - (Optional) `windows-app/dist/Plantoir-win-x64.zip` (portable edition)
 
