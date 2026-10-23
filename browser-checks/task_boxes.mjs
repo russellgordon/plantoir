@@ -411,8 +411,11 @@ async function connect(chunk) {
       const onScreen = await evaluate("window.__task.state()")
       await send("Page.addScriptToEvaluateOnNewDocument", {
         source: `new MutationObserver((changes) => { for (const change of changes) for (const node of change.addedNodes) {
+          // A real print sends these (#576): the page puts itself back only once it has seen one.
           if (node.tagName === "IFRAME") node.contentWindow.print = () => {
+            node.contentWindow.dispatchEvent(new Event("beforeprint"))
             window.__handoutBoxes = Array.from(node.contentDocument.querySelectorAll("input.plantoir-task")).map((box) => (box.checked ? "x" : "_")).join("")
+            node.contentWindow.dispatchEvent(new Event("afterprint"))
           } } }).observe(document, { childList: true, subtree: true })`,
       })
       // From another page, so the address with the print request is a new

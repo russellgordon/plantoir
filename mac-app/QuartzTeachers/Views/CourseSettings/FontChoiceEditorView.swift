@@ -111,11 +111,12 @@ struct FontChoiceEditorView: View {
     }
 
     /// A preview font for a site font family. The "Helvetica, Arial"
-    /// system pairing previews as Helvetica; every other family is
-    /// bundled with the app and registered at launch.
+    /// system pairing previews in the system font, which is what a site
+    /// with that choice shows on a Mac (San Francisco, #629); every other
+    /// family is bundled with the app and registered at launch.
     static func previewFont(family: String, size: CGFloat) -> Font {
         if family == "Helvetica, Arial" {
-            return Font.custom("Helvetica", size: size)
+            return Font.system(size: size)
         }
         return Font.custom(family, size: size)
     }

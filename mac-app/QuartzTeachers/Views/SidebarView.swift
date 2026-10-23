@@ -549,47 +549,7 @@ struct SidebarView: View {
         } message: {
             Text(scheduleProblem ?? "")
         }
-        // Asked BEFORE the rename, because the answer decides whether
-        // Obsidian is closed first. Two buttons on purpose: there is no
-        // third answer that leaves Obsidian showing the truth.
-        .alert(
-            "\(workspace.obsidianRenameRequest?.course.code ?? "") is open in Obsidian",
-            isPresented: obsidianRenameRequestIsPresented,
-            presenting: workspace.obsidianRenameRequest
-        ) { request in
-            Button("Close Obsidian and Rename") {
-                workspace.obsidianRenameRequest = nil
-                Task {
-                    await workspace.renameClosingObsidian(request)
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                workspace.obsidianRenameRequest = nil
-            }
-        } message: { request in
-            Text(CourseRenamer.obsidianQuestion(openVaultCount: request.openVaultPaths.count))
-        }
-        .alert("Could not rename", isPresented: renameProblemBinding) {
-            Button("OK") {
-                workspace.renameProblem = nil
-            }
-        } message: {
-            Text(workspace.renameProblem ?? "")
-        }
-        // Shown only when the rename had a consequence beyond itself. An
-        // ordinary rename says nothing at all: a teacher who has just watched
-        // the row change does not need an alert to confirm it.
-        .alert(
-            workspace.renameNotice?.title ?? "",
-            isPresented: renameNoticeIsPresented,
-            presenting: workspace.renameNotice
-        ) { _ in
-            Button("OK") {
-                workspace.renameNotice = nil
-            }
-        } message: { notice in
-            Text(notice.message)
-        }
+        .modifier(CourseRenameAlerts(workspace: workspace))
     }
 
 
@@ -913,39 +873,6 @@ struct SidebarView: View {
             set: { isPresented in
                 if !isPresented {
                     cancelScheduleRequest = nil
-                }
-            }
-        )
-    }
-
-    var obsidianRenameRequestIsPresented: Binding<Bool> {
-        return Binding(
-            get: { workspace.obsidianRenameRequest != nil },
-            set: { isPresented in
-                if !isPresented {
-                    workspace.obsidianRenameRequest = nil
-                }
-            }
-        )
-    }
-
-    var renameProblemBinding: Binding<Bool> {
-        return Binding(
-            get: { workspace.renameProblem != nil },
-            set: { isPresented in
-                if !isPresented {
-                    workspace.renameProblem = nil
-                }
-            }
-        )
-    }
-
-    var renameNoticeIsPresented: Binding<Bool> {
-        return Binding(
-            get: { workspace.renameNotice != nil },
-            set: { isPresented in
-                if !isPresented {
-                    workspace.renameNotice = nil
                 }
             }
         )
@@ -2515,6 +2442,110 @@ private struct OutsideSessionHolds: ViewModifier {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 workspace.refreshCoursesRevisedElsewhere()
+            }
+    }
+}
+
+/// The three alerts a course rename can raise — Obsidian has the course open,
+/// the rename failed, the rename had a consequence worth saying — lifted out
+/// of `SidebarView.body` for the same reason as `OutsideAgentAlerts` (#613).
+///
+/// Not a tidy-up, and the third time this chain has hit the limit. With these
+/// three alerts inside it, Xcode 27 (Swift 6.4) gave up on `SidebarView.body`
+/// with "unable to type-check this expression in reasonable time", and Xcode
+/// 26.6 (Swift 6.3.3) took 12,430 ms over it — finishing, but at the edge.
+/// With them here, the body type-checks in 249 ms under 26.6 and 219 ms under
+/// 27 (measured 2026-10-22 with `-warn-long-function-bodies`). One modifier
+/// whose body is checked on its own is the smallest cut that puts it back,
+/// and it keeps the rename's three answers side by side.
+///
+/// Adding a modifier to `SidebarView.body`? Put it in a group like this one
+/// rather than in the chain, and build under both Xcodes before calling it done.
+private struct CourseRenameAlerts: ViewModifier {
+
+    // MARK: - Stored properties
+
+    let workspace: WorkspaceModel
+
+    // MARK: - Computed properties
+
+    private var obsidianRenameRequestIsPresented: Binding<Bool> {
+        return Binding(
+            get: { workspace.obsidianRenameRequest != nil },
+            set: { isPresented in
+                if !isPresented {
+                    workspace.obsidianRenameRequest = nil
+                }
+            }
+        )
+    }
+
+    private var renameProblemBinding: Binding<Bool> {
+        return Binding(
+            get: { workspace.renameProblem != nil },
+            set: { isPresented in
+                if !isPresented {
+                    workspace.renameProblem = nil
+                }
+            }
+        )
+    }
+
+    private var renameNoticeIsPresented: Binding<Bool> {
+        return Binding(
+            get: { workspace.renameNotice != nil },
+            set: { isPresented in
+                if !isPresented {
+                    workspace.renameNotice = nil
+                }
+            }
+        )
+    }
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content
+            // Asked BEFORE the rename, because the answer decides whether
+            // Obsidian is closed first. Two buttons on purpose: there is no
+            // third answer that leaves Obsidian showing the truth.
+            .alert(
+                "\(workspace.obsidianRenameRequest?.course.code ?? "") is open in Obsidian",
+                isPresented: obsidianRenameRequestIsPresented,
+                presenting: workspace.obsidianRenameRequest
+            ) { request in
+                Button("Close Obsidian and Rename") {
+                    workspace.obsidianRenameRequest = nil
+                    Task {
+                        await workspace.renameClosingObsidian(request)
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    workspace.obsidianRenameRequest = nil
+                }
+            } message: { request in
+                Text(CourseRenamer.obsidianQuestion(openVaultCount: request.openVaultPaths.count))
+            }
+            .alert("Could not rename", isPresented: renameProblemBinding) {
+                Button("OK") {
+                    workspace.renameProblem = nil
+                }
+            } message: {
+                Text(workspace.renameProblem ?? "")
+            }
+            // Shown only when the rename had a consequence beyond itself. An
+            // ordinary rename says nothing at all: a teacher who has just watched
+            // the row change does not need an alert to confirm it.
+            .alert(
+                workspace.renameNotice?.title ?? "",
+                isPresented: renameNoticeIsPresented,
+                presenting: workspace.renameNotice
+            ) { _ in
+                Button("OK") {
+                    workspace.renameNotice = nil
+                }
+            } message: { notice in
+                Text(notice.message)
             }
     }
 }

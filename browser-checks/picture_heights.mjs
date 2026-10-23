@@ -27,6 +27,8 @@
 //     no picture's height and not the page's. The fixture's third picture,
 //     a viewBox-only SVG, is one the build deliberately cannot size, so it
 //     is what keeps #609's rule provable now that the PNGs carry sizes.
+//     And, once settled, the page has not scrolled by itself (#611: the
+//     sidebar's scrollIntoView moved it as it opened).
 //  C. (#612) A 390 px window: each sized picture keeps its own shape (the
 //     `height: auto` that lets its width shrink without squashing it).
 //
@@ -235,7 +237,8 @@ async function run(chunk) {
       await send("Page.navigate", { url: base + PAGE })
       // 1. Settled: loaded, every picture's bytes and the faces arrived, and
       // the page's height unchanged for a second (four reads 250 ms apart).
-      // Nothing is scrolled while waiting.
+      // Nothing is scrolled while waiting - nor, since #611, by the sidebar,
+      // which is asked in 2.
       let before = null
       let steady = 0
       for (let tries = 0; tries < 160 && steady < 4; tries += 1) {
@@ -256,7 +259,13 @@ async function run(chunk) {
         return finish(1, `FAIL: Picture Fixture never settled with its ${PICTURES} pictures arrived: ${JSON.stringify(before)}`)
       }
       const problems = []
-      // 2. Far enough below the window for the check to mean anything, and
+      // 2. The page has not moved by itself (#611): Quartz's sidebar brought
+      // the current page's row into view with scrollIntoView, which scrolled
+      // the page too, 300-600 px down a long page as it opened.
+      if (before.scrollY !== 0) {
+        problems.push(`the page moved by itself as it opened: scrollY ${before.scrollY} px (#611)`)
+      }
+      // Far enough below the window for the check to mean anything, and
       // laid out before any scroll.
       for (const picture of before.pictures) {
         if (picture.top < before.scrollY + 2 * before.window) {

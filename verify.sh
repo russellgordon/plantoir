@@ -228,6 +228,13 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+if (cd scripts && python3 test_site_disagreements.py) >/tmp/verify_site_disagreements_test.log 2>&1; then
+  pass "a runnable block the site shows as plain code: one folder problem, worded as the contract's cases say, its line in the teacher's file, and the command line the site's build runs printing exactly one marker (scripts/test_site_disagreements.py, #567)"
+else
+  fail "a runnable block the site shows as plain code: one folder problem (scripts/test_site_disagreements.py, #567)"
+  cat /tmp/verify_site_disagreements_test.log
+fi
+
 # Not toolchain tests, and deliberately not in scripts/: they live beside the
 # screenshot scripts so plantoir.app's marketing data never enters the recipe
 # or the image hash. They are here because nothing else runs them on the mac
@@ -480,6 +487,13 @@ else
   cat /tmp/verify_sidebar_page_marker_test.log
 fi
 
+if (cd scripts && python3 test_explorer_scroll.py) >/tmp/verify_explorer_scroll_test.log 2>&1; then
+  pass "the sidebar scrolls only itself when a page opens: Quartz's scrollIntoView replaced on every build, once, skipping an entry in a closed folder (scripts/test_explorer_scroll.py, #611)"
+else
+  fail "the sidebar may still move the page as it opens: the build patch did not apply, applied twice, or explorer.inline.ts changed shape (scripts/test_explorer_scroll.py, #611)"
+  cat /tmp/verify_explorer_scroll_test.log
+fi
+
 if (cd scripts && python3 test_code_lines_style.py) >/tmp/verify_code_lines_style_test.log 2>&1; then
   pass "every code block's line numbers: one gutter style with its hairline for static and runnable blocks, no ligatures in code, the editor's colour categories the contract's, and a handout's wrapped line hung under its code (scripts/test_code_lines_style.py, #585)"
 else
@@ -544,10 +558,20 @@ fi
 # says, and that the Swift image's recipe holds every pin and flag the
 # contract names. Stdlib only; the compiler itself is the Swift gate below.
 if (cd scripts && python3 test_swift_blocks.py) >/tmp/verify_swift_blocks_test.log 2>&1; then
-  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, and the trail's PLANTOIR_SWIFT: line from a real build log (scripts/test_swift_blocks.py, #493, #635)"
 else
-  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, and the trail's PLANTOIR_SWIFT: line from a real build log (scripts/test_swift_blocks.py, #493, #635)"
   cat /tmp/verify_swift_blocks_test.log
+fi
+
+# preview.sh's Swift step prints the PLANTOIR_SWIFT: line on every ending but
+# "already there" (#635): its block cut out and run with bash 3.2 against a
+# stand-in docker that runs the real swift_blocks.py got-ready.
+if (cd scripts && python3 test_swift_launcher_marker.py) >/tmp/verify_swift_launcher_marker_test.log 2>&1; then
+  pass "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence (scripts/test_swift_launcher_marker.py, #635)"
+else
+  fail "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence (scripts/test_swift_launcher_marker.py, #635)"
+  cat /tmp/verify_swift_launcher_marker_test.log
 fi
 
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
@@ -558,6 +582,16 @@ if (cd scripts && python3 test_katex_assets.py) >/tmp/verify_katex_assets_test.l
 else
   fail "maths: KaTeX's stylesheet, copy-tex and faces copied into every site, and latex.ts linking them instead of a CDN (scripts/test_katex_assets.py, #494)"
   cat /tmp/verify_katex_assets_test.log
+fi
+# Font variables quote one family at a time, and the "System fonts" choice
+# gets the system stack first (#629). The generated-CSS cases need a node of
+# 22.6 or later and skip without one; 6h's index.css check below reads the
+# real built stylesheet either way. Stdlib only.
+if (cd scripts && python3 test_font_variables.py) >/tmp/verify_font_variables_test.log 2>&1; then
+  pass "font variables: each family in a stack quoted on its own, the system-font choice on the system stack, a single family byte for byte as before (scripts/test_font_variables.py, #629)"
+else
+  fail "font variables: each family in a stack quoted on its own, the system-font choice on the system stack, a single family byte for byte as before (scripts/test_font_variables.py, #629)"
+  cat /tmp/verify_font_variables_test.log
 fi
 if (cd scripts && python3 test_quartz_additions_wiring.py) >/tmp/verify_quartz_wiring_test.log 2>&1; then
   pass "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
@@ -1089,6 +1123,26 @@ else
   cat /tmp/verify_unreadable_page_settings_test.log
 fi
 
+# ---- build_site.py: a front page whose title Plantoir wrote unquoted (#584) ----
+# Every case in contracts/shared-rules.json -> buildRepairs.frontPageTitleQuoted
+# through the build's own rule, and the front page copied the way the build
+# copies it: the teacher's page quoted, or only the build's copy for a course
+# kept for reference, a linked page and a read-only one, and a second build
+# that changes nothing. The two other test files are mounted for the helpers
+# it shares with them.
+echo ""
+echo "🔎 Checking that a front page whose title Plantoir wrote unquoted is put right by the build…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_front_page_title_repair.py" /opt/scripts/test_front_page_title_repair.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_dates_follow_the_class.py" /opt/scripts/test_dates_follow_the_class.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_unreadable_page_settings.py" /opt/scripts/test_unreadable_page_settings.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_front_page_title_repair.py >/tmp/verify_front_page_title_repair_test.log 2>&1; then
+  pass "build_site.py: a front page whose title holds an unquoted colon is quoted by the build (scripts/test_front_page_title_repair.py, #584)"
+else
+  fail "build_site.py: a front page whose title holds an unquoted colon is quoted by the build (scripts/test_front_page_title_repair.py, #584)"
+  cat /tmp/verify_front_page_title_repair_test.log
+fi
+
 # ---- build_site.py: links students would find dead (#333) ----
 # Every case in contracts/shared-rules.json -> siteHealth.linksIntoHiddenPages
 # through the build's own reader, in the image because it imports build_site
@@ -1584,6 +1638,7 @@ check_baked() {
 }
 check_baked scripts/contracts.py          /opt/scripts/contracts.py
 check_baked scripts/site_health.py        /opt/scripts/site_health.py
+check_baked scripts/site_said.py          /opt/scripts/site_said.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.
@@ -1730,6 +1785,71 @@ if [[ -z "$RUNNER_ENGINE_PROBLEMS" ]]; then
 else
   fail "The image's Pyodide or katex does not match contracts/toolchain.json: $RUNNER_ENGINE_PROBLEMS"
 fi
+# The certificate store (#639), by its pin: Debian's ca-certificates at
+# least the floor, neither root it distrusts left anywhere a TLS client here
+# looks - the bundle (curl, and Node with --use-openssl-ca), Python's default
+# context (urllib: every Netlify publish) and the hashed folder OpenSSL also
+# searches - and still more than 100 certificates, so an empty store, which
+# trusts nothing, cannot pass for one that distrusts the right two.
+CA_STORE_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'CAPY'
+import json, subprocess, sys
+pin = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "caCertificates"][0]
+inside = r"""
+import glob, json, re, ssl, subprocess, sys
+floor, names = sys.argv[1], sys.argv[2:]
+version = subprocess.run(["dpkg-query", "-W", "-f=${Version}", "ca-certificates"],
+                         capture_output=True, text=True).stdout.strip()
+at_least = subprocess.run(["dpkg", "--compare-versions", version, "ge", floor]).returncode == 0
+def common_names(context):
+    found = []
+    for cert in context.get_ca_certs():
+        for part in cert.get("subject", ()):
+            for key, value in part:
+                if key == "commonName":
+                    found.append(value)
+    return found
+default_context = ssl.create_default_context()
+default_names = common_names(default_context)
+bundle = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+bundle.load_verify_locations(cafile="/etc/ssl/certs/ca-certificates.crt")
+bundle_names = common_names(bundle)
+folder_subjects = []
+for path in sorted(glob.glob("/etc/ssl/certs/*.0")):
+    folder_subjects.append(subprocess.run(["openssl", "x509", "-noout", "-subject", "-in", path],
+                                          capture_output=True, text=True).stdout)
+print(json.dumps({"version": version, "atLeast": at_least, "count": len(default_context.get_ca_certs()),
+                  "default": [n for n in names if n in default_names],
+                  "bundle": [n for n in names if n in bundle_names],
+                  "folder": [n for n in names
+                             if any(re.search("CN ?= ?" + re.escape(n) + "(,|$)", s, re.M) for s in folder_subjects)]}))
+"""
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "python3", "-c", inside, pin["value"]] + pin["mustNotTrust"],
+                     capture_output=True, text=True)
+problems = []
+try:
+    found = json.loads(run.stdout)
+except ValueError:
+    print("PROBLEMS the store could not be read: " + (run.stderr.strip()[-300:] or "no output"))
+    sys.exit(0)
+if not found["atLeast"]:
+    problems.append(f"ca-certificates is {found['version'] or 'missing'}, older than {pin['value']}")
+for place, label in (("bundle", "the bundle"), ("default", "Python's default context"), ("folder", "/etc/ssl/certs")):
+    if found[place]:
+        problems.append(f"{label} still trusts " + " and ".join(found[place]))
+if found["count"] <= 100:
+    problems.append(f"Python's default context holds {found['count']} certificates, not more than 100")
+if problems:
+    print("PROBLEMS " + "; ".join(problems))
+else:
+    print(f"OK ca-certificates {found['version']} (at least {pin['value']}), holds {found['count']} certificates, "
+          f"and trusts neither " + " nor ".join(pin["mustNotTrust"]))
+CAPY
+)"
+if [[ "$CA_STORE_REPORT" == OK* ]]; then
+  pass "The image's certificate store is ${CA_STORE_REPORT#OK } (#639)"
+else
+  fail "The image's certificate store does not match contracts/toolchain.json -> caCertificates: ${CA_STORE_REPORT#PROBLEMS }"
+fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
 # -------------------- 4a. The live-reload client is still the one the rule names --------------------
@@ -1842,6 +1962,40 @@ fi
 if [[ "$SWIFT_GATE_READY" == "true" ]]; then
   SWIFT_IMAGE_SIZE="$(docker images --format '{{.Size}}' "$SWIFT_GATE_TAG" 2>/dev/null | head -1)"
   pass "the Swift image exists from support/swift ($SWIFT_BUILT_HOW, ${SWIFT_IMAGE_SIZE:-size unknown}) (#493)"
+  # The one check of the trail's byte count against the build log BuildKit
+  # really printed for this recipe (#635): only when it was built here. With
+  # --no-cache both download steps ran, so it must be the pins' whole sum for
+  # this Mac's architecture; otherwise it must be a sum the pins can make -
+  # and either way both download steps' headers must have been found, so a
+  # parser that finds none cannot pass by saying 0.
+  if [[ "$SWIFT_BUILT_HOW" == built* ]]; then
+    SWIFT_MARKER_LINE="$(cd scripts && PLANTOIR_CONTRACTS_DIR=../contracts python3 swift_blocks.py got-ready --outcome=built --course=VERIFY --section=1 --log=/tmp/verify_swift_image.log)"
+    SWIFT_MARKER_CHECK="$(cd scripts && PLANTOIR_CONTRACTS_DIR=../contracts NO_CACHE="$NO_CACHE" python3 -c '
+import json, os, sys, contracts, swift_blocks
+line = sys.argv[1]
+got = json.loads(line.split("PLANTOIR_SWIFT:", 1)[1])["downloadedBytes"]
+with open("/tmp/verify_swift_image.log", encoding="utf-8", errors="replace") as log:
+    found = swift_blocks.download_steps_in_log(log.read())
+pins = {pin["pin"]: pin.get("bytes") or 0 for pin in contracts.section("toolchain", "swiftImage", "pins")}
+arch = "arm64" if os.uname().machine in ("arm64", "aarch64") else "amd64"
+steps = contracts.section("shared-rules", "codeRunnerBlocks", "swift", "mac", "downloadSteps")
+sums = [0]
+for step in steps:
+    sums = sums + [already + sum(pins[name] for name in step["counts"][arch]) for already in sums]
+whole = sums[-1]
+if len(found) != len(steps):
+    print("only %d of the %d download steps were found in the log, so 0 bytes would prove nothing" % (len(found), len(steps)))
+elif os.environ.get("NO_CACHE"):
+    print("ok" if got == whole else "%d, not the whole %d" % (got, whole))
+else:
+    print("ok" if got in sums else "%d, which no set of steps makes" % got)
+' "$SWIFT_MARKER_LINE" 2>&1)"
+    if [[ "$SWIFT_MARKER_CHECK" == "ok" ]]; then
+      pass "the Swift image's real build log gives the trail its download size ($SWIFT_MARKER_LINE) (#635)"
+    else
+      fail "the Swift image's real build log does not give the trail a download size the pins make: $SWIFT_MARKER_CHECK (#635)"
+    fi
+  fi
   # The trim (ruling Q2) and the off-PATH wasm-opt (Phase 0 trap 1), as built.
   if docker run --rm "$SWIFT_GATE_TAG" sh -c 'test ! -e /opt/swift/usr/bin/lldb && test ! -e /opt/swift/usr/bin/sourcekit-lsp && test ! -e /opt/swift/usr/lib/swift_static && ! command -v wasm-opt >/dev/null && test -x /opt/binaryen/bin/wasm-opt && test -d /opt/swift-sdks/swift-6.4.0-RELEASE_wasm.artifactbundle' >/dev/null 2>&1; then
     pass "the Swift image is trimmed (no lldb, sourcekit or host libraries), its SDK is installed, and wasm-opt is off PATH (#493)"
@@ -1931,8 +2085,8 @@ restore_hit_fixture() {
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Anchor Fixture.md" "$HIT_COURSE/Picture Fixture.md" \
-        "$HIT_COURSE/Discussions/Runner Printable.md" \
-        "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
+        "$HIT_COURSE/Discussions/Runner Printable.md" "$HIT_COURSE/Discussions/Print Fallback Fixture.md" \
+        "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" "$HIT_COURSE/Plain Code Fixture.md" \
         "$HIT_COURSE/Live Plain Link.md" "$HIT_COURSE/Live Framed.md" "$HIT_COURSE/Live Autorun.md" "$HIT_COURSE/Live Box.md" \
         "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
         "$HIT_COURSE/Curriculum/Z1. Planted 100% Overall.md" "$HIT_COURSE/Curriculum/Z1.1.md" \
@@ -2506,6 +2660,29 @@ open(sys.argv[1], "w", encoding="utf-8").write(
     + paragraphs(61, 10))
 PY
 
+# #576: Print Fallback Fixture - a printable page one folder down, with
+# headings for a table of contents, 16 code blocks and two of the pictures
+# above, for browser-checks/print_fallback.mjs (which refuses the print
+# layout's script, so the browser lays the handout out itself). Removed by
+# restore_hit_fixture.
+python3 - "$HIT_COURSE/Discussions/Print Fallback Fixture.md" <<'PY'
+import sys
+lines = ["---", "title: Print Fallback Fixture", "printable: true", "---",
+         "A printable page for the print fallback check (plantoir-print-fallback-576).", ""]
+block = 0
+for part in range(1, 5):
+    lines += [f"## Part {part}", "", f"Question {part}: read each program and say what it prints.", ""]
+    for _ in range(4):
+        block += 1
+        lines += ["```python", f"total = {block}", f'print("block {block}:", total * 2)', "```", ""]
+    if part == 2:
+        lines += ["![[plantoir-hazard-wide.png|600]]", ""]
+    if part == 3:
+        lines += ["![[plantoir-hazard-tall.png]]", ""]
+lines += ["> [!answer]- Answer 1", ">", "> Each block prints twice its number (plantoir-print-fallback-answer-576).", ""]
+open(sys.argv[1], "w", encoding="utf-8").write("\n".join(lines))
+PY
+
 # ---- #485 E1: diagrams and graphs, planted for the same build ----
 # Every place a fence can sit (top level, a folded callout, a list item), the
 # packages that matter (pgfplots, circuitikz), a drawing with no description,
@@ -2744,6 +2921,19 @@ playground += "\n```swift run\n" + (gate / "13-prompt.swift").read_text(encoding
 (course / "Swift Hidden.md").write_text(
     "---\ntitle: Swift Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-swift-hidden-7f3a).\n\n"
     "```swift run\nprint(\"hidden swift\")\n```\n", encoding="utf-8")
+# #567: Plain Code Fixture - named without "Runner", which the runner check
+# below refuses on any plantoir: error: line - holds a fence left open in a
+# list item and then a runnable Swift block. The build's fence reader reads
+# the Swift block as part of the open fence, so it is never compiled; the
+# site's parser closes that fence at the end of its list item and finds the
+# block, whose key is not in the build's list: plain code, a plantoir: error:
+# line, and ONE runnableCodeShownAsPlainCode folder problem from the site's
+# build (siteHealth.checks). Swift because this site carries Python's engine,
+# which would run a Python block there anyway.
+(course / "Plain Code Fixture.md").write_text(
+    "---\ntitle: Plain Code Fixture\ncodeRunner: true\n---\nA fence left open (plantoir-plain-code-567).\n\n"
+    "- step one\n  ```python\n  print(1)\n- step two\n\n"
+    "```swift run\nprint(\"plain code 567\")\n```\n", encoding="utf-8")
 # #583: live input. Live Plain Link: a plain page linking to the Runner
 # Playground (the site's own link across the isolation line, one way); Live
 # Autorun: two autoruns, the first asks, then a link to Live Framed (across
@@ -3617,8 +3807,12 @@ if line not in said:
     problems.append(f"the build did not say: {line}")
 if not re.search(r'"name": "swiftCouldNotBePrepared"[^\n]*Swift Playground', said):
     problems.append("the build did not report the broken Swift block as the swiftCouldNotBePrepared folder problem")
-if re.search(r"plantoir: error: [^\n]*swift block", said.replace(line, "")):
-    problems.append("the build named another Swift block on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*swift block[^\n]*", said.replace(line, "")).group(0))
+# Plain Code Fixture's block is the one the site names on purpose (#567,
+# checked in 6j's next part).
+plain_code = "plantoir: error: Plain Code Fixture.md: swift block 1: "
+others = "\n".join(text for text in said.replace(line, "").splitlines() if plain_code not in text)
+if re.search(r"plantoir: error: [^\n]*swift block", others):
+    problems.append("the build named another Swift block on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*swift block[^\n]*", others).group(0))
 for problem in problems:
     print("   " + problem)
 sys.exit(1 if problems else 0)
@@ -3627,6 +3821,66 @@ then
   pass "runnable Swift: each block names its program (or compileError), static/swift-wasm holds exactly the programs visible pages use, static/swift is the overlay, and the block that does not compile is named at its line in the teacher's file with the compiler's first error, as a folder problem too (#493)"
 else
   fail "runnable Swift: one of the checks above failed (#493)"
+fi
+
+# ---- 6j, continued: a block the site shows as plain code is a folder problem (#567) ----
+# Plain Code Fixture's Swift block, after a fence left open in a list item:
+# the site shows it as plain code with no Run button, prints its
+# plantoir: error: line while it parses the page, and then - from the site's
+# own build, through scripts/site_said.py - ONE PLANTOIR_HEALTH: line naming
+# it (siteHealth.checks -> runnableCodeShownAsPlainCode), with the sentence
+# the app's dialog shows on the console too, after the error line.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE" <<'PLAINPY'
+import json, re, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+public, log, course = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+problems = []
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))
+runner = rules["codeRunnerBlocks"]
+check = next(entry for entry in rules["siteHealth"]["checks"] if entry["name"] == "runnableCodeShownAsPlainCode")
+prefix = rules["siteHealth"]["marker"]["prefix"]
+swift = next(row for row in runner["languages"] if row["fence"] == "swift")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+page = (public / "Plain-Code-Fixture.html").read_text(encoding="utf-8") if (public / "Plain-Code-Fixture.html").is_file() else ""
+if not page:
+    problems.append("Plain-Code-Fixture.html was not built")
+elif 'class="plantoir-runner"' in page or "plain code 567" not in page:
+    problems.append("Plain Code Fixture's Swift block is not plain code on the site")
+error = ("plantoir: error: Plain Code Fixture.md: swift block 1: "
+         + runner["words"]["blockAfterUnclosedFence"].replace("{language}", swift["displayName"]))
+if said.count(error) != 1:
+    problems.append(f"the site said {said.count(error)} times, not once: {error}")
+markers = [text[text.index(prefix):].strip() for text in said.splitlines()
+           if prefix in text and '"runnableCodeShownAsPlainCode"' in text]
+source = (course / "Plain Code Fixture.md").read_text(encoding="utf-8")
+opening = source.splitlines().index("```swift run") + 1
+sentence = (check["sentence"].replace("{page}", "Plain Code Fixture").replace("{course}", "EXC2O")
+            .replace("{section}", "1"))
+piece = (check["blockLine"].replace("{page}", "Plain Code Fixture").replace("{language}", swift["displayName"])
+         .replace("{block}", "1").replace("{line}", str(opening))
+         .replace("{reason}", check["reasons"]["blockAfterUnclosedFence"].replace("{language}", swift["displayName"])))
+detail = check["detail"].replace("{blocks}", piece)
+if len(markers) != 1:
+    problems.append(f"{len(markers)} runnableCodeShownAsPlainCode markers, not one")
+else:
+    finding = json.loads(markers[0][len(prefix):])
+    want = {"name": "runnableCodeShownAsPlainCode", "sentence": sentence, "detail": detail,
+            "fixable": False, "course": "EXC2O", "section": 1}
+    if finding != want:
+        problems.append(f"the finding is {finding}, not {want}")
+    if said.find(error) > said.find(markers[0]):
+        problems.append("the folder problem came before the site's own plantoir: error: line")
+if ("⚠️  " + sentence) not in said:
+    problems.append("the console does not show the dialog's sentence: " + sentence)
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+PLAINPY
+then
+  pass "runnable code shown as plain code: Plain Code Fixture's Swift block after a fence left open is plain code on the site, named once on the site's plantoir: error: line and then as ONE runnableCodeShownAsPlainCode folder problem from the site's own build, with the dialog's sentence and its line in the teacher's file (#567)"
+else
+  fail "runnable code shown as plain code: the site's block is not said as a folder problem (#567)"
 fi
 
 # ---- 6j, continued: live input (#583), as the build left it ----
@@ -4229,6 +4483,39 @@ else
   fail "the sidebar's page dot is missing from index.css, or the sidebar's row templates changed under it (#515)"
 fi
 
+# ---- 6h, continued: the font variables, by the built text (#629) ----
+# The Example Course uses the "System fonts" choice, stored as
+# "Helvetica, Arial". Quartz quoted that as ONE family, which no machine has;
+# the build now gives it the system stack itself, system-ui first, so the
+# site keeps the face it always showed (San Francisco on a Mac, Segoe UI on
+# Windows). The code font is a single family and must be as Quartz wrote it.
+if python3 - "$SITE_PUBLIC" <<'FONTVARPY'
+import re
+import sys
+from pathlib import Path
+public = Path(sys.argv[1])
+problems = []
+stylesheet = public / "index.css"
+css = stylesheet.read_text(encoding="utf-8") if stylesheet.is_file() else ""
+if not css:
+    problems.append("index.css was not built")
+if '"Helvetica, Arial"' in css:
+    problems.append('index.css still quotes "Helvetica, Arial" as one family')
+for variable in ("--headerFont", "--bodyFont"):
+    if not re.search(variable + r':\s*system-ui,\s*"Segoe UI",\s*Roboto,\s*Helvetica,\s*Arial,\s*sans-serif', css):
+        problems.append(f"index.css lacks {variable}: system-ui, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif")
+if not re.search(r'--codeFont:\s*"IBM Plex Mono",\s*ui-monospace', css):
+    problems.append('index.css lacks --codeFont: "IBM Plex Mono", ui-monospace')
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+FONTVARPY
+then
+  pass "the system-font choice is written as the system stack, system-ui first, and the code font as Quartz wrote it, in the built index.css (#629)"
+else
+  fail "the built index.css quotes a font stack as one family, or the system-font choice is not on the system stack (#629)"
+fi
+
 # ---- #612: pictures carry their real width and height, by the built text ----
 # Picture Fixture's two PNGs must carry the size the build read from them
 # and the marker that gives them pictures.scss's `height: auto`, and the
@@ -4372,9 +4659,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
        "Marker Fixture Page With A Title Long Enough To Wrap Onto A Second Line" >/tmp/verify_sidebar_page_marker.log 2>&1; then
-    pass "the sidebar's page dot: every page row in an open folder and a folder inside it has its dot, no folder row and no page at the top level does, a wrapped title's second line starts under its first letter, every dot is level with its title's first line (a too-wide first word included), the current page and a hovered link keep Quartz's colours, in light and dark, on a folder page, and every dot at least 3:1 under forced colours - $(head -1 /tmp/verify_sidebar_page_marker.log | sed 's/^OK: //') against the sidebar (#515, browser-checks/sidebar_page_marker.mjs)"
+    pass "the sidebar's page dot: every page row in an open folder and a folder inside it has its dot, no folder row and no page at the top level does, a wrapped title's second line starts under its first letter, every dot is level with its title's first line (a too-wide first word included), the current page and a hovered link keep Quartz's colours, in light and dark, on a folder page, and every dot at least 3:1 under forced colours - $(head -1 /tmp/verify_sidebar_page_marker.log | sed 's/^OK: //') against the sidebar; and as the sidebar drew, neither the page nor a closed folder's list scrolled by itself (#515, #611, browser-checks/sidebar_page_marker.mjs)"
   else
-    fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang (browser-checks/sidebar_page_marker.mjs, #515)"
+    fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang, or the page or a closed folder's list scrolled by itself as the sidebar drew (browser-checks/sidebar_page_marker.mjs, #515, #611)"
     cat /tmp/verify_sidebar_page_marker.log
   fi
   # #494: maths offline from the site's own KaTeX, and (#455 review S1)
@@ -4432,10 +4719,20 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # layout is the same in Chrome, which is asked here), and a sized picture
   # keeps its own shape in a phone's width.
   if node browser-checks/picture_heights.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_picture_heights.log 2>&1; then
-    pass "pictures keep their place before their bytes arrive and before they are scrolled to, so the text below them does not jump: Picture Fixture with its two PNGs' downloads held, then every picture arrived and nothing scrolled, then a 390 px window - $(head -1 /tmp/verify_picture_heights.log | sed 's/^OK: //') (#612, #609, browser-checks/picture_heights.mjs)"
+    pass "pictures keep their place before their bytes arrive and before they are scrolled to, so the text below them does not jump: Picture Fixture with its two PNGs' downloads held, then every picture arrived and nothing scrolled, the page not even by itself as it opened, then a 390 px window - $(head -1 /tmp/verify_picture_heights.log | sed 's/^OK: //') (#612, #609, #611, browser-checks/picture_heights.mjs)"
   else
-    fail "a picture had no height until its bytes arrived or until it was scrolled to, the page grew when it did, or a sized picture lost its shape in a narrow window (browser-checks/picture_heights.mjs, #612, #609)"
+    fail "a picture had no height until its bytes arrived or until it was scrolled to, the page grew when it did, a sized picture lost its shape in a narrow window, or the page moved by itself as it opened (browser-checks/picture_heights.mjs, #612, #609, #611)"
     cat /tmp/verify_picture_heights.log
+  fi
+  # #576: the Print button's fallback (the print layout's script refused),
+  # asked to print the way each browser answers print(): faces and pictures
+  # loaded before print(), the frame kept for a print put off, the page put
+  # back by the 30 s budget, and words.couldNotPrepare only when no print began.
+  if node browser-checks/print_fallback.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_print_fallback.log 2>&1; then
+    pass "Print's fallback, the browser laying the handout out itself: every picture and face loaded before print(), a print put off kept until afterprint, one that never comes, pictures that never arrive and a print layout that never finishes put back saying couldNotPrepare by the budget, a print with no afterprint put back quietly with the button free, headless Chrome's own print() put back at once - $(head -1 /tmp/verify_print_fallback.log | sed 's/^OK: //') (#576, browser-checks/print_fallback.mjs)"
+  else
+    fail "Print's fallback printed with the frame still loading, took the frame away before a print put off, or left Preparing to print… up (on either path) or said nothing when no print came (browser-checks/print_fallback.mjs, #576)"
+    cat /tmp/verify_print_fallback.log
   fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.
   if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
@@ -4445,8 +4742,8 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_my_progress.log
   fi
 else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before their bytes arrive and before they are scrolled to (#612, #609): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), and pictures laid out before their bytes arrive and before they are scrolled to (#612, #609): no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul

@@ -8,9 +8,14 @@
 # is the one this recipe was measured and verified on - Python 3.11.15,
 # Debian 13 (trixie), built 2026-08-05 - and the one BuildKit already resolved
 # for every build since, so pinning it re-downloads nothing for a Mac that
-# has it. The cost is that security fixes arrive only when someone bumps it:
-# `docker buildx imagetools inspect python:3.11-slim` names the current
-# index digest; bump it deliberately, and run verify.sh.
+# has it. The cost is that the packages the BASE ITSELF installed keep their
+# security fixes only until someone bumps it: `docker buildx imagetools
+# inspect python:3.11-slim` names the current index digest; bump it
+# deliberately, and run verify.sh. A package an apt line below NAMES comes
+# from Debian's live trixie-security instead, but only when that line's layer
+# is rebuilt - which a cached layer never is. The certificate store is the
+# one that cannot wait for either, so it has a late layer of its own (#639,
+# below the tikz engine).
 FROM python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
 
 # Python packages: frontmatter parsing, and Pillow to draw each
@@ -164,6 +169,28 @@ RUN cd /opt/vendor/tikz-engine \
  && npm ls node-tikzjax@1.0.5 \
  && npm cache clean --force
 
+# Debian's certificate store, at least 20250419+deb13u1 (#639): the version
+# that stops trusting "AAA Certificate Services" (Comodo) and "emSign ECC Root
+# CA - G3" (eMudhra), the roots above the intermediates compromised in
+# October 2026. Python's urllib - every Netlify publish, and deploy.py's own
+# Cloudflare calls - trusts this store, and OpenSSL checks no revocation, so
+# distrusting the roots is the protection. The base's own copy is frozen at
+# 20250419 by its digest, and the apt line above is cached on every Mac that
+# has built before; trixie-security is in the base's sources, so this
+# upgrades it without moving the digest. A FLOOR, not an `=` pin: Debian's
+# security archive serves only its newest version, so an exact pin would break
+# every first build the day deb13u2 ships, and a later version only distrusts
+# more. The floor is written in this line, so raising it re-runs the layer,
+# and a store older than it fails the build rather than shipping. Its own
+# layer, late, so a teacher who has built before re-runs only this (~10 MB,
+# seconds), not apt, wrangler, Quartz and npm (~330 MB). verify.sh checks
+# the version and both subjects; contracts/toolchain.json -> pins ->
+# caCertificates and documentation/02 -> "The certificate store" carry why.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' ca-certificates)" ge 20250419+deb13u1 \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Copy patched Quartz components into place
 COPY patches/Explorer.tsx /opt/quartz/quartz/components/Explorer.tsx
 COPY patches/FolderContent.tsx /opt/quartz/quartz/components/pages/FolderContent.tsx
@@ -224,6 +251,11 @@ COPY scripts/quizzes.py /opt/scripts/quizzes.py
 # Links entry and the plan the site's emitter reads. Imported by build_site.py
 # by bare name (test_baked_modules.py).
 COPY scripts/my_progress.py /opt/scripts/my_progress.py
+# What the SITE found (#567): a runnable block it showed as plain code, said
+# as one folder problem. build_site.py imports it by bare name to write the
+# side file, and the site's emitter (plantoirSiteSaid.ts) runs it as a file
+# with the build's own Python (test_baked_modules.py).
+COPY scripts/site_said.py /opt/scripts/site_said.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).

@@ -1475,11 +1475,13 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   the section rewritten at every launch. **Files are read with a strict
   UTF-8 decoder**, so a file saved in another encoding is refused, never
   written over (`addCases` "cannot be read again").
-- **The skills are whatever `support\agent_guidance\skills\` holds**, five
+- **The skills are whatever `support\agent_guidance\skills\` holds**, six
   today: `plantoir-page-authoring` (#596, the one the root files name FIRST;
   it routes to the four below, `printablePages.agentGuidance.pageAuthoringSkill`),
-  `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code` and
-  `plantoir-quizzes` (#563). `AgentGuidance.Write` enumerates the folder, so a
+  `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code`,
+  `plantoir-quizzes` (#563) and `plantoir-handouts` (#631, a PDF made from
+  LaTeX rather than a page, with starter `.tex` files in a subfolder;
+  `printablePages.agentGuidance.handoutsSkill`, 09 → "The handouts skill"). `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes
   skill teaches — the `> [!quiz]` callout and what the site does with it — is
   [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and
@@ -7668,8 +7670,13 @@ longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
 `ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
 (`TaskScheduling.cs`). A wrapper written before this change keeps no
 `PLANTOIR_SWIFT:` line until that deploy is scheduled again, as for
-`PLANTOIR_MY_PROGRESS:`. Neither event carries `appliesOn`: the mac owes
-both (its own issue).
+`PLANTOIR_MY_PROGRESS:`. Neither event carries `appliesOn`: the mac has
+recorded both since v1.9.0 (#635), from the same `PLANTOIR_SWIFT:` line, which
+`preview.sh` prints after building its Swift image (05 → "Recorded on the
+trail, on both platforms"). Its bytes and reasons are worked out by
+`swift_blocks.py got-ready` against `codeRunnerBlocks.swift.mac`, whose cases
+`test_swift_blocks.py` runs here too through `PythonToolchainTests`; nothing
+in this app changes for it.
 
 ### Shared fix the mac inherits
 
@@ -7678,6 +7685,34 @@ toolchain's folder, so a compile log never survived its own build. That was
 found here, where the first preview's `compile-<pid>.log` was gone.
 `LOGS_FOLDER` is now kept; `test_swift_blocks.py` →
 `PruneKeepsTheLogsTests` pins it.
+
+### The Code page's Swift pictures (#590), 2026-10-23
+
+v1.8.6 shipped Swift with its two plantoir.app pictures (`code-swift`,
+`code-swift-live`) still owed: a Windows window capture is taken at exactly
+2x (#557) and no 4K session was open that day, so
+`preview_pages_windows.py` left them out by name (`NOT_ON_WINDOWS`) and
+`site.json` → `availability.features.runnable-swift.windows` stayed false,
+which kept the Code page saying runnable Swift was on the Mac only. On
+2026-10-23 the list was dropped, the pictures taken by `capture_windows.py
+--code code-swift-live,code-swift` and promoted, and the flag set true in
+the same commit. Nothing about the pass changed for them: the marketing
+ICS4U already had `Reading Input in Swift.md` (the steps reported 0 made,
+95 already there), and the Mac's `prepare/code-swift*.js` reached "ready"
+unchanged.
+
+Measured on this PC (i5-8365U, a Remote Desktop session at 3840 x 2160,
+200%, taskbar NOT auto-hidden): the fitted scale was 2.000 with the
+taskbar showing (a 2160-pixel-tall work area fits the 860 DIP window at 2x;
+the 1832-tall screen of the earlier pass did not), so nothing was hidden.
+Swift was already ready (`READY.json`), so no download; the first ICS4U
+preview compiled its one block in 4.73 s (embedded SDK, 49,406 bytes,
+`compile-<pid>.log`), the preview was serving about two minutes after it
+was started, and the second run's preview compiled nothing. Each picture
+is 2560 x 1720 and Windows' OCR read every `expectText`. The Windows twins
+differ from the Mac's only in what is the platform's own: Windows' fonts
+for the Mac's (so a line wraps a little differently and the text sits a
+little lower), and Edge's title bar for the Mac window's frame.
 
 
 ## The trail's first and last lines (#565, the mac's #560), v1.8.0
@@ -8133,7 +8168,11 @@ Three edges the predicate now decides on purpose, pinned in
 Not changed here: `LinkGraph.IsCurriculum` and `CurriculumRules.IsCurriculumPage`
 still test the folders of whatever path they are given (they take no course),
 and #614 — a curriculum folder renamed to something without the word, read
-from `course_config.json` — is deferred to v1.9.0.
+from `course_config.json` — landed on the mac first (v1.9.0) and is owed here
+by its `windows` issue: `PagePaths.IsCurriculum` and every caller, including
+these two, have to take the course's declared folders. The rule, what was
+measured and what was rejected are in `10-local-ai-assistant.md` → "A
+curriculum folder is the one the course declares, or one named for it (#614)".
 
 **The publish plan (#617).** What the mac decided and why, including what was
 rejected, is `10-local-ai-assistant.md` → "A curriculum page the walk reaches
@@ -8231,8 +8270,12 @@ taken as written. One difference from the mac, kept: Windows reads only the
 FIRST `title:` line of the sibling and stops (the `break`), where the mac's
 loop reads on; they differ only for a front page with two title lines, which
 no Plantoir writer produces. `SiteHealthRepair.RestoreIndex` quotes the course name it
-puts back. Courses already made with a plain colon title are left alone, as on
-the mac (a one-click repair is a v1.9.0 follow-on).
+puts back. Courses already made with a plain colon title are put right by
+their next build from 1.9.0 (#584): the shared `build_site.py` quotes the
+front page's title itself, so Windows inherits the repair and its console
+sentence, and owes only the `PLANTOIR_REPAIRED:` trail line —
+[04 → "A course made before 1.8.1 is put right by its next
+build"](04-course-setup.md).
 
 **Not on disk, on purpose.** The contract's seventh folder case is `Unit 1:
 Kinematics`, and NTFS refuses `:` in a name, so every case runs IN MEMORY

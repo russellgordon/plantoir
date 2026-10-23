@@ -1255,9 +1255,10 @@ enum AssistPublishPlanner {
         if mustStay.contains(page.lowercasedTitle) {
             return .keyLinks
         }
-        // `build_site.py`'s own rule: any FOLDER segment containing
-        // "curriculum", so a course whose folder is called "Ontario
-        // Curriculum" is covered exactly as a plain one is.
+        // A folder the course declares in `curriculum_folders`, whatever it
+        // is called, or any FOLDER segment containing "curriculum" (#614).
+        // The assistant's own rule — the build maps the declared folders and
+        // has no page-by-page rule of its own to match.
         if AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) {
             return .curriculum
         }

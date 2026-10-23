@@ -29,6 +29,7 @@ import page_visibility
 import page_features
 import figures
 import swift_blocks
+import site_said
 import print_settings
 import quizzes
 import my_progress
@@ -1864,15 +1865,29 @@ def _wire_served_case(script_ts: Path) -> None:
     script_ts.write_text(text, encoding="utf-8")
 
 
+# Plantoir's emitters, each exported beside Quartz's own once: My Progress's
+# (#545), then the one that says what the site found (#567). Each has its own
+# check, so a section wired before #567 - which already exports the first -
+# gets the second on its next build.
+_PLANTOIR_EMITTERS = (
+    ("PlantoirProgress", "./plantoirProgress"),
+    ("PlantoirSiteSaid", "./plantoirSiteSaid"),
+)
+
+
 def _wire_emitters_index(index_ts: Path) -> None:
-    """Export My Progress's emitter (#545) beside Quartz's own."""
+    """Export Plantoir's emitters (#545, #567) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
-    if "export { PlantoirProgress }" in text:
-        return
-    if not text.endswith("\n"):
-        text += "\n"
-    text += f'export {{ PlantoirProgress }} from "./plantoirProgress" // {QUARTZ_ADDITIONS_MARKER}\n'
-    index_ts.write_text(text, encoding="utf-8")
+    changed = False
+    for name, module in _PLANTOIR_EMITTERS:
+        if f"export {{ {name} }}" in text:
+            continue
+        if not text.endswith("\n"):
+            text += "\n"
+        text += f'export {{ {name} }} from "{module}" // {QUARTZ_ADDITIONS_MARKER}\n'
+        changed = True
+    if changed:
+        index_ts.write_text(text, encoding="utf-8")
 
 
 def _wire_progress_emitter(config_ts: Path) -> None:
@@ -1893,6 +1908,31 @@ def _wire_progress_emitter(config_ts: Path) -> None:
         print("⚠️ Could not add the My Progress page: the site's settings have changed shape.")
         return
     text = text[:line_start] + indent + "Plugin.PlantoirProgress(),\n" + text[line_start:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_site_said_emitter(config_ts: Path) -> None:
+    """Put the emitter that says what the site found (#567, siteHealth ->
+    runnableCodeShownAsPlainCode) straight BEFORE Assets, like My
+    Progress's: an emitter runs after every transformer, so each page's
+    file.data already holds what the runnable-code transformer recorded, and
+    every emitter finishes before Quartz says it is done - so before a
+    preview's server answers. It writes no file, so its place changes nothing
+    else."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirSiteSaid(" in text:
+        return
+    anchor = "Plugin.Assets(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        return
+    at = text.index(anchor)
+    line_start = text.rfind("\n", 0, at) + 1
+    indent = text[line_start:at]
+    if indent.strip():
+        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        return
+    text = text[:line_start] + indent + "Plugin.PlantoirSiteSaid(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -2029,6 +2069,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
     Print button's component in pictures.scss), My
     Progress's two (#545: its emitter exported beside Quartz's and put
     before Assets; its script and styles ride as the quizzes' do), the
+    emitter that says which runnable blocks the site showed as plain code
+    (#567: exported beside My Progress's, and put before Assets after it), the
     folder pages' table of contents (#520), and
     live input's two (#583: the preview's server sends the isolation
     headers, and Quartz's router loads a page whole across the isolation
@@ -2052,6 +2094,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz" / "plugins" / "emitters" / "index.ts", _wire_emitters_index),
         (output_dir / "quartz.config.ts", _wire_progress_emitter),
+        (output_dir / "quartz.config.ts", _wire_site_said_emitter),
         (output_dir / "quartz.layout.ts", _wire_code_runner_component),
         (output_dir / "quartz.layout.ts", _wire_list_page_toc),
         (output_dir / "quartz" / "cli" / "handlers.js", _wire_isolation_serve),
@@ -2254,6 +2297,36 @@ def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Pa
     except Exception as error:
         print(f"⚠️ Could not prepare the Swift programs students run: {error}")
         return {"problems": [], "blocks": 0, "ready": 0}
+
+
+def _write_site_said(output_dir: Path, content_root: Path, course_code, section_number,
+                     swift_here: dict) -> None:
+    """
+    quartz/plantoir_site_said.json (#567; scripts/site_said.py): which Python
+    the site's emitter runs to say the runnable blocks it showed as plain code
+    as ONE folder problem (siteHealth -> runnableCodeShownAsPlainCode), where
+    each page that opts in came from in the course folder, and which Swift
+    blocks swiftCouldNotBePrepared already names. The pages are the ones
+    students can see, by the gate's own rule, read from the build's copies.
+    Never stops a build: if this cannot run, the site keeps its
+    `plantoir: error:` lines and says no finding.
+    """
+    try:
+        places = {}
+        for page in figures.pages_students_see(
+                content_root, _is_draft,
+                lambda page: _place_in_the_course(page, content_root),
+                lambda page: None, skip=_is_media_name, must_contain="codeRunner"):
+            source = _vault_source_of(content_root / page["path"])
+            places[page["path"]] = {"place": page["place"],
+                                    "source": str(source) if source is not None else None}
+        swift_named = []
+        for problem in swift_here.get("problems") or []:
+            swift_named.append([problem.get("page", ""), problem.get("block", 1)])
+        site_said.write_side_file(output_dir, course_code, section_number, places, swift_named,
+                                  content_root)
+    except Exception as error:
+        print(f"⚠️ Could not let the website say which blocks of code show as plain code: {error}")
 
 
 LOCALES_SRC_CANDIDATES = [
@@ -3787,20 +3860,22 @@ def _is_locked(source: Path) -> bool:
     return not os.access(source, os.W_OK)
 
 
-def _replace_the_page_safely(source: Path, original: str, rewritten: str) -> bool:
+def _replace_the_page_safely(source: Path, original: str, rewritten: str,
+                             suffix: str = ".plantoir-dating") -> bool:
     """
     Puts `rewritten` in place of the teacher's page without ever leaving a
     half-written file: the new text goes to a hidden file beside the page, is
     flushed to disk, and is renamed over the page in one step — but only if
-    the page still holds exactly the text the date was worked out from. A
+    the page still holds exactly the text the change was worked out from. A
     Stop partway through leaves the old page or the new one, never an empty
     one; an Obsidian save that lands after the page was read is kept, and the
-    next build dates it.
+    next build tries again. Used by the date pass (#275, #276) and by the
+    front page's title repair (#584), whose hidden file ends `suffix`.
     """
     folder = source.parent
     try:
         handle_number, temporary_name = tempfile.mkstemp(
-            dir=folder, prefix=f".{source.name}.", suffix=".plantoir-dating")
+            dir=folder, prefix=f".{source.name}.", suffix=suffix)
     except OSError:
         return False
     temporary = Path(temporary_name)
@@ -3899,6 +3974,260 @@ def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
     if not _replace_the_page_safely(source, text, rewritten):
         return None
     return "written"
+
+
+# === #584: a front page whose title Plantoir wrote unquoted ==================
+# Until 1.8.1 setup, the mac's SectionAdder and SiteHealthRepair wrote a
+# section's front page as `title: Grade 12 Physics: Mechanics, Section 1`, and
+# a course name holding ": " made it a page the build cannot read (#575), so the
+# section had no website. The build puts that ONE shape right, on every build:
+# `shared-rules.json` -> `buildRepairs.frontPageTitleQuoted`, whose cases
+# `scripts/test_front_page_title_repair.py` runs through the functions below.
+
+# The fallbacks are only for a contract that cannot be read at all; a test
+# pins each one to the contract's own value, so they cannot drift quietly.
+_FALLBACK_REPAIRED_PREFIX = "PLANTOIR_REPAIRED:"
+_FALLBACK_TITLE_QUOTED_SENTENCE = (
+    "🔧 Put quotes around the title of the front page of {course} Section {section}, "
+    "so the colon in it no longer stops the page's settings being read and the "
+    "website has its front page."
+)
+_FALLBACK_TITLE_LEFT_SENTENCE = (
+    "🔧 The title of the front page of {course} Section {section} has a colon that "
+    "stops the page's settings being read. The website reads it in quotes, so it has "
+    "its front page, but the page itself was left as it was, because {reason}."
+)
+_FALLBACK_TITLE_LEFT_REASONS = {
+    "reference": "the course is kept for reference",
+    "linked": "it also lives somewhere else",
+    "locked": "it is locked or set so it cannot be changed",
+}
+
+
+def _settings_can_be_read(text: str) -> bool:
+    """Whether the build's reader reads this page's settings."""
+    try:
+        frontmatter.loads(text)
+    except Exception:
+        return False
+    return True
+
+
+def _as_the_build_reads_it(text: str) -> str:
+    """The page as `frontmatter.load(path)` sees it: the file is opened with
+    universal newlines, so a Windows line ending and a lone carriage return
+    both arrive as "\n". Testing the raw text instead would disagree with the
+    build about a page saved on Windows."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _front_page_title_quoted(raw: str) -> str | None:
+    """
+    The front page with its title in double quotes — or None, when this is not
+    the one shape Plantoir itself wrote wrong (#584).
+
+    `raw` is the file as read with `newline=""`, so its line endings are kept.
+    Every condition must hold, in this order
+    (`buildRepairs.frontPageTitleQuoted.rule`):
+
+    1. it does not start with a byte-order mark (the date pass refuses those
+       too);
+    2. the build's reader REFUSES its settings, read as the build reads them;
+    3. line 1 is exactly `---`, and a later line exactly `---` closes the
+       settings;
+    4. exactly one line between them starts `title:` at the left edge;
+    5. that line is `title:`, one or more spaces, and a value that is not
+       empty and does not start with a quote;
+    6. the value holds ": " and neither " #" nor a tab and "#" (a comment);
+    7. the next line in the settings does not start with a space or a tab (else
+       the value would go on below);
+    8. the rewrite changes only that line, to `title: ` and the value as
+       `setup_course.frontmatter_title` quotes it, keeping its line ending;
+    9. the rewritten settings READ, and their title is exactly the value.
+
+    Anything else is left to the finding that already names it
+    (`pageSettingsUnreadable`): a page that is wrong in some other way, or
+    whose meaning would have to be guessed, is never rewritten.
+    """
+    if frontmatter is None:
+        return None
+    if raw.startswith("﻿"):
+        return None
+    if _settings_can_be_read(_as_the_build_reads_it(raw)):
+        return None
+    lines = raw.splitlines(keepends=True)
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        return None
+    closing_line = None
+    for index in range(1, len(lines)):
+        if lines[index].rstrip("\r\n") == "---":
+            closing_line = index
+            break
+    if closing_line is None:
+        return None
+    title_lines = []
+    for index in range(1, closing_line):
+        if lines[index].startswith("title:"):
+            title_lines.append(index)
+    if len(title_lines) != 1:
+        return None
+    title_line = title_lines[0]
+    line = lines[title_line]
+    without_ending = line.rstrip("\r\n")
+    ending = line[len(without_ending):]
+    after_the_key = without_ending[len("title:"):]
+    if not after_the_key.startswith(" "):
+        return None
+    value = after_the_key.strip(" \t")
+    if value == "" or value[0] in "\"'":
+        return None
+    if ": " not in value:
+        return None
+    if " #" in value or "\t#" in value:
+        return None
+    if title_line + 1 < closing_line and lines[title_line + 1][:1] in (" ", "\t"):
+        return None
+    quoted_line = "title: " + json.dumps(value, ensure_ascii=False) + ending
+    rewritten = "".join(lines[:title_line]) + quoted_line + "".join(lines[title_line + 1:])
+    try:
+        read_back = frontmatter.loads(_as_the_build_reads_it(rewritten))
+    except Exception:
+        return None
+    if read_back.metadata.get("title") != value:
+        return None
+    return rewritten
+
+
+def _quote_the_front_page_title(section_index: Path, copy: Path, frozen_course: bool) -> str | None:
+    """
+    Quotes the front page's title (#584) in the BUILD'S copy, always, so the
+    site has its front page, and in the teacher's own page when it may be
+    changed. Runs just after the copy is made and before its settings are
+    read, so a page put right is never hidden.
+
+    Returns "written" when the teacher's page was rewritten too; "reference",
+    "linked" or "locked" when only the copy was, because the course is kept
+    for reference, the page also lives somewhere else, or it is locked or
+    read-only (the date pass leaves the same three alone); "not written" when
+    the rewrite was refused at the last step — the page changed after it was
+    read, or the host would not let it be replaced (Finder's Locked, which the
+    container cannot see; a file held open on Windows) — and the next build
+    tries again; or None when there was nothing to put right.
+    """
+    try:
+        with open(copy, "r", encoding="utf-8", newline="") as handle:
+            raw = handle.read()
+    except Exception:
+        return None
+    quoted = _front_page_title_quoted(raw)
+    if quoted is None:
+        return None
+    # `shutil.copy2` carries a read-only page's mode into the copy.
+    _writable(copy)
+    try:
+        with open(copy, "w", encoding="utf-8", newline="") as handle:
+            handle.write(quoted)
+    except Exception:
+        return None
+    if frozen_course:
+        return "reference"
+    if _reaches_the_page_through_a_link(section_index):
+        return "linked"
+    if _is_locked(section_index):
+        return "locked"
+    # The copy holds what `shutil.copy2` read from the teacher's page, so
+    # `raw` is that page's text: a save that landed since is kept.
+    if not _replace_the_page_safely(section_index, raw, quoted, suffix=".plantoir-quoting"):
+        return "not written"
+    return "written"
+
+
+def _build_repair_rule(*keys, fallback):
+    """One value out of `shared-rules.json` -> `buildRepairs`."""
+    try:
+        value = contracts.section("shared-rules", "buildRepairs", *keys)
+    except Exception:
+        return fallback
+    if isinstance(fallback, str) and not isinstance(value, str):
+        return fallback
+    if isinstance(fallback, dict) and not isinstance(value, dict):
+        return fallback
+    return value
+
+
+def _filled_in(template: str, values: dict) -> str:
+    """Every {name} in ONE pass, so a value that itself holds braces is kept
+    as it is."""
+    return re.sub(r"\{(\w+)\}",
+                  lambda match: str(values.get(match.group(1), match.group(0))),
+                  template)
+
+
+def announce_front_page_title_quoted(outcome: str | None, course: str, section_number: int,
+                                     page: str, printer=print) -> None:
+    """
+    Says what the title repair did (#584): a sentence for the teacher and, only
+    when the teacher's own page was rewritten, one machine-readable line the
+    app puts on its activity trail (`buildRepairs.marker`) — the page's NAME,
+    never anything written on it. When only the build's copy was put right the
+    console says why and nothing goes on the trail, as the date pass's linked
+    and locked pages; when the rewrite was refused at the last step nothing is
+    said at all, since the next build tries again.
+    """
+    values = {"course": course, "section": section_number}
+    if outcome == "written":
+        sentence = _build_repair_rule("frontPageTitleQuoted", "sentence",
+                                      fallback=_FALLBACK_TITLE_QUOTED_SENTENCE)
+        printer(_filled_in(sentence, values))
+        prefix = _build_repair_rule("marker", "prefix", fallback=_FALLBACK_REPAIRED_PREFIX)
+        payload = {"course": course, "section": section_number,
+                   "repair": "frontPageTitleQuoted", "page": page}
+        printer(f"{prefix} {json.dumps(payload, ensure_ascii=False)}")
+        return
+    reasons = _build_repair_rule("frontPageTitleQuoted", "reasons",
+                                 fallback=_FALLBACK_TITLE_LEFT_REASONS)
+    reason = reasons.get(outcome) if outcome else None
+    if not isinstance(reason, str):
+        return
+    sentence = _build_repair_rule("frontPageTitleQuoted", "sentenceLeftAsItWas",
+                                  fallback=_FALLBACK_TITLE_LEFT_SENTENCE)
+    values["reason"] = reason
+    printer(_filled_in(sentence, values))
+
+
+def copy_the_section_front_page(course_dir: Path, section_dir: Path, content_root: Path, config,
+                                section_number: int, show_marker, course_code: str,
+                                frozen_course: bool) -> bool:
+    """
+    Copies the section's front page into the build and prepares it: the title
+    repair above (#584), its settings read (#246), the landing title, and its
+    links to section pages. Returns whether there was a front page to copy.
+    Factored out of `build_section_site` so the test drives exactly what the
+    build runs; `forget_vault_sources(course_dir)` must already have been
+    called, since the repair asks where the page lives.
+    """
+    section_index = section_dir / "index.md"
+    if not section_index.exists():
+        print("⚠️ Section index.md not found — site may not render correctly.")
+        return False
+    dest = content_root / "index.md"
+    shutil.copy2(section_index, dest)
+    remember_vault_source(dest, section_index, is_section_page=True)
+    outcome = _quote_the_front_page_title(section_index, dest, frozen_course)
+    announce_front_page_title_quoted(outcome, course_code, section_number,
+                                     _name_in_the_course(section_index))
+    process_frontmatter(dest, section_number)
+
+    # The landing title comes from the current settings, not from
+    # whatever was baked in at scaffold time.
+    set_landing_title(dest, config, section_number, show_marker)
+
+    # rewrite section-path wikilinks in the section index
+    print("🔍 Checking for wikilinks to rewrite in content/index.md...")
+    rewrite_section_wikilinks(dest)
+    print(f"  🏠 Copied section index.md to content/index.md")
+    return True
+# ===========================================================================
 
 
 def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
@@ -4348,7 +4677,7 @@ def _hide_a_page_whose_settings_cannot_be_read(file_path: Path, error: Exception
     hidden and named.
 
     The teacher's own file is never touched: this runs on the copy in
-    `content/`, and `_write_the_date_back` refuses a source that cannot be
+    `content/`, and `_write_date_into_the_teachers_page` refuses a source that cannot be
     parsed.
 
     Hiding must not depend on anything that can fail for another reason — the
@@ -5063,6 +5392,138 @@ export function googleFontHref(theme: Theme) {
             print("✅ Patched Head.tsx to skip an empty font request")
     except Exception as e:
         print(f"⚠️ Error patching Head.tsx: {e}")
+
+
+# The three lines Quartz v4.5.0's joinStyles writes the font variables with.
+# Each quotes the WHOLE typography name as one family.
+_FONT_VARIABLE_LINES_V450 = (
+    '  --headerFont: "${getFontSpecificationName(theme.typography.header)}", ${DEFAULT_SANS_SERIF};',
+    '  --bodyFont: "${getFontSpecificationName(theme.typography.body)}", ${DEFAULT_SANS_SERIF};',
+    '  --codeFont: "${getFontSpecificationName(theme.typography.code)}", ${DEFAULT_MONO};',
+)
+
+_FONT_VARIABLE_LINES_PATCHED = (
+    '  --headerFont: ${cssFontStack(theme.typography.header, DEFAULT_SANS_SERIF)};',
+    '  --bodyFont: ${cssFontStack(theme.typography.body, DEFAULT_SANS_SERIF)};',
+    '  --codeFont: ${cssFontStack(theme.typography.code, DEFAULT_MONO)};',
+)
+
+# A RAW string on purpose: the TypeScript carries the regular expression
+# /["\\]/g, and in an ordinary Python string "\\" becomes one backslash,
+# which leaves TypeScript an unterminated regular expression and fails every
+# course's build (#629's review). The test checks the patched file carries
+# the expression exactly as written here.
+_FONT_STACK_HELPER = r'''// Plantoir (#629): a typography choice can be a stack of families
+// ("Helvetica, Arial"), not just one. Quartz quoted the whole choice, so CSS
+// read ONE family called "Helvetica, Arial", which exists nowhere. Each family
+// is now quoted on its own, and a CSS keyword (serif, system-ui...) is left
+// bare, since a quoted keyword is read as a family name.
+const CSS_FONT_KEYWORDS = new Set([
+  "serif",
+  "sans-serif",
+  "monospace",
+  "cursive",
+  "fantasy",
+  "system-ui",
+  "ui-serif",
+  "ui-sans-serif",
+  "ui-monospace",
+  "ui-rounded",
+  "math",
+  "emoji",
+  "fangsong",
+  "-apple-system",
+  "blinkmacsystemfont",
+])
+
+// The "System fonts" choice is stored as "Helvetica, Arial", but what a
+// reader has always seen is their own system font: San Francisco on a Mac,
+// Segoe UI on Windows. Quartz's fallback already names system-ui and Segoe UI
+// ahead of Helvetica and Arial, so that choice is given the fallback alone,
+// and the site keeps looking exactly as it did.
+function isSystemFontChoice(families: string[]): boolean {
+  if (families.length !== 2) {
+    return false
+  }
+  return families[0].toLowerCase() === "helvetica" && families[1].toLowerCase() === "arial"
+}
+
+function cssFontStack(spec: FontSpecification, fallback: string): string {
+  const families: string[] = []
+  for (const part of getFontSpecificationName(spec).split(",")) {
+    const family = part.trim().replace(/^["']|["']$/g, "").replace(/["\\]/g, "").trim()
+    if (family.length > 0) {
+      families.push(family)
+    }
+  }
+  if (isSystemFontChoice(families)) {
+    return fallback
+  }
+  const entries: string[] = []
+  for (const family of families) {
+    if (CSS_FONT_KEYWORDS.has(family.toLowerCase())) {
+      entries.push(family)
+    } else {
+      entries.push(`"${family}"`)
+    }
+  }
+  entries.push(fallback)
+  return entries.join(", ")
+}
+
+'''
+
+
+def patch_font_variable_stacks(theme_ts_path: Path):
+    """
+    Quote each family in a font stack on its own (#629).
+
+    Quartz's joinStyles writes `--bodyFont: "<choice>", <fallback>`, quoting
+    the whole choice. For the "System fonts" choice, stored as
+    "Helvetica, Arial", that is ONE family named "Helvetica, Arial", which
+    no machine has, so the browser always fell through to the fallback's
+    system-ui: San Francisco on a Mac (measured with Chrome's platform-font
+    query, 2026-10-22), Segoe UI on Windows. Russell's ruling: those sites
+    keep looking exactly as they do, so that choice now gets the fallback
+    alone (system-ui first, Helvetica and Arial after it), and every other
+    stack is quoted one family at a time. A single family comes out byte
+    for byte as before, so a Google-font course's stylesheet is unchanged.
+
+    Runs on every build (existing folders heal on their next preview) and
+    is idempotent. Leaves the file alone, with a warning, if joinStyles is
+    not in the shape Quartz v4.5.0 writes it.
+    """
+    if not theme_ts_path.exists():
+        print(f"⚠️ theme.ts not found at {theme_ts_path}")
+        return
+    try:
+        content = theme_ts_path.read_text(encoding="utf-8")
+    except OSError as error:
+        print(f"⚠️ Could not read theme.ts: {error}")
+        return
+
+    if "function cssFontStack" in content:
+        print("ℹ️ Font variables already quote one family at a time (no change).")
+        return
+
+    anchor = "export function joinStyles"
+    shape_is_known = content.count(anchor) == 1
+    for line in _FONT_VARIABLE_LINES_V450:
+        if content.count(line) != 1:
+            shape_is_known = False
+    if not shape_is_known:
+        print("⚠️ joinStyles not in the expected shape; font variables left unchanged.")
+        return
+
+    for old_line, new_line in zip(_FONT_VARIABLE_LINES_V450, _FONT_VARIABLE_LINES_PATCHED):
+        content = content.replace(old_line, new_line, 1)
+    content = content.replace(anchor, _FONT_STACK_HELPER + anchor, 1)
+    try:
+        theme_ts_path.write_text(content, encoding="utf-8")
+    except OSError as error:
+        print(f"⚠️ Could not write theme.ts: {error}")
+        return
+    print("✅ Patched theme.ts so font stacks quote one family at a time")
 
 
 def patch_mermaid_font_wait(mermaid_ts_path: Path):
@@ -5997,6 +6458,66 @@ def patch_explorer_inline_expand_on_navigate(inline_path: Path):
 
     except Exception as e:
         print(f"⚠️ Error patching explorer.inline.ts: {e}")
+
+SIDEBAR_SCROLL_MARKER = "PLANTOIR-SIDEBAR-SCROLL"
+
+# Quartz v4.5.0's own line in explorer.inline.ts, exactly (patches/ keeps it).
+_SIDEBAR_SCROLL_OLD = 'activeElement.scrollIntoView({ behavior: "smooth" })'
+
+# What replaces it. scrollIntoView scrolls EVERY scrollable ancestor, and the
+# sidebar is sticky and as tall as the window, so on a long page it moved the
+# page itself 300-600 px as it opened, and on any page it slid a CLOSED
+# folder's hidden list toward a row nobody could see (#611). This moves only
+# the sidebar's own list, at once, centring the entry, and only when the
+# entry is in an open folder and out of view.
+_SIDEBAR_SCROLL_NEW = """// PLANTOIR-SIDEBAR-SCROLL (#611): bring the current page's entry into view
+        // in the sidebar's own list only, at once, and only when it can be seen.
+        let insideClosedFolder = false
+        let folder = activeElement.closest(".folder-outer")
+        while (folder) {
+          if (!folder.classList.contains("open")) insideClosedFolder = true
+          folder = folder.parentElement ? folder.parentElement.closest(".folder-outer") : null
+        }
+        if (!insideClosedFolder) {
+          const listBox = explorerUl.getBoundingClientRect()
+          const entryBox = activeElement.getBoundingClientRect()
+          const alreadyInView = entryBox.top >= listBox.top && entryBox.bottom <= listBox.bottom
+          if (!alreadyInView) {
+            explorerUl.scrollTop +=
+              entryBox.top - listBox.top - (explorerUl.clientHeight - entryBox.height) / 2
+          }
+        }"""
+
+
+def patch_explorer_scroll_in_sidebar_only(inline_path, printer=print) -> bool:
+    """
+    Stop the sidebar moving the page when a page opens (#611): replace
+    Quartz's scrollIntoView of the current page's entry with a scroll of the
+    sidebar's own list. Every build, so a section staged before the fix heals
+    on its next preview. Idempotent (its own marker). Answers whether the
+    file changed; a file of another shape is said once and left alone.
+    """
+    path = Path(inline_path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
+        printer(f"⚠️ Could not stop the sidebar moving the page: explorer.inline.ts could not be read ({error})")
+        return False
+    if SIDEBAR_SCROLL_MARKER in text:
+        return False
+    if text.count(_SIDEBAR_SCROLL_OLD) != 1:
+        printer("⚠️ Could not stop the sidebar moving the page: explorer.inline.ts has changed shape, "
+                "so a page may still jump as it opens.")
+        return False
+    text = text.replace(_SIDEBAR_SCROLL_OLD, _SIDEBAR_SCROLL_NEW, 1)
+    try:
+        path.write_text(text, encoding="utf-8")
+    except OSError as error:
+        printer(f"⚠️ Could not stop the sidebar moving the page: {error}")
+        return False
+    printer("✅ Patched explorer.inline.ts so the sidebar scrolls only itself")
+    return True
+
 
 def patch_quartz_build_clean(build_ts_path: Path):
     """
@@ -8412,6 +8933,7 @@ def build_section_site(
     theme_ts = output_dir / "quartz" / "util" / "theme.ts"
     head_tsx = output_dir / "quartz" / "components" / "Head.tsx"
     patch_google_font_href(theme_ts, head_tsx)
+    patch_font_variable_stacks(theme_ts)
     append_coverage_styles(output_dir / "quartz" / "styles" / "base.scss")
     latex_ts = output_dir / "quartz" / "plugins" / "transformers" / "latex.ts"
     patch_katex_mhchem(latex_ts)
@@ -8425,6 +8947,7 @@ def build_section_site(
     explorer_inline = output_dir / "quartz" / "components" / "scripts" / "explorer.inline.ts"
     patch_explorer_tsx_expand_behavior(explorer_tsx)
     patch_explorer_inline_expand_on_navigate(explorer_inline)
+    patch_explorer_scroll_in_sidebar_only(explorer_inline)
 
     install_patched_backlinks(output_dir)
     install_quartz_additions(output_dir)
@@ -8447,23 +8970,12 @@ def build_section_site(
 
     forget_vault_sources(course_dir)
     forget_unreadable_pages()
-    section_index = section_dir / "index.md"
-    if section_index.exists():
-        dest = content_root / "index.md"
-        shutil.copy2(section_index, dest)
-        remember_vault_source(dest, section_index, is_section_page=True)
-        process_frontmatter(dest, section_number)
-
-        # The landing title comes from the current settings, not from
-        # whatever was baked in at scaffold time.
-        set_landing_title(dest, config, section_number, show_marker)
-
-        # rewrite section-path wikilinks in the section index
-        print("🔍 Checking for wikilinks to rewrite in content/index.md...")
-        rewrite_section_wikilinks(dest)
-        print(f"  🏠 Copied section index.md to content/index.md")
-    else:
-        print("⚠️ Section index.md not found — site may not render correctly.")
+    # A course kept for reference is last year's, frozen on purpose: the build
+    # puts right its site copy (the date pass, #275/#276; the front page's
+    # title, #584) but never rewrites its files.
+    frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
+    copy_the_section_front_page(course_dir, section_dir, content_root, config, section_number,
+                                show_marker, course_code, frozen_course)
 
     # Copy shared folders
     print(f"\n📥 Copying shared folders into {content_root}...")
@@ -8674,8 +9186,8 @@ def build_section_site(
     # (#275, #276) — on every build, whichever way the class was published,
     # in the build's copy AND in the teacher's own files.
     # A course kept for reference is last year's, frozen on purpose: its site
-    # copy is dated the same way, but its files are never rewritten.
-    frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
+    # copy is dated the same way, but its files are never rewritten
+    # (`frozen_course`, worked out once before the front page was copied).
     dating = _date_pages_from_their_classes(content_root, section_number, write_back=not frozen_course)
     # Not said of a front page hidden because its settings could not be read
     # (#246): only the build's hidden copy was dated, and the teacher's page
@@ -8799,6 +9311,9 @@ def build_section_site(
         page_features.write_runner_words(output_dir, carried_runner_engines)
     except OSError as error:
         print(f"⚠️ Could not set up the code students run: {error}")
+    # What the site's emitter needs to say a block it shows as plain code as a
+    # folder problem (#567), ALWAYS, beside the runner's words.
+    _write_site_said(output_dir, content_root, course_code, section_number, swift_here)
     # KaTeX from the site itself (#494), ALWAYS and on every site: the
     # stylesheet, copy-tex and the woff2 faces the maths is set in.
     install_katex_assets(output_dir)

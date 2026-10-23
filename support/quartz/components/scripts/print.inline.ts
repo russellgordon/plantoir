@@ -36,10 +36,14 @@ import {
   paperBox,
   partColumns,
   partLetter,
+  PRINT_BUDGET_MS,
+  PRINT_LAST_WAIT_MS,
+  outOfTimeBeforePrint,
+  printOutcome,
   questionNumber,
   role,
 } from "./printRules"
-import type { Block, Paper } from "./printRules"
+import type { Block, BudgetStage, Paper, PrintMoment } from "./printRules"
 
 type Mode = "questionsOnly" | "answersOnly" | "withAnswersAtTheEnd"
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
@@ -776,13 +780,17 @@ function markWideTables(within: Element) {
 // skipped laying out anything off screen and every picture below the fold
 // measured 0 × 0 (since #609 it is laid out, but at the column's size, not
 // the paper's). A width the teacher gave (`|300`) is kept.
-async function imagesReady(within: HTMLElement) {
+// False when they had not all arrived by `deadline` (#576: a picture that
+// never arrives used to leave "Preparing to print…" up until a reload).
+async function imagesReady(within: HTMLElement, deadline: number, timers: Set<number>): Promise<boolean> {
   const waits: Promise<unknown>[] = []
   for (const image of within.querySelectorAll("img")) {
     image.loading = "eager"
     waits.push(image.decode().catch(() => undefined))
   }
-  await Promise.all(waits)
+  if (!(await finishedBy(Promise.all(waits), deadline, timers))) {
+    return false
+  }
   for (const image of within.querySelectorAll("img")) {
     const naturalWidth = image.naturalWidth
     const naturalHeight = image.naturalHeight
@@ -794,6 +802,53 @@ async function imagesReady(within: HTMLElement) {
     image.setAttribute("width", String(Math.round(width)))
     image.setAttribute("height", String(Math.round((width * naturalHeight) / naturalWidth)))
   }
+  return true
+}
+
+// Whether `work` was done by `deadline` (a Date.now() time, #576). Resolves
+// false at the deadline, and its timer is in `timers` until then, so a
+// restore can clear it.
+function finishedBy(work: Promise<unknown>, deadline: number, timers: Set<number>): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => {
+      timers.delete(timer)
+      resolve(false)
+    }, Math.max(0, deadline - Date.now()))
+    timers.add(timer)
+    const done = () => {
+      window.clearTimeout(timer)
+      timers.delete(timer)
+      resolve(true)
+    }
+    work.then(done, done)
+  })
+}
+
+// The fallback's frame, finished loading before it is printed (#576). Asked
+// to print a frame still fetching a face or a picture, WebKit returns from
+// print() at once and prints when the frame has loaded; the page then took
+// the frame away, and nothing printed (measured in Safari 26.6, 3 of 3
+// forced runs: fonts were still loading at the call every time). Laying the
+// handout out first is what asks for its faces, so fonts.ready means
+// something. False when the frame had not settled by `deadline`.
+async function frameSettled(doc: Document, deadline: number, timers: Set<number>): Promise<boolean> {
+  void doc.body.getBoundingClientRect()
+  const waits: Promise<unknown>[] = [doc.fonts.ready]
+  for (const image of doc.querySelectorAll("img")) {
+    const picture = image as HTMLImageElement
+    picture.loading = "eager"
+    waits.push(picture.decode().catch(() => undefined))
+  }
+  if (!(await finishedBy(Promise.all(waits), deadline, timers))) {
+    return false
+  }
+  // A face asked for while the others loaded starts a new wait.
+  while (doc.fonts.status === "loading") {
+    if (!(await finishedBy(doc.fonts.ready, deadline, timers))) {
+      return false
+    }
+  }
+  return true
 }
 
 function stylesheetsLoaded(doc: Document): Promise<void> {
@@ -1181,6 +1236,11 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
 
   busy = true
   say(status, words.preparing)
+  // One budget for everything "Preparing to print…" waits on, from the press
+  // to the print (#576, printOutcome).
+  const deadline = Date.now() + PRINT_BUDGET_MS
+  const timers: Set<number> = new Set()
+  const undo: Array<() => void> = []
   const html = document.documentElement
   const theme = html.getAttribute("saved-theme")
   let frame: HTMLIFrameElement | null = null
@@ -1190,6 +1250,14 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
       return
     }
     restored = true
+    for (const timer of timers) {
+      window.clearTimeout(timer)
+    }
+    timers.clear()
+    for (const step of undo) {
+      step()
+    }
+    undo.length = 0
     if (theme === "dark") {
       html.setAttribute("saved-theme", "dark")
       document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: "dark" } }))
@@ -1222,8 +1290,19 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     const pageTitle =
       (settings.page?.title ?? "").trim() ||
       (document.querySelector(".center h1.article-title")?.textContent ?? "").trim()
+    // The budget ran out at `stage`: nothing is printed (outOfTimeBeforePrint).
+    const gaveUp = (stage: BudgetStage) => {
+      console.warn(`Plantoir: this handout was not printed: ${stage} had not finished after ${PRINT_BUDGET_MS / 1000} s.`)
+      if (outOfTimeBeforePrint(stage) === "putBackCouldNotPrint") {
+        say(status, words.couldNotPrepare)
+      }
+      restore()
+    }
     const handout = buildHandout(mode, settings)
-    await imagesReady(handout)
+    if (!(await imagesReady(handout, deadline, timers))) {
+      gaveUp("pictures")
+      return
+    }
     // Counted before the layout sees it (completeness).
     let expected = 0
     for (const element of handout.querySelectorAll(COUNTED)) {
@@ -1237,9 +1316,18 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     await fontsReady(doc)
     await fitWideFormulas(doc, handout, paper, indexCss)
 
+    // The print layout runs inside the same budget (#576 review: a page whose
+    // layout never finished left "Preparing to print…" up for good). Running
+    // out of time is NOT a reason to try the fallback: nothing is printed.
     let paginated = false
+    let outOfTime: BudgetStage | null = null
     try {
-      await loadScript(doc, root + "static/pagedjs/paged.min.js")
+      const script = loadScript(doc, root + "static/pagedjs/paged.min.js")
+      if (!(await finishedBy(script, deadline, timers))) {
+        outOfTime = "printLayoutScript"
+        throw new Error("out of time")
+      }
+      await script
       const engine = (frame.contentWindow as unknown as {
         PagedModule?: { Previewer: new () => { preview: Function } }
       }).PagedModule
@@ -1250,18 +1338,30 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
       await fontsReady(doc)
       const previewer = new engine.Previewer()
       const content = doc.importNode(handout, true)
-      await previewer.preview(content, [indexCss, { [location.href]: pagedRules(paper, settings) }], doc.body)
+      const laidOut: Promise<unknown> = previewer.preview(content, [indexCss, { [location.href]: pagedRules(paper, settings) }], doc.body)
+      if (!(await finishedBy(laidOut, deadline, timers))) {
+        outOfTime = "printLayout"
+        throw new Error("out of time")
+      }
+      await laidOut
       labelPages(doc, mode, settings, pageTitle)
       paginated = true
     } catch {
       paginated = false
+    }
+    if (outOfTime !== null) {
+      gaveUp(outOfTime)
+      return
     }
     if (paginated) {
       const pictures: Promise<unknown>[] = []
       for (const image of doc.querySelectorAll("img")) {
         pictures.push((image as HTMLImageElement).decode().catch(() => undefined))
       }
-      await Promise.all(pictures)
+      if (!(await finishedBy(Promise.all(pictures), deadline, timers))) {
+        gaveUp("printLayoutPictures")
+        return
+      }
       const result = checkComplete(doc, expected)
       doc.documentElement.setAttribute("data-plantoir-print-path", "paged")
       doc.documentElement.setAttribute("data-plantoir-expected", String(expected))
@@ -1297,17 +1397,66 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
       doc.body.appendChild(doc.importNode(handout, true))
       doc.documentElement.setAttribute("data-plantoir-print-path", "fallback")
       await stylesheetsLoaded(doc)
+      if (!(await frameSettled(doc, deadline, timers))) {
+        gaveUp("frameSettled")
+        return
+      }
     }
 
-    frame.contentWindow!.addEventListener("afterprint", () => restore(), { once: true })
-    say(status, "")
-    frame.contentWindow!.focus()
-    frame.contentWindow!.print()
-    // print() returns when the dialog closes in Safari, Chrome and Edge
-    // (measured), and afterprint has normally put things back already. If a
-    // browser never sends afterprint, the page must not be left light with a
-    // dead button until a reload (review N4).
-    restore()
+    // The page is put back once the print is known to have happened
+    // (printOutcome, #576), never left light with a dead button (review N4).
+    // Heard on BOTH windows: Safari sends the frame's print events to the
+    // page's own window and never to the frame's (measured, 0 of 8 sheets),
+    // and headless Chrome to the frame's. The words on the button go when
+    // the print begins, not before it is asked for.
+    const view = frame.contentWindow!
+    let sawBefore = false
+    let sawAfter = false
+    let returned = false
+    const settle = (moment: PrintMoment) => {
+      const outcome = printOutcome(moment, sawBefore, sawAfter)
+      if (outcome === "keepWaiting") {
+        return
+      }
+      say(status, outcome === "putBackCouldNotPrint" ? words.couldNotPrepare : "")
+      restore()
+    }
+    const onBefore = () => {
+      sawBefore = true
+      say(status, "")
+      if (returned) {
+        settle("beforeprint")
+      }
+    }
+    const onAfter = () => {
+      sawAfter = true
+      if (returned) {
+        settle("afterprint")
+      }
+    }
+    for (const target of [window, view]) {
+      target.addEventListener("beforeprint", onBefore)
+      target.addEventListener("afterprint", onAfter)
+      undo.push(() => {
+        target.removeEventListener("beforeprint", onBefore)
+        target.removeEventListener("afterprint", onAfter)
+      })
+    }
+    view.focus()
+    view.print()
+    returned = true
+    settle("printReturned")
+    if (!restored) {
+      // Returned with nothing sent: a print put off until the frame has
+      // loaded (WebKit), or one that will never come. Wait out the budget,
+      // and never less than PRINT_LAST_WAIT_MS, so a print put off just
+      // before the budget ran out is not cut off at once.
+      const timer = window.setTimeout(() => {
+        timers.delete(timer)
+        settle("outOfTime")
+      }, Math.max(PRINT_LAST_WAIT_MS, deadline - Date.now()))
+      timers.add(timer)
+    }
   } catch {
     say(status, words.couldNotPrepare)
     restore()
