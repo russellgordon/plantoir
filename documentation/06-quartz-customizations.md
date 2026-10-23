@@ -746,14 +746,15 @@ answer toggles the same class; plan finding C). On Print:
    versions) — a hold
    far past anything measured on a real network. `restore()` clears every timer and takes
    the listeners off the page's window. **The Safari event order for a print
-   WebKit put off is UNMEASURED** (the re-run was stopped on 2026-10-23
-   because Russell was using Safari): the design assumes the late print
-   sends `beforeprint` and `afterprint` to the page's window as its other
-   prints do, and that its sheet holds the page's timers while it is up. If
-   it sends neither, the reader still gets their print and the page is put
-   back by the budget — with `couldNotPrepare` under a print that worked,
-   which is the reason to run `research/print-safari/safari_print.sh` once on
-   this change. Firefox remains unmeasured.
+   WebKit put off was measured on 2026-10-23** (real Safari 26.6, AppleScript-
+   driven, `research/print-safari/FINDINGS.md`): the late print sends
+   `beforeprint` to the PAGE's window 32–36 ms after `print()` returns, the
+   sheet appears, and `afterprint` comes on Cancel; the frame's own window
+   gets neither event in any of 8 sheet runs. So the wait-for-`beforeprint`
+   branch hears a postponed print, and with this change the forced fallback
+   opened the sheet 3 of 3 times (0 of 3 on the old code) while the Paged.js
+   path kept its timing (`print()` at +266/+275 ms against +272/+281 before).
+   Firefox remains unmeasured.
 
 **Fallback:** Paged.js missing or failing → the same frame printed by the
 browser, corners where it prints margin boxes (Chrome, Edge), one count for
