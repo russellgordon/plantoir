@@ -88,10 +88,11 @@ public class HarnessSourceRuleTests
             foreach (Match match in Holding.Matches(source))
             {
                 if (InAComment(source, match.Index)) continue;
-                // The line so far ends "using (" or "using var x = ": the call
-                // heads a using. (A string naming the safe form ends the same way.)
+                // The line so far ends "using (", "using (var x = ",
+                // "using var x = " or "using IDisposable x = ": the call heads a
+                // using. (A string naming the safe form ends the same way.)
                 string lineSoFar = source[(source.LastIndexOf('\n', match.Index) + 1)..match.Index];
-                if (Regex.IsMatch(lineSoFar, @"\busing\s*\(\s*$|\busing\s+var\s+\w+\s*=\s*$")) continue;
+                if (Regex.IsMatch(lineSoFar, @"\busing\s*\(\s*(\w+\s+\w+\s*=\s*)?$|\busing\s+\w+\s+\w+\s*=\s*$")) continue;
                 found.Add($"{name}:{LineOf(source, match.Index)}");
             }
         Assert.True(found.Count == 0,
