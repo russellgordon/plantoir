@@ -309,11 +309,18 @@ page's own body, byte for byte (split off by python-frontmatter's own
 `YAMLHandler().split`, which does no YAML), records the page, and prints one
 line: `🙈 Hidden from students until its settings can be read: <page> (near
 line N)`. `publish: false` is the one key every section reads as hidden, so
-the page is hidden in every section whatever it said. The teacher's own file
-is never touched — this runs on the copy in `content/`, which is deleted and
-re-copied on every build, so the rule is ALWAYS-section by construction and
-existing course folders pick it up without `--full-rebuild`; and
-`_write_the_date_back` already refuses a source it cannot parse.
+the page is hidden in every section whatever it said. The hiding never
+touches the teacher's own file — it runs on the copy in `content/`, which is
+deleted and re-copied on every build, so the rule is ALWAYS-section by
+construction and existing course folders pick it up without `--full-rebuild`;
+and `_write_date_into_the_teachers_page` already refuses a source it cannot
+parse. **One shape never reaches it (#584):** a section front page whose title
+Plantoir wrote with an unquoted `: ` before 1.8.1 is quoted first, by
+`copy_the_section_front_page`, in the copy always and in the teacher's page
+when it may be changed — `contracts/shared-rules.json` → `buildRepairs`, and
+[04 → "A course made before 1.8.1 is put right by its next
+build"](04-course-setup.md) for the rule, what was measured and what was
+rejected.
 
 Then, once per section build, ONE `pageSettingsUnreadable` site-health finding
 names every such page (at most ten, then "and N more"), each with the line the
@@ -324,8 +331,11 @@ the cases are `unreadablePageSettings.cases`, run by
 `process_frontmatter`, and by `check_visibility_against_the_site.py` on down
 through Quartz's own reader to the site. It is never offered a repair
 (`siteHealth.repair.neverOffered`): rewriting a teacher's settings means
-guessing what they meant. It reaches the trail through the existing `folder
-problem found` line, which carries the check's NAME and never a page's.
+guessing what they meant. The front-page title above is the one exception,
+because Plantoir wrote it and there is nothing to guess — and it is the BUILD
+that puts it right, unasked, not a button. It reaches the trail through the
+existing `folder problem found` line, which carries the check's NAME and never
+a page's.
 
 **Why: Russell, 2026-09-21, option B.** "A page that wrongly DISAPPEARS is
 noticed and harmless; one that wrongly APPEARS cannot be undone." A page
@@ -909,6 +919,17 @@ was not reading that console — wrong, since the scheduled run IS Plantoir
 is often the first build after a class goes visible, so the likeliest to rewrite
 files. The sentence the build prints is "Gave N of your page(s) the date of the
 first class that links to them".
+
+The front page's title repair (#584) reports the same way under its own
+prefix: one `PLANTOIR_REPAIRED: {"course", "section", "repair", "page"}` line
+per repair WRITTEN into a teacher's page (`shared-rules.json` →
+`buildRepairs.marker`), which the mac records as `folder problem repaired`
+(`BuildRepairReport`, read in `ScriptRunner` and in
+`ScheduledDeploy.recordFolderProblems` beside `PLANTOIR_DATED:`). A separate
+prefix rather than a second use of `PLANTOIR_DATED:` so that a later repair
+joins it under its own `repair` key; a reader that meets a key it does not
+know records nothing. Nothing is printed when only the build's copy was
+quoted.
 
 
 **"Get Ready for the Start of the Year" (#96) deliberately does NOT read these
@@ -1631,9 +1652,11 @@ the first tick never drops the map the scan found. A rename of any of them mater
 - `1.A.1`/`CRD-1.A.1` (essential knowledge): not measured on a real course.
 
 **Known limits.** A code in two folders counts on both maps (matching is by
-page name). The assistant still recognises curriculum pages by a folder name
-mentioning "curriculum", so a declared `AP CSP` folder's pages have a map but
-are not offered by the assistant (`isCurriculumPage.note`). Russell's own
+page name). (This used to say the assistant recognised curriculum pages only
+by a folder name mentioning "curriculum"; since #614 it reads the declared
+folders too, so a declared `AP CSP` folder's pages are offered and protected —
+`10-local-ai-assistant.md` → "A curriculum folder is the one the course
+declares, or one named for it (#614)".) Russell's own
 College Board layout was not measured (the working folders are his); the two
 read-only commands for him are in the #128 hand-over.
 
@@ -1866,7 +1889,9 @@ programs students edit and run in their browser; the site's half is
    block the build did not count can never become a Run button that says
    "isn't on this site yet" to students for ever. No line for a page students
    cannot see: Quartz parses those too and drops them later (the transformer
-   applies `patches/publish.ts`'s own test).
+   applies `patches/publish.ts`'s own test). Since #567 the same blocks are
+   also ONE folder problem, said from the site's build — "The safety net
+   becomes a folder problem" below.
 4. **The KaTeX copy** (#494, `install_katex_assets`, beside the gate, EVERY
    site): Quartz's own `node_modules/katex` — `dist/katex.min.css`,
    `dist/contrib/copy-tex.min.js`, the 20 woff2 faces and `LICENSE` — into
@@ -1879,7 +1904,9 @@ it serves) do not run the gate or rewrite the words file. A page that gains
 `codeRunner: true` or its first runnable block while a preview is ALREADY
 running therefore shows its blocks as plain code, with the `plantoir: error:`
 line in the preview's output, until the next Preview — never a Run button
-that cannot work. A page that already had runnable code keeps working.
+that cannot work. A page that already had runnable code keeps working. Such
+a block is NOT a folder problem: the site says its folder problem on the
+preview's first build only (#567, below).
 
 **Known limit.** The build counts runnable blocks with the toolchain's fence
 rule, not Quartz's parser. Every shape the reviews measured is now read alike
@@ -1889,7 +1916,8 @@ second container on a list marker's line (`- - ```python run`) is runnable on
 NEITHER side; a lazy line in a list item gives both sides one runner but
 different bodies (the site's is the one that runs). A shape nobody has
 measured that the two read differently shows as plain code with the
-`plantoir: error:` line above — the safety net, rather than a folder problem,
+`plantoir: error:` line above — the safety net — and, since #567, as the
+`runnableCodeShownAsPlainCode` folder problem, said from the site's build
 because only Quartz's parse knows, after the folder checks have been said.
 
 **Rejected:** a course-level switch (Russell, 2026-10-05: per page only); the
@@ -1897,6 +1925,94 @@ key alone deciding (above); downloading Pyodide when a site is built (a build
 would need the network); copying the worker into `/opt/vendor` (it would
 need its own line in both runtimes) or into every site's `static/` (a site
 without runnable code would carry it).
+
+### The safety net becomes a folder problem (#567, v1.9.0)
+
+A teacher previewing in the app never reads the build's console, so the
+safety net's `plantoir: error:` line above told an assistant and nobody
+else. Since #567 the same blocks are one folder problem,
+`siteHealth.checks` → `runnableCodeShownAsPlainCode`, with the dialog, the
+assistant's answer and the trail line every other folder problem gets. It is
+the ONE check said from the site's build rather than before it
+(`siteHealth.whereItRuns`), and that is the whole design:
+
+1. **The transformer records.** `codeRunner.ts`, in the branch that prints
+   the line (and only for a page students can see), also pushes
+   `{page, language, block, reason, code}` onto the page's
+   `file.data.plantoirSiteDisagreements` — the page's path in the site with
+   `.md`, the fence, the block's number among that language's blocks, the
+   reason's KEY (`blockAfterUnclosedFence`, `blockNotCompiled` or
+   `blockNotPrepared`, the same choice the line makes) and the code the site
+   read. The line itself is byte for byte what it was.
+2. **An emitter gathers.** `support/quartz/plugins/emitters/plantoirSiteSaid.ts`
+   (exported and put before `Plugin.Assets()` by `_wire_emitters_index` and
+   `_wire_site_said_emitter`, each with its own idempotency check, so a
+   section wired for My Progress before #567 gets it) writes no file. On its
+   FIRST emit in the process it gathers every page's blocks, pages in
+   path order (NFC), and — only when there are any — runs the build's own
+   Python with `execFileSync(python, [site_said.py], {input, timeout: 20 s,
+   windowsHide: true})`, the data on stdin, and passes what it prints to
+   stdout. A failure of any kind is one `ℹ️` line; the site is never at risk.
+   Every emitter finishes before Quartz says it is done, so the marker is in
+   the output before a preview's server answers.
+3. **Python words it.** `scripts/site_said.py` puts its own folder on
+   `sys.path` first (the #358 trap: Windows' embeddable Python replaces
+   `sys.path`, and `site_health.py` has no entry point of its own), maps each
+   path to the page's place in the course folder, finds `{line}` in the
+   teacher's own file by the code the site read (ONE opening ```` ``` ```` of
+   that language with `run` whose following lines hold it; none or several →
+   `blockLineNoLine`), leaves out every Swift block `swiftCouldNotBePrepared`
+   already names (one block, one finding), and builds ONLY this finding —
+   `site_health.site_disagreements_finding`, then `site_health.announce([it])`
+   in its own `try`. Never `announce_or_stay_quiet`: with no folder facts it
+   says "the Media folder is not there" and "no front page" falsely (plan
+   review, MUST 1). It reads and writes UTF-8 whatever the console's code
+   page, and always exits 0.
+4. **The side file.** `site_said.write_side_file`, in the ALWAYS section
+   straight after the runner's words, writes `quartz/plantoir_site_said.json`:
+   `sys.executable`, the script's path, the course and section, the content
+   folder, `places` (every opted-in page students can see: its place and the
+   teacher's file it came from) and `swiftNamed`. Same input, same bytes. NOT
+   `plantoir_code_runner.json`: the page's script bundles that one, and the
+   build machine's paths must never reach students (a test pins it).
+
+**Once per process.** Quartz 4.5.0 calls an emitter again, with every page,
+on each live rebuild. The emitter marks `globalThis` on its first emit and
+says nothing after, so a preview's later rebuilds keep only their
+`plantoir: error:` lines (Russell's ruling 2): re-announcing would bring the
+dialog up mid-edit, and the two apps deduplicate a CHANGED finding
+differently (the mac appends it, Windows drops it by `Identity`).
+
+**Measured.** The call costs **24-31 ms** in the image (the planner's three
+timings of the Python start: 35, 26 and 24 ms; the plan review's 24-31 ms;
+28 ms for the whole first emit in verify.sh's run of
+`check_runner_rules_against_the_site.py` in the image, 2026-10-23),
+**41-43 ms** on the mac host (M-series, Homebrew Python 3.14, the whole emit
+through `check_runner_rules_against_the_site.py`), and nothing on a site
+where no block disagrees, which is every site that is fine. For Python the
+net fires only when the site carries no Python engine at all (a carried
+engine wraps a block the build did not count as a WORKING block); for Swift
+it fires per block whose key is not in `plantoir-runners/swift.json` — which
+is why verify.sh's end-to-end fixture (Plain Code Fixture) is a Swift block
+after a list fence left open.
+
+**Rejected:** a Python pass after Quartz (a preview is one
+`quartz build --serve` process that never returns, so it would never run —
+My Progress's #545 rejection again); Python's public-sync watcher thread
+reading a file the site writes (it polls once a second, racing the server
+start the preview and the assistant wait on; reasoned, not measured);
+the emitter wording the finding itself from words Python prepared (#485's
+"Python prepares, Quartz places" shape — a second implementation of a
+finding's assembly, testable only by verify.sh on the mac); Python
+predicting the shapes with a reader of its own (it guesses at the site's
+parse and misses the shapes nobody measured, which is why the net exists);
+reusing My Progress's emitter (a different feature with its own switch and
+its own early returns, which would put this finding behind them); one
+marker per page or block (both apps key a finding on name, course and
+section, #246); piping node's output through Python to catch the line (it
+would change the terminal the app's progress markers come through); and
+reusing `words.blockNotPrepared`'s words in the dialog ("if this line comes
+back" has no line there — the check has `reasons` of its own).
 
 ### Live input: what the build adds (#583, v1.8.1)
 
@@ -2040,11 +2156,76 @@ Windows deliberately differs is in
 they compile too, and build the Swift image if a preview never did (ruling
 Q4). In practice a preview has already filled the cache.
 
+**Recorded on the trail, on both platforms** (#570 on Windows, #635 on the
+mac, v1.9.0). Getting Swift ready leaves "Swift got ready on this computer"
+(seconds, gigabytes downloaded) or "Swift could not be got ready" (why), from
+one `PLANTOIR_SWIFT:` line (`codeRunnerBlocks.swift.windows.marker`) that the
+app reads from the console and from a scheduled publish's log. On a Mac,
+`preview.sh` asks for it after building the Swift image (03 → preview.sh), and
+`swift_blocks.py got-ready` writes it from the build's own log
+(`codeRunnerBlocks.swift.mac`, cases in `bytesCases` and `reasonCases`):
+
+| Ending on a Mac | Line |
+|---|---|
+| the image was already there, or another launcher built it while this one waited, or this copy has no `support/swift` | none |
+| built | `ready: true`, the build's seconds, and `downloadedBytes` |
+| under 6 GB free (before anything was downloaded) | `noRoom` |
+| the build lock was held for longer than 1,200 s (`windows.waitSeconds`) | `waited` |
+| the build failed, and its failed step or BuildKit's summary says "no space left" (any case) or `curl: (23)` | `noRoom` |
+| ... says `computed checksum did NOT match` or `.tar.gz: FAILED` (sha256sum against the pin) | `damaged` |
+| ... names a curl network failure ((6), (7), (18), (28), (35), (52), (56)), a name that could not be resolved, `dial tcp`, or a timeout | `offline` |
+| any other failure: a moved pin's HTTP 404 (`curl: (22)`), a certificate curl could not check (`curl: (60)`), a crashed SDK install, a daemon error | `unpack` |
+
+`busy` (another installation running) is Windows' alone. **The reason is read
+only from the failed step's lines** (`#N ERROR`, then every `#N ` line) and the
+lines of no step (the closing summary): a step that succeeded can print
+anything, and apt warnings mention resolving and space. The Swift Dockerfile
+carries none of the needles, so its excerpt in the summary decides nothing
+(`test_swift_blocks.py` checks it).
+
+**The bytes are the pins of the download steps that RAN.** The build prints
+nothing about what it downloaded (`curl -fsSL`), so `downloadedBytes` sums
+`toolchain.json` → `swiftImage.pins` `bytes` for each download step with no
+`#N CACHED` line: the toolchain and SDK step is found by the SDK's URL in its
+header, binaryen's by its URLs, and the architecture is the header's `case
+"<arch>" in` - BuildKit prints each RUN header with its ARGs EXPANDED, so a
+`$WASM_SDK_URL` needle never matches (found by the plan's review against a
+real log, now `scripts/fixtures/swift-image-build/cached.log`), and it numbers
+steps in the order it reaches them, so CACHED is matched by number. First
+build on Apple silicon: 1,300,864,747 B ("1.3 GB"); Intel: 1,326,607,137 B.
+**Measured, why the CACHED case matters:** this Mac's four
+`teaching-quartz-swift:src-*` images (2026-10-17) share their first seven
+layers and differ only in the `COPY compile.py …` layer, so an update that
+changes compile.py rebuilds in seconds downloading nothing, and the line then
+says "0.0 GB downloaded" - true, and it tells a helper the update rebuilt from
+what was there. apt's packages and the base image are not counted (the scope
+of `swiftImage.measured`). `verify.sh` checks the sum against the build log
+BuildKit really printed whenever its Swift gate builds the image (the whole
+pin sum under `--no-cache`), and requires both download steps' headers to be
+found in it, so a parser that found none cannot pass by saying 0.
+
+**Rejected:** making the Dockerfile print curl's byte count - the Dockerfile
+is in the toolchain id, so every cached Swift program on every Mac would be
+compiled again, and 1.3 GB downloaded again, for a number on the trail;
+`docker image inspect`'s size (2.24 GB on disk, 504 MB compressed: neither is
+what was downloaded); a fixed 1.3 GB (false after the cached rebuild, and a
+second copy of the pins); a new script for it (it would need its own baked
+copy check and verify line for nothing `swift_blocks.py` cannot carry, and
+that file is not in the toolchain id).
+
+**Known gap:** the block-level reason is unchanged - a Mac build that failed
+for any cause still writes `{state: notDownloaded}`, whose sentence names the
+internet, so a `damaged`, `noRoom`-mid-build or `unpack` failure tells the
+teacher it could not be downloaded while the trail says why. Windows maps its
+reasons to states (`windows.ensureExit`); the mac adopting that is its own
+issue.
+
 **Known limit.** The build's fence reader and Quartz's parser read a lazy line
 in a list item differently (`fences.pageShapes`): the build compiles the body
 IT read and the site looks for the key of a shorter body, finds none, and
 shows the block as plain code with a `plantoir: error:` line
-(`words.blockNotCompiled`). The fence reader was deliberately NOT changed to
+(`words.blockNotCompiled`) and, since #567, as the
+`runnableCodeShownAsPlainCode` folder problem. The fence reader was deliberately NOT changed to
 follow lazy lines (the brief keeps the fence rule as #455 left it; the safety
 net names the block). A Swift block the build's reader cannot see at all is
 never compiled, and is named the same way.

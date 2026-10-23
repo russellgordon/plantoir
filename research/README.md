@@ -30,6 +30,18 @@ disagreements before its asymmetric fence rule, 0 after, on both readers —
 and how to re-run it. Cited from `PageVisibilityReader.isFence` and
 `documentation/08-course-config-reference.md`.
 
+## `print-safari/` — the Print button in real Safari
+
+Why the Print button's fallback printed nothing in Safari (#576): WebKit,
+asked to print a frame still loading, returns from `print()` at once and
+prints when the frame has loaded — and the page had already taken the frame
+away. `FINDINGS.md` records the runs (Safari 26.6, 0 sheets in 3 forced
+fallbacks, a sheet 39 ms later when the frame was kept), why safaridriver
+cannot measure printing at all, and what was NOT measured. `safari_print.sh`
+drives real Safari through AppleScript and System Events, so it is run by
+hand, never by a suite. Cited from `documentation/06-quartz-customizations.md`
+F3.
+
 ## `ai-assist/` — the local assistant
 
 Why the assistant is built the way it is: which models were tried, which were

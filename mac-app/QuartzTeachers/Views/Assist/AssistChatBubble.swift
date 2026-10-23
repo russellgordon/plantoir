@@ -101,7 +101,14 @@ enum AssistChatLayout {
 /// Proportions are held relative to the corner radius so a short bubble and a
 /// tall one are the same design, and everything is drawn inside the rect the
 /// background is given, since anything outside it is clipped.
-struct AssistChatBubbleShape: Shape {
+///
+/// `nonisolated` because `Shape.path(in:)` is, and SwiftUI may draw a shape off
+/// the main thread. The macOS 26 SDK did this implicitly (`Shape` carried a
+/// `_RemoveGlobalActorIsolation` marker that undid this target's default
+/// MainActor isolation); the macOS 27 SDK does not, and without the keyword
+/// Xcode 27 refuses the conformance (#613). The shape is pure geometry, so
+/// nothing in it needs the main actor.
+nonisolated struct AssistChatBubbleShape: Shape {
 
     // MARK: - Stored properties
 
@@ -349,7 +356,9 @@ struct AssistTypingIndicator: View {
 /// recording of Messages: the larger circle 0.41 of it, poking about two
 /// points past the corner; the smaller 0.14, below and outside with a
 /// sliver of gap.
-struct AssistThoughtBubbleShape: Shape {
+///
+/// `nonisolated` for the same reason as `AssistChatBubbleShape` (#613).
+nonisolated struct AssistThoughtBubbleShape: Shape {
 
     // MARK: - Functions
 

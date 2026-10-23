@@ -38,11 +38,21 @@ final class StartOfYearTests: XCTestCase {
     func testStartOfYearAsTheContractSays() async throws {
         let rules: [String: Any] = try StartOfYearTests.rules("startOfYear")
         let cases: [[String: Any]] = try XCTUnwrap(rules["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 15)
+        XCTAssertGreaterThanOrEqual(cases.count, 16)
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
-            let made = try AssistFixture.makeRunner(surface: .mcp)
+            // `curriculumFolders` is the course's `curriculum_folders`,
+            // written before the course is read (#614).
+            var declared: [String]? = nil
+            if let field = testCase["curriculumFolders"] {
+                declared = try XCTUnwrap(field as? [String], "\(name): curriculumFolders is a list of folder names")
+            }
+            let made = try AssistFixture.makeRunner(surface: .mcp, curriculumFolders: declared)
             defer { try? FileManager.default.removeItem(at: made.root) }
+            if let declared {
+                XCTAssertEqual(made.course.configuration.curriculumFolders, declared,
+                               "\(name): the course did not read its curriculum folders")
+            }
 
             if let naming = testCase["naming"] as? [String: String] {
                 made.course.configuration.unitWord = naming["word"] ?? "Unit"

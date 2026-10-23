@@ -812,6 +812,8 @@ async function connect(chunk) {
           for (const change of changes) for (const node of change.addedNodes) {
             if (node.tagName !== "IFRAME") continue
             node.contentWindow.print = () => {
+              // A real print sends these (#576): the page puts itself back only once it has seen one.
+              node.contentWindow.dispatchEvent(new Event("beforeprint"))
               const frame = node.contentDocument
               window.__printFrame = {
                 sheets: Array.from(frame.querySelectorAll('link[rel="stylesheet"]')).map((link) => {
@@ -822,6 +824,7 @@ async function connect(chunk) {
                 faces: Array.from(frame.fonts).filter((face) => face.status === "loaded").map((face) => face.family.replace(/["']/g, "")),
                 formulas: frame.querySelectorAll(".katex").length,
               }
+              node.contentWindow.dispatchEvent(new Event("afterprint"))
             }
           }
         }).observe(document.body, { childList: true })

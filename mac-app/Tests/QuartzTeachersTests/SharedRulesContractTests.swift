@@ -1924,15 +1924,34 @@ final class SharedRulesContractTests: XCTestCase {
         let course: Course = try makeCourse(in: root, target: nil, folderPath: root.path,
                                             hasDeployedBefore: true)
 
+        // Each case is asked twice: at the top of the course and inside
+        // `section1/`, since a page may be in either and the contract allows
+        // a harness to put it in either. `curriculumFolders` is the course's
+        // declared list (#614), set in memory, the way the course would have
+        // read it from `curriculum_folders`; absent means none declared.
         let pages: [String: Any] = try XCTUnwrap(rules["isCurriculumPage"] as? [String: Any])
         for testCase in try XCTUnwrap(pages["cases"] as? [[String: Any]]) {
             let path: String = try XCTUnwrap(testCase["path"] as? String)
-            let url: URL = course.directoryURL.appendingPathComponent("section1").appendingPathComponent(path)
+            let expected: Bool? = testCase["expect"] as? Bool
+            var declared: [String] = []
+            if let field = testCase["curriculumFolders"] {
+                declared = try XCTUnwrap(field as? [String], "curriculumFolders is a list of names: \(path)")
+            }
+            course.configuration.curriculumFolders = declared
+            XCTAssertEqual(course.configuration.curriculumFolders, declared, path)
+
+            let inTheSection: URL = course.directoryURL.appendingPathComponent("section1").appendingPathComponent(path)
+            let atTheTop: URL = course.directoryURL.appendingPathComponent(path)
             XCTAssertEqual(
-                AssistCurriculumMentions.isCurriculum(pageAt: url, in: course),
-                testCase["expect"] as? Bool, path
+                AssistCurriculumMentions.isCurriculum(pageAt: inTheSection, in: course),
+                expected, "section1/\(path) declaring \(declared)"
+            )
+            XCTAssertEqual(
+                AssistCurriculumMentions.isCurriculum(pageAt: atTheTop, in: course),
+                expected, "\(path) declaring \(declared)"
             )
         }
+        course.configuration.curriculumFolders = []
 
         let codes: [String: Any] = try XCTUnwrap(rules["isExpectationCode"] as? [String: Any])
         for testCase in try XCTUnwrap(codes["cases"] as? [[String: Any]]) {

@@ -128,6 +128,22 @@ cd mac-app && xcodegen generate && \
     -destination 'platform=macOS' -only-testing:QuartzTeachersTests test
 ```
 
+**Two Xcodes are installed, and the source must build under both** (#613).
+Run the full suite under the RELEASE Xcode, 26.6, by prefixing the command
+above with `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer`
+(`xcode-select` points at 27.0, so without it you are testing under 27), and
+then `build-for-testing` under 27.0 into a scratch `-derivedDataPath`, so a
+change 27 refuses is caught here rather than on the day releases move:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode-27.0.0.app/Contents/Developer \
+  xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug \
+    -derivedDataPath <scratch>/dd-27 build-for-testing
+```
+
+Why 26.6 builds releases, and what 27 refused the first time, is in
+`documentation/09-mac-app.md` → "Building with two Xcodes (#613)".
+
 Two things worth knowing:
 
 - **When a contract case disagrees with the app, the case may be the thing
@@ -161,6 +177,13 @@ authorisation. That is no longer what he wants: the launch is his.)
 rebuilds the bundle as a test host and terminates any running copy, so running
 the suite AFTER building undoes this step and leaves him launching a test-host
 bundle from the Dock. Test, then build, then stop.
+
+**Build his copy with 26.6** (`DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer`). Both Xcodes resolve this checkout to
+the SAME DerivedData folder (`Plantoir-apgtygotdszhhqgcdlzqyocoqnie`, the one
+his Dock icon names — `-showBuildSettings` under each, 2026-10-22), so a plain
+build under `xcode-select`'s 27.0 replaces his copy with one the release
+Xcode did not build. That is why the 27.0 check above goes into a scratch
+`-derivedDataPath` (#613).
 
 ### 6. Write it up, and commit as you go
 

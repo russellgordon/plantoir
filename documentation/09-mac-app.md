@@ -1978,7 +1978,7 @@ binary is started from a terminal:
 
 ```bash
 PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW=1 \
-  ~/Library/Developer/Xcode/DerivedData/Plantoir-euwbmkpykeyuztbpzedmiptcsqsg/Build/Products/Debug/Plantoir.app/Contents/MacOS/Plantoir
+  ~/Library/Developer/Xcode/DerivedData/Plantoir-apgtygotdszhhqgcdlzqyocoqnie/Build/Products/Debug/Plantoir.app/Contents/MacOS/Plantoir
 ```
 
 Press Preview on any section and wait for the build plus 45 seconds.
@@ -3022,6 +3022,72 @@ build's four How I Teach places — the shape Russell's P1 ruling rejected
 ("no per-course copy"). Put to Russell as a decision; making the working
 folder a git repository (or adding a `.git` marker) was rejected outright —
 it changes what other tools think the folder is.
+
+**The handouts skill (#631, v1.9.0): paper made OUTSIDE the site.** A
+teacher asking for "a worksheet" or "a quiz to print" was routed only to
+`plantoir-printing`, which makes a page of the site that prints. The house
+style for paper made as a PDF - LaTeX compiled with `tectonic`, one source
+and two outputs behind the `\qa`/`\onlyq`/`\onlya` switch with a two-line
+`- Answers` (`- Solutions` for a quiz or test) wrapper, the look, the four
+corners laid out as the course's print settings lay out the site's, the quiz and test conventions, every answer
+verified independently, a second agent reviewing any new question set,
+every page rendered with `pdftoppm` and looked at, no build files left -
+lived only in Russell's own `~/.claude/CLAUDE.md` and the MPM2DE course
+folder's, so only Claude Code on his Mac knew it. `plantoir-handouts`
+carries it for every assistant and every teacher, and tells the assistant
+to OFFER it first whenever something is to be printed, beside
+`plantoir-printing` for a page that prints. The rule is
+`printablePages.agentGuidance.handoutsSkill`. What was decided, and why:
+
+- **A skill of its own, not a section of `plantoir-printing`.** Both reach
+  every working folder the same way - both apps enumerate
+  `support/agent_guidance/skills/`, so a new folder there needs no code on
+  either platform - but the two teach different things (a Markdown page
+  the build turns into paper; a LaTeX file an assistant compiles) and a
+  printing skill twice as long is read less carefully for both.
+  `plantoir-printing` and `plantoir-page-authoring` each name it in one
+  sentence (`mentionedBy`), and it is deliberately NOT in
+  `pageAuthoringSkill.routesTo`: that table routes the parts of a page, and
+  a PDF handout is not one.
+- **Sources and answer keys are kept OUT of `courses/`.** Every file in a
+  course folder that is not a page is copied to the site (Quartz's Assets
+  emitter globs everything but `*.md`), so an answer key kept beside the
+  pages is one students can download. The skill suggests a
+  `handouts/<CODE>/` folder beside `courses/` when the teacher has no place
+  of their own, and the student copy alone goes into `Media` when it should
+  also be handed out from the site (`printPdf:`).
+- **The corners follow the course's print settings** - `print_school_name`,
+  `print_school_name_at`, `print_course_code_at` and `print_blanks`, read as
+  `scripts/print_settings.py` reads them - because the issue's fixed layout
+  (Class # always, school always top left) matches the site only for a
+  course set up that way: by default the site prints Name and Date alone
+  (implementation review). When the school's name is empty the assistant
+  ASKS, and says where in Course Settings it can be set once. REJECTED: the
+  issue's school name as a default, which would print one school's name on
+  every teacher's paper.
+- **Whether a quiz or test goes on the website is the teacher's call.** The
+  first version said a quiz or test "must never be on the class website";
+  nothing in the issue said so, and the director softened it to "usually
+  printed - ask" (put to Russell to confirm).
+- **Starters ship with the skill** (`starters/Handout.tex` and
+  `starters/Quiz.tex`, each with its wrapper), generic rather than Russell's
+  MPM2D templates, which carry one course's questions. Both were compiled
+  with tectonic and every page looked at when they were written (Tectonic
+  0.17.0 left only the PDFs). The quiz starter's marks column (`\score{K 4}`
+  in a reversed margin note), category totals and dark-blue working with
+  light-red balancing steps are this piece's reading of the style, since no
+  quiz source existed to copy.
+- **Changing the root files' words re-asks** a teacher who said Not Now to
+  the old section (`rootFileCases`), as every skill added so far has.
+
+**Measured, 2026-10-22**, a scratch working folder with the guidance as the
+app mirrors it and `courses/MPM2D/course_config.json` holding a school name,
+one run each:
+
+| Launcher | Prompt | Result |
+|---|---|---|
+| `claude -p` (2.1.309, `--permission-mode acceptEdits`), working folder root | `Make me a short warmup worksheet on solving one-step linear equations for MPM2D, with an answer key.` | PASS - built from the skill's starter in `handouts/MPM2D/`, the school's name from the course's settings, `- Answers` wrapper, both PDFs rendered and looked at, a separate reviewer re-solved every answer, no build files left. **Confounded:** Russell's own `~/.claude/CLAUDE.md` carries the same style, so this run says the skill was followed, not that it alone was enough |
+| `codex exec` (0.162.0, `-s workspace-write --skip-git-repo-check`), working folder root | `Make me a short quiz on factoring for MPM2D that I can print, with solutions.` | PASS - read `plantoir-handouts` (and `plantoir-printing`), wrote `Factoring Quiz.tex` with `- Solutions`, `\score` marks and `\work` in the solutions, in `handouts/MPM2D/`; all five answers re-checked by hand here and right. No global instructions on this side, so this is the clean run |
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
@@ -6184,8 +6250,9 @@ sidebar's modifier chain. Both are forced:
 - a second `.fileImporter` on the SAME view is a shape SwiftUI has been known
   to present only the first of, and the window's view already has one;
 - adding them to the sidebar's chain directly took the type-checker past its
-  limit — "unable to type-check this expression in reasonable time". Two other
-  groups of modifiers there are already wrapped up the same way.
+  limit — "unable to type-check this expression in reasonable time". Other
+  groups of modifiers there are wrapped up the same way, and the chain is
+  still at the edge ("Building with two Xcodes (#613)", below).
 
 After an import the sidebar **reveals** what arrived
 (`WorkspaceModel.revealReferenceCourse`): both the Reference Courses group and
@@ -11176,3 +11243,105 @@ base setting names `Plantoir`, only Debug names `Plantoir-Beta`, and Release
 excludes the Beta bundle. And the note under "The Windows icon derives from
 `mac-app/Plantoir.icon`" in [11. Release strategy](11-release-strategy.md)
 says to re-run the script when the art changes.
+
+## Building with two Xcodes (#613)
+
+This Mac has **Xcode 26.6** (Swift 6.3.3, macOS 26 SDK) and **Xcode 27.0**
+(Swift 6.4, macOS 27 SDK) installed, and `xcode-select` has pointed at 27.0
+since 2026-10-13. **Releases are built with 26.6** until a separate,
+deliberate piece moves them (Russell, 2026-10-22): a new SDK changes what the
+app does on the NEWEST macOS through linked-on-or-after checks in SwiftUI and
+AppKit, and nobody here can see that on a macOS 26 Mac, so a compiler bump is
+not free. The source must therefore build under BOTH. `RELEASING.md` step 4
+says how a release names its Xcode (`DEVELOPER_DIR=…`), and `publish.sh`
+prints `xcodebuild -version` in its step 3 so every release log records which
+one built it. `MAC-BOOTSTRAP.md` §4 says what a piece runs under each.
+
+Both Xcodes resolve the main checkout to the SAME DerivedData folder
+(`Plantoir-apgtygotdszhhqgcdlzqyocoqnie`, by `-showBuildSettings` under each
+on 2026-10-22) — the folder Russell's Dock icon names. So a build for his
+copy names 26.6 explicitly, and the 27.0 check goes into a scratch
+`-derivedDataPath`, or the two compilers take turns over one set of build
+products.
+
+### What failed under 27, measured
+
+`origin/dev` at badb062ab, `build-for-testing` Debug under 27, failed twice
+over — the second failure hidden until the first was fixed:
+
+1. **The two chat-bubble shapes** (`AssistChatBubbleShape`,
+   `AssistThoughtBubbleShape`): "conformance … to protocol 'Shape' crosses
+   into main actor-isolated code". The target builds with
+   `SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor`, so an unannotated struct is
+   `@MainActor`. Read off the two SDKs' `SwiftUICore` interfaces: 26's `Shape`
+   inherits `_RemoveGlobalActorIsolation`, a marker that quietly stripped
+   that default from any conforming type; 27's is declared
+   `nonisolated public protocol Shape` without the marker, so the shapes stay
+   `@MainActor` and their `path(in:)` cannot satisfy the `nonisolated`
+   requirement. Fixed by `nonisolated` on each struct — what 26's marker was
+   doing implicitly, and the spelling the same file already uses for
+   `AssistChatSide`. These are the only two `Shape`s in `mac-app/`.
+
+   **The app's one custom `Layout`** (`CappedHeightLayout`,
+   `Views/Helpers/CappedScrollArea.swift`) is `@MainActor` the same way and
+   still compiles under 27, because `Layout` is declared `@preconcurrency` in
+   both SDKs, which downgrades the mismatch. (The plan for this piece said
+   the app had no custom `Layout`; review found this one.) It is the next
+   candidate if a later SDK drops `@preconcurrency` there, and the fix would
+   be the same keyword.
+
+2. **`SidebarView.body`**: "the compiler is unable to type-check this
+   expression in reasonable time", pointing at the last alert's `message:`
+   closure, in two consecutive runs (not load). The expression is the whole
+   body — a `VStack` and a chain of about 25 `.alert`/`.sheet`/`.modifier`
+   calls. Measured with `-Xfrontend -warn-long-function-bodies=100`:
+
+   | `SidebarView.body` | Xcode 26.6 | Xcode 27.0 |
+   |---|---|---|
+   | before | 12,430 ms (finished, barely) | gave up |
+   | with the rename alerts in `CourseRenameAlerts` | 249 ms | 219 ms |
+
+   26.6 was already at the edge; 27's solver gives up sooner. The fix is the
+   cut `OutsideAgentAlerts` and `OutsideSessionHolds` already make: the three
+   rename alerts (open in Obsidian, could not rename, the rename notice)
+   moved verbatim, with their three bindings, into one `ViewModifier` at the
+   end of the file. Titles, messages, buttons and their order are unchanged,
+   so no contract, wording key or UI test moved. **This is the third time
+   that chain has hit the limit** — a new modifier on the sidebar belongs in
+   a group like these, not in the chain.
+
+With both changes the Debug build-for-testing (all three targets) and a
+Release build with `publish.sh`'s settings succeed under 27, and the same
+source builds clean under 26.6. Warnings did not move: 1,407 unique warning
+lines under 26.6 against 1,406 under 27, the same counts per kind (nearly all
+in the test target, which is `nonisolated` by default); 27 only adds
+`[#GroupName]` tags.
+
+### Rejected
+
+- **`@MainActor` on the `Shape` conformance** (the compiler's first
+  suggestion). SwiftUI is entitled to call `path(in:)` off the main thread —
+  that is why the requirement is `nonisolated` and `Shape` is `Sendable` —
+  and the shapes are pure geometry with nothing to protect.
+- **`@preconcurrency` on the conformance** (its second). Turns a compile
+  error into a possible runtime trap.
+- **`nonisolated` on `path(in:)` alone.** It reads stored properties and calls
+  a nested helper; whole-type `nonisolated` is simpler and matches the file.
+- **Splitting `SidebarView.body` into computed sub-views.** Reshapes the view
+  tree, and with it where alerts are presented.
+- **Compiler flags that raise the solver's time limit.** They hide the edge
+  rather than moving away from it, and per-target flags drift between
+  Xcodes.
+- **Refusing a non-26.6 Xcode in `publish.sh`.** It prints the version
+  instead: a refusal is one more thing to update at every Xcode bump, and is
+  worth adding only if a release is ever built with the wrong one.
+
+### Still at the edge
+
+`SectionDetailView.body` took **22,970 ms** to type-check under 26.6 and
+3,516 ms under 27 (full rebuilds, same flag) — the solver changed rather than
+uniformly improved. It compiles under both today, but 23 s is nearly twice
+what the sidebar took before 27 gave up on it; it has its own issue
+(milestone v2.0.0). Every other body measured under about 600 ms.
+
+Nothing here reaches Windows: it is the Swift toolchain only.
