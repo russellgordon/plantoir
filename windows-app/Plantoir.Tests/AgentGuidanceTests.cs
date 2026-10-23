@@ -278,6 +278,56 @@ public sealed class AgentGuidanceTests : IDisposable
     /// both root files name it in their FIRST bullet, so an assistant asked for
     /// any page reads it before writing anything.
     /// </summary>
+    /// <summary>
+    /// #649 (the mac's <c>PrintablePagesTests.testTheHandoutsSkillIsWrittenWithItsStartersAndEveryRouteToItNamesIt</c>,
+    /// #631): the handouts skill travels the same way WITH its starter
+    /// sources — the first skill with a subfolder and with spaces in its file
+    /// names (<c>starters\Handout - Answers.tex</c>) — both root files name
+    /// it, the printing and page-authoring skills name it, and it stays OUT of
+    /// the page routing table, since a handout made as a PDF is not part of a
+    /// page.
+    /// </summary>
+    [Fact]
+    public void TheHandoutsSkillIsWrittenWithItsStartersAndEveryRouteToItNamesIt()
+    {
+        var guidance = Contract["handoutsSkill"]!;
+        string skillName = guidance["skill"]!.ToString();
+        var starters = guidance["starters"]!.AsArray().Select(s => s!.ToString()).ToList();
+        var mentionedBy = guidance["mentionedBy"]!.AsArray().Select(s => s!.ToString()).ToList();
+        var routesTo = Contract["pageAuthoringSkill"]!["routesTo"]!.AsArray().Select(s => s!.ToString()).ToList();
+        Assert.False(routesTo.Contains(skillName), "a handout made as a PDF is not part of a page");
+        Assert.NotEmpty(starters);
+        Assert.NotEmpty(mentionedBy);
+
+        Assert.Empty(Pass().Failures);
+        foreach (string home in AgentGuidance.SkillHomes)
+        {
+            string skillFolder = Path.Combine(_folder, home, "skills", skillName);
+            string skill = File.ReadAllText(Path.Combine(skillFolder, "SKILL.md"));
+            foreach (string expected in new[]
+                     {
+                         "name: " + skillName, "tectonic", @"\qa", "- Answers", "- Solutions",
+                         "print_school_name", "pdftoppm", "never inside `courses/`", "`plantoir-printing`",
+                     })
+                Assert.True(skill.Contains(expected, StringComparison.Ordinal), $"{home}: the skill must say {expected}");
+            foreach (string starter in starters)
+            {
+                Assert.True(skill.Contains("`" + starter + "`", StringComparison.Ordinal), $"{home}: the skill must name {starter}");
+                string source = Path.Combine(skillFolder, starter.Replace('/', Path.DirectorySeparatorChar));
+                Assert.True(File.Exists(source), $"{home}: {starter} must be written");
+                Assert.True(File.ReadAllText(source).Contains(@"\showanswers", StringComparison.Ordinal), $"{home}: {starter}");
+            }
+            foreach (string mentioning in mentionedBy)
+            {
+                string other = File.ReadAllText(Path.Combine(_folder, home, "skills", mentioning, "SKILL.md"));
+                Assert.True(other.Contains($"`{skillName}`", StringComparison.Ordinal), $"{home}: {mentioning} must name {skillName}");
+            }
+        }
+        foreach (string name in AgentGuidance.RootFiles)
+            Assert.True(File.ReadAllText(Path.Combine(_folder, name)).Contains(skillName, StringComparison.Ordinal),
+                        $"{name} must name the {skillName} skill");
+    }
+
     [Fact]
     public void ThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst()
     {
