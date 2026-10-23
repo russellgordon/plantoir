@@ -1978,7 +1978,7 @@ binary is started from a terminal:
 
 ```bash
 PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW=1 \
-  ~/Library/Developer/Xcode/DerivedData/Plantoir-euwbmkpykeyuztbpzedmiptcsqsg/Build/Products/Debug/Plantoir.app/Contents/MacOS/Plantoir
+  ~/Library/Developer/Xcode/DerivedData/Plantoir-apgtygotdszhhqgcdlzqyocoqnie/Build/Products/Debug/Plantoir.app/Contents/MacOS/Plantoir
 ```
 
 Press Preview on any section and wait for the build plus 45 seconds.
