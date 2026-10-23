@@ -729,10 +729,12 @@ def reason_from_build_log(text: str, rules=None) -> str:
     return rules["otherwise"]
 
 
-def got_ready_marker(outcome: str, course=None, section=None, seconds=None, log_text=None) -> str:
+def got_ready_marker(outcome: str, course=None, section=None, seconds=None, log_text=None, reason=None) -> str:
     """The one PLANTOIR_SWIFT: line for an ending of preview.sh's Swift step:
     `built`, `failed`, `noRoom` or `waited` (codeRunnerBlocks.swift.mac.rule),
-    in windows.marker's shape, keys sorted as swift_windows_fetch.marker."""
+    in windows.marker's shape, keys sorted as swift_windows_fetch.marker.
+    A failed ending's `reason`, when given, is the one already read from the
+    log (#642), so the marker cannot name a different one."""
     data = {}
     if course:
         data["course"] = course
@@ -749,6 +751,8 @@ def got_ready_marker(outcome: str, course=None, section=None, seconds=None, log_
         data["ready"] = False
         if outcome in ("noRoom", "waited"):
             data["reason"] = outcome
+        elif reason:
+            data["reason"] = reason
         else:
             try:
                 data["reason"] = reason_from_build_log(log_text or "")
@@ -757,11 +761,57 @@ def got_ready_marker(outcome: str, course=None, section=None, seconds=None, log_
     return SWIFT_MARKER + " " + json.dumps(data, sort_keys=True)
 
 
+# ---- What a failed build leaves behind (#642) ------------------------------------
+#
+# The reason read from a failed build's log used to reach the trail and
+# nothing else: preview.sh told the teacher "the first time needs an internet
+# connection" and wrote {state: notDownloaded} for every failure, a full disk
+# and a damaged download included. The one reading now decides all three - the
+# console sentence, state.json (so each block's reason and the folder problem)
+# and the trail's reason - so they cannot disagree.
+
+def state_after_failed_build(reason: str) -> dict:
+    """What state.json holds after a failed build (mac.stateForReason, the
+    same mapping as Windows' ensureExit): always the build's reason, and a
+    `state` only for a reason the blocks name (noRoom, notDownloaded). An
+    unknown reason is unpack's: no state, so notCompiled."""
+    try:
+        states = _mac_rules()["stateForReason"]
+    except Exception:  # noqa: BLE001 - a missing rule leaves the honest "preview again"
+        states = {}
+    if reason not in states:
+        reason = "unpack"
+    written = {"reason": reason}
+    state = states.get(reason)
+    if state:
+        written["state"] = state
+    return written
+
+
+def sentence_after_failed_build(reason: str) -> str:
+    """The console sentence for a failed build (mac.printed), unpack's for a
+    reason it has no sentence for. Empty only when the contract cannot be read,
+    and preview.sh then prints its own copy of unpack's."""
+    try:
+        printed = _mac_rules()["printed"]
+    except Exception:  # noqa: BLE001
+        return ""
+    return printed.get(reason) or printed.get("unpack") or ""
+
+
+def _write_state_after_failed_build(path: str, reason: str) -> None:
+    try:
+        Path(path).write_text(json.dumps(state_after_failed_build(reason), sort_keys=True) + "\n",
+                              encoding="utf-8")
+    except OSError:
+        pass  # the sentence and the marker still say why
+
+
 def _got_ready_main(argv: list) -> int:
     outcome = _argument(argv, "outcome")
     if outcome not in ("built", "failed", "noRoom", "waited"):
         print("usage: swift_blocks.py got-ready --outcome=built|failed|noRoom|waited "
-              "--course=CODE --section=N [--seconds=N] [--log=PATH]", file=sys.stderr)
+              "--course=CODE --section=N [--seconds=N] [--log=PATH] [--state=PATH]", file=sys.stderr)
         return 2
     section = None
     try:
@@ -780,7 +830,20 @@ def _got_ready_main(argv: list) -> int:
             log_text = Path(log).read_text(encoding="utf-8", errors="replace")
         except OSError:
             log_text = ""
-    print(got_ready_marker(outcome, _argument(argv, "course"), section, seconds, log_text))
+    reason = None
+    if outcome == "failed":
+        # One reading of the log for everything that follows from it (#642).
+        try:
+            reason = reason_from_build_log(log_text)
+        except Exception:  # noqa: BLE001 - as got_ready_marker
+            reason = "unpack"
+        state = _argument(argv, "state")
+        if state:
+            _write_state_after_failed_build(state, reason)
+        sentence = sentence_after_failed_build(reason)
+        if sentence:
+            print(sentence)
+    print(got_ready_marker(outcome, _argument(argv, "course"), section, seconds, log_text, reason))
     return 0
 
 
