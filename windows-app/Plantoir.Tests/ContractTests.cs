@@ -817,8 +817,10 @@ public class ContractTests
             if (c is null) continue;
             string path = c["path"]!.ToString();
             bool expect = c["expect"]!.GetValue<bool>();
-            bool actual = CurriculumRules.IsCurriculumPage(path);
-            Assert.Equal(expect, actual);
+            // #614: what the course declares in curriculum_folders; absent means none.
+            var declared = (c["curriculumFolders"]?.AsArray() ?? new JsonArray()).Select(n => n!.ToString()).ToList();
+            bool actual = CurriculumRules.IsCurriculumPage(path, declared);
+            Assert.True(expect == actual, $"isCurriculumPage “{path}” (declared: {string.Join(", ", declared)}) should be {expect}.");
         }
 
         // isExpectationCode

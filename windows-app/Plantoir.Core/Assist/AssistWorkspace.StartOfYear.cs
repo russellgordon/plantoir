@@ -45,7 +45,7 @@ public sealed partial class AssistWorkspace
     /// </summary>
     public IReadOnlyList<StartOfYearPage> StartOfYearPages(Course course, int section)
     {
-        var graph = LinkGraph.Build(course.DirectoryPath, section);
+        var graph = LinkGraph.Build(course, section);
         var classPages = ClassPages(course, section).Select(Path.GetFullPath)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         string frontPage = Path.GetFullPath(SectionIndex.PathFor(course, section));
@@ -53,6 +53,7 @@ public sealed partial class AssistWorkspace
         var naming = course.Configuration.Naming;
 
         var pages = new List<StartOfYearPage>();
+        var declared = course.Configuration.CurriculumFolders;
         foreach (string full in graph.Pages.Where(page => ListsAsAPage(course, page)))
         {
             string text;
@@ -62,7 +63,7 @@ public sealed partial class AssistWorkspace
                 : string.Equals(full, keyLinks, StringComparison.OrdinalIgnoreCase) ? StartOfYearKind.KeyLinks
                 : classPages.Contains(full) ? StartOfYearKind.Class
                 : LinkGraph.IsLandingPage(full) ? StartOfYearKind.FolderIndex
-                : IsCurriculum(course.DirectoryPath, full) ? StartOfYearKind.Curriculum
+                : IsCurriculum(course.DirectoryPath, full, declared) ? StartOfYearKind.Curriculum
                 : StartOfYearKind.Page;
             string relativeDirectory = Path.GetRelativePath(course.DirectoryPath, Path.GetDirectoryName(full)!)
                 .Replace('\\', '/');

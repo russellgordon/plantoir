@@ -34,12 +34,18 @@ public static class PagePaths
 
     /// <summary>
     /// True when <paramref name="candidate"/> is a curriculum page of the
-    /// course at <paramref name="courseDirectory"/>: some FOLDER between the
-    /// course and the page has "curriculum" in its name, case-insensitively
-    /// (shared-rules.json → followingLinks.neverTakenDownByFollowingLinks,
-    /// curriculumRules.isCurriculumPage). The file name never counts (#615):
-    /// "Curriculum Coverage.md" in an ordinary folder is an ordinary page, as
-    /// it is on the mac (<c>AssistCurriculumMentions.isCurriculum(pageAt:in:)</c>).
+    /// course at <paramref name="courseDirectory"/>, by the one rule in
+    /// <see cref="CurriculumRules.IsCurriculum"/> (#614): its first folder
+    /// (after a <c>section&lt;n&gt;</c> folder) is one the course DECLARES in
+    /// <paramref name="declared"/>, or any of its folders has "curriculum" in
+    /// its name. The file name never counts (#615). As on the mac
+    /// (<c>AssistCurriculumMentions.isCurriculum(pageAt:in:)</c>).
+    ///
+    /// <paramref name="declared"/> is required rather than defaulted on
+    /// purpose: a caller that forgot it would silently lose a renamed folder's
+    /// protection, which is the bug #614 fixed. Pass
+    /// <c>course.Configuration.CurriculumFolders</c>, or use the
+    /// <see cref="IsCurriculum(Course, string)"/> overload.
     ///
     /// Only folders INSIDE the course are read, so a working folder called
     /// "Curriculum Work" does not make every page curriculum. A RELATIVE
@@ -49,7 +55,7 @@ public static class PagePaths
     /// <see cref="ResolveInside"/> first. A page outside the course, or a path
     /// that cannot be read, is false too.
     /// </summary>
-    public static bool IsCurriculum(string courseDirectory, string candidate)
+    public static bool IsCurriculum(string courseDirectory, string candidate, IReadOnlyList<string> declared)
     {
         if (string.IsNullOrWhiteSpace(courseDirectory) || string.IsNullOrWhiteSpace(candidate)) return false;
         if (!Path.IsPathFullyQualified(candidate)) return false;
@@ -62,10 +68,16 @@ public static class PagePaths
         var segments = relative.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
                                       StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length == 0 || segments[0] == "..") return false;    // outside the course
-        for (int i = 0; i < segments.Length - 1; i++)                     // folders only, never the file name
-            if (segments[i].Contains("curriculum", StringComparison.OrdinalIgnoreCase)) return true;
-        return false;
+        return CurriculumRules.IsCurriculum(segments[..^1], declared);    // folders only, never the file name
     }
+
+    /// <summary>
+    /// <see cref="IsCurriculum(string, string, IReadOnlyList{string})"/> for a
+    /// course, with the names it declares. Reads the declared list each call;
+    /// a loop over many pages should read it once and use the other overload.
+    /// </summary>
+    public static bool IsCurriculum(Course course, string candidate) =>
+        IsCurriculum(course.DirectoryPath, candidate, course.Configuration.CurriculumFolders);
 
     /// <summary>
     /// What a teacher calls this page (Quartz displayName).

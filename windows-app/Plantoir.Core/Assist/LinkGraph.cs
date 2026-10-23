@@ -32,16 +32,38 @@ public sealed class LinkGraph
 
     public IReadOnlyList<string> Pages { get; }
 
-    private LinkGraph(IReadOnlyList<string> pages,
+    /// <summary>The course the graph was built from.</summary>
+    public string CourseDirectory { get; }
+
+    /// <summary>
+    /// The curriculum folders the course declares (#614), kept so the sweep's
+    /// exclusions use the same rule as the planner — see
+    /// <see cref="PagePaths.IsCurriculum(string, string, IReadOnlyList{string})"/>.
+    /// </summary>
+    public IReadOnlyList<string> DeclaredCurriculum { get; }
+
+    private LinkGraph(string courseDirectory,
+                      IReadOnlyList<string> declaredCurriculum,
+                      IReadOnlyList<string> pages,
                       Dictionary<string, List<string>> targets,
                       Dictionary<string, List<string>> sources)
     {
+        CourseDirectory = courseDirectory;
+        DeclaredCurriculum = declaredCurriculum;
         Pages = pages;
         _targets = targets;
         _sources = sources;
     }
 
-    public static LinkGraph Build(string courseDirectory, int sectionNumber)
+    /// <summary>The graph of one section of <paramref name="course"/>, with the curriculum folders it declares.</summary>
+    public static LinkGraph Build(Course course, int sectionNumber) =>
+        Build(course.DirectoryPath, sectionNumber, course.Configuration.CurriculumFolders);
+
+    /// <param name="declaredCurriculum">
+    /// The course's <c>curriculum_folders</c> (<see cref="CourseConfiguration.CurriculumFolders"/>).
+    /// Required, not defaulted: forgetting it is how a renamed curriculum folder lost its protection (#614).
+    /// </param>
+    public static LinkGraph Build(string courseDirectory, int sectionNumber, IReadOnlyList<string> declaredCurriculum)
     {
         var byName = WikiLinks.IndexPages(courseDirectory, sectionNumber);
         var pages = PagePaths.MarkdownPages(courseDirectory, sectionNumber)
@@ -68,7 +90,7 @@ public sealed class LinkGraph
                 if (!sources[target].Contains(page)) sources[target].Add(page);
             }
         }
-        return new LinkGraph(pages, targets, sources);
+        return new LinkGraph(courseDirectory, declaredCurriculum, pages, targets, sources);
     }
 
     public IReadOnlyList<string> TargetsOf(string page) =>
@@ -104,19 +126,6 @@ public sealed class LinkGraph
         SourcesOf(page).Where(src => !isHidden(src)).ToList();
 
     /// <summary>
-    /// True when a page is a curriculum page (any folder segment contains "curriculum").
-    /// </summary>
-    public static bool IsCurriculum(string path)
-    {
-        string normalized = path.Replace('\\', '/');
-        var segments = normalized.Split('/');
-        for (int i = 0; i < segments.Length - 1; i++)
-            if (segments[i].Contains("curriculum", StringComparison.OrdinalIgnoreCase))
-                return true;
-        return false;
-    }
-
-    /// <summary>
     /// True when a page is a folder or section landing page (index.md).
     /// </summary>
     public static bool IsLandingPage(string path) =>
@@ -125,11 +134,15 @@ public sealed class LinkGraph
     /// <summary>
     /// Pages that are never taken down by following links (shared-rules.json -> followingLinks).
     /// Includes landing pages (index.md), curriculum pages, and Key Links targets.
+    /// A curriculum page is one by <see cref="PagePaths.IsCurriculum(string, string, IReadOnlyList{string})"/>,
+    /// read against the course, so a folder the course declares counts whatever it is called (#614)
+    /// and a working folder called "Curriculum Work" does not make every page one.
     /// </summary>
-    public static bool IsExcludedFromSweep(string path, IReadOnlySet<string>? keyLinksTargets = null)
+    public static bool IsExcludedFromSweep(string courseDirectory, IReadOnlyList<string> declaredCurriculum,
+                                           string path, IReadOnlySet<string>? keyLinksTargets = null)
     {
         if (IsLandingPage(path)) return true;
-        if (IsCurriculum(path)) return true;
+        if (PagePaths.IsCurriculum(courseDirectory, path, declaredCurriculum)) return true;
         if (string.Equals(Path.GetFileName(path), "Key Links.md", StringComparison.OrdinalIgnoreCase)) return true;
         if (keyLinksTargets is not null && keyLinksTargets.Contains(Path.GetFullPath(path))) return true;
         return false;
@@ -173,7 +186,7 @@ public sealed class LinkGraph
     public List<string> Unreferenced(IReadOnlySet<string>? keyLinksTargets = null,
                                      IReadOnlySet<string>? classPages = null) =>
         Pages.Where(p => SourcesOf(p).Count == 0)
-             .Where(p => !IsExcludedFromSweep(p, keyLinksTargets))
+             .Where(p => !IsExcludedFromSweep(CourseDirectory, DeclaredCurriculum, p, keyLinksTargets))
              .Where(p => classPages is null || !classPages.Contains(Path.GetFullPath(p)))
              .ToList();
 }

@@ -359,11 +359,12 @@ public sealed partial class AssistWorkspace
     public HashSet<string> ProtectedFromHiding(Course course, int sectionNumber)
     {
         var protectedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var declared = course.Configuration.CurriculumFolders;
 
         foreach (string page in PagePaths.MarkdownPages(course.DirectoryPath, sectionNumber))
         {
             if (string.Equals(Path.GetFileName(page), "index.md", StringComparison.OrdinalIgnoreCase) ||
-                IsCurriculum(course.DirectoryPath, page))
+                IsCurriculum(course.DirectoryPath, page, declared))
                 protectedPaths.Add(Path.GetFullPath(page));
         }
 
@@ -388,18 +389,19 @@ public sealed partial class AssistWorkspace
     private const string KeyLinksFileName = "Key Links.md";
 
     /// <summary>
-    /// True when a page is curriculum reference material.
-    ///
-    /// Matches build_site.py's own rule exactly — any FOLDER segment
-    /// containing "curriculum", case-insensitively, with the filename ignored.
-    /// That is what makes it work for a course whose folders are called
-    /// "Ontario Curriculum" and "College Board Curriculum" rather than plain
-    /// "Curriculum", which is the normal case outside the example content.
+    /// True when a page is curriculum reference material: its first folder is
+    /// one the course DECLARES in curriculum_folders (#614), or any FOLDER
+    /// segment contains "curriculum", case-insensitively, with the filename
+    /// ignored. The name half is what makes it work for a course whose folders
+    /// are called "Ontario Curriculum" and "College Board Curriculum" rather
+    /// than plain "Curriculum"; the declared half is what keeps a folder the
+    /// teacher renamed "Expectations".
     /// </summary>
-    /// <remarks>One predicate, in <see cref="PagePaths.IsCurriculum"/> (#615):
-    /// it wants a FULL path, and a relative one is false.</remarks>
-    public static bool IsCurriculum(string courseDirectory, string pagePath) =>
-        PagePaths.IsCurriculum(courseDirectory, pagePath);
+    /// <remarks>One predicate, in <see cref="CurriculumRules.IsCurriculum"/>
+    /// through <see cref="PagePaths.IsCurriculum(string, string, IReadOnlyList{string})"/>
+    /// (#615, #614): it wants a FULL path, and a relative one is false.</remarks>
+    public static bool IsCurriculum(string courseDirectory, string pagePath, IReadOnlyList<string> declared) =>
+        PagePaths.IsCurriculum(courseDirectory, pagePath, declared);
 
     /// <summary>
     /// Year-round reference pages, which belong to the start of the year
@@ -436,8 +438,9 @@ public sealed partial class AssistWorkspace
             catch { }
         }
 
+        var declared = course.Configuration.CurriculumFolders;
         foreach (string page in PagePaths.MarkdownPages(course.DirectoryPath, section))
-            if (IsCurriculum(course.DirectoryPath, page)) reference.Add(Path.GetFullPath(page));
+            if (IsCurriculum(course.DirectoryPath, page, declared)) reference.Add(Path.GetFullPath(page));
 
         var dates = new List<PlannedDate>();
         foreach (string page in reference.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
@@ -1121,13 +1124,13 @@ public sealed partial class AssistWorkspace
     /// </summary>
     /// <summary>The folder a planned page sits in, from the course folder ("Labs", "section1/All Classes").</summary>
     /// <summary>
-    /// <see cref="PagePaths.IsCurriculum"/> for a planned page, whose
+    /// <see cref="PagePaths.IsCurriculum(Course, string)"/> for a planned page, whose
     /// <c>RelativePath</c> is from the WORKING folder and so is resolved first
     /// (#615, #617). A page that cannot be resolved is not curriculum.
     /// </summary>
     private bool IsCurriculumPage(Course course, PlannedPage page)
     {
-        try { return PagePaths.IsCurriculum(course.DirectoryPath, PagePaths.ResolveInside(_folder, page.RelativePath)); }
+        try { return PagePaths.IsCurriculum(course, PagePaths.ResolveInside(_folder, page.RelativePath)); }
         catch (OutsideWorkspaceException) { return false; }
     }
 
@@ -1297,7 +1300,7 @@ public sealed partial class AssistWorkspace
         if (draft) return inherited;   // hiding a class never re-dates anything
 
         LinkGraph graph;
-        try { graph = LinkGraph.Build(course.DirectoryPath, section); }
+        try { graph = LinkGraph.Build(course, section); }
         catch { return inherited; }
 
         var classPaths = new HashSet<string>(
@@ -1466,7 +1469,7 @@ public sealed partial class AssistWorkspace
     private List<DanglingLink> DanglingAfter(Course course, int section, IReadOnlyList<PlannedPage> pages)
     {
         LinkGraph graph;
-        try { graph = LinkGraph.Build(course.DirectoryPath, section); }
+        try { graph = LinkGraph.Build(course, section); }
         catch { return new List<DanglingLink>(); }
 
         var planned = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -1495,7 +1498,7 @@ public sealed partial class AssistWorkspace
     /// <summary>The section's link graph, for the standalone consistency check.</summary>
     public (LinkGraph Graph, Func<string, bool> IsHidden) Inspect(Course course, int section)
     {
-        var graph = LinkGraph.Build(course.DirectoryPath, section);
+        var graph = LinkGraph.Build(course, section);
         return (graph, path =>
         {
             try
@@ -2646,7 +2649,7 @@ public sealed partial class AssistWorkspace
             Reference = reference,
             CurriculumCount = reference.Count(r =>
             {
-                try { return IsCurriculum(course.DirectoryPath, PagePaths.ResolveInside(_folder, r.RelativePath)); }
+                try { return PagePaths.IsCurriculum(course, PagePaths.ResolveInside(_folder, r.RelativePath)); }
                 catch { return false; }
             }),
             NonTeachingDays = timetable.NonTeachingDays,
@@ -2687,7 +2690,7 @@ public sealed partial class AssistWorkspace
     {
         var shifted = new List<PlannedDate>();
         LinkGraph graph;
-        try { graph = LinkGraph.Build(course.DirectoryPath, section); }
+        try { graph = LinkGraph.Build(course, section); }
         catch { return shifted; }
 
         var moves = new Dictionary<string, (DateOnly From, DateOnly To)>(StringComparer.OrdinalIgnoreCase);
@@ -2751,7 +2754,7 @@ public sealed partial class AssistWorkspace
                 : DateOf(course, section, path);
 
         LinkGraph graph;
-        try { graph = LinkGraph.Build(course.DirectoryPath, section); }
+        try { graph = LinkGraph.Build(course, section); }
         catch { return new List<string>(); }
 
         var classPages = ClassPages(course, section);
@@ -3143,7 +3146,7 @@ public sealed partial class AssistWorkspace
         else anchors.Add("every class");
 
         LinkGraph graph;
-        try { graph = LinkGraph.Build(course.DirectoryPath, section); }
+        try { graph = LinkGraph.Build(course, section); }
         catch (Exception error) { throw new AssistRefusal($"That section couldn’t be read: {error.Message}"); }
 
         var problems = new List<string>();
@@ -3398,13 +3401,16 @@ public sealed partial class AssistWorkspace
     public List<Expectation> CurriculumExpectations(Course course, int sectionNumber)
     {
         var found = new List<Expectation>();
+        var declared = course.Configuration.CurriculumFolders;
 
         foreach (string relative in Pages(course, sectionNumber))
         {
             string full;
             try { full = PagePaths.ResolveInside(_folder, relative); }
             catch { continue; }
-            if (!CurriculumRules.IsCurriculumPage(full)) continue;
+            // Against the COURSE (#614): a folder it declares counts whatever it
+            // is called, and the working folder's own name never does.
+            if (!PagePaths.IsCurriculum(course.DirectoryPath, full, declared)) continue;
 
             string code = Path.GetFileNameWithoutExtension(full);
             // Index and strand-heading pages are not expectations; an
