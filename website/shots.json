@@ -201,7 +201,7 @@
       },
       "alt": "A Swift program on a class website, highlighted and not editable, run and waiting: its output shows What is your name?, the answer Priya, How old are you?, and 14 being typed in a field under it, with Waiting for your answer beside the No more input button.",
       "caption": "Each readLine() waits for an answer, typed where the program asked for it.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "Ask, then answer",
         "What is your name?",
@@ -222,7 +222,7 @@
       },
       "alt": "A Swift program on a class website, highlighted and not editable, answered Priya and 14, and its output: each question with its answer after it, then Hello, Priya! Next year you will be 15.",
       "caption": "With its answers, the program carries on. The code stays as you wrote it.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "Ask, then answer",
         "Run",
