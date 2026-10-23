@@ -177,7 +177,7 @@ nonisolated enum PreviewReachability {
     ///
     /// ```
     /// PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW=1 \
-    ///   ~/Library/Developer/Xcode/DerivedData/Plantoir-euwbmkpykeyuztbpzedmiptcsqsg/Build/Products/Debug/Plantoir.app/Contents/MacOS/Plantoir
+    ///   ~/Library/Developer/Xcode/DerivedData/Plantoir-apgtygotdszhhqgcdlzqyocoqnie/Build/Products/Debug/Plantoir.app/Contents/MacOS/Plantoir
     /// ```
     static let pretendingVariableName: String = "PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW"
 

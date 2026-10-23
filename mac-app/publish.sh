@@ -151,6 +151,13 @@ mkdir -p "${BUILD_DIR}"
 BUILD_NUMBER="$(git -C "${HERE}" rev-list --count HEAD 2>/dev/null || echo 0)"
 echo "   - Build number: ${BUILD_NUMBER} (git rev-list --count HEAD)"
 
+# Which Xcode builds this release, written into the release's own log. This
+# Mac has more than one installed, and xcodebuild uses whatever xcode-select
+# points at unless DEVELOPER_DIR says otherwise — so the version is printed
+# rather than assumed. RELEASING.md step 4 names the Xcode releases are built
+# with and says to check this line before notarizing (#613).
+echo "   - Xcode: $(xcodebuild -version | tr '\n' ' ')(${DEVELOPER_DIR:-xcode-select: $(xcode-select -p)})"
+
 EXTRA_SETTINGS=()
 EXPECTED_FEED="${PRODUCTION_FEED}"
 if [[ -n "${REHEARSAL_FEED}" ]]; then
