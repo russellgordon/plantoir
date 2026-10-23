@@ -2072,8 +2072,9 @@ site. That is direction `shownWithNote`, and verify.sh's end-to-end fixture
 (Quiz Read Differently) uses it. With an empty `>` line on either side of
 the `<img>` the two agree (`single`), which matches the advice
 `words.problems.choicesInHtml` gives. An open `<pre>` straight after the
-title fires the same way. The extra call costs nothing: it is the same
-Python start, made only when something disagrees.
+title fires the same way. The extra call costs one Python start
+only when nothing else had already caused one (quizzes alone disagreeing);
+when a block disagrees too, both findings ride the same start.
 
 **Rejected:** merging into `quizzesNotReady` (both apps key a finding on
 name, course and section, #246, so the two would replace each other, and
