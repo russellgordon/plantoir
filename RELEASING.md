@@ -180,7 +180,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    REFUSES a missing or stale copy (#581). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
-   (and `Plantoir-win-x64.zip`). **Then build and sign the Windows update feed
+   (and `Plantoir-win-x64.zip`). **After installing it over the previous
+   version, check the tools copy read nothing (#559):** the first launch's
+   `working folder tools copied` line has no "(K read in full)" bracket and
+   `startup.log`'s `tools copy finished` says `0 read in full`; if not,
+   compare one file's ticks in `{app}\Toolchain\.hashes` with its
+   `LastWriteTimeUtc.Ticks` (`documentation/12-windows-app.md` → "What the
+   director must check at the cut"). **Then build and sign the Windows update feed
    from that exact installer, and commit it** ("The update feed (Windows)",
    below) — the `cut-release` skill does not do this for you, and a Windows
    release whose feed was not rebuilt is one no installed copy is offered.

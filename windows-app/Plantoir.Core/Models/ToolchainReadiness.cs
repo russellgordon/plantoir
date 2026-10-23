@@ -72,8 +72,11 @@ public static class ToolchainReadiness
     /// copy of the folder was still running when the caller's wait ran out
     /// (<see cref="TakingTurns.GiveUp"/>). Nothing was written.</param>
     /// <param name="WaitedForPid">The program whose copy this one waited for, if it waited.</param>
+    /// <param name="FilesCompared">Files that already had a copy and were compared with it (#559).</param>
+    /// <param name="FilesReadInFull">Of those, the files that had to be read to compare them (#559).</param>
     public sealed record Status(State State, int FilesChanged, int FilesFailed, double Seconds, string? Problem,
-                                string? FirstFailedPath = null, bool GaveUpWaiting = false, int? WaitedForPid = null);
+                                string? FirstFailedPath = null, bool GaveUpWaiting = false, int? WaitedForPid = null,
+                                int FilesCompared = 0, int FilesReadInFull = 0);
 
     /// <summary>
     /// How a copy that finds an earlier live copy of the folder waits for it:
@@ -522,7 +525,8 @@ public static class ToolchainReadiness
         bool ready = result.Failed == 0;
         var status = new Status(ready ? State.Ready : State.Failed, result.Changed, result.Failed,
                                 clock.Elapsed.TotalSeconds, problem ?? result.FirstProblem,
-                                problem is null ? result.FirstFailedPath : null, WaitedForPid: waitedFor);
+                                problem is null ? result.FirstFailedPath : null, WaitedForPid: waitedFor,
+                                FilesCompared: result.Compared, FilesReadInFull: result.ReadInFull);
         bool waitedBeforeClosing = false;
         (string Course, int Section)? forADeploy = null;
         lock (Gate)
@@ -536,10 +540,13 @@ public static class ToolchainReadiness
                 forADeploy = entry.ForAScheduledDeploy;
             }
         }
-        // Only a copy that DID something, or failed, is worth a line: every
-        // launch compares every file, and a line for each "nothing to do"
-        // would bury the one that explains a slow first launch.
-        if (result.Changed > 0 || result.Failed > 0)
+        // Only a copy that DID something, failed, or had to READ files to
+        // compare them is worth a line: every launch compares every file by
+        // length and time, and a line for each "nothing to do" would bury the
+        // one that explains a slow first launch. The reads are the #559 case:
+        // 14 files changed and about 12,700 were read twice, in 131.6 s, and
+        // a pass that only re-read files used to leave no line at all.
+        if (WritesATrailLine(result))
         {
             try
             {
@@ -568,11 +575,20 @@ public static class ToolchainReadiness
                                    bool waitedBeforeClosing = false)
     {
         string files = status.FilesChanged == 1 ? "1 file" : $"{status.FilesChanged} files";
+        // #559: how many files were compared, and how many of those had to be
+        // read, said only when there were any — so a folder filled from
+        // nothing reads exactly as it did before.
+        string updated = $"{files} brought up to date";
+        if (status.FilesCompared > 0)
+        {
+            updated += $", {status.FilesCompared} compared";
+            if (status.FilesReadInFull > 0) updated += $" ({status.FilesReadInFull} read in full)";
+        }
         string seconds = status.Seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
         string what = forAScheduledDeploy ? "the working folder ready for a scheduled deploy" : "the working folder ready";
         string closing = waitedBeforeClosing ? ", and Plantoir waited for it before closing" : "";
         if (status.State == State.Ready)
-            return $"got {what} — {files} brought up to date in {seconds} s{closing} — {workspacePath}";
+            return $"got {what} — {updated} in {seconds} s{closing} — {workspacePath}";
         string failed = status.FilesFailed == 1 ? "1 file" : $"{status.FilesFailed} files";
         string first = (status.FirstFailedPath, status.Problem) switch
         {
@@ -583,8 +599,16 @@ public static class ToolchainReadiness
         };
         string after = forAScheduledDeploy ? "the scheduled deploy stood down" : "Preview and Deploy wait for Reload Courses";
         return $"could not finish getting {what} — {failed} could not be copied or removed{first}, " +
-               $"{files} brought up to date in {seconds} s{closing}; {after} — {workspacePath}";
+               $"{updated} in {seconds} s{closing}; {after} — {workspacePath}";
     }
+
+    /// <summary>
+    /// Whether a copy is worth a trail line: it changed or failed something,
+    /// or it had to read files to compare them (#559) — never the ordinary
+    /// pass that answers every comparison from lengths and times.
+    /// </summary>
+    internal static bool WritesATrailLine(ToolchainMirror.CopyResult result) =>
+        result.Changed > 0 || result.Failed > 0 || result.ReadInFull > 0;
 
     private static void RaiseChanged(string workspacePath)
     {

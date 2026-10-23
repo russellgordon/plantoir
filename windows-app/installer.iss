@@ -27,6 +27,14 @@ DisableProgramGroupPage=yes
 ; (AppUpdates.IsPerUserInstall). An all-users copy left by an older installer
 ; still says it needs an administrator rather than updating beside itself.
 PrivilegesRequired=lowest
+; File times are stored in UTC (#559). The app trusts the build's manifest of
+; the bundled tools (Toolchain\.hashes, exact UTC times) when an installed
+; file's time is the manifest's rounded DOWN by under 2 s, which is what Inno's
+; default TimeStampRounding=2 does. Stored as LOCAL time instead, every file
+; would shift by an hour for a teacher who installs on the other side of a
+; clocks change (1 November) from the build, and no tolerance covers that:
+; every file would be read in full again on the first launch after the update.
+TimeStampsInUTC=yes
 OutputDir=dist
 OutputBaseFilename=PlantoirSetup
 SetupIconFile=Plantoir\Assets\Plantoir.ico
