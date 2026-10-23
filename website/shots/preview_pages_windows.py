@@ -2,9 +2,10 @@
 `capture_windows.py --code` / `--quizzes` (#590, #574).
 
 The Windows twins of capture.py's `capture_code_set` and `capture_quiz_set`:
-every `preview-page` shot whose `capture.scene` is `code` or `quizzes`, except
-the two Swift ones (`NOT_ON_WINDOWS`: code-swift and code-swift-live stay owed until
-their 2x picture is taken; Swift runs on Windows since v1.8.6, #570).
+every `preview-page` shot whose `capture.scene` is `code` or `quizzes`. The two
+Swift ones (code-swift, code-swift-live) were left out until their 2x picture
+was taken (Swift runs on Windows since v1.8.6, #570); since #590's Swift pass
+(2026-10-23) they are taken here like the rest.
 
 Each is a page of a NATIVE preview (print_set_windows.Preview, the bundled
 runtime) of the folder its `capture.workspace` names:
@@ -76,9 +77,6 @@ PREPARE_DIR = HERE / "prepare"
 PREPARE_TIMEOUT_MS = 120000
 
 SCENES = ("code", "quizzes")
-# The two Swift figures stay owed until their 2x picture is taken (Swift runs on
-# Windows since v1.8.6, #570), and no pass here takes them meanwhile.
-NOT_ON_WINDOWS = ("code-swift", "code-swift-live")
 
 # #557: a Windows window capture is never scaled, and stands beside the Mac's
 # 2x capture, so it is taken at exactly 2x: 1280 x 860 DIPs is 2560 x 1720.
@@ -99,8 +97,6 @@ def preview_page_shots(scene: str, only: list[str] | None = None) -> list[dict]:
     for shot in manifest["shots"]:
         capture = shot.get("capture", {})
         if capture.get("kind") != "preview-page" or capture.get("scene") != scene:
-            continue
-        if shot["id"] in NOT_ON_WINDOWS:
             continue
         if only is not None and shot["id"] not in only:
             continue
@@ -447,9 +443,7 @@ def capture_preview_pages(selection: dict[str, list[str] | None], dry_run: bool 
         if only is not None:
             unknown = [identifier for identifier in only if identifier not in [shot["id"] for shot in chosen]]
             if unknown:
-                raise SystemExit(f"Not a Windows {scene} figure: {', '.join(unknown)}"
-                                 + (" (the Swift two stay owed until their 2x picture is taken)"
-                                    if set(unknown) & set(NOT_ON_WINDOWS) else ""))
+                raise SystemExit(f"Not a Windows {scene} figure: {', '.join(unknown)}")
         for shot in chosen:
             if shot not in shots:
                 shots.append(shot)

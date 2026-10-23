@@ -19,6 +19,13 @@ matches the task before writing:
 - **Printable pages** - worksheets, handouts, practice sets, answer keys, or
   any page "students will print", or a page that should hand out an existing
   PDF: the `plantoir-printing` skill (`.claude/skills/plantoir-printing/SKILL.md`).
+- **Handouts made as a PDF** - "make me a worksheet", a warmup, a review
+  sheet, a quiz or test for marks, an answer key or solutions, anything to
+  print and hand out, in any course: the `plantoir-handouts` skill
+  (`.claude/skills/plantoir-handouts/SKILL.md`) - offer its house style
+  first (a LaTeX source, the PDF and its answer key from one file), where
+  the files go, and how every answer is checked. It says when a printable
+  page is the better fit.
 - **Graphs and diagrams** - a graph of a function (a parabola beside its
   parent, two lines meeting), a geometry or similar-triangles figure, a
   number line, a probability tree, a circuit, anything to be "plotted" or

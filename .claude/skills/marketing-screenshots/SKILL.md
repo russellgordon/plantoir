@@ -386,8 +386,8 @@ three it marks both shots `windows: true`, and they come off
 `website/SCREENSHOTS.md` → "Windows Capture" has the whole of it.
 
 **The Code and Quizzes pages, on Windows (#590):** `python
-website/shots/capture_windows.py --code --quizzes` takes the eight figures
-that are not Swift from native previews of `~/School Web Space` (ICS3U) and
+website/shots/capture_windows.py --code --quizzes` takes the ten figures
+from native previews of `~/School Web Space` (ICS3U, and ICS4U for Swift) and
 `~/Teaching` (MCV4U, SCH3U, ENG2D), each put into its state by the Mac's own
 `shots/prepare/<id>.js` and read back against `expectText`. It backs each
 folder's courses up into its `courses/_backups` first, refuses while
@@ -396,8 +396,9 @@ Plantoir is running, and refuses any scale but 2× (a 4K session at 200%);
 nothing to `site/img`. It promotes nothing: `--promote id,id` marks a shot
 `windows: true` once its pictures pass, and the shot comes off
 `WINDOWS_PICTURE_OWED` by hand in the same (release) commit. The Swift two
-are not taken yet: Swift runs on Windows since v1.8.6 (#570), and the two stay
-owed until their 2x picture is taken.
+are taken too since 2026-10-23 (Swift runs on Windows since v1.8.6, #570):
+the first preview of ICS4U after Swift is ready compiles its block, so give
+that preview its minute.
 
 On Windows the `--app` pass makes and states `~/Teaching` itself (#459): the
 `provision` scene makes folders.json's courses through the New Course panel,

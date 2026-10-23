@@ -314,7 +314,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-16 | **Pie chart viewBox re-fit** | `mermaid.inline.ts` | Mermaid centres a pie title on the pie, which the legend pushes leftward, and never widens the chart — the overflow fell outside the viewBox and was clipped. Every pie's viewBox is re-fitted from `getBBox()` after render, so a long title widens the chart instead of losing its first words. |
 | C2-17 | **Pie chart palette** | `mermaid.inline.ts` | Mermaid takes `pie1` from `primaryColor`, which Quartz sets to `--light` — the page background, so the first slice vanished, legend swatch and all. The palette is now SOLVED per colour scheme at render time from that scheme's own accents (contrast-filtered, then farthest-point selection), with `pieOpacity: 1`. Fixed fractions failed 74 of 86 scheme-and-mode combinations, which is why it must stay solved rather than tuned. |
 | C2-18 | **Right sidebar column sharing** | `base.scss` (appended) | On a much-linked page the backlinks crowded out the table of contents. The contents are capped at 50% of the column (only when they have a sibling), the backlinks take the rest, and both lists scroll. |
-| C2-19 | **Google Fonts request filtered** | `quartz/util/theme.ts`, `quartz/components/Head.tsx` | Quartz builds ONE stylesheet request from all three font choices, and this app offers system stacks. Google rejects the whole request if any family is unknown to it — HTTP 400, so NO fonts downloaded, including the code font mermaid measures in. System stacks and families are now filtered out, and an empty request is dropped entirely. |
+| C2-19 | **Google Fonts request filtered** | `quartz/util/theme.ts`, `quartz/components/Head.tsx` | Quartz builds ONE stylesheet request from all three font choices, and this app offers system stacks. Google rejects the whole request if any family is unknown to it — HTTP 400, so NO fonts downloaded, including the code font mermaid measures in. System stacks and families are now filtered out, and an empty request is dropped entirely. The font VARIABLES in the same file are C2-31's. |
 | C2-20 | **mhchem enabled** | `quartz/plugins/transformers/latex.ts` | Adds `import "katex/contrib/mhchem"`, so `$\ce{CaCO3(s) <=> CaO(s) + CO2(g)}$` renders. KaTeX runs at build time here, and the `katex` package Quartz already installs ships the extension, so this downloads nothing. |
 | C2-21 | **Curriculum coverage map styles** | `quartz/styles/base.scss` (appended) | The grid, chips, and the five-step red → orange → yellow → green → blue scale for the generated `Curriculum Coverage` page. The colours are deliberately NOT taken from the course's colour scheme — the map's whole meaning is that ordered reading, and a scheme that recoloured it would destroy that. The scale was SEARCHED rather than picked by eye: `scripts/choose_coverage_scale.py` scores candidates on CIEDE2000 separation and through deuteranopia and protanopia simulation, which is why the top step is blue rather than a darker green — the closest pair an ordinary-sighted reader now sees is ΔE 31, against ΔE 10 before. Cells carry the expectation's code and nothing else: a digit in every cell turned the map into a table of numbers, so the count now reaches a screen reader through the cell's label and a teacher through the hover preview. The legend is a vertical list below a rule, worded "addressed once", "addressed twice", and so on. The ring marking assessed work is two rings — white inside dark — so that it stays legible on all five cell colours; a single tone disappeared on either the yellow or the darkest step depending on which was chosen. The style block is REPLACED rather than skipped when it is already present, so a stylesheet surviving from an earlier build still picks up changes. |
 | C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form — the slug being Quartz's own (`_quartz_segment_slug`: `Q&A Curriculum` is `Q-and-A-Curriculum`; until #569 only spaces were replaced, so a folder named with `&` stayed in every panel). Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
@@ -325,7 +325,9 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-26 | **KaTeX from the site itself (#494)** | `quartz/plugins/transformers/latex.ts`; `quartz/static/katex/` | Quartz v4.5.0's `externalResources` linked `cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css` and `contrib/copy-tex.min.js` on EVERY page (400 links each on a built ICS3U site), while its own lockfile installs **0.16.21** and rehype-katex renders every formula with that at build time — so sites were rendered with one version and styled with another, and the maths depended on a third party and a network. `patch_katex_local` (marker `PLANTOIR-KATEX-LOCAL`, idempotent, independent of C2-20's import) replaces that block with two `additionalHead` functions: `<link rel=stylesheet href="<pathToRoot>/static/katex/katex.min.css" spa-preserve>` and `<script src=".../static/katex/contrib/copy-tex.min.js" defer spa-preserve>`, relative to each page so a site served under a folder finds them, kept across the site's page changes like `index.css`; the 404 page, served at any depth, links from the `baseUrl`'s path (review N6, Head.tsx's own rule). `install_katex_assets` copies the files from Quartz's own `node_modules/katex` every build (05 → Runnable code, step 4): the stylesheet (23,352 bytes), copy-tex (1,673), the **20 woff2 faces** (259,792) and the MIT licence — 284,817 bytes on EVERY site, woff2 only because every browser that can run a site's code takes woff2 first. Netlify's CSP loses `https://cdn.jsdelivr.net` by itself (07). **Rejected:** gating it per site on maths (Python cannot tell maths the way remark-math does — `$` in prose, currency — and a wrong guess breaks every formula silently; the cost is about 2% of Pyodide, uploaded once by content hash); all three font formats (1.10 MB); inlining the CSS into index.css (a generated SCSS file from node_modules every build); absolute `/static/katex/` (breaks a folder published under a subpath). **The print path had to follow** (#455 review S1): a link kept across page changes keeps its RELATIVE href, which then resolves against the new page — one folder off. print.inline.ts now takes every stylesheet for the print frame from the address the sheet was really fetched from (`link.sheet.href`), which fixed the same latent fault in its `index.css` lookup; measured by `browser-checks/maths_offline.mjs`: with the old code a handout printed after a page change from the top of the site to a page one folder down got a 404 KaTeX stylesheet (0 rules), now 249 rules. **The regression the plan expected did not happen:** a folder publish OPENED AS A FILE was expected to lose KaTeX's faces in Chrome (an opaque origin); measured 2026-10-17, Chrome for Testing 155 and Safari 26.6 both loaded `KaTeX_Main` and `KaTeX_Math` from `static/katex/fonts/` beside a page opened from disk, so the maths keeps its look offline from a file too (it used to need the network for the CDN). |
 | C2-27 | **A folder page's table of contents (#520)** | `quartz.layout.ts` | `_wire_list_page_toc`, one of `wire_quartz_additions`' edits, puts `Component.DesktopOnly(Component.TableOfContents())` — the content layout's own — in `defaultListPageLayout`'s right column, which is `[]` in v4.5.0, and touches nothing else. Quartz renders every `folder/index.md` with that layout (and the tag pages), so a curriculum folder's index with `enableToc: true` and five headings of its own showed no table of contents: the data was computed and placed nowhere. Quartz's own rule then decides, as on any page — shown by default, `enableToc: false` hides it, and only with two or more headings of depth 3 or less on the page itself — so tag pages and folder pages with no headings of their own are unchanged. Measured on the #520 plan by editing a built layout and re-running Quartz: the curriculum index showed "Navigate this page" with its strand headings, while `Concepts/index`, `tags/A1` and the front page stayed at 0; expectation pages had shown a table of contents all along. Idempotent, every build; a list layout of another shape warns and is left alone. **Chosen** (ruling Q2 on the plan): on every folder page with the headings, as Quartz does on every other page — 49 of 1,009 folder index pages across `support/` show one, 9 of them without having asked. **Rejected:** only on folder pages that say `enableToc: true` (a wrapper component of our own, and a rule unlike every other page's). `scripts/test_folder_page_toc.py` drives it through `wire_quartz_additions`; verify.sh 6h reads EXC2O's built `Curriculum/index.html`. |
 | C2-28 | **Every code block's line numbers, hairline and no ligatures (#585)** | `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, carried into `index.css` by `codeRunner.scss`) | Quartz numbers every highlighted line in a 1rem box with no separator. One gutter style for static blocks and the runnable editor: Quartz's own dimmed colour, the code font, a box `--plantoir-digits` wide (3 from line 100, 4 from line 1000, by CSS), a 1 px hairline in `var(--lightgray)`, no fill; no programming ligatures in any code element, inline code in prose included. On paper the hairline runs down each line past wrapped rows, printed even with a browser's background graphics off. Every site, every page with code - I12 says why and what was measured. |
-| C2-29 | **My Progress under the class folder in the sidebar, and its emitter (#545)** | `quartz/components/scripts/explorer.inline.ts`, `quartz.config.ts`, `quartz/plugins/emitters/index.ts` | `pin_my_progress_in_sidebar` adds, once, an import of `progressRules.pinnedOrder` and one data line rewritten on every build (`{slug, after}`: the page's slug, or `""` when this build made none, and the class folders' slug segments), and loops over `pinnedOrder(orderedTopLevel, …)` — `orderedTopLevel` is a `const` (plan review F1). `_wire_emitters_index` exports `PlantoirProgress`; `_wire_progress_emitter` puts it straight before `Plugin.Assets()`. Every build, idempotent; a script or settings file of another shape warns and is left alone (the page then sorts last, or no manifest is written). Section L. |
+| C2-29 | **My Progress under the class folder in the sidebar, and its emitter (#545)** | `quartz/components/scripts/explorer.inline.ts`, `quartz.config.ts`, `quartz/plugins/emitters/index.ts` | `pin_my_progress_in_sidebar` adds, once, an import of `progressRules.pinnedOrder` and one data line rewritten on every build (`{slug, after}`: the page's slug, or `""` when this build made none, and the class folders' slug segments), and loops over `pinnedOrder(orderedTopLevel, …)` — `orderedTopLevel` is a `const` (plan review F1). `_wire_emitters_index` exports `PlantoirProgress` (and, since #567, `PlantoirSiteSaid`, each export with its own check); `_wire_progress_emitter` puts it straight before `Plugin.Assets()`, and `_wire_site_said_emitter` puts `Plugin.PlantoirSiteSaid()` between the two (05 → "The safety net becomes a folder problem"). Every build, idempotent; a script or settings file of another shape warns and is left alone (the page then sorts last, or no manifest is written). Section L. |
+| C2-30 | **The sidebar scrolls only itself (#611)** | `quartz/components/scripts/explorer.inline.ts` | `patch_explorer_scroll_in_sidebar_only` (marker `PLANTOIR-SIDEBAR-SCROLL`) replaces Quartz's one `activeElement.scrollIntoView({ behavior: "smooth" })` — which scrolled the PAGE as well as the sidebar, 300-600 px down a long page as it opened — with a scroll of the sidebar's own list: none when the current page's entry is inside a closed folder, none when it is already in view, otherwise `scrollTop` set once, at once, centring it. Every build, idempotent, run straight after C2-3's expand-on-navigate patch; a script of another shape warns and is left alone. `patches/explorer.inline.ts` keeps Quartz's line (A2 unchanged). Section O. |
+| C2-31 | **Font stacks quoted one family at a time, and the system-font choice on the system stack (#629)** | `quartz/util/theme.ts` | Quartz's `joinStyles` wrote `--bodyFont: "<choice>", <fallback>`, quoting the WHOLE choice, so the "System fonts" choice — stored as `"Helvetica, Arial"` by both apps and `setup_course.py` — became ONE family of that name, which no machine has. The browser fell through to the fallback's `system-ui`: Chrome's platform-font query (`CSS.getPlatformFontsForNode`, Chrome for Testing 155.0.8059.39, this Mac, 2026-10-22/23) reports `.SF NS` (San Francisco), so Helvetica was never shown. **Russell's ruling (2026-10-22): those sites keep looking as they do** — San Francisco on a Mac, Segoe UI on Windows. So `patch_font_variable_stacks` adds `cssFontStack`: each family is quoted on its own, CSS keywords (`serif`, `system-ui`, `-apple-system`…) are left bare, and the system choice gets Quartz's fallback ALONE (`system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, …`), which puts system-ui and Segoe UI ahead of Helvetica and Arial. Measured: the same query reports `.SF NS` for the old and the new stack. A single family comes out byte for byte as before, so a Google-font site's stylesheet does not change (`scripts/test_font_variables.py` runs the patched TypeScript under node and compares). Every build, idempotent, anchored on the three v4.5.0 lines (each must match once) and warning without editing anything otherwise; the helper is a RAW Python string, because `/["\\]/g` in an ordinary one loses a backslash and every course's build fails on an unterminated regular expression (caught in review; the test pins the text). **Rejected:** quoting each family with Helvetica first, as the planner first proposed — measured to render Helvetica, a visible change to every system-font site that Russell turned down; changing the STORED value (to `"system-ui, Helvetica, Arial"` or similar) — every existing `course_config.json`, the Windows catalogue, the contract cases in `shared-rules.json`, the mac goldens, `setup_course.py`'s detection, C2-19's filter and `social_card.py` all key on the literal, and old folders would still carry the old one, so the build is the one place that fixes all of them; Python writing the stacks as literals into `theme.ts` — typography lives in `quartz.config.ts` (C1-11, full rebuild only), so two sources could disagree; editing Quartz's `DEFAULT_SANS_SERIF`, which buys nothing. Not affected: the Google request (C2-19 already drops stacks), the printed page (#499's `print.scss` sets its own font variables), the social card. The label for the choice now says "System fonts (each device's own)" in the mac app and in `setup_course.py`, and the mac's font editor previews it in the system font rather than Helvetica. **Windows inherits the CSS free** (shared `build_site.py` against its bundled Quartz v4.5.0; a different `theme.ts` would only warn) and owes the same label, on its own issue. |
 
 ### C3. Content-level transformations (every build)
 
@@ -689,12 +691,70 @@ answer toggles the same class; plan finding C). On Print:
    fixture's 30-line displayed formula on LANDSCAPE paper (taller than the
    6.85 in content box; a formula is one line box and cannot split) and
    passed it on portrait; the fixture now carries 20 lines.
-6b. `print()`; restored again when `print()` returns, in case a browser never
-   sends `afterprint` (review N4). That is right where `print()` waits for the
-   dialog to close — Safari, Chrome and Edge, measured — and UNMEASURED in
-   Firefox, where a `print()` that returned at once would take the frame away
-   mid-print. `afterprint` restores the theme and removes the frame (measured
-   in Safari: Cancel fires it too; the page came back dark with no frame).
+6b. `print()`, and the page put back only once the print is known to have
+   happened (#576, v1.9.0; the rule is `printOutcome` in `printRules.ts`, its
+   cases `shared-rules.json` → `printablePages.printRequest`). **`print()`
+   does not always print before it returns**, and the old step — restore the
+   moment it returns, in case a browser never sends `afterprint` (review N4)
+   — took the frame away before WebKit's print in the fallback. What each
+   browser does, measured:
+   - Safari's paged path, Chrome and Edge: `print()` blocks with the dialog up
+     (8.6 s until Cancel, Safari) and sends `beforeprint` and `afterprint`
+     inside it. **Safari sends both to the PAGE's window, never to the
+     frame's** (0 of 8 sheets), so the old `afterprint` listener on
+     `frame.contentWindow` never fired there; only the restore after the
+     return put Safari back. Cancel fires `afterprint` too.
+   - Headless Chrome for Testing 155: `beforeprint` on the FRAME's window,
+     synchronously inside `print()`, and never `afterprint` (3 of 3, plan
+     review).
+   - WebKit asked to print a frame still loading a face or a picture:
+     `print()` returns in 0 ms, sends nothing, and prints when the frame has
+     loaded — if the frame is still there. Safari 26.6 on the fallback:
+     `print()` called ~90 ms after the press with `fonts.status` "loading",
+     frame removed 3 ms after it returned, no sheet (3 of 3, any page size);
+     with the frame's removal suppressed, the sheet opened **39 ms later**.
+   So `beforeprint` and `afterprint` are heard on BOTH windows, and
+   `printablePages.words.preparing` goes on `beforeprint` (not before
+   `print()` is called). When `print()` returns having sent either event, the
+   page is put back at once — waiting for an `afterprint` headless Chrome
+   never sends would hold the button. When it returns having sent neither,
+   the frame stays and the page waits for the rest of the budget:
+   `afterprint` puts it back, `beforeprint` alone keeps it waiting (its sheet
+   may be up), and when the wait ends it is put back — saying
+   `printablePages.words.couldNotPrepare` only if no `beforeprint` ever came.
+   That wait is what is left of the budget but **never less than 3 s**
+   (`PRINT_LAST_WAIT_MS`, `printRequest.lastWaitMs`), so a print WebKit put
+   off just as the budget ran out is not cut off at 0 ms (implementation
+   review); "Preparing to print…" can therefore last up to 33 s.
+   **One budget, 30 s from the press** (`PRINT_BUDGET_MS`, `printRequest.budgetMs`),
+   bounds every wait that could otherwise never end, on BOTH paths, not a
+   chain of limits (`printRequest.budgetStages`): the pictures of step 3a (a
+   picture that never arrives used to leave the words up until a reload,
+   #576 comment 2), the print layout's script, `previewer.preview` and the
+   decode of its pictures (the first version of #576 left these out: a
+   layout that never finished still said "Preparing to print…" at 42.6 s,
+   implementation review case W), the fallback's settling (below) and the
+   wait after `print()`. Out of time at any of them, nothing is printed and
+   the button says `couldNotPrepare` (`outOfTimeBeforePrint`); running out
+   in the print layout does NOT fall back to the browser's layout, which
+   would have no time left either. The diagrams' 8 s, the stylesheets' 3 s
+   and the faces' 4 s keep their own caps, inside the same clock. One
+   consequence: a page whose faces were held 7 s took 35 s to reach
+   `print()` on the Paged.js path in Safari (measured before the change) and
+   printed; under the budget it would say `couldNotPrepare` instead (inferred,
+   not measured — in Chrome the same page printed at about 22 s on both
+   versions) — a hold
+   far past anything measured on a real network. `restore()` clears every timer and takes
+   the listeners off the page's window. **The Safari event order for a print
+   WebKit put off was measured on 2026-10-23** (real Safari 26.6, AppleScript-
+   driven, `research/print-safari/FINDINGS.md`): the late print sends
+   `beforeprint` to the PAGE's window 32–36 ms after `print()` returns, the
+   sheet appears, and `afterprint` comes on Cancel; the frame's own window
+   gets neither event in any of 8 sheet runs. So the wait-for-`beforeprint`
+   branch hears a postponed print, and with this change the forced fallback
+   opened the sheet 3 of 3 times (0 of 3 on the old code) while the Paged.js
+   path kept its timing (`print()` at +266/+275 ms against +272/+281 before).
+   Firefox remains unmeasured.
 
 **Fallback:** Paged.js missing or failing → the same frame printed by the
 browser, corners where it prints margin boxes (Chrome, Edge), one count for
@@ -705,6 +765,66 @@ and the console warns once, and the browser check FAILS if the fixture takes
 the fallback. The fallback still prints everything, so it shows no sentence
 to the reader: one telling Safari users their page numbers are missing would
 be wrong in Chrome, which prints them (review S6 considered; REJECTED).
+
+**Until #576 (v1.9.0) the fallback printed NOTHING in Safari** — "Preparing
+to print…", then nothing, 3 of 3 forced runs in Safari 26.6, a small page as
+much as a long one (`research/print-safari/FINDINGS.md`). It called `print()`
+on the frame straight after `index.css` loaded, with the frame's faces still
+loading and, over a real network, its pictures too (2 of 2 pending); WebKit
+put the print off and step 6b's restore took the frame away. Chrome prints
+whatever state the frame is in, which is why it went unseen. Since #576 the
+fallback lays the frame out (which is what asks for its faces) and waits for
+`fonts.ready` and every picture's `decode()` — again while a face is still
+loading — inside the budget, and gives up with `couldNotPrepare`, printing
+nothing, if they have not come by then. Russell's report (#576) came from
+1.7.2, whose fallback was taken after an in-site page change (the relative
+`index.css` href, #494, fixed in 1.8.0): the live page printed on the Paged.js
+path in real Safari on 2026-10-23, directly and from the home page (2 of 2).
+What still reaches the fallback is `paged.min.js` failing to load, or Paged.js
+throwing on some content.
+
+`browser-checks/print_fallback.mjs` (verify.sh 6h) drives it in headless
+Chrome for Testing on the planted `Discussions/Print Fallback Fixture` (one
+folder down, a table of contents, 16 code blocks, two pictures), with
+`paged.min.js` answered 404 and the frame's `print()` replaced by a stand-in
+that answers as a given browser does: (A) pictures held 1.5 s and faces 1 s —
+at `print()` none pending and fonts "loaded"; (B) a print put off — the frame
+still there at a late `beforeprint` on the page's window and put back after
+`afterprint`; (C) a print that never comes — `couldNotPrepare` by the
+budget; (D) pictures that never arrive — `couldNotPrepare`, no `print()`;
+(E) a late `beforeprint` and no `afterprint` — put back quietly by the budget,
+and the button prints again; (F) headless Chrome's own `print()` — put back
+at once; (W) the PRINT LAYOUT never finishing (the stylesheet Paged.js
+fetches never answered once Print is pressed) — `couldNotPrepare` by the
+budget, no `print()`. W failed on #576's first version (2bfee8653: still
+"Preparing to print…" at 34 s) and passed on the fix, by copy-and-restore
+in a scratch build of the ICS3U page (esbuild bundle spliced into a built
+`postscript.js`). A to E each FAILED on the code before #576 (copy-and-restore of
+`print.inline.ts`, 2026-10-23: at the old `print()` fonts were "loading" with
+2 of 2 pictures pending under (A), and "loading" even with nothing held under
+(C) — the Safari finding, reproduced in Chrome's state at the call; the frame
+was gone at (B)'s and (E)'s `beforeprint`; (C) ended saying nothing and (D)
+said "Preparing to print…" at 33 s); (F) is a guard and passed on both. The
+five checks that replace the frame's `print()` to read the handout
+(`print_handout`, `maths_offline`, `code_runner`, `quiz_check`, `task_boxes`)
+send `beforeprint` then `afterprint` from their stand-ins, as a real print
+does; without them the page would now wait out the budget after each and
+then say `couldNotPrepare`.
+
+REJECTED for #576: **a fixed delay before `print()`** — a guess at a race
+(CLAUDE.md), and WebKit's own deferral already waits for exactly the right
+moment if the frame is left alone; **polling the frame's `readyState`** — it
+read "complete" at the call (the frame is written with `document.write`, so
+its load finished long before its faces); **listening on the frame's window
+only** — Safari never fires there; **restoring only on `afterprint`** —
+headless Chrome never sends it, so every print would hold the button for the
+whole budget (plan review); **separate limits per wait** (15 s for pictures,
+15 s for the print) — chained limits add up to a minute of "Preparing to
+print…", so there is one budget (plan review). **safaridriver as the WebKit
+gate** — under automation WebKit skips printing altogether (below), so it
+cannot see a print sheet; the sheet stays a manual check
+(`research/print-safari/safari_print.sh`, which needs Safari's "Allow
+JavaScript from Apple Events" and Accessibility access for the terminal).
 
 ### F4. ⌘P on a printable page
 
@@ -1208,7 +1328,12 @@ Safari does not, and there a pinch zooms the page) — so a plain scroll
   administrator's password) and a restart of the running Safari turn on. Measured: the handout of a
   printable fixture with 11 figures, from dark mode, in all three modes and
   both papers: every piece laid out (29 of 29), none split, lettering
-  rgb(0, 0, 0), the 530 px tree whole.
+  rgb(0, 0, 0), the 530 px tree whole. (Even with remote automation on, it
+  would not show a PRINT: under safaridriver `print()` returns in 0 ms with no
+  event and no sheet, Safari 26.6, measured for #576 —
+  `research/print-safari/FINDINGS.md`. Reading what the page holds at the
+  moment it calls `print()` still works, which is what #597's WebKit leg can
+  carry; its stand-in must send the print events, as the Chrome checks' do.)
 
 **Found in passing, not E1's, and fixed in the same release:** Quartz's own ⌘P on a page that is NOT
 printable used to overlay the sidebar's folder list on page 2 of the paper and
@@ -1413,6 +1538,66 @@ first line and left of it; the current page's
   fails the contrast test (every scheme listed), a `> a:hover` rule fails the
   link test, and the import left out of `concatenateResources` fails the
   carrier test.
+
+**Reading a sidebar that is still arriving, and still moving (#616, #601,
+2026-10-22).** Two races in the browser check, both the check's and neither
+the page's:
+
+- **The wait.** `open()` waited for any `.explorer-ul > li`, and Quartz's
+  `OverflowList` writes one static row, `li.overflow-end`, into every page's
+  HTML, so the wait was over at DOMContentLoaded, before the explorer had
+  drawn anything; with a slow `contentIndex.json` the check failed with
+  `the folder "Tasks" is not in the sidebar` (#616). It now waits for a row
+  that is not `.overflow-end`. That is enough because `setupExplorer` builds
+  the whole tree into one fragment and inserts it in ONE call, so no partial
+  sidebar can be seen. An empty sidebar still fails, with the "did not load"
+  sentence. Rejected: waiting for the planted folder's row (it would turn a
+  real "the folder is not in the sidebar" into a vague "did not load"), and
+  any sleep.
+- **The pairing.** Until #611 (section O), on a full load with no saved
+  `explorerScrollTop`, `explorer.inline.ts` smooth-scrolled the current page's
+  row into view, which moved the WINDOW on a long page (`scrollY` 0 to 476 px
+  over about 360 ms, the row moving 1 to 41 px a frame, sampled per frame,
+  light and dark alike) and slid a CLOSED folder's hidden list (157 px on a
+  one-line page). #601's "0.8 px" miss was one frame of that move, not font
+  metrics: a still dot's middle sits 9.79 px below its line's top, and #601's
+  sat 18.8 px below, 9.0 px off, so the line's bottom edge only happened to be
+  0.8 px away. verify.sh's fixture pages are one line long, so the window
+  could not move there; O2 says why the folder's list sliding as the check
+  opened it is the likelier source. So every geometry reading (the long
+  title's lines, content edge and dot; each page row's first line and dot)
+  now comes from `readInOneFrame`: the row's lines, the dot's box from CDP,
+  the lines again, kept only when the two line readings are identical and
+  the dot is drawn; 20 tries, 100 ms apart, then a failure that says why.
+  **What it proves:** the line and the dot were read within one frame,
+  because the line is read on both sides of the dot and that move only ever
+  went one way. It did not prove the sidebar had stopped, and did not need
+  to: 537 paired reads taken MID-scroll all gave the same 9.79 px offset as
+  a still sidebar (re-run on #616: 102 light and 410 dark mid-scroll pairs,
+  every one 9.79 px). Since #611 that scroll is gone; the pairing stays,
+  because a folder still opens with a .3 s transition that moves the rows
+  below it.
+  **A wait-for-the-scroll-to-end gate was REJECTED for that reason**: it
+  proves nothing the pairing does not, and it cannot defend against a move
+  after the gate. The first fix (f12bd11b1) paired only the every-row loop,
+  kept the step-1 box when a re-read came back empty, and left the
+  long-title block judging that step-1 box against lines read later; all
+  three are gone. Also rejected: the dot from `getComputedStyle(row,
+  "::before").top` (a derived box in place of the browser's own layout,
+  which #515's review chose), `scroll-behavior: auto` injected into the page
+  (changes the page under test), and a wider tolerance (`TOLERANCE` is not in
+  the vertical test, and widening it would hide a real one-line drift).
+- **Must-fail** (copy-and-restore, on the EXC2O copy above, served with
+  `contentIndex.json` delayed): at 600 ms the old check failed 3 of 3 with
+  `the folder "Tasks" is not in the sidebar`, the new one passed 3 of 3
+  (`OK: light 5.63:1, dark 9.45:1, forced colours 10.41:1`, the same at
+  0 ms). A 9 px instant move of the sidebar's list injected at the start of
+  the geometry step: the old check failed 3 of 3 at 0 ms with `the dot's
+  middle (693.9 px) is not beside the title's first line (675.1-693.1 px)`
+  (at 600 ms it fails earlier, on the folder sentence); the new one passed
+  3 of 3 at 0 ms and at 600 ms; a dot really moved 14 px still
+  fails the new one. The injection is not shipped: a test hook in a gate is a
+  second code path.
 
 **On Windows** (#546, 2026-10-16): the same check, unchanged, against a
 native build gave the same `OK: light 5.63:1, dark 9.45:1, forced colours
@@ -1653,9 +1838,13 @@ never shows "isn't on this site yet" for ever because of it. So:
   block above it on the page was never closed (the likeliest cause, review
   N3: the site closes such a fence at the end of its list item, the build's
   reader carries on) — never for a page students cannot see (the
-  transformer applies `patches/publish.ts`'s test). The line is in the
-  build's output only: the transformer runs after the folder checks are
-  said, so it is not a folder problem in the app (a gap recorded on #455).
+  transformer applies `patches/publish.ts`'s test). The transformer runs
+  after the folder checks are said, so since #567 it also RECORDS each such
+  block on the page's `file.data.plantoirSiteDisagreements`, and the emitter
+  `plantoirSiteSaid.ts` says them as ONE folder problem
+  (`runnableCodeShownAsPlainCode`) through `scripts/site_said.py`, on the
+  first build of the process only — 05 → "The safety net becomes a folder
+  problem".
 - both sides split the info string on the SAME separators (`INFO_SPACE`:
   tab, space and Unicode's space separators, NBSP — Option-Space — among
   them; review N2: micromark leaves `python<NBSP>run` all in `lang`, and the
@@ -1771,7 +1960,8 @@ block's first line; add `readonly`, `stdin` or (sparingly) `autorun` after
 it. Write instructions that work whether the page asks as the program runs
 or uses the box ("when it asks, type your name"), never "type in the box".
 Preview and press Run on each block; a block that shows as plain code is
-named on a `plantoir: error:` line. The skill `plantoir-runnable-code`
+named on a `plantoir: error:` line and, since #567, as a folder problem in
+the app (`runnableCodeShownAsPlainCode`). The skill `plantoir-runnable-code`
 (support/agent_guidance) carries the whole of this for an assistant.
 
 **Rejected** (with the reasons above and in 02 and 05): Skulpt; Custom
@@ -1822,7 +2012,8 @@ exists, `data-runner-unready="<reason>"` when the build said why not (then
 Run is off and `words.notReady` shows), and when the key is not listed at
 all - the build's reader and Quartz's read the block differently, or the
 page changed under a running preview - plain code and a `plantoir: error:`
-line with `words.blockNotCompiled` (review S2's safety net, extended).
+line with `words.blockNotCompiled` (review S2's safety net, extended), and
+the `runnableCodeShownAsPlainCode` folder problem since #567.
 
 **The thread** is `static/swift/plantoir-swift-worker.js`, a module worker
 like Python's, with the hand-rolled WASI shim beside it
@@ -3049,9 +3240,10 @@ Not a My Progress rule: any link with a `#heading`. The browser scrolls to
 the heading as soon as the page is laid out, before the runnable code's
 editors, diagrams, maths faces and pictures above it take their size;
 Chrome re-anchors later, Safari and Arc do not (ICS3U: 1,706 px short at
-+1 s). And the sidebar smooth-scrolls its current entry into view, which
-on a long sidebar drags the window too (measured in the check: without the
-fix the heading ended 4,291 px below the window's top). `headingAnchor.inline.ts`
++1 s). And, until #611 (section O), the sidebar smooth-scrolled its
+current entry into view, which on a long sidebar dragged the window too
+(measured in the check: without the fix the heading ended 4,291 px below the
+window's top). `headingAnchor.inline.ts`
 (riding `PlantoirMetaLine` with the other scripts) scrolls to the heading
 again, at once rather than smoothly, whenever the page's column changes size
 (a ResizeObserver — the one settle signal every late piece shares), when the
@@ -3411,6 +3603,123 @@ makes that 358 x 119`). Green three out of three with everything back.
   its bytes arrive the new picture's shape wins (`height: auto`), but at the
   old width. A page edited during the preview, or a picture ADDED during it,
   is sized right. A publish is always a fresh build and is never affected.
+
+## O. The sidebar never moves the page (#611, v1.9.0)
+
+A student opening a long page on a desktop saw it jump down by itself, 300 to
+600 px, as the sidebar drew. Quartz v4.5.0's `explorer.inline.ts` (and
+upstream's `v4` branch today) brings the current page's entry into view on a
+load with no saved sidebar position:
+
+```ts
+const activeElement = explorerUl.querySelector(".active")
+if (activeElement) activeElement.scrollIntoView({ behavior: "smooth" })
+```
+
+`scrollIntoView` with its default `block: "start"` scrolls EVERY scrollable
+ancestor — `overflow: hidden` ones and the document included — and the
+sidebar is `position: sticky; height: 100vh`, so lining a row up with the
+window's top moves the page. On a first visit the entry is usually inside a
+CLOSED folder (height 0; `elementFromPoint` misses it), so it scrolled the page
+and the folder's hidden list toward a row nobody could see. The intended
+scroller is `ul.explorer-ul` (`overflow-y: auto`), the one that scrolls when
+the rows are taller than the sidebar (656 px of rows in 479 on EXC2O).
+
+### O1. The fix
+
+C2-30, `patch_explorer_scroll_in_sidebar_only` in `scripts/build_site.py`,
+replaces that one line: if any `.folder-outer` around the entry lacks `open`,
+nothing scrolls; if the entry is already inside the list's box, nothing
+scrolls; otherwise the list's own `scrollTop` is set ONCE, instantly, so the
+entry sits in its middle. The saved-position branch above it is untouched.
+
+**It runs on every FULL load until the first in-site page change in a
+tab** — a first visit, or a reload with no page change before it, runs it
+again. Quartz saves the list's `scrollTop` in
+`sessionStorage.explorerScrollTop` on every in-site navigation (`prenav`), and
+from then on the restore branch wins, `"0"` included, since a non-empty
+string is truthy.
+
+**Where it goes is the trap.** `patches/explorer.inline.ts` reaches a
+section's Quartz copy only when the scaffold is staged (`if full_rebuild or
+not output_dir.exists()`), and an existing section keeps its copy (checked
+on a real MCV4U section: the old line was still there); on Windows
+`fetch-runtime.ps1` copies it only into a runtime being fetched. A patch in
+the every-build section reaches every existing section on both platforms on
+its next preview, with no full rebuild and no new runtime.
+
+### O2. Measured (2026-10-22, M4 Pro, macOS 26.6, Chrome for Testing 155, EXC2O)
+
+Old code, 1512 × 900 unless said; with the fix every figure below is 0, except the `#heading` row, which is where the heading is.
+
+| Case | `window.scrollY` | closed folder's list `scrollTop` |
+|---|---|---|
+| Long page, its folder closed (a fresh profile: the usual case) | 0 → **476** over ~360 ms, 17 frames | 336 |
+| Short (one-line) page, folder closed | 0 (cannot scroll) | **157** |
+| Long page, folder saved open | **609** (635 on another page) | — |
+| The same, then a page change in the site and back | **787** | — |
+| The same, then reloaded in the tab | **787** (the plan review saw 1,218) | — |
+| Long page, folder saved open, 1024 × 768 | **477** | — |
+| Long page with a `#heading` | the heading's own place (1,187), held there by L7 both ways | — |
+| 390 × 844 (phone, sidebar collapsed) | 0 | 0 |
+
+With the fix, a saved-open long page's entry is centred in the list
+(1512 × 600: entry at 335 px in a list 246-425 px) or the list stops at its
+end (at 900 px: `scrollTop` 177, the most it can be), and a short page whose
+entry is already visible moves nothing. The one-line page's 157 px
+is the likelier source of #601's 9 px in verify.sh: its fixture pages are one
+line long, so the window cannot move there, but the folder's rows slid as the
+check opened it (a folder's list clamps back to 0 once it opens, so the
+lasting damage was always the page's jump).
+
+### O3. The checks
+
+- `scripts/test_explorer_scroll.py` runs the patch on the real
+  `patches/explorer.inline.ts` after C2-3's: replaced once, no
+  `scrollIntoView` left in the block, the saved-position branch kept, braces
+  still balanced, a second run changes nothing, a reshaped file is said once
+  and left alone, and the call sits in the every-build section. verify.sh step
+  0; Windows' `PythonToolchainTests` discovers it. Must-fail: 7 errors on the
+  old `build_site.py` (copy-and-restore).
+- `browser-checks/picture_heights.mjs` phase B: once Picture Fixture has
+  settled on a fresh visit, `scrollY` must be 0.
+- `browser-checks/sidebar_page_marker.mjs`: on the first load of the fixture
+  page, before any folder is opened, 30 animation frames read the most the
+  page and any `.folder-outer:not(.open) > ul` were scrolled; both must be 0.
+- **Must-fail, both browser checks**, on a copy of verify.sh's own built
+  EXC2O site with the fix's compiled block in `postscript.js` put back to
+  Quartz's `scrollIntoView` (the only difference): picture_heights failed with
+  `scrollY 246 px`, sidebar_page_marker with a closed folder's list at
+  `157 px` (Marker Fixture is one line, in a closed folder); the unaltered
+  copy passed both. On the plan's EXC2O copy the sidebar check also caught a
+  long page in a closed folder: `page 476`, `closedList 105`.
+
+### O4. Rejected
+
+- **`block: "nearest"`**: the window stayed at 0 on this fixture, but it
+  still scrolled the closed folder's list (157 / 336 px) and still moves the
+  window whenever the row is outside the viewport.
+- **`scrollIntoView({ container: "nearest" })`**: Chrome-only and recent;
+  students use Safari.
+- **Nearest edge instead of centred**: leaves the entry on the list's bottom
+  edge (measured: bottom 725 px = the list's bottom), under Quartz's 50 px
+  `gradient-active` fade.
+- **Keeping it smooth**: there is nothing to animate from on a fresh load,
+  and a moving sidebar is exactly what #601 and #616 had to wait out.
+- **Editing `patches/explorer.inline.ts` as well**: it reaches only new
+  sections and full rebuilds (and a Windows runtime only when re-fetched), and
+  two copies of the same block would have to be kept in step. Quartz's line
+  stays there, and `test_explorer_scroll.py` fails if it ever changes, so the
+  patch cannot quietly stop applying.
+
+### O5. Not changed here
+
+`patch_explorer_inline_expand_on_navigate` (C2-3) never sets
+`opts.expandOnNavigate`: its first step adds the field to the interface, so
+its second step's guard (`"expandOnNavigate:" not in src`) is then false and
+the options line is skipped. The current page's folder therefore never
+springs open on a page change. Its own issue; fixing it makes an entry in an
+open folder the common case, which this fix already handles.
 
 ## E. Summary: what is *not* customized
 

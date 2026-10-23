@@ -22,9 +22,9 @@ website/shots/windowshot/obj/
 # folder it opens - and this repository is one (it has preview.sh at its
 # root). Their source is support/agent_guidance; a copy here would load the
 # teachers' skills into this repository's own sessions (#454 review N5).
-# The graphs skill (#485 E1) was missed until Windows #496 (2026-10-15).
-.claude/skills/plantoir-printing/
-.claude/skills/plantoir-math-graphs/
+# Every one of them is named plantoir-*, so one pattern covers each skill
+# added there; none of this repository's own skills may start with it.
+.claude/skills/plantoir-*/
 /.agents/
 
 # Release bundles (publish output)

@@ -16,9 +16,9 @@ Two halves:
 1. `support/quartz/components/scripts/printRules.ts` - the file the page's
    own print code imports - is bundled with the scaffold's esbuild and every
    case in `contracts/shared-rules.json` -> `printablePages` (answerCallouts,
-   labels, titleCleaning, pageLabels, curriculumConnection, and since #499
-   questionItems, paper, footer, paperLook, completeness) is run through it
-   in Node. The Python
+   labels, titleCleaning, pageLabels, curriculumConnection, since #499
+   questionItems, paper, footer, paperLook, completeness, and since #576
+   printRequest) is run through it in Node. The Python
    tests cannot reach these: the rule lives in the browser.
 2. Every typed line in `contracts/file-formats.json` -> `pageOptIns` is put
    through the build's own reader (python-frontmatter, after
@@ -129,12 +129,24 @@ for (const c of pages.completeness.cases) {
   const got = rules.mayPrint(c.expected, c.found, c.overflowing)
   if (got !== c.print) failures.push(`completeness ${JSON.stringify(c)}: ${got}`)
 }
+if (rules.PRINT_BUDGET_MS !== pages.printRequest.budgetMs) failures.push(`printRequest.budgetMs: the site waits ${rules.PRINT_BUDGET_MS} ms`)
+if (rules.PRINT_LAST_WAIT_MS !== pages.printRequest.lastWaitMs) failures.push(`printRequest.lastWaitMs: the site waits ${rules.PRINT_LAST_WAIT_MS} ms`)
+if (JSON.stringify(rules.PRINT_BUDGET_STAGES) !== JSON.stringify(pages.printRequest.budgetStages)) failures.push(`printRequest.budgetStages: the site's are ${JSON.stringify(rules.PRINT_BUDGET_STAGES)}`)
+for (const c of pages.printRequest.beforePrintCases) {
+  const got = rules.outOfTimeBeforePrint(c.stage)
+  if (got !== c.outcome) failures.push(`printRequest.beforePrintCases ${c.stage}: ${got}`)
+}
+for (const c of pages.printRequest.cases) {
+  const got = rules.printOutcome(c.moment, c.sawBefore, c.sawAfter)
+  if (got !== c.outcome) failures.push(`printRequest ${JSON.stringify(c)}: ${got}`)
+}
 const count = pages.answerCallouts.cases.length + pages.labels.cases.length +
   pages.titleCleaning.cases.length + pages.pageLabels.cases.length +
   curriculum.headings.length + curriculum.sections.length +
   items.numbering.length + items.partLetters.length + items.columns.length +
   1 + pages.paper.cases.length + pages.footer.cases.length + pages.paperLook.cases.length +
-  pages.completeness.cases.length + pages.paperLook.formulas.cases.length + pages.paperLook.tables.cases.length
+  pages.completeness.cases.length + pages.paperLook.formulas.cases.length + pages.paperLook.tables.cases.length +
+  3 + pages.printRequest.cases.length + pages.printRequest.beforePrintCases.length
 console.log(JSON.stringify({ count, failures }))
 """
 

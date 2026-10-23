@@ -80,12 +80,15 @@ const PROBE = `
       for (const node of change.addedNodes) {
         if (node.tagName !== "IFRAME") continue
         node.contentWindow.print = () => {
+          // A real print sends these (#576): the page puts itself back only once it has seen one.
+          node.contentWindow.dispatchEvent(new Event("beforeprint"))
           const frame = node.contentDocument
           window.__frameSheets = Array.from(frame.querySelectorAll('link[rel="stylesheet"]')).map((link) => {
             let rules = -1
             try { rules = link.sheet ? link.sheet.cssRules.length : 0 } catch { rules = -1 }
             return { href: link.href, rules }
           })
+          node.contentWindow.dispatchEvent(new Event("afterprint"))
         }
       }
     }

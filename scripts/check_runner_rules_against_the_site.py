@@ -23,7 +23,10 @@ Three halves:
    field; and the transformer itself (codeRunner.ts) is run over a page whose
    engine the site does and does not carry, to pin `siteDisagrees`: plain
    code and one `plantoir: error:` line, and no line for a page students
-   cannot see. Since #493 also every `swift.cacheKey` case (the site's
+   cannot see; and (#567) the emitter plantoirSiteSaid.ts after it, which
+   says the blocks the transformer recorded as ONE runnableCodeShownAsPlainCode
+   marker through the build's Python (scripts/site_said.py), once per process.
+   Since #493 also every `swift.cacheKey` case (the site's
    normalising and key), and Swift blocks whose program the build has, could
    not make, or never saw.
 2. Every `pageShapes` case is read by the BUILD's side too
@@ -74,6 +77,7 @@ import toolchain_paths  # noqa: E402
 
 RULE_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunnerRule.ts"
 TRANSFORMER_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunner.ts"
+SITE_SAID_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "emitters" / "plantoirSiteSaid.ts"
 ISOLATION_MJS = toolchain_paths.SUPPORT_DIR / "quartz" / "cli" / "plantoirIsolation.mjs"
 COLOUR_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "components" / "scripts" / "codeRunnerColour.ts"
 RUNNER_SCSS = toolchain_paths.SUPPORT_DIR / "quartz" / "components" / "styles" / "codeRunner.scss"
@@ -96,6 +100,7 @@ import remarkGfm from "remark-gfm"
 import { createHash } from "crypto"
 import { LANGUAGES, runnerFor, findRunners, filled, normaliseProgram, asksFor } from "RULE_TS"
 import { CodeRunnerFences, programKey } from "TRANSFORMER_TS"
+import { PlantoirSiteSaid, forgetWhatWasSaid } from "SITE_SAID_TS"
 import { pageVerdict, headersFor, PAGE_HEADERS, ENGINE_HEADERS, ENGINE_FOLDERS, ALLOWED_HOSTS } from "ISOLATION_MJS"
 
 const rules = JSON.parse(readFileSync(process.argv[2], "utf-8"))
@@ -273,13 +278,147 @@ for (const c of rules.isolation.cases) {
     if (JSON.stringify(got) !== JSON.stringify(want)) failures.push(`the preview's headers for ${address}: ${JSON.stringify(got)}`)
   }
 }
-console.log(JSON.stringify({ count, failures }))
+// What the site found, said as ONE folder problem (#567): the transformer
+// records every block it prints a line for, and the emitter hands them to the
+// build's Python (scripts/site_said.py) on its first emit only. The Python
+// side of this file reads what was printed (siteSaidRuns).
+const siteSaidRuns = []
+{
+  const said = JSON.parse(readFileSync(process.argv[3], "utf-8"))
+  const pages = [
+    ["Units/Loops.md", unclosedPage + "\n```python run\nprint(3)\n```\n", undefined],
+    ["Units/Strings.md", page, undefined],
+    ["Units/Hidden.md", page, false],
+  ]
+  const runs = [
+    { name: "three blocks on two pages, and a hidden page", carried: [], emits: 2 },
+    { name: "nothing disagrees", carried: ["pyodide"], emits: 1 },
+  ]
+  for (const run of runs) {
+    count += 1
+    const site = mkdtempSync(join(tmpdir(), "plantoir-site-said-"))
+    mkdirSync(join(site, "quartz"))
+    mkdirSync(join(site, "content", "Units"), { recursive: true })
+    writeFileSync(join(site, "quartz", "plantoir_code_runner.json"), JSON.stringify({ words, carried: run.carried, limits: {} }))
+    writeFileSync(join(site, "quartz", "plantoir_site_said.json"), JSON.stringify({ ...said, content: join(site, "content") }))
+    for (const [path, text] of pages) writeFileSync(join(site, "content", path), text)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25)
+    process.chdir(site)
+    const lines = []
+    const log = console.log
+    console.log = (line) => lines.push(String(line))
+    const content = []
+    for (const [path, text, publish] of pages) {
+      const tree = parse(text)
+      const file = { value: text, data: { frontmatter: { codeRunner: true, publish }, slug: path.slice(0, -3), relativePath: path } }
+      transform(tree, file)
+      content.push([tree, file])
+    }
+    console.log = log
+    forgetWhatWasSaid()
+    const emitter = PlantoirSiteSaid()
+    const printed = []
+    const ms = []
+    const write = process.stdout.write.bind(process.stdout)
+    for (let index = 0; index < run.emits; index += 1) {
+      const chunks = []
+      process.stdout.write = (chunk) => {
+        chunks.push(String(chunk))
+        return true
+      }
+      const started = performance.now()
+      let emitted = null
+      try {
+        emitted = await emitter.emit({}, content, {})
+      } finally {
+        process.stdout.write = write
+      }
+      ms.push(performance.now() - started)
+      printed.push(chunks.join(""))
+      if (!Array.isArray(emitted) || emitted.length !== 0) failures.push(`plantoirSiteSaid, ${run.name}: emitted ${JSON.stringify(emitted)}`)
+    }
+    process.chdir(home)
+    siteSaidRuns.push({ name: run.name, lines, printed, ms })
+  }
+}
+console.log(JSON.stringify({ count, failures, siteSaidRuns }))
 """
+
+
+def site_said_payload() -> dict:
+    """What the build would write into quartz/plantoir_site_said.json for the
+    Node half's pages, bar `content` (the Node half's own folder)."""
+    return {"python": sys.executable, "script": str(Path(__file__).resolve().parent / "site_said.py"),
+            "course": "ICS3U", "section": 1,
+            "places": {"Units/Loops.md": {"place": "Unit 1/Loops", "source": None},
+                       "Units/Strings.md": {"place": "Unit 1/Strings", "source": None}},
+            "swiftNamed": []}
+
+
+def check_what_the_site_said(runs: list) -> list:
+    """
+    #567: the emitter's output, run by run. Three blocks on two pages are ONE
+    marker, after their three unchanged `plantoir: error:` lines, the hidden
+    page names nothing, the second emit (a preview's rebuild) says nothing,
+    and a site where nothing disagrees never calls Python.
+    """
+    failures = []
+    prefix = contracts.section("shared-rules", "siteHealth", "marker", "prefix")
+    words = contracts.section("shared-rules", "codeRunnerBlocks", "words")
+    python_row = contracts.section("shared-rules", "codeRunnerBlocks", "languages")[0]
+
+    def filled(text):
+        return text.replace("{language}", python_row["displayName"]).replace("{inputCall}", python_row["inputCall"])
+
+    by_name = {run["name"]: run for run in runs}
+    several = by_name.get("three blocks on two pages, and a hidden page")
+    quiet = by_name.get("nothing disagrees")
+    if several is None or quiet is None:
+        return ["plantoirSiteSaid: the Node half did not run every case"]
+    want_lines = [
+        "plantoir: error: Units/Loops.md: python block 1: " + filled(words["blockAfterUnclosedFence"]),
+        # The list item's fence is still open above it too.
+        "plantoir: error: Units/Loops.md: python block 2: " + filled(words["blockAfterUnclosedFence"]),
+        "plantoir: error: Units/Strings.md: python block 1: " + filled(words["blockNotPrepared"]),
+    ]
+    if several["lines"] != want_lines:
+        failures.append(f"plantoirSiteSaid: the transformer's lines changed: {several['lines']}")
+    first = several["printed"][0]
+    markers = [line for line in first.splitlines() if prefix in line]
+    if len(markers) != 1:
+        failures.append(f"plantoirSiteSaid: {len(markers)} markers for three blocks, not one: {first!r}")
+    else:
+        finding = json.loads(markers[0][markers[0].index(prefix) + len(prefix):])
+        check = None
+        for entry in contracts.section("shared-rules", "siteHealth", "checks"):
+            if entry["name"] == "runnableCodeShownAsPlainCode":
+                check = entry
+        expected = check["sentenceForSeveral"].replace("{count}", "3").replace("{course}", "ICS3U").replace("{section}", "1")
+        if finding.get("name") != "runnableCodeShownAsPlainCode" or finding.get("sentence") != expected:
+            failures.append(f"plantoirSiteSaid: the finding is {finding}")
+        detail = finding.get("detail", "")
+        for piece in ("“Unit 1/Loops”, Python block 1, line 6: ", "“Unit 1/Loops”, Python block 2, line 10: ",
+                      "“Unit 1/Strings”, Python block 1, line 1: "):
+            if piece not in detail:
+                failures.append(f"plantoirSiteSaid: the detail does not name {piece!r}: {detail}")
+        if "Hidden" in first:
+            failures.append("plantoirSiteSaid: the hidden page was named")
+        if finding.get("section") != 1 or finding.get("course") != "ICS3U":
+            failures.append(f"plantoirSiteSaid: the finding names {finding.get('course')} {finding.get('section')}")
+    if len(several["printed"]) != 2 or several["printed"][1] != "":
+        failures.append(f"plantoirSiteSaid: a second emit said {several['printed'][1:]!r}")
+    if quiet["lines"] != [] or quiet["printed"] != [""]:
+        failures.append(f"plantoirSiteSaid: a site where nothing disagrees said {quiet['lines']} {quiet['printed']}")
+    if not failures:
+        print(f"plantoirSiteSaid.ts: one finding for three blocks, said once, in {several['ms'][0]:.0f} ms "
+              f"(a second emit {several['ms'][1]:.1f} ms; a site where nothing disagrees {quiet['ms'][0]:.1f} ms)")
+    return failures
 
 
 def run_the_rules_in_node(folder: Path) -> list:
     entry = folder / "runner.mjs"
     entry.write_text(RUNNER.replace("RULE_TS", str(RULE_TS)).replace("TRANSFORMER_TS", str(TRANSFORMER_TS))
+                     .replace("SITE_SAID_TS", str(SITE_SAID_TS))
                      .replace("ISOLATION_MJS", str(ISOLATION_MJS)), encoding="utf-8")
     bundle = folder / "runner.bundle.mjs"
     environment = dict(os.environ, NODE_PATH=str(NODE_MODULES))
@@ -287,10 +426,13 @@ def run_the_rules_in_node(folder: Path) -> list:
                     f"--outfile={bundle}", "--log-level=warning"], check=True, env=environment)
     rules = folder / "codeRunnerBlocks.json"
     rules.write_text(json.dumps(contracts.section("shared-rules", "codeRunnerBlocks")), encoding="utf-8")
-    output = subprocess.run(["node", str(bundle), str(rules)], check=True, capture_output=True, text=True).stdout
+    said = folder / "site_said.json"
+    said.write_text(json.dumps(site_said_payload()), encoding="utf-8")
+    output = subprocess.run(["node", str(bundle), str(rules), str(said)], check=True, capture_output=True,
+                            text=True).stdout
     result = json.loads(output.strip().splitlines()[-1])
     print(f"codeRunnerRule.ts: {result['count']} contract cases run in Node over Quartz's own parser")
-    return result["failures"]
+    return result["failures"] + check_what_the_site_said(result.get("siteSaidRuns") or [])
 
 
 COLOUR_RUNNER = r"""
