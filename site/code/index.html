@@ -120,10 +120,10 @@ for index in range(1, len(names)):
   <p>The program in an editor, with <strong>Run</strong>, <strong>Stop</strong> and <strong>Reset</strong> under it and the output below. Their changes are kept in their own browser for next time; Reset brings back yours. This is <em>Spot the Bug</em>, with the bug found and fixed:</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/code-python-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/code-python-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/code-python-light.webp" type="image/webp">
-      <img src="../img/code-python-light.png" alt="A Python program on a class website's Spot the Bug page, changed so its loop starts at the first name, with Run, Stop and Reset under it, its output — Ali, Bea and Cy, one to a line — and the word Finished."
+      <source srcset="../img/code-python-dark.webp" data-win-srcset="../img/code-python-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-python-dark.png" data-win-srcset="../img/code-python-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-python-light.webp" data-win-srcset="../img/code-python-windows-light.webp" type="image/webp">
+      <img src="../img/code-python-light.png" data-win-src="../img/code-python-windows-light.png" alt="A Python program on a class website's Spot the Bug page, changed so its loop starts at the first name, with Run, Stop and Reset under it, its output — Ali, Bea and Cy, one to a line — and the word Finished."
            width="1392" height="972" loading="lazy" decoding="async">
     </picture>
     <figcaption>Students change the program, press Run, and read what it prints underneath.</figcaption>
@@ -131,10 +131,10 @@ for index in range(1, len(names)):
   <p>A program that asks for input stops at each <code>input()</code> and waits, with its prompt in the output and a place right after it to type the answer. Return sends it and the program carries on. This is <em>Talking to the User</em>, answered once and waiting for its second answer:</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/code-python-live-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/code-python-live-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/code-python-live-light.webp" type="image/webp">
-      <img src="../img/code-python-live-light.png" alt="A Python program on the Talking to the User page, run and waiting: the output shows Player name: Priya, then Minutes practised this week: with 185 being typed in a field right after the prompt, and the line Waiting for your answer under the buttons."
+      <source srcset="../img/code-python-live-dark.webp" data-win-srcset="../img/code-python-live-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-python-live-dark.png" data-win-srcset="../img/code-python-live-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-python-live-light.webp" data-win-srcset="../img/code-python-live-windows-light.webp" type="image/webp">
+      <img src="../img/code-python-live-light.png" data-win-src="../img/code-python-live-windows-light.png" alt="A Python program on the Talking to the User page, run and waiting: the output shows Player name: Priya, then Minutes practised this week: with 185 being typed in a field right after the prompt, and the line Waiting for your answer under the buttons."
            width="1392" height="972" loading="lazy" decoding="async">
     </picture>
     <figcaption>The program stops at each input() and waits. The student types the answer right in the output and presses Return.</figcaption>
@@ -142,10 +142,10 @@ for index in range(1, len(names)):
   <p>An error ends in Python's own traceback, and its line numbers are the ones down the editor's left side:</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/code-python-error-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/code-python-error-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/code-python-error-light.webp" type="image/webp">
-      <img src="../img/code-python-error-light.png" alt="A Python program on the Reading an Error Message page that asked how many hours, was answered abc, and ended in a traceback: line 2, then ValueError: invalid literal for int() with base 10: 'abc'."
+      <source srcset="../img/code-python-error-dark.webp" data-win-srcset="../img/code-python-error-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-python-error-dark.png" data-win-srcset="../img/code-python-error-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-python-error-light.webp" data-win-srcset="../img/code-python-error-windows-light.webp" type="image/webp">
+      <img src="../img/code-python-error-light.png" data-win-src="../img/code-python-error-windows-light.png" alt="A Python program on the Reading an Error Message page that asked how many hours, was answered abc, and ended in a traceback: line 2, then ValueError: invalid literal for int() with base 10: 'abc'."
            width="1392" height="972" loading="lazy" decoding="async">
     </picture>
     <figcaption>Answered abc where it wanted a number. An error names the line in the editor, in Python's own words.</figcaption>
@@ -160,7 +160,7 @@ for index in range(1, len(names)):
     <li>One program runs on a page at a time, and <strong>Stop</strong> ends any of them, a loop that never ends included.</li>
   </ul>
   <p>The first Run on a page takes a moment while Python loads; later Runs start at once, until a program is stopped or another block's Run interrupts it. On paper a runnable block prints as code — the student's own, if they changed it. In Obsidian it stays an ordinary Python block.</p>
-  <p class="availability">On the Mac. The Windows version gets this in a later release.</p>
+  
 </section>
 
 <hr class="rule">
@@ -238,16 +238,16 @@ if let age = Int(ageText) {
   <p>The question with its choices, <strong>Check</strong> and <strong>Show answer</strong>. Checked, it says whether they were right and opens your explanation:</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/code-quiz-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/code-quiz-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/code-quiz-light.webp" type="image/webp">
-      <img src="../img/code-quiz-light.png" alt="A self-check question on a class website asking what a two-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it."
+      <source srcset="../img/code-quiz-dark.webp" data-win-srcset="../img/code-quiz-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-quiz-dark.png" data-win-srcset="../img/code-quiz-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/code-quiz-light.webp" data-win-srcset="../img/code-quiz-windows-light.webp" type="image/webp">
+      <img src="../img/code-quiz-light.png" data-win-src="../img/code-quiz-windows-light.png" alt="A self-check question on a class website asking what a two-line Python loop prints, with the second of four choices picked, the word Right!, and the explanation opened under it."
            width="1392" height="972" loading="lazy" decoding="async">
     </picture>
     <figcaption>A question students check for themselves, with your explanation once they have.</figcaption>
 </figure>
   <p>Every kind of question, in mathematics, chemistry and English too, and how answers are checked: <a href="../quizzes/">Quizzes</a>.</p>
-  <p class="availability">On the Mac. The Windows version gets this in a later release.</p>
+  
 </section>
 
 <hr class="rule">
