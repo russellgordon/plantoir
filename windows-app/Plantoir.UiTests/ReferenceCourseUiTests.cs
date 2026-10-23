@@ -183,7 +183,7 @@ public class ReferenceCourseUiTests
         Assert.NotNull(desktop.FindFirstDescendant(cf => cf.ByName("Remove Course…").And(cf.ByControlType(ControlType.MenuItem))));
         if (!item!.IsEnabled)
         {
-            Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+            Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
             return;   // no Obsidian on this machine: the note is reached only through it
         }
         DrivenApp.PressMenuItem(item);
@@ -224,7 +224,7 @@ public class ReferenceCourseUiTests
         Assert.NotNull(item);
         if (!item!.IsEnabled)
         {
-            Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+            Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
             _output.WriteLine("no Obsidian on this machine: the route is reached only through it");
             return;
         }
@@ -258,13 +258,13 @@ public class ReferenceCourseUiTests
 
         var live = MenuOf("sidebar-ICS3U-section1");
         Assert.NotNull(live("Remove Section…"));
-        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+        Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
         Thread.Sleep(500);
 
         var reference = MenuOf($"sidebar-{Folder}-section1");
         Assert.Null(reference("Remove Section…"));
         Assert.Null(reference("Remove Course…"));
-        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+        Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
     }
 
     private delegate AutomationElement? MenuItemNamed(string name);

@@ -106,7 +106,7 @@ public partial class App : Application
             }
             var last = Plantoir.Core.Models.ToolchainReadiness.LastCopyOf(folder);
             LogDiagnostic($"tools copy finished for '{folder}': {state}, {last?.FilesChanged ?? 0} changed, " +
-                          $"{last?.FilesFailed ?? 0} failed, {(last?.Seconds ?? 0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s" +
+                          $"{last?.FilesFailed ?? 0} failed, {last?.FilesCompared ?? 0} compared, {last?.FilesReadInFull ?? 0} read in full, {(last?.Seconds ?? 0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s" +
                           (last?.Problem is { Length: > 0 } problem ? $" ({problem})" : ""));
         };
 

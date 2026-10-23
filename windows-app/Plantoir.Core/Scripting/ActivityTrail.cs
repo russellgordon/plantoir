@@ -227,8 +227,11 @@ public static class ActivityTrail
         FolderProblemFound,
         /// <summary>
         /// A folder a feature depends on was put back, at the teacher's
-        /// request. Separate from FolderProblemFound: one says something is
-        /// wrong, the other says somebody acted on it.
+        /// request — or, since #584, a section front page's title the BUILD
+        /// put quotes around without being asked (<c>PLANTOIR_REPAIRED:</c>,
+        /// <see cref="Plantoir.Core.Models.BuildRepairReport"/>). Separate from
+        /// FolderProblemFound: one says something is wrong, the other says
+        /// somebody acted on it.
         /// </summary>
         FolderProblemRepaired,
         /// <summary>
@@ -568,9 +571,10 @@ public static class ActivityTrail
         /// #473: the app copied its tools into a working folder in the
         /// background (or could not finish): the folder (redacted), files
         /// brought up to date, files that failed, seconds, and the outcome in
-        /// the sentence. Only when something changed or failed. Windows only:
-        /// the teacher now SEES a banner for this, and the mac mirrors the
-        /// same files with only an os_log line.
+        /// the sentence; since #559 also how many files were compared and how
+        /// many read in full. Written when something changed or failed, or
+        /// any file was read in full to compare it (#559). Both platforms
+        /// since the mac's #476; the counts are Windows-only until #663.
         /// </summary>
         WorkingFolderToolsCopied,
         /// <summary>

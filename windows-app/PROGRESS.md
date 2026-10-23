@@ -12,6 +12,68 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 8d2f1145f — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
+## 2026-10-23 — a driven run leaves the real trail alone, and every key sent down is sent up (#641, #638, v1.8.7)
+
+Branch `issue/641-ui-harness`.
+
+- **#641:** UI tests started with `--state-dir` still wrote "got the working folder ready" lines to the REAL trail.
+  - The writer was the harness's OWN process: `DrivenApp` sets the working folder up in-process, and only the app was redirected. It now redirects itself first.
+  - The window's `plantoir-mcp` is now handed `--state-dir` too (`AppDataRoot.ArgumentsToHandOn` / `StateDirFrom`, pinned by `StateDirHandOnTests`).
+  - `RealTrailUntouchedUiTests` drives both writers. It fails on an added real-trail line that names the run's folder or its one-off course code.
+  - The launchers' refusal lines still bypass it: #664 (both platforms, v1.9.0).
+- **#638:** 24 FlaUI key-downs had no key-up. They are now `Keyboard.Type`, or `using (Keyboard.Pressing(...))` for a held modifier.
+  - `HarnessSourceRuleTests` (plain facts) keeps them out. The one exception, allowed by name, is `PageTablesUiTests.HeldSpace`.
+  - `HeldKeys` releases any key still down. `DrivenApp.Dispose` records it without throwing, and the `HeldKeyLedger` collection fixture fails the cleanup naming the keys and tests. This was seen working when F2 was put back to a bare key-down.
+- **Measured** (i5-8365U, RDP session, other worktrees' unit runs on the PC at times):
+  - Full UI run 1: **101/101**, 51 m 13 s, OpenRecentUiTests and PreviewStartPageUiTests included.
+  - Full UI run 2: **100/101**, 57 m 21 s. `AcceleratorUnderDialogUiTests` failed: "the second window would not close". It failed again in five runs alone, one of them with the F2 change reverted, so it is not this piece. The new dump shows a real WinUI window ignoring `WindowPattern.Close`, not a tooltip; it is recorded as a known flake in `documentation/12-windows-app.md`, and the idle RDP session with LogonUI running is the unproven suspect.
+  - Real trail across both runs and every re-run: **0** lines naming a `plantoir-ui-` folder.
+  - Unit suite: Failed 6, Passed 2989, Total 2995. One was a load timeout that passed alone; five are #614's unimplemented curriculum contract cases.
+- `documentation/12-windows-app.md` → "The flags the app answers" and "A key sent DOWN must be sent UP".
+
+## 2026-10-23 — the tools copy compares by fingerprint (#559, #663)
+
+Branch `issue/559-mirror-timestamps`. The build writes `Toolchain\.hashes` (path, length, UTC ticks, SHA-256); each working folder gets an index under `AppDataRoot\toolchain-index`; a same-length, different-time file is compared by hash when both fingerprints still describe their files, else read as before. The trail line now says "N brought up to date, M compared (K read in full)" and is written when anything was read. Measured (i5-8365U, 16 GB, Windows 11 Pro 26200, warm, 12,909 files) — Debug tree, no rounding: a restamped bundle read 12,909 files in 6.7–10.8 s before, 0 files in 4.5–5.1 s after; rounded down to 2 s as an installed bundle is: 12,909 files in 10.1–10.2 s (156.0 s the first, cold) before, 0 files in 6.1–7.2 s after. Inno rounds installed times DOWN to 2 s, so the manifest side trusts a time up to 2 s below its own (one-sided); `installer.iss` now sets `TimeStampsInUTC=yes` so a clocks change between build and install cannot shift times an hour. The mac's mirror has the same flaw: #663. `documentation/12-windows-app.md` → "Comparing without reading (#559)".
+
+## 2026-10-23 — the plan's checkbox; Working keeps the dialog's height (#655, the mac's #654, v1.8.7)
+
+Branch `issue/655-plan-sheet`. The control under Publish Pages… / Hide Pages…'s plan table is a `CheckBox` (same `menuPlanShowAlready…` words, same id, unticked for every new plan, a second click takes the rows out); `PlanTableLayout.FoldHeight` 36 → 40, the platform's 32-epx checkbox + 4 gap measuring 36, an exact fit with no margin. The mac's second fault (the answer kept the plan's height) was never on Windows: a `ContentDialog` sizes to its content. Windows had a third: Working's one-line spinner SHRANK the dialog (to 184 epx) and the answer grew it again. Working now holds the stage before's height — the content plus the button row, which collapses when Working clears the buttons (the content alone still shrank the box to 342) — after Choose, the later-classes question and the plan, clamped to the window on every resize. REJECTED: dropping the hold on a resize (a minimise and restore mid-publish shrank the dialog to the spinner). Measured, the dialog's box at a 1000 × 698-epx window (x64 Debug, 200% scale; the box from the app's own log in a `--state-dir` run, because UI Automation reads it stale):
+
+| Plan | Choose | Working | Plan | Working | Answer |
+|---|---|---|---|---|---|
+| Publish, 1 change + 4 folded | 769×417 | 769×417 | 769×422 | 769×422 | 769×189 |
+| Hide, 1 change | 769×430 | 769×430 | 769×258 | 769×258 | 769×189 |
+
+Gates: `PageTablesUiTests` + `PlanTableUiTests` 12 of 12 through `run-ui-tests.ps1`; must-fails red (no hold: Working 184; content-only hold: 342). `dotnet test` Failed 7, Passed 2981, Total 2988 — #647's five curriculum cases, `ReferenceMarkerAgreementTests` (another worktree deploying REF at the same moment) and `ObsidianFigureAddOnsTests` (`offerMessage`, not this piece). `documentation/12-windows-app.md` → "The plan's checkbox, and the answer fitted to its sentence (#655, the mac's #654)".
+
+## 2026-10-23 — verify-deploy.ps1: this checkout's recipe, a real first publish, Netlify page addresses (#630, #623, #657)
+
+Branch `issue/657-verify-deploy`.
+
+**#630.** `verify-deploy.ps1` first mirrors its own checkout's launchers and recipe into the working folder's `.toolchain\`. It is a true mirror, as `ToolchainMirror.SyncDirectory` is: stale files are deleted and `__pycache__` is left alone. It rebuilds from scratch only when something changed. `PLANTOIR_RUNTIME` is required and defaults to `windows-app\Vendor\runtime`; a runtime without `vendor\pyodide` is refused. A running Plantoir or plantoir-mcp gets a warning, not a refusal. Each Cloudflare leg waits, for at most 120 s, until production serves the `index.html` it uploaded; a timeout fails.
+
+**#623.** A new flag, `-FirstPublish`, renames the saved surname and the section's site records aside behind a per-path sentinel. It answers with a random surname and restores everything on every exit path. The prompts used to join because, before ConPTY's 30-row screen scrolls, it draws "text, blank line, text" as `…only asked once.\e[8;1HFirst time setup…` and stripping the escape joined the lines. PtyDriver now passes its output through `CursorMoveLineBreaks` first, and gained `--bytes-log`.
+
+**#657.** `Check-PageLinks` runs verify-deploy.sh's own `check_page_links` program on six legs. The folder legs also check that no page carries the marker and that `plantoirPaths` appears exactly 3 times.
+
+**Measured** (i5-8365U, Ethernet):
+- `-FirstPublish`: **167 passed, 0 failed, 0 skipped**. It answered exactly the surname and site-name questions.
+- The plain run against the section's own sites: **166 passed, 0 failed, 0 skipped**.
+- The re-run after the review fixes, `-FirstPublish` again: 166 passed, 0 failed, 0 skipped.
+- Every Netlify and Cloudflare leg: 23 of 23 links answered 200.
+
+New issues: #661 (the app's own console very likely shows the same joins) and #665 (the mac's Cloudflare race). `documentation/12-windows-app.md` → "verify-deploy.ps1".
+
+**Gate:** `dotnet test` Failed 7, Passed 2986, Total 2993. The seven are `dev`'s curriculum-folder and Obsidian-wording cases, plus one `PythonToolchainTests` 3-minute load timeout; a different file timed out when it was re-run alone.
+
+## 2026-10-23 — a folder the course declares in curriculum_folders is curriculum, whatever it is called (#647, the mac's #614)
+
+Branch `issue/647-curriculum-folders`. One rule, `CurriculumRules.IsCurriculum(folderSegments, declared)`, the twin of the mac's `isCurriculum(folderSegments:declared:)`. It sets aside a leading `section<n>` folder (`HowITeachPage.IsASectionFolderName`). A page is curriculum when its first folder equals a declared name (NFC both sides, `OrdinalIgnoreCase`) or any folder contains "curriculum". It is reached through `PagePaths.IsCurriculum(courseDirectory, fullPath, declared)`, where `declared` is required. Every caller now passes `course.Configuration.CurriculumFolders`: `ProtectedFromHiding`, `ReasonToKeep` and the #617 trim, `ReferenceDates`, the Start of Year kinds and count, `CurriculumExpectations`, and `LinkGraph.Unreferenced`. `LinkGraph.Build` keeps the course root and the list, and `LinkGraph.IsCurriculum` is gone. Side fix: the expectations list and the orphan list used to test the FULL path, so a working folder named "Curriculum Work" counted; they read folders inside the course now. All four harnesses read `curriculumFolders`, so the five red contract cases pass with no named gaps. New tests: the accent case and the section folder being set aside. Details: `documentation/12-windows-app.md` → "A folder the course declares is curriculum, whatever it is called (#647, the mac's #614)".
+
+Gates: `dotnet test` Failed 3, Passed 2987, Skipped 0, Total 2990 (16 m 46 s, with another worktree's suite running). None of the three is this piece's:
+- `ObsidianFigureAddOnsTests.TheWordsAreTheContractsWithWindowsOwnTwo` ("wording.offerMessage differs") is red on the base commit too.
+- `ReferenceMarkerAgreementTests.EveryRowAgainstTheRealLauncher` and `test_starting_content_prompts.py` timed out under load and passed when re-run alone.
+
 ## 2026-10-23 — the Code page's Swift pictures on Windows (#590)
 
 Branch `issue/590-swift-pictures`. `preview_pages_windows.py` no longer leaves `code-swift` and `code-swift-live` out (`NOT_ON_WINDOWS` is gone); both were taken at 2x by `capture_windows.py --code code-swift-live,code-swift` (fitted scale 2.000 in a 3840 x 2160 Remote Desktop session at 200%, taskbar showing), read back against `expectText`, promoted to `windows: true`, and taken off `WINDOWS_PICTURE_OWED`; `site.json` → `runnable-swift` is `windows: true`, so the Code page drops its Mac-only line, and its download sentence gives both sizes. The first ICS4U preview compiled its one block in 4.73 s (Swift already ready). `documentation/12-windows-app.md` → "The Code page's Swift pictures (#590)". Gates: `website/test_build_data.py` and `build.py --check`.
@@ -710,9 +772,12 @@ read back (`PublishToFolderUiTests`). Doc 12 → "A test that runs a launcher".
    stale pipe handles into its pseudo-console child; `wsl.exe` then reports
    "the input device is not a TTY". A GUI app is naturally clean; test
    harnesses must get their own console (ShellExecute / `Start-Process`).
-2. **ConPTY soft-wrap duplication.** Re-rendered wrapped lines arrive with the
-   boundary character doubled — hence the runner's 400-column pseudo console,
-   so no real line wraps.
+2. **ConPTY soft-wrap duplication.** A line longer than the screen that wraps
+   on the bottom row while something redraws arrives as two lines, the second
+   starting with the boundary character again. 400 columns turned out NOT to
+   be wider than every real line (a 611-character `PLANTOIR_HEALTH:` line,
+   #662), so the app's runs now get 8,192 (`ConPtyProcess.LauncherColumns`);
+   PtyDriver keeps 400. Doc 12 → "How wide the console is, and why".
 3. **PowerShell 5.1 + `$ErrorActionPreference='Stop'` + wsl stderr.** Any
    redirected call site (`*> $null`) turns wsl's stderr into terminating
    ErrorRecords; the launchers' `docker` wrapper relaxes the preference around

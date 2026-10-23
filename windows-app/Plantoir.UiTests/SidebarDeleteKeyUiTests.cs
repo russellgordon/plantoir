@@ -20,7 +20,7 @@ public class SidebarDeleteKeyUiTests
     private static void PressDelete(DrivenApp app)
     {
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.DELETE);
+        Keyboard.Type(VirtualKeyShort.DELETE);
     }
 
     [UiFact]

@@ -170,7 +170,11 @@ Three consequences that catch people out:
   runs it. What changed on 2026-09-07 is that this is now SAID rather than
   merely true: `.githooks/pre-commit` names it when a commit touches the
   publishing path (a warning; it never blocks), and `RELEASING.md` requires a
-  run with nothing skipped for a release that changes that path.
+  run with nothing skipped for a release that changes that path. Since 1.8.7
+  (#630) it first mirrors its own checkout's launchers and recipe into the
+  working folder and requires `PLANTOIR_RUNTIME`, defaulting it to
+  `windows-app\Vendor\runtime`. A run judges the checkout it was started
+  from, not whatever the folder last received.
 
   **The Python half of `verify.sh` does run here now.** Every shared
   `scripts/test_*.py` file executes inside `dotnet test` via
@@ -284,6 +288,109 @@ native runtime replaced the container. The first two or three stages of most
 progress bars could never be reached, so the bar sat at 0% until a later, real
 marker jumped it forward several steps at once.
 
+### How wide the console is, and why (#662, 2026-10-23)
+
+**The app's own launcher runs get a screen 8,192 columns wide**
+(`ConPtyProcess.LauncherColumns`, passed by `ScriptRunner.Run`). Everything
+else that calls `ConPtyProcess.Start` — PtyDriver, the harnesses,
+`ConPtyRedirectedParentTests` — keeps the 400-column default, deliberately:
+#623's work on reading cursor moves as line breaks (12 → "verify-deploy.ps1",
+`CursorMoveLineBreaks.cs`) reads PtyDriver's output at 400, and widening it
+under that work would change what it measures. Widening PtyDriver is left to
+a later issue if anybody wants it.
+
+**What went wrong at 400.** The first check of #650 on this PC found the
+build's `PLANTOIR_HEALTH:` line for a block of code shown as plain code — 611
+characters — split in two: no dialog, no "found a problem with this course's
+folders (runnableCodeShownAsPlainCode)" trail line, and the JSON's tail in the
+console. The bytes, captured with a node child that does what a real build
+does (Quartz's spinner, `readline.clearLine` + `cursorTo` every 20 ms on the
+current row; `plantoirSiteSaid.ts` blocking in `execFileSync` for ~300 ms and
+then writing the ⚠️ sentence, the detail and the machine line in ONE write):
+the first 400 characters (`…close tha`), a real `CR LF` to scroll the screen,
+`ESC[29;400H` — the cursor back to the LAST column of the row above — and the
+rest of the line starting again from that column's character (`at block…`).
+Every reader strips the cursor move, so it sees two lines, the second starting
+with a repeated character. That is the "boundary character duplicated" the old
+comment in `ConPty.cs` described.
+
+**It needs the screen to be FULL.** With fewer than 30 rows printed, the same
+line at the same width came through whole three times of three; with forty
+lines printed first, it split three times of three. That is why the same line
+written straight to PtyDriver came through whole, and why
+`ConPtyLongLineTests` prints forty lines before the long one: a test without
+them passes at any width and proves nothing. Its control,
+`AtTheOldWidthTheSameLineIsSplit`, holds the fault in view — if it ever fails,
+conhost has changed how it repaints a wrapped line, so re-measure before
+narrowing the screen again.
+
+**Measured, 2026-10-23, Lenovo 20QES70500 (i5-8365U, 16 GB), Windows 11 Pro
+26200, Windows PowerShell 5.1**, three runs per width unless one number is
+given:
+
+| | 400 | 4096 | 8192 | 32767 |
+|---|---|---|---|---|
+| The 611-character line split (node child, full screen) | **3 of 3** | 0 of 3 | 0 of 3 | 0 of 3 |
+| Pseudo console + child start | 53-71 ms | 53-181 ms | 54-65 ms | 55-79 ms |
+| conhost working set, peak | 8.5 MB | 9.1 MB | 10.0 MB | 13.9-14.8 MB |
+| Quartz spinner alone, 3 s | 1.2 KB/s | 1.6 KB/s | 1.5 KB/s | 1.0 KB/s |
+| `deploy.ps1`'s Netlify token call (`Invoke-WebRequest`, a 401 back) | 216-329 ms | 206-227 ms | 202-224 ms | 184-233 ms |
+| Cloudflare's `Invoke-RestMethod` (a 401 back) | 140-188 ms | 135-197 ms | 136-165 ms | 133-135 ms |
+| 10 × `Clear-Host` + 28 coloured lines | 531-770 ms | 833-1610 ms | 945-1088 ms | 2213-2850 ms |
+| Bytes for that whole script | 45-46 KB | 49-51 KB | 51-54 KB | 75-80 KB |
+| 2 MB local download through `Invoke-WebRequest`'s progress (one run) | 86 s, 0.39 MB | 108 s, 3.1 MB | 218 s, 6.5 MB | over 280 s (stopped) |
+| Host errors at any step, or writing one line as wide as the screen | none | none | none | none |
+
+What the table says, and why 8,192 anyway. ConPTY repaints the SPINNER
+cheaply at any width (`ESC[K`, not spaces), so the width costs a build
+nothing. **Windows PowerShell 5.1 does pay for width**: it pads every progress
+frame to the full screen (runs of 4,096 and 16,384 spaces in the captured
+bytes), and a full-screen repaint grows with it too. At 8,192 a 2 MB download
+through `Invoke-WebRequest` took 218 s against 86 s at 400, and ten coloured
+repaints 945-1088 ms against 531-770 ms. **That cost lands on nothing a
+teacher runs:** the launchers draw no progress (no `Expand-Archive`, no
+`Write-Progress`, no download under the app's console), and their only web
+calls — the three tiny API requests in `deploy.ps1` — measured the same at
+every width. A launcher that ever downloads something large through
+`Invoke-WebRequest` should set `$ProgressPreference = 'SilentlyContinue'`
+around it. What 8,192 buys over 4,096 is room: at about 40 characters a page,
+a `PLANTOIR_DATED:` line passes 4,096 at roughly 100 re-dated pages and 8,192
+at roughly 200, and the largest ready-made courses (SPH3U, SCH4U) re-date at
+most 88 class pages per section. 32,767 would buy more room
+at four times 400's repaint time.
+
+**The lengths it has to hold.** A one-block plain-code finding is 531-611
+characters, and the most it names (ten blocks, then "and N more") about
+2,300; `site_said.py` packs every block into ONE finding. But no width is a
+cure: `PLANTOIR_DATED:` names every page the build rewrote and
+`PLANTOIR_MAPS:` every map, with no cap, so a line longer than 8,192 MAY split
+the same way. That is not measured: Python prints those lines before Quartz
+starts its spinner, and whether the split needs the spinner or only a full
+screen and a wrap on the bottom row is not known. The follow-up issue (#666)
+proposes a cap in the shared Python.
+(`PLANTOIR_LINKS_CHECKLIST:` carries counts only, not links.)
+
+**Rejected: joining a split line back together before the readers.** The
+shape is recognisable (a line of exactly the screen's width, then a cursor
+move to its last column), but a joiner would have to see the cursor move
+BEFORE `StripControlSequences` drops it, in two readers that strip first
+(`TranscriptBuilder.Append` and `CollectHealthFindings`); it depends on how
+this one conhost build repaints, which #623 shows is not stable; and guessing
+wrong glues two real lines together. **Rejected: 32,767**, the most a `short`
+allows: the PowerShell numbers above. **Rejected: widening every caller**: see
+PtyDriver, above.
+
+**What a teacher sees.** The console's `TextBlock`
+(`Views/TaskProgressView.xaml`, `ConsoleText`) does not wrap and sits in a
+`ScrollViewer` with a horizontal scroll bar, so a long line that used to arrive
+broken — two lines, the second starting with a repeated letter — now shows as
+ONE line, and the scroll bar reaches further to the right. Machine lines are
+hidden whole as before (`transcriptStripping.machineLines`).
+
+**For the mac, to know only.** Its pseudo terminal is the kernel's, which
+passes bytes through as written and never repaints, so it has nothing to do
+here. Windows' screen is wide for this reason, not out of habit.
+
 ---
 
 ## Scheduled deploys
@@ -368,7 +475,8 @@ problem — **nobody answers a question at 6 a.m.**
   The **folder keeps the name `unanswered`** though it now holds successes.
   Renaming it was implemented and reverted: a task scheduled before that date
   points at a wrapper `.ps1` already on disk that writes the old path, and
-  nothing rewrites that wrapper until the section is scheduled again — so a
+  nothing rewrote that wrapper before bundle 3 (since then it is written
+  afresh at each run, but a task set earlier still runs its own) — so a
   rename costs a second directory read for ever, on pain of the first
   overnight run after an update going silent. A one-line record from such a
   wrapper is still read, as the question it was.
@@ -497,9 +605,66 @@ construction rather than in `OnLaunched`, which is why they compose with
 exactly how far it reaches. It moves everything under
 `%LOCALAPPDATA%\Plantoir` for that run: settings, the breadcrumb trail, the
 startup log, downloaded models, built sites, scheduled-deploy wrappers and
-their finished sentinels. It does NOT move Credential Manager, and it does not
-reach a CHILD process. **Quote the path**: the raw-argument fallback splits on
-spaces.
+their finished sentinels. It does NOT move Credential Manager, and it reaches
+a CHILD process only when the app hands it on. **Quote the path**: the
+raw-argument fallback splits on spaces.
+
+**Three writers missed it until #641 (2026-10-23), and the trail is how that
+was found.** During the 1.8.6 update proof the REAL trail held "got the working
+folder ready — … — C:\Users\…\Temp\plantoir-ui-*\workspace" lines, written
+the evening before by UI-suite runs that had all been started with
+`--state-dir`. What wrote them, and what each does now:
+
+- **The harness's own process. This wrote the line that was seen.**
+  `DrivenApp` sets the working folder up IN-PROCESS
+  (`ToolchainMirror.InitializeWorkspace`, also used for OpenRecent's second
+  folder). That copy goes through `ToolchainReadiness.Ensure`, which writes
+  the line. `AppDataRoot` is per-process, and only the APP had been
+  redirected. **Now** `DrivenApp` calls `AppDataRoot.RedirectTo(stateDir)` on
+  its own process before the copy, so the line lands in the run's own trail
+  through the same resolver the app uses. It is safe because the tests run
+  one at a time ("drives the real app"). One side effect: the copy starts
+  `StartGuidance` on `Task.Run`, and that pass can finish after the NEXT test
+  has re-pointed the static, so its line can land in the next run's trail.
+  It cannot reach the real one. A second side effect, from the same static:
+  after a test's `Dispose` deletes its folder, and after the LAST test, the
+  harness still points at the deleted state folder. A late guidance write in
+  that gap recreates `%TEMP%\plantoir-ui-…\state\Logs\` holding one trail
+  line. That is litter under TEMP, never the real trail, and if it lands
+  before the script's last step `run-ui-tests.ps1` lists it as "Kept this
+  run's files", which is the folder to delete. It was left as
+  is rather than adding a production-side "reset" to `AppDataRoot` for the
+  harness alone. `RealBuildsRoot` reads `%LOCALAPPDATA%` directly and is not
+  moved.
+- **The window's own `plantoir-mcp.exe`**: Section menu backups, rollovers,
+  `LauncherRunner`'s lines. **Now** `McpClient` passes `--state-dir
+  <AppDataRoot.Current>` when the run is redirected
+  (`AppDataRoot.ArgumentsToHandOn`), and the server reads it with
+  `AppDataRoot.StateDirFrom` and applies it before anything resolves a path.
+  Only the space-separated form is read; `--state-dir=<dir>` is not, since
+  nothing writes it. `StateDirHandOnTests` pins both halves. That moves the server's
+  `BuildOutputLocation.BuildsRootFor` fallback and its settings (the
+  Cloudflare account among them) too, while the launchers it runs still build
+  into the REAL root. That is the same split the window already had, so the
+  divergence `AssistWorkspace.LegacyMarkerHomes` describes now holds for the
+  server as well. A server started by an outside door (Claude Code, Codex) is
+  never handed it.
+- **The launchers' own refusal lines** (`Write-TrailLine` in `preview.ps1`
+  and `deploy.ps1`; the mac's `note_on_the_trail`) still use the real path.
+  **Not fixed here**: it is a toolchain change on both platforms, #664
+  (`PLANTOIR_TRAIL_DIR`, trail only, never the builds root). No current test
+  triggers a refusal.
+
+**What a driven run must not touch**, and what now checks it: the real trail,
+settings, startup log, scheduled-deploy wrappers and pending sentinels, and
+Task Scheduler. It MAY touch the real builds root (each run's folder is
+deleted by `DrivenApp.Dispose`) and the Swift home (`%LOCALAPPDATA%\Plantoir\swift`,
+resolved by the launcher's Python). `RealTrailUntouchedUiTests` drives both
+fixed writers (a fresh working folder, then Section ▸ Publish Pages…) and fails
+on any line ADDED to the real trail that names the run's temporary folder or
+its one-off course code. It judges by content rather than byte count because
+this PC is shared: another copy or a scheduled publish may append during the
+run, and those lines are printed for information only.
 
 **The LAUNCHERS are the sharp edge, and they are the exception most likely to
 catch somebody out.** `preview.ps1`, `deploy.ps1` and `setup.ps1` compute the
@@ -881,7 +1046,9 @@ a teacher can see it rather than merely held in a constant.
 carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
 `dotnet test` builds them and runs none of those — only
 `AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
-and need no desktop (bundle 11). The project is in the solution so a SOLUTION build compiles it —
+and need no desktop (bundle 11), and `HarnessSourceRuleTests`, five more that
+keep a bare key-down, a discarded `Keyboard.Pressing` and an unwatched key out
+of the sources (#638). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -892,6 +1059,13 @@ and not reopening it — that part is the teacher's).
 
 It does **not** judge anything visual: colour, contrast, dark-mode legibility,
 how a long name wraps. That is a screenshot pass, not this.
+
+**Some things on screen are not in the UI Automation tree at all** — a
+`ContentDialog`'s box is one (its element is the whole overlay, and the
+rectangles inside it read stale): for those the app logs what it laid out,
+in a `--state-dir` run only, and the test reads the run's `startup.log`
+(`PageTablesUiTests.TheAnswerAfterA…PlanIsFittedToItsSentence`, #655 →
+"The plan's checkbox, and the answer fitted to its sentence").
 
 **One of them now reads a FILE rather than the screen**, and it is worth
 knowing why that belongs here. `MarksPoolRemovalUiTests` removes a folder in
@@ -1008,6 +1182,40 @@ test. `grep -n "\.Click()\|\.RightClick()" Plantoir.UiTests/*.cs` should
 find only the comment in `DrivenApp.cs` that explains why. Built, NOT run
 through the window when this was written (the UI suite needs the whole
 machine; the director schedules it).
+
+### A key sent DOWN must be sent UP: `Keyboard.Type`, never a bare key-down (#638, 2026-10-23)
+
+FlaUI's `Keyboard.Press` sends the key going DOWN and nothing else. Measured
+while fixing #634: `GetAsyncKeyState(VK_SPACE)` still read down 400 ms after
+one. Twenty-four calls in thirteen UI test files never sent the up, for
+Escape, Return, Tab, Down, Delete, F2 and Space. Each left its key held at the
+operating-system level for the REST OF THE RUN, so every later test typed
+into a keyboard with a key already down. That may explain failures seen only
+under the full suite (OpenRecentUiTests and PreviewStartPageUiTests failed in
+the 2026-10-23 full run and passed alone).
+
+- **A key to type is `Keyboard.Type(key)`**, down and up. A key to HOLD
+  around something else (Ctrl-click, Alt held, Shift+Tab) is
+  `using (Keyboard.Pressing(key)) { … }`, which sends the up on dispose, a
+  failing assert included. `PlanTable`'s Shift+Tab had called `Pressing` and
+  thrown the disposable away; it is a `using` now.
+- **`HarnessSourceRuleTests`** (plain facts, no desktop) fails on any
+  `Keyboard.Press(` in the UI test sources. The exception is one method,
+  allowed by name: `PageTablesUiTests.HeldSpace`, which imitates
+  auto-repeat (several downs, then one up in a `finally`) and must keep
+  its release.
+- **`HeldKeys` sweeps for a key held any other way.** It reads
+  `GetAsyncKeyState` for every modifier (generic and left/right, Windows
+  keys included) and every key the suite sends. `DrivenApp`'s constructor
+  releases anything already down, and says so. `DrivenApp.Dispose` releases
+  what the test left down, says so, and RECORDS it. It does not throw:
+  `Dispose` runs in a `using`, and a throw there would REPLACE the test's own
+  exception, so a real failure would be reported as a stuck key. The
+  collection fixture `HeldKeyLedger` (on `DrivesTheRealAppCollection`)
+  throws at the end of the collection instead, and xUnit reports that as a
+  separate cleanup failure naming the keys and the tests that left them. A
+  key a person is holding, or a modifier stuck by a remote-desktop session,
+  reads exactly the same, and the message says so.
 
 ### A test that runs a launcher (bundle 11, 2026-10-01)
 
@@ -1278,7 +1486,12 @@ dialog has never been seen by anybody checking that it works.
    has been deleted — covered by no automated check. Since 2026-09-09 (issue
    #123) it drives every launcher through `PtyDriver` under a pseudoconsole and
    ANSWERS by prompt text, the way the mac's `verify-deploy.sh` has done through
-   `expect` for months.
+   `expect` for months. Questions are only asked when a section has no site
+   yet, so a run reaches them only with `-FirstPublish` (1.8.7, #623). That
+   flag moves the saved surname and the section's site records aside, and
+   that run is the first one able to pass: until then ConPTY's cursor jumps
+   glued each question to the sentence before it (the "verify-deploy.ps1"
+   section further down).
 
    What it still cannot reach is what this section is about: the **dialog**.
    The harness answers the launcher's console questions; a teacher meets a
@@ -3949,12 +4162,18 @@ legacy `curriculum_folder` naming the primary.
 `PLANTOIR_MAPS:` is read from the console (`ScriptRunner`) and from a scheduled
 publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
 `Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
-reader would never see the line. A wrapper written before this keeps its old
-scan until its schedule is set again. `PLANTOIR_MY_PROGRESS:` (#599) rides the
-same three places — the console reader, the record reader and the wrapper's
-scan — and a wrapper written before #599 likewise misses it until the
-schedule is set again ("My Progress: the trail line and the two readers
-(#599)" below).
+reader would never see the line. The wrapper is written afresh by
+`ScheduledRun` at the moment each run starts (since bundle 3), so a deploy
+already scheduled scans for a new marker from its next run, once the
+`Plantoir.exe` it was registered with (`TaskScheduling.RunnerExecutable`) has
+been updated in place, with no need to schedule it again. Only a task set
+before bundle 3 runs its own baked wrapper, once, and misses it.
+`PLANTOIR_MY_PROGRESS:` (#599) and `PLANTOIR_REPAIRED:` (#645) ride the same
+three places — the console reader, the record reader and the wrapper's scan —
+the same way ("My
+Progress: the trail line and the two readers (#599)" below). (This said a
+wrapper "keeps its old scan until its schedule is set again" until
+2026-10-23, which has not been true of a task set since bundle 3.)
 
 The build prints the line from the contract's own prefix
 (`build_site.announce_coverage_maps` reads `coverageMapsBuilt.marker.prefix`
@@ -5165,6 +5384,160 @@ on its own and the window says so); and doing nothing and recording the gap,
 the other answer #484 allowed — the mac waits, and the difference would have
 been one more thing to explain.
 
+### Comparing without reading (#559, 2026-10-23)
+
+**What was wrong.** `ToolchainMirror.SyncFile` trusted a copy when its length
+AND time matched the bundled file. When only the length matched, it read BOTH
+files in full, compared them, restamped the copy, and counted nothing. So the
+cost of a pass followed how many TIMES differed, not how many files changed.
+The release tree's times are git's: the csproj's `Content … PreserveNewest`
+copy keeps each file's checkout time, and the installer keeps the build's. A
+release built from a freshly checked-out tree therefore restamps the whole
+recipe. v1.7.1's `Toolchain\` had 12,759 of 12,783 entries stamped
+2026-10-15 08:51, so the 1.7.1 → 1.7.2 first launch read about 12,700 files
+twice: **131.6 s for 14 changed files**, 102–132 s cold (Defender scanning
+freshly installed files on first open) and 11.2 s warm (Lenovo 20QES70500,
+i5-8365U, 16 GB, Windows 11 Pro 26200; the issue's comment of 2026-10-22 has
+the whole table).
+
+**What it does now.**
+- **The build writes a manifest.** `Toolchain\.hashes` holds one line per
+  bundled file: relative path, length, last-write time in UTC ticks and
+  SHA-256, written by `Plantoir.csproj` → `PlantoirWriteToolchainHashes`.
+  - On Build it writes into OutDir, with Inputs/Outputs, so a Debug build
+    that changed no recipe file only checks times (the second x64 build here
+    wrote nothing).
+  - On Publish it writes in full into `$(PublishDir)Toolchain\`
+    (`PlantoirPublishToolchainHashes`), the way `PublishNativeRuntime`
+    writes the runtime. That is the tree `publish.ps1` packages: the
+    installer takes `{#PublishDir}\*` recursively. Checked on 2026-10-23: a
+    `dotnet publish` to a scratch folder carried 12,909 lines for 12,909
+    recipe files.
+  - It sits at the recipe's root, which is neither a `RecipeRootFiles` entry
+    nor inside a `RecipeFolders` folder, so it is never mirrored.
+- **Each working folder gets an index.** It is the manifest last applied to
+  that folder, with each copy's OWN length and time read back from the disk
+  after stamping (`CopyModificationDate` swallows a failure, so the time is
+  never assumed).
+  - It lives at `AppDataRoot\toolchain-index\<FolderContainers.FolderIdentifier>.hashes`,
+    so the teacher never sees it, it does not travel with a copied folder,
+    and a `--state-dir` run keeps its own. Like `builds\<id>`, one index
+    (about 2 MB) accumulates per folder id and nothing deletes it; accepted,
+    since a working folder is rarely abandoned and the cost is a file.
+  - It is written whole (a temporary file, then a rename), and only when the
+    pass failed nothing and the index changed.
+- **The comparison** (`MirrorPass`). Length and time equal → identical, as
+  before. Otherwise, at the same length:
+  - the manifest still describes the bundled file AND the index still
+    describes the copy → the hashes are compared and nothing is read;
+  - only the manifest is trusted → the copy alone is hashed (one read, not
+    two);
+  - otherwise → both are read, exactly as before.
+
+  A fingerprint is trusted only while its file's length and time still match
+  it. For the INDEX that means the 2 ms `FilesLookIdentical` allows, because
+  its time is the copy's own exact stamp. For the MANIFEST it means a bundled
+  time no later than the manifest's and less than 2 s earlier
+  (`Fingerprint.StillDescribesInstalled`): the installer rounds every file's
+  time DOWN to 2 s (Inno's `TimeStampRounding` default, found by the
+  implementation review: 3,000 of 3,000 files under
+  `%LOCALAPPDATA%\Programs\Plantoir\Toolchain` on a 2 s boundary, against 0
+  of 3,000 in the Debug tree), while the manifest holds the build tree's
+  exact ticks. With the 2 ms check on that side too, the first version of
+  this piece never trusted an INSTALLED bundle, the one case it exists for,
+  and the index never filled. One-sided and under 2 s: a later time, or one
+  2 s or more earlier, is a file that moved on
+  (`AnInstalledBundleWhoseTimesWereRoundedDownIsStillTrusted`,
+  `ABundledFileTwoSecondsOlderThanItsManifestIsNotTrusted`). Nobody edits the
+  bundle in place. So a stale manifest or a copy edited in place costs
+  reads, never a missed copy
+  (`ToolchainFingerprintTests.AStaleManifestDoesNotSkipTheCopy`, where the
+  stale manifest's hash IS the copy's: trusting it would have left the old
+  script in place).
+- **`AgentGuidance`'s skills** go through `SyncDirectory` with no manifest,
+  so they take exactly the pre-#559 path.
+
+**Measured** (same PC, 2026-10-23, warm cache, a scratch working folder
+filled from the x64 Debug build's `Toolchain\`, 12,909 files). The harness
+called `ToolchainMirror.RefreshToolchain` directly. "Before" is the same
+build with the manifest hidden, which is exactly the old code path (and
+exactly what the 2 ms manifest check did to an installed bundle). Three
+runs each, in the order they ran.
+
+*As an installed bundle is* — every bundled file's time rounded DOWN to 2 s
+the way Inno does it (12,909 of 12,909 moved; none was on a boundary
+before). For each run, a "release" restamped the bundle, wrote its manifest
+from the exact times, then rounded it:
+
+| Pass | Before (read both) | After | Read in full |
+|---|---|---|---|
+| A release over a filled folder, rounded bundle | 156.0 (the first, cold) / 10.1 / 10.2 s | **6.4 / 6.1 / 7.2 s** | 12,909 → **0** |
+
+*Debug tree, no rounding* (the first measurements, before the review):
+
+| Pass | Before (read both) | After | Read in full |
+|---|---|---|---|
+| Every BUNDLE file restamped (the release case), index present | 8.2 / 6.7 / 10.8 s | **5.1 / 4.5 / 4.5 s** | 12,909 → **0** |
+| Every `.toolchain` file restamped | 195.5 (the first, cold) / 7.1 / 7.7 s | 9.3 / 6.3 / 11.3 s | 12,909 → 12,909 (the copy only, not both) |
+| Index deleted, bundle restamped | — | 13.2 / 6.6 / 6.1 s | 12,909 (the copy only); the next such pass reads 0 |
+| Ordinary pass (times match): the same code either way | 2.2 s | 0.9–2.1 s | 0 |
+
+Read it carefully, because the warm numbers undersell it.
+- **The release case now reads nothing.** Its remaining ~4.5 s is restamping
+  12,909 copies (one `SetLastWriteTimeUtc` each), not reading.
+- **The cold cost the issue measured was the reads.** 102–132 s, with
+  Defender scanning each freshly installed bundle file on first open. With
+  the manifest, the bundle is not opened at all.
+- **A cold first-launch-after-install could not be reproduced here without
+  a reboot**, so that number is argued from the read count, not measured.
+  The director checks it at the next cut: the first launch's trail line
+  should read "N files brought up to date, M compared in S s", with NO
+  bracket (the "(K read in full)" bracket is left out when K is 0).
+- **A copy whose own time moved is still read.** Nothing can tell it from an
+  edit; with the manifest, though, it is read once rather than twice.
+
+**What the director must check at the cut.** After installing the cut
+build over the previous one, the first launch's `working folder tools
+copied` line should read "N files brought up to date, M compared in S s",
+with no "(K read in full)" bracket (it is left out when K is 0), and
+`startup.log`'s `tools copy finished` should say `0 read in full`. If it
+reads every file, the installed times are not within 2 s below the
+manifest's. Look at one file: `.hashes` holds its UTC ticks, and
+`(Get-Item …).LastWriteTimeUtc.Ticks` holds the installed copy's.
+
+**Why `installer.iss` says `TimeStampsInUTC=yes`.** Inno stores file times
+as LOCAL time by default and converts them back on install. A build made
+on one side of a clocks change (1 November) and installed on the other would
+then shift every file by an hour, and no tolerance covers an hour without
+also trusting a file that really moved. UTC storage has no such seam.
+
+**The zip.** `Compress-Archive` stores DOS times, rounded DOWN to 2 s like
+Inno's, so a copy unpacked from `Plantoir-win-x64.zip` is trusted the same
+way. DOS times are local, though: unpacked in another time zone than the
+build's, every file is hours off, falls back to the old reads, and is only
+slow.
+
+**Rejected:**
+- **Building releases from a tree whose files keep their times (the issue's
+  option a).** It is a release-process promise that breaks silently:
+  director runs use a worktree per stack, any new clone restamps
+  everything, and a branch switch restamps every file it touches. It also
+  does nothing for a copy someone else restamped.
+- **Copying on every time mismatch.** Writing 12.9k files costs more than
+  reading them, with Defender scanning each write.
+- **Hashing the bundle lazily on first launch and caching that.** That IS
+  the cold read.
+- **Keeping the index beside `.toolchain`.** The teacher sees it, and it
+  travels with a copied folder.
+- **Not restamping a copy the hashes show identical.** It would save most of
+  the remaining 4.5 s, but `.toolchain`'s times would no longer be the
+  bundle's, and the build scripts read file times. Deferred until measured
+  cold, not done.
+
+The mac's mirror has the same design and the same flaw
+(`WorkspaceModel.filesLookIdentical` / `syncFile`); GitHub #663 asks it to
+match, counts on the trail included.
+
 ### What was rejected
 
 - **Copy into a temporary folder and rename it into place.** Atomic, but it
@@ -5193,6 +5566,11 @@ been one more thing to explain.
 - **A modal "please wait" dialog.** It would block exactly what the teacher
   can safely do meanwhile (read and edit pages, settings) and is the shape of
   the freeze this fixes.
+- **Trusting length and time alone, and reading both files when only the
+  length matched** — the comparison #473 shipped with. Correct, but its cost
+  follows the bundle's timestamps, and a release built from a fresh tree made
+  it read about 12,700 files twice (131.6 s). Replaced by fingerprints in #559
+  ("Comparing without reading", above).
 - **A contract key** for the banner states: window mechanics are not contract
   (`contracts/README.md`). The state → enabled and state → banner mappings are
   pure functions in Core (`ToolchainReadiness.RefusalFor`, `BannerFor`,
@@ -5203,12 +5581,23 @@ been one more thing to explain.
 `working folder tools copied` (`ActivityTrail.Event.WorkingFolderToolsCopied`;
 `shared-rules.json` → `activityTrail.mustRecord` — `appliesOn: ["windows"]`
 until the mac's #476 wrote it too) is written once per copy that changed or
-failed something, never for the ordinary pass:
+failed something — and, since #559, once per copy that had to READ any file
+to compare it — never for the ordinary pass:
 
 ```
 … · got the working folder ready — 2389 files brought up to date in 5.3 s — C:\…\workspace
-… · could not finish getting the working folder ready — 2 files could not be copied or removed (first: .toolchain\scripts\build_site.py, <its error>), 40 files brought up to date in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
+… · got the working folder ready — 14 files brought up to date, 12889 compared (12745 read in full) in 131.6 s — C:\…\workspace
+… · could not finish getting the working folder ready — 2 files could not be copied or removed (first: .toolchain\scripts\build_site.py, <its error>), 40 files brought up to date, 12860 compared in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
 ```
+
+Since #559 the line says how many files were **compared** with a copy that
+was already there, and in brackets how many of those had to be **read in
+full** to answer; each is said only when it is above 0, so a folder filled
+from nothing reads exactly as it did. The second line above is what 1.7.1 →
+1.7.2 would have written: the old line said "14 files" and nothing about the
+twelve thousand it read twice, which is why #559 took a measurement session
+to explain. Windows-only for now — the mac's line lacks the counts (GitHub
+#663).
 
 Since #477 the scheduled run's own copy writes it with the course and
 section, "got the working folder ready for a scheduled deploy — …", and a
@@ -5221,14 +5610,18 @@ scheduled run gave up), not on the trail: the run's own `scheduled publish
 waited for the course` line carries that.
 
 It does not say "after an update": the same copy fills a folder the picker sets
-up from nothing, and refreshes any stale one. And a pass that changed NOTHING
-but still took more than a second (a slow disk comparing 12,753 files) shows
-the banner and writes no line — which is fine: the banner was true while it
-was up, and a line saying "0 files" on every slow launch would bury the one
-that explains a real copy; the `startup.log` lines below still time it.
+up from nothing, and refreshes any stale one. A pass that changed nothing and
+READ nothing — every file answered by length and time, or by fingerprint —
+writes no line however long the disk took, because a line on every slow launch
+would bury the one that explains a real copy; the `startup.log` lines below
+still time it. A pass that changed nothing but had to read files DOES write
+one since #559 ("0 files brought up to date, 12903 compared (12903 read in
+full) in 11.2 s"): until then the 11.2 s pass #559 measured left no trace at
+all, and the reads are the whole story of a slow first launch.
 
 For a developer, `startup.log` brackets it: `tools copy started for '<folder>'`
-and `tools copy finished for '<folder>': Ready, N changed, M failed, S s`. Time
+and `tools copy finished for '<folder>': Ready, N changed, M failed, C
+compared, R read in full, S s`. Time
 from launch to window is `App.OnLaunched starting` (or `Program.Main starting`)
 to `MainWindow.Activate called`; launch to a usable Preview is the same start to
 `tools copy finished`.
@@ -5495,6 +5888,21 @@ delivered (the dialog kept it); control (no dialog): all four arrived at
 their handlers" (2026-10-15). One of three runs that day failed on its own
 Ctrl+N control ("the second window would not close") and passed twice since,
 alone and paired — recorded as a flake, not chased.
+**It came back on 2026-10-23 (#638's branch) and stayed.** The test passed in
+that branch's first full run (101/101), then failed in the second and in
+five runs alone after it, one of them with F2 put back to the bare key-down,
+so the key change is not the cause. The failure message now lists the
+process's top-level windows, and the dump rules out the tooltip-or-popup
+idea: "Before Ctrl+N the process had 1 top-level element(s); closed:
+[WinUIDesktopWin32WindowClass "Plantoir" 0x25704A2 Window]; the main window
+is 0x3200732. Now: [… 0x25704A2 Window]; [… 0x3200732 Window]". So the right
+window was chosen, a real WinUI window, and UI Automation's
+`WindowPattern.Close` was ignored by it. A UIA probe at the same moment read
+both windows as `ReadyForUserInteraction`, not modal, with no dialog up, and
+the close handler returns at once for a window that is not the last one. The
+PC was an RDP session left idle for hours with LogonUI running, which is the
+suspect but not proven. Not chased further: re-run it with the session in
+use before believing it.
 The neighbouring UI tests the change touches (reference courses, Copy a Page,
 import for reference, Course Settings' Save, the sidebar's names) ran 13 of
 14; `ImportForReferenceUiTests.AnOldWorkingFolderIsImportedShelvedByYearAndLocked`
@@ -5801,8 +6209,11 @@ out, 1 page ticked"; endings carried out, changed nothing, took the last change
 back, took part of the last change back (#550), cancelled at the plan,
 rebuilt, not rebuilt, opened) and
 `SectionMenuBackedUpACourse`. The second is written by the window's
-`plantoir-mcp`, which `--state-dir` does not reach (`AppDataRoot` does not
-cross processes), so a UI test's copy line lands in the PC's own trail.
+`plantoir-mcp`. Until #641 (2026-10-23) `--state-dir` did not reach that
+server (`AppDataRoot` does not cross processes), so a UI test's copy line
+landed in the PC's own trail. The window now hands it on, the line lands in
+the run's trail, and `SectionVerbsUiTests` asserts it there (see "The flags
+the app answers").
 
 **Testing it**: unit — `SectionVerbsTests` (calls, the runner entry, Undo's
 place, the trail, the claim, Rebuild's two answers), `SectionMenuServerTests`
@@ -7363,17 +7774,193 @@ asserted passes, so a clean run should now read 148 passed, 0 failed,
 Netlify ("7 file", 182–239 KiB sent) and 20–29 s to Cloudflare ("Uploaded 7
 files (46 already uploaded)", 400–709 KiB) on Ethernet.
 
-**What the first run also found, not fixed here:** on a FIRST publish (no
-saved surname, a new site) two of the harness's answered prompts failed
-`Assert-OnlyExpectedPromptsWereAnswered`, because the line PtyDriver saw
-joined the sentence before it with no line break: "…It is saved on this
-computer and only asked once.First time setup... what is your last name?
-(letters only):" and "…all users across the world.Enter Netlify site name
-[pyt1o-s1-2026-testing]:" (and in the log, "Saved teacher last name for
-future deploys: testingChoose a Website Address."). The answers were the
-right ones and the publishes succeeded; the anchored patterns are what
-refused them. It predates this piece (nothing here touches `deploy.py`'s
-prompts or PtyDriver) and is #623.
+**What the first run also found** (fixed in 1.8.7, #623, below): on a
+FIRST publish (no saved surname, a new site) two of the harness's answered
+prompts failed `Assert-OnlyExpectedPromptsWereAnswered`. The line PtyDriver
+saw had the sentence before it joined on with no line break: "…It is saved
+on this computer and only asked once.First time setup... what is your last
+name? (letters only):" and "…all users across the world.Enter Netlify site
+name [pyt1o-s1-2026-testing]:". The log showed the same join in "Saved
+teacher last name for future deploys: testingChoose a Website Address.".
+
+#### Why the lines joined, and the fix (#623, 1.8.7)
+
+**Measured with PtyDriver's `--bytes-log`**, which writes each read from
+the pseudo console with ESC, CR and LF made visible. The stub printed
+deploy.py's first-publish lines and asked deploy.py's questions, in four
+ways: on a fresh screen, after 60 lines of filler, and each of those with a
+0.4 s pause between lines. The join happened only on a fresh screen with
+the output arriving in one flush. There, ConPTY draws "text, blank line,
+text" by jumping the cursor rather than with CR LF CR LF:
+
+    [read 283] \e[?25l Timestamp TZ offset: -0400\e[4;1HTeacher Surname.\r\nYour surname is used…\r\nconflicts with other classes. It is saved on this computer and only asked once.\e[8;1HFirst time setup... what is your last name? (letters only): \e[?25h
+
+`TranscriptBuilder.StripControlSequences` removes `\e[8;1H`, and with it
+the only thing that separated the lines. Split flushes, and a screen that
+has already scrolled, both came out as plain `\r\n` with no join. That is
+why most of the old log's blank lines survived and the joins all sat in its
+first 30 rows (ConPty.cs makes the screen 30 rows).
+
+**The fix is narrow and is PtyDriver's alone:**
+`Plantoir.Core/Scripting/CursorMoveLineBreaks.cs`. A cursor position
+(`CSI row;1 H`/`f`, or no column) or cursor-next-line (`CSI n E`) that lands
+in column 1 while the current line has text ends that line. A CR LF goes in
+front of the escape, and stripping goes on as before. An escape cut in half
+by a read is held back until it is whole. PtyDriver puts it in front of BOTH
+the `--raw-log` and the transcript its rules read the `# prompt:` line from.
+Tests: `ParsingTests` → `CursorMoveLineBreaksTests`, built from the measured
+bytes.
+
+**Rejected:**
+- *Tracking rows*, inserting one LF per row skipped so the blank line comes
+  back too. It has to model scrolling and repaints to be right, and getting
+  it wrong duplicates lines. A blank line lost harms no reader of these
+  logs; a joined line broke the run.
+- *Loosening `ExpectedQuestions`*. The anchoring is the safety story.
+- *Changing `StripControlSequences` or the app's `TranscriptBuilder` path*.
+  `ScriptRunner`'s question detection reads the same lines, and
+  `transcriptStripping` pins what the console strips. The app's console
+  very probably shows the same joins in a run's first 30 rows. That is
+  #661, to be confirmed in the window first.
+
+**Accepted cost:** when ConPTY repaints a row in place with `CSI r;1 H`,
+the repainted line now shows up a second time in `--raw-log` and the
+transcript. This was accepted because the `# prompt:` matcher reads only the
+last non-empty line, and `repliedTo` stops the same question being answered
+twice.
+
+#### Running this checkout, with this runtime (#630, 1.8.7)
+
+At the 1.8.5 cut a run from the main checkout gave **59 passed, 89 failed**,
+against a product that was fine. Two things were stale:
+- the working folder's `.toolchain\` dated from a week before, with 79
+  files under `scripts\` that differed from HEAD;
+- with no `PLANTOIR_RUNTIME`, the launchers used the INSTALLED app's
+  runtime, which had no `vendor\pyodide`.
+
+The checks read the checkout's `contracts\`, so the stale mirror read as a
+product failure. The preflight now does three things.
+
+- **Mirrors** the six launchers to the top of the folder, and
+  `ToolchainMirror.RecipeRootFiles` plus `contracts/toolchain.json` →
+  `recipeFolders` into `.toolchain\`. It is a true mirror, as
+  `ToolchainMirror.SyncDirectory` is: files the checkout lacks are deleted,
+  and `__pycache__` is skipped on both sides. The launchers run Python from
+  `.toolchain\`, so deleting its caches made every run count 22 changes and
+  rebuild from scratch: measured on the second run, fixed after it. It
+  copies from the WORKING TREE, because
+  that is what the checks read. A `git archive HEAD` copy would recreate the
+  mismatch whenever the tree has changes. The Result block prints the
+  commit, the count of uncommitted changes and how many files were mirrored.
+  When anything changed, the preview runs with `--full-rebuild`, because
+  some of build_site's edits run only when the scaffold is first copied.
+  *Refusing instead* was rejected: it would hand the person running it the
+  robocopy remedy every time. Mirroring is exactly what the app does to a
+  folder it touches.
+- **Warns, without refusing,** about a running `Plantoir` or
+  `plantoir-mcp`. Either can rewrite `.toolchain\` under the run, but
+  usually serves another folder: a director session runs one of its own.
+- **Requires a runtime.** `PLANTOIR_RUNTIME` defaults to
+  `windows-app\Vendor\runtime` and is exported to the launchers. The run
+  refuses if the runtime has no `manifest.json` or no `vendor\pyodide`.
+
+**The mac's `verify-deploy.sh` is exposed the same way. This is for it to know, and
+to MATCH if it wants to (#665).** It reads the CHECKOUT's `contracts/`
+(`check_engine_folder`'s `toolchain.json`). It builds from the working
+folder's own `.toolchain/`, which it reads for `PREVIEW_RULE_FILE` and the
+launchers run. Nothing refreshes that folder but the app. On the mac the
+image tag hashes `.toolchain/`, so a stale mirror is a stale IMAGE as well,
+which still looks healthy. The cure is the same: refresh the folder's
+recipe from the checkout before judging it.
+
+**Cloudflare propagation** (the second trap at the same cut). Production
+was still serving the previous deployment when the single Cloudflare leg
+was judged: eight failures, all gone two minutes later. Every Cloudflare leg
+now waits until production's front page is byte for byte the `index.html`
+it just uploaded. The folder comes from deploy.py's "Deploying from local
+build:" line. The wait is at most 120 s, and a timeout FAILS rather than
+skips. Comparing against the deployment's own address
+(`<hash>.<project>.pages.dev`) was rejected: on a project's first publish
+that subdomain resolves later than the site does (`Url-FromLog`'s comment).
+
+#### A real first publish: `-FirstPublish` (#623)
+
+Several things are moved aside behind a sentinel,
+`courses\.verify-deploy-first-publish.json`:
+- the saved surname: `courses\.internal\profile.json`, and the old
+  `courses\_secrets\profile.json`;
+- the section's Netlify record (`.netlify_sites\section<N>.json`) and its
+  legacy record (`section<N>\.netlify_site.json`);
+- its Cloudflare record (`.cloudflare_sites\section<N>.json`).
+
+The prompts are answered with a random letters-only surname (`vd` and eight
+letters). Each host therefore gets a NEW site, because deploy.py reuses a
+Netlify site or Cloudflare project that already has the same name.
+
+The originals are only ever RENAMED, to `<path>.verify-deploy-hidden`. The
+move happens inside the run's `try`, after the preflight and the PtyDriver
+build, so the `finally` puts them back on every exit path from then on,
+Ctrl+C included. The sentinel is rewritten after each step and records, per
+path, whether the original was hidden or absent. Restoring deletes what
+stands at a path only when its original is safe beside it or there never was
+one: in either case it is a record deploy.py wrote for the test's site. A
+hidden original is always moved back. If a move fails, the run refuses and
+puts back whatever it had moved; nothing is deleted. A run that is killed
+outright is put right by the next run's preflight, which also notices a
+hidden file the sentinel never got to record. So the course points at its
+own sites again afterwards.
+
+The first version recorded every path before moving anything, then deleted
+whatever stood at each. A failed move would have deleted the course's real
+record (Opus implementation review). The Result block
+lists the addresses published to; for a first-publish run those are sites
+nothing deletes. A plain run asks nothing, so a release needs both runs.
+
+#### The Netlify page-address check (#657, #628)
+
+`Check-PageLinks` runs verify-deploy.sh's own `check_page_links` program.
+It is READ OUT of verify-deploy.sh at run time and written to
+`$work\check_page_links.py`, so the two platforms judge links by one text.
+A PowerShell port would resolve links with .NET's `Uri`, whose escaping
+differs from urllib's exactly where the check looks (`%2C`). It runs with
+the runtime's Python: `-X utf8 -I`, `PYTHONUTF8=1`, and its output read
+from a file, because PowerShell 5.1 reads a child's stdout as ASCII.
+
+It runs six times: on Netlify and Cloudflare alone, and in each pairing.
+Each folder leg also checks two things:
+- the folder carries no `data-plantoir-paths`. That is three legs, a
+  superset of the mac's two.
+- the built `postscript.js` names `plantoirPaths` exactly three times
+  (`Check-ServedCase`). `_wire_served_case` only warns when an anchor has
+  moved, so this is the one place a moved anchor fails anything.
+
+Before these checks were wired in, they were tried against the section's
+existing Netlify site (published before #628). They failed as they should:
+1 of 23 links answered 200, with 22 case 301s and no marker.
+
+**Measured 2026-10-23** (i5-8365U, Windows 11 Pro 26200, Ethernet), from
+this checkout at 11d71b49e, which mirrored 85 files into a folder last
+refreshed 2026-10-15:
+- **The first-publish run: 167 passed, 0 failed, 0 skipped.** It answered
+  exactly two questions, "First time setup... what is your last name?
+  (letters only):" and "Enter Netlify site name
+  [ics3u-s1-2026-vdcbzovnae]:", each on a line of its own. It created
+  `ics3u-s1-2026-vdcbzovnae.netlify.app` and
+  `ics3u-s1-2026-vdcbzovnae.pages.dev`.
+- Every Netlify leg: 23 same-site links, all 23 answering 200.
+- Every Cloudflare leg: 23 links, all 23 answering 200, and the control
+  `/all-classes/unit-4,-day-22` answering 404.
+- Cloudflare production matched the upload after 0–1 s on all three legs.
+- Publishes: Netlify 171 s for the first ("318 file", 20,564 KiB), then
+  208 s ("82 file"). Cloudflare 106 s, then 161 s ("Uploaded 81 files (281
+  already uploaded)"). The PC was running another agent's previews and
+  test suite at the same time.
+- **The plain run straight after, against the section's own sites
+  (`ics3u-s1-2026-gordon`): 166 passed, 0 failed, 0 skipped.** It asked
+  nothing. Every page-link leg read 23 of 23 links answering 200. That
+  Netlify site was published before #628, and on 2026-10-23, before these
+  publishes, it answered 1 of 23. Cloudflare production matched after
+  0–1 s.
 
 ## Runnable Swift on Windows (#570, the mac's #493), v1.8.6
 
@@ -7668,9 +8255,9 @@ longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
 `SwiftGotReady.cs`, in both readers (the console's
 `ScriptRunner.RecordHealthFinding`, and the scheduled publish's
 `ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
-(`TaskScheduling.cs`). A wrapper written before this change keeps no
-`PLANTOIR_SWIFT:` line until that deploy is scheduled again, as for
-`PLANTOIR_MY_PROGRESS:`. Neither event carries `appliesOn`: the mac has
+(`TaskScheduling.cs`). A deploy already scheduled picks the line up from its
+next run, because `ScheduledRun` writes the wrapper afresh each time (see
+`PLANTOIR_MAPS:` above). Neither event carries `appliesOn`: the mac has
 recorded both since v1.9.0 (#635), from the same `PLANTOIR_SWIFT:` line, which
 `preview.sh` prints after building its Swift image (05 → "Recorded on the
 trail, on both platforms"). Its bytes and reasons are worked out by
@@ -7774,10 +8361,9 @@ What Windows owed:
   the `CoverageMapsBuilt` pattern — in the console reader
   (`ScriptRunner.RecordHealthFinding`, and the 8000-character carry guard),
   the scheduled publish's record reader (`ScheduledHealthFindings`) and the
-  wrapper's marker scan (`TaskScheduling.cs`). A scheduled-deploy wrapper
-  written before this change has no `PLANTOIR_MY_PROGRESS:` in its scan, so a
-  scheduled run's line reaches the trail only once that deploy is scheduled
-  again — the same as for `PLANTOIR_MAPS:`. The sentences are
+  wrapper's marker scan (`TaskScheduling.cs`). A deploy already scheduled
+  scans for it from its next run, since `ScheduledRun` writes the wrapper
+  afresh each time; only a task set before bundle 3 misses it, once. The sentences are
   `myProgressBuilt.trailLine.shapes`, "N page(s)" spelled 1 page / N pages.
 - **`include_my_progress` and `success_criteria_headings`**, read-only
   (`CourseConfiguration.IncludesMyProgress(section)`, `SuccessCriteriaHeadings`;
@@ -8007,11 +8593,13 @@ kept by an unpublish, a linked class left as it is, no room for a key),
 `DrawnRows(open)` through the ONE sort: one table, one sort. Opened, the
 folded rows are drawn in that sort among the rows to read — in plan order
 they come where the plan puts them (the pages already right are its last
-group), under any other sort mixed among the rest; never a second list. The disclosure is a borderless
-`ToggleButton` with a chevron, 4 epx under the table, closed for every new plan
-(`sectionVerbPlanAlreadyRight`; its Toggle pattern tells Narrator its state).
-REJECTED: `Expander` (a 48-epx header on a card background, with an animation:
-a second panel where the mac's is a line of the table's — the plan review).
+group), under any other sort mixed among the rest; never a second list. The
+control was a borderless `ToggleButton` with a chevron, 4 epx under the table,
+closed for every new plan (`sectionVerbPlanAlreadyRight`). **Since #655 it is a
+`CheckBox`** with the same words, id and rule — see "The plan's checkbox, and the
+answer fitted to its sentence (#655)" below. REJECTED: `Expander` (a 48-epx
+header on a card background, with an animation: a second panel where the mac's
+is a line of the table's — the plan review).
 
 **Opening it never grows the dialog** (Russell's ruling on the mac): the
 table's height is FIXED at `PlanTable.RowsWhenClosed` — the rows to read,
@@ -8020,8 +8608,8 @@ fewer) — within what the window fits, and the opened rows scroll inside.
 REJECTED: `MaxHeight`, which #548 used: a short list shrinks to its rows and
 grows when the folded ones arrive, which is the mac's measured failure (316 →
 484). The window wins over the five-row floor: on a window that holds two
-rows, two. `PlanTableLayout.For(…, folds)` reserves the disclosure's line
-(`FoldHeight`).
+rows, two. `PlanTableLayout.For(…, folds)` reserves the control's line
+(`FoldHeight`; 36 for the disclosure, 40 for the checkbox since #655).
 
 ### 3. "Resizable": the window is the dialog's resize handle
 
@@ -8070,7 +8658,7 @@ were: the mac's "opens at its old size, which is its minimum".
 
 **Testing it.** Unit: `PageTablesTests` (the fold, its words and its closed
 height; the picker's rows; the widths and columns), `PlanTableTests` (the fit
-with the disclosure, identical to #548 up to 756), `StartOfYearSheetTests`
+with the disclosure — the checkbox since #655 — identical to #548 up to 756), `StartOfYearSheetTests`
 (rows above 756), `ContractTests` (the five keys). Through the window
 (`PageTablesUiTests`, opt-in): the tick rules, Space in Find a Page and the
 table's height across a search, Return and Escape with a row selected, the
@@ -8117,13 +8705,98 @@ XAML root of 565–590 epx; `PageTablesUiTests`, which writes its numbers to
 **UI totals:** `PageTablesUiTests` 6 of 6; with `PlanTableUiTests` 10 of 10;
 `LaterClassesAtDeployUiTests` (3, the new table test among them) and
 `SectionVerbsUiTests` passed in the combined run. Two `PlanTableUiTests` were
-corrected for the fold: they open the disclosure before reading the page
-already visible (`OpenTheFold`, which also checks the table does not move).
+corrected for the fold: they open the disclosure (tick the checkbox, since
+#655) before reading the page already visible (`OpenTheFold`, which also checks the table does not move).
 UI Automation's Expand does not make the menus re-read what is live (a real
 click or Alt does), so the tests open a fresh app per key; and
 `RunSectionVerb` now queues one more `ApplyMenuEnablement` after its dialog
 has finished closing, since `ShowAsync` returns while the dialog is still a
 popup.
+
+## The plan's checkbox, and the answer fitted to its sentence (#655, the mac's #654)
+
+The mac fixed two faults in the Publish Pages… / Hide Pages… plan sheet in
+v1.8.7 (`documentation/09-mac-app.md` → "v1.8.7: one table, one checkbox; the
+answer fitted to its sentence (#654)"). On Windows the first fault was
+there; the second was not (the answer already fitted its sentence); and a
+third, at Working, was — the mac's fix covers it too, because its Working
+never shrinks.
+
+**1. One table, one checkbox.** The control under the plan table is a
+`CheckBox` (`SectionVerbDialog.AlreadyRightBox`), the same
+`menuPlanShowAlready…` words, the same id `sectionVerbPlanAlreadyRight`,
+unticked for every new plan; ticking it adds the pages already right to the
+table ABOVE it through the one sort, and a second click takes them out. A
+disclosure (#634's chevron `ToggleButton`) promised a fold below it that never
+appeared. Nothing about the height rule moved: the table is still counted with
+the checkbox unticked, and ticking it moves neither the table nor the buttons
+(pinned to the pixel by `PageTablesUiTests.ThePlanFoldsThePagesAlreadyRightUntilTheCheckboxIsTicked`,
+which also asserts the control's type is `CheckBox` and that it starts Off).
+
+The checkbox keeps the platform's height. MEASURED (x64 Debug, the test PC at
+200% scale, 2026-10-23): **32 epx tall, 4 under the table, 36 in all** —
+against the disclosure's 27 + 4. Unlike the mac's (7 pt shorter), the line got
+TALLER. `PlanTableLayout.FoldHeight` went 36 → **40**: 36 would have been an
+exact fit with no margin, and a fit that comes out short clips the dialog's
+buttons, which costs more than the one row 40 takes at roughly one window
+height in eight. The UI test now ASSERTS that the measured line fits
+`FoldHeight` (it was a logged note). REJECTED: trimming the checkbox's
+`MinHeight` to keep 36 — the 32-epx row is Fluent's hit target.
+
+**2. The answer is fitted to its sentence — already true here.** A
+`ContentDialog` sizes to its content and `_host` carries only a width, so after
+Go the box shrinks to the one sentence over OK on its own; the mac's fault
+(`SheetGrowsToItsMinimum` only ever grew the window) has no Windows
+counterpart. The width is the host's, set from the window at every stage, so
+it is kept. MEASURED, the dialog's box at a 1000×698-epx window:
+
+| Plan | Choose | Working | Plan | Working | Answer |
+|---|---|---|---|---|---|
+| Publish, 1 change + 4 folded | 769×417 | 769×417 | 769×422 | 769×422 | 769×189 |
+| Hide, 1 change | 769×430 | 769×430 | 769×258 | 769×258 | 769×189 |
+
+**3. Working keeps the height of the stage before it — the fault Windows
+did have.** Working's spinner is one line, so the dialog SHRANK to it (184
+epx) and grew again to the answer: two size changes, and after Choose a third.
+The mac's Working is grow-only, so its sheet changes size once. Now
+`ShowWorking` sets `_host.MinHeight` to the stage before's height — the host's
+`ActualHeight` PLUS the button row's (`CommandSpace`, read from the template
+before the button texts are cleared): Working clears both buttons,
+ContentDialog's "NoneVisible" state collapses that row, and holding the host
+alone still shrank the box by the row (MEASURED: 422 → 342). `SetContent`
+clears the hold for every other stage, so the plan and the answer fit their
+own content. It applies after Choose and after the question about classes
+dated later too (grow-only Working, as the mac; the test asserts the picker's
+417 held at Working as well as the plan's), and to the three page items only
+(gated as `SizeTheHost` is), so Re-date and Make Room are untouched. The hold
+is CLAMPED to what the window leaves room for — the window's height less what
+the box carries outside the host — when Working starts and again whenever the
+window changes size (`ApplyTheHold`), because `ContentDialogMaxHeight` is
+wide open here and a hold past the window would clip the box. REJECTED (the
+implementation review): dropping the hold on a resize, which shrank the dialog
+to the spinner when a teacher minimised and restored the window mid-publish.
+The spinner and its words sit at the TOP of the held space
+(`VerticalAlignment.Top`): stretched, the 20-epx ring centred in the held
+height while the words drew at the top.
+
+**How it is measured.** The dialog's box is not in the UI Automation tree (its
+element is the whole overlay), and the elements inside it misled: the title's
+and the buttons' rectangles read the SAME at the plan and the answer, while a
+picture of the screen showed the box centred and shrunk (258 → 189 epx, which
+is what the app logged). So the app writes the box it laid out — its
+template's `BackgroundElement` — to its diagnostic log whenever the box or the
+content changes size ("Section menu dialog at Plan: box 769x422, …"), and
+once more, after a forced layout, the moment Working starts (a call that
+answers before the next layout pass would otherwise log no Working box at
+all). Only in a `--state-dir` run (`AppDataRoot.IsRedirected`, the UI tests'):
+a teacher dragging the window would otherwise write a synchronous line, and
+walk the dialog's template, on every frame. And
+`PageTablesUiTests.TheAnswerAfterAPublishPlanIsFittedToItsSentence` /
+`…AHidePlan…` read those lines: every Working box equals the plan's (±1), the
+answer is more than 32 epx shorter, the width is equal, and OK is inside the
+window. Must-fails, each run against the Publish test: the hold removed —
+Working 184 against the plan's 422, red; the hold without the button row —
+Working 342, red.
 
 ## One curriculum test, folder segments only (#615), and a linked curriculum page is not "already visible" (#617, the mac's #607)
 
@@ -8163,16 +8836,16 @@ Three edges the predicate now decides on purpose, pinned in
   wrong place; false makes a missed resolve visible in a test instead.
 - **The contract's `isCurriculumPage.cases`** are run through it with a course
   root in front, so the planner and the assistant's list of expectations
-  (`CurriculumRules.IsCurriculumPage`) answer alike.
+  (`CurriculumRules.IsCurriculumPage` then; since #647, below, it goes through
+  `PagePaths.IsCurriculum`) answer alike.
 
-Not changed here: `LinkGraph.IsCurriculum` and `CurriculumRules.IsCurriculumPage`
-still test the folders of whatever path they are given (they take no course),
-and #614 — a curriculum folder renamed to something without the word, read
-from `course_config.json` — landed on the mac first (v1.9.0) and is owed here
-by its `windows` issue: `PagePaths.IsCurriculum` and every caller, including
-these two, have to take the course's declared folders. The rule, what was
-measured and what was rejected are in `10-local-ai-assistant.md` → "A
-curriculum folder is the one the course declares, or one named for it (#614)".
+Not changed by #615, and changed since: `LinkGraph.IsCurriculum` and
+`CurriculumRules.IsCurriculumPage` used to test the folders of whatever path
+they were given, working folder included, because they took no course. #614
+(a curriculum folder renamed to something without the word, read from
+`course_config.json`) landed on the mac first and reached Windows through
+#647, which also put those two onto the one rule. See "A folder the course
+declares is curriculum, whatever it is called (#647, the mac's #614)" below.
 
 **The publish plan (#617).** What the mac decided and why, including what was
 rejected, is `10-local-ai-assistant.md` → "A curriculum page the walk reaches
@@ -8204,6 +8877,111 @@ removed again (copy-and-restore), the #607 case and two
 trail records what a publish or unpublish WROTE. A publish writes the same
 pages as before (#607's reasoning), and an unpublish that now hides one page
 more still says truthfully how many it hid.
+
+## A folder the course declares is curriculum, whatever it is called (#647, the mac's #614)
+
+**What a teacher sees.** A teacher who renames `Curriculum` to `Expectations`
+in Course Settings has the new name written to `curriculum_folders`, and the
+build maps the folder from there. Until #647 the assistant on Windows
+forgot it. Hiding a class took the expectation pages it linked to down with
+it. Get Ready for the Start of the Year drafted them. The curriculum tools
+(`list_curriculum_expectations` and the mentions pair) offered none. A
+publish plan listed them as "already visible". Now the folder is curriculum
+again, everywhere the assistant asks.
+
+**The rule** is the mac's, and the reasons and the rejected options are in
+`10-local-ai-assistant.md` → "A curriculum folder is the one the course
+declares, or one named for it (#614)". On Windows it lives in ONE pure
+function, `CurriculumRules.IsCurriculum(folderSegments, declared)`, the twin
+of `AssistCurriculumMentions.isCurriculum(folderSegments:declared:)`:
+
+1. A leading section folder is set aside first. The check is
+   `HowITeachPage.IsASectionFolderName`: case-sensitive like the mac's
+   `SectionPublishState.isSectionFolderName`, with digits 0–9 only (the mac
+   accepts any Unicode numeric; see the accepted differences below).
+   `GradedFolderChoices.IsSectionFolder` ignores case, so it was not used.
+2. **Declared:** the FIRST folder left equals a declared name. Both sides
+   are `.Normalize()`d (NFC), then compared with `OrdinalIgnoreCase`.
+   Swift's `==` treats a composed é and an e plus a combining accent as
+   equal; C#'s ordinal comparison does not, so without the normalisation a
+   folder typed one way and declared the other would miss.
+3. **By name, kept:** any folder left contains "curriculum", ignoring case.
+4. The file name never counts (#615).
+
+`declared` is `CourseConfiguration.CurriculumFolders`:
+`curriculum_folders`, then the legacy `curriculum_folder`, cleaned by
+`CurriculumFolderRule.Declared`. It is deliberately not intersected with
+`shared_folders` and not resolved against the disk.
+
+**One path in.** `PagePaths.IsCurriculum(courseDirectory, fullPath,
+declared)` makes the page relative to the course and hands its folders to
+the rule. It has the same edges as #615: relative, outside-the-course and
+other-drive paths are false. `PagePaths.IsCurriculum(Course, fullPath)` reads
+the course's list for you. `declared` is a REQUIRED argument everywhere,
+never a default, because a caller that silently passed nothing is exactly
+how a renamed folder lost its protection. The callers:
+
+| Caller | What it decides |
+|---|---|
+| `AssistWorkspace.ProtectedFromHiding` | pages a draft flag must never be set on |
+| `AssistWorkspace.IsCurriculumPage` (planned page) → `ReasonToKeep` and the #617 publish trim | the hide sweep keeps it; the publish plan leaves it out of "already visible" |
+| `AssistWorkspace.ReferenceDates` | rolled-over reference pages dated to the first day |
+| the Start of Year plan's `StartOfYearPages` (`StartOfYearKind.Curriculum`) | never drafted |
+| `PlanReDate`'s `CurriculumCount` (`ReDatePlan`, the mac's `SectionReDatePlanner`) | the curriculum pages a re-date counts on its card |
+| `AssistWorkspace.CurriculumExpectations` | the curriculum tools' list of expectations |
+| `LinkGraph.Unreferenced` → `IsExcludedFromSweep` | `check_section`'s "linked from nowhere" list (plantoir-mcp) |
+
+`CurriculumRules.IsCurriculumPage(relativePath, declared)` is the same rule
+for a path relative to the course. Only the contract harness calls it.
+`LinkGraph.IsCurriculum(path)` is gone. `LinkGraph.Build` now takes the
+`Course` (or its directory and declared list) and keeps both, so
+`IsExcludedFromSweep` can ask `PagePaths` against the course.
+
+**A side fix, from the same move.** `CurriculumExpectations` used to call
+`CurriculumRules.IsCurriculumPage` on a FULL path. So did `LinkGraph`'s sweep
+exclusion. A working folder whose own name held the word (say "Curriculum
+Work") therefore made every page of every course a curriculum candidate for
+the expectations tool (filtered only by its file name looking like `A1.1`).
+It also took every page off `check_section`'s orphan list. Both now read
+folders inside the course only, as the planner already did since #615. The
+mac read course-relative already, so nothing is owed back.
+
+**Harnesses.**
+- `ContractTests.SharedRules_CurriculumRules_MatchesContract` and
+  `CurriculumPredicateTests.TheContractsCurriculumPageCasesHoldUnderACourse`
+  read each case's `curriculumFolders` (absent means none). The second runs
+  every case twice, at the course's top and inside `section1\`, so the
+  section folder is shown to be set aside rather than compared.
+- `FollowingLinksContractTests.WriteConfig` and `StartOfYearTests.LayOut`
+  write `curriculum_folders` into the course's `course_config.json` before
+  the course is read.
+- New: `ADeclaredNameMatchesWhicheverWayItsAccentIsWritten` (the mac's
+  `testADeclaredNameMatchesWhicheverWayItsAccentIsWritten`) and
+  `TheSectionFolderIsSetAsideNotCompared`.
+
+No named gaps were held: the rule landed in the same piece as the cases' first
+Windows run. No trail line changes, because the publish and unpublish events
+carry counts, not reasons. No tool description, schema or wording moved.
+Tool OUTPUT changes, and that is the fix.
+
+**Known, accepted differences.**
+- `OrdinalIgnoreCase` folds case per character (invariant upper-casing),
+  while Swift's `lowercased()` is full Unicode lower-casing. The two can
+  disagree on rare letters (ß against "SS", say) in a folder name.
+- A section folder is `section` plus digits 0–9 on Windows
+  (`HowITeachPage.IsASectionFolderName`). The mac accepts any character
+  Swift calls `isNumber`, so `section١` (an Arabic-Indic one) is a section
+  folder there and the top folder here.
+
+No real course has been seen with either, so no contract case was added.
+
+**A name that cannot be normalised.** NTFS allows a lone surrogate in a
+folder name, and `string.Normalize()` throws `ArgumentException` on one.
+`ProtectedFromHiding` and the `ReferenceDates` loop do not catch around the
+predicate, so a throw there would have failed the whole plan. The rule
+therefore normalises inside a try and falls back to comparing the names as
+they are (`CurriculumPredicateTests.AFolderNameThatCannotBeNormalisedIsComparedAsItIs`).
+
 ## A folder added later, and titles YAML can read (#580, #586; the mac's #506, #575), v1.8.0 / v1.8.1
 
 **What a teacher sees.** A folder added in Course Settings ▸ Content Structure
@@ -8273,9 +9051,16 @@ no Plantoir writer produces. `SiteHealthRepair.RestoreIndex` quotes the course n
 puts back. Courses already made with a plain colon title are put right by
 their next build from 1.9.0 (#584): the shared `build_site.py` quotes the
 front page's title itself, so Windows inherits the repair and its console
-sentence, and owes only the `PLANTOIR_REPAIRED:` trail line —
+sentence. The `PLANTOIR_REPAIRED:` line is read by `BuildRepairReport` in all
+three places a build's output arrives — the console (`ScriptRunner`), a
+scheduled run's record (`ScheduledHealthFindings`, through the wrapper's
+`Select-String` scan) and a run `plantoir-mcp` started (`LauncherRunner`) —
+and written as `folder problem repaired` with `trailLine`; a repair key this
+app does not know writes nothing (#645, `BuildRepairReportTests`) —
 [04 → "A course made before 1.8.1 is put right by its next
-build"](04-course-setup.md).
+build"](04-course-setup.md). `LauncherRunner` also drops every other machine
+line (`TranscriptBuilder.IsMachineLine`) before it reports progress, so no
+`PLANTOIR_` JSON reaches the assistant's progress text.
 
 **Not on disk, on purpose.** The contract's seventh folder case is `Unit 1:
 Kinematics`, and NTFS refuses `:` in a name, so every case runs IN MEMORY
@@ -8907,8 +9692,10 @@ after, the temp vaults' window files removed):
   settings dialog in the main window, and Obsidian opens it in a window of its
   own while a vault leaves `settingsPopoutWindow` at its default, true. The
   sentence telling the teacher to close that window is back at the end of
-  `wording.offerMessage` AND `windowsWording.offerMessage`; Windows owes it in
-  its own wording source (the `windows` issue that #627 opened). The detail is
+  `wording.offerMessage` AND `windowsWording.offerMessage`, and Windows says it
+  too since #656 (`ObsidianFigureAddOnsWording.OfferMessage`, pinned whole
+  against `windowsWording.offerMessage` by
+  `ObsidianFigureAddOnsTests.TheWordsAreTheContractsWithWindowsOwnTwo`). The detail is
   in `documentation/09-mac-app.md` → "Obsidian's add-ons for diagrams and
   graphs (#495)" → "Teacher words".
 - The reopen, with two vaults open, one minimised, a pop-out of the other, and

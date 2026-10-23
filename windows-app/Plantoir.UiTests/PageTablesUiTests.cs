@@ -13,8 +13,10 @@ namespace Plantoir.UiTests;
 /// box ticks it, selecting ticks nothing, Space ticks the selected row exactly
 /// once, Space typed in Find a Page ticks nothing, Return and Escape still
 /// reach Continue and Cancel with a row selected — its height does not move
-/// while the teacher searches; the plan folds the pages already right without
-/// the dialog growing when it opens; and the dialog follows a wider window.
+/// while the teacher searches; the plan folds the pages already right until a
+/// checkbox is ticked, without the dialog growing when they are shown (#655);
+/// the answer after Go is fitted to its sentence (#655); and the dialog
+/// follows a wider window.
 /// Expected words come from <see cref="AssistWording"/>, never typed. Real
 /// keys go to whatever is in front, so each press is preceded by
 /// <see cref="CopyAPageEscapeUiTests.Front"/>, and a row is FOCUSED before a
@@ -62,7 +64,7 @@ public class PageTablesUiTests
                         TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(250)).Result
         ?? throw new Xunit.Sdk.XunitException($"{what} never appeared ({automationId}).");
 
-    private AutomationElement OpenThePicker(DrivenApp app)
+    private AutomationElement OpenThePicker(DrivenApp app, string item = "sectionPublishPages")
     {
         app.SelectSection(Code, 1);
         // The menus re-read what is live when the pointer enters a title or the
@@ -80,7 +82,7 @@ public class PageTablesUiTests
             }
             try
             {
-                EndToEnd.PressMenuBarItem(app, "Section", "sectionPublishPages");
+                EndToEnd.PressMenuBarItem(app, "Section", item);
                 break;
             }
             catch (FlaUI.Core.Exceptions.ElementNotEnabledException) when (DateTime.Now - started < TimeSpan.FromSeconds(30))
@@ -90,7 +92,7 @@ public class PageTablesUiTests
             }
         }
         if (DateTime.Now - started > TimeSpan.FromSeconds(2))
-            _output.WriteLine($"Publish Pages… was greyed for {(DateTime.Now - started).TotalSeconds:0.0} s after the last dialog");
+            _output.WriteLine($"{item} was greyed for {(DateTime.Now - started).TotalSeconds:0.0} s after the last dialog");
         return WaitFor(app, "sectionVerbPickerTable", "the picker's table");
     }
 
@@ -265,7 +267,7 @@ public class PageTablesUiTests
         WaitFor(app, "sectionVerbPage1", "box 1").AsCheckBox().Toggle();
         SelectAndFocus(app, "sectionVerbPageRow1");
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.RETURN);
+        Keyboard.Type(VirtualKeyShort.RETURN);
         WaitFor(app, "sectionVerbPlanTable", "the plan, after Return with a row selected");
         MenuBar.CloseDialog(app);
     }
@@ -277,19 +279,21 @@ public class PageTablesUiTests
         OpenThePicker(app);
         SelectAndFocus(app, "sectionVerbPageRow0");
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         Assert.True(Retry.WhileFalse(() => app.OpenDialog() is null, TimeSpan.FromSeconds(10)).Result,
                     "Escape with a row selected did not cancel the picker");
     }
 
     /// <summary>
     /// A plan of 1 change and 4 pages already visible: the table is five rows
-    /// tall with the disclosure closed (the floor), shows the one row, and
-    /// opening the disclosure adds the four to the SAME table without moving
-    /// the table's or the dialog's edges.
+    /// tall with the checkbox unticked (the floor), shows the one row, and
+    /// ticking the checkbox adds the four to the SAME table without moving
+    /// the table's or the dialog's edges; a second click takes them out
+    /// (#655, the mac's #654: a CHECKBOX, not a disclosure, which promised a
+    /// fold below it that never appeared).
     /// </summary>
     [UiFact]
-    public void ThePlanFoldsThePagesAlreadyRight_AndOpeningDoesNotGrowTheDialog()
+    public void ThePlanFoldsThePagesAlreadyRightUntilTheCheckboxIsTicked()
     {
         using var app = new DrivenApp(WriteCourse);
         OpenThePicker(app);
@@ -299,8 +303,10 @@ public class PageTablesUiTests
         dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
         var table = WaitFor(app, "sectionVerbPlanTable", "the plan's table");
 
-        var fold = WaitFor(app, "sectionVerbPlanAlreadyRight", "the disclosure");
+        var fold = WaitFor(app, "sectionVerbPlanAlreadyRight", "the checkbox");
         Assert.Equal(AssistWording.MenuPlanShowAlready(Seen, publishing: true), fold.Name);
+        Assert.Equal(FlaUI.Core.Definitions.ControlType.CheckBox, fold.ControlType);
+        Assert.Equal(FlaUI.Core.Definitions.ToggleState.Off, fold.Patterns.Toggle.Pattern.ToggleState.Value);
         Assert.True(Retry.WhileFalse(() => table.FindAllChildren().Length == 1, TimeSpan.FromSeconds(5)).Result,
                     $"closed, the table draws {table.FindAllChildren().Length} rows, not the one to read");
         var tableBefore = table.BoundingRectangle;
@@ -310,9 +316,14 @@ public class PageTablesUiTests
         _output.WriteLine($"closed: table {tableBefore.Height} tall (row {pitch}); Publish at {publishBefore.Top}");
         Assert.InRange(tableBefore.Height, 5 * 31, 5 * 33 + 2);           // five rows' worth, one drawn
 
-        Note($"MEASURED fold: disclosure {fold.BoundingRectangle.Height} tall, its top {fold.BoundingRectangle.Top - tableBefore.Bottom} under the table " +
-                          $"(FoldHeight {PlanTableLayout.FoldHeight} counts both)");
-        fold.Patterns.Toggle.Pattern.Toggle();
+        // The line PlanTableLayout reserves must hold the checkbox and its gap,
+        // or a fit counted with it comes out short and clips the buttons.
+        int foldLine = fold.BoundingRectangle.Bottom - tableBefore.Bottom;
+        Note($"MEASURED fold: checkbox {fold.BoundingRectangle.Height} tall, its top {fold.BoundingRectangle.Top - tableBefore.Bottom} under the table " +
+             $"({foldLine} in all; FoldHeight {PlanTableLayout.FoldHeight} counts both)");
+        Assert.True(foldLine <= PlanTableLayout.FoldHeight,
+                    $"the checkbox and its gap take {foldLine} epx; PlanTableLayout.FoldHeight reserves {PlanTableLayout.FoldHeight}");
+        fold.AsCheckBox().Click();
         Assert.True(Retry.WhileFalse(() => table.FindAllChildren().Length == 1 + Seen, TimeSpan.FromSeconds(5)).Result,
                     $"open, the table draws {table.FindAllChildren().Length} rows, not {1 + Seen}");
         Assert.Equal(FlaUI.Core.Definitions.ToggleState.On, fold.Patterns.Toggle.Pattern.ToggleState.Value);
@@ -321,9 +332,102 @@ public class PageTablesUiTests
         Picture(app, "plan-open");
         Assert.EndsWith(AssistWording.MenuPlanAlreadyVisible, WaitFor(app, $"sectionVerbPlanRow{Seen}", "the last row").Name);
 
-        fold.Patterns.Toggle.Pattern.Toggle();
+        fold.AsCheckBox().Click();
         Assert.True(Retry.WhileFalse(() => table.FindAllChildren().Length == 1, TimeSpan.FromSeconds(5)).Result,
-                    "closing the disclosure did not fold the rows again");
+                    "a second click on the checkbox did not take the rows out again");
+        Assert.Equal(FlaUI.Core.Definitions.ToggleState.Off, fold.Patterns.Toggle.Pattern.ToggleState.Value);
+        Assert.Equal(tableBefore, table.BoundingRectangle);
+        MenuBar.CloseDialog(app);
+    }
+
+    /// <summary>
+    /// #655 (the mac's #654): after Go the dialog shows one sentence over OK
+    /// and is FITTED to it — shorter than the plan, the same width — while
+    /// Working keeps the height of the stage before it, so the dialog changes
+    /// size once. The dialog's BOX is not in the UI Automation tree (its
+    /// element is the whole overlay), and the elements inside it did not help:
+    /// MEASURED 2026-10-23, the title's and the buttons' rectangles read the
+    /// same at the plan and at the answer while a picture of the screen showed
+    /// the box centred and shrunk. So the box is read from the size the app
+    /// laid it out at (the "Section menu dialog at …" lines in its own
+    /// startup.log, its template's <c>BackgroundElement</c>), and OK is checked
+    /// to be inside the window. Publish (1 change, 4 folded) and Hide (1 change).
+    /// </summary>
+    [UiFact]
+    public void TheAnswerAfterAPublishPlanIsFittedToItsSentence() => TheAnswerAfterAPlanIsFittedToItsSentence(publishing: true);
+
+    /// <summary>The same for Hide Pages…: a plan of one page to hide.</summary>
+    [UiFact]
+    public void TheAnswerAfterAHidePlanIsFittedToItsSentence() => TheAnswerAfterAPlanIsFittedToItsSentence(publishing: false);
+
+    private static readonly System.Text.RegularExpressions.Regex BoxLine =
+        new(@"Section menu dialog at (\w+): box (\d+)x(\d+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>Every box the app laid the dialog out at, in order: (stage, width, height).</summary>
+    private static List<(string Stage, int Width, int Height)> Boxes(DrivenApp app)
+    {
+        var boxes = new List<(string, int, int)>();
+        try
+        {
+            using var stream = new FileStream(Path.Combine(app.StateDirectory, "startup.log"), FileMode.Open, FileAccess.Read,
+                                              FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            foreach (string line in reader.ReadToEnd().Split('\n'))
+                if (BoxLine.Match(line) is { Success: true } match)
+                    boxes.Add((match.Groups[1].Value, int.Parse(match.Groups[2].Value), int.Parse(match.Groups[3].Value)));
+        }
+        catch (IOException) { }
+        return boxes;
+    }
+
+    private void TheAnswerAfterAPlanIsFittedToItsSentence(bool publishing)
+    {
+        using var app = new DrivenApp(WriteCourse);
+        OpenThePicker(app, publishing ? "sectionPublishPages" : "sectionHidePages");
+        var dialog = MenuBar.Dialog(app, publishing ? "Publish Pages…" : "Hide Pages…");
+        string pick = publishing ? "Unit 1, Day 1" : "Seen 1";
+        dialog.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.CheckBox))
+              .First(element => element.Name == pick).AsCheckBox().Toggle();
+        dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.AsButton().Invoke();
+        // Working after Choose lasts about two seconds (the plan is read), long
+        // enough for a picture of the spinner in the held dialog.
+        if (Retry.WhileNull(() => app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId("sectionVerbWorking")),
+                            TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(50)).Result is not null)
+            Picture(app, publishing ? "655-publish-working" : "655-hide-working");
+        WaitFor(app, "sectionVerbPlanTable", "the plan's table");
+        Thread.Sleep(600);
+        Picture(app, publishing ? "655-publish-plan" : "655-hide-plan");
+        var go = MenuBar.Dialog(app, "the plan").FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!;
+        go.AsButton().Invoke();
+        var result = WaitFor(app, "sectionVerbResult", "the answer");
+        Thread.Sleep(800);
+        Picture(app, publishing ? "655-publish-answer" : "655-hide-answer");
+
+        var boxes = Boxes(app);
+        Note($"MEASURED answer ({(publishing ? "Publish" : "Hide")}): window {app.Window.BoundingRectangle.Width}x{app.Window.BoundingRectangle.Height} epx; " +
+             $"the dialog's box by stage: {string.Join(", ", boxes.Select(box => $"{box.Stage} {box.Width}x{box.Height}"))}; answer \"{result.Name}\"");
+        int planAt = boxes.FindLastIndex(box => box.Stage == "Plan");
+        Assert.True(planAt >= 0, "the app never logged the plan's box");
+        var plan = boxes[planAt];
+        // Working after Choose keeps the picker's height too (grow-only Working, as the mac).
+        int chooseAt = boxes.FindLastIndex(planAt, box => box.Stage == "Choose");
+        Assert.True(chooseAt >= 0, "the app never logged the picker's box");
+        var choose = boxes[chooseAt];
+        var workingAfterChoose = boxes.Skip(chooseAt + 1).Take(planAt - chooseAt - 1).Where(box => box.Stage == "Working").ToList();
+        Assert.NotEmpty(workingAfterChoose);
+        Assert.All(workingAfterChoose, box => Assert.InRange(box.Height, choose.Height - 1, choose.Height + 1));
+        var after = boxes.Skip(planAt + 1).ToList();
+        var working = after.Where(box => box.Stage == "Working").ToList();
+        var answers = after.Where(box => box.Stage == "Result").ToList();
+        Assert.NotEmpty(working);
+        Assert.NotEmpty(answers);
+        // Working keeps the plan's height: the dialog changes size once.
+        Assert.All(working, box => Assert.InRange(box.Height, plan.Height - 1, plan.Height + 1));
+        var answer = answers[^1];
+        Assert.True(answer.Height < plan.Height - 32, $"the answer kept the plan's height: plan {plan.Height}, answer {answer.Height}");
+        Assert.Equal(plan.Width, answer.Width);   // the width is kept
+        var ok = MenuBar.Dialog(app, "the answer").FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))!.BoundingRectangle;
+        Assert.True(ok.Height > 0 && ok.Bottom <= app.Window.BoundingRectangle.Bottom, "OK is not inside the window");
         MenuBar.CloseDialog(app);
     }
 

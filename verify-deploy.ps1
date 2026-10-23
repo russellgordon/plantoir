@@ -44,15 +44,32 @@
     A Plantoir working folder. Defaults to a copy made for testing, never a
     teacher's own.
 
+.PARAMETER FirstPublish
+    Publish as a FIRST publish (#123, #623): the saved surname and the
+    section's Netlify and Cloudflare site records are moved aside (renamed,
+    never deleted) once the run has started,
+    a random letters-only surname is given when deploy.py asks for one, and so
+    each host gets a NEW site with a name nobody has. Everything moved aside is
+    put back on every exit path from then on, Ctrl+C included (a run killed
+    outright is put right by the next run's preflight), and the records this
+    run wrote are deleted, so the
+    course points at its own sites again. The sites it made are listed in the
+    Result block; nothing deletes them. Without it, the run publishes to the
+    sites the section already has and asks nothing.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File verify-deploy.ps1 `
         -WorkingFolder "C:\Users\me\Desktop\plantoir-test" -Course ICS3U -Section 1
+
+.EXAMPLE
+    powershell -NoProfile -ExecutionPolicy Bypass -File verify-deploy.ps1 -FirstPublish
 #>
 [CmdletBinding()]
 param(
     [string]$WorkingFolder = "$env:USERPROFILE\Desktop\plantoir-deploy-verify",
     [string]$Course = "ICS3U",
-    [int]$Section = 1
+    [int]$Section = 1,
+    [switch]$FirstPublish
 )
 
 $ErrorActionPreference = 'Continue'
@@ -86,6 +103,211 @@ $originalConfig = Get-Content -LiteralPath $config -Raw -Encoding UTF8
 $work = Join-Path ([IO.Path]::GetTempPath()) ("plantoir-deploy-verify-" + [Guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 $folderTarget = Join-Path $work "published"
+
+# ------------------------------------------- the runtime the launchers build with
+# REQUIRED, and defaulted to this checkout's own (#630). With no
+# PLANTOIR_RUNTIME the launchers fall back to the INSTALLED app's runtime,
+# which is whatever release was installed last: at the 1.8.5 cut that one had
+# no vendor\pyodide, so every engine check failed and read as a product
+# failure. A teacher never meets this - the app sets its own runtime - so this
+# is the harness's to get right. Exported so PtyDriver, cmd and the launcher
+# all inherit it.
+if (-not $env:PLANTOIR_RUNTIME) {
+    $env:PLANTOIR_RUNTIME = Join-Path $PSScriptRoot "windows-app\Vendor\runtime"
+    $runtimeSaid = "defaulted to this checkout's"
+} else { $runtimeSaid = "from PLANTOIR_RUNTIME" }
+$script:Runtime = $env:PLANTOIR_RUNTIME
+if (-not (Test-Path (Join-Path $script:Runtime 'manifest.json')) -or -not (Test-Path (Join-Path $script:Runtime 'vendor\pyodide'))) {
+    Write-Host "The runtime at $($script:Runtime) has no manifest.json or no vendor\pyodide." -ForegroundColor Red
+    Write-Host "Run windows-app\Vendor\fetch-runtime.ps1, or set PLANTOIR_RUNTIME to a runtime that has them." -ForegroundColor Red
+    exit 1
+}
+$script:RuntimePython = Join-Path $script:Runtime 'python\python.exe'
+Ok "runtime ($runtimeSaid): $($script:Runtime)"
+
+# Anything else that might rewrite this folder's .toolchain while the run is
+# using it. A WARNING, not a refusal: a running Plantoir or plantoir-mcp
+# usually serves a different working folder (the director's session runs
+# one), and only a person can say which.
+$others = @(Get-Process -Name Plantoir, plantoir-mcp -ErrorAction SilentlyContinue)
+foreach ($other in $others) {
+    $path = try { $other.Path } catch { "" }
+    Write-Host "  [warn] $($other.ProcessName) is running (pid $($other.Id)$(if ($path) { ", $path" })). If it serves $WorkingFolder it can rewrite .toolchain under this run." -ForegroundColor Yellow
+}
+
+# ------------------------------------- the recipe the launchers run, mirrored
+# The checks below read THIS checkout's contracts/, so the launchers must run
+# THIS checkout's recipe (#630). They run whatever the folder's .toolchain\
+# last received, and nothing refreshes it but the app: at the 1.8.5 cut the
+# mirror dated from a week before, 79 files under scripts\ differed, and a run
+# gave 59 passed, 89 failed - against a product that was fine.
+#
+# MIRRORED rather than refused, because mirroring is exactly what the app does
+# to a folder it touches (ToolchainMirror.RefreshLaunchers/RefreshToolchain),
+# and a refusal would only hand the person running this the robocopy remedy
+# every time. A TRUE mirror, as ToolchainMirror.SyncDirectory is: a file the
+# checkout no longer has is deleted, or a removed script would go on running.
+# From the WORKING TREE, not `git archive HEAD` (the screenshot harness's
+# choice): the checks read the working tree's contracts, so a HEAD recipe
+# would recreate the mismatch this exists to remove. Which tree it was is
+# printed in the Result block.
+$script:RecipeRootFiles = @('Dockerfile', 'setup.sh', 'preview.sh', 'deploy.sh',
+                            'setup.bat', 'preview.bat', 'deploy.bat', 'setup.ps1', 'preview.ps1', 'deploy.ps1')
+$script:Launchers = @('setup.ps1', 'preview.ps1', 'deploy.ps1', 'setup.bat', 'preview.bat', 'deploy.bat')
+$script:MirrorChanged = @()
+function Sync-RecipeFile([string]$Source, [string]$Destination) {
+    $src = Get-Item -LiteralPath $Source
+    $dst = Get-Item -LiteralPath $Destination -ErrorAction SilentlyContinue
+    if ($dst -and $dst.Length -eq $src.Length) {
+        if ([Math]::Abs(($src.LastWriteTimeUtc - $dst.LastWriteTimeUtc).TotalSeconds) -lt 0.002) { return }
+        if ((Get-FileHash -LiteralPath $Source).Hash -eq (Get-FileHash -LiteralPath $Destination).Hash) {
+            $dst.LastWriteTimeUtc = $src.LastWriteTimeUtc
+            return
+        }
+    }
+    $folder = Split-Path -Parent $Destination
+    if (-not (Test-Path -LiteralPath $folder)) { New-Item -ItemType Directory -Force -Path $folder | Out-Null }
+    Copy-Item -LiteralPath $Source -Destination $Destination -Force
+    (Get-Item -LiteralPath $Destination).LastWriteTimeUtc = $src.LastWriteTimeUtc
+    $script:MirrorChanged += $Destination.Substring($WorkingFolder.TrimEnd('\').Length + 1)
+}
+function Sync-RecipeFolder([string]$Source, [string]$Destination) {
+    $wanted = @{}
+    foreach ($file in Get-ChildItem -LiteralPath $Source -Recurse -File -Force) {
+        $relative = $file.FullName.Substring($Source.Length + 1)
+        # Python's caches are made by running the tests; the app bundles none.
+        if ($relative -match '(^|\\)__pycache__\\' -or $relative -like '*.pyc') { continue }
+        $wanted[$relative.ToLowerInvariant()] = $true
+        Sync-RecipeFile $file.FullName (Join-Path $Destination $relative)
+    }
+    if (Test-Path -LiteralPath $Destination) {
+        foreach ($file in Get-ChildItem -LiteralPath $Destination -Recurse -File -Force) {
+            $relative = $file.FullName.Substring($Destination.Length + 1)
+            if ($wanted.ContainsKey($relative.ToLowerInvariant())) { continue }
+            # The launchers run Python FROM .toolchain, so it makes caches of
+            # its own there. Deleting them would count as a change on every
+            # run and force a --full-rebuild each time (measured: the second
+            # run "mirrored" 22 files, every one a .pyc).
+            if ($relative -match '(^|\\)__pycache__\\' -or $relative -like '*.pyc') { continue }
+            Remove-Item -LiteralPath $file.FullName -Force
+            $script:MirrorChanged += "$($Destination.Substring($WorkingFolder.TrimEnd('\').Length + 1))\$relative (deleted)"
+        }
+    }
+}
+try {
+    $toolchainRoot = Join-Path $WorkingFolder ".toolchain"
+    foreach ($name in $script:Launchers) { Sync-RecipeFile (Join-Path $PSScriptRoot $name) (Join-Path $WorkingFolder $name) }
+    foreach ($name in $script:RecipeRootFiles) { Sync-RecipeFile (Join-Path $PSScriptRoot $name) (Join-Path $toolchainRoot $name) }
+    $recipeFolders = (Get-Content -LiteralPath (Join-Path $PSScriptRoot "contracts\toolchain.json") -Raw -Encoding UTF8 | ConvertFrom-Json).recipeFolders.folders
+    foreach ($folder in $recipeFolders) { Sync-RecipeFolder (Join-Path $PSScriptRoot $folder) (Join-Path $toolchainRoot $folder) }
+} catch {
+    Write-Host "The recipe could not be mirrored into $WorkingFolder : $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Refusing to run: the checks would judge this checkout against whatever the folder had before." -ForegroundColor Red
+    exit 1
+}
+if ($script:MirrorChanged.Count -eq 0) { Ok "the folder already runs this checkout's recipe (launchers and .toolchain, nothing differed)" }
+else {
+    Ok "mirrored this checkout's recipe into the folder: $($script:MirrorChanged.Count) file(s) changed, the first: $((@($script:MirrorChanged) | Select-Object -First 5) -join ', ')"
+}
+$script:Commit = (& git -C $PSScriptRoot rev-parse --short HEAD 2>$null)
+$script:Dirty = @(& git -C $PSScriptRoot status --porcelain 2>$null).Count
+
+# ------------------------------------------------- a FIRST publish (#123, #623)
+# What a first publish reads, moved aside so deploy.py asks for a surname and
+# names new sites: the saved surname (and its pre-.internal location), the
+# section's Netlify record (and its legacy per-section one) and its
+# Cloudflare record.
+#
+# THE ORIGINALS ARE NEVER DELETED, only renamed to <path>.verify-deploy-hidden,
+# and the sentinel records, path by path and AFTER each step, whether that
+# path's original was hidden or absent. Restoring deletes what is at a path
+# only when its original is safe beside it (hidden) or there never was one
+# (absent): then it is a record deploy.py wrote for the test's site. Anything
+# else - a move that failed, a kill between a move and the sentinel - is left
+# alone, and a hidden original is always moved back. So a run killed half way
+# is put right by the NEXT run's preflight, and no failure on the way can cost
+# the course its real records. (The first version wrote every path into the
+# sentinel before moving anything and then deleted whatever stood at each: a
+# move that failed would have deleted the real record. Opus review.)
+$script:FirstPublishState = @(
+    (Join-Path $WorkingFolder "courses\.internal\profile.json"),
+    (Join-Path $WorkingFolder "courses\_secrets\profile.json"),
+    (Join-Path $WorkingFolder "courses\$Course\.netlify_sites\section$Section.json"),
+    (Join-Path $WorkingFolder "courses\$Course\.cloudflare_sites\section$Section.json"),
+    (Join-Path $WorkingFolder "courses\$Course\section$Section\.netlify_site.json")
+)
+$script:Sentinel = Join-Path $WorkingFolder "courses\.verify-deploy-first-publish.json"
+$script:SitesWritten = @()
+$script:HideRecord = @{}
+function Write-HideSentinel {
+    $entries = @(foreach ($key in $script:HideRecord.Keys) { @{ path = $key; original = $script:HideRecord[$key] } })
+    [IO.File]::WriteAllText($script:Sentinel, (ConvertTo-Json -InputObject @{ entries = $entries } -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
+}
+function Test-AnythingHidden {
+    if (Test-Path -LiteralPath $script:Sentinel) { return $true }
+    foreach ($path in $script:FirstPublishState) { if (Test-Path -LiteralPath "$path.verify-deploy-hidden") { return $true } }
+    return $false
+}
+function Restore-FirstPublishState {
+    if (-not (Test-AnythingHidden)) { return }
+    $recorded = @{}
+    if (Test-Path -LiteralPath $script:Sentinel) {
+        try {
+            $said = Get-Content -LiteralPath $script:Sentinel -Raw -Encoding UTF8 | ConvertFrom-Json
+            foreach ($entry in @($said.entries)) { if ($entry.path) { $recorded[[string]$entry.path] = [string]$entry.original } }
+        } catch { }
+    }
+    foreach ($path in $script:FirstPublishState) {
+        $hidden = "$path.verify-deploy-hidden"
+        $originalIsSafe = Test-Path -LiteralPath $hidden
+        $thereWasNone = $recorded[$path] -eq 'absent'
+        if ((Test-Path -LiteralPath $path) -and ($originalIsSafe -or $thereWasNone)) {
+            # What deploy.py wrote for the test's site. Its name is kept for
+            # the Result block, then the record goes.
+            try {
+                $record = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+                $kind = if ($path -like '*cloudflare_sites*') { 'Cloudflare Pages project' } elseif ($path -like '*netlify*') { 'Netlify site' } else { '' }
+                if ($kind -and $record.name) { $script:SitesWritten += "$kind $($record.name)" }
+            } catch { }
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        }
+        if ($originalIsSafe) {
+            try { Move-Item -LiteralPath $hidden -Destination $path -Force -ErrorAction Stop }
+            catch { Write-Host "  [warn] could not put $path back from $hidden - move it back by hand: $($_.Exception.Message)" -ForegroundColor Yellow; return }
+        } elseif ($recorded[$path] -eq 'hidden') {
+            Write-Host "  [warn] $path was recorded as moved aside but $hidden is not there; left as it is" -ForegroundColor Yellow
+        }
+    }
+    Remove-Item -LiteralPath $script:Sentinel -Force -ErrorAction SilentlyContinue
+    $script:HideRecord = @{}
+    Write-Host "  put the saved surname and the section's own site records back" -ForegroundColor DarkGray
+}
+# Moving them aside happens INSIDE the run's try (below), so the finally that
+# puts them back covers every exit path after it, Ctrl+C included.
+function Hide-FirstPublishState {
+    Write-HideSentinel
+    foreach ($path in $script:FirstPublishState) {
+        if (Test-Path -LiteralPath $path) {
+            try { Move-Item -LiteralPath $path -Destination "$path.verify-deploy-hidden" -Force -ErrorAction Stop }
+            catch { return "could not move $path aside: $($_.Exception.Message)" }
+            $script:HideRecord[$path] = 'hidden'
+        } else {
+            $script:HideRecord[$path] = 'absent'
+        }
+        Write-HideSentinel
+    }
+    return ""
+}
+if (Test-AnythingHidden) {
+    Restore-FirstPublishState
+    Ok "a FIRST-publish run before this one was stopped half way: its surname and site records were put back first"
+    $script:SitesWritten = @()
+}
+$script:Surname = 'Testing'
+if ($FirstPublish) {
+    $letters = 'abcdefghijklmnopqrstuvwxyz'.ToCharArray()
+    $script:Surname = 'vd' + (-join (1..8 | ForEach-Object { $letters | Get-Random }))
+}
 
 # A page of runnable code and a formula (#455, #494, #583), borrowed into the
 # section so every destination carries the Python engine, the site's own
@@ -245,8 +467,8 @@ function Set-Destination {
 # accepting `<base>-01`: deliberately matching macOS (Russell, 2026-09-09)
 # rather than answering 'q' to cancel, which was the other candidate.
 $script:PromptRules = @(
-    @{ Pattern = 'last name.*:$';                       Reply = 'Testing'  },
-    @{ Pattern = 'letters only for your last name.*:$'; Reply = 'Testing'  },
+    @{ Pattern = 'last name.*:$';                       Reply = $script:Surname },
+    @{ Pattern = 'letters only for your last name.*:$'; Reply = $script:Surname },
     @{ Pattern = 'Enter Netlify site name.*\]:$';       Reply = '{ENTER}'  },
     @{ Pattern = 'different Netlify site name.*\]:$';   Reply = '{ENTER}'  }
 )
@@ -422,6 +644,113 @@ function Check-Folder {
     if ($dirty.Count -gt 0) { No "$What - the published site carries the preview's live-reload client" }
     else { Ok "$What - no page carries the live-reload client" }
 }
+
+# ------------------------------------------- page addresses on Netlify (#628, #657)
+# verify-deploy.sh's check_page_links, run here as the SAME program: it is
+# read out of verify-deploy.sh at run time (the heredoc inside
+# check_page_links) rather than copied, so the two platforms judge links by
+# one text and cannot drift. Ported to PowerShell it would resolve links with
+# .NET's Uri, whose escaping differs from urllib's exactly where this check
+# looks (`%2C`). It is run by the runtime's own Python, which the preflight
+# has already required. What it asks of each host is in verify-deploy.sh's
+# comment above check_page_links and in contracts/shared-rules.json ->
+# netlifyPageAddresses.
+#
+# Output goes through a FILE: Windows PowerShell 5.1 reads a child's stdout
+# through $OutputEncoding, which is ASCII, and the program prints link text.
+$script:PageLinksProgram = $null
+function Get-PageLinksProgram {
+    if ($script:PageLinksProgram) { return $script:PageLinksProgram }
+    $sh = Get-Content -LiteralPath (Join-Path $PSScriptRoot "verify-deploy.sh") -Raw -Encoding UTF8
+    # Anchored to the function: from its opening line, through lines that
+    # are not its closing `}` at column 0, to its OWN heredoc - so a reshaped
+    # function cannot make this pick up the next <<'PY' in the file.
+    $found = [regex]::Match(($sh -replace "`r", ""), "(?m)^check_page_links\(\) \{[^\n]*\n(?:(?!\}\n)[^\n]*\n)*?[^\n]*<<'PY'\n((?:(?!PY\n)[^\n]*\n)*?)PY\n")
+    if (-not $found.Success) { return $null }
+    $path = Join-Path $work "check_page_links.py"
+    [IO.File]::WriteAllText($path, $found.Groups[1].Value + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    $script:PageLinksProgram = $path
+    return $path
+}
+function Check-PageLinks([string]$What, [string]$Base, [string]$Kind) {
+    $program = Get-PageLinksProgram
+    if (-not $program) { No "$What's page links could not be checked: check_page_links's program was not found in verify-deploy.sh"; return }
+    $out = Join-Path $work ("page-links-" + [Guid]::NewGuid().ToString('N').Substring(0,6) + ".txt")
+    $err = "$out.err"
+    $env:PYTHONUTF8 = '1'; $env:PYTHONIOENCODING = 'utf-8'
+    try {
+        $p = Start-Process -FilePath $script:RuntimePython -ArgumentList @('-X', 'utf8', '-I', ('"' + $program + '"'), ('"' + $Base + '"'), $Kind) `
+                           -NoNewWindow -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+    } finally { Remove-Item Env:PYTHONUTF8, Env:PYTHONIOENCODING -ErrorAction SilentlyContinue }
+    $said = if (Test-Path -LiteralPath $out) { @(Get-Content -LiteralPath $out -Encoding UTF8) } else { @() }
+    $summary = ($said | Where-Object { $_ -like 'SUMMARY *' } | Select-Object -First 1)
+    if ($p.ExitCode -ne 0 -or -not $summary) {
+        $why = if (Test-Path -LiteralPath $err) { (Get-Content -LiteralPath $err -Raw -Encoding UTF8) } else { "" }
+        No "$What's page links could not be checked (exit $($p.ExitCode)) $why"
+        return
+    }
+    $problems = @($said | Where-Object { $_ -like 'PROBLEM *' })
+    if ($problems.Count -gt 0) {
+        No "$What's page links: $($summary.Substring(8))"
+        foreach ($problem in $problems) { Write-Host "         $($problem.Substring(8))" -ForegroundColor Red }
+    } else { Ok "$What's page links: $($summary.Substring(8))" }
+}
+
+# A folder publish is sent the build's bytes: no marker, links as built. Run
+# on all three folder legs here (the mac runs it on two), so it is a superset.
+function Check-NoMarkerFolder([string]$What, [string]$Site) {
+    $marked = @(Get-ChildItem -LiteralPath $Site -Recurse -File -ErrorAction SilentlyContinue |
+                Select-String -Pattern 'data-plantoir-paths' -SimpleMatch -List | Select-Object -First 1)
+    if ($marked.Count -gt 0) { No "$What carries data-plantoir-paths, which only a Netlify publish adds (#628)" }
+    else { Ok "$What carries the build's links as built, with no Netlify marker (#628)" }
+}
+
+# The build's own half of #628 reached a Windows-built site: the router, the
+# link previews and the search previews each follow the marker, so the built
+# postscript.js names plantoirPaths exactly three times
+# (build_site._wire_served_case, which only WARNS when an anchor has moved -
+# so this is the one place a moved anchor fails anything). Read from a folder
+# publish because the build keeps no scaffold to inspect.
+function Check-ServedCase([string]$What, [string]$Site) {
+    $script = Join-Path $Site "postscript.js"
+    if (-not (Test-Path -LiteralPath $script)) { No "$What has no postscript.js"; return }
+    $count = [regex]::Matches((Get-Content -LiteralPath $script -Raw -Encoding UTF8), 'plantoirPaths').Count
+    if ($count -eq 3) { Ok "$What's postscript.js follows the Netlify marker in all three places (plantoirPaths x3)" }
+    else { No "$What's postscript.js names plantoirPaths $count time(s), not 3 - an anchor in _wire_served_case moved" }
+}
+
+# Cloudflare's production address serves the NEW deployment only after it
+# has propagated (#630's second comment): at the 1.8.5 cut a single
+# Cloudflare leg was judged while production still served the deployment
+# before it, eight checks failed, and two minutes later all of them passed.
+# Wait for production's front page to be byte for byte the index.html this
+# leg uploaded (the folder deploy.py names in "Deploying from local build:"),
+# for at most 120 s. Not reaching it is a FAILURE - the run then judges what
+# production is serving, and says so - never a skip.
+function Wait-CloudflareProduction([string]$What, [string]$Log, [string]$Url) {
+    $built = [regex]::Match($Log, '(?m)Deploying from local build: (.+?)\s*$')
+    if (-not $built.Success) { No "$What - no 'Deploying from local build:' line, so what was uploaded is unknown"; return }
+    $index = Join-Path $built.Groups[1].Value "index.html"
+    if (-not (Test-Path -LiteralPath $index)) { No "$What - the uploaded build has no index.html at $index"; return }
+    $want = (Get-FileHash -LiteralPath $index).Hash
+    $fetched = Join-Path $work "cf-front-page.html"
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ($clock.Elapsed.TotalSeconds -lt 120) {
+        Remove-Item -LiteralPath $fetched -ErrorAction SilentlyContinue
+        & $script:Curl -s -L --max-time 20 -H "Cache-Control: no-cache" -o $fetched "$($Url.TrimEnd('/'))/" 2>$null
+        if ((Test-Path -LiteralPath $fetched) -and (Get-FileHash -LiteralPath $fetched).Hash -eq $want) {
+            Ok "$What - production serves this deployment's front page (after $([int]$clock.Elapsed.TotalSeconds) s)"
+            return
+        }
+        Start-Sleep -Seconds 5
+    }
+    No "$What - production did not serve this deployment's front page within 120 s; judging what it does serve"
+}
+
+# Every address a publish answered at, for the Result block: a FIRST-publish
+# run creates them, and nothing deletes them.
+$script:SitesUsed = @()
+function Note-Site([string]$Url) { if ($Url -and $script:SitesUsed -notcontains $Url) { $script:SitesUsed += $Url } }
 
 # Which host a published address belongs to. A publish is only proved by an
 # address of the RIGHT KIND: the first version of this script checked a
@@ -655,13 +984,29 @@ function Measure-Deploy([string]$Label, [string]$Script, [string[]]$LauncherArgs
 # script had been testing at the time.
 try {
 
+if ($FirstPublish) {
+    $hideProblem = Hide-FirstPublishState
+    if ($hideProblem) {
+        No "FIRST publish: $hideProblem - refusing to publish, and putting back what was moved"
+        Restore-FirstPublishState
+        $script:ReachedTheEnd = $true
+        exit 1
+    }
+    Ok "FIRST publish: the surname and the section's site records are moved aside; deploy.py will be told '$($script:Surname)'"
+}
+
 # --------------------------------------------------- the preview, and the race
 Hdr "Preview - serve mode, which is what a teacher actually uses"
+# --full-rebuild when the mirror above changed anything: some of build_site's
+# edits run only when the Quartz scaffold is first copied, so a section built
+# by the folder's previous recipe keeps them until it is rebuilt from scratch
+# (#630; the 1.8.5 cut's remedy was deleting the builds folder by hand).
+if ($script:MirrorChanged.Count -gt 0) { Ok "the recipe changed, so the preview rebuilds the section from scratch (--full-rebuild)" }
 [IO.File]::WriteAllText($runnerPage, ($runnerPageText -replace "`r`n", "`n"), $script:NoBom)
 Ok "a page of runnable code borrowed into section $Section (removed on any exit)"
 $previewLog = Join-Path $work "preview.log"
 $previewProcess = Start-Process -FilePath "cmd.exe" `
-    -ArgumentList "/c", ".\preview.bat $Course $Section > `"$previewLog`" 2>&1" `
+    -ArgumentList "/c", ".\preview.bat $Course $Section$(if ($script:MirrorChanged.Count -gt 0) { ' --full-rebuild' }) > `"$previewLog`" 2>&1" `
     -WorkingDirectory $WorkingFolder -PassThru -WindowStyle Hidden
 $script:PreviewProcess = $previewProcess
 
@@ -751,6 +1096,8 @@ $folderRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Sectio
 if ($folderRun.ExitCode -eq 0) { Ok "publish to a folder exited 0" } else { No "publish to a folder exited $($folderRun.ExitCode)" }
 Check-Folder "folder" (Join-Path $folderTarget "section$Section")
 Check-EngineFolder "the folder" (Join-Path $folderTarget "section$Section")
+Check-NoMarkerFolder "the folder" (Join-Path $folderTarget "section$Section")
+Check-ServedCase "the folder" (Join-Path $folderTarget "section$Section")
 
 Hdr "Destination 2 of 3 - Netlify"
 if ($haveNetlify) {
@@ -758,7 +1105,12 @@ if ($haveNetlify) {
     $netlifyRun = Measure-Deploy "Netlify, first publish with the engine" "deploy.bat" @($Course, "$Section") (Join-Path $work "deploy-netlify.log")
     if ($netlifyRun.ExitCode -eq 0) { Ok "publish to Netlify exited 0" } else { No "publish to Netlify exited $($netlifyRun.ExitCode)" }
     $netlifyUrl = Url-FromLog $netlifyRun.Log
-    if ($netlifyUrl) { Check-Url "Netlify" $netlifyUrl -MustEndWith "netlify.app"; Check-Engine "Netlify" "$($netlifyUrl.TrimEnd('/'))/" } else { No "no Netlify address in the output" }
+    if ($netlifyUrl) {
+        Note-Site $netlifyUrl
+        Check-Url "Netlify" $netlifyUrl -MustEndWith "netlify.app"
+        Check-Engine "Netlify" "$($netlifyUrl.TrimEnd('/'))/"
+        Check-PageLinks "Netlify" "$($netlifyUrl.TrimEnd('/'))/" netlify
+    } else { No "no Netlify address in the output" }
 } else { Skipped "Netlify (no credentials)" }
 
 Hdr "Destination 3 of 3 - Cloudflare Pages"
@@ -772,7 +1124,13 @@ if ($haveCloudflare) {
     if ($cloudflareRun.Log -match '(?i)cloudflare|wrangler|pages\.dev') { Ok "the launcher really went to Cloudflare" }
     else { No "the Cloudflare leg's output never mentions Cloudflare - it published somewhere else" }
     $cloudflareUrl = Url-FromLog $cloudflareRun.Log
-    if ($cloudflareUrl) { Check-Url "Cloudflare Pages" $cloudflareUrl -MustEndWith "pages.dev"; Check-Engine "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/" } else { No "no Cloudflare address in the output" }
+    if ($cloudflareUrl) {
+        Note-Site $cloudflareUrl
+        Check-Url "Cloudflare Pages" $cloudflareUrl -MustEndWith "pages.dev"
+        Wait-CloudflareProduction "Cloudflare Pages" $cloudflareRun.Log $cloudflareUrl
+        Check-Engine "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/"
+        Check-PageLinks "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/" cloudflare
+    } else { No "no Cloudflare address in the output" }
 } else { Skipped "Cloudflare Pages (no credentials)" }
 
 # ------------------------------------------------------------- the pairings
@@ -791,9 +1149,15 @@ if ($haveNetlify) {
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
     $u = Url-FromLog $legOne.Log
-    if ($u) { Check-Url "Netlify (paired)" $u -MustEndWith "netlify.app" } else { No "no Netlify address in the paired output" }
+    if ($u) {
+        Note-Site $u
+        Check-Url "Netlify (paired)" $u -MustEndWith "netlify.app"
+        Check-PageLinks "Netlify (paired with a folder)" "$($u.TrimEnd('/'))/" netlify
+    } else { No "no Netlify address in the paired output" }
     Check-Folder "folder (paired)" (Join-Path $folderTarget "section$Section")
     Check-EngineFolder "the folder (paired with Netlify)" (Join-Path $folderTarget "section$Section")
+    Check-NoMarkerFolder "the folder (paired with Netlify)" (Join-Path $folderTarget "section$Section")
+    Check-ServedCase "the folder (paired with Netlify)" (Join-Path $folderTarget "section$Section")
 } else { Skipped "Netlify + folder (no Netlify credentials)" }
 
 Hdr "Pairing 2 of 3 - Cloudflare primary, a folder also"
@@ -806,10 +1170,17 @@ if ($haveCloudflare) {
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (cloudflare $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
     $cfPaired = Url-FromLog $legOne.Log
-    if ($cfPaired) { Check-Url "Cloudflare (paired with a folder)" $cfPaired -MustEndWith "pages.dev" }
+    if ($cfPaired) {
+        Note-Site $cfPaired
+        Check-Url "Cloudflare (paired with a folder)" $cfPaired -MustEndWith "pages.dev"
+        Wait-CloudflareProduction "Cloudflare (paired with a folder)" $legOne.Log $cfPaired
+        Check-PageLinks "Cloudflare (paired with a folder)" "$($cfPaired.TrimEnd('/'))/" cloudflare
+    }
     else { No "no Cloudflare address in the paired output" }
     Check-Folder "folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
     Check-EngineFolder "the folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
+    Check-NoMarkerFolder "the folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
+    Check-ServedCase "the folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
 } else { Skipped "Cloudflare + folder (no Cloudflare credentials)" }
 
 Hdr "Pairing 3 of 3 - Netlify primary, Cloudflare also"
@@ -820,12 +1191,29 @@ if ($haveNetlify -and $haveCloudflare) {
     $legTwo = Measure-Deploy "Cloudflare, second publish" "deploy.bat" @($Course, "$Section", "--target", "cloudflare") (Join-Path $work "pair3-cf.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), cloudflare $($legTwo.ExitCode))" }
-    $u1 = Url-FromLog $legOne.Log; if ($u1) { Check-Url "Netlify (paired with Cloudflare)" $u1 -MustEndWith "netlify.app"; Check-Engine "Netlify (paired with Cloudflare)" "$($u1.TrimEnd('/'))/" }
-    $u2 = Url-FromLog $legTwo.Log; if ($u2) { Check-Url "Cloudflare (paired with Netlify)" $u2 -MustEndWith "pages.dev"; Check-Engine "Cloudflare (paired with Netlify)" "$($u2.TrimEnd('/'))/" }
+    $u1 = Url-FromLog $legOne.Log
+    if ($u1) {
+        Note-Site $u1
+        Check-Url "Netlify (paired with Cloudflare)" $u1 -MustEndWith "netlify.app"
+        Check-Engine "Netlify (paired with Cloudflare)" "$($u1.TrimEnd('/'))/"
+        Check-PageLinks "Netlify (paired with Cloudflare)" "$($u1.TrimEnd('/'))/" netlify
+    } else { No "no Netlify address in the paired output" }
+    $u2 = Url-FromLog $legTwo.Log
+    if ($u2) {
+        Note-Site $u2
+        Check-Url "Cloudflare (paired with Netlify)" $u2 -MustEndWith "pages.dev"
+        Wait-CloudflareProduction "Cloudflare (paired with Netlify)" $legTwo.Log $u2
+        Check-Engine "Cloudflare (paired with Netlify)" "$($u2.TrimEnd('/'))/"
+        Check-PageLinks "Cloudflare (paired with Netlify)" "$($u2.TrimEnd('/'))/" cloudflare
+    } else { No "no Cloudflare address in the paired output" }
 } else { Skipped "Netlify + Cloudflare (needs both sets of credentials)" }
 
 # ------------------------------------------------------------------ finishing
 $script:ReachedTheEnd = $true
+# Put a first publish's surname and records back BEFORE the Result block, so
+# the names of the sites it made can be listed in it. The finally below does
+# it again, harmlessly, on every other exit path.
+Restore-FirstPublishState
 Hdr "Result"
 Write-Host "  $($script:Pass) passed, $($script:Fail) failed, $($script:Skip) skipped"
 if ($script:Measured.Count -gt 0) {
@@ -833,6 +1221,13 @@ if ($script:Measured.Count -gt 0) {
     Write-Host "  Publishing a site that carries the Python engine (#455), measured:"
     foreach ($line in $script:Measured) { Write-Host "    $line" }
 }
+Write-Host "  recipe: this checkout at $($script:Commit)$(if ($script:Dirty -gt 0) { " with $($script:Dirty) uncommitted change(s)" } else { ', clean' }); $($script:MirrorChanged.Count) file(s) mirrored into the folder"
+Write-Host "  runtime: $($script:Runtime)"
+if ($script:SitesUsed.Count -gt 0) {
+    Write-Host "  published to$(if ($FirstPublish) { ' (CREATED by this first-publish run; nothing deletes them)' }):"
+    foreach ($site in $script:SitesUsed) { Write-Host "    $site" }
+}
+foreach ($site in $script:SitesWritten) { Write-Host "    record removed from the course: $site" }
 Write-Host "  logs: $work"
 if ($script:Fail -gt 0) {
     Write-Host "  Failures:" -ForegroundColor Red
@@ -843,6 +1238,7 @@ exit 0
 
 }
 finally {
+    Restore-FirstPublishState
     Restore-Config
     Stop-AnyPreview
     Remove-RunnerPage

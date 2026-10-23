@@ -46,7 +46,7 @@ public sealed record PlanTable(string Summary, IReadOnlyList<PlanTable.Row> Rows
     /// <summary>The fewest rows the table is tall enough for while pages are folded under it (the mac's <c>fewestPlanRowsUnderAFold</c>).</summary>
     public const int FewestRowsUnderAFold = 5;
 
-    /// <summary>A page already the way it was asked to be: the only rows the disclosure folds away.</summary>
+    /// <summary>A page already the way it was asked to be: the only rows the checkbox folds away (#655).</summary>
     public static bool IsAlreadyRight(Change change) => change is Change.AlreadyVisible or Change.AlreadyHidden;
 
     /// <summary>
@@ -56,26 +56,26 @@ public sealed record PlanTable(string Summary, IReadOnlyList<PlanTable.Row> Rows
     /// </summary>
     public IReadOnlyList<Row> RowsToRead => Rows.Where(row => !IsAlreadyRight(row.Change)).ToList();
 
-    /// <summary>The pages already visible (or already hidden), in plan order: what the disclosure folds.</summary>
+    /// <summary>The pages already visible (or already hidden), in plan order: what the checkbox folds.</summary>
     public IReadOnlyList<Row> RowsAlreadyRight => Rows.Where(row => IsAlreadyRight(row.Change)).ToList();
 
-    /// <summary>Whether the plan folds anything: there is something to read AND something already right. A plan with nothing else to read shows every row and no disclosure.</summary>
+    /// <summary>Whether the plan folds anything: there is something to read AND something already right. A plan with nothing else to read shows every row and no checkbox.</summary>
     public bool FoldsAlreadyRight => Rows.Any(row => IsAlreadyRight(row.Change)) && Rows.Any(row => !IsAlreadyRight(row.Change));
 
     /// <summary>The rows drawn: every row when nothing folds; else the rows to read, then — open — the pages already right, appended in plan order.</summary>
     public IReadOnlyList<Row> DrawnRows(bool open) =>
         !FoldsAlreadyRight || open ? (FoldsAlreadyRight ? RowsToRead.Concat(RowsAlreadyRight).ToList() : Rows) : RowsToRead;
 
-    /// <summary>The disclosure's words, or null when the plan folds nothing.</summary>
+    /// <summary>The checkbox's words, or null when the plan folds nothing.</summary>
     public string? FoldLabel => FoldsAlreadyRight
         ? AssistWording.MenuPlanShowAlready(RowsAlreadyRight.Count, publishing: RowsAlreadyRight[0].Change == Change.AlreadyVisible)
         : null;
 
     /// <summary>
-    /// How many rows tall the table is, counted with the disclosure CLOSED —
+    /// How many rows tall the table is, counted with the checkbox UNTICKED —
     /// the rows to read, never fewer than <see cref="FewestRowsUnderAFold"/>
     /// (or every row, when there are fewer) while pages are folded — so
-    /// opening it never grows the dialog (Russell's ruling on the mac, R8).
+    /// ticking it never grows the dialog (Russell's ruling on the mac, R8).
     /// Before the window's own limit, which the dialog applies after.
     /// </summary>
     public int RowsWhenClosed => FoldsAlreadyRight

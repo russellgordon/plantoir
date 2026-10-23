@@ -135,7 +135,7 @@ public class PlanTableUiTests
             _output.WriteLine($"tab {press}: focus on {at?.ControlType} \"{at?.Name}\" ({id})");
             Assert.False(id.StartsWith("sectionVerbPlanSort"), $"Tab reached the sort header {id} before the table");
             CopyAPageEscapeUiTests.Front(app);
-            Keyboard.Press(VirtualKeyShort.TAB);
+            Keyboard.Type(VirtualKeyShort.TAB);
             Thread.Sleep(250);
         }
         Assert.True(FocusIsIn(app, table), "Tab never put the focus on the plan's table");
@@ -255,16 +255,15 @@ public class PlanTableUiTests
         TabIntoTheTable(app, table);
         // The sort headers come next in the Tab order; Shift+Tab goes back to the table.
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.TAB);
+        Keyboard.Type(VirtualKeyShort.TAB);
         Thread.Sleep(250);
         Assert.Equal("sectionVerbPlanSortPage", app.Window.Automation.FocusedElement()?.Properties.AutomationId.ValueOrDefault);
-        Keyboard.Pressing(VirtualKeyShort.SHIFT);
-        Keyboard.Press(VirtualKeyShort.TAB);
-        Keyboard.Release(VirtualKeyShort.SHIFT);
+        using (Keyboard.Pressing(VirtualKeyShort.SHIFT))
+            Keyboard.Type(VirtualKeyShort.TAB);
         Thread.Sleep(250);
         Assert.True(FocusIsIn(app, table), "Shift+Tab from the first header did not go back to the table");
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         app.AssertAbsent("sectionVerbDialog", "the Publish Pages… dialog, after Escape with the table focused");
 
         Assert.True(NoneChanged(app), "Escape at the plan changed a page");
@@ -280,7 +279,7 @@ public class PlanTableUiTests
         TabIntoTheTable(app, table);
 
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.RETURN);
+        Keyboard.Type(VirtualKeyShort.RETURN);
         var result = WaitFor(app, "sectionVerbResult", "what Publish did, after Return with the table focused");
         _output.WriteLine("result: " + result.Name);
         MenuBar.CloseDialog(app);
@@ -392,13 +391,15 @@ public class PlanTableUiTests
     }
 
     /// <summary>
-    /// #634 (the mac's #622): open the disclosure that folds the pages already
-    /// right, checking its words and that the table's edges do not move.
+    /// #634 (the mac's #622): tick the checkbox (#655; a disclosure until
+    /// then) that folds the pages already right, checking its words and that
+    /// the table's edges do not move.
     /// </summary>
     private static void OpenTheFold(DrivenApp app, AutomationElement table, int already)
     {
-        var fold = WaitFor(app, "sectionVerbPlanAlreadyRight", "the disclosure under the table");
+        var fold = WaitFor(app, "sectionVerbPlanAlreadyRight", "the checkbox under the table");
         Assert.Equal(AssistWording.MenuPlanShowAlready(already, publishing: true), fold.Name);
+        Assert.Equal(FlaUI.Core.Definitions.ControlType.CheckBox, fold.ControlType);
         var before = table.BoundingRectangle;
         if (fold.Patterns.Toggle.Pattern.ToggleState.Value != FlaUI.Core.Definitions.ToggleState.On)
             fold.Patterns.Toggle.Pattern.Toggle();
