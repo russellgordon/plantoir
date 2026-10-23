@@ -532,10 +532,20 @@ fi
 # says, and that the Swift image's recipe holds every pin and flag the
 # contract names. Stdlib only; the compiler itself is the Swift gate below.
 if (cd scripts && python3 test_swift_blocks.py) >/tmp/verify_swift_blocks_test.log 2>&1; then
-  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, and the trail's PLANTOIR_SWIFT: line from a real build log (scripts/test_swift_blocks.py, #493, #635)"
 else
-  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, and the Swift image's pins and flags (scripts/test_swift_blocks.py, #493)"
+  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, and the trail's PLANTOIR_SWIFT: line from a real build log (scripts/test_swift_blocks.py, #493, #635)"
   cat /tmp/verify_swift_blocks_test.log
+fi
+
+# preview.sh's Swift step prints the PLANTOIR_SWIFT: line on every ending but
+# "already there" (#635): its block cut out and run with bash 3.2 against a
+# stand-in docker that runs the real swift_blocks.py got-ready.
+if (cd scripts && python3 test_swift_launcher_marker.py) >/tmp/verify_swift_launcher_marker_test.log 2>&1; then
+  pass "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence (scripts/test_swift_launcher_marker.py, #635)"
+else
+  fail "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence (scripts/test_swift_launcher_marker.py, #635)"
+  cat /tmp/verify_swift_launcher_marker_test.log
 fi
 
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
@@ -1829,6 +1839,40 @@ fi
 if [[ "$SWIFT_GATE_READY" == "true" ]]; then
   SWIFT_IMAGE_SIZE="$(docker images --format '{{.Size}}' "$SWIFT_GATE_TAG" 2>/dev/null | head -1)"
   pass "the Swift image exists from support/swift ($SWIFT_BUILT_HOW, ${SWIFT_IMAGE_SIZE:-size unknown}) (#493)"
+  # The one check of the trail's byte count against the build log BuildKit
+  # really printed for this recipe (#635): only when it was built here. With
+  # --no-cache both download steps ran, so it must be the pins' whole sum for
+  # this Mac's architecture; otherwise it must be a sum the pins can make -
+  # and either way both download steps' headers must have been found, so a
+  # parser that finds none cannot pass by saying 0.
+  if [[ "$SWIFT_BUILT_HOW" == built* ]]; then
+    SWIFT_MARKER_LINE="$(cd scripts && PLANTOIR_CONTRACTS_DIR=../contracts python3 swift_blocks.py got-ready --outcome=built --course=VERIFY --section=1 --log=/tmp/verify_swift_image.log)"
+    SWIFT_MARKER_CHECK="$(cd scripts && PLANTOIR_CONTRACTS_DIR=../contracts NO_CACHE="$NO_CACHE" python3 -c '
+import json, os, sys, contracts, swift_blocks
+line = sys.argv[1]
+got = json.loads(line.split("PLANTOIR_SWIFT:", 1)[1])["downloadedBytes"]
+with open("/tmp/verify_swift_image.log", encoding="utf-8", errors="replace") as log:
+    found = swift_blocks.download_steps_in_log(log.read())
+pins = {pin["pin"]: pin.get("bytes") or 0 for pin in contracts.section("toolchain", "swiftImage", "pins")}
+arch = "arm64" if os.uname().machine in ("arm64", "aarch64") else "amd64"
+steps = contracts.section("shared-rules", "codeRunnerBlocks", "swift", "mac", "downloadSteps")
+sums = [0]
+for step in steps:
+    sums = sums + [already + sum(pins[name] for name in step["counts"][arch]) for already in sums]
+whole = sums[-1]
+if len(found) != len(steps):
+    print("only %d of the %d download steps were found in the log, so 0 bytes would prove nothing" % (len(found), len(steps)))
+elif os.environ.get("NO_CACHE"):
+    print("ok" if got == whole else "%d, not the whole %d" % (got, whole))
+else:
+    print("ok" if got in sums else "%d, which no set of steps makes" % got)
+' "$SWIFT_MARKER_LINE" 2>&1)"
+    if [[ "$SWIFT_MARKER_CHECK" == "ok" ]]; then
+      pass "the Swift image's real build log gives the trail its download size ($SWIFT_MARKER_LINE) (#635)"
+    else
+      fail "the Swift image's real build log does not give the trail a download size the pins make: $SWIFT_MARKER_CHECK (#635)"
+    fi
+  fi
   # The trim (ruling Q2) and the off-PATH wasm-opt (Phase 0 trap 1), as built.
   if docker run --rm "$SWIFT_GATE_TAG" sh -c 'test ! -e /opt/swift/usr/bin/lldb && test ! -e /opt/swift/usr/bin/sourcekit-lsp && test ! -e /opt/swift/usr/lib/swift_static && ! command -v wasm-opt >/dev/null && test -x /opt/binaryen/bin/wasm-opt && test -d /opt/swift-sdks/swift-6.4.0-RELEASE_wasm.artifactbundle' >/dev/null 2>&1; then
     pass "the Swift image is trimmed (no lldb, sourcekit or host libraries), its SDK is installed, and wasm-opt is off PATH (#493)"

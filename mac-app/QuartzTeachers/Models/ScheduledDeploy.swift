@@ -2891,6 +2891,9 @@ enum ScheduledDeploy {
         // app's helpers folder and can install from it, or create the
         // website builder, while nobody is watching (#312).
         HelperBootstrapReport.noteOnTheTrail(from: text)
+        // A scheduled run's build gets Swift ready too, the first time a
+        // course with Swift blocks is published that way (#635).
+        SwiftGotReadyReport.noteOnTheTrail(from: text)
         // A How I Teach page kept off the website this run (#209) — the same
         // reader as the console's, for the same reason as the lines above.
         HowITeachKeptOffReport.noteOnTheTrail(from: text)
