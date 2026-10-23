@@ -105,7 +105,7 @@ public sealed record StartOfYearSheet(
 /// </remarks>
 public static class StartOfYearSheetLayout
 {
-    /// <summary>Rows shown before the table scrolls, as the mac's five.</summary>
+    /// <summary>Rows shown before the table scrolls, as the mac's five, within <see cref="DialogMaxHeight"/>; a taller window adds rows (#634).</summary>
     public const int MostRows = 5;
 
     /// <summary>The fewest rows shown, whatever the window.</summary>
@@ -170,6 +170,16 @@ public static class StartOfYearSheetLayout
         // 4. A window too short for all of that: the notes scroll from two lines.
         if (aboveCap + notesCap + table > room)
             notesCap = Math.Max(Math.Min(notes, NotesFewest), room - aboveCap - table);
+
+        // 5. A window taller than the dialog ever was (#634, the mac's #621):
+        // the height it adds goes to the table, row by measured row.
+        double added = windowHeight - DialogMaxHeight;
+        while (added > 0 && rows < rowHeights.Count && rowHeights[rows] <= added)
+        {
+            added -= rowHeights[rows];
+            rows++;
+        }
+        table = Table(rows);
 
         double height = chrome + aboveCap + table + notesCap;
         bool allShown = rows == rowHeights.Count && notesCap >= notes && aboveCap >= above;

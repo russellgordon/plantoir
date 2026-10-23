@@ -5927,8 +5927,11 @@ stage's `MenuPage.Folder` gives "" for a root page. Left as it is.
 13 = the table's 1-epx border plus the rows' 12 of padding), columns Page 170,
 Folder 150, What changes the rest, each cell trimmed with its whole text in a
 tooltip (as the mac), each row `sectionVerbPlanRow<plan position>` and named
-"title, folder, what changes" for Narrator. No alternating backgrounds.
-REJECTED: `ItemsView` (no columns or header either, and no precedent here);
+"title, folder, what changes" for Narrator. No alternating backgrounds
+until #634, which banded it (and the picker before it, which since #634 is a
+`SelectionMode = Single` table of its own — "The picker as a table, the plan
+folds, the dialogs follow the window", below); since #634 too the column
+widths are set from the dialog's width rather than fixed. REJECTED: `ItemsView` (no columns or header either, and no precedent here);
 a toolkit DataGrid (no toolkit package is in the project, and a dependency
 in the self-contained bundle for one read-only list that the app already
 draws by hand buys nothing a teacher can see — and would be Russell's call).
@@ -5942,7 +5945,10 @@ precedent), so the dialog is the same width at every stage — the mac rejected
 widening mid-flow because the sheet jumps. On a window narrower than 680 + 2 ×
 24 epx it takes the window's width less 24 at each side (at 175% and 200% a
 1920-pixel screen's default window is about 680 and 595 epx wide). The panel
-stretches to it.
+stretched to it. **Superseded by #634:** the width now follows the window
+(680 at its 900-epx minimum, up to 980), carried by a host `Grid` inside the
+dialog at every stage, because the template reads those two resources once —
+see "The picker as a table, the plan folds, the dialogs follow the window".
 
 **Height: what fits the window — a deliberate departure from the mac's fixed
 12 rows.** ContentDialog's content `ScrollViewer` has its vertical scrolling
@@ -5958,11 +5964,14 @@ cap is clamp(min(H, 756) − 230 − 2 − 8 − 4 × 32, 40, 120) epx, and it i
 notes scroller's `MaxHeight`, so a note cut short scrolls into view. Then the
 ROWS: clamp(floor((min(H, 756) − 230 − 2 − shown notes − 8) / 32), 2, 12)
 (`FewestRows` 2), after which the table scrolls inside itself. 756 is
-ContentDialog's own maximum height; 230 is everything else on the stage
+ContentDialog's own maximum height (since #634 the page dialogs raise it, and a
+window taller than 756 gives every further 32 epx to the table as one more
+row — `PlanTableLayout.ExtraRows`; under 756 every count here holds); 230 is everything else on the stage
 (measured 220–222). The counts are made again on `XamlRoot.Changed` while the
 plan shows, so a window resized under the plan does not clip what was counted
-for its old size; the handler is on the WINDOW's XamlRoot, so it is taken off
-in the dialog's `Closed` as well as when the stage moves on — a close at the
+for its old size; the handler is on the WINDOW's XamlRoot, so it is attached on
+`Opened` and taken off in the dialog's `Closed` (since #634 `SetContent` swaps the
+relayout for each stage instead) — a close at the
 plan changes neither, and it would otherwise stay for the window's life
 (the third review). No unit test reaches that: it is window code.
 `PlanTableTests.EverythingFitsWheneverTwoRowsAndTwoLinesOfNotesCan` pins the
@@ -7551,7 +7560,9 @@ names exactly the pages Go will leave as they are. The MCP text
 **The height rule** (`StartOfYearSheetLayout.For`, pure). The mac's fixed
 620 pt budget cannot be copied: this window's minimum height is 600 epx, and
 a ContentDialog cannot scroll content it clips. So the budget is the window's
-height (at most `ContentDialogMaxHeight`, 756) less the measured chrome, and
+height (at most `ContentDialogMaxHeight`, 756 — since #634 a taller window
+gives the table its added height, row by measured row, and the sheet's width
+follows the window as the Section menu's does) less the measured chrome, and
 the parts give way in an order, each scrolling inside itself rather than
 being cut:
 
@@ -7597,6 +7608,202 @@ list 30-odd pages long):
 tables, rows for the staying pages, and a table in the MCP text (the mac's
 rejections, `09-mac-app.md` → "The pages as a table (#589)"). The
 start-of-year picture on plantoir.app is retaken separately.
+
+## The picker as a table, the plan folds, the dialogs follow the window (#634, the mac's #608, #621, #622), v1.8.6
+
+The mac's v1.8.6 changed three things in the Section menu's page sheets
+(`documentation/09-mac-app.md` → "The plan as a table (#524)" → "v1.8.6",
+which has its measurements and what it rejected). This is what Windows did
+with each, and where it could not be the same.
+
+**The wording.** Five keys: `menuPickDateColumn` is the constant
+`AssistWording.MenuPickDateColumn`; the other four are ONE mac method,
+`menuPlanShowAlready(count:publishing:)`. The contract walk resolves every key
+to a member of its own name, so Windows has the dispatcher
+`MenuPlanShowAlready(count, publishing)` — what the dialog calls — and the
+three members it returns (`MenuPlanShowAlreadyHiding(count)`,
+`MenuPlanShowAlreadyOnePage`, `MenuPlanShowAlreadyOnePageHiding`), the shape
+`MenuPlanSummary` set. `ContractTests` asserts all five by hand, through the
+dispatcher, with the generator's samples. No ledger entry, no contract edit.
+
+### 1. The picker and the later-classes question are tables
+
+`Views/TickTable` draws all three: Publish Pages… and Hide Pages…'s first stage
+(Page, Folder, Date) and #475's question at Publish Pages… and at Deploy (Page,
+Date). One builder, so the three cannot drift. A `ListView` with
+`SelectionMode = Single` — there has to BE a selected row for Space to tick —
+1-epx border, a plain header (the mac's picker does not sort, so neither does
+this), each row a `CheckBox` whose content IS the title (trimmed, the whole
+title in its tooltip), the folder, and the date cell: a class's day as
+`AssistWording.LaterClassesDay` says it, empty for a page that is not a class.
+Rows are banded (`SubtleFillColorSecondaryBrush` on alternate rows), counted
+by the rows SHOWN, so a search or a sort never puts two bands together; the
+plan table and Start of Year are banded the same way (the mac's reason: the
+two steps of one flow look alike). Ids: the boxes keep `sectionVerbPage<i>` and
+`laterClass<i>`, the rows are `sectionVerbPageRow<i>` and `laterClassRow<i>`.
+
+**The tick rules, and how each is made:**
+
+- A click on a box ticks it — and a click on its title, which is the box's
+  content (the mac's Xcode-membership shape). Native.
+- Selecting a row ticks nothing. Native: `ListView` selection never touches
+  the box.
+- Space ticks the row with the focus, else the selected row: the list's
+  tunnelling `PreviewKeyDown`. A held Space's repeats are ignored
+  (`KeyStatus.WasKeyDown`), so holding it ticks once rather than flickering. The plan review (amendment 2) asked whether a
+  focused `CheckBox`, which clicks on key-UP, would then flip twice. MEASURED:
+  Space after a mouse click on a box flipped it once with a key-up handler,
+  and once with that handler's key renamed away — so the handler was taken
+  out. (A box whose key-down never arrives has nothing to click on key-up;
+  the test did not read where the focus sat after the click, so that part is
+  reasoning.)
+- Space typed in Find a Page ticks nothing: the field is the list's sibling,
+  so its keys never reach the list's handler.
+- Return with a row selected reaches Continue — when Continue is live —
+  because a `ListView` keeps Return for itself (measured for #548), so the
+  table catches it. At Deploy, a plain `ContentDialog`, Return records "the
+  main button" and hides the dialog, and the answer is read as Hide Ticked and
+  Deploy. Escape needs nothing: it reaches the dialog.
+- **Narrator** hears each row's state: `AutomationProperties.ItemStatus`
+  "ticked" / "not ticked", set on every change (the plan review's amendment 1).
+  A box is named by its title — "title — folder" for two pages of one title —
+  and its row "title, folder, date". **The later-classes box was named
+  "title — day"** while the day was in its words; it is the title now, and the
+  row carries the day.
+
+**The height counts every page offered**, never the search's leftovers, so
+the dialog stays still while the teacher types: `PageTableLayout.PickerRows`
+— up to 12 (the mac's `mostPickerRowsShown`) within 756 epx, fewer on a short
+window, never fewer than two (one for one page), never more than offered — as
+a fixed `Height`.
+
+### 2. The plan folds the pages already right
+
+`PlanTable.RowsToRead` (every change, and every page that stays for a reason:
+kept by an unpublish, a linked class left as it is, no room for a key),
+`RowsAlreadyRight` (already visible, already hidden — those two only),
+`FoldsAlreadyRight` (both non-empty, the mac's `foldsAlreadyRight`),
+`DrawnRows(open)` and `FoldLabel` are pure and unit-tested. The dialog draws
+`DrawnRows(open)` through the ONE sort: one table, one sort. Opened, the
+folded rows are drawn in that sort among the rows to read — in plan order
+they come where the plan puts them (the pages already right are its last
+group), under any other sort mixed among the rest; never a second list. The disclosure is a borderless
+`ToggleButton` with a chevron, 4 epx under the table, closed for every new plan
+(`sectionVerbPlanAlreadyRight`; its Toggle pattern tells Narrator its state).
+REJECTED: `Expander` (a 48-epx header on a card background, with an animation:
+a second panel where the mac's is a line of the table's — the plan review).
+
+**Opening it never grows the dialog** (Russell's ruling on the mac): the
+table's height is FIXED at `PlanTable.RowsWhenClosed` — the rows to read,
+never fewer than five while pages are folded (or every row, when there are
+fewer) — within what the window fits, and the opened rows scroll inside.
+REJECTED: `MaxHeight`, which #548 used: a short list shrinks to its rows and
+grows when the folded ones arrive, which is the mac's measured failure (316 →
+484). The window wins over the five-row floor: on a window that holds two
+rows, two. `PlanTableLayout.For(…, folds)` reserves the disclosure's line
+(`FoldHeight`).
+
+### 3. "Resizable": the window is the dialog's resize handle
+
+A `ContentDialog` has no edge to drag. REJECTED: a drag grip in its corner (no
+Windows dialog has one; the dialog is centred, so a corner grip moves at half
+the pointer's speed; and it would reach into the template). So the teacher
+makes the WINDOW bigger, and the page dialogs — the Section menu's three page
+items, the Deploy question and Start of Year — grow with it, while at any
+window up to the one they were designed for they are exactly the dialogs they
+were: the mac's "opens at its old size, which is its minimum".
+
+- **Width** (`PageTableLayout.DialogWidth`): the old width (680; 548 for the
+  Deploy question, ContentDialog's own) at the window's 900-epx minimum, one
+  epx of dialog per epx of window past it, **at most 300 more (980 and 848)**,
+  never wider than the window less 24 a side. The XAML root is about 14 epx
+  narrower than the window's outer edge, so growth starts about 14 epx past the
+  900 outer minimum. **The 300-epx cap is a Windows-only choice** — the
+  director's ruling of 2026-10-22, pending Russell; the mac's sheets have no
+  maximum, but they open at 560 and grow only when dragged, where a maximised
+  window here would make a 1,700-epx table. It is one constant,
+  `PageTableLayout.MostAdded`.
+- **Live**: the template reads `ContentDialogMinWidth`/`MaxWidth` once, so
+  they are set wide open and a host `Grid` inside the dialog carries the width,
+  every stage drawn in it (so the dialog is one width at every stage, as #548
+  wanted), reset on `XamlRoot.Changed`. The plan's notes are re-measured at
+  the live width on every fit.
+- **Columns**: the plan's Page and What changes share what Folder (150) leaves
+  in #548's proportion — exactly 170 / 150 / 262 at 680 — until What changes
+  reaches 320 (the mac's cap); past that Page takes every epx. Start of Year
+  the same: 170 / 140 / 272 at 680, Why capped at 300. The picker's Folder
+  (140) and Date (170) are fixed; Page takes the rest.
+- **Height**: every fit is #548's and #619's up to 756 epx, ContentDialog's
+  old maximum; a window taller than that gives every further 32 epx to the
+  table as one more row (`PlanTableLayout.ExtraRows`; Start of Year row by
+  measured row), with `ContentDialogMaxHeight` raised so the dialog can use
+  them. Nothing a window up to 756 tall shows has moved
+  (`PlanTableTests.UpTo756TheFitIs548s_AndATallerWindowGivesTheTableRows`
+  compares every height against #548's formula). On this PC (1920 × 1080 at
+  150%) the root is never taller than about 690 epx, so this half is seen only
+  at 100–125%.
+- **"Grows to a taller stage, never shrinks"**: the first half is free — a
+  ContentDialog re-measures at every stage, where the mac's `.fitted` sheet
+  never re-fits and needed `SheetGrowsToItsMinimum`. The second half exists on
+  the mac to keep a size the TEACHER dragged to, and nobody drags here.
+  REJECTED: a `MinHeight` ratchet, which would add jumps nobody asked for.
+
+**Testing it.** Unit: `PageTablesTests` (the fold, its words and its closed
+height; the picker's rows; the widths and columns), `PlanTableTests` (the fit
+with the disclosure, identical to #548 up to 756), `StartOfYearSheetTests`
+(rows above 756), `ContractTests` (the five keys). Through the window
+(`PageTablesUiTests`, opt-in): the tick rules, Space in Find a Page and the
+table's height across a search, Return and Escape with a row selected, the
+fold on a plan of 1 change + 4 already visible (five rows tall, unchanged when
+opened), a wider window; `LaterClassesAtDeployUiTests.TheQuestionIsATable_AndSpaceTicksTheSelectedRow`.
+The trail is unchanged, as on the mac: this is how the choice is shown, not
+what Publish does.
+
+**Measured through the window** (2026-10-22, this PC over a remote session at
+200%: the screen 3024 × 1832 pixels, the main window about 937 × 625 epx, a
+XAML root of 565–590 epx; `PageTablesUiTests`, which writes its numbers to
+`%TEMP%\plantoir-634-measured.txt`):
+
+- **The picker's chrome: 285 epx** against `PageTableLayout.PickerChrome` 300
+  (the dialog box 415 epx tall over a 130-epx table of 4 rows, 4 × 32 + 2), so
+  the estimate keeps a 15-epx margin and was left.
+- **The disclosure: 27 epx tall, 4 epx under the table** — 31 against
+  `PlanTableLayout.FoldHeight` 36, a 5-epx margin, left.
+- **The width:** at a 900-epx window the plan's dialog is 680 wide; widened by
+  400 epx (900 → 1300), the table went from 632 to 932 epx — exactly the
+  300-epx cap — and the app's log read "dialog 980 wide".
+- **The fold:** a plan of 1 change + 4 already visible draws one row in a
+  table five rows tall; opened, five rows, with the table's and Publish's
+  rectangles unchanged to the pixel. #548's 19-row fixture: 18 rows to read,
+  1 folded, the table 8–9 rows tall at a root of 565–590.
+- **Banding**, in light and dark (pictures kept out of the site; the test
+  takes them only with `PLANTOIR_634_PICTURES=1`): the
+  alternate rows read in both themes; in light the band is faint but visible.
+- **Must-fails**, each a one-line change run against its test: Space's key in
+  `TickTable`'s `PreviewKeyDown` renamed (Space → Scroll) — "Space on the
+  selected row did not tick it"; the plan table's `Height` renamed to
+  `MaxHeight` — the table measured 34 epx (one row) instead of five rows'
+  worth; the picker's rows counted from the search's leftovers — 34 epx
+  against 130.
+- **Found on the way:** the sentences above the picker and the question were
+  CENTRED in the wider dialog (a `TextBlock` with a `MaxWidth` narrower than
+  its panel is centred), so `Words` is left-aligned now; at 680 it had been
+  centred by 56 epx since #548. The sentences keep their 520-epx `MaxWidth`
+  in every one of these dialogs — the Deploy question's too, which lost it in
+  the first cut and had its lines run the dialog's whole width — so they read
+  at a book's width even in a 980-epx dialog, and the two later-classes
+  questions lay out alike (the implementation review).
+
+**UI totals:** `PageTablesUiTests` 6 of 6; with `PlanTableUiTests` 10 of 10;
+`LaterClassesAtDeployUiTests` (3, the new table test among them) and
+`SectionVerbsUiTests` passed in the combined run. Two `PlanTableUiTests` were
+corrected for the fold: they open the disclosure before reading the page
+already visible (`OpenTheFold`, which also checks the table does not move).
+UI Automation's Expand does not make the menus re-read what is live (a real
+click or Alt does), so the tests open a fresh app per key; and
+`RunSectionVerb` now queues one more `ApplyMenuEnablement` after its dialog
+has finished closing, since `ShowAsync` returns while the dialog is still a
+popup.
 
 ## One curriculum test, folder segments only (#615), and a linked curriculum page is not "already visible" (#617, the mac's #607)
 

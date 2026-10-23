@@ -2065,29 +2065,23 @@ public sealed partial class SectionDetailView : UserControl
 
         bool meeting = _course.Configuration.ClassNoun == ClassNoun.Meeting;
         string title = meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle;
-        var boxes = new List<(ClassesDatedLater.Page Page, CheckBox Box)>();
-        var list = new StackPanel { Spacing = 2 };
-        int index = 0;
-        foreach (var page in flagged)
-        {
-            string shown = $"{page.Title} — {AssistWording.LaterClassesDay(page.Date!.Value)}";
-            var box = new CheckBox { Content = shown, IsChecked = true };
-            AutomationProperties.SetName(box, shown);
-            AutomationProperties.SetAutomationId(box, $"laterClass{index++}");
-            boxes.Add((page, box));
-            list.Children.Add(box);
-        }
+        // A table, the picker's shape (#634, the mac's #608): Page with its
+        // box, and Date; Space ticks the row, Return is Hide Ticked and Deploy.
+        var table = TickTable.ForLaterClasses(flagged, title);
+        var boxes = table.Rows.Select(row => (Page: flagged[row.Index], row.Box)).ToList();
         var content = new StackPanel { Spacing = 12, MinWidth = 460 };
         content.Children.Add(new TextBlock
         {
             Text = meeting ? AssistWording.LaterClassesAtDeployForAMeeting(nextDay) : AssistWording.LaterClassesAtDeploy(nextDay),
-            TextWrapping = TextWrapping.Wrap, MaxWidth = 520,
+            // A book's width in a dialog that may be 848 wide, left-aligned, as
+            // the Section menu's question says it (SectionVerbDialog.Words).
+            TextWrapping = TextWrapping.Wrap, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left,
         });
-        content.Children.Add(new ScrollViewer { Content = list, MaxHeight = 320 });
+        content.Children.Add(table.Panel);
         content.Children.Add(new TextBlock
         {
             Text = meeting ? AssistWording.LaterClassesKeptNoteForAMeeting : AssistWording.LaterClassesKeptNote,
-            TextWrapping = TextWrapping.Wrap, MaxWidth = 520, Opacity = 0.8,
+            TextWrapping = TextWrapping.Wrap, Opacity = 0.8, MaxWidth = 520, HorizontalAlignment = HorizontalAlignment.Left,
         });
         var dialog = new ContentDialog
         {
@@ -2098,6 +2092,33 @@ public sealed partial class SectionDetailView : UserControl
             CloseButtonText = AssistWording.MenuCancelButton,
             DefaultButton = ContentDialogButton.Primary,
         };
+        // The width follows the window (#634, the mac's #621): 548 — its width
+        // before — at the window's 900-epx minimum, up to 300 more; the content
+        // carries it, since the template reads ContentDialogMaxWidth once.
+        dialog.Resources["ContentDialogMaxWidth"] = 100000.0;
+        dialog.Resources["ContentDialogMaxHeight"] = 100000.0;
+        void Fit(XamlRoot? root)
+        {
+            double width = root is { Size.Width: > 0 }
+                ? PageTableLayout.DialogWidth(PageTableLayout.DeployQuestionWidth, root.Size.Width)
+                : PageTableLayout.DeployQuestionWidth;
+            content.Width = width - 2 * PageTableLayout.DialogPadding;
+            double height = root is { Size.Height: > 0 } ? root.Size.Height : PlanTableLayout.DialogMaxHeight;
+            table.SetRows(PageTableLayout.PickerRows(height, flagged.Count));
+        }
+        Fit(EffectiveXamlRoot);
+        Windows.Foundation.TypedEventHandler<XamlRoot, XamlRootChangedEventArgs> refit = (root, _) => Fit(root);
+        dialog.Opened += (_, _) => { if (dialog.XamlRoot is { } root) { root.Changed += refit; Fit(root); } };
+        dialog.Closed += (_, _) => { if (dialog.XamlRoot is { } root) root.Changed -= refit; };
+        // Return with a row selected is the main button: the list keeps Return
+        // for itself (measured for #548), so the table catches it and the
+        // dialog closes as if Hide Ticked and Deploy had been pressed.
+        bool returnPressed = false;
+        table.Enter = () =>
+        {
+            returnPressed = true;
+            dialog.Hide();
+        };
         AutomationProperties.SetAutomationId(dialog, "laterClassesDialog");
 
         _isAskingAboutLaterClasses = true;
@@ -2105,6 +2126,7 @@ public sealed partial class SectionDetailView : UserControl
         try
         {
             var chosen = await ShowDialogSafelyAsync(dialog);
+            if (returnPressed) chosen = ContentDialogResult.Primary;
             if (chosen is not (ContentDialogResult.Primary or ContentDialogResult.Secondary))
             {
                 ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,

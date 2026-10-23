@@ -100,7 +100,7 @@ public class StartOfYearSheetTests
     [Fact]
     public void ATallWindowShowsFiveRowsAndEverythingElseWhole()
     {
-        var fit = StartOfYearSheetLayout.For(800, 250, 60, 140, 80, 160, Rows(19));
+        var fit = StartOfYearSheetLayout.For(756, 250, 60, 140, 80, 160, Rows(19));
         Assert.Equal(5, fit.Rows);
         Assert.Equal((140, 160), (fit.AboveCap, fit.NotesCap));
         Assert.True(fit.Height <= StartOfYearSheetLayout.DialogMaxHeight);
@@ -113,6 +113,30 @@ public class StartOfYearSheetTests
         Assert.Equal(3, fit.Rows);
         Assert.Equal(3 * 32 + StartOfYearSheetLayout.TableBorder, fit.TableHeight);
         Assert.True(fit.AllShown);
+    }
+
+    /// <summary>
+    /// A window taller than ContentDialog's old 756 gives the table its height,
+    /// row by measured row (#634, the mac's #621) — and nothing else moves.
+    /// Must-fail: adding the rows from the window's whole height.
+    /// </summary>
+    [Fact]
+    public void ATallerWindowGivesTheTableRows_RowByMeasuredRow()
+    {
+        var at756 = StartOfYearSheetLayout.For(756, 250, 60, 140, 80, 160, Rows(19));
+        var at820 = StartOfYearSheetLayout.For(820, 250, 60, 140, 80, 160, Rows(19));
+        Assert.Equal(5 + 2, at820.Rows);                                   // 64 epx more: two 32-epx rows
+        Assert.Equal((at756.AboveCap, at756.NotesCap), (at820.AboveCap, at820.NotesCap));
+        Assert.True(at820.Height <= 820);
+        var twoLine = StartOfYearSheetLayout.For(820, 250, 60, 140, 80, 160, Rows(19, 50));
+        Assert.Equal(StartOfYearSheetLayout.For(756, 250, 60, 140, 80, 160, Rows(19, 50)).Rows + 1, twoLine.Rows);
+        Assert.Equal(3, StartOfYearSheetLayout.For(1400, 250, 0, 60, 40, 100, Rows(3)).Rows);   // never more than there are
+        // Nothing moves at or under 756.
+        for (double height = 400; height <= 756; height += 3)
+        {
+            var fit = StartOfYearSheetLayout.For(height, 250, 60, 140, 80, 160, Rows(19));
+            Assert.True(fit.Rows <= StartOfYearSheetLayout.MostRows, $"{fit.Rows} rows at {height}");
+        }
     }
 
     /// <summary>The rows give way first, down to two, before anything a teacher must read.</summary>
@@ -183,7 +207,7 @@ public class StartOfYearSheetTests
     public void TwoLineRowsAreCountedAtTheirHeight()
     {
         var mixed = new List<double> { 52, 32, 52, 52, 32, 32 };
-        var fit = StartOfYearSheetLayout.For(800, 250, 0, 60, 40, 60, mixed);
+        var fit = StartOfYearSheetLayout.For(756, 250, 0, 60, 40, 60, mixed);
         Assert.Equal(5, fit.Rows);
         Assert.Equal(52 + 32 + 52 + 52 + 32 + StartOfYearSheetLayout.TableBorder, fit.TableHeight);
     }
