@@ -12,6 +12,26 @@ Read this first; the dated entries below are history, newest first, and an earli
 - **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 8d2f1145f — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
+## 2026-10-23 — verify-deploy.ps1: this checkout's recipe, a real first publish, Netlify page addresses (#630, #623, #657)
+
+Branch `issue/657-verify-deploy`.
+
+**#630.** `verify-deploy.ps1` first mirrors its own checkout's launchers and recipe into the working folder's `.toolchain\`. It is a true mirror, as `ToolchainMirror.SyncDirectory` is: stale files are deleted and `__pycache__` is left alone. It rebuilds from scratch only when something changed. `PLANTOIR_RUNTIME` is required and defaults to `windows-app\Vendor\runtime`; a runtime without `vendor\pyodide` is refused. A running Plantoir or plantoir-mcp gets a warning, not a refusal. Each Cloudflare leg waits, for at most 120 s, until production serves the `index.html` it uploaded; a timeout fails.
+
+**#623.** A new flag, `-FirstPublish`, renames the saved surname and the section's site records aside behind a per-path sentinel. It answers with a random surname and restores everything on every exit path. The prompts used to join because, before ConPTY's 30-row screen scrolls, it draws "text, blank line, text" as `…only asked once.\e[8;1HFirst time setup…` and stripping the escape joined the lines. PtyDriver now passes its output through `CursorMoveLineBreaks` first, and gained `--bytes-log`.
+
+**#657.** `Check-PageLinks` runs verify-deploy.sh's own `check_page_links` program on six legs. The folder legs also check that no page carries the marker and that `plantoirPaths` appears exactly 3 times.
+
+**Measured** (i5-8365U, Ethernet):
+- `-FirstPublish`: **167 passed, 0 failed, 0 skipped**. It answered exactly the surname and site-name questions.
+- The plain run against the section's own sites: **166 passed, 0 failed, 0 skipped**.
+- The re-run after the review fixes, `-FirstPublish` again: 166 passed, 0 failed, 0 skipped.
+- Every Netlify and Cloudflare leg: 23 of 23 links answered 200.
+
+New issues: #661 (the app's own console very likely shows the same joins) and #665 (the mac's Cloudflare race). `documentation/12-windows-app.md` → "verify-deploy.ps1".
+
+**Gate:** `dotnet test` Failed 7, Passed 2986, Total 2993. The seven are `dev`'s curriculum-folder and Obsidian-wording cases, plus one `PythonToolchainTests` 3-minute load timeout; a different file timed out when it was re-run alone.
+
 ## 2026-10-23 — the Code page's Swift pictures on Windows (#590)
 
 Branch `issue/590-swift-pictures`. `preview_pages_windows.py` no longer leaves `code-swift` and `code-swift-live` out (`NOT_ON_WINDOWS` is gone); both were taken at 2x by `capture_windows.py --code code-swift-live,code-swift` (fitted scale 2.000 in a 3840 x 2160 Remote Desktop session at 200%, taskbar showing), read back against `expectText`, promoted to `windows: true`, and taken off `WINDOWS_PICTURE_OWED`; `site.json` → `runnable-swift` is `windows: true`, so the Code page drops its Mac-only line, and its download sentence gives both sizes. The first ICS4U preview compiled its one block in 4.73 s (Swift already ready). `documentation/12-windows-app.md` → "The Code page's Swift pictures (#590)". Gates: `website/test_build_data.py` and `build.py --check`.
