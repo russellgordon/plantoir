@@ -264,7 +264,7 @@ public class PlanTableTests
     /// Whenever the window can hold the chrome, the fewest rows and two lines
     /// of notes, everything fits — so nothing is clipped from outside, where
     /// the notes' own scroll bar could not reach it. Long notes give way first.
-    /// Since #634 also with the disclosure under the table, and above 756 epx,
+    /// Since #634 also with the disclosure (a checkbox since #655) under the table, and above 756 epx,
     /// where the window's added height goes to the rows.
     /// </summary>
     [Theory]
