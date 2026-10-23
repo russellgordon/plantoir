@@ -533,19 +533,18 @@ class PreviewPageSceneTests(unittest.TestCase):
 
     def test_the_windows_code_and_quiz_passes_take_only_their_own(self):
         # #590: capture_windows.py --code / --quizzes (preview_pages_windows.py)
-        # take each scene's own pages and not the Swift two, which stay
-        # owed until their 2x picture is taken. Plain Python,
-        # so it runs on either machine.
+        # take each scene's own pages -- the Swift two as well since their 2x
+        # pictures were taken on 2026-10-23 (they were left out until then).
+        # Plain Python, so it runs on either machine.
         sys.path.insert(0, str(build.WEBSITE / "shots"))
         import preview_pages_windows
         self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("code")],
-                         ["code-python", "code-python-live", "code-python-error", "code-quiz"])
+                         ["code-python", "code-python-live", "code-python-error", "code-swift-live", "code-swift",
+                          "code-quiz"])
         self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("quizzes")],
                          ["quiz-math", "quiz-chemistry", "quiz-english", "quiz-code-run"])
-        self.assertEqual(preview_pages_windows.preview_page_shots("code", ["code-swift"]), [])
-        # The two left out are real shots, so leaving them out is a decision
-        # rather than a stale name.
-        identifiers = [shot["id"] for shot in self.manifest_shots()]
+        self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("code", ["code-swift"])],
+                         ["code-swift"])
         # Each figure's page, named as the planting steps name it, so the
         # changed-page guard can match their report: a page planted from
         # CODE_PAGES or folders.json, or one of the ready-made course's.
@@ -566,9 +565,6 @@ class PreviewPageSceneTests(unittest.TestCase):
                     self.assertTrue(label in known or shared.is_file(), label)
         self.assertEqual(preview_pages_windows.page_label({"course": "ICS3U", "path": "/Warm-Ups/Spot-the-Bug"}),
                          "ICS3U/Warm-Ups/Spot the Bug.md")
-        for excluded in preview_pages_windows.NOT_ON_WINDOWS:
-            with self.subTest(excluded=excluded):
-                self.assertIn(excluded, identifiers)
         for shot in preview_pages_windows.preview_page_shots("code") + preview_pages_windows.preview_page_shots("quizzes"):
             with self.subTest(shot=shot["id"]):
                 self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).exists())
