@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Plantoir.Core.Models;
@@ -49,22 +51,72 @@ public static class CurriculumRules
     private static readonly Regex BlockAnchorRegex = new(@"\s+\^[A-Za-z0-9_-]+$", RegexOptions.Compiled);
 
     /// <summary>
-    /// Checks whether a page path is inside a curriculum folder.
-    /// Matches any folder segment containing "curriculum" (case-insensitive);
-    /// the file name itself is ignored.
+    /// True when a page, given by its path RELATIVE TO THE COURSE, is in a
+    /// curriculum folder (shared-rules.json → curriculumRules.isCurriculumPage).
+    /// Splits the path and hands its folders to <see cref="IsCurriculum"/>;
+    /// the file name is dropped. For a full path on disk use
+    /// <see cref="PagePaths.IsCurriculum(string, string, IReadOnlyList{string})"/>,
+    /// which makes it relative to the course first, so a working folder called
+    /// "Curriculum Work" does not make every page curriculum.
     /// </summary>
-    public static bool IsCurriculumPage(string path)
+    public static bool IsCurriculumPage(string relativePath, IReadOnlyList<string> declared)
     {
-        if (string.IsNullOrWhiteSpace(path)) return false;
+        if (string.IsNullOrWhiteSpace(relativePath)) return false;
+        var segments = relativePath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 2) return false;                 // a page at the top has no folder
+        return IsCurriculum(segments[..^1], declared);
+    }
 
-        string normalized = path.Replace('\\', '/');
-        var segments = normalized.Split('/');
-        for (int i = 0; i < segments.Length - 1; i++)
-        {
-            if (segments[i].Contains("curriculum", StringComparison.OrdinalIgnoreCase))
+    /// <summary>
+    /// The one curriculum rule (#614, the mac's
+    /// <c>AssistCurriculumMentions.isCurriculum(folderSegments:declared:)</c>),
+    /// without a disk: the page's FOLDER segments relative to the course, its
+    /// file name already dropped, and the names the course declares
+    /// (<see cref="CourseConfiguration.CurriculumFolders"/>: curriculum_folders,
+    /// then the legacy curriculum_folder).
+    ///
+    /// <list type="number">
+    /// <item>A leading section folder (<c>section2</c>) is set aside, and is
+    /// never itself compared with a declared name.</item>
+    /// <item>DECLARED: the first folder left equals a declared name, ignoring
+    /// letter case. Top level only — that is the folder the build maps; a
+    /// lesson subfolder sharing the name is not it.</item>
+    /// <item>BY NAME, kept beside it: any folder contains "curriculum",
+    /// ignoring letter case. A course made from scratch declares nothing, and
+    /// a page wrongly kept up costs nothing students did not already see,
+    /// while one wrongly hidden breaks every class that embeds it.</item>
+    /// <item>The file name never counts (#615).</item>
+    /// </list>
+    ///
+    /// Both sides are NFC-normalised before comparing: Swift's <c>==</c>
+    /// treats the composed and decomposed forms of an accent as equal, and an
+    /// ordinal comparison in C# does not, so a folder typed one way and
+    /// declared the other would otherwise miss.
+    /// </summary>
+    public static bool IsCurriculum(IReadOnlyList<string> folderSegments, IReadOnlyList<string> declared)
+    {
+        var folders = folderSegments.Where(s => !string.IsNullOrEmpty(s)).ToList();
+        if (folders.Count > 0 && HowITeachPage.IsASectionFolderName(folders[0])) folders.RemoveAt(0);
+        if (folders.Count == 0) return false;
+
+        string top = Normalised(folders[0]);
+        foreach (string name in declared)
+            if (!string.IsNullOrEmpty(name) && string.Equals(Normalised(name), top, StringComparison.OrdinalIgnoreCase))
                 return true;
-        }
-        return false;
+
+        return folders.Any(folder => folder.Contains("curriculum", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// NFC, or the name as it is when it cannot be normalised. NTFS allows a
+    /// lone surrogate in a folder name and <see cref="string.Normalize()"/>
+    /// throws on one; several callers loop over a whole course with no catch,
+    /// so a throw here would fail the plan rather than one comparison.
+    /// </summary>
+    private static string Normalised(string name)
+    {
+        try { return name.Normalize(); }
+        catch (ArgumentException) { return name; }
     }
 
     /// <summary>
