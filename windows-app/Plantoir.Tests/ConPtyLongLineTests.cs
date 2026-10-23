@@ -175,7 +175,13 @@ public sealed class ConPtyLongLineTests : IDisposable
         var runner = new ScriptRunner(context);
         context.Send(_ => runner.Run("preview.ps1", new[] { "MPM2D", "1" }, _folder), null);
         var waited = runner.WaitUntilFinished();
-        Assert.Same(waited, await Task.WhenAny(waited, Task.Delay(TimeSpan.FromSeconds(90))));
+        if (await Task.WhenAny(waited, Task.Delay(TimeSpan.FromSeconds(90))) != waited)
+        {
+            // Stop the tree (powershell, node, python) so Dispose can delete the folder.
+            runner.Terminate();
+            await runner.WaitUntilFinishedOrKill(10_000);
+            Assert.Fail("the child did not finish within 90 s");
+        }
         // Let the last posted flush run before reading.
         context.Send(_ => { }, null);
 
@@ -226,8 +232,12 @@ public sealed class ConPtyLongLineTests : IDisposable
         string text;
         lock (raw) text = raw.ToString();
         runner.ReceiveOutput(text);
-        Assert.Empty(runner.HealthFindings);
-        Assert.Contains(runner.Transcript.Lines, line => line.StartsWith("at block with a line like", StringComparison.Ordinal));
+        const string why =
+            "The CONTROL failed: at 400 columns the long line no longer split, so conhost has changed how it " +
+            "repaints a wrapped line. The product is NOT broken (the test above proves the line arrives whole). " +
+            "Re-measure before narrowing the screen: documentation/12-windows-app.md -> \"How wide the console is, and why\".";
+        Assert.True(runner.HealthFindings.Count == 0, why);
+        Assert.True(runner.Transcript.Lines.Any(line => line.StartsWith("at block with a line like", StringComparison.Ordinal)), why);
     }
 
     /// <summary>One thread, in order — the interface thread the app posts to.</summary>
