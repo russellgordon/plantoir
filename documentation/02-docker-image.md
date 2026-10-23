@@ -598,7 +598,7 @@ in an isolated buildx builder:**
 | OpenSSL / undici | 3.0.19 / 6.24.1 | 3.5.9 / 6.29.1 |
 | global `WebSocket` | undefined | a function |
 | `tls.rootCertificates` | 144, four emSign roots incl. ECC Root CA - G3 | **116**, emSign Root CA - G1 only, neither #639 subject |
-| image size | 1.80 GB (409,188,226 bytes) | 1.85 GB (419,682,603 bytes) |
+| image size (`docker images`; in brackets, the compressed size `docker inspect` reports) | 1.80 GB (409,188,226 bytes compressed) | 1.85 GB (419,682,603 bytes compressed) |
 | cold build | 87 s | 84 s |
 | Quartz + tikz engine `npm ls --all --long` | 665 lines | identical, no EBADENGINE, same lockfile |
 
