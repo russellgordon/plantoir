@@ -8907,8 +8907,10 @@ after, the temp vaults' window files removed):
   settings dialog in the main window, and Obsidian opens it in a window of its
   own while a vault leaves `settingsPopoutWindow` at its default, true. The
   sentence telling the teacher to close that window is back at the end of
-  `wording.offerMessage` AND `windowsWording.offerMessage`; Windows owes it in
-  its own wording source (the `windows` issue that #627 opened). The detail is
+  `wording.offerMessage` AND `windowsWording.offerMessage`, and Windows says it
+  too since #656 (`ObsidianFigureAddOnsWording.OfferMessage`, pinned whole
+  against `windowsWording.offerMessage` by
+  `ObsidianFigureAddOnsTests.TheWordsAreTheContractsWithWindowsOwnTwo`). The detail is
   in `documentation/09-mac-app.md` → "Obsidian's add-ons for diagrams and
   graphs (#495)" → "Teacher words".
 - The reopen, with two vaults open, one minimised, a pop-out of the other, and
