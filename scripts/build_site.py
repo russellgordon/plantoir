@@ -1778,6 +1778,77 @@ def _wire_isolation_nav(spa_ts: Path) -> None:
     spa_ts.write_text(text[:at] + _ISOLATION_NAV_LINES + text[at:], encoding="utf-8")
 
 
+# Page addresses on Netlify (#628, contracts/shared-rules.json ->
+# netlifyPageAddresses): a Netlify publish lower-cases a page's links in memory
+# and marks the page `data-plantoir-paths="lowercase"` (netlify_paths.py), so
+# a link written into the page asks for the address Netlify serves rather than
+# one it answers with a 301. These edits make the site's router and its link
+# previews do the same for the addresses they make themselves - the explorer,
+# search and the graph - and ONLY when the marker is on the page: the preview,
+# a folder publish and Cloudflare Pages carry no marker and behave exactly as
+# before. Same origin only; the query and the fragment are kept.
+SERVED_CASE_MARKER = "PLANTOIR-SERVED-CASE"
+
+_SERVED_CASE_IMPORT = 'import { fetchCanonical } from "./util"\n'
+_SERVED_CASE_FUNCTION = (
+    "// " + SERVED_CASE_MARKER + " (#628, netlifyPageAddresses): on a page a Netlify publish marked,\n"
+    "// ask for a page at the lower-case address Netlify serves it from. Unmarked: unchanged.\n"
+    "function plantoirServedCase(url: URL): URL {\n"
+    "  if (document.documentElement.dataset.plantoirPaths !== \"lowercase\") return url\n"
+    "  if (url.origin !== window.location.origin) return url\n"
+    "  const served = new URL(url.toString())\n"
+    "  served.pathname = url.pathname.replace(/%[0-9A-Fa-f]{2}|[A-Z]+/g, (piece) =>\n"
+    "    piece.startsWith(\"%\") ? piece : piece.toLowerCase(),\n"
+    "  )\n"
+    "  return served\n"
+    "}\n"
+)
+_SERVED_CASE_EDITS = {
+    "spa.inline.ts": (
+        (
+            '  return { url: new URL(href), scroll: "routerNoscroll" in a.dataset ? false : undefined }\n',
+            '  return { url: plantoirServedCase(new URL(href)), scroll: "routerNoscroll" in a.dataset ? false : undefined }\n',
+        ),
+        (
+            "async function navigate(url: URL, isBack: boolean = false) {\n  if (isNavigating) return\n",
+            "async function navigate(url: URL, isBack: boolean = false) {\n  url = plantoirServedCase(url)\n  if (isNavigating) return\n",
+        ),
+    ),
+    "popover.inline.ts": (
+        (
+            "  const targetUrl = new URL(link.href)\n",
+            "  const targetUrl = plantoirServedCase(new URL(link.href))\n",
+        ),
+    ),
+}
+
+
+def _wire_served_case(script_ts: Path) -> None:
+    """The router (spa.inline.ts: the link a click follows, and every
+    navigation, which the graph and search reach through spaNavigate) and the
+    link previews (popover.inline.ts) ask for a page at the lower-case address
+    on a page a Netlify publish marked (#628). Idempotent: the marker is
+    written once. All of a file's anchors or none: one that has moved warns
+    and leaves the file as Quartz wrote it, which costs a redirect, never a
+    link."""
+    edits = _SERVED_CASE_EDITS.get(script_ts.name)
+    if edits is None:
+        return
+    text = script_ts.read_text(encoding="utf-8")
+    if SERVED_CASE_MARKER in text:
+        return
+    anchors = [_SERVED_CASE_IMPORT] + [old for old, _ in edits]
+    for anchor in anchors:
+        if text.count(anchor) != 1:
+            print("⚠️ Could not let the site's links ask Netlify for each page's own address: the page router has changed shape.")
+            return
+    for old, new in edits:
+        text = text.replace(old, new)
+    at = text.index(_SERVED_CASE_IMPORT) + len(_SERVED_CASE_IMPORT)
+    text = text[:at] + "\n" + _SERVED_CASE_FUNCTION + text[at:]
+    script_ts.write_text(text, encoding="utf-8")
+
+
 def _wire_emitters_index(index_ts: Path) -> None:
     """Export My Progress's emitter (#545) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
@@ -1946,7 +2017,9 @@ def wire_quartz_additions(output_dir: Path) -> None:
     folder pages' table of contents (#520), and
     live input's two (#583: the preview's server sends the isolation
     headers, and Quartz's router loads a page whole across the isolation
-    line).
+    line), and the served case's two (#628: the router and the link
+    previews ask Netlify for a page's lower-case address, only on a page a
+    Netlify publish marked).
     Idempotent; an anchor that has moved warns and leaves the file alone.
 
     Deliberately NOT a third edit to mermaid.inline.ts (an event saying the
@@ -1968,6 +2041,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.layout.ts", _wire_list_page_toc),
         (output_dir / "quartz" / "cli" / "handlers.js", _wire_isolation_serve),
         (output_dir / "quartz" / "components" / "scripts" / "spa.inline.ts", _wire_isolation_nav),
+        (output_dir / "quartz" / "components" / "scripts" / "spa.inline.ts", _wire_served_case),
+        (output_dir / "quartz" / "components" / "scripts" / "popover.inline.ts", _wire_served_case),
     ):
         try:
             wire(path)
