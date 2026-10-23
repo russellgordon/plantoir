@@ -278,6 +278,7 @@ can turn the entry into a "?" and drop it. So clean and rebuild in ONE
 command, and check the bundle is back before saying a word:
 
 ```bash
+export DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer   # the release Xcode (#613)
 cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir clean && \
   xcodegen generate && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir \
     -destination 'platform=macOS' build
