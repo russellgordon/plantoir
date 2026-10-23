@@ -33,10 +33,21 @@ public class FollowingLinksContractTests : IDisposable
         File.WriteAllText(Path.Combine(_folder, "deploy.ps1"), "# marker");
         string directory = Path.Combine(_folder, "courses", Course);
         Directory.CreateDirectory(Path.Combine(directory, "section1", "All Classes"));
-        File.WriteAllText(Path.Combine(directory, "course_config.json"), $$"""
+        WriteConfig(curriculumFolders: null);
+    }
+
+    /// <summary>
+    /// The course's course_config.json. A case's <c>curriculumFolders</c>
+    /// (#614) is written as <c>curriculum_folders</c> before the course is
+    /// read; absent means the course declares none.
+    /// </summary>
+    private void WriteConfig(JsonArray? curriculumFolders)
+    {
+        string declared = curriculumFolders is null ? "" : $", \"curriculum_folders\": {curriculumFolders.ToJsonString()}";
+        File.WriteAllText(Path.Combine(_folder, "courses", Course, "course_config.json"), $$"""
             { "course_code": "{{Course}}", "course_name": "A course", "deploy_target": "netlify",
               "num_sections": 1, "per_section_folders": ["All Classes"], "per_section_files": [],
-              "section_numbers": [1] }
+              "section_numbers": [1]{{declared}} }
             """);
     }
 
@@ -58,6 +69,7 @@ public class FollowingLinksContractTests : IDisposable
     public async Task Case_MatchesContract(string list, string name)
     {
         var c = Following[list]!["cases"]!.AsArray().First(x => x!["name"]!.ToString() == name)!;
+        WriteConfig(c["curriculumFolders"]?.AsArray());
         var written = Lay(c["pages"]!.AsArray());
         var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
         var progress = new Progress<ProgressNotificationValue>(_ => { });

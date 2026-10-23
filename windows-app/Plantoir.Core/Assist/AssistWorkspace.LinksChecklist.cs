@@ -227,7 +227,7 @@ public sealed partial class AssistWorkspace
             .Select(c => Path.GetFullPath(PagePaths.ResolveInside(_folder, c.Page.RelativePath)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var graph = LinkGraph.Build(course.DirectoryPath, section);
+        var graph = LinkGraph.Build(course, section);
         var classPaths = ClassPages(course, section).Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var placeOfPath = pages.ToDictionary(p => Path.GetFullPath(p.Value), p => p.Key, StringComparer.OrdinalIgnoreCase);
 
@@ -323,7 +323,7 @@ public sealed partial class AssistWorkspace
             // earliest class anywhere that can reach it, which is what the
             // assistant's date rule would pick through a visible overview.
             var classPaths = ClassPages(course, section).Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var graph = LinkGraph.Build(course.DirectoryPath, section);
+            var graph = LinkGraph.Build(course, section);
             var dated = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var cls in stillHiddenClasses)
             {

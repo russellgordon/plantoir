@@ -51,7 +51,9 @@ public class StartOfYearTests : IDisposable
             "\"shared_folders\":[\"Concepts\"],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[\"Key Links.md\"]" +
             (c["naming"] is JsonNode naming
                 ? $",\"unit_word\":\"{naming["word"]}\",\"class_page_scheme\":\"{naming["scheme"]}\",\"class_noun\":\"{naming["noun"]}\""
-                : "") + "}");
+                : "") +
+            // #614: the folders the course declares, written before the course is read.
+            (c["curriculumFolders"] is JsonArray declared ? $",\"curriculum_folders\":{declared.ToJsonString()}" : "") + "}");
 
         var paths = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var page in c["pages"]!.AsArray())

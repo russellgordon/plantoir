@@ -2425,6 +2425,27 @@ moved (the local tool digest is unchanged); tool OUTPUT changes, which is the
 fix. No trail line changes: the publish and unpublish events carry counts,
 not reasons.
 
+**On Windows (#647).** The same rule is
+`CurriculumRules.IsCurriculum(folderSegments, declared)`, reached through
+`PagePaths.IsCurriculum(courseDirectory, fullPath, declared)`, with the
+declared list a REQUIRED argument. Its callers are the twins of the table
+above:
+- `ReasonToKeep` and the #617 publish trim, through
+  `AssistWorkspace.IsCurriculumPage`;
+- `ProtectedFromHiding`;
+- the Start of Year plan's kinds and `CurriculumCount`;
+- `ReferenceDates`;
+- `CurriculumExpectations`;
+- `LinkGraph.Unreferenced`, which is `check_section`'s orphan list.
+
+The section folder is set aside with `HowITeachPage.IsASectionFolderName`
+(case-sensitive, ASCII digits, as on the mac). Both names are NFC-normalised
+before an `OrdinalIgnoreCase` comparison. Before #647, two of those callers
+(the expectations list and the orphan list) tested the FULL path, working
+folder included; they read folders inside the course now. Details:
+`12-windows-app.md` → "A folder the course declares is curriculum, whatever
+it is called (#647, the mac's #614)".
+
 ### What counts as a link
 
 Settled 2026-09-26,
