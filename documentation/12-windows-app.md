@@ -5969,8 +5969,9 @@ window taller than 756 gives every further 32 epx to the table as one more
 row — `PlanTableLayout.ExtraRows`; under 756 every count here holds); 230 is everything else on the stage
 (measured 220–222). The counts are made again on `XamlRoot.Changed` while the
 plan shows, so a window resized under the plan does not clip what was counted
-for its old size; the handler is on the WINDOW's XamlRoot, so it is taken off
-in the dialog's `Closed` as well as when the stage moves on — a close at the
+for its old size; the handler is on the WINDOW's XamlRoot, so it is attached on
+`Opened` and taken off in the dialog's `Closed` (since #634 `SetContent` swaps the
+relayout for each stage instead) — a close at the
 plan changes neither, and it would otherwise stay for the window's life
 (the third review). No unit test reaches that: it is window code.
 `PlanTableTests.EverythingFitsWheneverTwoRowsAndTwoLinesOfNotesCan` pins the
