@@ -392,13 +392,15 @@ public class PlanTableUiTests
     }
 
     /// <summary>
-    /// #634 (the mac's #622): open the disclosure that folds the pages already
-    /// right, checking its words and that the table's edges do not move.
+    /// #634 (the mac's #622): tick the checkbox (#655; a disclosure until
+    /// then) that folds the pages already right, checking its words and that
+    /// the table's edges do not move.
     /// </summary>
     private static void OpenTheFold(DrivenApp app, AutomationElement table, int already)
     {
-        var fold = WaitFor(app, "sectionVerbPlanAlreadyRight", "the disclosure under the table");
+        var fold = WaitFor(app, "sectionVerbPlanAlreadyRight", "the checkbox under the table");
         Assert.Equal(AssistWording.MenuPlanShowAlready(already, publishing: true), fold.Name);
+        Assert.Equal(FlaUI.Core.Definitions.ControlType.CheckBox, fold.ControlType);
         var before = table.BoundingRectangle;
         if (fold.Patterns.Toggle.Pattern.ToggleState.Value != FlaUI.Core.Definitions.ToggleState.On)
             fold.Patterns.Toggle.Pattern.Toggle();

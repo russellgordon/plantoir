@@ -327,8 +327,8 @@ public class ContractTests
         Assert.Equal(wording["menuPlanSummaryOnePage"]!.ToString(), AssistWording.MenuPlanSummary(1, 0, publishing: true));
         Assert.Equal(wording["planNothingWouldChange"]!.ToString(), AssistWording.MenuPlanSummary(0, 5, publishing: true));
 
-        // #634 (mac #608, #622): the picker's Date column, and the disclosure
-        // that folds the pages already right — one dispatcher, four keys.
+        // #634 (mac #608, #622): the picker's Date column, and the checkbox
+        // (a disclosure until #655) that folds the pages already right — one dispatcher, four keys.
         Assert.Equal(wording["menuPickDateColumn"]!.ToString(), AssistWording.MenuPickDateColumn);
         Assert.Equal(wording["menuPlanShowAlready"]!.ToString(), AssistWording.MenuPlanShowAlready(16, publishing: true));
         Assert.Equal(wording["menuPlanShowAlreadyHiding"]!.ToString(), AssistWording.MenuPlanShowAlready(2, publishing: false));
