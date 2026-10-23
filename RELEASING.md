@@ -180,8 +180,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    from that exact installer, and commit it** ("The update feed (Windows)",
    below) — the `cut-release` skill does not do this for you, and a Windows
    release whose feed was not rebuilt is one no installed copy is offered.
-4. **Build the signed & notarized macOS bundle**:
-   `cd mac-app; ./publish.sh -Sign`. Output lands in `mac-app/dist/Plantoir-macOS.dmg`.
+4. **Build the signed & notarized macOS bundle**, with **Xcode 26.6**:
+   `cd mac-app; DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer ./publish.sh -Sign`. Output lands in `mac-app/dist/Plantoir-macOS.dmg`.
+   `xcodebuild` otherwise uses whatever `xcode-select` points at, which on this
+   Mac is 27.0 — so name the Xcode, and check the `Xcode:` line `publish.sh`
+   prints in its step 3 says 26.6 before notarization starts (#613; why 26.6
+   and not 27: `documentation/09-mac-app.md` → "Building with two Xcodes").
    Since #204 it also signs the updater inside the app item by item and REFUSES
    a bundle whose updater is not on the app's own team, before notarization.
    Since #312 it also fetches and signs the website builder's helper programs
@@ -295,9 +299,18 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
    Output: **`dist/PlantoirSetup.exe`** (and portable `dist/Plantoir-win-x64.zip`) + SHA-256.
 
-4. **Build the signed macOS bundle**:
+4. **Build the signed macOS bundle**, with **Xcode 26.6** — the release
+   Xcode until a deliberate piece moves it (#613):
 
-       ./publish.sh -Sign
+       DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer ./publish.sh -Sign
+
+   Name the Xcode every time: `xcodebuild` otherwise uses whatever
+   `xcode-select` points at, and on this Mac that has been 27.0 since
+   2026-10-13. `publish.sh` prints `Xcode: …` in its step 3, with the folder
+   it came from; check it says 26.6 before notarization starts. A new SDK
+   changes behaviour on the newest macOS through linked-on-or-after checks,
+   which nobody here can see from a macOS 26 Mac, so moving to 27 is its own
+   piece (`documentation/09-mac-app.md` → "Building with two Xcodes (#613)").
 
    One-time tooling on the Mac:
    - Developer ID Application certificate installed in Keychain Access
@@ -693,7 +706,7 @@ Spotlight's list.
 | Step | Tag | What |
 |---|---|---|
 | R0 | LOCAL | Record Russell's app: `defaults read /Applications/Plantoir.app/Contents/Info.plist CFBundleShortVersionString` and `CFBundleVersion`, and `codesign -dvvv /Applications/Plantoir.app 2>&1 \| grep CDHash=` — written down, for C3. Also written down: `defaults read ca.russellgordon.Plantoir 2>/dev/null \| grep -c '"\?SU'` (0 on 1.3.1, which has no updater), `mdfind "kMDItemCFBundleIdentifier == 'ca.russellgordon.Plantoir'"` (his copies today), and `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock docker ps --format '{{.Names}} {{.Ports}}'` (the ports his containers hold). Russell creates a standard account of his choosing and writes its short name down here as `<account>` (this run: `plantoir`); C2 and C3 use that name. |
-| R1 | IDENTITY | In Russell's account, on the issue branch: `./publish.sh -Sign --rehearsal-feed https://plantoir.app/updates/rehearsal-204/macos.xml` → build **A** (version `<v>-rehearsal.<build>`, `dist/Plantoir-macOS-REHEARSAL.dmg`; keep a copy as A). Record build, size, SHA-256, the notarization id. **The positive team check, and must-fail (b):** the run passing `check-signatures.sh` is the first. Then, BEFORE R2 (whose `publish.sh` run `rm -rf`s `mac-app/build/`): `ditto mac-app/build/Plantoir.app /tmp/r1b/Plantoir.app`, and with `ID` the identity publish.sh printed: `codesign --force --sign - --options runtime /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate`; `codesign --force --timestamp --options runtime --sign "$ID" /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework`; `codesign --force --timestamp --options runtime --entitlements mac-app/QuartzTeachers/QuartzTeachers.entitlements --sign "$ID" /tmp/r1b/Plantoir.app`; then `mac-app/release/check-signatures.sh /tmp/r1b/Plantoir.app` must exit 1 naming `Autoupdate` twice (WRONG TEAM and NO SECURE TIMESTAMP) and nothing else. Delete `/tmp/r1b` after. |
+| R1 | IDENTITY | In Russell's account, on the issue branch, with the release Xcode named as step 4 names it: `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer ./publish.sh -Sign --rehearsal-feed https://plantoir.app/updates/rehearsal-204/macos.xml` → build **A** (version `<v>-rehearsal.<build>`, `dist/Plantoir-macOS-REHEARSAL.dmg`; keep a copy as A). Record build, size, SHA-256, the notarization id, and the `Xcode:` line publish.sh printed in its step 3 (it must say 26.6, #613). **The positive team check, and must-fail (b):** the run passing `check-signatures.sh` is the first. Then, BEFORE R2 (whose `publish.sh` run `rm -rf`s `mac-app/build/`): `ditto mac-app/build/Plantoir.app /tmp/r1b/Plantoir.app`, and with `ID` the identity publish.sh printed: `codesign --force --sign - --options runtime /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate`; `codesign --force --timestamp --options runtime --sign "$ID" /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework`; `codesign --force --timestamp --options runtime --entitlements mac-app/QuartzTeachers/QuartzTeachers.entitlements --sign "$ID" /tmp/r1b/Plantoir.app`; then `mac-app/release/check-signatures.sh /tmp/r1b/Plantoir.app` must exit 1 naming `Autoupdate` twice (WRONG TEAM and NO SECURE TIMESTAMP) and nothing else. Delete `/tmp/r1b` after. |
 | R2 | IDENTITY | One commit later, build **B** the same way. Then `rm -rf mac-app/build` so no Release build is left registered with Launch Services in his account. |
 | R3 | IDENTITY | Twice, A first then B: `python3 website/update_feed.py macos --version <A's or B's own version, the "-rehearsal.<build>" string> --dmg <that DMG> --notes <a short notes file> --rehearsal website/updates/rehearsal-204/macos.xml --download-prefix https://github.com/russellgordon/plantoir/releases/download/v<v>-rehearsal-204/` — B's run with `--required-warning` and a fake warning in its notes, so the feed holds both items and both sections of notes. `--version` must be the rehearsal string or the DMG is refused as "built before the version was raised" (which here only means the wrong string was typed). Both items name the same download address, and only B is uploaded: harmless, since A is the version installed and never offered. From the main checkout the Keychain does not ask (Always Allow since 2026-09-29, above); from a worktree it asks twice each run — answer **Allow**. Never committed (`.gitignore`). |
 | R4 | OUTWARD | `gh release create v<v>-rehearsal-204 --prerelease --target <the issue branch's commit> -R russellgordon/plantoir` with B's DMG (`Plantoir-macOS-REHEARSAL.dmg`). `--target` keeps the tag off `main`. Then V9. |

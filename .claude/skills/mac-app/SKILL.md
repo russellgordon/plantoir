@@ -154,6 +154,13 @@ silently.
    `xcodegen` first, always: the project file is generated and NOT committed,
    so a new file exists for the compiler only after it runs.
 
+   **Name the Xcode: prefix both commands with `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer`.**
+   `xcode-select` points at 27.0, and releases are built with 26.6. Both
+   Xcodes write the SAME DerivedData folder, the one his Dock icon names, so
+   an unprefixed build hands him a 27.0 copy. Then `build-for-testing` under
+   27.0 into a scratch `-derivedDataPath` — never the shared folder — so the
+   source keeps building under both (`MAC-BOOTSTRAP.md` §4, #613).
+
 2. **Run the unit tests**, which are fast and worth having every time:
    ```bash
    xcodebuild -project Plantoir.xcodeproj -scheme Plantoir \
