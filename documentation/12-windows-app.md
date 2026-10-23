@@ -290,8 +290,8 @@ marker jumped it forward several steps at once.
 (`ConPtyProcess.LauncherColumns`, passed by `ScriptRunner.Run`). Everything
 else that calls `ConPtyProcess.Start` — PtyDriver, the harnesses,
 `ConPtyRedirectedParentTests` — keeps the 400-column default, deliberately:
-#623's work on reading cursor moves as line breaks (branch
-`issue/657-verify-deploy`) reads PtyDriver's output at 400, and widening it
+#623's work on reading cursor moves as line breaks (12 → "verify-deploy.ps1",
+`CursorMoveLineBreaks.cs`) reads PtyDriver's output at 400, and widening it
 under that work would change what it measures. Widening PtyDriver is left to
 a later issue if anybody wants it.
 
@@ -351,7 +351,8 @@ every width. A launcher that ever downloads something large through
 `Invoke-WebRequest` should set `$ProgressPreference = 'SilentlyContinue'`
 around it. What 8,192 buys over 4,096 is room: at about 40 characters a page,
 a `PLANTOIR_DATED:` line passes 4,096 at roughly 100 re-dated pages and 8,192
-at roughly 200, and a full year's course nears 100. 32,767 would buy more room
+at roughly 200, and the largest ready-made courses (SPH3U, SCH4U) re-date at
+most 88 class pages per section. 32,767 would buy more room
 at four times 400's repaint time.
 
 **The lengths it has to hold.** A one-block plain-code finding is 531-611
