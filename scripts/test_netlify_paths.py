@@ -373,6 +373,12 @@ SPA_SHAPE = (
     "  if (isNavigating) return\n"
     "}\n"
 )
+SEARCH_SHAPE = (
+    'import { registerEscapeHandler, removeAllChildren } from "./util"\n'
+    "  async function fetchContent(slug: FullSlug): Promise<Element[]> {\n"
+    "    const targetUrl = resolveUrl(slug).toString()\n"
+    "  }\n"
+)
 POPOVER_SHAPE = (
     'import { fetchCanonical } from "./util"\n'
     "async function mouseEnterHandler() {\n"
@@ -407,6 +413,12 @@ class BuildEditTests(unittest.TestCase):
         self.assertEqual(text.count(build_site.SERVED_CASE_MARKER), 1)
         self.assertIn("const targetUrl = plantoirServedCase(new URL(link.href))", text)
 
+    def test_search_previews_ask_for_the_served_address(self):
+        text, said = self.wired("search.inline.ts", SEARCH_SHAPE)
+        self.assertEqual(said, "")
+        self.assertEqual(text.count(build_site.SERVED_CASE_MARKER), 1)
+        self.assertIn("const targetUrl = plantoirServedCase(resolveUrl(slug)).toString()", text)
+
     def test_the_edit_is_a_no_op_without_the_mark_and_off_the_sites_origin(self):
         function = build_site._SERVED_CASE_FUNCTION
         self.assertIn('if (document.documentElement.dataset.plantoirPaths !== "lowercase") return url', function)
@@ -427,6 +439,7 @@ class BuildEditTests(unittest.TestCase):
         source = inspect.getsource(build_site.wire_quartz_additions)
         self.assertIn('"spa.inline.ts", _wire_served_case)', source)
         self.assertIn('"popover.inline.ts", _wire_served_case)', source)
+        self.assertIn('"search.inline.ts", _wire_served_case)', source)
 
     def test_quartzs_own_files_take_the_edit(self):
         """Against Quartz's real files where they are (the image's
@@ -438,7 +451,7 @@ class BuildEditTests(unittest.TestCase):
                 found = folder
         if found is None:
             self.skipTest("no Quartz scaffold on this machine (verify.sh step 6 checks the built one)")
-        for name in ("spa.inline.ts", "popover.inline.ts"):
+        for name in ("spa.inline.ts", "popover.inline.ts", "search.inline.ts"):
             text, said = self.wired(name, (found / name).read_text(encoding="utf-8"))
             self.assertEqual(said, "", name)
             self.assertEqual(text.count(build_site.SERVED_CASE_MARKER), 1, name)

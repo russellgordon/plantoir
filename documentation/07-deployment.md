@@ -894,8 +894,9 @@ named.
    marker `PLANTOIR-SERVED-CASE`, in `wire_quartz_additions` beside the
    isolation edits): the router (`spa.inline.ts`, in `getOpts` so
    `isSamePage` compares like with like, and at the top of `navigate`, which
-   the graph and search reach through `spaNavigate`) and the link previews
-   (`popover.inline.ts`) lower-case a same-origin URL's pathname, keeping its
+   the graph and search reach through `spaNavigate`), the link previews
+   (`popover.inline.ts`) and search's result previews (`search.inline.ts`,
+   whose `fetchContent` fetches the page itself) lower-case a same-origin URL's pathname, keeping its
    query, fragment and %-escapes, ONLY when the page carries the marker. No
    marker - the preview, a folder, Cloudflare - and nothing changes. The
    script lands in `postscript.js`, a file, so the CSP does not move. An

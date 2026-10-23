@@ -3699,12 +3699,12 @@ fi
 # page keeps its inline scripts' hashes, changes nothing on a second pass,
 # keeps every data-slug and wears the marker once, no same-site page link
 # keeps a capital in its path, and no page the BUILD wrote carries the marker.
-# The site's script carries the router's and the link previews' edit once
-# each (the function reads dataset.plantoirPaths once; a doubled edit would
-# read it four times). The build keeps no scaffold beside public/, so the
+# The site's script carries the router's, the link previews' and search's
+# edit once each (the function reads dataset.plantoirPaths once per file; a
+# doubled edit would read it six times). The build keeps no scaffold beside public/, so the
 # script is where the edit is seen; test_netlify_paths.py pins the marker.
 if (cd scripts && python3 test_netlify_paths.py --site "../$SITE_PUBLIC") >/tmp/verify_netlify_paths_site.log 2>&1 \
-   && [ "$(grep -o 'plantoirPaths' "$SITE_PUBLIC/postscript.js" 2>/dev/null | wc -l | tr -d ' ')" = "2" ]; then
+   && [ "$(grep -o 'plantoirPaths' "$SITE_PUBLIC/postscript.js" 2>/dev/null | wc -l | tr -d ' ')" = "3" ]; then
   pass "page addresses on Netlify: the built site's links lower-case as a Netlify publish sends them with nothing else moved - $(tail -1 /tmp/verify_netlify_paths_site.log) - and the router and link previews carry the edit once (#628)"
 else
   fail "page addresses on Netlify: the built site does not take the netlifyPageAddresses rule, or the router's edit is missing or doubled (#628)"

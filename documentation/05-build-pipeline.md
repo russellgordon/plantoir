@@ -1907,8 +1907,8 @@ itself, both in the ALWAYS section and idempotent (`wire_quartz_additions`):
 the preview server's `cli/handlers.js` (`PLANTOIR-ISOLATION-SERVE`) sends the
 isolation headers per request, and the router's `spa.inline.ts`
 (`PLANTOIR-ISOLATION-NAV`) loads a page whole across the isolation line.
-Two more beside them since #628 (`PLANTOIR-SERVED-CASE`, `_wire_served_case`):
-the router and the link previews ask for a page's lower-case address, only on
+Three more beside them since #628 (`PLANTOIR-SERVED-CASE`, `_wire_served_case`):
+the router, the link previews and search's result previews ask for a page's lower-case address, only on
 a page a Netlify publish marked (07 → "Page addresses on Netlify"). The
 build itself prints no note: in preview mode Quartz builds inside its server,
 after `build_site.py` could read anything, so the `plantoir: note:` line for
