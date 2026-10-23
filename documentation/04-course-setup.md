@@ -591,7 +591,9 @@ functions (in the image by `verify.sh`, on Windows by `PythonToolchainTests`).
   line (`buildRepairs.marker`) naming course, section, repair and page; the
   mac puts it on the trail as `folder problem repaired` with the repair's
   `trailLine` (`BuildRepairReport`, from the console in `ScriptRunner` and
-  from a scheduled run's log in `ScheduledDeploy.recordFolderProblems`). The
+  from a scheduled run's log in `ScheduledDeploy.recordFolderProblems`;
+  Windows the same, plus a run `plantoir-mcp` started — `BuildRepairReport.cs`
+  in `ScriptRunner`, `ScheduledHealthFindings` and `LauncherRunner`, #645). The
   line is hidden from the console by the one rule for every `PLANTOIR_` line
   (`transcriptStripping.machineLines`). A build that could quote only its
   copy prints no marker and leaves no trail line, as the date pass's linked

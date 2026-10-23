@@ -3949,12 +3949,12 @@ legacy `curriculum_folder` naming the primary.
 `PLANTOIR_MAPS:` is read from the console (`ScriptRunner`) and from a scheduled
 publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
 `Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
-reader would never see the line. A wrapper written before this keeps its old
-scan until its schedule is set again. `PLANTOIR_MY_PROGRESS:` (#599) rides the
-same three places — the console reader, the record reader and the wrapper's
-scan — and a wrapper written before #599 likewise misses it until the
-schedule is set again ("My Progress: the trail line and the two readers
-(#599)" below).
+reader would never see the line. The wrapper is written afresh by `ScheduledRun` at the moment each run starts (since bundle 3), so a deploy already scheduled scans for a new marker from its next run, once the `Plantoir.exe` it was registered with (`TaskScheduling.RunnerExecutable`) has been updated in place, with no need to schedule it again. Only a task set before bundle 3 runs its own baked wrapper, once, and misses it. `PLANTOIR_MY_PROGRESS:` (#599)
+and `PLANTOIR_REPAIRED:` (#645) ride the same three places — the console
+reader, the record reader and the wrapper's scan — the same way ("My
+Progress: the trail line and the two readers (#599)" below). (This said a
+wrapper "keeps its old scan until its schedule is set again" until
+2026-10-23, which has not been true of a task set since bundle 3.)
 
 The build prints the line from the contract's own prefix
 (`build_site.announce_coverage_maps` reads `coverageMapsBuilt.marker.prefix`
@@ -7668,9 +7668,9 @@ longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
 `SwiftGotReady.cs`, in both readers (the console's
 `ScriptRunner.RecordHealthFinding`, and the scheduled publish's
 `ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
-(`TaskScheduling.cs`). A wrapper written before this change keeps no
-`PLANTOIR_SWIFT:` line until that deploy is scheduled again, as for
-`PLANTOIR_MY_PROGRESS:`. Neither event carries `appliesOn`: the mac has
+(`TaskScheduling.cs`). A deploy already scheduled picks the line up from its
+next run, because `ScheduledRun` writes the wrapper afresh each time (see
+`PLANTOIR_MAPS:` above). Neither event carries `appliesOn`: the mac has
 recorded both since v1.9.0 (#635), from the same `PLANTOIR_SWIFT:` line, which
 `preview.sh` prints after building its Swift image (05 → "Recorded on the
 trail, on both platforms"). Its bytes and reasons are worked out by
@@ -7774,10 +7774,9 @@ What Windows owed:
   the `CoverageMapsBuilt` pattern — in the console reader
   (`ScriptRunner.RecordHealthFinding`, and the 8000-character carry guard),
   the scheduled publish's record reader (`ScheduledHealthFindings`) and the
-  wrapper's marker scan (`TaskScheduling.cs`). A scheduled-deploy wrapper
-  written before this change has no `PLANTOIR_MY_PROGRESS:` in its scan, so a
-  scheduled run's line reaches the trail only once that deploy is scheduled
-  again — the same as for `PLANTOIR_MAPS:`. The sentences are
+  wrapper's marker scan (`TaskScheduling.cs`). A deploy already scheduled
+  scans for it from its next run, since `ScheduledRun` writes the wrapper
+  afresh each time; only a task set before bundle 3 misses it, once. The sentences are
   `myProgressBuilt.trailLine.shapes`, "N page(s)" spelled 1 page / N pages.
 - **`include_my_progress` and `success_criteria_headings`**, read-only
   (`CourseConfiguration.IncludesMyProgress(section)`, `SuccessCriteriaHeadings`;
@@ -8273,9 +8272,16 @@ no Plantoir writer produces. `SiteHealthRepair.RestoreIndex` quotes the course n
 puts back. Courses already made with a plain colon title are put right by
 their next build from 1.9.0 (#584): the shared `build_site.py` quotes the
 front page's title itself, so Windows inherits the repair and its console
-sentence, and owes only the `PLANTOIR_REPAIRED:` trail line —
+sentence. The `PLANTOIR_REPAIRED:` line is read by `BuildRepairReport` in all
+three places a build's output arrives — the console (`ScriptRunner`), a
+scheduled run's record (`ScheduledHealthFindings`, through the wrapper's
+`Select-String` scan) and a run `plantoir-mcp` started (`LauncherRunner`) —
+and written as `folder problem repaired` with `trailLine`; a repair key this
+app does not know writes nothing (#645, `BuildRepairReportTests`) —
 [04 → "A course made before 1.8.1 is put right by its next
-build"](04-course-setup.md).
+build"](04-course-setup.md). `LauncherRunner` also drops every other machine
+line (`TranscriptBuilder.IsMachineLine`) before it reports progress, so no
+`PLANTOIR_` JSON reaches the assistant's progress text.
 
 **Not on disk, on purpose.** The contract's seventh folder case is `Unit 1:
 Kinematics`, and NTFS refuses `:` in a name, so every case runs IN MEMORY
