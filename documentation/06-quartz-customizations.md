@@ -689,12 +689,56 @@ answer toggles the same class; plan finding C). On Print:
    fixture's 30-line displayed formula on LANDSCAPE paper (taller than the
    6.85 in content box; a formula is one line box and cannot split) and
    passed it on portrait; the fixture now carries 20 lines.
-6b. `print()`; restored again when `print()` returns, in case a browser never
-   sends `afterprint` (review N4). That is right where `print()` waits for the
-   dialog to close — Safari, Chrome and Edge, measured — and UNMEASURED in
-   Firefox, where a `print()` that returned at once would take the frame away
-   mid-print. `afterprint` restores the theme and removes the frame (measured
-   in Safari: Cancel fires it too; the page came back dark with no frame).
+6b. `print()`, and the page put back only once the print is known to have
+   happened (#576, v1.9.0; the rule is `printOutcome` in `printRules.ts`, its
+   cases `shared-rules.json` → `printablePages.printRequest`). **`print()`
+   does not always print before it returns**, and the old step — restore the
+   moment it returns, in case a browser never sends `afterprint` (review N4)
+   — took the frame away before WebKit's print in the fallback. What each
+   browser does, measured:
+   - Safari's paged path, Chrome and Edge: `print()` blocks with the dialog up
+     (8.6 s until Cancel, Safari) and sends `beforeprint` and `afterprint`
+     inside it. **Safari sends both to the PAGE's window, never to the
+     frame's** (0 of 8 sheets), so the old `afterprint` listener on
+     `frame.contentWindow` never fired there; only the restore after the
+     return put Safari back. Cancel fires `afterprint` too.
+   - Headless Chrome for Testing 155: `beforeprint` on the FRAME's window,
+     synchronously inside `print()`, and never `afterprint` (3 of 3, plan
+     review).
+   - WebKit asked to print a frame still loading a face or a picture:
+     `print()` returns in 0 ms, sends nothing, and prints when the frame has
+     loaded — if the frame is still there. Safari 26.6 on the fallback:
+     `print()` called ~90 ms after the press with `fonts.status` "loading",
+     frame removed 3 ms after it returned, no sheet (3 of 3, any page size);
+     with the frame's removal suppressed, the sheet opened **39 ms later**.
+   So `beforeprint` and `afterprint` are heard on BOTH windows, and
+   `printablePages.words.preparing` goes on `beforeprint` (not before
+   `print()` is called). When `print()` returns having sent either event, the
+   page is put back at once — waiting for an `afterprint` headless Chrome
+   never sends would hold the button. When it returns having sent neither,
+   the frame stays and the page waits for the rest of the budget:
+   `afterprint` puts it back, `beforeprint` alone keeps it waiting (its sheet
+   may be up), and when the budget runs out it is put back — saying
+   `printablePages.words.couldNotPrepare` only if no `beforeprint` ever came.
+   **One budget, 30 s from the press** (`PRINT_BUDGET_MS`, `printRequest.budgetMs`),
+   covers everything "Preparing to print…" waits on, not a chain of limits:
+   the pictures of step 3a (a picture that never arrives used to leave the
+   words up until a reload, #576 comment 2; now `couldNotPrepare` and
+   nothing printed), the fallback's settling (below) and the wait after
+   `print()`. The Paged.js steps keep their own limits and are otherwise
+   unchanged — a page whose faces were held 7 s took 35 s to reach `print()`
+   in Safari and still printed, which leaves the budget spent; it prints on
+   (the dialog sends the events), and only a browser that sends nothing then
+   gets `couldNotPrepare` at once. `restore()` clears every timer and takes
+   the listeners off the page's window. **The Safari event order for a print
+   WebKit put off is UNMEASURED** (the re-run was stopped on 2026-10-23
+   because Russell was using Safari): the design assumes the late print
+   sends `beforeprint` and `afterprint` to the page's window as its other
+   prints do, and that its sheet holds the page's timers while it is up. If
+   it sends neither, the reader still gets their print and the page is put
+   back by the budget — with `couldNotPrepare` under a print that worked,
+   which is the reason to run `research/print-safari/safari_print.sh` once on
+   this change. Firefox remains unmeasured.
 
 **Fallback:** Paged.js missing or failing → the same frame printed by the
 browser, corners where it prints margin boxes (Chrome, Edge), one count for
@@ -705,6 +749,61 @@ and the console warns once, and the browser check FAILS if the fixture takes
 the fallback. The fallback still prints everything, so it shows no sentence
 to the reader: one telling Safari users their page numbers are missing would
 be wrong in Chrome, which prints them (review S6 considered; REJECTED).
+
+**Until #576 (v1.9.0) the fallback printed NOTHING in Safari** — "Preparing
+to print…", then nothing, 3 of 3 forced runs in Safari 26.6, a small page as
+much as a long one (`research/print-safari/FINDINGS.md`). It called `print()`
+on the frame straight after `index.css` loaded, with the frame's faces still
+loading and, over a real network, its pictures too (2 of 2 pending); WebKit
+put the print off and step 6b's restore took the frame away. Chrome prints
+whatever state the frame is in, which is why it went unseen. Since #576 the
+fallback lays the frame out (which is what asks for its faces) and waits for
+`fonts.ready` and every picture's `decode()` — again while a face is still
+loading — inside the budget, and gives up with `couldNotPrepare`, printing
+nothing, if they have not come by then. Russell's report (#576) came from
+1.7.2, whose fallback was taken after an in-site page change (the relative
+`index.css` href, #494, fixed in 1.8.0): the live page printed on the Paged.js
+path in real Safari on 2026-10-23, directly and from the home page (2 of 2).
+What still reaches the fallback is `paged.min.js` failing to load, or Paged.js
+throwing on some content.
+
+`browser-checks/print_fallback.mjs` (verify.sh 6h) drives it in headless
+Chrome for Testing on the planted `Discussions/Print Fallback Fixture` (one
+folder down, a table of contents, 16 code blocks, two pictures), with
+`paged.min.js` answered 404 and the frame's `print()` replaced by a stand-in
+that answers as a given browser does: (A) pictures held 1.5 s and faces 1 s —
+at `print()` none pending and fonts "loaded"; (B) a print put off — the frame
+still there at a late `beforeprint` on the page's window and put back after
+`afterprint`; (C) a print that never comes — `couldNotPrepare` by the
+budget; (D) pictures that never arrive — `couldNotPrepare`, no `print()`;
+(E) a late `beforeprint` and no `afterprint` — put back quietly by the budget,
+and the button prints again; (F) headless Chrome's own `print()` — put back
+at once. A to E each FAILED on the code before #576 (copy-and-restore of
+`print.inline.ts`, 2026-10-23: at the old `print()` fonts were "loading" with
+2 of 2 pictures pending under (A), and "loading" even with nothing held under
+(C) — the Safari finding, reproduced in Chrome's state at the call; the frame
+was gone at (B)'s and (E)'s `beforeprint`; (C) ended saying nothing and (D)
+said "Preparing to print…" at 33 s); (F) is a guard and passed on both. The
+five checks that replace the frame's `print()` to read the handout
+(`print_handout`, `maths_offline`, `code_runner`, `quiz_check`, `task_boxes`)
+send `beforeprint` then `afterprint` from their stand-ins, as a real print
+does; without them the page would now wait out the budget after each and
+then say `couldNotPrepare`.
+
+REJECTED for #576: **a fixed delay before `print()`** — a guess at a race
+(CLAUDE.md), and WebKit's own deferral already waits for exactly the right
+moment if the frame is left alone; **polling the frame's `readyState`** — it
+read "complete" at the call (the frame is written with `document.write`, so
+its load finished long before its faces); **listening on the frame's window
+only** — Safari never fires there; **restoring only on `afterprint`** —
+headless Chrome never sends it, so every print would hold the button for the
+whole budget (plan review); **separate limits per wait** (15 s for pictures,
+15 s for the print) — chained limits add up to a minute of "Preparing to
+print…", so there is one budget (plan review). **safaridriver as the WebKit
+gate** — under automation WebKit skips printing altogether (below), so it
+cannot see a print sheet; the sheet stays a manual check
+(`research/print-safari/safari_print.sh`, which needs Safari's "Allow
+JavaScript from Apple Events" and Accessibility access for the terminal).
 
 ### F4. ⌘P on a printable page
 
@@ -1208,7 +1307,12 @@ Safari does not, and there a pinch zooms the page) — so a plain scroll
   administrator's password) and a restart of the running Safari turn on. Measured: the handout of a
   printable fixture with 11 figures, from dark mode, in all three modes and
   both papers: every piece laid out (29 of 29), none split, lettering
-  rgb(0, 0, 0), the 530 px tree whole.
+  rgb(0, 0, 0), the 530 px tree whole. (Even with remote automation on, it
+  would not show a PRINT: under safaridriver `print()` returns in 0 ms with no
+  event and no sheet, Safari 26.6, measured for #576 —
+  `research/print-safari/FINDINGS.md`. Reading what the page holds at the
+  moment it calls `print()` still works, which is what #597's WebKit leg can
+  carry; its stand-in must send the print events, as the Chrome checks' do.)
 
 **Found in passing, not E1's, and fixed in the same release:** Quartz's own ⌘P on a page that is NOT
 printable used to overlay the sidebar's folder list on page 2 of the paper and
