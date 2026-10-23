@@ -1762,6 +1762,71 @@ if [[ -z "$RUNNER_ENGINE_PROBLEMS" ]]; then
 else
   fail "The image's Pyodide or katex does not match contracts/toolchain.json: $RUNNER_ENGINE_PROBLEMS"
 fi
+# The certificate store (#639), by its pin: Debian's ca-certificates at
+# least the floor, neither root it distrusts left anywhere a TLS client here
+# looks - the bundle (curl, and Node with --use-openssl-ca), Python's default
+# context (urllib: every Netlify publish) and the hashed folder OpenSSL also
+# searches - and still more than 100 certificates, so an empty store, which
+# trusts nothing, cannot pass for one that distrusts the right two.
+CA_STORE_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'CAPY'
+import json, subprocess, sys
+pin = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "caCertificates"][0]
+inside = r"""
+import glob, json, re, ssl, subprocess, sys
+floor, names = sys.argv[1], sys.argv[2:]
+version = subprocess.run(["dpkg-query", "-W", "-f=${Version}", "ca-certificates"],
+                         capture_output=True, text=True).stdout.strip()
+at_least = subprocess.run(["dpkg", "--compare-versions", version, "ge", floor]).returncode == 0
+def common_names(context):
+    found = []
+    for cert in context.get_ca_certs():
+        for part in cert.get("subject", ()):
+            for key, value in part:
+                if key == "commonName":
+                    found.append(value)
+    return found
+default_context = ssl.create_default_context()
+default_names = common_names(default_context)
+bundle = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+bundle.load_verify_locations(cafile="/etc/ssl/certs/ca-certificates.crt")
+bundle_names = common_names(bundle)
+folder_subjects = []
+for path in sorted(glob.glob("/etc/ssl/certs/*.0")):
+    folder_subjects.append(subprocess.run(["openssl", "x509", "-noout", "-subject", "-in", path],
+                                          capture_output=True, text=True).stdout)
+print(json.dumps({"version": version, "atLeast": at_least, "count": len(default_context.get_ca_certs()),
+                  "default": [n for n in names if n in default_names],
+                  "bundle": [n for n in names if n in bundle_names],
+                  "folder": [n for n in names
+                             if any(re.search("CN ?= ?" + re.escape(n) + "(,|$)", s, re.M) for s in folder_subjects)]}))
+"""
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "python3", "-c", inside, pin["value"]] + pin["mustNotTrust"],
+                     capture_output=True, text=True)
+problems = []
+try:
+    found = json.loads(run.stdout)
+except ValueError:
+    print("PROBLEMS the store could not be read: " + (run.stderr.strip()[-300:] or "no output"))
+    sys.exit(0)
+if not found["atLeast"]:
+    problems.append(f"ca-certificates is {found['version'] or 'missing'}, older than {pin['value']}")
+for place, label in (("bundle", "the bundle"), ("default", "Python's default context"), ("folder", "/etc/ssl/certs")):
+    if found[place]:
+        problems.append(f"{label} still trusts " + " and ".join(found[place]))
+if found["count"] <= 100:
+    problems.append(f"Python's default context holds {found['count']} certificates, not more than 100")
+if problems:
+    print("PROBLEMS " + "; ".join(problems))
+else:
+    print(f"OK ca-certificates {found['version']} (at least {pin['value']}), holds {found['count']} certificates, "
+          f"and trusts neither " + " nor ".join(pin["mustNotTrust"]))
+CAPY
+)"
+if [[ "$CA_STORE_REPORT" == OK* ]]; then
+  pass "The image's certificate store is ${CA_STORE_REPORT#OK } (#639)"
+else
+  fail "The image's certificate store does not match contracts/toolchain.json -> caCertificates: ${CA_STORE_REPORT#PROBLEMS }"
+fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
 # -------------------- 4a. The live-reload client is still the one the rule names --------------------
