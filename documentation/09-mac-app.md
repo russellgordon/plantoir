@@ -3980,8 +3980,9 @@ reader should know, on Obsidian **1.14.4** (`documentation/12-windows-app.md` �
 trust question chooses "Browse vault in Restricted Mode", as here; and after
 "Trust author and enable plugins" Obsidian 1.14.4 OPENED Settings ▸ Community
 plugins in a window of its own, first-time trust and after Restricted Mode
-alike — the opposite of #582's measurement on 1.13.7, so either 1.14 changed
-it or Windows differs.
+alike. That contradicted #582's measurement on 1.13.7, and the mac re-measured
+it (#627, 2026-10-23): Obsidian does the same here, on 1.13.7 and 1.14.4, and
+#582 was a false negative — "Teacher words", below.
 
 **Where the files come from.** Carried, never downloaded on the yes:
 `mac-app/Vendor/fetch-obsidian-addons.sh` reads every id, version, size,
@@ -4139,13 +4140,36 @@ from 1.13.7's `i18n.js` — "Trust author and enable plugins", "Browse vault in
 Restricted Mode", "Community plugins", "Exit Restricted mode". The trust
 question puts its focus on "Browse vault in Restricted Mode", so the offer
 says Return chooses the other button. After Trust, Obsidian switches the
-add-ons on and goes straight on: it does NOT open Settings ▸ Community plugins
-(the live check counted `.modal.mod-settings` at 0, with the open note
-redrawing at once). The offer used to say it did — review S9 had read that
-from Obsidian's code — and told the teacher to close the settings; #582 took
-that sentence out of `offerMessage` (both platforms) and corrected
-`wording.note`. The
-key is per vault, so six courses with figures mean six trust clicks.
+add-ons on and opens Settings ▸ "Community plugins" **in a window of its own**,
+showing them switched on, so `offerMessage` (both platforms) ends by telling
+the teacher to close that window and carry on.
+
+That sentence has been in, out and back in, and the history is the reason to
+trust the third state. Review S9 read it from Obsidian's code and the offer
+said it (#495). #582 took it out after the 2026-10-17 live check counted
+`.modal.mod-settings` at 0 on 1.13.7. Windows then saw the Settings window on
+1.14.4 (#581), and #627 re-measured on the mac on 2026-10-23: an isolated
+Obsidian (HOME and `--user-data-dir` both redirected — `HOME` alone hands off
+to a running Obsidian and exits — `--use-mock-keychain`, buttons pressed by
+name over the debugging port, no keystrokes), a fresh vault per run written the
+way `ObsidianFigureAddOns.install` writes one, on the running package **1.13.7**
+and on **1.14.4** from Obsidian's release asset, each with a first-time trust
+and with a trust after "Browse vault in Restricted Mode" and a relaunch.
+**8 of 8 runs opened Settings** — a second window, "Settings - <vault> -
+Obsidian <version>", 900 × 700, on "Community plugins", both add-ons on — and
+in every run the MAIN window's `.modal.mod-settings` count was 0. That is why
+#582 missed it: the trust button calls `setting.open()` then
+`openTabById("community-plugins")` in both versions, and the settings dialog
+goes into a pop-out window while the vault's `settingsPopoutWindow` is at its
+default, true (Plantoir's `app.json` does not set it). The check looked in the
+one window the dialog never uses. It was a false negative, not a version or
+platform difference. Measured in passing, and not acted on here: choosing
+Restricted Mode is not remembered — Obsidian asks the trust question again at
+the next open, on both versions — so `settingFooter`'s "Exit Restricted mode"
+advice is for a course where Restricted mode was switched on in Obsidian's
+settings.
+
+The key is per vault, so six courses with figures mean six trust clicks.
 
 **The trail** — four events (`activityTrail.mustRecord`): "obsidian add-ons
 offered" (the answer, or why a course was not asked), "obsidian add-ons added"
