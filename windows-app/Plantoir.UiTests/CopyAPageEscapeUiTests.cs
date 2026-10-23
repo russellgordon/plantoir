@@ -43,7 +43,7 @@ public class CopyAPageEscapeUiTests
     internal static void PressEscape(DrivenApp app)
     {
         Front(app);
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         Thread.Sleep(600);
     }
 

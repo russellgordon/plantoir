@@ -46,7 +46,7 @@ public class AcceleratorUnderDialogUiTests
     {
         switch (key)
         {
-            case "F2": Keyboard.Press(VirtualKeyShort.F2); break;
+            case "F2": Keyboard.Type(VirtualKeyShort.F2); break;
             case "Ctrl+Shift+R": Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_R); break;
             case "Ctrl+N": Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_N); break;
             case "Ctrl+O": Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_O); break;
