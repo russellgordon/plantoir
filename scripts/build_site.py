@@ -29,6 +29,7 @@ import page_visibility
 import page_features
 import figures
 import swift_blocks
+import site_said
 import print_settings
 import quizzes
 import my_progress
@@ -1778,15 +1779,29 @@ def _wire_isolation_nav(spa_ts: Path) -> None:
     spa_ts.write_text(text[:at] + _ISOLATION_NAV_LINES + text[at:], encoding="utf-8")
 
 
+# Plantoir's emitters, each exported beside Quartz's own once: My Progress's
+# (#545), then the one that says what the site found (#567). Each has its own
+# check, so a section wired before #567 - which already exports the first -
+# gets the second on its next build.
+_PLANTOIR_EMITTERS = (
+    ("PlantoirProgress", "./plantoirProgress"),
+    ("PlantoirSiteSaid", "./plantoirSiteSaid"),
+)
+
+
 def _wire_emitters_index(index_ts: Path) -> None:
-    """Export My Progress's emitter (#545) beside Quartz's own."""
+    """Export Plantoir's emitters (#545, #567) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
-    if "export { PlantoirProgress }" in text:
-        return
-    if not text.endswith("\n"):
-        text += "\n"
-    text += f'export {{ PlantoirProgress }} from "./plantoirProgress" // {QUARTZ_ADDITIONS_MARKER}\n'
-    index_ts.write_text(text, encoding="utf-8")
+    changed = False
+    for name, module in _PLANTOIR_EMITTERS:
+        if f"export {{ {name} }}" in text:
+            continue
+        if not text.endswith("\n"):
+            text += "\n"
+        text += f'export {{ {name} }} from "{module}" // {QUARTZ_ADDITIONS_MARKER}\n'
+        changed = True
+    if changed:
+        index_ts.write_text(text, encoding="utf-8")
 
 
 def _wire_progress_emitter(config_ts: Path) -> None:
@@ -1807,6 +1822,31 @@ def _wire_progress_emitter(config_ts: Path) -> None:
         print("⚠️ Could not add the My Progress page: the site's settings have changed shape.")
         return
     text = text[:line_start] + indent + "Plugin.PlantoirProgress(),\n" + text[line_start:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_site_said_emitter(config_ts: Path) -> None:
+    """Put the emitter that says what the site found (#567, siteHealth ->
+    runnableCodeShownAsPlainCode) straight BEFORE Assets, like My
+    Progress's: an emitter runs after every transformer, so each page's
+    file.data already holds what the runnable-code transformer recorded, and
+    every emitter finishes before Quartz says it is done - so before a
+    preview's server answers. It writes no file, so its place changes nothing
+    else."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirSiteSaid(" in text:
+        return
+    anchor = "Plugin.Assets(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        return
+    at = text.index(anchor)
+    line_start = text.rfind("\n", 0, at) + 1
+    indent = text[line_start:at]
+    if indent.strip():
+        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        return
+    text = text[:line_start] + indent + "Plugin.PlantoirSiteSaid(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -1943,6 +1983,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
     Print button's component in pictures.scss), My
     Progress's two (#545: its emitter exported beside Quartz's and put
     before Assets; its script and styles ride as the quizzes' do), the
+    emitter that says which runnable blocks the site showed as plain code
+    (#567: exported beside My Progress's, and put before Assets after it), the
     folder pages' table of contents (#520), and
     live input's two (#583: the preview's server sends the isolation
     headers, and Quartz's router loads a page whole across the isolation
@@ -1964,6 +2006,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz" / "plugins" / "emitters" / "index.ts", _wire_emitters_index),
         (output_dir / "quartz.config.ts", _wire_progress_emitter),
+        (output_dir / "quartz.config.ts", _wire_site_said_emitter),
         (output_dir / "quartz.layout.ts", _wire_code_runner_component),
         (output_dir / "quartz.layout.ts", _wire_list_page_toc),
         (output_dir / "quartz" / "cli" / "handlers.js", _wire_isolation_serve),
@@ -2163,6 +2206,36 @@ def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Pa
     except Exception as error:
         print(f"⚠️ Could not prepare the Swift programs students run: {error}")
         return {"problems": [], "blocks": 0, "ready": 0}
+
+
+def _write_site_said(output_dir: Path, content_root: Path, course_code, section_number,
+                     swift_here: dict) -> None:
+    """
+    quartz/plantoir_site_said.json (#567; scripts/site_said.py): which Python
+    the site's emitter runs to say the runnable blocks it showed as plain code
+    as ONE folder problem (siteHealth -> runnableCodeShownAsPlainCode), where
+    each page that opts in came from in the course folder, and which Swift
+    blocks swiftCouldNotBePrepared already names. The pages are the ones
+    students can see, by the gate's own rule, read from the build's copies.
+    Never stops a build: if this cannot run, the site keeps its
+    `plantoir: error:` lines and says no finding.
+    """
+    try:
+        places = {}
+        for page in figures.pages_students_see(
+                content_root, _is_draft,
+                lambda page: _place_in_the_course(page, content_root),
+                lambda page: None, skip=_is_media_name, must_contain="codeRunner"):
+            source = _vault_source_of(content_root / page["path"])
+            places[page["path"]] = {"place": page["place"],
+                                    "source": str(source) if source is not None else None}
+        swift_named = []
+        for problem in swift_here.get("problems") or []:
+            swift_named.append([problem.get("page", ""), problem.get("block", 1)])
+        site_said.write_side_file(output_dir, course_code, section_number, places, swift_named,
+                                  content_root)
+    except Exception as error:
+        print(f"⚠️ Could not let the website say which blocks of code show as plain code: {error}")
 
 
 LOCALES_SRC_CANDIDATES = [
@@ -9014,6 +9087,9 @@ def build_section_site(
         page_features.write_runner_words(output_dir, carried_runner_engines)
     except OSError as error:
         print(f"⚠️ Could not set up the code students run: {error}")
+    # What the site's emitter needs to say a block it shows as plain code as a
+    # folder problem (#567), ALWAYS, beside the runner's words.
+    _write_site_said(output_dir, content_root, course_code, section_number, swift_here)
     # KaTeX from the site itself (#494), ALWAYS and on every site: the
     # stylesheet, copy-tex and the woff2 faces the maths is set in.
     install_katex_assets(output_dir)

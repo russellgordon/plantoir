@@ -1889,7 +1889,9 @@ programs students edit and run in their browser; the site's half is
    block the build did not count can never become a Run button that says
    "isn't on this site yet" to students for ever. No line for a page students
    cannot see: Quartz parses those too and drops them later (the transformer
-   applies `patches/publish.ts`'s own test).
+   applies `patches/publish.ts`'s own test). Since #567 the same blocks are
+   also ONE folder problem, said from the site's build — "The safety net
+   becomes a folder problem" below.
 4. **The KaTeX copy** (#494, `install_katex_assets`, beside the gate, EVERY
    site): Quartz's own `node_modules/katex` — `dist/katex.min.css`,
    `dist/contrib/copy-tex.min.js`, the 20 woff2 faces and `LICENSE` — into
@@ -1902,7 +1904,9 @@ it serves) do not run the gate or rewrite the words file. A page that gains
 `codeRunner: true` or its first runnable block while a preview is ALREADY
 running therefore shows its blocks as plain code, with the `plantoir: error:`
 line in the preview's output, until the next Preview — never a Run button
-that cannot work. A page that already had runnable code keeps working.
+that cannot work. A page that already had runnable code keeps working. Such
+a block is NOT a folder problem: the site says its folder problem on the
+preview's first build only (#567, below).
 
 **Known limit.** The build counts runnable blocks with the toolchain's fence
 rule, not Quartz's parser. Every shape the reviews measured is now read alike
@@ -1912,7 +1916,8 @@ second container on a list marker's line (`- - ```python run`) is runnable on
 NEITHER side; a lazy line in a list item gives both sides one runner but
 different bodies (the site's is the one that runs). A shape nobody has
 measured that the two read differently shows as plain code with the
-`plantoir: error:` line above — the safety net, rather than a folder problem,
+`plantoir: error:` line above — the safety net — and, since #567, as the
+`runnableCodeShownAsPlainCode` folder problem, said from the site's build
 because only Quartz's parse knows, after the folder checks have been said.
 
 **Rejected:** a course-level switch (Russell, 2026-10-05: per page only); the
@@ -1920,6 +1925,94 @@ key alone deciding (above); downloading Pyodide when a site is built (a build
 would need the network); copying the worker into `/opt/vendor` (it would
 need its own line in both runtimes) or into every site's `static/` (a site
 without runnable code would carry it).
+
+### The safety net becomes a folder problem (#567, v1.9.0)
+
+A teacher previewing in the app never reads the build's console, so the
+safety net's `plantoir: error:` line above told an assistant and nobody
+else. Since #567 the same blocks are one folder problem,
+`siteHealth.checks` → `runnableCodeShownAsPlainCode`, with the dialog, the
+assistant's answer and the trail line every other folder problem gets. It is
+the ONE check said from the site's build rather than before it
+(`siteHealth.whereItRuns`), and that is the whole design:
+
+1. **The transformer records.** `codeRunner.ts`, in the branch that prints
+   the line (and only for a page students can see), also pushes
+   `{page, language, block, reason, code}` onto the page's
+   `file.data.plantoirSiteDisagreements` — the page's path in the site with
+   `.md`, the fence, the block's number among that language's blocks, the
+   reason's KEY (`blockAfterUnclosedFence`, `blockNotCompiled` or
+   `blockNotPrepared`, the same choice the line makes) and the code the site
+   read. The line itself is byte for byte what it was.
+2. **An emitter gathers.** `support/quartz/plugins/emitters/plantoirSiteSaid.ts`
+   (exported and put before `Plugin.Assets()` by `_wire_emitters_index` and
+   `_wire_site_said_emitter`, each with its own idempotency check, so a
+   section wired for My Progress before #567 gets it) writes no file. On its
+   FIRST emit in the process it gathers every page's blocks, pages in
+   path order (NFC), and — only when there are any — runs the build's own
+   Python with `execFileSync(python, [site_said.py], {input, timeout: 20 s,
+   windowsHide: true})`, the data on stdin, and passes what it prints to
+   stdout. A failure of any kind is one `ℹ️` line; the site is never at risk.
+   Every emitter finishes before Quartz says it is done, so the marker is in
+   the output before a preview's server answers.
+3. **Python words it.** `scripts/site_said.py` puts its own folder on
+   `sys.path` first (the #358 trap: Windows' embeddable Python replaces
+   `sys.path`, and `site_health.py` has no entry point of its own), maps each
+   path to the page's place in the course folder, finds `{line}` in the
+   teacher's own file by the code the site read (ONE opening ```` ``` ```` of
+   that language with `run` whose following lines hold it; none or several →
+   `blockLineNoLine`), leaves out every Swift block `swiftCouldNotBePrepared`
+   already names (one block, one finding), and builds ONLY this finding —
+   `site_health.site_disagreements_finding`, then `site_health.announce([it])`
+   in its own `try`. Never `announce_or_stay_quiet`: with no folder facts it
+   says "the Media folder is not there" and "no front page" falsely (plan
+   review, MUST 1). It reads and writes UTF-8 whatever the console's code
+   page, and always exits 0.
+4. **The side file.** `site_said.write_side_file`, in the ALWAYS section
+   straight after the runner's words, writes `quartz/plantoir_site_said.json`:
+   `sys.executable`, the script's path, the course and section, the content
+   folder, `places` (every opted-in page students can see: its place and the
+   teacher's file it came from) and `swiftNamed`. Same input, same bytes. NOT
+   `plantoir_code_runner.json`: the page's script bundles that one, and the
+   build machine's paths must never reach students (a test pins it).
+
+**Once per process.** Quartz 4.5.0 calls an emitter again, with every page,
+on each live rebuild. The emitter marks `globalThis` on its first emit and
+says nothing after, so a preview's later rebuilds keep only their
+`plantoir: error:` lines (Russell's ruling 2): re-announcing would bring the
+dialog up mid-edit, and the two apps deduplicate a CHANGED finding
+differently (the mac appends it, Windows drops it by `Identity`).
+
+**Measured.** The call costs **24-31 ms** in the image (the planner's three
+timings of the Python start: 35, 26 and 24 ms; the plan review's 24-31 ms;
+28 ms for the whole first emit in verify.sh's run of
+`check_runner_rules_against_the_site.py` in the image, 2026-10-23),
+**41-43 ms** on the mac host (M-series, Homebrew Python 3.14, the whole emit
+through `check_runner_rules_against_the_site.py`), and nothing on a site
+where no block disagrees, which is every site that is fine. For Python the
+net fires only when the site carries no Python engine at all (a carried
+engine wraps a block the build did not count as a WORKING block); for Swift
+it fires per block whose key is not in `plantoir-runners/swift.json` — which
+is why verify.sh's end-to-end fixture (Plain Code Fixture) is a Swift block
+after a list fence left open.
+
+**Rejected:** a Python pass after Quartz (a preview is one
+`quartz build --serve` process that never returns, so it would never run —
+My Progress's #545 rejection again); Python's public-sync watcher thread
+reading a file the site writes (it polls once a second, racing the server
+start the preview and the assistant wait on; reasoned, not measured);
+the emitter wording the finding itself from words Python prepared (#485's
+"Python prepares, Quartz places" shape — a second implementation of a
+finding's assembly, testable only by verify.sh on the mac); Python
+predicting the shapes with a reader of its own (it guesses at the site's
+parse and misses the shapes nobody measured, which is why the net exists);
+reusing My Progress's emitter (a different feature with its own switch and
+its own early returns, which would put this finding behind them); one
+marker per page or block (both apps key a finding on name, course and
+section, #246); piping node's output through Python to catch the line (it
+would change the terminal the app's progress markers come through); and
+reusing `words.blockNotPrepared`'s words in the dialog ("if this line comes
+back" has no line there — the check has `reasons` of its own).
 
 ### Live input: what the build adds (#583, v1.8.1)
 
@@ -2131,7 +2224,8 @@ issue.
 in a list item differently (`fences.pageShapes`): the build compiles the body
 IT read and the site looks for the key of a shorter body, finds none, and
 shows the block as plain code with a `plantoir: error:` line
-(`words.blockNotCompiled`). The fence reader was deliberately NOT changed to
+(`words.blockNotCompiled`) and, since #567, as the
+`runnableCodeShownAsPlainCode` folder problem. The fence reader was deliberately NOT changed to
 follow lazy lines (the brief keeps the fence rule as #455 left it; the safety
 net names the block). A Swift block the build's reader cannot see at all is
 never compiled, and is named the same way.

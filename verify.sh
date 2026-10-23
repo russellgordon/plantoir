@@ -228,6 +228,13 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+if (cd scripts && python3 test_site_disagreements.py) >/tmp/verify_site_disagreements_test.log 2>&1; then
+  pass "a runnable block the site shows as plain code: one folder problem, worded as the contract's cases say, its line in the teacher's file, and the command line the site's build runs printing exactly one marker (scripts/test_site_disagreements.py, #567)"
+else
+  fail "a runnable block the site shows as plain code: one folder problem (scripts/test_site_disagreements.py, #567)"
+  cat /tmp/verify_site_disagreements_test.log
+fi
+
 # Not toolchain tests, and deliberately not in scripts/: they live beside the
 # screenshot scripts so plantoir.app's marketing data never enters the recipe
 # or the image hash. They are here because nothing else runs them on the mac
@@ -1609,6 +1616,7 @@ check_baked() {
 }
 check_baked scripts/contracts.py          /opt/scripts/contracts.py
 check_baked scripts/site_health.py        /opt/scripts/site_health.py
+check_baked scripts/site_said.py          /opt/scripts/site_said.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.
@@ -1990,7 +1998,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Anchor Fixture.md" "$HIT_COURSE/Picture Fixture.md" \
         "$HIT_COURSE/Discussions/Runner Printable.md" \
-        "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" \
+        "$HIT_COURSE/Swift Playground.md" "$HIT_COURSE/Swift Hidden.md" "$HIT_COURSE/Plain Code Fixture.md" \
         "$HIT_COURSE/Live Plain Link.md" "$HIT_COURSE/Live Framed.md" "$HIT_COURSE/Live Autorun.md" "$HIT_COURSE/Live Box.md" \
         "$HIT_COURSE/Discussions/Overall Backlinks Fixture.md" "$HIT_COURSE/Discussions/Overall Backlinks Specific.md" \
         "$HIT_COURSE/Curriculum/Z1. Planted 100% Overall.md" "$HIT_COURSE/Curriculum/Z1.1.md" \
@@ -2802,6 +2810,19 @@ playground += "\n```swift run\n" + (gate / "13-prompt.swift").read_text(encoding
 (course / "Swift Hidden.md").write_text(
     "---\ntitle: Swift Hidden\npublish: false\ncodeRunner: true\n---\nHidden (plantoir-swift-hidden-7f3a).\n\n"
     "```swift run\nprint(\"hidden swift\")\n```\n", encoding="utf-8")
+# #567: Plain Code Fixture - named without "Runner", which the runner check
+# below refuses on any plantoir: error: line - holds a fence left open in a
+# list item and then a runnable Swift block. The build's fence reader reads
+# the Swift block as part of the open fence, so it is never compiled; the
+# site's parser closes that fence at the end of its list item and finds the
+# block, whose key is not in the build's list: plain code, a plantoir: error:
+# line, and ONE runnableCodeShownAsPlainCode folder problem from the site's
+# build (siteHealth.checks). Swift because this site carries Python's engine,
+# which would run a Python block there anyway.
+(course / "Plain Code Fixture.md").write_text(
+    "---\ntitle: Plain Code Fixture\ncodeRunner: true\n---\nA fence left open (plantoir-plain-code-567).\n\n"
+    "- step one\n  ```python\n  print(1)\n- step two\n\n"
+    "```swift run\nprint(\"plain code 567\")\n```\n", encoding="utf-8")
 # #583: live input. Live Plain Link: a plain page linking to the Runner
 # Playground (the site's own link across the isolation line, one way); Live
 # Autorun: two autoruns, the first asks, then a link to Live Framed (across
@@ -3675,8 +3696,12 @@ if line not in said:
     problems.append(f"the build did not say: {line}")
 if not re.search(r'"name": "swiftCouldNotBePrepared"[^\n]*Swift Playground', said):
     problems.append("the build did not report the broken Swift block as the swiftCouldNotBePrepared folder problem")
-if re.search(r"plantoir: error: [^\n]*swift block", said.replace(line, "")):
-    problems.append("the build named another Swift block on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*swift block[^\n]*", said.replace(line, "")).group(0))
+# Plain Code Fixture's block is the one the site names on purpose (#567,
+# checked in 6j's next part).
+plain_code = "plantoir: error: Plain Code Fixture.md: swift block 1: "
+others = "\n".join(text for text in said.replace(line, "").splitlines() if plain_code not in text)
+if re.search(r"plantoir: error: [^\n]*swift block", others):
+    problems.append("the build named another Swift block on a plantoir: error: line: " + re.search(r"plantoir: error: [^\n]*swift block[^\n]*", others).group(0))
 for problem in problems:
     print("   " + problem)
 sys.exit(1 if problems else 0)
@@ -3685,6 +3710,66 @@ then
   pass "runnable Swift: each block names its program (or compileError), static/swift-wasm holds exactly the programs visible pages use, static/swift is the overlay, and the block that does not compile is named at its line in the teacher's file with the compiler's first error, as a folder problem too (#493)"
 else
   fail "runnable Swift: one of the checks above failed (#493)"
+fi
+
+# ---- 6j, continued: a block the site shows as plain code is a folder problem (#567) ----
+# Plain Code Fixture's Swift block, after a fence left open in a list item:
+# the site shows it as plain code with no Run button, prints its
+# plantoir: error: line while it parses the page, and then - from the site's
+# own build, through scripts/site_said.py - ONE PLANTOIR_HEALTH: line naming
+# it (siteHealth.checks -> runnableCodeShownAsPlainCode), with the sentence
+# the app's dialog shows on the console too, after the error line.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE" <<'PLAINPY'
+import json, re, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+public, log, course = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+problems = []
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))
+runner = rules["codeRunnerBlocks"]
+check = next(entry for entry in rules["siteHealth"]["checks"] if entry["name"] == "runnableCodeShownAsPlainCode")
+prefix = rules["siteHealth"]["marker"]["prefix"]
+swift = next(row for row in runner["languages"] if row["fence"] == "swift")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+page = (public / "Plain-Code-Fixture.html").read_text(encoding="utf-8") if (public / "Plain-Code-Fixture.html").is_file() else ""
+if not page:
+    problems.append("Plain-Code-Fixture.html was not built")
+elif 'class="plantoir-runner"' in page or "plain code 567" not in page:
+    problems.append("Plain Code Fixture's Swift block is not plain code on the site")
+error = ("plantoir: error: Plain Code Fixture.md: swift block 1: "
+         + runner["words"]["blockAfterUnclosedFence"].replace("{language}", swift["displayName"]))
+if said.count(error) != 1:
+    problems.append(f"the site said {said.count(error)} times, not once: {error}")
+markers = [text[text.index(prefix):].strip() for text in said.splitlines()
+           if prefix in text and '"runnableCodeShownAsPlainCode"' in text]
+source = (course / "Plain Code Fixture.md").read_text(encoding="utf-8")
+opening = source.splitlines().index("```swift run") + 1
+sentence = (check["sentence"].replace("{page}", "Plain Code Fixture").replace("{course}", "EXC2O")
+            .replace("{section}", "1"))
+piece = (check["blockLine"].replace("{page}", "Plain Code Fixture").replace("{language}", swift["displayName"])
+         .replace("{block}", "1").replace("{line}", str(opening))
+         .replace("{reason}", check["reasons"]["blockAfterUnclosedFence"].replace("{language}", swift["displayName"])))
+detail = check["detail"].replace("{blocks}", piece)
+if len(markers) != 1:
+    problems.append(f"{len(markers)} runnableCodeShownAsPlainCode markers, not one")
+else:
+    finding = json.loads(markers[0][len(prefix):])
+    want = {"name": "runnableCodeShownAsPlainCode", "sentence": sentence, "detail": detail,
+            "fixable": False, "course": "EXC2O", "section": 1}
+    if finding != want:
+        problems.append(f"the finding is {finding}, not {want}")
+    if said.find(error) > said.find(markers[0]):
+        problems.append("the folder problem came before the site's own plantoir: error: line")
+if ("⚠️  " + sentence) not in said:
+    problems.append("the console does not show the dialog's sentence: " + sentence)
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+PLAINPY
+then
+  pass "runnable code shown as plain code: Plain Code Fixture's Swift block after a fence left open is plain code on the site, named once on the site's plantoir: error: line and then as ONE runnableCodeShownAsPlainCode folder problem from the site's own build, with the dialog's sentence and its line in the teacher's file (#567)"
+else
+  fail "runnable code shown as plain code: the site's block is not said as a folder problem (#567)"
 fi
 
 # ---- 6j, continued: live input (#583), as the build left it ----
