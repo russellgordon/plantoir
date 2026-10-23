@@ -8169,16 +8169,16 @@ Three edges the predicate now decides on purpose, pinned in
   wrong place; false makes a missed resolve visible in a test instead.
 - **The contract's `isCurriculumPage.cases`** are run through it with a course
   root in front, so the planner and the assistant's list of expectations
-  (`CurriculumRules.IsCurriculumPage`) answer alike.
+  (`CurriculumRules.IsCurriculumPage` then; since #647, below, it goes through
+  `PagePaths.IsCurriculum`) answer alike.
 
-Not changed here: `LinkGraph.IsCurriculum` and `CurriculumRules.IsCurriculumPage`
-still test the folders of whatever path they are given (they take no course),
-and #614 — a curriculum folder renamed to something without the word, read
-from `course_config.json` — landed on the mac first (v1.9.0) and is owed here
-by its `windows` issue: `PagePaths.IsCurriculum` and every caller, including
-these two, have to take the course's declared folders. The rule, what was
-measured and what was rejected are in `10-local-ai-assistant.md` → "A
-curriculum folder is the one the course declares, or one named for it (#614)".
+Not changed by #615, and changed since: `LinkGraph.IsCurriculum` and
+`CurriculumRules.IsCurriculumPage` used to test the folders of whatever path
+they were given, working folder included, because they took no course. #614
+(a curriculum folder renamed to something without the word, read from
+`course_config.json`) landed on the mac first and reached Windows through
+#647, which also put those two onto the one rule. See "A folder the course
+declares is curriculum, whatever it is called (#647, the mac's #614)" below.
 
 **The publish plan (#617).** What the mac decided and why, including what was
 rejected, is `10-local-ai-assistant.md` → "A curriculum page the walk reaches
@@ -8210,6 +8210,111 @@ removed again (copy-and-restore), the #607 case and two
 trail records what a publish or unpublish WROTE. A publish writes the same
 pages as before (#607's reasoning), and an unpublish that now hides one page
 more still says truthfully how many it hid.
+
+## A folder the course declares is curriculum, whatever it is called (#647, the mac's #614)
+
+**What a teacher sees.** A teacher who renames `Curriculum` to `Expectations`
+in Course Settings has the new name written to `curriculum_folders`, and the
+build maps the folder from there. Until #647 the assistant on Windows
+forgot it. Hiding a class took the expectation pages it linked to down with
+it. Get Ready for the Start of the Year drafted them. The curriculum tools
+(`list_curriculum_expectations` and the mentions pair) offered none. A
+publish plan listed them as "already visible". Now the folder is curriculum
+again, everywhere the assistant asks.
+
+**The rule** is the mac's, and the reasons and the rejected options are in
+`10-local-ai-assistant.md` → "A curriculum folder is the one the course
+declares, or one named for it (#614)". On Windows it lives in ONE pure
+function, `CurriculumRules.IsCurriculum(folderSegments, declared)`, the twin
+of `AssistCurriculumMentions.isCurriculum(folderSegments:declared:)`:
+
+1. A leading section folder is set aside first. The check is
+   `HowITeachPage.IsASectionFolderName`: case-sensitive like the mac's
+   `SectionPublishState.isSectionFolderName`, with digits 0–9 only (the mac
+   accepts any Unicode numeric; see the accepted differences below).
+   `GradedFolderChoices.IsSectionFolder` ignores case, so it was not used.
+2. **Declared:** the FIRST folder left equals a declared name. Both sides
+   are `.Normalize()`d (NFC), then compared with `OrdinalIgnoreCase`.
+   Swift's `==` treats a composed é and an e plus a combining accent as
+   equal; C#'s ordinal comparison does not, so without the normalisation a
+   folder typed one way and declared the other would miss.
+3. **By name, kept:** any folder left contains "curriculum", ignoring case.
+4. The file name never counts (#615).
+
+`declared` is `CourseConfiguration.CurriculumFolders`:
+`curriculum_folders`, then the legacy `curriculum_folder`, cleaned by
+`CurriculumFolderRule.Declared`. It is deliberately not intersected with
+`shared_folders` and not resolved against the disk.
+
+**One path in.** `PagePaths.IsCurriculum(courseDirectory, fullPath,
+declared)` makes the page relative to the course and hands its folders to
+the rule. It has the same edges as #615: relative, outside-the-course and
+other-drive paths are false. `PagePaths.IsCurriculum(Course, fullPath)` reads
+the course's list for you. `declared` is a REQUIRED argument everywhere,
+never a default, because a caller that silently passed nothing is exactly
+how a renamed folder lost its protection. The callers:
+
+| Caller | What it decides |
+|---|---|
+| `AssistWorkspace.ProtectedFromHiding` | pages a draft flag must never be set on |
+| `AssistWorkspace.IsCurriculumPage` (planned page) → `ReasonToKeep` and the #617 publish trim | the hide sweep keeps it; the publish plan leaves it out of "already visible" |
+| `AssistWorkspace.ReferenceDates` | rolled-over reference pages dated to the first day |
+| the Start of Year plan's `StartOfYearPages` (`StartOfYearKind.Curriculum`) | never drafted |
+| `PlanReDate`'s `CurriculumCount` (`ReDatePlan`, the mac's `SectionReDatePlanner`) | the curriculum pages a re-date counts on its card |
+| `AssistWorkspace.CurriculumExpectations` | the curriculum tools' list of expectations |
+| `LinkGraph.Unreferenced` → `IsExcludedFromSweep` | `check_section`'s "linked from nowhere" list (plantoir-mcp) |
+
+`CurriculumRules.IsCurriculumPage(relativePath, declared)` is the same rule
+for a path relative to the course. Only the contract harness calls it.
+`LinkGraph.IsCurriculum(path)` is gone. `LinkGraph.Build` now takes the
+`Course` (or its directory and declared list) and keeps both, so
+`IsExcludedFromSweep` can ask `PagePaths` against the course.
+
+**A side fix, from the same move.** `CurriculumExpectations` used to call
+`CurriculumRules.IsCurriculumPage` on a FULL path. So did `LinkGraph`'s sweep
+exclusion. A working folder whose own name held the word (say "Curriculum
+Work") therefore made every page of every course a curriculum candidate for
+the expectations tool (filtered only by its file name looking like `A1.1`).
+It also took every page off `check_section`'s orphan list. Both now read
+folders inside the course only, as the planner already did since #615. The
+mac read course-relative already, so nothing is owed back.
+
+**Harnesses.**
+- `ContractTests.SharedRules_CurriculumRules_MatchesContract` and
+  `CurriculumPredicateTests.TheContractsCurriculumPageCasesHoldUnderACourse`
+  read each case's `curriculumFolders` (absent means none). The second runs
+  every case twice, at the course's top and inside `section1\`, so the
+  section folder is shown to be set aside rather than compared.
+- `FollowingLinksContractTests.WriteConfig` and `StartOfYearTests.LayOut`
+  write `curriculum_folders` into the course's `course_config.json` before
+  the course is read.
+- New: `ADeclaredNameMatchesWhicheverWayItsAccentIsWritten` (the mac's
+  `testADeclaredNameMatchesWhicheverWayItsAccentIsWritten`) and
+  `TheSectionFolderIsSetAsideNotCompared`.
+
+No named gaps were held: the rule landed in the same piece as the cases' first
+Windows run. No trail line changes, because the publish and unpublish events
+carry counts, not reasons. No tool description, schema or wording moved.
+Tool OUTPUT changes, and that is the fix.
+
+**Known, accepted differences.**
+- `OrdinalIgnoreCase` folds case per character (invariant upper-casing),
+  while Swift's `lowercased()` is full Unicode lower-casing. The two can
+  disagree on rare letters (ß against "SS", say) in a folder name.
+- A section folder is `section` plus digits 0–9 on Windows
+  (`HowITeachPage.IsASectionFolderName`). The mac accepts any character
+  Swift calls `isNumber`, so `section١` (an Arabic-Indic one) is a section
+  folder there and the top folder here.
+
+No real course has been seen with either, so no contract case was added.
+
+**A name that cannot be normalised.** NTFS allows a lone surrogate in a
+folder name, and `string.Normalize()` throws `ArgumentException` on one.
+`ProtectedFromHiding` and the `ReferenceDates` loop do not catch around the
+predicate, so a throw there would have failed the whole plan. The rule
+therefore normalises inside a try and falls back to comparing the names as
+they are (`CurriculumPredicateTests.AFolderNameThatCannotBeNormalisedIsComparedAsItIs`).
+
 ## A folder added later, and titles YAML can read (#580, #586; the mac's #506, #575), v1.8.0 / v1.8.1
 
 **What a teacher sees.** A folder added in Course Settings ▸ Content Structure
