@@ -898,6 +898,13 @@ and not reopening it — that part is the teacher's).
 It does **not** judge anything visual: colour, contrast, dark-mode legibility,
 how a long name wraps. That is a screenshot pass, not this.
 
+**Some things on screen are not in the UI Automation tree at all** — a
+`ContentDialog`'s box is one (its element is the whole overlay, and the
+rectangles inside it read stale): for those the app logs what it laid out,
+in a `--state-dir` run only, and the test reads the run's `startup.log`
+(`PageTablesUiTests.TheAnswerAfterA…PlanIsFittedToItsSentence`, #655 →
+"The plan's checkbox, and the answer fitted to its sentence").
+
 **One of them now reads a FILE rather than the screen**, and it is worth
 knowing why that belongs here. `MarksPoolRemovalUiTests` removes a folder in
 Course Settings — the row's own button, the confirmation, Save — and then
@@ -8198,11 +8205,13 @@ kept by an unpublish, a linked class left as it is, no room for a key),
 `DrawnRows(open)` through the ONE sort: one table, one sort. Opened, the
 folded rows are drawn in that sort among the rows to read — in plan order
 they come where the plan puts them (the pages already right are its last
-group), under any other sort mixed among the rest; never a second list. The disclosure is a borderless
-`ToggleButton` with a chevron, 4 epx under the table, closed for every new plan
-(`sectionVerbPlanAlreadyRight`; its Toggle pattern tells Narrator its state).
-REJECTED: `Expander` (a 48-epx header on a card background, with an animation:
-a second panel where the mac's is a line of the table's — the plan review).
+group), under any other sort mixed among the rest; never a second list. The
+control was a borderless `ToggleButton` with a chevron, 4 epx under the table,
+closed for every new plan (`sectionVerbPlanAlreadyRight`). **Since #655 it is a
+`CheckBox`** with the same words, id and rule — see "The plan's checkbox, and the
+answer fitted to its sentence (#655)" below. REJECTED: `Expander` (a 48-epx
+header on a card background, with an animation: a second panel where the mac's
+is a line of the table's — the plan review).
 
 **Opening it never grows the dialog** (Russell's ruling on the mac): the
 table's height is FIXED at `PlanTable.RowsWhenClosed` — the rows to read,
@@ -8211,8 +8220,8 @@ fewer) — within what the window fits, and the opened rows scroll inside.
 REJECTED: `MaxHeight`, which #548 used: a short list shrinks to its rows and
 grows when the folded ones arrive, which is the mac's measured failure (316 →
 484). The window wins over the five-row floor: on a window that holds two
-rows, two. `PlanTableLayout.For(…, folds)` reserves the disclosure's line
-(`FoldHeight`).
+rows, two. `PlanTableLayout.For(…, folds)` reserves the control's line
+(`FoldHeight`; 36 for the disclosure, 40 for the checkbox since #655).
 
 ### 3. "Resizable": the window is the dialog's resize handle
 
@@ -8261,7 +8270,7 @@ were: the mac's "opens at its old size, which is its minimum".
 
 **Testing it.** Unit: `PageTablesTests` (the fold, its words and its closed
 height; the picker's rows; the widths and columns), `PlanTableTests` (the fit
-with the disclosure, identical to #548 up to 756), `StartOfYearSheetTests`
+with the disclosure — the checkbox since #655 — identical to #548 up to 756), `StartOfYearSheetTests`
 (rows above 756), `ContractTests` (the five keys). Through the window
 (`PageTablesUiTests`, opt-in): the tick rules, Space in Find a Page and the
 table's height across a search, Return and Escape with a row selected, the
@@ -8308,13 +8317,98 @@ XAML root of 565–590 epx; `PageTablesUiTests`, which writes its numbers to
 **UI totals:** `PageTablesUiTests` 6 of 6; with `PlanTableUiTests` 10 of 10;
 `LaterClassesAtDeployUiTests` (3, the new table test among them) and
 `SectionVerbsUiTests` passed in the combined run. Two `PlanTableUiTests` were
-corrected for the fold: they open the disclosure before reading the page
-already visible (`OpenTheFold`, which also checks the table does not move).
+corrected for the fold: they open the disclosure (tick the checkbox, since
+#655) before reading the page already visible (`OpenTheFold`, which also checks the table does not move).
 UI Automation's Expand does not make the menus re-read what is live (a real
 click or Alt does), so the tests open a fresh app per key; and
 `RunSectionVerb` now queues one more `ApplyMenuEnablement` after its dialog
 has finished closing, since `ShowAsync` returns while the dialog is still a
 popup.
+
+## The plan's checkbox, and the answer fitted to its sentence (#655, the mac's #654)
+
+The mac fixed two faults in the Publish Pages… / Hide Pages… plan sheet in
+v1.8.7 (`documentation/09-mac-app.md` → "v1.8.7: one table, one checkbox; the
+answer fitted to its sentence (#654)"). On Windows the first fault was
+there; the second was not (the answer already fitted its sentence); and a
+third, at Working, was — the mac's fix covers it too, because its Working
+never shrinks.
+
+**1. One table, one checkbox.** The control under the plan table is a
+`CheckBox` (`SectionVerbDialog.AlreadyRightBox`), the same
+`menuPlanShowAlready…` words, the same id `sectionVerbPlanAlreadyRight`,
+unticked for every new plan; ticking it adds the pages already right to the
+table ABOVE it through the one sort, and a second click takes them out. A
+disclosure (#634's chevron `ToggleButton`) promised a fold below it that never
+appeared. Nothing about the height rule moved: the table is still counted with
+the checkbox unticked, and ticking it moves neither the table nor the buttons
+(pinned to the pixel by `PageTablesUiTests.ThePlanFoldsThePagesAlreadyRightUntilTheCheckboxIsTicked`,
+which also asserts the control's type is `CheckBox` and that it starts Off).
+
+The checkbox keeps the platform's height. MEASURED (x64 Debug, the test PC at
+200% scale, 2026-10-23): **32 epx tall, 4 under the table, 36 in all** —
+against the disclosure's 27 + 4. Unlike the mac's (7 pt shorter), the line got
+TALLER. `PlanTableLayout.FoldHeight` went 36 → **40**: 36 would have been an
+exact fit with no margin, and a fit that comes out short clips the dialog's
+buttons, which costs more than the one row 40 takes at roughly one window
+height in eight. The UI test now ASSERTS that the measured line fits
+`FoldHeight` (it was a logged note). REJECTED: trimming the checkbox's
+`MinHeight` to keep 36 — the 32-epx row is Fluent's hit target.
+
+**2. The answer is fitted to its sentence — already true here.** A
+`ContentDialog` sizes to its content and `_host` carries only a width, so after
+Go the box shrinks to the one sentence over OK on its own; the mac's fault
+(`SheetGrowsToItsMinimum` only ever grew the window) has no Windows
+counterpart. The width is the host's, set from the window at every stage, so
+it is kept. MEASURED, the dialog's box at a 1000×698-epx window:
+
+| Plan | Choose | Working | Plan | Working | Answer |
+|---|---|---|---|---|---|
+| Publish, 1 change + 4 folded | 769×417 | 769×417 | 769×422 | 769×422 | 769×189 |
+| Hide, 1 change | 769×430 | 769×430 | 769×258 | 769×258 | 769×189 |
+
+**3. Working keeps the height of the stage before it — the fault Windows
+did have.** Working's spinner is one line, so the dialog SHRANK to it (184
+epx) and grew again to the answer: two size changes, and after Choose a third.
+The mac's Working is grow-only, so its sheet changes size once. Now
+`ShowWorking` sets `_host.MinHeight` to the stage before's height — the host's
+`ActualHeight` PLUS the button row's (`CommandSpace`, read from the template
+before the button texts are cleared): Working clears both buttons,
+ContentDialog's "NoneVisible" state collapses that row, and holding the host
+alone still shrank the box by the row (MEASURED: 422 → 342). `SetContent`
+clears the hold for every other stage, so the plan and the answer fit their
+own content. It applies after Choose and after the question about classes
+dated later too (grow-only Working, as the mac; the test asserts the picker's
+417 held at Working as well as the plan's), and to the three page items only
+(gated as `SizeTheHost` is), so Re-date and Make Room are untouched. The hold
+is CLAMPED to what the window leaves room for — the window's height less what
+the box carries outside the host — when Working starts and again whenever the
+window changes size (`ApplyTheHold`), because `ContentDialogMaxHeight` is
+wide open here and a hold past the window would clip the box. REJECTED (the
+implementation review): dropping the hold on a resize, which shrank the dialog
+to the spinner when a teacher minimised and restored the window mid-publish.
+The spinner and its words sit at the TOP of the held space
+(`VerticalAlignment.Top`): stretched, the 20-epx ring centred in the held
+height while the words drew at the top.
+
+**How it is measured.** The dialog's box is not in the UI Automation tree (its
+element is the whole overlay), and the elements inside it misled: the title's
+and the buttons' rectangles read the SAME at the plan and the answer, while a
+picture of the screen showed the box centred and shrunk (258 → 189 epx, which
+is what the app logged). So the app writes the box it laid out — its
+template's `BackgroundElement` — to its diagnostic log whenever the box or the
+content changes size ("Section menu dialog at Plan: box 769x422, …"), and
+once more, after a forced layout, the moment Working starts (a call that
+answers before the next layout pass would otherwise log no Working box at
+all). Only in a `--state-dir` run (`AppDataRoot.IsRedirected`, the UI tests'):
+a teacher dragging the window would otherwise write a synchronous line, and
+walk the dialog's template, on every frame. And
+`PageTablesUiTests.TheAnswerAfterAPublishPlanIsFittedToItsSentence` /
+`…AHidePlan…` read those lines: every Working box equals the plan's (±1), the
+answer is more than 32 epx shorter, the width is equal, and OK is inside the
+window. Must-fails, each run against the Publish test: the hold removed —
+Working 184 against the plan's 422, red; the hold without the button row —
+Working 342, red.
 
 ## One curriculum test, folder segments only (#615), and a linked curriculum page is not "already visible" (#617, the mac's #607)
 
