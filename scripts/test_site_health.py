@@ -73,6 +73,8 @@ class SiteHealthTests(unittest.TestCase):
                                  "reason": "compileError", "said": "cannot find 'nmae' in scope"}]},
             {"quiz_problems": [{"page": "Unit 2/Practice", "n": 3, "line": 41,
                                 "reason": "noCorrectChoice", "fill": {}}]},
+            {"site_disagreements": [{"page": "Units/Loops", "language": "python", "block": 1,
+                                     "line": 9, "reason": "blockAfterUnclosedFence"}]},
         ):
             broken = dict(HEALTHY)
             broken.update(facts)

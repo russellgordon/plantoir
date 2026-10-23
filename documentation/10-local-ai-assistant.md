@@ -8306,6 +8306,19 @@ review S1): the warning stays, and Get Ready keeps what it keeps. The sheet
 and the build now say the same thing in two places; making the sheet say the
 next build will list them is a wording-pass question, not done here.
 
+**A folder problem the SITE says (#567).** `runnableCodeShownAsPlainCode` —
+a runnable block the site showed as plain code — is printed from Quartz's
+own build (an emitter running `scripts/site_said.py`), not by build_site.py
+before it, but it is the same `PLANTOIR_HEALTH:` line, so
+`SiteHealthFinding.appending` picks it up with no change on any of the
+assistant's paths. It arrives before Quartz says it is done, so before a
+preview's server answers and before a build-only run (the paths with no
+window, `AssistSiteWork`) finishes: an answer is never raced by it. It is
+said on the FIRST build of a site-building process only, so a page broken
+while a preview runs is not reported by the assistant until the next
+preview — the same as the dialog (05 → "The safety net becomes a folder
+problem").
+
 ### check_section's third group, "linked but missed"
 
 `check_section` now reports three groups, and `shared-rules.json` →

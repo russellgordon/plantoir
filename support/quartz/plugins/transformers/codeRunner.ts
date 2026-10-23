@@ -23,7 +23,12 @@
 // the engines this site carries into quartz/plantoir_code_runner.json. A
 // runnable block whose language's engine is not there stays plain code - a
 // student never meets a Run button that can never work - and one line says
-// so for the teacher and any assistant reading the build.
+// so for the teacher and any assistant reading the build. Each such block is
+// also RECORDED on the page's file.data.plantoirSiteDisagreements - page,
+// language, block, reason and code, exactly what the line says - and the
+// emitter plantoirSiteSaid.ts says them all as ONE folder problem
+// (#567: siteHealth.checks -> runnableCodeShownAsPlainCode), because a
+// teacher previewing in the app never reads the build's console.
 //
 // A block that can ask for input as it runs carries data-runner-asks="input"
 // or "edit" (#583, codeRunnerRule.asksFor): which pages the host isolates
@@ -53,6 +58,18 @@ type RunnerFile = { words: Record<string, string>; carried: string[] }
 type Programs = Record<string, { ok: boolean; file?: string; reason?: string }>
 
 const WORDS_FILE = join("quartz", "plantoir_code_runner.json")
+
+// One runnable block the site showed as plain code (#567), as the
+// `plantoir: error:` line names it: the page's path in the site's content
+// (with .md), the language's fence, the block's number among that language's
+// blocks on the page, the reason's key in words, and the code the site read.
+export type SiteDisagreement = { page: string; language: string; block: number; reason: string; code: string }
+
+declare module "vfile" {
+  interface DataMap {
+    plantoirSiteDisagreements: SiteDisagreement[]
+  }
+}
 
 const cache = new Map<string, { stamp: number; value: unknown }>()
 
@@ -132,15 +149,29 @@ export const CodeRunnerFences: QuartzTransformerPlugin = () => ({
                 known.words.blockAfterUnclosedFence !== undefined &&
                 unclosedFenceBefore(tree as unknown as MdNode, String(file.value ?? ""), runner.node)
               let reason = known.words.blockNotPrepared
+              let reasonKey = "blockNotPrepared"
               if (unclosed) {
                 reason = known.words.blockAfterUnclosedFence
+                reasonKey = "blockAfterUnclosedFence"
               } else if (carried.includes(runner.language.engine) && notListed && known.words.blockNotCompiled) {
                 reason = known.words.blockNotCompiled
+                reasonKey = "blockNotCompiled"
               }
               console.log(
                 `plantoir: error: ${page}: ${runner.language.fence} block ${runner.n}: ` +
                   filled(reason, runner.language),
               )
+              // The same block, recorded for the emitter (#567): the reason
+              // by its key, so the finding can say it in words of its own.
+              const recorded = (file.data.plantoirSiteDisagreements ?? []) as SiteDisagreement[]
+              recorded.push({
+                page,
+                language: runner.language.fence,
+                block: runner.n,
+                reason: reasonKey,
+                code: code.value,
+              })
+              file.data.plantoirSiteDisagreements = recorded
             }
             continue
           }

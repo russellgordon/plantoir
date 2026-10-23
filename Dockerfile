@@ -224,6 +224,11 @@ COPY scripts/quizzes.py /opt/scripts/quizzes.py
 # Links entry and the plan the site's emitter reads. Imported by build_site.py
 # by bare name (test_baked_modules.py).
 COPY scripts/my_progress.py /opt/scripts/my_progress.py
+# What the SITE found (#567): a runnable block it showed as plain code, said
+# as one folder problem. build_site.py imports it by bare name to write the
+# side file, and the site's emitter (plantoirSiteSaid.ts) runs it as a file
+# with the build's own Python (test_baked_modules.py).
+COPY scripts/site_said.py /opt/scripts/site_said.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).
