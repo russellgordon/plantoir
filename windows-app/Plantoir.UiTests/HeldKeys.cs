@@ -35,7 +35,11 @@ public static class HeldKeys
 {
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int virtualKey);
 
-    /// <summary>The keys the suite sends, plus every modifier in both its generic and left/right forms.</summary>
+    /// <summary>Every modifier in its generic and left/right forms, and every
+    /// key the suite names as a <c>VirtualKeyShort</c> (letters typed as TEXT
+    /// go down and up inside <c>Keyboard.Type</c> and are not watched).
+    /// <see cref="HarnessSourceRuleTests"/> fails when a test names a key
+    /// missing here.</summary>
     public static readonly VirtualKeyShort[] Watched =
     {
         VirtualKeyShort.SHIFT, VirtualKeyShort.LSHIFT, VirtualKeyShort.RSHIFT,
@@ -45,7 +49,8 @@ public static class HeldKeys
         VirtualKeyShort.ESCAPE, VirtualKeyShort.RETURN, VirtualKeyShort.TAB, VirtualKeyShort.SPACE,
         VirtualKeyShort.DELETE, VirtualKeyShort.BACK,
         VirtualKeyShort.UP, VirtualKeyShort.DOWN, VirtualKeyShort.LEFT, VirtualKeyShort.RIGHT,
-        VirtualKeyShort.F2,
+        VirtualKeyShort.F2, VirtualKeyShort.F4,
+        VirtualKeyShort.KEY_D, VirtualKeyShort.KEY_N, VirtualKeyShort.KEY_O, VirtualKeyShort.KEY_R,
     };
 
     /// <summary>The watched keys that read DOWN right now.</summary>

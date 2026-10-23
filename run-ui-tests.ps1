@@ -37,7 +37,12 @@
     folder - settings, the breadcrumb trail, the startup log, scheduled-deploy
     sentinels, models, built sites - to a temporary folder deleted afterwards;
     the working folder is built from scratch. Your own working folder,
-    remembered windows and window positions are not read or written.
+    remembered windows and window positions are not read or written. Since
+    #641 the window's own plantoir-mcp, and this harness's own process, keep
+    their state there too. One gap remains: a refusal line a LAUNCHER writes
+    itself (preview.ps1 / deploy.ps1 Write-TrailLine) still goes to the real
+    %LOCALAPPDATA%\Plantoir\Logs\activity.txt - GitHub #664. No test
+    triggers one today.
 
     The exception worth knowing: the LAUNCHERS compute the builds root
     themselves. Since bundle 11 (2026-10-01) the end-to-end tests run them on

@@ -18,12 +18,12 @@ string? course = null;
 // window passes it when it was itself started with one (the UI tests), so the
 // server's trail lines, settings and build-output root follow the window's
 // rather than landing in this PC's real %LOCALAPPDATA%\Plantoir. No outside
-// door passes it.
-for (int i = 0; i < args.Length - 1; i++)
-    if (args[i] == "--state-dir") { Plantoir.Core.Models.AppDataRoot.RedirectTo(args[i + 1]); break; }
+// door passes it. The space-separated form only (AppDataRoot.StateDirFrom).
+if (Plantoir.Core.Models.AppDataRoot.StateDirFrom(args) is { } stateDir)
+    Plantoir.Core.Models.AppDataRoot.RedirectTo(stateDir);
 for (int i = 0; i < args.Length; i++)
 {
-    if (args[i] == "--state-dir" && i + 1 < args.Length) { i++; continue; }
+    if (args[i] == Plantoir.Core.Models.AppDataRoot.StateDirFlag && i + 1 < args.Length) { i++; continue; }
     if ((args[i] == "--folder" || args[i] == "-f") && i + 1 < args.Length) folder = args[++i];
     else if (args[i].StartsWith("--folder=", StringComparison.Ordinal)) folder = args[i]["--folder=".Length..];
     else if ((args[i] == "--course" || args[i] == "-c") && i + 1 < args.Length) course = args[++i];

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Plantoir.Core.Models;
@@ -65,6 +66,35 @@ public static class AppDataRoot
     /// <summary>Whether this run is keeping its state somewhere of its own —
     /// so a caller can SAY so rather than leave a reader guessing.</summary>
     public static bool IsRedirected => _redirected is not null;
+
+    /// <summary>The flag that carries a redirect on a command line.</summary>
+    public const string StateDirFlag = "--state-dir";
+
+    /// <summary>
+    /// The folder a command line asks for: the argument after the first
+    /// <c>--state-dir</c>, or null. PURE. The space-separated form only;
+    /// <c>--state-dir=&lt;dir&gt;</c> is NOT accepted, by the app or by
+    /// <c>plantoir-mcp</c>, because nothing writes it and a second spelling
+    /// is a second thing to keep in step.
+    /// </summary>
+    public static string? StateDirFrom(IReadOnlyList<string> args)
+    {
+        for (int i = 0; i < args.Count - 1; i++)
+            if (args[i] == StateDirFlag) return args[i + 1];
+        return null;
+    }
+
+    /// <summary>
+    /// What a child process of OURS (the window's <c>plantoir-mcp</c>, #641)
+    /// is handed so it keeps its state where this run does: the flag and the
+    /// folder when <paramref name="redirectedTo"/> is set, nothing otherwise.
+    /// PURE; <see cref="ArgumentsToHandOn"/> is this run's answer.
+    /// </summary>
+    public static IReadOnlyList<string> HandOnArguments(string? redirectedTo) =>
+        redirectedTo is null ? Array.Empty<string>() : new[] { StateDirFlag, redirectedTo };
+
+    /// <summary>This run's <see cref="HandOnArguments"/>.</summary>
+    public static IReadOnlyList<string> ArgumentsToHandOn => HandOnArguments(_redirected);
 
     public static string Combine(params string[] parts)
     {
