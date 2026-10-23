@@ -96,10 +96,33 @@ public class PageTablesUiTests
 
     private static bool Ticked(DrivenApp app, int index) => WaitFor(app, $"sectionVerbPage{index}", $"box {index}").AsCheckBox().IsChecked == true;
 
+    /// <summary>
+    /// One Space: down AND up. FlaUI's <c>Keyboard.Press</c> is the key going
+    /// DOWN only — measured 2026-10-22, <c>GetAsyncKeyState(VK_SPACE)</c> still
+    /// read down 400 ms after it — so two Presses are a HELD Space to the app
+    /// (the second arrives with <c>KeyStatus.WasKeyDown</c>), and the table
+    /// rightly ignores it as a repeat.
+    /// </summary>
     private static void Space(DrivenApp app)
     {
         CopyAPageEscapeUiTests.Front(app);
-        Keyboard.Press(VirtualKeyShort.SPACE);
+        Keyboard.Type(VirtualKeyShort.SPACE);
+        Thread.Sleep(400);
+    }
+
+    /// <summary>A held Space: what the keyboard sends while the key is held — more downs, no up — then the release.</summary>
+    private static void HeldSpace(DrivenApp app)
+    {
+        CopyAPageEscapeUiTests.Front(app);
+        try
+        {
+            for (int down = 0; down < 6; down++)
+            {
+                Keyboard.Press(VirtualKeyShort.SPACE);
+                Thread.Sleep(down == 0 ? 500 : 33);
+            }
+        }
+        finally { Keyboard.Release(VirtualKeyShort.SPACE); }
         Thread.Sleep(400);
     }
 
@@ -167,6 +190,12 @@ public class PageTablesUiTests
         Space(app);
         Assert.False(Ticked(app, 1), "a second Space did not untick it (or the first flipped it twice)");
         Assert.False(Ticked(app, 0) || Ticked(app, 2) || Ticked(app, 3), "Space ticked a row that was not selected");
+
+        // A held Space ticks once: its repeats never flicker the box.
+        HeldSpace(app);
+        Assert.True(Ticked(app, 1), "a held Space did not tick the row exactly once (its repeats flipped it back)");
+        Space(app);
+        Assert.False(Ticked(app, 1), "Space after a held Space did not untick it");
 
         // A click on the box ticks it — then Space, with the focus ON the box,
         // flips it exactly once (a box clicks on key-up; the table takes both).

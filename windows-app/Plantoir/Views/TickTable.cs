@@ -25,13 +25,14 @@ namespace Plantoir.Views;
 /// for #548 — so it is caught on its way down). Space typed in Find a Page
 /// never reaches the list: the field is its sibling.</para>
 ///
-/// <para>Space is taken on its way DOWN only. The plan review asked whether a
-/// focused <c>CheckBox</c>, which clicks on key-up, would then flip twice:
-/// MEASURED (2026-10-22, <c>PageTablesUiTests</c>, Space after a mouse click
-/// on the box): one flip with a key-up handler, and one flip with that
-/// handler's key renamed away — so there is none. A box whose key-down never
-/// arrives has nothing to click on key-up; the test did not read where the
-/// focus sat after the click, so that is the reasoning, not a measurement.</para>
+/// <para>Space is taken on its way DOWN only, and a held Space's repeats
+/// (<c>KeyStatus.WasKeyDown</c>) are swallowed, so holding it ticks once.
+/// MEASURED (2026-10-22, <c>PageTablesUiTests</c>): six downs and one up
+/// ticked the row once, and failed with the guard taken out; Space (down AND
+/// up) after a mouse click on the box flipped it once, with no key-up handler.
+/// A focused <c>CheckBox</c> clicks on key-up, but a box whose key-down never
+/// arrives has nothing to click on; the test did not read where the focus sat
+/// after the click, so that is the reasoning, not a measurement.</para>
 ///
 /// <para>Each row tells Narrator whether it is ticked
 /// (<c>AutomationProperties.ItemStatus</c>), updated on every change, so a
