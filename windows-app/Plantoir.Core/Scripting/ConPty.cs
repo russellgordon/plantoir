@@ -25,6 +25,19 @@ public sealed class ConPtyProcess : IDisposable
 
     public int ProcessId { get; }
 
+    /// <summary>
+    /// The screen width the app's own launcher runs get (#662): wider than any
+    /// machine line a build prints today, so <c>PLANTOIR_HEALTH:</c> and the
+    /// other markers reach their readers whole. A width, not a cure — a line
+    /// longer than this still splits the same way, and the machine lines have
+    /// no cap (the follow-up issue proposes one). Why 8192 and not the 32767 a
+    /// <c>short</c> allows: Windows PowerShell 5.1 pads every progress frame
+    /// to the full width, so <c>Invoke-WebRequest</c>'s progress costs bytes
+    /// and time in proportion to it. The measurements are in
+    /// documentation/12-windows-app.md → "How wide the console is, and why".
+    /// </summary>
+    public const short LauncherColumns = 8192;
+
     private ConPtyProcess(SafeFileHandle inputWrite, SafeFileHandle outputRead,
                           nint pseudoConsole, nint processHandle, nint threadHandle,
                           nint attributeList, int processId)
@@ -52,9 +65,16 @@ public sealed class ConPtyProcess : IDisposable
     /// (Plantoir.Tests.ConPtyRedirectedParentTests). Launching harnesses with
     /// their own console (ShellExecute) is still the safer habit.
     /// </summary>
-    // 400 columns: ConPTY re-renders soft-wrapped lines with the boundary
-    // character duplicated, which corrupts transcript lines and could split
-    // a milestone marker. A width no real line reaches sidesteps it.
+    // The width matters because a line LONGER than the screen does not
+    // always come back as one line. Measured 2026-10-23 (#662): when a line
+    // wraps on the bottom row while something redraws the screen (Quartz's
+    // spinner), ConPTY sends the first `columns` characters, a REAL CR LF to
+    // scroll, then a cursor move back to the last column of the row above
+    // (ESC[29;400H) and the rest of the line starting again from that
+    // column's character. A reader that strips the cursor move sees two
+    // lines, the second beginning with a repeated character. 400 is kept as
+    // the default for PtyDriver and the harnesses (#623's work reads this
+    // output at this width); the app's own runs pass LauncherColumns.
     public static ConPtyProcess Start(string commandLine, string workingDirectory,
                                       short columns = 400, short rows = 30,
                                       IReadOnlyDictionary<string, string>? extraEnvironment = null)

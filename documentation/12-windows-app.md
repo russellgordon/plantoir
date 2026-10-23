@@ -284,6 +284,99 @@ native runtime replaced the container. The first two or three stages of most
 progress bars could never be reached, so the bar sat at 0% until a later, real
 marker jumped it forward several steps at once.
 
+### How wide the console is, and why (#662, 2026-10-23)
+
+**The app's own launcher runs get a screen 8,192 columns wide**
+(`ConPtyProcess.LauncherColumns`, passed by `ScriptRunner.Run`). Everything
+else that calls `ConPtyProcess.Start` — PtyDriver, the harnesses,
+`ConPtyRedirectedParentTests` — keeps the 400-column default, deliberately:
+#623's work on reading cursor moves as line breaks (branch
+`issue/657-verify-deploy`) reads PtyDriver's output at 400, and widening it
+under that work would change what it measures. Widening PtyDriver is left to
+a later issue if anybody wants it.
+
+**What went wrong at 400.** The first check of #650 on this PC found the
+build's `PLANTOIR_HEALTH:` line for a block of code shown as plain code — 611
+characters — split in two: no dialog, no "found a problem with this course's
+folders (runnableCodeShownAsPlainCode)" trail line, and the JSON's tail in the
+console. The bytes, captured with a node child that does what a real build
+does (Quartz's spinner, `readline.clearLine` + `cursorTo` every 20 ms on the
+current row; `plantoirSiteSaid.ts` blocking in `execFileSync` for ~300 ms and
+then writing the ⚠️ sentence, the detail and the machine line in ONE write):
+the first 400 characters (`…close tha`), a real `CR LF` to scroll the screen,
+`ESC[29;400H` — the cursor back to the LAST column of the row above — and the
+rest of the line starting again from that column's character (`at block…`).
+Every reader strips the cursor move, so it sees two lines, the second starting
+with a repeated character. That is the "boundary character duplicated" the old
+comment in `ConPty.cs` described.
+
+**It needs the screen to be FULL.** With fewer than 30 rows printed, the same
+line at the same width came through whole three times of three; with forty
+lines printed first, it split three times of three. That is why the same line
+written straight to PtyDriver came through whole, and why
+`ConPtyLongLineTests` prints forty lines before the long one: a test without
+them passes at any width and proves nothing. Its control,
+`AtTheOldWidthTheSameLineIsSplit`, holds the fault in view — if it ever fails,
+conhost has changed how it repaints a wrapped line, so re-measure before
+narrowing the screen again.
+
+**Measured, 2026-10-23, Lenovo 20QES70500 (i5-8365U, 16 GB), Windows 11 Pro
+26200, Windows PowerShell 5.1**, three runs per width unless one number is
+given:
+
+| | 400 | 4096 | 8192 | 32767 |
+|---|---|---|---|---|
+| The 611-character line split (node child, full screen) | **3 of 3** | 0 of 3 | 0 of 3 | 0 of 3 |
+| Pseudo console + child start | 53-71 ms | 53-181 ms | 54-65 ms | 55-79 ms |
+| conhost working set, peak | 8.5 MB | 9.1 MB | 10.0 MB | 13.9-14.8 MB |
+| Quartz spinner alone, 3 s | 1.2 KB/s | 1.6 KB/s | 1.5 KB/s | 1.0 KB/s |
+| `deploy.ps1`'s Netlify token call (`Invoke-WebRequest`, a 401 back) | 216-329 ms | 206-227 ms | 202-224 ms | 184-233 ms |
+| Cloudflare's `Invoke-RestMethod` (a 401 back) | 140-188 ms | 135-197 ms | 136-165 ms | 133-135 ms |
+| 10 × `Clear-Host` + 28 coloured lines | 531-770 ms | 833-1610 ms | 945-1088 ms | 2213-2850 ms |
+| Bytes for that whole script | 45-46 KB | 49-51 KB | 51-54 KB | 75-80 KB |
+| 2 MB local download through `Invoke-WebRequest`'s progress (one run) | 86 s, 0.39 MB | 108 s, 3.1 MB | 218 s, 6.5 MB | over 280 s (stopped) |
+| Host errors at any step, or writing one line as wide as the screen | none | none | none | none |
+
+Two things in that table decide the width. ConPTY repaints the SPINNER
+cheaply at any width (`ESC[K`, not spaces), so the screen's width costs a build
+nothing. But **Windows PowerShell 5.1 pads every progress frame to the full
+width** (runs of 4,096 and 16,384 spaces in the captured bytes), so
+`Invoke-WebRequest`'s progress costs bytes and time in proportion to it. The
+launchers' only web calls are three tiny API requests in `deploy.ps1`, which
+measured the same at every width; a large download through
+`Invoke-WebRequest` from a launcher would be the first thing to notice it
+(set `$ProgressPreference = 'SilentlyContinue'` around it). 8,192 is the
+widest that kept every PowerShell number close to 400's.
+
+**The lengths it has to hold.** A one-block plain-code finding is 531-611
+characters, and the most it names (ten blocks, then "and N more") about
+2,300; `site_said.py` packs every block into ONE finding. But no width is a
+cure: `PLANTOIR_DATED:` names every page the build rewrote and
+`PLANTOIR_MAPS:` every map, with no cap, so a line longer than 8,192 splits
+exactly as before. The follow-up issue proposes a cap in the shared Python.
+(`PLANTOIR_LINKS_CHECKLIST:` carries counts only, not links.)
+
+**Rejected: joining a split line back together before the readers.** The
+shape is recognisable (a line of exactly the screen's width, then a cursor
+move to its last column), but a joiner would have to see the cursor move
+BEFORE `StripControlSequences` drops it, in two readers that strip first
+(`TranscriptBuilder.Append` and `CollectHealthFindings`); it depends on how
+this one conhost build repaints, which #623 shows is not stable; and guessing
+wrong glues two real lines together. **Rejected: 32,767**, the most a `short`
+allows: the PowerShell numbers above. **Rejected: widening every caller**: see
+PtyDriver, above.
+
+**What a teacher sees.** The console's `TextBlock`
+(`Views/TaskProgressView.xaml`, `ConsoleText`) does not wrap and sits in a
+`ScrollViewer` with a horizontal scroll bar, so a long line that used to arrive
+broken — two lines, the second starting with a repeated letter — now shows as
+ONE line, and the scroll bar reaches further to the right. Machine lines are
+hidden whole as before (`transcriptStripping.machineLines`).
+
+**For the mac, to know only.** Its pseudo terminal is the kernel's, which
+passes bytes through as written and never repaints, so it has nothing to do
+here. Windows' screen is wide for this reason, not out of habit.
+
 ---
 
 ## Scheduled deploys
