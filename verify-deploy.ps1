@@ -181,6 +181,11 @@ function Sync-RecipeFolder([string]$Source, [string]$Destination) {
         foreach ($file in Get-ChildItem -LiteralPath $Destination -Recurse -File -Force) {
             $relative = $file.FullName.Substring($Destination.Length + 1)
             if ($wanted.ContainsKey($relative.ToLowerInvariant())) { continue }
+            # The launchers run Python FROM .toolchain, so it makes caches of
+            # its own there. Deleting them would count as a change on every
+            # run and force a --full-rebuild each time (measured: the second
+            # run "mirrored" 22 files, every one a .pyc).
+            if ($relative -match '(^|\\)__pycache__\\' -or $relative -like '*.pyc') { continue }
             Remove-Item -LiteralPath $file.FullName -Force
             $script:MirrorChanged += "$($Destination.Substring($WorkingFolder.TrimEnd('\').Length + 1))\$relative (deleted)"
         }
