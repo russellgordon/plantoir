@@ -272,13 +272,6 @@ public sealed class AgentGuidanceTests : IDisposable
     }
 
     /// <summary>
-    /// #600 (the mac's <c>PrintablePagesTests.testThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst</c>,
-    /// #596): the page-authoring skill travels the same way, names every
-    /// feature skill it routes to in backticks — each written beside it — and
-    /// both root files name it in their FIRST bullet, so an assistant asked for
-    /// any page reads it before writing anything.
-    /// </summary>
-    /// <summary>
     /// #649 (the mac's <c>PrintablePagesTests.testTheHandoutsSkillIsWrittenWithItsStartersAndEveryRouteToItNamesIt</c>,
     /// #631): the handouts skill travels the same way WITH its starter
     /// sources — the first skill with a subfolder and with spaces in its file
@@ -328,6 +321,13 @@ public sealed class AgentGuidanceTests : IDisposable
                         $"{name} must name the {skillName} skill");
     }
 
+    /// <summary>
+    /// #600 (the mac's <c>PrintablePagesTests.testThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst</c>,
+    /// #596): the page-authoring skill travels the same way, names every
+    /// feature skill it routes to in backticks — each written beside it — and
+    /// both root files name it in their FIRST bullet, so an assistant asked for
+    /// any page reads it before writing anything.
+    /// </summary>
     [Fact]
     public void ThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst()
     {
