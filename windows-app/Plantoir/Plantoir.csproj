@@ -105,12 +105,14 @@
                 var info = new FileInfo(path);
                 string sha;
                 using (var stream = File.OpenRead(path))
-                    sha = BitConverter.ToString(SHA256.Create().ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+                using (var hasher = SHA256.Create())
+                    sha = BitConverter.ToString(hasher.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
                 return path.Substring(prefix.Length) + "\t" + info.Length + "\t" + info.LastWriteTimeUtc.Ticks + "\t" + sha;
             })
             .OrderBy(line => line, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        string temporary = manifest + ".tmp";
+        // Unique per build, so two builds into one tree never share a temporary file.
+        string temporary = manifest + "." + Guid.NewGuid().ToString("N") + ".tmp";
         File.WriteAllLines(temporary, lines);
         File.Copy(temporary, manifest, true);
         File.Delete(temporary);
@@ -120,7 +122,7 @@
   </UsingTask>
   <Target Name="PlantoirFindBuiltToolchain">
     <ItemGroup>
-      <_PlantoirBuiltToolchain Include="$(TargetDir)Toolchain\**" Exclude="$(TargetDir)Toolchain\.hashes;$(TargetDir)Toolchain\.hashes.tmp" />
+      <_PlantoirBuiltToolchain Include="$(TargetDir)Toolchain\**" Exclude="$(TargetDir)Toolchain\.hashes;$(TargetDir)Toolchain\.hashes.*.tmp" />
     </ItemGroup>
   </Target>
   <Target Name="PlantoirWriteToolchainHashes" AfterTargets="Build" DependsOnTargets="PlantoirFindBuiltToolchain"

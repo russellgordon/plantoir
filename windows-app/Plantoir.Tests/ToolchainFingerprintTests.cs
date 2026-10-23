@@ -123,6 +123,46 @@ public sealed class ToolchainFingerprintTests : IDisposable
         Assert.Equal(0, ToolchainMirror.RefreshToolchain(_folder, _bundled).ReadInFull);
     }
 
+    /// <summary>Moves every bundled file's time down by <paramref name="by"/>: what the installer's 2 s rounding does.</summary>
+    private void RoundTheBundleDown(TimeSpan by)
+    {
+        foreach (string file in Directory.EnumerateFiles(_bundled, "*", SearchOption.AllDirectories))
+        {
+            if (Path.GetFileName(file) == ToolchainMirror.ManifestName) continue;
+            File.SetLastWriteTimeUtc(file, File.GetLastWriteTimeUtc(file) - by);
+        }
+    }
+
+    [Fact]
+    public void AnInstalledBundleWhoseTimesWereRoundedDownIsStillTrusted()
+    {
+        // Inno rounds every installed file's time DOWN to 2 s, and a zip stores
+        // DOS times rounded the same way, while the manifest holds the build
+        // tree's exact ticks. Up to 1.999 s down is the same file.
+        WriteManifest();
+        ToolchainMirror.RefreshToolchain(_folder, _bundled);
+        RoundTheBundleDown(TimeSpan.FromMilliseconds(1999));
+
+        var pass = ToolchainMirror.RefreshToolchain(_folder, _bundled);
+
+        Assert.Equal(0, pass.Changed);
+        Assert.Equal(3, pass.Compared);
+        Assert.Equal(0, pass.ReadInFull);
+    }
+
+    [Fact]
+    public void ABundledFileTwoSecondsOlderThanItsManifestIsNotTrusted()
+    {
+        WriteManifest();
+        ToolchainMirror.RefreshToolchain(_folder, _bundled);
+        RoundTheBundleDown(TimeSpan.FromSeconds(2));
+
+        var pass = ToolchainMirror.RefreshToolchain(_folder, _bundled);
+
+        Assert.Equal(0, pass.Changed);
+        Assert.Equal(3, pass.ReadInFull);   // read both, as before #559
+    }
+
     [Fact]
     public void AStaleManifestDoesNotSkipTheCopy()
     {

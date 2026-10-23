@@ -140,7 +140,31 @@ public static class ToolchainMirror
         public bool StillDescribes(FileInfo file) =>
             file.Exists && file.Length == Length
             && Math.Abs(file.LastWriteTimeUtc.Ticks - WriteTicksUtc) < TimeSpan.TicksPerMillisecond * 2;
+
+        /// <summary>
+        /// Whether this MANIFEST entry still describes an INSTALLED bundled
+        /// file: same length, and a time no later than the manifest's and less
+        /// than 2 s earlier. The installer rounds every file's time DOWN to
+        /// 2 s (Inno's TimeStampRounding default; measured 3,000 of 3,000
+        /// installed files on a 2 s boundary) and a zip stores DOS times,
+        /// rounded down the same way, while the manifest holds the build
+        /// tree's exact ticks — so the 2 ms check would never trust an
+        /// installed bundle, the one case #559 exists for. One-sided and
+        /// under 2 s: a time LATER than the manifest's, or 2 s or more
+        /// earlier, is a file that moved on. Nobody edits the bundle in
+        /// place; the index side keeps the 2 ms check, because that time is
+        /// the copy's own exact stamp.
+        /// </summary>
+        public bool StillDescribesInstalled(FileInfo file)
+        {
+            if (!file.Exists || file.Length != Length) return false;
+            long roundedDownBy = WriteTicksUtc - file.LastWriteTimeUtc.Ticks;
+            return roundedDownBy >= 0 && roundedDownBy < InstallerRounding.Ticks;
+        }
     }
+
+    /// <summary>How far an installer or a zip may round a bundled file's time down (#559).</summary>
+    internal static readonly TimeSpan InstallerRounding = TimeSpan.FromSeconds(2);
 
     /// <summary>
     /// Where a working folder's index lives: the manifest last applied to its
@@ -220,7 +244,7 @@ public static class ToolchainMirror
 
         /// <summary>The bundled file's hash, if the manifest still describes it.</summary>
         public string? BundledHash(string relative, FileInfo source) =>
-            _bundled is not null && _bundled.TryGetValue(relative, out var entry) && entry.StillDescribes(source)
+            _bundled is not null && _bundled.TryGetValue(relative, out var entry) && entry.StillDescribesInstalled(source)
                 ? entry.Sha256 : null;
 
         /// <summary>The copy's hash, if the last pass's index still describes it.</summary>

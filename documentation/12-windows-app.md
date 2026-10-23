@@ -5221,8 +5221,22 @@ the whole table).
   - otherwise → both are read, exactly as before.
 
   A fingerprint is trusted only while its file's length and time still match
-  it (the same 2 ms `FilesLookIdentical` allows). So a stale manifest or a
-  copy edited in place costs reads, never a missed copy
+  it. For the INDEX that means the 2 ms `FilesLookIdentical` allows, because
+  its time is the copy's own exact stamp. For the MANIFEST it means a bundled
+  time no later than the manifest's and less than 2 s earlier
+  (`Fingerprint.StillDescribesInstalled`): the installer rounds every file's
+  time DOWN to 2 s (Inno's `TimeStampRounding` default, found by the
+  implementation review: 3,000 of 3,000 files under
+  `%LOCALAPPDATA%\Programs\Plantoir\Toolchain` on a 2 s boundary, against 0
+  of 3,000 in the Debug tree), while the manifest holds the build tree's
+  exact ticks. With the 2 ms check on that side too, the first version of
+  this piece never trusted an INSTALLED bundle, the one case it exists for,
+  and the index never filled. One-sided and under 2 s: a later time, or one
+  2 s or more earlier, is a file that moved on
+  (`AnInstalledBundleWhoseTimesWereRoundedDownIsStillTrusted`,
+  `ABundledFileTwoSecondsOlderThanItsManifestIsNotTrusted`). Nobody edits the
+  bundle in place. So a stale manifest or a copy edited in place costs
+  reads, never a missed copy
   (`ToolchainFingerprintTests.AStaleManifestDoesNotSkipTheCopy`, where the
   stale manifest's hash IS the copy's: trusting it would have left the old
   script in place).
@@ -5232,8 +5246,20 @@ the whole table).
 **Measured** (same PC, 2026-10-23, warm cache, a scratch working folder
 filled from the x64 Debug build's `Toolchain\`, 12,909 files). The harness
 called `ToolchainMirror.RefreshToolchain` directly. "Before" is the same
-build with the manifest hidden, which is exactly the old code path. Three
-runs each, in the order they ran:
+build with the manifest hidden, which is exactly the old code path (and
+exactly what the 2 ms manifest check did to an installed bundle). Three
+runs each, in the order they ran.
+
+*As an installed bundle is* — every bundled file's time rounded DOWN to 2 s
+the way Inno does it (12,909 of 12,909 moved; none was on a boundary
+before). For each run, a "release" restamped the bundle, wrote its manifest
+from the exact times, then rounded it:
+
+| Pass | Before (read both) | After | Read in full |
+|---|---|---|---|
+| A release over a filled folder, rounded bundle | 156.0 (the first, cold) / 10.1 / 10.2 s | **6.4 / 6.1 / 7.2 s** | 12,909 → **0** |
+
+*Debug tree, no rounding* (the first measurements, before the review):
 
 | Pass | Before (read both) | After | Read in full |
 |---|---|---|---|
@@ -5255,11 +5281,25 @@ Read it carefully, because the warm numbers undersell it.
 - **A copy whose own time moved is still read.** Nothing can tell it from an
   edit; with the manifest, though, it is read once rather than twice.
 
-**What the director must check at the cut.** The INSTALLED `{app}\Toolchain`
-must keep the manifest's times (Inno records each file's time by default).
-The **zip** does not: `Compress-Archive` stores DOS times, at a resolution of
-2 s, so a copy unpacked from `Plantoir-win-x64.zip` has times no manifest
-entry matches. It falls back to today's reads, which is safe and only slow.
+**What the director must check at the cut.** After installing the cut
+build over the previous one, the first launch's `working folder tools
+copied` line should say "(0 read in full)" or name no reads, and
+`startup.log`'s `tools copy finished` should say `0 read in full`. If it
+reads every file, the installed times are not within 2 s below the
+manifest's. Look at one file: `.hashes` holds its UTC ticks, and
+`(Get-Item …).LastWriteTimeUtc.Ticks` holds the installed copy's.
+
+**Why `installer.iss` says `TimeStampsInUTC=yes`.** Inno stores file times
+as LOCAL time by default and converts them back on install. A build made
+on one side of a clocks change (1 November) and installed on the other would
+then shift every file by an hour, and no tolerance covers an hour without
+also trusting a file that really moved. UTC storage has no such seam.
+
+**The zip.** `Compress-Archive` stores DOS times, rounded DOWN to 2 s like
+Inno's, so a copy unpacked from `Plantoir-win-x64.zip` is trusted the same
+way. DOS times are local, though: unpacked in another time zone than the
+build's, every file is hours off, falls back to the old reads, and is only
+slow.
 
 **Rejected:**
 - **Building releases from a tree whose files keep their times (the issue's
