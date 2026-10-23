@@ -566,8 +566,8 @@ measurement), on an M4 Pro with Colima at 6 CPUs / 12 GiB, 2026-09-26:
 | `npm install -g wrangler@4.80.0` | 65.1 MB | |
 | `git clone` of Quartz | 42.0 MB → **2.3 MB** at depth 1 | |
 | Quartz's `npm install` | 128.0 MB | the largest |
-| certificate store (#639, added 2026-10-23) | 10.4 MB | mostly apt's lists; an install that changes nothing for a no-cache build, which NodeSource's script already upgraded |
-| **Total** | **≈382 MB → ≈342 MB** | #312's VM counter read 389.8 MB in a fresh VM |
+| certificate store (#639, added 2026-10-23) | 10.4 MB | measured on its own, after #334, so NOT in the total below; mostly apt's lists, and an install that changes nothing for a no-cache build, which NodeSource's script already upgraded |
+| **Total** | **≈382 MB → ≈342 MB** | #334's stages only (≈352 MB with #639's layer); #312's VM counter read 389.8 MB in a fresh VM |
 
 Time here: 49–52 s cold with the base cached; an incremental rebuild after a
 script edit is 5 s, every heavy layer `CACHED`. A teacher's fresh 3-CPU / 4 GB
