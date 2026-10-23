@@ -27135,14 +27135,15 @@
             "lang": "text\u00a0wrap",
             "meta": null,
             "wraps": true,
-            "why": "Split on INFO_SPACE, as codeRunnerBlocks.fences splits it (#455 review N2)."
+            "why": "Split on INFO_SPACE, as codeRunnerBlocks.fences splits it (#455 review N2). What it does NOT do is make the block read as plain `text` further on: rehype-pretty-code 0.14 renders it with data-language=\"text\u00a0wrap\", the no-break space kept, not \"text\" (measured 2026-10-23 in the image, for #653's review). The wrapper still wraps it, and its lines are intact."
           },
           {
             "name": "no-break spaces, then highlighted lines",
             "fence": "text\u00a0\u00a0wrap {3}",
             "lang": "text\u00a0\u00a0wrap",
             "meta": "{3}",
-            "wraps": true
+            "wraps": true,
+            "why": "As the case above: wrapped, and line 3 still highlighted, but rehype-pretty-code 0.14 renders it with data-language=\"text\u00a0\u00a0wrap\", both no-break spaces kept, not \"text\" (measured 2026-10-23 in the image)."
           },
           {
             "name": "with highlighted lines after it",
@@ -27172,6 +27173,14 @@
             "lang": "python",
             "meta": "run wrap",
             "wraps": false
+          },
+          {
+            "name": "text run wrap: text is not a runner language, so it wraps and gets no Run button",
+            "fence": "text run wrap",
+            "lang": "text",
+            "meta": "run wrap",
+            "wraps": true,
+            "why": "`run` is just another word after `text` (codeRunnerBlocks reads runners for its LANGUAGES only), so the block wraps; the check script also runs it on a `codeRunner: true` page through the runner transformer and requires no runner."
           },
           {
             "name": "TEXT in capitals is not text (Q1)",
