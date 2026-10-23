@@ -1414,6 +1414,60 @@ first line and left of it; the current page's
   link test, and the import left out of `concatenateResources` fails the
   carrier test.
 
+**Reading a sidebar that is still arriving, and still moving (#616, #601,
+2026-10-22).** Two races in the browser check, both the check's and neither
+the page's:
+
+- **The wait.** `open()` waited for any `.explorer-ul > li`, and Quartz's
+  `OverflowList` writes one static row, `li.overflow-end`, into every page's
+  HTML, so the wait was over at DOMContentLoaded, before the explorer had
+  drawn anything; with a slow `contentIndex.json` the check failed with
+  `the folder "Tasks" is not in the sidebar` (#616). It now waits for a row
+  that is not `.overflow-end`. That is enough because `setupExplorer` builds
+  the whole tree into one fragment and inserts it in ONE call, so no partial
+  sidebar can be seen. An empty sidebar still fails, with the "did not load"
+  sentence. Rejected: waiting for the planted folder's row (it would turn a
+  real "the folder is not in the sidebar" into a vague "did not load"), and
+  any sleep.
+- **The pairing.** On a full load with no saved `explorerScrollTop`,
+  `explorer.inline.ts` smooth-scrolls the current page's row into view, which
+  moves the WINDOW: `scrollY` 0 to 476 px over about 360 ms, the row moving
+  1 to 41 px a frame (sampled per frame, light and dark alike; the whole-page
+  scroll itself is #611). #601's "0.8 px" miss was one frame of that, not
+  font metrics: a still dot's middle sits 9.79 px below its line's top, and #601's sat
+  18.8 px below, 9.0 px off, so the line's bottom edge only happened to be
+  0.8 px away. So every geometry reading (the long title's lines, content
+  edge and dot; each page row's first line and dot) now comes from
+  `readInOneFrame`: the row's lines, the dot's box from CDP, the lines again,
+  kept only when the two line readings are identical and the dot is drawn;
+  20 tries, 100 ms apart, then a failure that says why. **What it proves:**
+  the line and the dot were read within one frame, because the line is read
+  on both sides of the dot and the scroll only goes one way. It does not
+  prove the sidebar has stopped, and need not: 537 paired reads taken
+  MID-scroll all gave the same 9.79 px offset as a still sidebar (re-run on
+  this piece: 102 light and 410 dark mid-scroll pairs, every one 9.79 px).
+  **A wait-for-the-scroll-to-end gate was REJECTED for that reason**: it
+  proves nothing the pairing does not, and it cannot defend against a move
+  after the gate. The first fix (f12bd11b1) paired only the every-row loop,
+  kept the step-1 box when a re-read came back empty, and left the
+  long-title block judging that step-1 box against lines read later; all
+  three are gone. Also rejected: the dot from `getComputedStyle(row,
+  "::before").top` (a derived box in place of the browser's own layout,
+  which #515's review chose), `scroll-behavior: auto` injected into the page
+  (changes the page under test), and a wider tolerance (`TOLERANCE` is not in
+  the vertical test, and widening it would hide a real one-line drift).
+- **Must-fail** (copy-and-restore, on the EXC2O copy above, served with
+  `contentIndex.json` delayed): at 600 ms the old check failed 3 of 3 with
+  `the folder "Tasks" is not in the sidebar`, the new one passed 3 of 3
+  (`OK: light 5.63:1, dark 9.45:1, forced colours 10.41:1`, the same at
+  0 ms). A 9 px instant move of the sidebar's list injected at the start of
+  the geometry step: the old check failed 3 of 3 at 0 ms with `the dot's
+  middle (693.9 px) is not beside the title's first line (675.1-693.1 px)`
+  (at 600 ms it fails earlier, on the folder sentence); the new one passed
+  3 of 3 at 0 ms and at 600 ms; a dot really moved 14 px still
+  fails the new one. The injection is not shipped: a test hook in a gate is a
+  second code path.
+
 **On Windows** (#546, 2026-10-16): the same check, unchanged, against a
 native build gave the same `OK: light 5.63:1, dark 9.45:1, forced colours
 10.41:1`; the dot was looked at in the app's preview pane, light and dark,
