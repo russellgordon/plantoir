@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-22 | Swift code blocks run on Windows, as on the Mac. The first preview with a Swift block downloads about 2.3 GB once, says how far it has got, and keeps about 0.9 GB. Later previews compile only blocks that changed: a few seconds each, or about a minute for a block that needs the full standard library. The 1.8.6 notes' "Not yet on Windows" sentence about Swift comes out. The two Swift marketing pictures stay owed until their 2x picture is taken, so plantoir.app's `runnable-swift` stays Mac only. | Windows | [#570](https://github.com/russellgordon/plantoir/issues/570) |
 | 2026-10-22 | Install and Reopen on the update offer that comes by itself once a day now closes Plantoir, installs and opens the new version, as it already did from File ▸ Check for Updates…; before, the window stayed open and nothing was installed. | Windows | [#632](https://github.com/russellgordon/plantoir/issues/632) |
 
 
