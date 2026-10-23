@@ -31,8 +31,8 @@ here:
 
 Each is at `.claude/skills/<name>/SKILL.md` (and `.agents/skills/<name>/SKILL.md`)
 in this working folder. A flowchart or timeline is a diagram (section 6
-here), not a maths figure. A handout made as a PDF rather than a page - and
-any quiz or test for marks, which never goes on the site - is the
+here), not a maths figure. A handout made as a PDF rather than a page -
+usually including a quiz or test for marks - is the
 `plantoir-handouts` skill; when a teacher asks for something to print,
 offer its house style alongside `plantoir-printing`.
 

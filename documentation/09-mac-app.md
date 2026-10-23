@@ -3029,7 +3029,7 @@ teacher asking for "a worksheet" or "a quiz to print" was routed only to
 style for paper made as a PDF - LaTeX compiled with `tectonic`, one source
 and two outputs behind the `\qa`/`\onlyq`/`\onlya` switch with a two-line
 `- Answers` (`- Solutions` for a quiz or test) wrapper, the look, the four
-corners the site prints, the quiz and test conventions, every answer
+corners laid out as the course's print settings lay out the site's, the quiz and test conventions, every answer
 verified independently, a second agent reviewing any new question set,
 every page rendered with `pdftoppm` and looked at, no build files left -
 lived only in Russell's own `~/.claude/CLAUDE.md` and the MPM2DE course
@@ -3056,11 +3056,19 @@ to OFFER it first whenever something is to be printed, beside
   `handouts/<CODE>/` folder beside `courses/` when the teacher has no place
   of their own, and the student copy alone goes into `Media` when it should
   also be handed out from the site (`printPdf:`).
-- **The school's name comes from the course's `print_school_name`** - the
-  same setting the site's printed pages use - and when it is empty the
-  assistant ASKS, and says where in Course Settings it can be set once.
-  REJECTED: the issue's school name as a default, which would print one
-  school's name on every teacher's paper.
+- **The corners follow the course's print settings** - `print_school_name`,
+  `print_school_name_at`, `print_course_code_at` and `print_blanks`, read as
+  `scripts/print_settings.py` reads them - because the issue's fixed layout
+  (Class # always, school always top left) matches the site only for a
+  course set up that way: by default the site prints Name and Date alone
+  (implementation review). When the school's name is empty the assistant
+  ASKS, and says where in Course Settings it can be set once. REJECTED: the
+  issue's school name as a default, which would print one school's name on
+  every teacher's paper.
+- **Whether a quiz or test goes on the website is the teacher's call.** The
+  first version said a quiz or test "must never be on the class website";
+  nothing in the issue said so, and the director softened it to "usually
+  printed - ask" (put to Russell to confirm).
 - **Starters ship with the skill** (`starters/Handout.tex` and
   `starters/Quiz.tex`, each with its wrapper), generic rather than Russell's
   MPM2D templates, which carry one course's questions. Both were compiled

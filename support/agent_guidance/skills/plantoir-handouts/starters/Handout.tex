@@ -45,6 +45,9 @@
 \renewcommand{\headrulewidth}{0pt}
 \newcommand{\fillblank}[2]{#1 \rule[-0.15em]{#2}{0.4pt}}
 \fancyhead[L]{\small\sffamily\color{gray}\schoolname}
+% Lay the corners out as the course's print settings do (the skill's sections 2
+% and 5): keep only the blanks print_blanks lists, and move or drop the school's
+% name and the course code as print_school_name_at and print_course_code_at say.
 \fancyhead[R]{\small\sffamily\color{gray}\fillblank{Name}{3.2cm}\quad\fillblank{Date}{2.2cm}\quad\fillblank{Class \#}{1.4cm}}
 \fancyfoot[L]{\small\sffamily\color{gray}\doctitle\ $\cdot$ \coursecode}
 \fancyfoot[R]{\small\sffamily\color{gray}Page \thepage\ of \pageref{LastPage}}

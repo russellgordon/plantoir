@@ -21,8 +21,9 @@ style below as the starting point, in one or two sentences:
 
 - **A PDF in the house style** (this skill): a LaTeX source compiled to
   `Name.pdf`, with the answer key `Name - Answers.pdf` made from the same
-  source. Best for paper that is only ever printed, and the only right
-  choice for a quiz or test - those must never be on the class website.
+  source. Best for paper that is only ever printed. A quiz or test for
+  marks is usually printed this way; whether it also goes on the class
+  website is the teacher's call - ask.
 - **A page on the class website that prints**: the `plantoir-printing` skill
   (`.claude/skills/plantoir-printing/SKILL.md`, the same file is at
   `.agents/skills/plantoir-printing/SKILL.md`). Best when students should
@@ -55,14 +56,25 @@ without asking again.
   that a new name does not differ from an existing file in that folder only
   by capital letters: on most computers that is the same file, and the
   compile would overwrite it.
-- **The school's name and the course code.** Read the course's settings,
-  `courses/<CODE>/course_config.json`: `print_school_name` is the school's
-  name as the class website prints it, and the course code is the folder's
-  code (`course_code` if a reference course's folder has a year after it),
-  in capitals. If `print_school_name` is missing or empty, ask the teacher
-  for the school's name, and mention that putting it in Course Settings,
-  under Printing, makes the website's printed pages carry it too. Do not
-  edit `course_config.json` yourself unless the teacher asks.
+- **The corners: read the course's print settings.** They are in
+  `courses/<CODE>/course_config.json`, and the class website lays out its
+  printed pages from them (section 5 says how):
+  - `print_school_name` - the school's name. If it is missing or empty,
+    ask the teacher for it, and mention that putting it in Course
+    Settings, under Printing, makes the website's printed pages carry it
+    too.
+  - `print_school_name_at` - where the school's name goes: `header_left`
+    (top left, also when the key is missing), `footer_left` (bottom left)
+    or `none` (not printed).
+  - `print_course_code_at` - where the course code goes: `footer_left`
+    (also when missing), `header_left` or `none`.
+  - `print_blanks` - the blanks a student fills in: any of `name`, `date`,
+    `class_number`, always printed in that order. Missing (or `null`) means
+    Name and Date only; an empty list means none.
+
+  The course code is the folder's code (`course_code` if a reference
+  course's folder has a year after it), in capitals. Do not edit
+  `course_config.json` yourself unless the teacher asks.
 
 ## 3. One source, two outputs
 
@@ -104,8 +116,10 @@ source.
 ## 5. Header and footer
 
 All four corners `\small\sffamily\color{gray}`, no rule under the header,
-with `fancyhdr` and `lastpage`. This matches what the class website prints,
-so paper from either looks the same:
+with `fancyhdr` and `lastpage`, laid out as the course's print settings
+do (section 2), so paper from the website and from here looks the same.
+With the school's name top left, the course code bottom left and all three
+blanks, that is:
 
 ```latex
 \pagestyle{fancy}
@@ -118,11 +132,16 @@ so paper from either looks the same:
 \fancyfoot[R]{\small\sffamily\color{gray}Page \thepage\ of \pageref{LastPage}}
 ```
 
-- **Top left**: the school's name (section 2).
-- **Top right**: the blanks a student fills in, Name, Date and Class #, at
-  those widths.
-- **Bottom left**: the handout's title, then the course code of the course
-  it is for (`MPM2D`, `ICS3U`, `SCH3U`, ...).
+- **Top left**: whatever `print_school_name_at` and `print_course_code_at`
+  put at `header_left` - by default the school's name. Two in one corner
+  read `School Name $\cdot$ CODE`, school first.
+- **Top right**: the blanks `print_blanks` lists, in the order Name, Date,
+  Class #, at the widths above. Leave out the `\fillblank` of any it does
+  not list (by default Class # is left out).
+- **Bottom left**: the handout's title, then whatever is placed at
+  `footer_left` - by default the course code of the course it is for
+  (`MPM2D`, `ICS3U`, `SCH3U`, ...). With nothing placed there, the title
+  alone.
 - **Bottom right**: `Page 1 of 3`.
 
 ## 6. Quizzes and tests
