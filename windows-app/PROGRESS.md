@@ -753,9 +753,12 @@ read back (`PublishToFolderUiTests`). Doc 12 → "A test that runs a launcher".
    stale pipe handles into its pseudo-console child; `wsl.exe` then reports
    "the input device is not a TTY". A GUI app is naturally clean; test
    harnesses must get their own console (ShellExecute / `Start-Process`).
-2. **ConPTY soft-wrap duplication.** Re-rendered wrapped lines arrive with the
-   boundary character doubled — hence the runner's 400-column pseudo console,
-   so no real line wraps.
+2. **ConPTY soft-wrap duplication.** A line longer than the screen that wraps
+   on the bottom row while something redraws arrives as two lines, the second
+   starting with the boundary character again. 400 columns turned out NOT to
+   be wider than every real line (a 611-character `PLANTOIR_HEALTH:` line,
+   #662), so the app's runs now get 8,192 (`ConPtyProcess.LauncherColumns`);
+   PtyDriver keeps 400. Doc 12 → "How wide the console is, and why".
 3. **PowerShell 5.1 + `$ErrorActionPreference='Stop'` + wsl stderr.** Any
    redirected call site (`*> $null`) turns wsl's stderr into terminating
    ErrorRecords; the launchers' `docker` wrapper relaxes the preference around
