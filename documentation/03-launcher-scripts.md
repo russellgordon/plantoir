@@ -1826,6 +1826,12 @@ round passed it).
   it during the wait, or when this copy carries no `support/swift`; `busy`
   is never printed on a Mac. If the website builder cannot be asked, the line
   is lost and the preview carries on. Only the build is timed, not the wait.
+  A preview stopped while the image is building leaves no line at all: the
+  launcher is ended before either ending prints. That is accepted because
+  nothing finished and nothing is wrong with the Mac - the next preview builds
+  again (Docker keeps the layers that completed) and prints the line then,
+  and a trap to print `unpack` on the way out would record a teacher's own
+  Stop as a failure.
   `scripts/test_swift_launcher_marker.py` cuts this block out and runs every
   ending with bash 3.2 and a stand-in `docker`. A scheduled
   publish runs the same step (ruling Q4), so its log carries the line too and

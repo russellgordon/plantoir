@@ -2085,7 +2085,8 @@ says "0.0 GB downloaded" - true, and it tells a helper the update rebuilt from
 what was there. apt's packages and the base image are not counted (the scope
 of `swiftImage.measured`). `verify.sh` checks the sum against the build log
 BuildKit really printed whenever its Swift gate builds the image (the whole
-pin sum under `--no-cache`).
+pin sum under `--no-cache`), and requires both download steps' headers to be
+found in it, so a parser that found none cannot pass by saying 0.
 
 **Rejected:** making the Dockerfile print curl's byte count - the Dockerfile
 is in the toolchain id, so every cached Swift program on every Mac would be

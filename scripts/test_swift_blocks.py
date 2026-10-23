@@ -760,6 +760,16 @@ class GotReadyMarkerTests(unittest.TestCase):
         no_copy = text.replace("#8 CACHED", "#8 DONE 0.0s")
         self.assertEqual(swift_blocks.downloaded_bytes(no_copy), 0)
 
+    def test_the_real_log_names_both_download_steps_and_a_log_without_them_names_none(self):
+        """verify.sh requires every step to be found, so a parser that finds
+        no header cannot pass by reporting 0 bytes."""
+        found = swift_blocks.download_steps_in_log(self.real_log())
+        self.assertEqual(len(found), len(self.mac["downloadSteps"]))
+        for _step, _number, ran, arch in found:
+            self.assertFalse(ran)
+            self.assertEqual(arch, "arm64")
+        self.assertEqual(swift_blocks.download_steps_in_log("#1 [internal] load build definition\n#1 DONE 0.0s"), [])
+
     def test_a_failed_real_log_is_read_from_its_failed_step(self):
         text = self.real_log().replace(
             "#9 CACHED",

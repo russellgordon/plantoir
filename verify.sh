@@ -1842,13 +1842,17 @@ if [[ "$SWIFT_GATE_READY" == "true" ]]; then
   # The one check of the trail's byte count against the build log BuildKit
   # really printed for this recipe (#635): only when it was built here. With
   # --no-cache both download steps ran, so it must be the pins' whole sum for
-  # this Mac's architecture; otherwise it must be a sum the pins can make.
+  # this Mac's architecture; otherwise it must be a sum the pins can make -
+  # and either way both download steps' headers must have been found, so a
+  # parser that finds none cannot pass by saying 0.
   if [[ "$SWIFT_BUILT_HOW" == built* ]]; then
     SWIFT_MARKER_LINE="$(cd scripts && PLANTOIR_CONTRACTS_DIR=../contracts python3 swift_blocks.py got-ready --outcome=built --course=VERIFY --section=1 --log=/tmp/verify_swift_image.log)"
     SWIFT_MARKER_CHECK="$(cd scripts && PLANTOIR_CONTRACTS_DIR=../contracts NO_CACHE="$NO_CACHE" python3 -c '
-import json, os, sys, contracts
+import json, os, sys, contracts, swift_blocks
 line = sys.argv[1]
 got = json.loads(line.split("PLANTOIR_SWIFT:", 1)[1])["downloadedBytes"]
+with open("/tmp/verify_swift_image.log", encoding="utf-8", errors="replace") as log:
+    found = swift_blocks.download_steps_in_log(log.read())
 pins = {pin["pin"]: pin.get("bytes") or 0 for pin in contracts.section("toolchain", "swiftImage", "pins")}
 arch = "arm64" if os.uname().machine in ("arm64", "aarch64") else "amd64"
 steps = contracts.section("shared-rules", "codeRunnerBlocks", "swift", "mac", "downloadSteps")
@@ -1856,7 +1860,9 @@ sums = [0]
 for step in steps:
     sums = sums + [already + sum(pins[name] for name in step["counts"][arch]) for already in sums]
 whole = sums[-1]
-if os.environ.get("NO_CACHE"):
+if len(found) != len(steps):
+    print("only %d of the %d download steps were found in the log, so 0 bytes would prove nothing" % (len(found), len(steps)))
+elif os.environ.get("NO_CACHE"):
     print("ok" if got == whole else "%d, not the whole %d" % (got, whole))
 else:
     print("ok" if got in sums else "%d, which no set of steps makes" % got)
