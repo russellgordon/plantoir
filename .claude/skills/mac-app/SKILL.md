@@ -148,13 +148,15 @@ silently.
 1. **Build it.**
    ```bash
    cd mac-app && xcodegen generate && \
+     DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer \
      xcodebuild -project Plantoir.xcodeproj -scheme Plantoir \
        -destination 'platform=macOS' build
    ```
    `xcodegen` first, always: the project file is generated and NOT committed,
    so a new file exists for the compiler only after it runs.
 
-   **Name the Xcode: prefix both commands with `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer`.**
+   **Name the Xcode: the build above and the test run in step 2 both carry
+   `DEVELOPER_DIR=…Xcode-26.6.0…`, and must.**
    `xcode-select` points at 27.0, and releases are built with 26.6. Both
    Xcodes write the SAME DerivedData folder, the one his Dock icon names, so
    an unprefixed build hands him a 27.0 copy. Then `build-for-testing` under
@@ -163,6 +165,7 @@ silently.
 
 2. **Run the unit tests**, which are fast and worth having every time:
    ```bash
+   DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer \
    xcodebuild -project Plantoir.xcodeproj -scheme Plantoir \
      -destination 'platform=macOS' -only-testing:QuartzTeachersTests test
    ```
