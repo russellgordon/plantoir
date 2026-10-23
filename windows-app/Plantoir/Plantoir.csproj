@@ -100,6 +100,9 @@
         string prefix = Path.GetFullPath(Root).TrimEnd('\\') + "\\";
         var lines = Directory.EnumerateFiles(prefix, "*", SearchOption.AllDirectories)
             .Where(path => !string.Equals(path, manifest, StringComparison.OrdinalIgnoreCase))
+            // A temporary file a crashed build left behind is never fingerprinted.
+            .Where(path => !(Path.GetFileName(path).StartsWith(".hashes.", StringComparison.OrdinalIgnoreCase)
+                             && path.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)))
             .Select(path =>
             {
                 var info = new FileInfo(path);

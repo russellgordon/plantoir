@@ -151,6 +151,20 @@ public sealed class ToolchainFingerprintTests : IDisposable
     }
 
     [Fact]
+    public void ABundledFileLaterThanItsManifestIsNotTrusted()
+    {
+        // Rounding only ever moves a time DOWN; a later one is a file that moved on.
+        WriteManifest();
+        ToolchainMirror.RefreshToolchain(_folder, _bundled);
+        RoundTheBundleDown(-TimeSpan.FromMilliseconds(500));
+
+        var pass = ToolchainMirror.RefreshToolchain(_folder, _bundled);
+
+        Assert.Equal(0, pass.Changed);
+        Assert.Equal(3, pass.ReadInFull);   // read both, as before #559
+    }
+
+    [Fact]
     public void ABundledFileTwoSecondsOlderThanItsManifestIsNotTrusted()
     {
         WriteManifest();
