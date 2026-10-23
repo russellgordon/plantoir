@@ -52,7 +52,8 @@ milestone.
 
 ## Building
 
-Requires Xcode 26+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+Builds with Xcode 26.6 and 27.0 — releases use 26.6, as `RELEASING.md` step 4
+says (#613) — and needs [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 (`brew install xcodegen`). The Xcode project file is generated, not committed:
 
 ```bash
