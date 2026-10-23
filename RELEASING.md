@@ -112,9 +112,6 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-10-22 | Publish Pages… and Hide Pages… show their pages as a banded table — Page (the tick box is the title), Folder and Date — and so does the question about classes dated later, at Publish Pages… and at Deploy; Space ticks the selected row. The plan lists only the pages a teacher must read, with the pages already visible (or hidden) folded behind a disclosure under the table (`menuPlanShowAlready`). The page dialogs and Start of Year grow with a wider (or, from 757 epx, taller) window. | Windows (the mac since v1.8.6, #608 #621 #622) | [#634](https://github.com/russellgordon/plantoir/issues/634) |
-| 2026-10-22 | Swift code blocks run on Windows, as on the Mac. The first preview with a Swift block downloads about 2.3 GB once, says how far it has got, and keeps about 0.9 GB. Later previews compile only blocks that changed: a few seconds each, or about a minute for a block that needs the full standard library. The 1.8.6 notes' "Not yet on Windows" sentence about Swift comes out. The two Swift marketing pictures stay owed until their 2x picture is taken, so plantoir.app's `runnable-swift` stays Mac only. | Windows | [#570](https://github.com/russellgordon/plantoir/issues/570) |
-| 2026-10-22 | Install and Reopen on the update offer that comes by itself once a day now closes Plantoir, installs and opens the new version, as it already did from File ▸ Check for Updates…; before, the window stayed open and nothing was installed. | Windows | [#632](https://github.com/russellgordon/plantoir/issues/632) |
 
 
 ## Warnings the release notes MUST carry
@@ -129,8 +126,6 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
-| 2026-10-22 (#632) | **Windows:** if you choose Install and Reopen on the offer that appears by itself and Plantoir stays open, close Plantoir, open it again, then choose File ▸ Check for Updates… and install from there. | The fix is IN this release, so it takes effect only from the copy after it: a teacher on 1.8.5 or earlier who accepts the daily offer for this release meets the old fault once, and the window it leaves open is half shut down. |
-| 2026-10-22 (#570) | **Windows:** the first preview of a course with Swift code downloads about 2.3 GB, once, and needs about 6 GB of free space while it does; the preview waits for it (a few minutes, longer on a slow connection). About 0.9 GB stays on the PC afterwards. | A teacher who opens a Swift course on a school line, or on a nearly full disk, would otherwise read a long first preview, or Swift blocks that say "not ready", as a fault; the notes are the only place to read it before it happens. |
 
 ## Trim the roadmap
 
