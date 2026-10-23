@@ -2040,6 +2040,69 @@ Windows deliberately differs is in
 they compile too, and build the Swift image if a preview never did (ruling
 Q4). In practice a preview has already filled the cache.
 
+**Recorded on the trail, on both platforms** (#570 on Windows, #635 on the
+mac, v1.9.0). Getting Swift ready leaves "Swift got ready on this computer"
+(seconds, gigabytes downloaded) or "Swift could not be got ready" (why), from
+one `PLANTOIR_SWIFT:` line (`codeRunnerBlocks.swift.windows.marker`) that the
+app reads from the console and from a scheduled publish's log. On a Mac,
+`preview.sh` asks for it after building the Swift image (03 → preview.sh), and
+`swift_blocks.py got-ready` writes it from the build's own log
+(`codeRunnerBlocks.swift.mac`, cases in `bytesCases` and `reasonCases`):
+
+| Ending on a Mac | Line |
+|---|---|
+| the image was already there, or another launcher built it while this one waited, or this copy has no `support/swift` | none |
+| built | `ready: true`, the build's seconds, and `downloadedBytes` |
+| under 6 GB free (before anything was downloaded) | `noRoom` |
+| the build lock was held for longer than 1,200 s (`windows.waitSeconds`) | `waited` |
+| the build failed, and its failed step or BuildKit's summary says "no space left" (any case) or `curl: (23)` | `noRoom` |
+| ... says `computed checksum did NOT match` or `.tar.gz: FAILED` (sha256sum against the pin) | `damaged` |
+| ... names a curl network failure ((6), (7), (18), (28), (35), (52), (56)), a name that could not be resolved, `dial tcp`, or a timeout | `offline` |
+| any other failure: a moved pin's HTTP 404 (`curl: (22)`), a certificate curl could not check (`curl: (60)`), a crashed SDK install, a daemon error | `unpack` |
+
+`busy` (another installation running) is Windows' alone. **The reason is read
+only from the failed step's lines** (`#N ERROR`, then every `#N ` line) and the
+lines of no step (the closing summary): a step that succeeded can print
+anything, and apt warnings mention resolving and space. The Swift Dockerfile
+carries none of the needles, so its excerpt in the summary decides nothing
+(`test_swift_blocks.py` checks it).
+
+**The bytes are the pins of the download steps that RAN.** The build prints
+nothing about what it downloaded (`curl -fsSL`), so `downloadedBytes` sums
+`toolchain.json` → `swiftImage.pins` `bytes` for each download step with no
+`#N CACHED` line: the toolchain and SDK step is found by the SDK's URL in its
+header, binaryen's by its URLs, and the architecture is the header's `case
+"<arch>" in` - BuildKit prints each RUN header with its ARGs EXPANDED, so a
+`$WASM_SDK_URL` needle never matches (found by the plan's review against a
+real log, now `scripts/fixtures/swift-image-build/cached.log`), and it numbers
+steps in the order it reaches them, so CACHED is matched by number. First
+build on Apple silicon: 1,300,864,747 B ("1.3 GB"); Intel: 1,326,607,137 B.
+**Measured, why the CACHED case matters:** this Mac's four
+`teaching-quartz-swift:src-*` images (2026-10-17) share their first seven
+layers and differ only in the `COPY compile.py …` layer, so an update that
+changes compile.py rebuilds in seconds downloading nothing, and the line then
+says "0.0 GB downloaded" - true, and it tells a helper the update rebuilt from
+what was there. apt's packages and the base image are not counted (the scope
+of `swiftImage.measured`). `verify.sh` checks the sum against the build log
+BuildKit really printed whenever its Swift gate builds the image (the whole
+pin sum under `--no-cache`).
+
+**Rejected:** making the Dockerfile print curl's byte count - the Dockerfile
+is in the toolchain id, so every cached Swift program on every Mac would be
+compiled again, and 1.3 GB downloaded again, for a number on the trail;
+`docker image inspect`'s size (2.24 GB on disk, 504 MB compressed: neither is
+what was downloaded); a fixed 1.3 GB (false after the cached rebuild, and a
+second copy of the pins); a new script for it (it would need its own baked
+copy check and verify line for nothing `swift_blocks.py` cannot carry, and
+that file is not in the toolchain id).
+
+**Known gap:** the block-level reason is unchanged - a Mac build that failed
+for any cause still writes `{state: notDownloaded}`, whose sentence names the
+internet, so a `damaged`, `noRoom`-mid-build or `unpack` failure tells the
+teacher it could not be downloaded while the trail says why. Windows maps its
+reasons to states (`windows.ensureExit`); the mac adopting that is its own
+issue.
+
 **Known limit.** The build's fence reader and Quartz's parser read a lazy line
 in a list item differently (`fences.pageShapes`): the build compiles the body
 IT read and the site looks for the key of a shorter body, finds none, and

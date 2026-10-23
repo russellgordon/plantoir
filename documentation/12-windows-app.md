@@ -7668,8 +7668,13 @@ longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
 `ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
 (`TaskScheduling.cs`). A wrapper written before this change keeps no
 `PLANTOIR_SWIFT:` line until that deploy is scheduled again, as for
-`PLANTOIR_MY_PROGRESS:`. Neither event carries `appliesOn`: the mac owes
-both (its own issue).
+`PLANTOIR_MY_PROGRESS:`. Neither event carries `appliesOn`: the mac has
+recorded both since v1.9.0 (#635), from the same `PLANTOIR_SWIFT:` line, which
+`preview.sh` prints after building its Swift image (05 → "Recorded on the
+trail, on both platforms"). Its bytes and reasons are worked out by
+`swift_blocks.py got-ready` against `codeRunnerBlocks.swift.mac`, whose cases
+`test_swift_blocks.py` runs here too through `PythonToolchainTests`; nothing
+in this app changes for it.
 
 ### Shared fix the mac inherits
 
