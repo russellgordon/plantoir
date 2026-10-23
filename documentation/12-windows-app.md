@@ -7462,6 +7462,15 @@ product failure. The preflight now does three things.
   `windows-app\Vendor\runtime` and is exported to the launchers. The run
   refuses if the runtime has no `manifest.json` or no `vendor\pyodide`.
 
+**The mac's `verify-deploy.sh` is exposed the same way. This is for it to know, and
+to MATCH if it wants to (#665).** It reads the CHECKOUT's `contracts/`
+(`check_engine_folder`'s `toolchain.json`). It builds from the working
+folder's own `.toolchain/`, which it reads for `PREVIEW_RULE_FILE` and the
+launchers run. Nothing refreshes that folder but the app. On the mac the
+image tag hashes `.toolchain/`, so a stale mirror is a stale IMAGE as well,
+which still looks healthy. The cure is the same: refresh the folder's
+recipe from the checkout before judging it.
+
 **Cloudflare propagation** (the second trap at the same cut). Production
 was still serving the previous deployment when the single Cloudflare leg
 was judged: eight failures, all gone two minutes later. Every Cloudflare leg

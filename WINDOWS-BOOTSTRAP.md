@@ -329,9 +329,13 @@ Split it in two:
   2026-09-07, eighteen later the same week) — the same files `verify.sh` runs on the
   mac, in about eight seconds with no Docker, network or credentials. Until then this side ran none of them, so a shared
   file could be broken from this machine with every gate on it green.
-- **The IMAGE is not.** Nothing here builds the Docker image or checks the
-  baked files. Verify those by driving a real publish through the app, and say
-  so in a `mac` issue, so the mac re-runs `verify.sh` after the next sync.
-  For publishing specifically that means `verify-deploy.ps1`, which
+- **The IMAGE is not, because Windows has no image at all.** It carries its
+  own runtime and builds natively, so a publish driven through the app here
+  exercises the bundled runtime, not the image. A change to the Dockerfile or
+  the baked files made from Windows is gated only when `verify.sh` runs on the
+  mac after the next sync, so say so in a `mac` issue. (This said "Verify those
+  by driving a real publish through the app" until 2026-10-23. That was the
+  reading CLAUDE.md corrected on 2026-09-27.)
+  Publishing itself is gated by `verify-deploy.ps1`, which
   `RELEASING.md` requires — with nothing skipped — for a release that changes
   the publishing path.
