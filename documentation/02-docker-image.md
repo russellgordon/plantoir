@@ -83,7 +83,9 @@ The image is layered as follows (in order):
    must appear in (`dockerfileContains`, `windowsRuntimeContains`) and a test
    on each platform holds its own file against them, so a pin raised in one
    place cannot quietly stay put in the other.
-3. **Node.js 20 + tools** — installed from NodeSource. Quartz is a Node
+3. **Node.js 22.23.4, pinned exactly, + tools** — installed from NodeSource
+   (`setup_22.x`, then `nodejs=22.23.4-1nodesource1`; Node 20 until #640,
+   see "Node 22 (#640)" below). Quartz is a Node
    program (`npx quartz build`). Also installed: `curl`, `git` (needed to
    clone Quartz), `lsof` (used to kill a previous preview server holding
    the requested port, 8081–8084), `dos2unix`/`unix2dos` (line-ending
@@ -93,10 +95,13 @@ The image is layered as follows (in order):
 4. **`npm install -g wrangler@4.80.0`** — Cloudflare's own deploy CLI,
    used by `deploy.py` when a course publishes to Cloudflare Pages (see
    [deployment](07-deployment.md)). It is pinned, and pinned **below
-   4.100** deliberately: from that version wrangler requires Node 22, and
-   this image ships Node 20 because that is the version Quartz v4.5.0 is
-   known-good against. If Node is ever raised, revalidate Quartz *before*
-   chasing a newer CLI. The pin also keeps the image reproducible and stops
+   4.87** deliberately: 4.87.0 is the first wrangler whose `engines.node` is
+   `>=22.0.0` (4.80.0 to 4.86.0 say `>=20.3.0`; this said 4.100 until #640,
+   which was never a boundary). The image runs Node 22 since #640, but the
+   pin is shared with Windows, whose runtime stays on Node 20 until its own
+   issue lands — so the ceiling is Windows' now, and moving wrangler is its
+   own piece once both platforms run 22. If Node is ever raised, revalidate
+   Quartz *before* chasing a newer CLI. The pin also keeps the image reproducible and stops
    an upstream CLI change from breaking a teacher's publishing mid-term.
    Note this adds an npm-registry dependency to the image build, alongside
    the Debian and GitHub sources.
@@ -491,7 +496,8 @@ compromised intermediate is refused only once its root is no longer trusted.
   `/etc/ca-certificates.conf` gains `!mozilla/Comodo_AAA_Services_root.crt`
   and `!mozilla/emSign_ECC_Root_CA_-_G3.crt`. Neither subject is left in any
   of the three places. The layer received 10.4 MB (mostly apt's lists) in 4 s.
-- **The fleet is mixed today.** NodeSource's `setup_20.x` itself runs
+- **The fleet is mixed today.** NodeSource's `setup_20.x` (measured on 20,
+  before #640; `setup_22.x` does the same) itself runs
   `apt install … ca-certificates`, so a build with NO cache — a brand-new
   teacher — already got deb13u1 before this change. Every Mac that has built
   before holds the apt line's layer cached (here, built 2026-10-17 and reused
@@ -501,10 +507,13 @@ compromised intermediate is refused only once its root is no longer trusted.
   G1", "emSign Root CA - C1" and "emSign ECC Root CA - C3". Debian removed
   exactly the two above. That is a finding, not a gate: the
   check names the two removed subjects and does not curate trust of its own.
-- **Node 20's built-in store** (v20.20.2 in the image, 144 roots, used by
-  wrangler for Cloudflare) does NOT read this file: it already lacks AAA
-  Certificate Services but still trusts emSign ECC Root CA - G3 and the three
-  above. That exposure belongs to the Node 22 piece, #640, not to this layer.
+- **Node's own built-in store** (`tls.rootCertificates`, used by wrangler for
+  Cloudflare) does NOT read this file. On Node 20.20.2 it held 144 roots and
+  still trusted emSign ECC Root CA - G3 (and the three above), though not AAA
+  Certificate Services. Since #640 the image runs Node 22.23.4, whose store
+  holds **116** roots and neither subject; of the four emSign roots only
+  emSign Root CA - G1 is left, as in Debian's. verify.sh checks Node's store
+  under the `node` pin ("Node 22 (#640)" below).
 - **The Swift image is not changed and does not pick this up.**
   `teaching-quartz-swift:src-747b0982` carries 20250419 (150 certificates).
   `ca-certificates` is on its FIRST apt line (`support/swift/Dockerfile`), so
@@ -552,6 +561,95 @@ among them OpenSSL itself (`libssl3t64` 3.5.6 → 3.5.7), which is the library
 `urllib` runs on — a follow-up issue decides between a digest bump and
 naming the package.
 
+### Node 22 (#640, v1.9.0)
+
+The image moved from an unpinned `setup_20.x` to **Node 22.23.4, pinned
+exactly** (`nodejs=22.23.4-1nodesource1`). Node 20 has been end-of-life since
+2026-04-30, and the unpinned line let the image and Windows' runtime drift to
+different patch releases (#636). 22.23.4 is the 2026-10-20 security release
+(npm 10.9.9, OpenSSL 3.5.9). **Node 22 is itself end-of-life on 2027-04-30**,
+so Quartz 5 (#512) or Node 24 has to land before then.
+
+**Why an `=` pin here when #639's is a floor.** NodeSource's `node_22.x
+nodistro` keeps its history: on arm64 `apt-cache madison nodejs` lists every
+version from 22.5.0 to 22.23.4, and amd64's Packages file has 22.23.4 down
+past 22.22.0 (measured 2026-10-23). So the pin does not break a first build
+the day 22.23.5 ships, the opposite of Debian's security archive.
+`setup_22.x` writes `/etc/apt/preferences.d/nodejs` (Pin-Priority 600 for
+deb.nodesource.com), so the `=` resolves from NodeSource, not Debian.
+
+**wrangler's engines, measured** (`npm view 'wrangler@>=4.80.0' engines.node`,
+2026-10-23): 4.80.0 to 4.86.0 say `>=20.3.0`; 4.87.0 to 4.152.0 (the current
+`latest`) say `>=22.0.0`; none needs 24 yet. The pin's old reason, "below
+4.100", was thirteen minors late — the pin itself was always safe. wrangler
+stays at 4.80.0 and runs on 22 (`wrangler --version`, `wrangler pages --help`
+exit 0); `mustStayBelow` is now `"4.87"` because Windows' runtime is still on
+Node 20.18.1 and the pin is shared. The contract records wrangler's own
+engines as `nodeEngine` (`>=20.3.0`): verify.sh reads it out of the image's
+wrangler `package.json`, and the mac suite checks the `node` pin satisfies it.
+
+**Measured, before (dev's recipe) and after, on an M4 Pro, Colima, arm64,
+in an isolated buildx builder:**
+
+| | Node 20 | Node 22 |
+|---|---|---|
+| `node --version` / npm | v20.20.2 / 10.8.2 | **v22.23.4** / 10.9.9 |
+| `wrangler --version` | 4.80.0 | 4.80.0 |
+| OpenSSL / undici | 3.0.19 / 6.24.1 | 3.5.9 / 6.29.1 |
+| global `WebSocket` | undefined | a function |
+| `tls.rootCertificates` | 144, four emSign roots incl. ECC Root CA - G3 | **116**, emSign Root CA - G1 only, neither #639 subject |
+| image size | 1.80 GB (409,188,226 bytes) | 1.85 GB (419,682,603 bytes) |
+| cold build | 87 s | 84 s |
+| Quartz + tikz engine `npm ls --all --long` | 665 lines | identical, no EBADENGINE, same lockfile |
+
+**The site is the same.** One EXC2O course tree built in both images, twice
+each: after removing timestamps and Quartz's random Explorer ids, and
+comparing order-insensitively, the same 336 files with **0 differences**. The
+remaining raw differences are run-to-run noise that Node 20 shows against
+itself (9–49 files between two Node 20 runs: the Explorer id, `<time
+datetime>`, and the order of equal-dated pages on tag and folder pages). A
+TikZ figure's cache entry is byte-identical (engine id `469d55e0a0342d07`),
+so diagrams cached under Node 20 stay valid. Native packages (sharp,
+lightningcss, @napi-rs/simple-git, esbuild) are N-API or standalone binaries,
+so nothing rebuilds per Node version.
+
+**The one new behaviour: a deprecation line in the console.** On Node 22
+every Quartz build printed ``(node:N) [DEP0040] DeprecationWarning: The
+`punycode` module is deprecated`` (Quartz v4.5.0's dependencies require the
+built-in), which reaches the app's console — machinery a teacher should not
+see (CLAUDE.md rule 1). `scripts/toolchain_paths.py` → `node_environment`
+adds `--disable-warning=DEP0040` to `NODE_OPTIONS` for Quartz (build_site.py)
+and for the figure helper (figures.py), keeping any `NODE_OPTIONS` already
+set and never writing the flag twice. The figure helper was measured silent
+on Node 22 with and without it (a diagram and a graph, stderr empty); it is
+routed anyway so every node the build starts is under one rule, and a later
+deprecation cannot become the reason given when the helper fails to start. It is accepted from Node 20.11
+(measured on 20.20.2 and 22.23.4), so Windows' Node 20 runtime inherits it
+safely. `scripts/test_node_warnings.py` pins the helper and both callers;
+verify.sh fails if the main build's log carries a `[DEP` code at all (Node's
+own prefix, not the word "DeprecationWarning", which a page could carry).
+
+**Rejected:**
+
+- **Node 24** — the ruling on #636 is 22; Quartz's own v4 line runs on 22;
+  24 buys a year (EOL 2028-04-30) but is a second, unmeasured jump. Noted for
+  #512.
+- **A floating `setup_22.x`** — the image and Windows drift again, which is
+  #636's own finding about 20.x.
+- **A late `nodejs` layer that leaves the apt line alone** — it saves existing
+  teachers only the apt layer (about 90 MB, estimated), because wrangler,
+  Quartz and the rest below must rebuild anyway to be installed by the new
+  npm; it carries Node 20's files as dead weight and gives an image no
+  no-cache build reproduces.
+- **`NODE_NO_WARNINGS=1`** — hides every warning, including the ones a real
+  break would print.
+- **Removing `mustStayBelow` now** — Windows' suite reads it, and the ceiling
+  still holds for Windows' Node 20.
+
+**For Windows:** the runtime (`windows-app/Vendor/fetch-runtime.ps1`) stays
+on Node 20.18.1 until its own `windows` issue moves it to the same 22.23.4;
+that issue adds `windowsRuntimeContains` to the `node` pin with the bump.
+
 ### What the first build downloads (measured for #334)
 
 Per container (`/sys/class/net/eth0/statistics/rx_bytes` inside each
@@ -568,6 +666,13 @@ measurement), on an M4 Pro with Colima at 6 CPUs / 12 GiB, 2026-09-26:
 | Quartz's `npm install` | 128.0 MB | the largest |
 | certificate store (#639, added 2026-10-23) | 10.4 MB | measured on its own, after #334, so NOT in the total below; mostly apt's lists, and an install that changes nothing for a no-cache build, which NodeSource's script already upgraded |
 | **Total** | **≈382 MB → ≈342 MB** | #334's stages only (≈352 MB with #639's layer); #312's VM counter read 389.8 MB in a fresh VM |
+
+**Since #640 (2026-10-23)** the apt line's text changed (`setup_22.x` and
+the `nodejs=` pin), so every teacher who has built before re-downloads that
+line and everything after it once — about 330 MB by this table's numbers
+(apt, wrangler, the clone, Quartz's `npm install`, the tikz engine, Pyodide,
+the certificate layer), not re-measured. That piece's own cold build was 84 s
+in an isolated builder, against 87 s on Node 20.
 
 Time here: 49–52 s cold with the base cached; an incremental rebuild after a
 script edit is 5 s, every heavy layer `CACHED`. A teacher's fresh 3-CPU / 4 GB
