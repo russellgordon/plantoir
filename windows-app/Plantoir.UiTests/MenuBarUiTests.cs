@@ -34,7 +34,7 @@ internal static class MenuBar
     /// <summary>Close whatever menu is open.</summary>
     public static void Close()
     {
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         Thread.Sleep(300);
     }
 

@@ -25,12 +25,12 @@ public class ListTablesUiTests
         app.Find("add:" + Shared, "+ under the shared folders").AsButton().Invoke();
         var field = app.Find("addField:" + Shared, "the new folder's name").AsTextBox();
         field.Text = "Projects";
-        Keyboard.Press(VirtualKeyShort.RETURN);
+        Keyboard.Type(VirtualKeyShort.RETURN);
         var added = app.Find("row:" + Shared + ":Projects", "the new row");
 
         added.AsListBoxItem().Select();
         added.Focus();
-        Keyboard.Press(VirtualKeyShort.DELETE);
+        Keyboard.Type(VirtualKeyShort.DELETE);
         app.AssertAbsent("row:" + Shared + ":Projects", "the deleted row", TimeSpan.FromSeconds(5));
     }
 

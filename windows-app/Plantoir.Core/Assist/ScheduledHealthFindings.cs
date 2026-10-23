@@ -146,6 +146,14 @@ public static class ScheduledHealthFindings
                                keptOff.TrailSentence, keptOff.Course, keptOff.Section, writtenAt);
         }
 
+        // The build's PLANTOIR_REPAIRED: line (#584, mac #645): an overnight
+        // publish is as likely as any build to be the one that put a front
+        // page's title right, and nobody watched its console.
+        foreach (var repaired in BuildRepairReport.ReportsIn(lines))
+        {
+            repaired.Record(writtenAt);
+        }
+
         // deploy.py's PLANTOIR_CLOUDFLARE_REMADE: (#395), appended by the
         // wrapper's Cloudflare leg: an overnight publish is exactly the one
         // nobody watched remake the project, and its address may have changed.

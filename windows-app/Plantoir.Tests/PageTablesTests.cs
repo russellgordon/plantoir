@@ -6,7 +6,7 @@ namespace Plantoir.Tests;
 /// <summary>
 /// #634 (the mac's #608, #621, #622): the rules under the page-table dialogs
 /// that can be proven without a window — which plan rows fold, the
-/// disclosure's words, the table's height with the disclosure closed, the
+/// checkbox's words (#655; a disclosure until then), the table's height with it unticked, the
 /// picker's rows, and the dialogs' widths and columns as the window grows.
 /// The tick rules and the drawn heights are in <c>PageTablesUiTests</c>.
 /// </summary>
@@ -65,9 +65,9 @@ public class PageTablesTests
         Assert.Equal(AssistWording.MenuPlanShowAlready(2, publishing: false), plan.FoldLabel);
     }
 
-    /// <summary>A plan with nothing else to read shows every row and no disclosure (the mac's <c>foldsAlreadyRight</c>).</summary>
+    /// <summary>A plan with nothing else to read shows every row and no checkbox (the mac's <c>foldsAlreadyRight</c>).</summary>
     [Fact]
-    public void APlanWithNothingElseToReadShowsEveryRowAndNoDisclosure()
+    public void APlanWithNothingElseToReadShowsEveryRowAndNoCheckbox()
     {
         var onlyAlready = Plan(0, 4);
         Assert.False(onlyAlready.FoldsAlreadyRight);
@@ -82,12 +82,12 @@ public class PageTablesTests
     }
 
     /// <summary>
-    /// The disclosure's words say the pages' own state. Must-fail: reading
+    /// The checkbox's words say the pages' own state. Must-fail: reading
     /// "publishing" from the plan's FIRST row, which is a change, not a page
     /// already right.
     /// </summary>
     [Fact]
-    public void TheDisclosureNamesTheCountAndTheState()
+    public void TheCheckboxNamesTheCountAndTheState()
     {
         Assert.Equal(AssistWording.MenuPlanShowAlready(16, publishing: true), Plan(5, 16).FoldLabel);
         Assert.Equal(AssistWording.MenuPlanShowAlreadyOnePage, Plan(5, 1).FoldLabel);
@@ -96,7 +96,7 @@ public class PageTablesTests
         Assert.Equal(AssistWording.MenuPlanShowAlreadyOnePageHiding, kept.FoldLabel);
     }
 
-    // ---- The table's height with the disclosure closed ------------------------
+    // ---- The table's height with the checkbox unticked ----------------------
 
     /// <summary>
     /// The table is as tall as the rows to read, never fewer than five while
@@ -111,7 +111,7 @@ public class PageTablesTests
     [InlineData(1, 2, 3)]
     [InlineData(14, 1, 14)]
     [InlineData(0, 9, 9)]
-    public void TheTableIsCountedWithTheDisclosureClosed(int changes, int already, int rows)
+    public void TheTableIsCountedWithTheCheckboxUnticked(int changes, int already, int rows)
     {
         var plan = Plan(changes, already);
         Assert.Equal(rows, plan.RowsWhenClosed);

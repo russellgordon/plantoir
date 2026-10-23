@@ -129,13 +129,11 @@ public class PreviewStartPageUiTests
         using var app = new DrivenApp(CourseFixtures.WriteBoth);
         app.SelectSection(CourseFixtures.NeverAsked, 1);
         app.BringToFront();
-        Keyboard.Press(VirtualKeyShort.ALT);
-        try
+        using (Keyboard.Pressing(VirtualKeyShort.ALT))
         {
             Assert.True(Retry.WhileFalse(() => ButtonName(app) == PreviewStartPage.PreviewAtLastViewed, TimeSpan.FromSeconds(3)).Result,
                         $"holding Alt left the button reading {ButtonName(app)}");
         }
-        finally { Keyboard.Release(VirtualKeyShort.ALT); }
         Assert.True(Retry.WhileFalse(() => ButtonName(app) == PreviewStartPage.Preview, TimeSpan.FromSeconds(3)).Result,
                     $"letting Alt go left the button reading {ButtonName(app)}");
     }
@@ -149,8 +147,7 @@ public class PreviewStartPageUiTests
         app.WillServe(Code, 1);
         app.BringToFront();
         var button = app.Find("previewButton", "the Preview button");
-        Keyboard.Press(VirtualKeyShort.ALT);
-        try
+        using (Keyboard.Pressing(VirtualKeyShort.ALT))
         {
             app.ClickMiddleOf(button);
             // Held a moment past the click, as a hand does: WinUI raises Click
@@ -160,7 +157,6 @@ public class PreviewStartPageUiTests
             // as up and opened the front page.
             Thread.Sleep(500);
         }
-        finally { Keyboard.Release(VirtualKeyShort.ALT); }
 
         Assert.True(app.WaitAnsweringDialogs(() => Loaded(app).Contains("/" + Page), LongEnoughToBuild),
                     $"the pane never opened {Page}; it says \"{Loaded(app)}\"" + app.AnsweredSoFar);

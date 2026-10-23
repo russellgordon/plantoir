@@ -432,12 +432,12 @@ public class ReDateTests : IDisposable
         // A real course has "Ontario Curriculum" and "College Board
         // Curriculum", not "Curriculum" — matching the literal name would
         // miss every page in it.
-        Assert.True(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\Ontario Curriculum\A1.1.md"));
-        Assert.True(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\College Board Curriculum\U1.md"));
-        Assert.True(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\Curriculum\index.md"));
-        Assert.False(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\Concepts\Recursion.md"));
+        Assert.True(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\Ontario Curriculum\A1.1.md", Array.Empty<string>()));
+        Assert.True(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\College Board Curriculum\U1.md", Array.Empty<string>()));
+        Assert.True(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\Curriculum\index.md", Array.Empty<string>()));
+        Assert.False(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\Concepts\Recursion.md", Array.Empty<string>()));
         // The FILE name never counts — only folders.
-        Assert.False(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\Setup\Curriculum Notes.md"));
+        Assert.False(AssistWorkspace.IsCurriculum(@"C:\c", @"C:\c\Setup\Curriculum Notes.md", Array.Empty<string>()));
     }
 
     [Fact]

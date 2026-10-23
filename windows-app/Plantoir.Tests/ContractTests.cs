@@ -327,8 +327,8 @@ public class ContractTests
         Assert.Equal(wording["menuPlanSummaryOnePage"]!.ToString(), AssistWording.MenuPlanSummary(1, 0, publishing: true));
         Assert.Equal(wording["planNothingWouldChange"]!.ToString(), AssistWording.MenuPlanSummary(0, 5, publishing: true));
 
-        // #634 (mac #608, #622): the picker's Date column, and the disclosure
-        // that folds the pages already right — one dispatcher, four keys.
+        // #634 (mac #608, #622): the picker's Date column, and the checkbox
+        // (a disclosure until #655) that folds the pages already right — one dispatcher, four keys.
         Assert.Equal(wording["menuPickDateColumn"]!.ToString(), AssistWording.MenuPickDateColumn);
         Assert.Equal(wording["menuPlanShowAlready"]!.ToString(), AssistWording.MenuPlanShowAlready(16, publishing: true));
         Assert.Equal(wording["menuPlanShowAlreadyHiding"]!.ToString(), AssistWording.MenuPlanShowAlready(2, publishing: false));
@@ -817,8 +817,10 @@ public class ContractTests
             if (c is null) continue;
             string path = c["path"]!.ToString();
             bool expect = c["expect"]!.GetValue<bool>();
-            bool actual = CurriculumRules.IsCurriculumPage(path);
-            Assert.Equal(expect, actual);
+            // #614: what the course declares in curriculum_folders; absent means none.
+            var declared = (c["curriculumFolders"]?.AsArray() ?? new JsonArray()).Select(n => n!.ToString()).ToList();
+            bool actual = CurriculumRules.IsCurriculumPage(path, declared);
+            Assert.True(expect == actual, $"isCurriculumPage “{path}” (declared: {string.Join(", ", declared)}) should be {expect}.");
         }
 
         // isExpectationCode

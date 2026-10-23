@@ -184,6 +184,15 @@ public sealed class LauncherRunner : ILauncherRunner
                 return;
             }
 
+            // #584 (mac #645): the build's PLANTOIR_REPAIRED: line, a front
+            // page's title it put right in the teacher's own page - the same
+            // trail line the app writes from its own runs.
+            if (Plantoir.Core.Models.BuildRepairReport.Parse(line) is { } repaired)
+            {
+                repaired.Record();
+                return;
+            }
+
             if (Plantoir.Core.Models.SiteHealthFinding.Parse(line) is { } finding)
             {
                 lock (gate)
@@ -205,6 +214,13 @@ public sealed class LauncherRunner : ILauncherRunner
                 }
                 return;
             }
+
+            // Any other machine line (PLANTOIR_DATED:, PLANTOIR_KEPT_OFF:, a
+            // marker the shared Python adds tomorrow) is JSON, not narration,
+            // and never reaches the assistant's progress text or the kept
+            // tail - transcriptStripping.machineLines' one rule, as the app's
+            // console applies it.
+            if (Plantoir.Core.Scripting.TranscriptBuilder.IsMachineLine(line)) return;
 
             lock (gate)
             {

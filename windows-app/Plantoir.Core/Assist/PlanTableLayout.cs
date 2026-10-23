@@ -73,14 +73,19 @@ public static class PlanTableLayout
     }
 
     /// <summary>
-    /// The disclosure under the table when the plan folds the pages already
-    /// right (#634, the mac's #622): its row and the gap above it.
+    /// The checkbox under the table when the plan folds the pages already
+    /// right (#655, the mac's #654; a disclosure since #634): the platform's
+    /// 32-epx <c>CheckBox</c>, the 4-epx gap above it, and a 4-epx margin.
+    /// 36 would have been an exact fit with no margin, and a fit that comes
+    /// out short clips the dialog's buttons — which costs more than the one
+    /// row this takes at about one window height in eight. The disclosure it
+    /// replaced measured 27 + 4 against 36.
     /// </summary>
-    public const double FoldHeight = 36;
+    public const double FoldHeight = 40;
 
     /// <param name="windowHeight">The XAML root's height, epx.</param>
     /// <param name="notesNatural">The notes' height laid out at the dialog's width, uncapped; 0 for none.</param>
-    /// <param name="folds">Whether the disclosure shows under the table.</param>
+    /// <param name="folds">Whether the checkbox shows under the table.</param>
     /// <remarks>
     /// Up to <see cref="DialogMaxHeight"/> this is the #548 fit, unchanged.
     /// A window taller than that gives every further <see cref="RowPitch"/>

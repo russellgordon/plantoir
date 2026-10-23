@@ -20,6 +20,9 @@ public class CurriculumPredicateTests : IDisposable
     private readonly string _folder = Directory.CreateTempSubdirectory("plantoir-curriculum").FullName;
     private string CourseDir => Path.Combine(_folder, "courses", Course);
 
+    /// <summary>A course that declares no curriculum folder: only the name rule applies.</summary>
+    private static readonly IReadOnlyList<string> None = Array.Empty<string>();
+
     public CurriculumPredicateTests()
     {
         File.WriteAllText(Path.Combine(_folder, "preview.ps1"), "# marker");
@@ -50,15 +53,15 @@ public class CurriculumPredicateTests : IDisposable
     public void OnlyAFolderInsideTheCourseMakesAPageCurriculum(string inCourse, bool expected)
     {
         string root = @"C:\work\courses\ICS3U";
-        Assert.Equal(expected, PagePaths.IsCurriculum(root, Path.Combine(root, inCourse)));
+        Assert.Equal(expected, PagePaths.IsCurriculum(root, Path.Combine(root, inCourse), None));
     }
 
     [Fact]
     public void AFolderAboveTheCourseDoesNotCount()
     {
         string root = @"C:\Curriculum Work\courses\ICS3U";
-        Assert.False(PagePaths.IsCurriculum(root, root + @"\section1\Glossary.md"));
-        Assert.True(PagePaths.IsCurriculum(root, root + @"\Curriculum\A1.1.md"));
+        Assert.False(PagePaths.IsCurriculum(root, root + @"\section1\Glossary.md", None));
+        Assert.True(PagePaths.IsCurriculum(root, root + @"\Curriculum\A1.1.md", None));
     }
 
     [Fact]
@@ -67,9 +70,9 @@ public class CurriculumPredicateTests : IDisposable
         // A PlannedPage.RelativePath is from the WORKING folder; passed raw it
         // used to resolve against the process's current directory. It is
         // false now, whatever it says — callers resolve it first.
-        Assert.False(PagePaths.IsCurriculum(@"C:\work\courses\ICS3U", @"courses\ICS3U\Curriculum\A1.1.md"));
-        Assert.False(PagePaths.IsCurriculum(@"C:\work\courses\ICS3U", @"Curriculum\A1.1.md"));
-        Assert.False(PagePaths.IsCurriculum(@"C:\work\courses\ICS3U", ""));
+        Assert.False(PagePaths.IsCurriculum(@"C:\work\courses\ICS3U", @"courses\ICS3U\Curriculum\A1.1.md", None));
+        Assert.False(PagePaths.IsCurriculum(@"C:\work\courses\ICS3U", @"Curriculum\A1.1.md", None));
+        Assert.False(PagePaths.IsCurriculum(@"C:\work\courses\ICS3U", "", None));
     }
 
     [Fact]
@@ -77,17 +80,21 @@ public class CurriculumPredicateTests : IDisposable
     {
         string root = @"C:\work\courses\ICS3U";
         // A segment that is exactly "..": the page is in ANOTHER course.
-        Assert.False(PagePaths.IsCurriculum(root, @"C:\work\courses\ICS3U\..\ICS4U\Curriculum\A1.1.md"));
-        Assert.False(PagePaths.IsCurriculum(root, @"C:\work\courses\ICS4U\Curriculum\A1.1.md"));
-        Assert.False(PagePaths.IsCurriculum(root, @"D:\Curriculum\A1.1.md"));
+        Assert.False(PagePaths.IsCurriculum(root, @"C:\work\courses\ICS3U\..\ICS4U\Curriculum\A1.1.md", None));
+        Assert.False(PagePaths.IsCurriculum(root, @"C:\work\courses\ICS4U\Curriculum\A1.1.md", None));
+        Assert.False(PagePaths.IsCurriculum(root, @"D:\Curriculum\A1.1.md", None));
         // ".." that stays inside the course still counts.
-        Assert.True(PagePaths.IsCurriculum(root, @"C:\work\courses\ICS3U\section1\..\Curriculum\A1.1.md"));
+        Assert.True(PagePaths.IsCurriculum(root, @"C:\work\courses\ICS3U\section1\..\Curriculum\A1.1.md", None));
     }
 
     /// <summary>
     /// shared-rules.json → curriculumRules.isCurriculumPage.cases, each path
     /// under a course root, so the planner's predicate answers exactly as the
-    /// assistant's list of expectations does.
+    /// assistant's list of expectations does. A case's <c>curriculumFolders</c>
+    /// is what the course declares (#614); absent means none. Each case runs
+    /// twice — at the course's top and inside <c>section1\</c>, which the
+    /// contract allows — so the section folder is shown to be set aside
+    /// rather than compared with a declared name.
     /// </summary>
     [Fact]
     public void TheContractsCurriculumPageCasesHoldUnderACourse()
@@ -95,13 +102,75 @@ public class CurriculumPredicateTests : IDisposable
         string root = @"C:\Curriculum Work\courses\ICS3U";
         var cases = ContractLoader.LoadJson("shared-rules.json")!["curriculumRules"]!["isCurriculumPage"]!["cases"]!.AsArray();
         Assert.NotEmpty(cases);
+        var failures = new List<string>();
         foreach (var c in cases)
         {
-            string path = c!["path"]!.ToString();
+            string path = c!["path"]!.ToString().Replace('/', '\\');
             bool expected = c["expect"]!.GetValue<bool>();
-            Assert.True(expected == PagePaths.IsCurriculum(root, Path.Combine(root, path.Replace('/', '\\'))),
-                $"“{path}” should be {(expected ? "" : "not ")}curriculum.");
+            var declared = (c["curriculumFolders"]?.AsArray() ?? new System.Text.Json.Nodes.JsonArray())
+                .Select(n => n!.ToString()).ToList();
+            foreach (string where in new[] { path, Path.Combine("section1", path) })
+                if (expected != PagePaths.IsCurriculum(root, Path.Combine(root, where), declared))
+                    failures.Add($"“{where}” (declared: {string.Join(", ", declared)}) should be {(expected ? "" : "not ")}curriculum.");
         }
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+    }
+
+    /// <summary>
+    /// The mac's <c>testADeclaredNameMatchesWhicheverWayItsAccentIsWritten</c>:
+    /// Swift's <c>==</c> treats a composed é and an e plus a combining accent
+    /// as equal, and C#'s ordinal comparison does not, so both sides are
+    /// normalised first (#614). Either way round, and in any letter case.
+    /// </summary>
+    [Fact]
+    public void ADeclaredNameMatchesWhicheverWayItsAccentIsWritten()
+    {
+        string root = @"C:\work\courses\ICS3U";
+        string composed = "Attentes d\u00E9taill\u00E9es";          // é as one character
+        string decomposed = "Attentes de\u0301taille\u0301es";      // e + combining acute
+        Assert.NotEqual(composed, decomposed);
+
+        Assert.True(PagePaths.IsCurriculum(root, Path.Combine(root, composed, "A1.1.md"), new[] { decomposed }));
+        Assert.True(PagePaths.IsCurriculum(root, Path.Combine(root, decomposed, "A1.1.md"), new[] { composed }));
+        Assert.True(PagePaths.IsCurriculum(root, Path.Combine(root, "section1", composed.ToUpperInvariant(), "A1.1.md"), new[] { decomposed }));
+        Assert.False(PagePaths.IsCurriculum(root, Path.Combine(root, composed, "A1.1.md"), None));
+    }
+
+    /// <summary>
+    /// NTFS allows a lone surrogate in a folder name, and string.Normalize()
+    /// throws on one. The rule must answer rather than throw, because
+    /// ProtectedFromHiding and ReferenceDates loop over a whole course with no
+    /// catch: the name is compared as it is.
+    /// </summary>
+    [Fact]
+    public void AFolderNameThatCannotBeNormalisedIsComparedAsItIs()
+    {
+        string root = @"C:\work\courses\ICS3U";
+        string broken = "Expect\uD800ations";                       // a high surrogate with no partner
+        Assert.Throws<ArgumentException>(() => broken.Normalize());
+
+        Assert.True(PagePaths.IsCurriculum(root, Path.Combine(root, broken, "A1.1.md"), new[] { broken }));
+        Assert.False(PagePaths.IsCurriculum(root, Path.Combine(root, broken, "A1.1.md"), new[] { "Expectations" }));
+        Assert.False(PagePaths.IsCurriculum(root, Path.Combine(root, "Expectations", "A1.1.md"), new[] { broken }));
+        Assert.True(PagePaths.IsCurriculum(root, Path.Combine(root, "Expectations", "A1.1.md"), new[] { broken, "Expectations" }));
+    }
+
+    /// <summary>
+    /// The section folder is set aside, never compared: a course that somehow
+    /// declared "section1" does not make every section page curriculum, and a
+    /// declared name below the top (after the section folder) does not count.
+    /// </summary>
+    [Fact]
+    public void TheSectionFolderIsSetAsideNotCompared()
+    {
+        string root = @"C:\work\courses\ICS3U";
+        Assert.False(PagePaths.IsCurriculum(root, root + @"\section1\All Classes\Unit 1, Day 1.md", new[] { "section1" }));
+        Assert.True(PagePaths.IsCurriculum(root, root + @"\section1\Expectations\A1.1.md", new[] { "Expectations" }));
+        Assert.False(PagePaths.IsCurriculum(root, root + @"\section1\Concepts\Expectations\A1.1.md", new[] { "Expectations" }));
+        // "Section1" is not a section folder (the mac's rule is case-sensitive), so it is the top folder.
+        Assert.True(PagePaths.IsCurriculum(root, root + @"\Section1\A1.1.md", new[] { "Section1" }));
+        // A page at the top of the course has no folder, whatever its file is called.
+        Assert.False(PagePaths.IsCurriculum(root, root + @"\Expectations.md", new[] { "Expectations" }));
     }
 
     // ---- The publish plan (#617) ------------------------------------------

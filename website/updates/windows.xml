@@ -5,6 +5,47 @@
     <description>Plantoir for Windows</description>
     <language>en</language>
     <item>
+      <title>Plantoir 1.8.7</title>
+      <description>New in Plantoir 1.8.7
+
+This update brings Windows up to date with what the Mac got in 1.8.7, and makes the first start after an update quicker.
+
+BEFORE YOU UPDATE
+
+- Deploy each section again to bring the fixes to your class websites. A site you deployed earlier keeps working exactly as it did. Faster links on Netlify, the page that no longer jumps as it opens, and the better print behaviour all reach a site the next time you deploy it.
+
+NEW
+
+- Printed handouts in your school's style, from an outside assistant. When you ask Claude Code or Codex for a worksheet, quiz or handout to print, in a course folder, it now offers a house style: a PDF made from one file that holds the questions and the answer key together, with the same corners as a page printed from your class website.
+
+IMPROVED
+
+- Publish Pages and Hide Pages are tidier. "Show the 16 pages already visible" is now a checkbox that adds those pages to the table, rather than a triangle that seemed to open something below. While Plantoir works, the window keeps its size instead of shrinking to the spinner and growing again; once it has an answer, the window fits that one sentence.
+- Links on a site deployed to Netlify open faster. Every link between pages used to take a detour through a redirect; now it goes straight to the page.
+- A runnable code block the website can only show as plain code, because of an unfinished code block above it, say, is now listed among your folder's problems in Plantoir, naming the page and the line, so you can fix it before students see it.
+- Getting a folder ready after an update is quicker. The first time Plantoir opens a working folder after installing a new version, it used to read every one of its own files to check them, which took about two minutes on some PCs. It now knows what it brought with it and checks in a few seconds. The line in the activity record says how many files were compared.
+- The font choice that read "Helvetica, Arial" is now called "System fonts (each device's own)", which is what it has always shown. Pages look the same.
+- The offer to add Obsidian's diagram and graph add-ons says again that Obsidian opens its settings in a window of its own after you choose Trust, so you know to close it.
+
+FIXED
+
+- A page no longer jumps down by itself as it opens. The sidebar used to scroll the whole page by several hundred pixels while it found the current entry; now it scrolls only its own list.
+- Print on a long page is put back properly. When the printable layout cannot be used and the browser lays the page out itself, the page now waits for its pictures before printing and returns to normal once the print is done.
+- A curriculum folder you renamed, to "Expectations", say, is still treated as curriculum: its pages are not hidden at the start of the year, not taken down when a class is hidden, and not listed as "already visible" when you publish.
+- A course made before 1.8.1 whose name has a colon in it (such as "Physics: Mechanics") gets its website back on its next preview or deploy, with no need for the hand fix described in the 1.8.1 notes. The repair is noted in the activity record.
+
+DOWNLOADS
+
+File: PlantoirSetup.exe   Size: 248.8 MB (260,890,520 bytes)   SHA-256: c5919bd5e0e08af15f0f18c63013f801dd6c40054d9464fb21f295321389b55f
+File: Plantoir-win-x64.zip   Size: 415.3 MB (435,430,821 bytes)   SHA-256: 901b899d29644a3ebdba093668d6de531e5ebca463c6d46801ff6bb142bff7c2
+
+The SHA-256 lets your IT department verify the download is genuine.</description>
+      <pubDate>Fri, 23 Oct 2026 19:21:05 -04:00</pubDate>
+      <sparkle:version>1.8.7</sparkle:version>
+      <sparkle:shortVersionString>1.8.7</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.7/PlantoirSetup.exe" sparkle:version="1.8.7" sparkle:shortVersionString="1.8.7" length="260890520" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="IWMX2fAxDNP6rdRHH6yHN4i0rioLjAOJzoHGISEjz9wkBC4ym1JgnqsSgZeP2WxCjCJtBNk4w1FwB+IK29DsAw==" />
+    </item>
+    <item>
       <title>Plantoir 1.8.6</title>
       <description>New in Plantoir 1.8.6
 
@@ -39,7 +80,7 @@ The SHA-256 lets your IT department verify the download is genuine.</description
       <pubDate>Thu, 22 Oct 2026 23:00:56 -04:00</pubDate>
       <sparkle:version>1.8.6</sparkle:version>
       <sparkle:shortVersionString>1.8.6</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.6/PlantoirSetup.exe" sparkle:version="1.8.6" sparkle:shortVersionString="1.8.6" length="260350896" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="+ncwecJ6c2+MLx4hFbU5L9fmR2VmJnHu251uOJNtGr7sTTKH669ieiY9ozaksEyhPO0rkitkTmJViGrcCaKSBg==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.6/PlantoirSetup.exe" sparkle:version="1.8.6" sparkle:shortVersionString="1.8.6" length="260350896" sparkle:os="windows" type="application/octet-stream" sparkle:criticalUpdate="false" sparkle:signature="+ncwecJ6c2+MLx4hFbU5L9fmR2VmJnHu251uOJNtGr7sTTKH669ieiY9ozaksEyhPO0rkitkTmJViGrcCaKSBg==" />
     </item>
     <item>
       <title>Plantoir 1.8.5</title>

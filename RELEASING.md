@@ -150,6 +150,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
    gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional.
+1a. **Minor releases (x.y.0) only: is Cloudflare Pages still safe?** Check
+   Cloudflare's changelog for a Pages end-of-life date and whether Workers now
+   takes custom domains with outside nameservers. Checklist step 1a says what
+   to look for and what to do.
 2. **Check the version** in `windows-app/Plantoir/Plantoir.csproj` and
    `mac-app/project.yml`: **every platform whose asset this cut attaches must
    read the tag's number**, set BEFORE its bundle is built; a platform that
@@ -176,7 +180,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    REFUSES a missing or stale copy (#581). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
-   (and `Plantoir-win-x64.zip`). **Then build and sign the Windows update feed
+   (and `Plantoir-win-x64.zip`). **After installing it over the previous
+   version, check the tools copy read nothing (#559):** the first launch's
+   `working folder tools copied` line has no "(K read in full)" bracket and
+   `startup.log`'s `tools copy finished` says `0 read in full`; if not,
+   compare one file's ticks in `{app}\Toolchain\.hashes` with its
+   `LastWriteTimeUtc.Ticks` (`documentation/12-windows-app.md` → "What the
+   director must check at the cut"). **Then build and sign the Windows update feed
    from that exact installer, and commit it** ("The update feed (Windows)",
    below) — the `cut-release` skill does not do this for you, and a Windows
    release whose feed was not rebuilt is one no installed copy is offered.
@@ -214,6 +224,40 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 1. **Version.** `<Version>` in `windows-app/Plantoir/Plantoir.csproj` and
    `MARKETING_VERSION` in `mac-app/project.yml`. `project.yml` is the source on
    the mac side, so re-run `xcodegen generate` after changing it.
+1a. **Cloudflare Pages vs Workers — every minor release (x.y.0), skip for
+   patches.** Plantoir publishes to Cloudflare **Pages** (the default
+   destination for new courses since #668). Cloudflare steers new projects
+   towards **Workers with Static Assets**, but as of 2026-10-23 its
+   [migration guide](https://developers.cloudflare.com/workers/static-assets/migrate-from-pages/)
+   does not deprecate Pages, static-asset requests are free on both, and
+   Workers has one blocker for teachers: **it does not support custom
+   domains whose nameservers are outside Cloudflare.** On Pages a teacher
+   keeps their domain at Hover or their school's DNS and adds a CNAME; on
+   Workers they would have to move the whole domain to Cloudflare, which most
+   school domains cannot do. None of the extra Workers features matter for a
+   static class site. So we stay on Pages until one of these changes. Check:
+
+   - Cloudflare's changelog and blog: any Pages deprecation, end-of-life
+     date, or new free-plan limits.
+   - Whether Workers now supports custom domains with **external**
+     nameservers (CNAME setup). If yes, the main blocker is gone.
+   - Free-plan terms for static assets on Pages and Workers: still free and
+     unlimited?
+   - `wrangler pages deploy` still works with the `wrangler` version pinned
+     in the image.
+
+   Record the outcome in one line in the release notes' internal checklist
+   (or the cut-release session), even when nothing changed. **If a migration
+   becomes necessary, open an issue for it** — its rough shape: replace the
+   Pages path in `deploy.py` with `wrangler deploy` and a generated
+   `wrangler.jsonc` (`assets.directory`, `not_found_handling: "404-page"`,
+   `workers_dev: true`); keep `_headers`/`_redirects` (Workers supports
+   them), the 25 MB per-file check and the per-section markers; update the
+   token permissions in `contracts/app-rules.json`; keep the
+   `cloudflare_pages` config spelling working for existing courses on both
+   platforms; and plan for `*.pages.dev` addresses becoming `*.workers.dev`,
+   which breaks students' bookmarks unless the course has a custom domain
+   (a teacher-facing message, and probably a period of publishing to both).
 2. **Full test pass**: `dotnet test Plantoir.Tests` and the mac unit suite, plus
    a hand smoke of create → preview → publish on a real course.
 
@@ -273,6 +317,23 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > It needs three credentials, the network and about twenty minutes, and it
    > **creates real, globally unique sites that nothing deletes** — so no suite
    > runs it and none should. Delete the sites it made when you are done.
+   >
+   > **On Windows, run it from the checkout being released, and once with
+   > `-FirstPublish`** (#630, #623). It mirrors that checkout's launchers and
+   > recipe into the working folder's `.toolchain\` before anything runs,
+   > deleting files the checkout no longer has, and rebuilds the section from
+   > scratch when anything changed. It requires `PLANTOIR_RUNTIME`, which
+   > defaults to `windows-app\Vendor\runtime`, and refuses a runtime with no
+   > `vendor\pyodide`. Until 1.8.7 it ran whatever the folder last received,
+   > and against the installed app's runtime. At the 1.8.5 cut that read as
+   > 59 passed and 89 failed, for a product that was fine. `-FirstPublish`
+   > publishes as a new teacher would: a new surname, new sites and both
+   > questions answered. The ordinary run reuses the section's sites and asks
+   > nothing, so a cut needs both: the first-publish run, then a plain run
+   > against the sites the section already has. The Result block lists the
+   > sites the first-publish run made, so they can be deleted. Cloudflare
+   > reuses a project of the same name, which is why the surname is random
+   > on each run.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503):

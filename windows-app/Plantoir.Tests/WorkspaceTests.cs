@@ -142,9 +142,21 @@ public class CatalogTests
     [Fact]
     public void FontFileNameStripsSpaces() => Assert.Equal("SourceSans3", FontCatalog.FileBaseName("Source Sans 3"));
 
+    /// <summary>
+    /// #648 (mac #629, <c>BundledFontTests.testTheSystemPairingIsNotLabelledOrPreviewedAsHelvetica</c>):
+    /// the system choice is still stored as "Helvetica, Arial", but its label
+    /// names neither, because the site shows each device's own font.
+    /// </summary>
     [Fact]
-    public void SystemPairingLabel() =>
-        Assert.Equal("System fonts (Helvetica, Arial)", FontCatalog.PairingLabel("Helvetica, Arial", "Helvetica, Arial"));
+    public void SystemPairingLabel()
+    {
+        string label = FontCatalog.PairingLabel("Helvetica, Arial", "Helvetica, Arial");
+        Assert.Equal("System fonts (each device's own)", label);
+        Assert.StartsWith("System fonts", label);
+        Assert.DoesNotContain("Helvetica", label);
+        Assert.DoesNotContain("Arial", label);
+        Assert.Contains(FontCatalog.Pairings, pairing => pairing.Header == "Helvetica, Arial" && pairing.Body == "Helvetica, Arial");
+    }
 
     [Fact]
     public void ColourSchemeParsesArrayOrWrappedAndSwatches()

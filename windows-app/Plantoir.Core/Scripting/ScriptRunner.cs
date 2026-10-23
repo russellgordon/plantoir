@@ -236,7 +236,9 @@ public sealed class ScriptRunner : INotifyPropertyChanged
 
         try
         {
+            // Wide, so a long machine line is not split on its way (#662).
             _process = ConPtyProcess.Start(commandLine.ToString(), workingDirectory,
+                                           columns: ConPtyProcess.LauncherColumns,
                                            extraEnvironment: extraEnvironment);
         }
         catch (Exception error)
@@ -682,6 +684,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal) &&
             !Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(_unscannedHealthOutput) &&
             !Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(_unscannedHealthOutput) &&
+            !Plantoir.Core.Models.BuildRepairReport.IsMarkerLine(_unscannedHealthOutput) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.CoverageMapsBuilt.Marker, StringComparison.Ordinal) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.MyProgressBuilt.Marker, StringComparison.Ordinal) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SwiftGotReady.Marker, StringComparison.Ordinal) &&
@@ -744,6 +747,14 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         {
             ActivityTrail.Note(ActivityTrail.Event.HowITeachPageKeptOff,
                                keptOff.TrailSentence, keptOff.Course, keptOff.Section);
+            return;
+        }
+
+        // The build's PLANTOIR_REPAIRED: line (#584, mac #645): something the
+        // build put right in the teacher's own page without being asked.
+        if (Plantoir.Core.Models.BuildRepairReport.Parse(line) is { } repaired)
+        {
+            repaired.Record();
             return;
         }
 
