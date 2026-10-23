@@ -519,12 +519,23 @@ the evening before by UI-suite runs that had all been started with
   one at a time ("drives the real app"). One side effect: the copy starts
   `StartGuidance` on `Task.Run`, and that pass can finish after the NEXT test
   has re-pointed the static, so its line can land in the next run's trail.
-  It cannot reach the real one. `RealBuildsRoot` reads `%LOCALAPPDATA%`
-  directly and is not moved.
+  It cannot reach the real one. A second side effect, from the same static:
+  after a test's `Dispose` deletes its folder, and after the LAST test, the
+  harness still points at the deleted state folder. A late guidance write in
+  that gap recreates `%TEMP%\plantoir-ui-…\state\Logs\` holding one trail
+  line. That is litter under TEMP, never the real trail, and if it lands
+  before the script's last step `run-ui-tests.ps1` lists it as "Kept this
+  run's files", which is the folder to delete. It was left as
+  is rather than adding a production-side "reset" to `AppDataRoot` for the
+  harness alone. `RealBuildsRoot` reads `%LOCALAPPDATA%` directly and is not
+  moved.
 - **The window's own `plantoir-mcp.exe`**: Section menu backups, rollovers,
   `LauncherRunner`'s lines. **Now** `McpClient` passes `--state-dir
-  <AppDataRoot.Current>` when `AppDataRoot.IsRedirected`, and the server
-  applies it before anything resolves a path. That moves the server's
+  <AppDataRoot.Current>` when the run is redirected
+  (`AppDataRoot.ArgumentsToHandOn`), and the server reads it with
+  `AppDataRoot.StateDirFrom` and applies it before anything resolves a path.
+  Only the space-separated form is read; `--state-dir=<dir>` is not, since
+  nothing writes it. `StateDirHandOnTests` pins both halves. That moves the server's
   `BuildOutputLocation.BuildsRootFor` fallback and its settings (the
   Cloudflare account among them) too, while the launchers it runs still build
   into the REAL root. That is the same split the window already had, so the
@@ -5583,6 +5594,21 @@ delivered (the dialog kept it); control (no dialog): all four arrived at
 their handlers" (2026-10-15). One of three runs that day failed on its own
 Ctrl+N control ("the second window would not close") and passed twice since,
 alone and paired — recorded as a flake, not chased.
+**It came back on 2026-10-23 (#638's branch) and stayed.** The test passed in
+that branch's first full run (101/101), then failed in the second and in
+five runs alone after it, one of them with F2 put back to the bare key-down,
+so the key change is not the cause. The failure message now lists the
+process's top-level windows, and the dump rules out the tooltip-or-popup
+idea: "Before Ctrl+N the process had 1 top-level element(s); closed:
+[WinUIDesktopWin32WindowClass "Plantoir" 0x25704A2 Window]; the main window
+is 0x3200732. Now: [… 0x25704A2 Window]; [… 0x3200732 Window]". So the right
+window was chosen, a real WinUI window, and UI Automation's
+`WindowPattern.Close` was ignored by it. A UIA probe at the same moment read
+both windows as `ReadyForUserInteraction`, not modal, with no dialog up, and
+the close handler returns at once for a window that is not the last one. The
+PC was an RDP session left idle for hours with LogonUI running, which is the
+suspect but not proven. Not chased further: re-run it with the session in
+use before believing it.
 The neighbouring UI tests the change touches (reference courses, Copy a Page,
 import for reference, Course Settings' Save, the sidebar's names) ran 13 of
 14; `ImportForReferenceUiTests.AnOldWorkingFolderIsImportedShelvedByYearAndLocked`
@@ -5889,8 +5915,11 @@ out, 1 page ticked"; endings carried out, changed nothing, took the last change
 back, took part of the last change back (#550), cancelled at the plan,
 rebuilt, not rebuilt, opened) and
 `SectionMenuBackedUpACourse`. The second is written by the window's
-`plantoir-mcp`, which `--state-dir` does not reach (`AppDataRoot` does not
-cross processes), so a UI test's copy line lands in the PC's own trail.
+`plantoir-mcp`. Until #641 (2026-10-23) `--state-dir` did not reach that
+server (`AppDataRoot` does not cross processes), so a UI test's copy line
+landed in the PC's own trail. The window now hands it on, the line lands in
+the run's trail, and `SectionVerbsUiTests` asserts it there (see "The flags
+the app answers").
 
 **Testing it**: unit — `SectionVerbsTests` (calls, the runner entry, Undo's
 place, the trail, the claim, Rebuild's two answers), `SectionMenuServerTests`

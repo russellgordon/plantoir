@@ -118,6 +118,15 @@ public class AcceleratorUnderDialogUiTests
         ok!.AsButton().Invoke();
     }
 
+    /// <summary>A top-level element as a failure message names it: class, name, handle, control type.</summary>
+    private static string Describe(AutomationElement element)
+    {
+        string Read(Func<string> read) { try { return read(); } catch { return "?"; } }
+        return $"[{Read(() => element.Properties.ClassName.ValueOrDefault ?? "")} \"{Read(() => element.Properties.Name.ValueOrDefault ?? "")}\" " +
+               $"0x{Read(() => element.Properties.NativeWindowHandle.ValueOrDefault.ToInt64().ToString("X"))} " +
+               $"{Read(() => element.Properties.ControlType.ValueOrDefault.ToString())}]";
+    }
+
     /// <summary>Shut whatever the key opened in the control, and wait until it has gone.</summary>
     private static void CloseWhatTheKeyOpened(DrivenApp app, string key, int pid, int windowsBefore)
     {
@@ -135,9 +144,17 @@ public class AcceleratorUnderDialogUiTests
                                              TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result, "Ctrl+N arrived but no second window opened");
                 var second = desktop.FindAllChildren(cf => cf.ByProcessId(pid))
                                     .First(w => w.Properties.NativeWindowHandle.ValueOrDefault != app.Window.Properties.NativeWindowHandle.ValueOrDefault);
+                string chosen = Describe(second);
                 second.AsWindow().Close();
-                Assert.True(Retry.WhileFalse(() => desktop.FindAllChildren(cf => cf.ByProcessId(pid)).Length == windowsBefore,
-                                             TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result, "the second window would not close");
+                if (!Retry.WhileFalse(() => desktop.FindAllChildren(cf => cf.ByProcessId(pid)).Length == windowsBefore,
+                                      TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result)
+                    // What was there, so a failure can say whether "the second
+                    // window" was a window at all: the review's hypothesis is a
+                    // tooltip or popup counted, or chosen, in its place (#638).
+                    throw new Xunit.Sdk.XunitException(
+                        $"the second window would not close. Before Ctrl+N the process had {windowsBefore} top-level " +
+                        $"element(s); closed: {chosen}; the main window is 0x{app.Window.Properties.NativeWindowHandle.ValueOrDefault.ToInt64():X}. " +
+                        "Now: " + string.Join("; ", desktop.FindAllChildren(cf => cf.ByProcessId(pid)).Select(Describe)));
                 break;
             case "Ctrl+O":
                 AutomationElement? Picker() =>

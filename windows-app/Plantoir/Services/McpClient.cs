@@ -111,11 +111,8 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         // per-process, so without it every trail line the window's server
         // wrote (a Section menu backup, a rollover, a launcher's outcome)
         // went to this PC's REAL trail.
-        if (Plantoir.Core.Models.AppDataRoot.IsRedirected)
-        {
-            info.ArgumentList.Add("--state-dir");
-            info.ArgumentList.Add(Plantoir.Core.Models.AppDataRoot.Current);
-        }
+        foreach (string argument in Plantoir.Core.Models.AppDataRoot.ArgumentsToHandOn)
+            info.ArgumentList.Add(argument);
         return info;
     }
 
