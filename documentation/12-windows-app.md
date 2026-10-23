@@ -8135,7 +8135,7 @@ normalise CR LF before reading.
   Figures Fixture's deliberately broken drawings (functionplot block 3 and
   tikz block 6, `\foo`), and 12 are "Swift programs cannot be made ready"
   lines (Swift Playground 7, Runner Fixture 3, Quiz Playground 2), because
-  Windows compiles no Swift (#570).
+  Windows compiled no Swift then (#570, fixed in v1.8.6).
   Neither log contained the `readDifferently` sentence ("the site and the
   folder check read this question differently…").
 - **The two builds read alike, to the byte.** All four pages gave identical
@@ -8351,7 +8351,7 @@ FAIL: Swift run in a choice prints its output: {"status":"This program isn't rea
 ```
 
 That is its whole problem list: the two Swift lines and nothing else.
-Windows compiles no Swift (#570), and the build reported
+Windows compiled no Swift then (#570, fixed in v1.8.6), and the build reported
 `swiftCouldNotBePrepared` for 12 blocks on 3 pages. A copy whose only change
 expects those two runs to be "not ready" printed:
 

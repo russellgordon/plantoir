@@ -129,6 +129,7 @@ commit that moves the version line.
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
 | 2026-10-22 (#632) | **Windows:** if you choose Install and Reopen on the offer that appears by itself and Plantoir stays open, close Plantoir, open it again, then choose File ▸ Check for Updates… and install from there. | The fix is IN this release, so it takes effect only from the copy after it: a teacher on 1.8.5 or earlier who accepts the daily offer for this release meets the old fault once, and the window it leaves open is half shut down. |
+| 2026-10-22 (#570) | **Windows:** the first preview of a course with Swift code downloads about 2.3 GB, once, and needs about 6 GB of free space while it does; the preview waits for it (a few minutes, longer on a slow connection). About 0.9 GB stays on the PC afterwards. | A teacher who opens a Swift course on a school line, or on a nearly full disk, would otherwise read a long first preview, or Swift blocks that say "not ready", as a fault; the notes are the only place to read it before it happens. |
 
 ## Trim the roadmap
 
