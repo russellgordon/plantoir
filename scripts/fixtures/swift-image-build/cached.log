@@ -1,0 +1,46 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 6.85kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/6] FROM docker.io/library/python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
+#4 resolve docker.io/library/python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 14.27kB done
+#5 DONE 0.0s
+
+#6 [3/6] RUN set -e;     case "arm64" in       arm64) url="https://download.swift.org/swift-6.4.0-release/debian13-aarch64/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13-aarch64.tar.gz"; sum="c501354c2690c93676cb08243c6e3e4e5f2b2dc46e557bf9538427d51788f132" ;;       amd64) url="https://download.swift.org/swift-6.4.0-release/debian13/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE-debian13.tar.gz"; sum="b623947404e7ea9843cfc315ed8624e85410fae571eb353339780ed222243737" ;;       *) echo "no Swift toolchain is pinned for arm64"; exit 1 ;;     esac;     curl -fsSL "$url" -o /tmp/swift.tar.gz;     echo "$sum  /tmp/swift.tar.gz" | sha256sum -c -;     mkdir -p /opt/swift;     tar -xzf /tmp/swift.tar.gz -C /opt/swift --strip-components=1;     rm /tmp/swift.tar.gz;     curl -fsSL "https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz" -o /tmp/wasm-sdk.tar.gz;     echo "f07b7be3c586d92d7a07051fc6d303b87ebea67eadc40640ba59d5a8b79aa86d  /tmp/wasm-sdk.tar.gz" | sha256sum -c -;     /opt/swift/usr/bin/swift sdk install /tmp/wasm-sdk.tar.gz --swift-sdks-path /opt/swift-sdks;     rm /tmp/wasm-sdk.tar.gz;     /opt/swift/usr/bin/swift sdk list --swift-sdks-path /opt/swift-sdks;     cd /opt/swift/usr;     rm -rf bin/lldb bin/lldb-argdumper bin/lldb-dap bin/lldb-server bin/repl_swift         bin/sourcekit-lsp bin/clangd bin/docc bin/swift-format bin/wasmkit bin/plutil         bin/swift-build bin/swift-run bin/swift-test bin/swift-package bin/swift-sdk         bin/swift-experimental-sdk bin/swift-package-collection bin/swift-package-registry         bin/swift-build-tool bin/swift-build-sdk-interfaces bin/swift-api-digester         bin/swift-symbolgraph-extract bin/swift-synthesize-interface bin/swift-help         bin/clang-cache bin/llvm-cov bin/llvm-profdata         lib/liblldb.so* lib/libsourcekitdInProc.so lib/libSwiftSourceKitClientPlugin.so         lib/libSwiftSourceKitPlugin.so lib/libclang.so* lib/libLTO.so*         lib/swift_static lib/swift/embedded lib/swift/pm lib/python3*         share/doc share/docc share/man share/sourcekit-lsp share/pm include/SourceKit;     /opt/swift/usr/bin/swiftc --version
+#6 CACHED
+
+#7 [2/6] RUN apt-get update && apt-get install -y --no-install-recommends         curl ca-certificates libcurl4t64 libedit2 libncurses6 libsqlite3-0 libxml2         libuuid1 zlib1g tzdata     && apt-get clean && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [5/6] COPY compile.py ReadLineShim.swift FlushBeforeRead.c /opt/plantoir-swift/
+#8 CACHED
+
+#9 [4/6] RUN set -e;     case "arm64" in       arm64) url="https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-aarch64-linux.tar.gz"; sum="89c07ea56faf38d0fbecf36ca8ec0721756716185f265b568e133d427f299bf8" ;;       amd64) url="https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-x86_64-linux.tar.gz"; sum="2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489" ;;       *) echo "no binaryen is pinned for arm64"; exit 1 ;;     esac;     curl -fsSL "$url" -o /tmp/binaryen.tar.gz;     echo "$sum  /tmp/binaryen.tar.gz" | sha256sum -c -;     mkdir -p /opt/binaryen/bin;     tar -xzf /tmp/binaryen.tar.gz -C /opt/binaryen/bin --strip-components=2 binaryen-version_133/bin/wasm-opt;     rm /tmp/binaryen.tar.gz;     /opt/binaryen/bin/wasm-opt --version
+#9 CACHED
+
+#10 [6/6] WORKDIR /tmp
+#10 CACHED
+
+#11 exporting to image
+#11 exporting layers done
+#11 exporting manifest sha256:2de301ccfaae72ce40d6f6bb94c55fd315608a754ebc548ee210338f3d398bec done
+#11 exporting config sha256:160e192e5140ee7d4b87f7ba84f5d04d7da0d7afd697fd0c3a269f78e5cbaed2 done
+#11 exporting attestation manifest sha256:44c1d247e2069ab29c3c765b5f612dee1ee7885a3c38b6166d164c0401ba3672
+#11 exporting attestation manifest sha256:44c1d247e2069ab29c3c765b5f612dee1ee7885a3c38b6166d164c0401ba3672 0.0s done
+#11 exporting manifest list sha256:fb8b7e0fc9878541806418ab54369f4a877ac2fa1247323ae760f8b76360d70a done
+#11 naming to docker.io/library/plantoir-review-635:cached done
+#11 unpacking to docker.io/library/plantoir-review-635:cached done
+#11 DONE 0.0s
