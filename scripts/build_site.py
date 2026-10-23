@@ -5303,6 +5303,138 @@ export function googleFontHref(theme: Theme) {
         print(f"⚠️ Error patching Head.tsx: {e}")
 
 
+# The three lines Quartz v4.5.0's joinStyles writes the font variables with.
+# Each quotes the WHOLE typography name as one family.
+_FONT_VARIABLE_LINES_V450 = (
+    '  --headerFont: "${getFontSpecificationName(theme.typography.header)}", ${DEFAULT_SANS_SERIF};',
+    '  --bodyFont: "${getFontSpecificationName(theme.typography.body)}", ${DEFAULT_SANS_SERIF};',
+    '  --codeFont: "${getFontSpecificationName(theme.typography.code)}", ${DEFAULT_MONO};',
+)
+
+_FONT_VARIABLE_LINES_PATCHED = (
+    '  --headerFont: ${cssFontStack(theme.typography.header, DEFAULT_SANS_SERIF)};',
+    '  --bodyFont: ${cssFontStack(theme.typography.body, DEFAULT_SANS_SERIF)};',
+    '  --codeFont: ${cssFontStack(theme.typography.code, DEFAULT_MONO)};',
+)
+
+# A RAW string on purpose: the TypeScript carries the regular expression
+# /["\\]/g, and in an ordinary Python string "\\" becomes one backslash,
+# which leaves TypeScript an unterminated regular expression and fails every
+# course's build (#629's review). The test checks the patched file carries
+# the expression exactly as written here.
+_FONT_STACK_HELPER = r'''// Plantoir (#629): a typography choice can be a stack of families
+// ("Helvetica, Arial"), not just one. Quartz quoted the whole choice, so CSS
+// read ONE family called "Helvetica, Arial", which exists nowhere. Each family
+// is now quoted on its own, and a CSS keyword (serif, system-ui...) is left
+// bare, since a quoted keyword is read as a family name.
+const CSS_FONT_KEYWORDS = new Set([
+  "serif",
+  "sans-serif",
+  "monospace",
+  "cursive",
+  "fantasy",
+  "system-ui",
+  "ui-serif",
+  "ui-sans-serif",
+  "ui-monospace",
+  "ui-rounded",
+  "math",
+  "emoji",
+  "fangsong",
+  "-apple-system",
+  "blinkmacsystemfont",
+])
+
+// The "System fonts" choice is stored as "Helvetica, Arial", but what a
+// reader has always seen is their own system font: San Francisco on a Mac,
+// Segoe UI on Windows. Quartz's fallback already names system-ui and Segoe UI
+// ahead of Helvetica and Arial, so that choice is given the fallback alone,
+// and the site keeps looking exactly as it did.
+function isSystemFontChoice(families: string[]): boolean {
+  if (families.length !== 2) {
+    return false
+  }
+  return families[0].toLowerCase() === "helvetica" && families[1].toLowerCase() === "arial"
+}
+
+function cssFontStack(spec: FontSpecification, fallback: string): string {
+  const families: string[] = []
+  for (const part of getFontSpecificationName(spec).split(",")) {
+    const family = part.trim().replace(/^["']|["']$/g, "").replace(/["\\]/g, "").trim()
+    if (family.length > 0) {
+      families.push(family)
+    }
+  }
+  if (isSystemFontChoice(families)) {
+    return fallback
+  }
+  const entries: string[] = []
+  for (const family of families) {
+    if (CSS_FONT_KEYWORDS.has(family.toLowerCase())) {
+      entries.push(family)
+    } else {
+      entries.push(`"${family}"`)
+    }
+  }
+  entries.push(fallback)
+  return entries.join(", ")
+}
+
+'''
+
+
+def patch_font_variable_stacks(theme_ts_path: Path):
+    """
+    Quote each family in a font stack on its own (#629).
+
+    Quartz's joinStyles writes `--bodyFont: "<choice>", <fallback>`, quoting
+    the whole choice. For the "System fonts" choice, stored as
+    "Helvetica, Arial", that is ONE family named "Helvetica, Arial", which
+    no machine has, so the browser always fell through to the fallback's
+    system-ui: San Francisco on a Mac (measured with Chrome's platform-font
+    query, 2026-10-22), Segoe UI on Windows. Russell's ruling: those sites
+    keep looking exactly as they do, so that choice now gets the fallback
+    alone (system-ui first, Helvetica and Arial after it), and every other
+    stack is quoted one family at a time. A single family comes out byte
+    for byte as before, so a Google-font course's stylesheet is unchanged.
+
+    Runs on every build (existing folders heal on their next preview) and
+    is idempotent. Leaves the file alone, with a warning, if joinStyles is
+    not in the shape Quartz v4.5.0 writes it.
+    """
+    if not theme_ts_path.exists():
+        print(f"⚠️ theme.ts not found at {theme_ts_path}")
+        return
+    try:
+        content = theme_ts_path.read_text(encoding="utf-8")
+    except OSError as error:
+        print(f"⚠️ Could not read theme.ts: {error}")
+        return
+
+    if "function cssFontStack" in content:
+        print("ℹ️ Font variables already quote one family at a time (no change).")
+        return
+
+    anchor = "export function joinStyles"
+    shape_is_known = content.count(anchor) == 1
+    for line in _FONT_VARIABLE_LINES_V450:
+        if content.count(line) != 1:
+            shape_is_known = False
+    if not shape_is_known:
+        print("⚠️ joinStyles not in the expected shape; font variables left unchanged.")
+        return
+
+    for old_line, new_line in zip(_FONT_VARIABLE_LINES_V450, _FONT_VARIABLE_LINES_PATCHED):
+        content = content.replace(old_line, new_line, 1)
+    content = content.replace(anchor, _FONT_STACK_HELPER + anchor, 1)
+    try:
+        theme_ts_path.write_text(content, encoding="utf-8")
+    except OSError as error:
+        print(f"⚠️ Could not write theme.ts: {error}")
+        return
+    print("✅ Patched theme.ts so font stacks quote one family at a time")
+
+
 def patch_mermaid_font_wait(mermaid_ts_path: Path):
     """
     Make mermaid wait for the code font before it measures anything.
@@ -8710,6 +8842,7 @@ def build_section_site(
     theme_ts = output_dir / "quartz" / "util" / "theme.ts"
     head_tsx = output_dir / "quartz" / "components" / "Head.tsx"
     patch_google_font_href(theme_ts, head_tsx)
+    patch_font_variable_stacks(theme_ts)
     append_coverage_styles(output_dir / "quartz" / "styles" / "base.scss")
     latex_ts = output_dir / "quartz" / "plugins" / "transformers" / "latex.ts"
     patch_katex_mhchem(latex_ts)
