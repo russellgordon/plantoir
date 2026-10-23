@@ -3544,8 +3544,8 @@ separate fourth checkbox column, as the issue sketched.
 reason (kept by an unpublish, a linked class left as it is, no room for a
 key) — those must be read before Go. The pages already the way they were
 asked to be (`rowsAlreadyRight`: already visible, already hidden, nothing
-else) sit behind a `DisclosureGroup` under the table, closed for every new
-plan, worded `menuPlanShowAlready(count:publishing:)` — four keys,
+else) sit behind a control under the table — a `DisclosureGroup` in 1.8.6,
+a checkbox since 1.8.7 (#654, below) — unticked for every new plan, worded `menuPlanShowAlready(count:publishing:)` — four keys,
 `menuPlanShowAlready`, `…Hiding`, `…OnePage`, `…OnePageHiding`. The
 disclosure has no content of its own: opening it appends those rows to the
 SAME table, in plan order — one table and one sort, as #589 chose. A plan
@@ -3592,7 +3592,8 @@ window's `contentMinSize` (measured: SwiftUI announces that key; `minSize`
 sends nothing) and, on the next main-actor turn, grows the window to it —
 never shrinking it, so a sheet the teacher made bigger stays bigger, and the
 next, shorter stage leaves it where it is. The disclosure never raises the
-minimum, so it never moves the sheet.
+minimum, so it never moves the sheet. (Since 1.8.7 the answer after a plan is
+the one exception: it is fitted to its sentence, #654, below.)
 
 REJECTED: two tables for the fold (one height function and one sort, as
 #589); a literal 620-pt minimum (a two-row picker would carry about 300 pt of
@@ -3602,6 +3603,64 @@ Copy a Page (not a `Table`, and its figure is in the reference scene — a
 follow-up issue if wanted). The trail is unchanged: this is how the plan is
 shown, not what Publish does. Windows: the five keys travel in
 `assist-wording.json`; the layout went as one `windows` issue.
+
+#### v1.8.7: one table, one checkbox; the answer fitted to its sentence (#654)
+
+**One table, one checkbox.** The control under the plan table is a `Toggle`
+in `.checkbox` style, bound to `showsAlreadyRight`, wearing the same
+`menuPlanShowAlready(count:publishing:)` words and the same accessibility id
+(`sectionVerbSheetPlanAlreadyRight`). It was a `DisclosureGroup` with an
+empty body: ticking it adds rows to the table ABOVE it (one table, one sort,
+#589), so a triangle promised a fold below it that never appeared (Russell,
+from the ICS3U sheet). Everything #622 measured holds — the table's height is
+counted with the checkbox unticked, ticking it moves neither the sheet nor
+its minimum (`testOpeningTheFoldMovesNeitherTheSheetNorItsSmallestSize`) — and
+a second click takes the rows out again. The checkbox's line is 7 pt shorter
+than the disclosure's, so a plan WITH pages folded is 7 pt shorter than in
+1.8.6 (measured: 5 + 16 opens at 309, was 316; a hide plan of 2 + 2 at 285,
+was 292; the worst plan 609, was 616) and a plan with nothing folded is
+unchanged (21 pages, 454). The 6-pt `foldSpacing` stays. No wording key moved,
+so the generated contract does not.
+
+**The answer is fitted to its sentence; the worst-plan cap is the plan's
+alone.** After Go (or a refusal at the plan, or a failure) the sheet shows
+one sentence over OK, but `SheetGrowsToItsMinimum` only ever GREW the window,
+so the answer kept the plan's height. Measured on macOS 26.6
+(`PageTablesSheetTests.testTheAnswerAfterAPlanIsFittedToItsSentence`, which
+presents the sheet for real and runs the write): a Publish plan of 21 pages
+stayed 454 pt to show an answer needing 124, a Hide plan 292 (at 700 wide).
+Now `SectionVerbSheet` passes `fitsItsContent: model.stage == .finished`, and
+while that is true the watcher sets the window's height to its
+`contentMinSize` — smaller as well as larger — keeping the width (the 700 a
+teacher dragged it to stays 700). Both cases now end at 124. The
+fit runs on the next main-actor turn after the stage changes AND on every
+later change of the minimum, since the new minimum may arrive either side of
+the stage. The shrink is ANIMATED (`setFrame(_:display:animate:)`), about
+the sheet's middle: AppKit keeps a sheet centred on its window through a
+change of size anyway (measured: the middle stays where the plan's was), so
+the middle is kept and AppKit has nothing to correct. (The unit-test host
+suppresses window animation, so the animation itself is seen in the real app,
+not measured by the suite.) WORKING keeps the grow-only rule, so the
+plan-height sheet holds its spinner and the sheet changes size ONCE, to the
+answer — measured by logging every resize through Working → Finished: the
+Working minimum (124 pt) is never above the answer's, and the first fit runs
+with the answer's minimum already in place, both for a one-line answer (454 →
+124, one resize) and an eleven-line one (454 → 284, one resize, then a no-op);
+there is no shrink to a spinner and grow again. The answer is the last thing
+the sheet shows, so fitting it takes away no size a teacher still needs; a
+teacher who resizes the answer keeps that size only until its minimum next
+changes, when it is fitted again. `.result` sheets (Undo Last Change and the
+others with no sheet of their own) are at `.finished` from the start, so they
+fit too — they open at their answer's size already, so nothing moves.
+
+REJECTED: a smaller `.frame` on the answer's view — the view is already 124
+pt (`fittingSize` says so); it is the WINDOW that keeps the height, which is
+#621's finding that `.fitted` never fits again; an `.id` per stage (the same
+finding); shrinking at WORKING too (the sheet would shrink to a spinner and
+grow again to a multi-line answer); a fixed answer height. Start of Year
+keeps grow-only — its result stages were not part of this. The trail is
+unchanged: this is how the answer is shown, not what Publish does. Windows
+owes both as one `windows` issue (its plan sheet uses the same keys).
 
 ### Classes dated after the next class, at Deploy (#475)
 
