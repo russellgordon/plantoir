@@ -26,6 +26,9 @@ public class PageTablesUiTests
     private const string Code = "UITICK";
     private const int Seen = 4;
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+
     private readonly ITestOutputHelper _output;
     public PageTablesUiTests(ITestOutputHelper output) => _output = output;
 
@@ -124,9 +127,21 @@ public class PageTablesUiTests
         Thread.Sleep(500);
         string theme = Environment.GetEnvironmentVariable("PLANTOIR_634_THEME") ?? "system";
         string path = Path.Combine(Path.GetTempPath(), $"plantoir-634-{name}-{theme}.png");
-        // The whole screen: an element's rectangle is in the wrong units at 200%.
-        try { FlaUI.Core.Capturing.Capture.Screen().ToFile(path); _output.WriteLine("picture: " + path); }
+        // The whole screen in REAL pixels: this process is not DPI-aware, so
+        // FlaUI's captures come out a quarter of the screen at 200%. The thread
+        // is made per-monitor aware for the capture alone, then put back.
+        IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try
+        {
+            int width = GetSystemMetrics(0), height = GetSystemMetrics(1);
+            using var bitmap = new System.Drawing.Bitmap(width, height);
+            using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                graphics.CopyFromScreen(0, 0, 0, 0, new System.Drawing.Size(width, height));
+            bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            _output.WriteLine($"picture: {path} ({width} x {height})");
+        }
         catch (Exception error) { _output.WriteLine("no picture: " + error.Message); }
+        finally { SetThreadDpiAwarenessContext(previous); }
     }
 
     private static string Status(AutomationElement row) => row.Properties.ItemStatus.ValueOrDefault ?? "";

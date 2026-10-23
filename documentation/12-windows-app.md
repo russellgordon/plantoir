@@ -7648,11 +7648,13 @@ two steps of one flow look alike). Ids: the boxes keep `sectionVerbPage<i>` and
 - Selecting a row ticks nothing. Native: `ListView` selection never touches
   the box.
 - Space ticks the row the focus is in, or else the selected row: the list's
-  tunnelling `PreviewKeyDown`. It is taken on the way UP as well
-  (`PreviewKeyUp`): a focused `CheckBox` clicks on key-UP, so a key-down taken
-  and a key-up let through would flip a box with the focus on it twice (the
-  plan review's amendment 2; the UI test presses Space after a mouse click,
-  with the focus on the box, and expects one flip).
+  tunnelling `PreviewKeyDown`. The plan review (amendment 2) asked whether a
+  focused `CheckBox`, which clicks on key-UP, would then flip twice. MEASURED:
+  Space after a mouse click on a box flipped it once with a key-up handler,
+  and once with that handler's key renamed away — so the handler was taken
+  out. (A box whose key-down never arrives has nothing to click on key-up;
+  the test did not read where the focus sat after the click, so that part is
+  reasoning.)
 - Space typed in Find a Page ticks nothing: the field is the list's sibling,
   so its keys never reach the list's handler.
 - Return with a row selected reaches Continue — when Continue is live —
@@ -7753,7 +7755,48 @@ opened), a wider window; `LaterClassesAtDeployUiTests.TheQuestionIsATable_AndSpa
 The trail is unchanged, as on the mac: this is how the choice is shown, not
 what Publish does.
 
-**Through the window: not yet measured** on this branch — the UI tests above are written and compile; their numbers (the picker's chrome against the 300 estimated, the disclosure's line against `FoldHeight` 36, the dialog's width at a widened window) are owed and will replace this line.
+**Measured through the window** (2026-10-22, this PC over a remote session at
+200%: the screen 3024 × 1832 pixels, the main window about 937 × 625 epx, a
+XAML root of 565–590 epx; `PageTablesUiTests`, which writes its numbers to
+`%TEMP%\plantoir-634-measured.txt`):
+
+- **The picker's chrome: 285 epx** against `PageTableLayout.PickerChrome` 300
+  (the dialog box 415 epx tall over a 130-epx table of 4 rows, 4 × 32 + 2), so
+  the estimate keeps a 15-epx margin and was left.
+- **The disclosure: 27 epx tall, 4 epx under the table** — 31 against
+  `PlanTableLayout.FoldHeight` 36, a 5-epx margin, left.
+- **The width:** at a 900-epx window the plan's dialog is 680 wide; widened by
+  400 epx (900 → 1300), the table went from 632 to 932 epx — exactly the
+  300-epx cap — and the app's log read "dialog 980 wide".
+- **The fold:** a plan of 1 change + 4 already visible draws one row in a
+  table five rows tall; opened, five rows, with the table's and Publish's
+  rectangles unchanged to the pixel. #548's 19-row fixture: 18 rows to read,
+  1 folded, the table 8–9 rows tall at a root of 565–590.
+- **Banding**, in light and dark (pictures kept out of the site): the
+  alternate rows read in both themes; in light the band is faint but visible.
+- **Must-fails**, each a one-line change run against its test: Space's key in
+  `TickTable`'s `PreviewKeyDown` renamed (Space → Scroll) — "Space on the
+  selected row did not tick it"; the plan table's `Height` renamed to
+  `MaxHeight` — the table measured 34 epx (one row) instead of five rows'
+  worth; the picker's rows counted from the search's leftovers — 34 epx
+  against 130.
+- **Found on the way:** the sentences above the picker and the question were
+  CENTRED in the wider dialog (a `TextBlock` with a `MaxWidth` narrower than
+  its panel is centred), so `Words` is left-aligned now; at 680 it had been
+  centred by 56 epx since #548.
+
+**UI totals:** `PageTablesUiTests` 6 of 6; with `PlanTableUiTests` 10 of 10;
+`LaterClassesAtDeployUiTests` (3, the new table test among them) and
+`SectionVerbsUiTests` passed in the combined run. Two `PlanTableUiTests` were
+corrected for the fold: they open the disclosure before reading the page
+already visible (`OpenTheFold`, which also checks the table does not move).
+**One thing the tests met and worked around:** opened through UI Automation's
+Expand, the Section menu kept Publish Pages… greyed for 30 s after a dialog
+closed, even with the pointer moved over the Section title — the menus
+re-read what is live on a pointer entering a title or the menu bar taking
+the focus, and the dialog's own close leaves them greyed. The tests open a
+fresh app per key instead; whether a teacher's mouse ever meets it is not
+measured here.
 
 ## One curriculum test, folder segments only (#615), and a linked curriculum page is not "already visible" (#617, the mac's #607)
 
