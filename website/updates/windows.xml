@@ -5,6 +5,43 @@
     <description>Plantoir for Windows</description>
     <language>en</language>
     <item>
+      <title>Plantoir 1.8.6</title>
+      <description>New in Plantoir 1.8.6
+
+This update brings Windows up to date with what the Mac got in 1.8.6, and finishes two things Windows owed from 1.8.5.
+
+BEFORE YOU UPDATE
+
+- If you updated to 1.8.5 by accepting the offer Plantoir made on its own (the daily check) and nothing happened, close Plantoir, open it again, then choose File, Check for Updates and install from there. That fault is fixed in this version, so the next update will install either way.
+- Swift programs need a large one-time download. The first time you preview a course that has a Swift program in it, Plantoir downloads about 2.3 GB to get Swift ready and needs about 6 GB of free space while it does. The preview waits for it: a few minutes, longer on a slow connection. This happens once; about 0.9 GB stays on the PC afterwards. If there is not enough room, Plantoir says so and the rest of the page builds as usual.
+
+NEW
+
+- Swift programs that students can run, on Windows. A Swift code block marked to run is built into the page, with Run, Stop and Reset, exactly as on the Mac. Deploy each section again to bring it to your sites.
+
+IMPROVED
+
+- Publish Pages and Hide Pages pick from a table. The list of pages you choose from is now a table with Page, Folder and Date columns, banded like the plan that follows it, with a checkbox on each row. Type in the search field to narrow it; press Space to tick the selected row. The list of later classes offered after a plan is a table too.
+- The plan lists only the pages you need to read. Pages that are already visible (or already hidden) sit behind "Show the N pages already visible" under the table, closed to start with. Opening it never makes the window grow.
+- The page sheets follow the window. Make the Plantoir window wider and the Page column takes the extra width, so long page titles are no longer cut off; make it taller and more rows show.
+
+FIXED
+
+- Accepting the update offer Plantoir makes on its own (the daily check) now closes Plantoir and installs, as choosing File, Check for Updates always did.
+- The sentence above the page picker was centred; it now sits at the left like the rest.
+
+DOWNLOADS
+
+File: PlantoirSetup.exe   Size: 248.3 MB (260,350,896 bytes)   SHA-256: 0c1280e4bc6331d6f859f45d15ef8d6acc6189d15940efe2562b107f4005bea2
+File: Plantoir-win-x64.zip   Size: 414.5 MB (434,683,545 bytes)   SHA-256: f6bd48d6561d3421e9c0910cd3dd9f11897fea9aceeb674c45d6690e0d98a010
+
+The SHA-256 lets your IT department verify the download is genuine.</description>
+      <pubDate>Thu, 22 Oct 2026 23:00:56 -04:00</pubDate>
+      <sparkle:version>1.8.6</sparkle:version>
+      <sparkle:shortVersionString>1.8.6</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.6/PlantoirSetup.exe" sparkle:version="1.8.6" sparkle:shortVersionString="1.8.6" length="260350896" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="+ncwecJ6c2+MLx4hFbU5L9fmR2VmJnHu251uOJNtGr7sTTKH669ieiY9ozaksEyhPO0rkitkTmJViGrcCaKSBg==" />
+    </item>
+    <item>
       <title>Plantoir 1.8.5</title>
       <description>New in Plantoir 1.8.5
 
@@ -57,7 +94,7 @@ The SHA-256 lets your IT department verify the download is genuine.</description
       <pubDate>Thu, 22 Oct 2026 15:41:27 -04:00</pubDate>
       <sparkle:version>1.8.5</sparkle:version>
       <sparkle:shortVersionString>1.8.5</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.5/PlantoirSetup.exe" sparkle:version="1.8.5" sparkle:shortVersionString="1.8.5" length="260328160" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="eQWQZSGCTYgq1XKg+cf9VlIdvohNR9uLDLmboE1dyCedeTgFejUICmfrVCR70Y86G2O+P/yhD3xr73a3XTbnBw==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.5/PlantoirSetup.exe" sparkle:version="1.8.5" sparkle:shortVersionString="1.8.5" length="260328160" sparkle:os="windows" type="application/octet-stream" sparkle:criticalUpdate="false" sparkle:signature="eQWQZSGCTYgq1XKg+cf9VlIdvohNR9uLDLmboE1dyCedeTgFejUICmfrVCR70Y86G2O+P/yhD3xr73a3XTbnBw==" />
     </item>
     <item>
       <title>Plantoir 1.7.2</title>
