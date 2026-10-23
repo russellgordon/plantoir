@@ -8163,7 +8163,8 @@ Three edges the predicate now decides on purpose, pinned in
   wrong place; false makes a missed resolve visible in a test instead.
 - **The contract's `isCurriculumPage.cases`** are run through it with a course
   root in front, so the planner and the assistant's list of expectations
-  (`CurriculumRules.IsCurriculumPage`) answer alike.
+  (`CurriculumRules.IsCurriculumPage` then; since #647, below, it goes through
+  `PagePaths.IsCurriculum`) answer alike.
 
 Not changed by #615, and changed since: `LinkGraph.IsCurriculum` and
 `CurriculumRules.IsCurriculumPage` used to test the folders of whatever path
