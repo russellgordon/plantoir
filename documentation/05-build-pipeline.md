@@ -2003,9 +2003,12 @@ block shares was said ten times and "and 7 more";
 |---|---|
 | `compileError` | Swift found an error; the line is the first error's, in the teacher's file, and the words carry the compiler's own message. The block shows its code with Run off ("This program isn't ready to run yet."). |
 | `noRoom` | the launcher found less than 6 GB free for the Swift image (`state.json` beside the cache says so; plan removes it at the start of every run). |
-| `notDownloaded` | the launcher could not build the Swift image, which downloads about 1.3 GB the first time (`state.json`: `{state: notDownloaded}`); the sentence names the download and the internet. |
+| `notDownloaded` | the launcher could not get Swift ready - on a Mac, build the Swift image (about 1.3 GB the first time); on Windows, fetch it (about 2.3 GB; offline, or a download that was not what was pinned) (`state.json`: `{state: notDownloaded}`); the sentence names the download, filled per platform from `swift.downloadGigabytes`, and the internet. |
 | `notCompiled` | nothing recorded, and the sentence says only "preview the course again" (implementation review N1: it used to blame the internet for causes that have nothing to do with it): a compile that did not finish (killed, too slow, wasm-opt failed - none is cached, so the next preview tries again), a wait for another launcher's download that gave up, or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
-| `notOnWindows` | the build ran on Windows, which has no container and compiles nothing in v1.8 (#493 option (b)). Chosen in the shared Python (review N2), so Windows teachers read a sentence about Windows the day they take these scripts. |
+
+Until v1.8.6 a fifth reason, `notOnWindows`, said Windows could not compile
+Swift (#493 option (b)); it went when Windows began compiling (#570), and the
+`reasonCases` now pin the same three reasons on both platforms.
 
 **Notes, not problems.** A block whose program is over 5 MB is named on a
 `plantoir: note:` line (`swift.notes.large`, implementation review S2): a
@@ -2018,6 +2021,20 @@ The build is never stopped by any of them (#493 ruling Q1, the #485 E1
 precedent): a failed build would also stop the preview the teacher needs to
 fix the block. The issue's acceptance 11 ("fails the build") was ruled out
 for that reason.
+
+**On Windows** (#570, v1.8.6) there is no container, so `preview.ps1` does
+the same three steps natively: the shared plan with the bundled Python, then
+`scripts/swift_windows_fetch.py ensure` in place of building the image (the
+swift.org Windows installer, checked and unpacked without elevation into
+`%LOCALAPPDATA%\Plantoir\swift\6.4.0` the first time - about 2.3 GB
+downloaded, 0.9 GB kept, with a percent line while it downloads), then
+`scripts/swift_windows_compile.py`, which runs this same `compile.py`,
+unchanged, with a Windows environment and limits. Prepare is the one above.
+The Windows toolchain id hashes the wrapper and the fetched pins too
+(`cache.toolchainIdFromOnWindows`). What is fetched, what was measured
+(a full-library block takes about 50 s here, almost all wasm-opt) and where
+Windows deliberately differs is in
+[12 → Runnable Swift on Windows](12-windows-app.md#runnable-swift-on-windows-570-the-macs-493-v186).
 
 **Scheduled publishes** run the same launcher (`preview.sh --build-only`), so
 they compile too, and build the Swift image if a preview never did (ruling

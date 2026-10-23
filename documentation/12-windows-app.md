@@ -211,6 +211,7 @@ computing its own path (see "The flags the app answers"):
 | `scheduled\folder-problems\` | What last night's build found wrong with a course's folders, for the next time there is somebody to tell. |
 | `assist\`, `models\` | The assistant's MCP configuration (`mcp-<CODE>.json`) and the model weights it downloads. |
 | `WebView2\` | The embedded preview's user-data folder. |
+| `swift\` | Since v1.8.6 (#570): `6.4.0\` is Swift, about 0.9 GB, fetched by the first preview with a Swift block (`READY.json` says which pins it is); `work\` is the per-block compile folder; `download\` and `staging-*` exist only while getting Swift ready; `fetch.lock` and `fetch.log` beside them. Resolved by the LAUNCHER's Python from `%LOCALAPPDATA%` (`swift_windows_fetch.home()`, `PLANTOIR_SWIFT_HOME` for a test), so `--state-dir` does NOT move it. Uninstalling leaves it. |
 | `settings.json` | The app's own settings — and, since Windows has no system window restoration, the remembered-windows list IS the restoration mechanism. (`AssistWindowPlacements`, beside it, is deliberately NOT replayed: restoring an assistant window would load a multi-gigabyte model unasked, so it remembers placement only and is a separate type.) |
 
 **The folder id is a hash, and it must never be derived twice.** The launcher
@@ -7328,16 +7329,19 @@ file 200 with a runnable type, a worker CSP that allows wasm, the borrowed
 page's runnable block, COOP/COEP on that page and COEP on both engine
 folders, none on the front page, KaTeX's stylesheet as `text/css` and a
 face, no CSP naming jsdelivr, and the folder publishes' engine and KaTeX
-files against the contract's hashes. Swift is checked as far as Windows
-carries it — `static/swift/plantoir-swift-worker.js` and `plantoir-wasi.mjs`
-as JavaScript with COEP, and the overlay byte for byte — and the borrowed
-page's ```` ```swift run ```` fence is EXPECTED to be reported as not ready
-(`swift.reasons.notOnWindows` on a `plantoir: error:` line, and the
-`swiftCouldNotBePrepared` folder problem) by the preview and by the publish
-that rebuilds; and the compiled program, which Windows cannot make (#570),
-is asserted ABSENT — a program found on a Windows-built site fails the run —
-rather than skipped, so a Windows run can be the "nothing skipped" run
-`RELEASING.md` asks for (the #568 implementation review). It also times each Netlify and Cloudflare publish and counts the
+files against the contract's hashes. Swift is checked as
+verify-deploy.sh checks it — `static/swift/plantoir-swift-worker.js` and
+`plantoir-wasi.mjs` as JavaScript with COEP, the overlay byte for byte, and
+since v1.8.6 (#570) the borrowed page's compiled program: the page carries
+`data-runner-wasm`, the program answers 200 and starts with `\0asm`, the
+folder publishes carry it in `static/swift-wasm/`, and the preview and the
+publish that rebuilds say the block is ready (no `plantoir: error:` line,
+no `swiftCouldNotBePrepared`). The first run on a PC gets Swift ready
+through the preview, the product path (about 2.3 GB, a few minutes). Until
+v1.8.6 the program was asserted ABSENT and the not-ready line EXPECTED
+(`swift.reasons.notOnWindows`), rather than skipped, so a Windows run could
+be the "nothing skipped" run `RELEASING.md` asks for (the #568
+implementation review). It also times each Netlify and Cloudflare publish and counts the
 bytes sent on the interface the default route uses (route metric plus
 interface metric: sorting on the route's alone read a Wi-Fi counter that
 never moved beside the wired adapter).
@@ -7369,38 +7373,311 @@ right ones and the publishes succeeded; the anchored patterns are what
 refused them. It predates this piece (nothing here touches `deploy.py`'s
 prompts or PtyDriver) and is #623.
 
-## Runnable Swift (#493), v1.8.0: Windows compiles none of it yet
+## Runnable Swift on Windows (#570, the mac's #493), v1.8.6
 
-The mac compiles a course's ` ```swift run ` blocks in a SECOND container
-image, started by the launcher before the build (05 → Runnable Swift, 02 →
-The Swift image). Windows has had no container since 2026-08-19, so there is
-nothing to start, and in v1.8.x **Windows compiles no Swift** (#493 option
-(b), Russell's ruling). What reaches this side unchanged, and works today:
-the site's code (the transformer, `SwiftWasmRuntime`, the worker and the
-WASI shim in `support/gated/swift/` - so a site published from a Mac runs its
-Swift blocks in any browser, Edge and the WebView2 pane included), the shared
-Python (`swift_blocks.py`'s prepare runs in every build here, finds no
-programs, and - because it is chosen in the shared Python on `os.name`
-(review N2) - says each block is not ready with
-`codeRunnerBlocks.swift.reasons.notOnWindows`, as a `plantoir: error:` line
-and as the `swiftCouldNotBePrepared` folder problem), the contract cases
-(`swift.reasonCases` carry `appliesOn`), and the skill's Swift section, which
-tells an assistant Windows cannot make Swift runnable yet. The Swift engine
-needs no vendor folder (`page_features.OVERLAY_IS_THE_ENGINE`), so a Windows
-site carries the thread and shows each block with Run off and
-`words.notReady` - never a broken Run button.
+Since v1.8.6 a ` ```swift run ` block built on Windows is a program a student
+runs, exactly as one built on a Mac. Until then (v1.8.0–1.8.5, #493 option
+(b)) Windows compiled nothing and every block said
+`swift.reasons.notOnWindows`; that reason and the 1.8.5 stopgap are gone.
+The site's half (the transformer, `SwiftWasmRuntime`, the worker and the
+WASI shim in `support/gated/swift/`) was never platform-specific and is
+unchanged. The mac compiles in a second container image (05 → Runnable
+Swift, 02 → The Swift image); Windows has no container, so what replaced the
+image is a one-time fetch of the swift.org **Windows** toolchain, and what
+runs `compile.py` is a small wrapper.
 
-**What Windows must decide** is in the `windows` issue for #493: (a) a native
-swift.org Windows toolchain and the same wasm SDK fetched on demand into the
-runtime (size, the wasm cross-compile on Windows and byte-for-byte agreement
-with the mac's programs are all unmeasured; `swift-gate/` is the test), or
-(c) programs carried in the course folder so a Mac-compiled course works
-here (rejected so far: build output stays out of the vault). Until then
-`preview.ps1` has no Swift step. Nothing here should go red: no Windows
-test reads `codeRunnerBlocks.swift` or `swiftImage` yet, and
-`RepairIsOfferedForExactlyTheContractsChecks` finds the new
-`swiftCouldNotBePrepared` check in `siteHealth.repair.neverOffered`, where
-review S8 put it so this suite and the mac's stay green.
+### What happens at a preview
+
+`preview.ps1`'s `Invoke-RunnableSwift`, just after "Running the website
+builder on this PC" and before `build_site.py`. It is the order of
+`preview.sh`'s `prepare_runnable_swift`:
+
+1. **Plan**: `swift_blocks.py plan --course=C --format=lines`, with the
+   bundled Python (the shared plan; the cache is
+   `%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>\.swift-cache\<toolchain id>`).
+   If nothing is waiting, nothing else happens, so a teacher who never
+   writes Swift never downloads Swift.
+2. **Get Swift ready**: `swift_windows_fetch.py ensure`, IN THE FOREGROUND,
+   as the mac builds its image in the foreground. If Swift is already ready
+   it says nothing. If not, it prints `codeRunnerBlocks.swift.windows.printed`
+   in this order: `gettingReady`, then `gettingReadyPercent` about every ten
+   per cent (the mac goes quiet for its minutes; a school line takes about
+   six here), `unpacking`, then `ready`, followed by a `PLANTOIR_SWIFT:`
+   line for the trail.
+3. **Compile**: `🦅 Making N Swift programs ready to run…`, then
+   `swift_windows_compile.py <jobs> <cache> --log=<.swift-cache\logs\compile-<pid>.log>`.
+4. **Prepare**: the build, unchanged. It reports `🦅 6 of 7 Swift programs
+   on this site ready to run`, a `plantoir: error:` line for each block that
+   has no program, and the `swiftCouldNotBePrepared` folder problem.
+
+Exit codes of `ensure` (`windows.ensureExit`), and the `state.json` the
+launcher writes for prepare:
+
+| Exit | State | Cause |
+|---|---|---|
+| 0 | none | Ready. |
+| 10 | `noRoom` | Too little room. |
+| 11 | `notDownloaded` | Offline, or a download that was not what was pinned. |
+| 12 | none, so the build says `notCompiled` | Another installation running, an unpack that failed, or the wait for another launcher gave up. |
+
+The reasons are the mac's own. `notDownloaded`'s
+"(the first time downloads about {downloadGigabytes} GB)" is filled per
+platform (`swift.downloadGigabytes`: 1.3 on a Mac, 2.3 here), so the mac's
+rendered sentence is byte for byte what it was.
+
+**A scheduled publish can do the first fetch unattended.** It runs
+`preview.ps1 --build-only`, so it gets Swift ready and compiles too (the
+mac's ruling Q4). On a PC where no preview has got Swift ready yet, the
+first scheduled publish of a course with a Swift block downloads the 2.3 GB
+on its own, typically overnight with nobody watching, and the publish waits
+for it (about three minutes here, longer on a slow line). Nobody sees the
+percent lines, which go only to the run's log. What the teacher sees later:
+- the trail line "Swift got ready on this computer" (or "Swift could not
+  be got ready", with the reason), because `TaskScheduling.cs`'s wrapper
+  keeps the `PLANTOIR_SWIFT:` line and `ScheduledHealthFindings` records
+  it, dated to the run;
+- on the published site, every block runnable, or the usual "not ready" for
+  each block, with the `swiftCouldNotBePrepared` folder problem waiting at
+  the next launch, as for any scheduled build's folder problems.
+
+A scheduled run that fails offline tries again at the next run or preview.
+Nothing is downloaded for a course with no Swift.
+
+### What is fetched, where, and how big
+
+Everything is pinned in `contracts/toolchain.json` → `swiftWindows`, and
+everything is non-admin. Measured 2026-10-22 on this PC (Lenovo 20QES70500,
+i5-8365U, 4 cores / 8 threads, 16 GB, Windows 11 Pro 26200, Ethernet, not
+elevated):
+
+1. The swift.org installer,
+   `swift-6.4.0-RELEASE-windows10.exe` (2,097,914,680 B). The download
+   resumes with HTTP Range. Its SHA-256 is checked, then its Authenticode
+   signer: Windows' own `Get-AuthenticodeSignature` must say `Valid`, with
+   `CN=Apple Inc.` and `O=Apple Inc.` in the subject. It is the only Windows
+   artifact swift.org publishes; there is no checksum entry and no `.sig`.
+   So the pinned SHA-256 is the check, and the signature is defence in
+   depth.
+2. The bundle's payloads sit in ONE solid LZX cabinet attached at byte
+   1,312,800. The fetch checks for `MSCF` there, a cbCabinet of
+   2,096,591,258 (pinned), and that the cabinet ends inside the file
+   (10,622 B before its end, where the signature is). Then it copies the
+   cabinet out.
+3. Windows' own `expand.exe container.cab -F:<id>` takes out `a1`
+   `bld.noasserts.msi`, `a14` `bld.noasserts.cab`, `a10` `rtl.amd64.msi`
+   and `a23` `rtl.amd64.cab`. Each is checked against the **SHA-512 in the
+   bundle's own Burn manifest** (`Payload/@Hash`, Apple's), so no second
+   2.1 GB download was needed to take hashes.
+4. `msiexec /a <msi> TARGETDIR=<dir> /qn` (an administrative extraction: no
+   UAC, not elevated) for the compiler and the runtime. Exit 1618 (another
+   installation running) waits 30 s, three times, then gives up as `busy`.
+5. A trim to the measured set (`trim.remove` / `mustKeep`): from
+   1,874,323,927 B to 533,231,069 B. The VC++ runtime DLLs from the runtime
+   MSI (`trim.vcRuntime`) go beside the tools, because a PC without the
+   redistributable lacks VCRUNTIME140, VCRUNTIME140_1 and MSVCP140.
+6. The mac's own wasm SDK pin (92,760,992 B), unpacked with `tar.exe`, and
+   binaryen version_133 x86_64-windows (111,045,528 B), of which only
+   `wasm-opt.exe` is kept, OUTSIDE the toolchain's `bin`.
+7. A smoke compile of one tiny program through the real wrapper. An install
+   that cannot compile is never marked ready. Then `READY.json` (the pins'
+   digest, the bytes kept and the seconds per step) is written, and the
+   staging folder is renamed to `%LOCALAPPDATA%\Plantoir\swift\6.4.0`. The
+   installer and the tarballs go only then, so a step that fails late
+   needs no second download.
+
+**Downloaded:** 2,301,721,200 B (about 2.3 GB). **Kept:** 898,260,086 B
+(the toolchain 533,231,069 B, the SDK 354,685,593 B, wasm-opt
+10,343,424 B; `swiftWindows.keptBytes`). The measurement's hand trim was
+3,268 B smaller, because it also removed `usr/bin/clang-deps-launcher.py`,
+a Python script nothing here runs, which `trim.remove` does not name.
+`keptBytes` is not part of the install digest, so correcting it fetched
+nothing again. **Peak while
+unpacking:** 4,817,697,631 B, sampled every 2 s (the installer, the carved
+cabinet and the extraction overlap). That is inside the shared
+`room.needGigabytes` of 6, which is checked before anything is downloaded.
+
+| Run | Download | Check (hashes + signature) | Expand | msiexec + trim | SDK + wasm-opt | Smoke | Total |
+|---|---|---|---|---|---|---|---|
+| `ensure` on its own | 21.5 s | 40.1 s | 31.3 s | 56.0 s | 7.6 s | 6.8 s | **164 s** |
+| `ensure` resumed after a kill 6 s in (478 MB already there) | 22.7 s | 47.4 s | 15.4 s | 29.0 s | 4.1 s | 6.2 s | **126 s** |
+| inside the first `preview.ps1 EXC2O 1 --build-only` | | | | | | | **127 s** (preview 263 s in all, 7 blocks compiled) |
+
+The download ran at about 100 MB/s here. A 50 Mbit/s school line would take
+about six minutes, which is why the percent line exists.
+
+**A kill is safe.** Stop Preview ends the fetch with the launcher. The
+partial `.part` is resumed with Range the next time (measured above). Once
+the next fetch holds the lock it deletes every `staging-*` and `old-*`
+folder, and prunes a version folder for other pins, as the mac prunes
+superseded images. One fetch at a time per PC: `fetch.lock` is held with
+`msvcrt.locking` for the life of the process, so a killed holder releases
+it by dying. A second launcher prints `waitingForAnother` and waits up to
+1,200 s, the mac's `take_the_swift_build_lock` limit, then
+`stillGettingReady`.
+
+**The first real run failed, and that changed two things.** Renaming the
+compiler's folder the moment `msiexec` had written it said "Access is
+denied" (most likely Defender scanning the new files). With the installer
+already deleted, the retry cost a second 2.1 GB download. Now every folder
+move is tried again for up to 20 s (`move`, `rename_into_place`), and the
+installer is kept until Swift is ready, which makes the measured 4.82 GB
+peak about 0.3 GB higher than deleting it after the carve would.
+
+**Uninstalling Plantoir leaves the 0.9 GB** in `%LOCALAPPDATA%\Plantoir\swift`,
+as it leaves the assistant's models. Delete the folder to reclaim it; the
+next Swift preview fetches again.
+
+### The compile wrapper: compile.py unchanged, adjusted for this PC
+
+`scripts/swift_windows_compile.py` sets `PLANTOIR_SWIFTC`,
+`PLANTOIR_SWIFT_SDK` and `PLANTOIR_WASM_OPT` to the install, then imports
+`support/swift/compile.py` from the working folder's `.toolchain` without
+writing `__pycache__` beside it. It then changes these names, each checked
+to exist by `test_swift_windows.py` (`PATCHED`), so a rename in compile.py
+fails a test instead of silently going unpatched:
+
+- **`environment()`.** `PATH` is the toolchain's `bin` plus System32, with
+  `SystemRoot`, and `TEMP`/`TMP`/`USERPROFILE`/`HOME` in
+  `swift\work\tmp`. compile.py's own environment (`…:/usr/bin:/bin`,
+  `HOME=/tmp`, no `SystemRoot`) made every block "compile" in 1.8 s as
+  `error: permissionDenied`, cached as the code's fault.
+- **`CLANG`** is `clang.exe`.
+- **`OBJECT_ROOT`** is `%LOCALAPPDATA%\Plantoir\swift\work`, a fixed
+  folder per block. Measured: the same code in the same folder gave the same
+  bytes (01-greeting compiled again was byte-identical to the preview's
+  program). Programs from two different homes differ in 16 bytes, the
+  module hash (spike G4). Two previews compiling one block would share its
+  folder, so each block is taken under a lock file of its own, and a
+  preview that finds the lock held leaves that job to the other.
+- **`-nonlib-dependency-scanner`** on both compiles
+  (`windows.compile.extraCompileFlags`). Without it, the libSwiftScan
+  warning was the first line of every cached diagnostic.
+- **`tidy()`** strips the work folder in both separators, and keeps a
+  failure's words ONLY when they carry `error:`. The guard is the
+  environment fix, plus the preflight below, plus this rule: a failure with
+  no `error:` in it goes down compile.py's own "stopped without saying why"
+  path and is not cached. `run()` turns a missing program (`OSError`) into
+  `NotTheCompilers`, also not cached.
+- **`JOB_SECONDS`** is `compile.jobSecondsOnWindows` (600), and at most
+  `mostFullAtOnce` (2) full-library compiles run at once. The worker count
+  is compile.py's `main`'s local, so the wrapper runs its own loop with one
+  worker per CPU and holds a semaphore around the full-library
+  `compile_one_way`.
+- **A preflight before any job**: the tools, the SDK and one tiny program.
+  If it fails, the wrapper exits 3, touches no job and caches nothing.
+
+**The toolchain id on Windows** (`cache.toolchainIdFromOnWindows`) hashes
+the four recipe files with their CR LF made LF (this checkout writes CR LF;
+the id must not differ by accident), the wrapper, and the canonical JSON of
+the pins' HASHES (installer SHA-256, payload SHA-512s, configuration, SDK,
+binaryen). A Windows cache and a Mac cache
+therefore never share an id, a moved Windows pin compiles everything again,
+and a `why` edit compiles nothing. The mac's id is unchanged byte for byte:
+its branch normalises nothing, and a test recomputes the old formula.
+
+### Measured: the gate and the product path
+
+- **swift-gate, through the product wrapper.** The 15 fragments compiled in
+  **165 s** wall. The measurement's bare loop, eight full-library compiles
+  at once, took 153 s; two at a time costs about the same wall time and
+  keeps every wasm-opt step near its 50 s alone. The program sizes and
+  libraries are the mac's README table exactly (01 = 62,347 embedded,
+  05 = 3,453,463 full, 15 = 39,652). `node browser-checks/wasi_run.mjs` on
+  an LF copy printed `OK: 15 fragments and the shim's own checks`,
+  including the G5 must-fail and live input.
+- **A course (EXC2O) with verify.sh's 7-block Swift Playground page.**
+  - Getting ready plus the build: 263 s.
+  - A preview with the cache emptied took 91 s. Its compile log: embedded
+    blocks 4.7–12.5 s each, the full-library block 60.3 s (almost all of it
+    wasm-opt), and the broken block's compile error in 3.4 s.
+  - The build then said `🦅 6 of 7 Swift programs on this site ready to run`
+    and one `plantoir: error: Exercises/Swift Playground.md: swift block 5,
+    line 64: Swift found an error in it: cannot find 'nmae' in scope`.
+  - **The next preview took 28 s and compiled nothing.**
+- **`browser-checks/swift_runner.mjs` in headless Edge 155.0.4283.60**
+  (Node 20 with `--experimental-websocket`, against that build):
+  `OK: {"embeddedFirstRun":{"ms":70,"bytes":62347},"fullFirstRun":{"ms":123,"bytes":3453463},"stopMs":7}`.
+  The WebView2 pane (the same Chromium) was not driven.
+- **`verify-deploy.ps1`**, against `~/Desktop/plantoir-deploy-verify` (ICS3U,
+  with Swift already ready on the PC), took 14 minutes:
+  **148 passed, 0 failed, 0 skipped**. Those are the totals the earlier
+  measurement predicted for a clean run once the eight standing Swift skips
+  became checks. The page's program (45,844 B) answered HTTP 200 as
+  `application/wasm` from Netlify, Cloudflare and both pairings; every folder
+  publish carried it in `static/swift-wasm/`; and the preview and the
+  publish that rebuilt said nothing was wrong with the block.
+- **A trap for whoever runs these here:** with `core.autocrlf=true`,
+  swift-gate's `.expected` and `.stdin` are CR LF. `wasi_run.mjs` and
+  `swift_runner.mjs` both FAIL on line endings alone (the full-library
+  block's output "does not match"). Run them against LF copies of the files.
+
+### The wasm-opt risk
+
+On this i5-8365U a full-library block costs about 50 s, against the mac's
+7–10 s. wasm-opt `-Os` is 48.9 s of it: 105.4 s with one thread, 48.1 s with
+eight, and identical output every time. The likely cause is that wasm-opt
+uses the MSVC CRT's allocator where the Swift tools load mimalloc; that is
+unproven. 600 s per step and two at a time leave a slow PC about ten times
+the margin. A block that still passes the limit is not cached, so it is
+tried again at every preview, and the build says `notCompiled` meanwhile.
+The cure for a teacher is the one the skill already gives: a one-argument
+`print` stays Embedded (5–12 s). **Not measured:** a slower PC, Windows on
+Arm (not pinned: the app is win-x64 only), and the WebView2 pane.
+
+### Where Windows deliberately differs from the mac
+
+| The mac | Windows | Why |
+|---|---|---|
+| A second container image, built by Docker from `support/swift/Dockerfile` | The swift.org Windows installer, unpacked without elevation | No container on Windows since 2026-08-19 |
+| `docker run --network none` isolates the compile | The compile runs as the teacher, with the network there | No container to isolate in; the job is the teacher's own code |
+| The image tag hashes `support/swift`; the Docker layer cache holds it | `READY.json` carries the pins' digest; a version folder for other pins is pruned | Nothing is built, so nothing is tagged |
+| The image build goes quiet for its minutes | A percent line about every 10% | A 2.3 GB download on a school line |
+| `/tmp/plantoir-swift/<key>`, a different `/tmp` per container | `swift\work\<key>`, shared by every preview, under a per-block lock | One host, one folder |
+| 1.3 GB downloaded, 2.24 GB kept | 2.3 GB downloaded, 0.9 GB kept | Each platform's smallest working form |
+| GPG signature, plus a SHA-256 per tarball | SHA-256 on the installer, Apple's SHA-512 per payload, Authenticode as defence in depth | swift.org publishes no Windows `.sig` |
+
+**Rejected** (`swiftWindows.rejected`):
+
+- Carrying Swift in the installer: 0.9 GB for every teacher.
+- `swift sdk install`: it needs MSVC's `link.exe`.
+- `installer.exe /layout`: it copies only itself.
+- An HTTP Range fetch of just the payloads: one solid LZX folder, measured
+  MISMATCH.
+- The default asserts toolchain.
+- WiX's `wix burn extract`: a .NET tool to ship, where `expand.exe` comes
+  with Windows.
+- cabinet.dll FDI in-process, to avoid carving: the next step if the peak
+  ever matters.
+- **A background fetch with a progress banner**: planned first, and
+  replaced on plan review by matching the mac (the preview waits). It needed
+  a reason the mac never shows, a window, and a status file the app polls,
+  for a once-per-PC wait.
+
+### Recorded on the trail
+
+`activityTrail.mustRecord` has two events: **"Swift got ready on this
+computer"** (seconds, gigabytes) and **"Swift could not be got ready"**,
+with the reason as one of offline, noRoom, damaged, busy, unpack (also
+anything unexpected, such as a signature check that hangs past 300 s:
+`ensure` turns every exception into one, so the console never shows a
+traceback without its marker) or waited (another preview held the fetch for
+longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
+"already ready" prints the marker. They are read from the `PLANTOIR_SWIFT:` line by
+`SwiftGotReady.cs`, in both readers (the console's
+`ScriptRunner.RecordHealthFinding`, and the scheduled publish's
+`ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
+(`TaskScheduling.cs`). A wrapper written before this change keeps no
+`PLANTOIR_SWIFT:` line until that deploy is scheduled again, as for
+`PLANTOIR_MY_PROGRESS:`. Neither event carries `appliesOn`: the mac owes
+both (its own issue).
+
+### Shared fix the mac inherits
+
+`swift_blocks.prune` deleted the launcher's `logs\` folder with every older
+toolchain's folder, so a compile log never survived its own build. That was
+found here, where the first preview's `compile-<pid>.log` was gone.
+`LOGS_FOLDER` is now kept; `test_swift_blocks.py` →
+`PruneKeepsTheLogsTests` pins it.
 
 
 ## The trail's first and last lines (#565, the mac's #560), v1.8.0
@@ -8065,7 +8342,7 @@ normalise CR LF before reading.
   Figures Fixture's deliberately broken drawings (functionplot block 3 and
   tikz block 6, `\foo`), and 12 are "Swift programs cannot be made ready"
   lines (Swift Playground 7, Runner Fixture 3, Quiz Playground 2), because
-  Windows compiles no Swift (#570).
+  Windows compiled no Swift then (#570, fixed in v1.8.6).
   Neither log contained the `readDifferently` sentence ("the site and the
   folder check read this question differently…").
 - **The two builds read alike, to the byte.** All four pages gave identical
@@ -8281,7 +8558,7 @@ FAIL: Swift run in a choice prints its output: {"status":"This program isn't rea
 ```
 
 That is its whole problem list: the two Swift lines and nothing else.
-Windows compiles no Swift (#570), and the build reported
+Windows compiled no Swift then (#570, fixed in v1.8.6), and the build reported
 `swiftCouldNotBePrepared` for 12 blocks on 3 pages. A copy whose only change
 expects those two runs to be "not ready" printed:
 
