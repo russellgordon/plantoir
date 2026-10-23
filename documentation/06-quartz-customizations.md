@@ -2202,7 +2202,7 @@ asks (uppercase-hex percent-encoding, redirects followed and re-encoded):
 | Raw UTF-8 rule (`/Café-Menu`) | never matches | never matches |
 | Fully percent-encoded rule (`/C%2B%2B-Basics`, `/Unit-4%2C-Day-22`) | no match for encoded ASCII punctuation | **matches** (and the raw `+ , ' ( ) ! :` forms do NOT) |
 | Browser form (`/c++-basics`, `/set-%7B1,-2%7D`, `/caf%C3%A9-menu`) | **matches**, ASCII case ignored | - |
-| Capitals | every path is 301'd to its lower case, Ü to ü too, so a rule must be lower-cased (`%C3%9C` never matches `%C3%BC`) | case-sensitive; a lower-case request is a 404 |
+| Capitals | every page's path is 301'd to its lower case, Ü to ü too, so a rule must be lower-cased (`%C3%9C` never matches `%C3%BC`); a file that is not a page answers 200 in any case (measured 2026-10-23, #628, 07 → "Page addresses on Netlify") | case-sensitive; a lower-case request is a 404 |
 | `/x.html`, `/x/` | 301 to the lower-case pretty path | 308 to `/x` |
 | folder `/x`, `/x/index.html` | 301 to `/x/` | 308 to `/x/` |
 
@@ -2229,6 +2229,19 @@ COEP disagrees with `crossOriginIsolated` - isolation is fixed when a
 document is made, so morphing would leave a runner page reached by a link
 un-isolated, or carry COEP into a plain page and block its frames (both
 pinned in `code_runner.mjs`; red against the unpatched router).
+
+**The served case (#628).** Two more marker edits (`PLANTOIR-SERVED-CASE`,
+`_wire_served_case`, ALWAYS, idempotent) put one function,
+`plantoirServedCase`, into the router (`spa.inline.ts`: `getOpts` and the
+top of `navigate`), the link previews (`popover.inline.ts`: the URL
+`fetchCanonical` is asked for) and search's result previews
+(`search.inline.ts`: the URL `fetchContent` fetches). On a page whose `<html>` carries
+`data-plantoir-paths="lowercase"` - which only a Netlify publish adds - it
+lower-cases a same-origin URL's pathname (ASCII, %-escapes kept, query and
+fragment untouched), so the explorer's, search's and the graph's links ask
+for the address Netlify serves rather than one it 301s. Unmarked, it returns
+the URL as it was. 07 → "Page addresses on Netlify" has the measurements and
+what was rejected.
 
 **Known limits (implementation review).** The note line comes from each
 publish and from the preview's server when the page is first opened there,
