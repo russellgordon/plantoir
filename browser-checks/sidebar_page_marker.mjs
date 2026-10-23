@@ -192,8 +192,13 @@ async function connect(chunk) {
   const open = async (url) => {
     await send("Page.navigate", { url })
     if (!(await until(`document.readyState === "complete"`))) return false
-    // The sidebar is drawn after the page loads, from contentIndex.json.
-    if (!(await until(`document.querySelector(".explorer .explorer-ul > li") !== null`))) return false
+    // The sidebar is drawn after the page loads, from contentIndex.json. Its
+    // list is in the page's HTML from the start, holding one static row of
+    // Quartz's own (li.overflow-end, OverflowList), so a wait for "any row" is
+    // over before the explorer has drawn anything (#616). The explorer inserts
+    // EVERY row in one call (patches/explorer.inline.ts builds the whole tree
+    // into one fragment first), so the first other row means all of them.
+    if (!(await until(`document.querySelector(".explorer .explorer-ul > li:not(.overflow-end)") !== null`))) return false
     await evaluate(HELPERS)
     return true
   }
@@ -214,6 +219,46 @@ async function connect(chunk) {
     const box = { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }
     if (box.right - box.left <= 0 || box.bottom - box.top <= 0) return null
     return box
+  }
+  // A page row's lines, content edge and dot, read in ONE frame (#601). Quartz
+  // smooth-scrolls the window for about 360 ms after the sidebar draws, to
+  // bring the current page's row into view, so a dot read in one frame and a
+  // line read in the next can be a whole frame's move apart (9 px was seen).
+  // The row's lines are read on BOTH sides of the dot: when the two readings
+  // are identical, nothing moved between them - the scroll only ever goes one
+  // way - so the dot read between them is in that same layout. Up to 20 tries,
+  // 100 ms apart; null (and why) when no try paired.
+  const readInOneFrame = async (index) => {
+    const linesNow = `(() => {
+      const row = window.__plMarker.rows[${index}]
+      const link = row.querySelector(":scope > a")
+      if (!link) return null
+      const style = getComputedStyle(row)
+      const rowLeft = row.getBoundingClientRect().left
+      const edge = rowLeft + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft)
+      const rects = Array.from(link.getClientRects()).map((r) => ({ left: r.left, top: r.top, bottom: r.bottom }))
+      return { edge, rowLeft, rects }
+    })()`
+    const same = (one, other) => {
+      if (one.edge !== other.edge || one.rowLeft !== other.rowLeft || one.rects.length !== other.rects.length) return false
+      for (let line = 0; line < one.rects.length; line += 1) {
+        const [a, b] = [one.rects[line], other.rects[line]]
+        if (a.left !== b.left || a.top !== b.top || a.bottom !== b.bottom) return false
+      }
+      return true
+    }
+    let why = "the sidebar kept moving"
+    for (let tries = 0; tries < 20; tries += 1) {
+      const before = await evaluate(linesNow)
+      const dot = await markerBox(index)
+      const after = await evaluate(linesNow)
+      if (!before || !after) why = "it has no link to measure"
+      else if (dot === null) why = "its dot was not drawn when read again"
+      else if (same(before, after)) return { reading: { ...after, dot }, why: null }
+      else why = "the sidebar kept moving"
+      await pause(100)
+    }
+    return { reading: null, why }
   }
   // Opens the named folder with a click on its chevron, unless it is open
   // already; then waits until its list has a height that has stopped growing
@@ -317,13 +362,14 @@ async function connect(chunk) {
       return
     }
     if (geometry) {
-      const lines = await evaluate(`(() => {
-        const row = window.__plMarker.rows[${long.index}]
-        const style = getComputedStyle(row)
-        const edge = row.getBoundingClientRect().left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft)
-        const rects = Array.from(row.querySelector(":scope > a").getClientRects()).map((r) => ({ left: r.left, top: r.top, bottom: r.bottom }))
-        return { edge, rowLeft: row.getBoundingClientRect().left, rects }
-      })()`)
+      // The lines, the edges and the dot all from one reading (#601): the long
+      // title's dot is NOT the box read for step 1, which may be from an
+      // earlier frame than these lines.
+      const { reading: lines, why: longWhy } = await readInOneFrame(long.index)
+      if (!lines) {
+        problems.push(`${mode}: the long title's dot and lines could not be read in the same frame in 20 tries (${longWhy})`)
+        return
+      }
       seen.longTitleLines = lines.rects.length
       if (lines.rects.length < 2) {
         problems.push(`${mode}: the long title did not wrap (${lines.rects.length} line) - the hanging indent is not proven`)
@@ -331,7 +377,7 @@ async function connect(chunk) {
         const [first, second] = lines.rects
         if (Math.abs(second.left - first.left) > TOLERANCE) problems.push(`${mode}: the long title's second line starts at ${second.left.toFixed(1)} px, not under its first letter at ${first.left.toFixed(1)} px`)
         if (Math.abs(second.left - lines.edge) > TOLERANCE) problems.push(`${mode}: the long title's second line starts at ${second.left.toFixed(1)} px, not at the row's content edge ${lines.edge.toFixed(1)} px`)
-        const dot = long.box
+        const dot = lines.dot
         if (dot.right > first.left + TOLERANCE) problems.push(`${mode}: the dot (to ${dot.right.toFixed(1)} px) is not left of the title (from ${first.left.toFixed(1)} px)`)
         if (dot.left < lines.rowLeft - TOLERANCE) problems.push(`${mode}: the dot (from ${dot.left.toFixed(1)} px) sticks out of its row (from ${lines.rowLeft.toFixed(1)} px)`)
         const middle = (dot.top + dot.bottom) / 2
@@ -341,32 +387,20 @@ async function connect(chunk) {
       // Every page row, not only the long one: the dot is left of the title's
       // FIRST line and level with it - so a title whose first word is too wide
       // for the line (planted too) does not leave the dot alone on a line.
+      // Each row's dot and first line come from one reading, for the reason
+      // above.
       let beside = 0
       for (const row of rows.filter((entry) => entry.kind.startsWith("page in") && entry.box !== null)) {
-        // The dot and the line read at the SAME moment: the sidebar may still
-        // be smooth-scrolling its current entry into view (Quartz), and a dot
-        // read before that scroll against a line read after it is one line
-        // off (seen as a ~19 px miss, intermittently). Read the line, the
-        // dot, the line again, and keep the pair only when the line held.
-        const lineNow = `(() => {
-          const r = window.__plMarker.rows[${row.index}].querySelector(":scope > a").getClientRects()[0]
-          return r ? { left: r.left, top: r.top, bottom: r.bottom } : null
-        })()`
-        let first = null
-        let dot = row.box
-        for (let tries = 0; tries < 20; tries += 1) {
-          const before = await evaluate(lineNow)
-          const box = await markerBox(row.index)
-          const after = await evaluate(lineNow)
-          first = after
-          if (box !== null) dot = box
-          if (before && after && before.top === after.top) break
-          await pause(100)
+        const { reading, why } = await readInOneFrame(row.index)
+        const first = reading ? reading.rects[0] : null
+        if (!reading) problems.push(`${mode}: the dot and the first line of "${row.title}" could not be read in the same frame in 20 tries (${why})`)
+        else if (!first) problems.push(`${mode}: "${row.title}" has no line to measure`)
+        else {
+          const dot = reading.dot
+          const middle = (dot.top + dot.bottom) / 2
+          if (middle < first.top || middle > first.bottom || dot.right > first.left + TOLERANCE) problems.push(`${mode}: the dot of "${row.title}" (middle ${middle.toFixed(1)} px) is not beside its first line (${first.top.toFixed(1)}-${first.bottom.toFixed(1)} px, from ${first.left.toFixed(1)} px)`)
+          else beside += 1
         }
-        const middle = (dot.top + dot.bottom) / 2
-        if (!first) problems.push(`${mode}: "${row.title}" has no line to measure`)
-        else if (middle < first.top || middle > first.bottom || dot.right > first.left + TOLERANCE) problems.push(`${mode}: the dot of "${row.title}" (middle ${middle.toFixed(1)} px) is not beside its first line (${first.top.toFixed(1)}-${first.bottom.toFixed(1)} px, from ${first.left.toFixed(1)} px)`)
-        else beside += 1
       }
       seen.dotsBesideFirstLine = beside
     }
