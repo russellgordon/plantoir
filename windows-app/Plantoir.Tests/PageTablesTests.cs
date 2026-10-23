@@ -28,7 +28,7 @@ public class PageTablesTests
     // ---- Which rows fold (#622) -----------------------------------------------
 
     [Fact]
-    public void APublishPlanFoldsOnlyThePagesAlreadyVisible_AndOpeningAppendsThemInPlanOrder()
+    public void APublishPlanFoldsOnlyThePagesAlreadyVisible_AndOpeningDrawsThemInPlanOrder()
     {
         var plan = Plan(5, 16);
         Assert.True(plan.FoldsAlreadyRight);

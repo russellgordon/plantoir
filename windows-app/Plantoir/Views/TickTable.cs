@@ -11,18 +11,18 @@ namespace Plantoir.Views;
 
 /// <summary>
 /// A list of pages to tick, as a bordered table with banded rows (#634, the
-/// mac's #608): Page â€” the checkbox IS the title â€” then the other columns
-/// (Folder and Date for Publish Pagesâ€¦ and Hide Pagesâ€¦; Date for the question
-/// about classes dated later, at Publish Pagesâ€¦ and at Deploy). ONE builder
+/// mac's #608): Page — the checkbox IS the title — then the other columns
+/// (Folder and Date for Publish Pages… and Hide Pages…; Date for the question
+/// about classes dated later, at Publish Pages… and at Deploy). ONE builder
 /// for the three, so they cannot drift.
 /// </summary>
 /// <remarks>
 /// <para><b>The tick rules</b> (the mac's, measured there on a real
-/// <c>NSTableView</c>): a click on a box ticks it â€” and on its title, which is
+/// <c>NSTableView</c>): a click on a box ticks it — and on its title, which is
 /// the box's content; selecting a row ticks nothing; Space ticks the selected
 /// row (or the row the focus is in); Return reaches the dialog's main button
-/// with a row selected (a <c>ListView</c> keeps Return for itself â€” measured
-/// for #548 â€” so it is caught on its way down). Space typed in Find a Page
+/// with a row selected (a <c>ListView</c> keeps Return for itself — measured
+/// for #548 — so it is caught on its way down). Space typed in Find a Page
 /// never reaches the list: the field is its sibling.</para>
 ///
 /// <para>Space is taken on its way DOWN only. The plan review asked whether a
@@ -157,6 +157,12 @@ internal sealed class TickTable
             }
             if (args.Key != Windows.System.VirtualKey.Space) return;
             if (RowWithTheFocus() is not { } row) return;
+            // A held Space repeats; it ticks once, never flickering the box.
+            if (args.KeyStatus.WasKeyDown)
+            {
+                args.Handled = true;
+                return;
+            }
             args.Handled = true;
             row.Box.IsChecked = row.Box.IsChecked != true;
             List.SelectedItem = row.Item;
@@ -169,8 +175,8 @@ internal sealed class TickTable
 
     /// <summary>
     /// The question about classes dated after the next class (#475), at
-    /// Publish Pagesâ€¦ and at Deploy: Page and Date, every class ticked. Each
-    /// box is named by its title (it was "title â€” day" when the day was in the
+    /// Publish Pages… and at Deploy: Page and Date, every class ticked. Each
+    /// box is named by its title (it was "title — day" when the day was in the
     /// box's words), and its row "title, day".
     /// </summary>
     public static TickTable ForLaterClasses(IReadOnlyList<ClassesDatedLater.Page> flagged, string name)
@@ -199,7 +205,7 @@ internal sealed class TickTable
         return grid;
     }
 
-    /// <summary>The row the keyboard focus is in, else the selected row â€” and only a row the table is showing.</summary>
+    /// <summary>The row the keyboard focus is in, else the selected row — and only a row the table is showing.</summary>
     private Row? RowWithTheFocus()
     {
         var showing = List.Items.OfType<ListViewItem>().ToHashSet();
@@ -222,8 +228,15 @@ internal sealed class TickTable
         Band(List);
     }
 
-    /// <summary>The table's height, counted from the rows it is told â€” the dialog counts every page offered, never a search's leftovers.</summary>
-    public void SetRows(int rows) => List.Height = rows * PlanTableLayout.RowPitch + 2 * PageTableLayout.TableBorder;
+    /// <summary>The table's height, counted from the rows it is told — the dialog counts every page offered, never a search's leftovers.</summary>
+    /// <returns>Whether the height changed, so a caller logs only a change.</returns>
+    public bool SetRows(int rows)
+    {
+        double height = rows * PlanTableLayout.RowPitch + 2 * PageTableLayout.TableBorder;
+        if (List.Height == height) return false;
+        List.Height = height;
+        return true;
+    }
 
     /// <summary>
     /// Alternate rows take a quiet fill, counted by the rows SHOWN, so a search

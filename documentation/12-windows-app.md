@@ -7647,8 +7647,9 @@ two steps of one flow look alike). Ids: the boxes keep `sectionVerbPage<i>` and
   content (the mac's Xcode-membership shape). Native.
 - Selecting a row ticks nothing. Native: `ListView` selection never touches
   the box.
-- Space ticks the row the focus is in, or else the selected row: the list's
-  tunnelling `PreviewKeyDown`. The plan review (amendment 2) asked whether a
+- Space ticks the row with the focus, else the selected row: the list's
+  tunnelling `PreviewKeyDown`. A held Space's repeats are ignored
+  (`KeyStatus.WasKeyDown`), so holding it ticks once rather than flickering. The plan review (amendment 2) asked whether a
   focused `CheckBox`, which clicks on key-UP, would then flip twice. MEASURED:
   Space after a mouse click on a box flipped it once with a key-up handler,
   and once with that handler's key renamed away — so the handler was taken
@@ -7682,8 +7683,10 @@ kept by an unpublish, a linked class left as it is, no room for a key),
 `RowsAlreadyRight` (already visible, already hidden — those two only),
 `FoldsAlreadyRight` (both non-empty, the mac's `foldsAlreadyRight`),
 `DrawnRows(open)` and `FoldLabel` are pure and unit-tested. The dialog draws
-`DrawnRows(open)` through the ONE sort: one table, one sort, the folded rows
-appended in plan order when they open. The disclosure is a borderless
+`DrawnRows(open)` through the ONE sort: one table, one sort. Opened, the
+folded rows are drawn in that sort among the rows to read — in plan order
+they come where the plan puts them (the pages already right are its last
+group), under any other sort mixed among the rest; never a second list. The disclosure is a borderless
 `ToggleButton` with a chevron, 4 epx under the table, closed for every new plan
 (`sectionVerbPlanAlreadyRight`; its Toggle pattern tells Narrator its state).
 REJECTED: `Expander` (a 48-epx header on a card background, with an animation:
@@ -7772,7 +7775,8 @@ XAML root of 565–590 epx; `PageTablesUiTests`, which writes its numbers to
   table five rows tall; opened, five rows, with the table's and Publish's
   rectangles unchanged to the pixel. #548's 19-row fixture: 18 rows to read,
   1 folded, the table 8–9 rows tall at a root of 565–590.
-- **Banding**, in light and dark (pictures kept out of the site): the
+- **Banding**, in light and dark (pictures kept out of the site; the test
+  takes them only with `PLANTOIR_634_PICTURES=1`): the
   alternate rows read in both themes; in light the band is faint but visible.
 - **Must-fails**, each a one-line change run against its test: Space's key in
   `TickTable`'s `PreviewKeyDown` renamed (Space → Scroll) — "Space on the
@@ -7783,20 +7787,22 @@ XAML root of 565–590 epx; `PageTablesUiTests`, which writes its numbers to
 - **Found on the way:** the sentences above the picker and the question were
   CENTRED in the wider dialog (a `TextBlock` with a `MaxWidth` narrower than
   its panel is centred), so `Words` is left-aligned now; at 680 it had been
-  centred by 56 epx since #548.
+  centred by 56 epx since #548. The sentences keep their 520-epx `MaxWidth`
+  in every one of these dialogs — the Deploy question's too, which lost it in
+  the first cut and had its lines run the dialog's whole width — so they read
+  at a book's width even in a 980-epx dialog, and the two later-classes
+  questions lay out alike (the implementation review).
 
 **UI totals:** `PageTablesUiTests` 6 of 6; with `PlanTableUiTests` 10 of 10;
 `LaterClassesAtDeployUiTests` (3, the new table test among them) and
 `SectionVerbsUiTests` passed in the combined run. Two `PlanTableUiTests` were
 corrected for the fold: they open the disclosure before reading the page
 already visible (`OpenTheFold`, which also checks the table does not move).
-**One thing the tests met and worked around:** opened through UI Automation's
-Expand, the Section menu kept Publish Pages… greyed for 30 s after a dialog
-closed, even with the pointer moved over the Section title — the menus
-re-read what is live on a pointer entering a title or the menu bar taking
-the focus, and the dialog's own close leaves them greyed. The tests open a
-fresh app per key instead; whether a teacher's mouse ever meets it is not
-measured here.
+UI Automation's Expand does not make the menus re-read what is live (a real
+click or Alt does), so the tests open a fresh app per key; and
+`RunSectionVerb` now queues one more `ApplyMenuEnablement` after its dialog
+has finished closing, since `ShowAsync` returns while the dialog is still a
+popup.
 
 ## One curriculum test, folder segments only (#615), and a linked curriculum page is not "already visible" (#617, the mac's #607)
 
