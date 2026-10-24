@@ -80,8 +80,12 @@ enum PreviewedPageSource {
         let hidden: Bool = entry["hidden"] as? Bool ?? false
         // The front page that is only an embed of a class opens the class
         // (ruling 1) — while that file is there; otherwise the front page.
+        // The class carries its own flag, `showsHidden`: the trail says
+        // "(hidden from students)" of the file that OPENS (ruling 4), and a
+        // visible front page can show a hidden class.
         if let shows = entry["shows"] as? String {
-            let shown: Answer = PreviewedPageSource.file(source: shows, hidden: false, courseFolder: courseFolder)
+            let showsHidden: Bool = entry["showsHidden"] as? Bool ?? false
+            let shown: Answer = PreviewedPageSource.file(source: shows, hidden: showsHidden, courseFolder: courseFolder)
             if case .page = shown {
                 return shown
             }

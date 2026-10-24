@@ -3481,7 +3481,7 @@ def _body_without_settings(text: str) -> str:
 
 
 def _front_page_embed_source(section_index: Path, content_root: Path,
-                             course_dir: Path) -> str | None:
+                             course_dir: Path) -> tuple[str, bool] | None:
     """
     Russell's ruling on #518 (2026-10-23): when the section's front page is
     ONLY a single `![[...]]` line below its settings, Open in Obsidian opens
@@ -3491,6 +3491,11 @@ def _front_page_embed_source(section_index: Path, content_root: Path,
     leaves the front page itself, because guessing would open the wrong file.
     Read from the TEACHER's file, not the build's copy, which the build gives
     a title and may give the section marker.
+
+    Answers the class page's file and whether students are kept from IT -
+    the front page can be visible while the class it embeds is hidden, and
+    the trail says "(hidden from students)" of the file that opens (ruling
+    4), so `showsHidden` is that class's own flag, never the front page's.
     """
     try:
         text = section_index.read_text(encoding="utf-8")
@@ -3511,7 +3516,14 @@ def _front_page_embed_source(section_index: Path, content_root: Path,
             matches.append(page)
     if len(matches) != 1:
         return None
-    return _vault_relative_source(matches[0], course_dir, content_root)
+    source = _vault_relative_source(matches[0], course_dir, content_root)
+    if source is None:
+        return None
+    try:
+        hidden = _is_draft(matches[0].read_text(encoding="utf-8"))
+    except Exception:
+        hidden = False
+    return source, hidden
 
 
 def _vault_relative_source(copied: Path, course_dir: Path,
@@ -3578,9 +3590,10 @@ def page_sources(content_root: Path, course_dir: Path, course_code: str,
         entry = {"source": source, "hidden": hidden}
         if slug == "index":
             section_index = course_dir / source
-            shows = _front_page_embed_source(section_index, content_root, course_dir)
-            if shows is not None:
-                entry["shows"] = shows
+            shown = _front_page_embed_source(section_index, content_root, course_dir)
+            if shown is not None:
+                entry["shows"] = shown[0]
+                entry["showsHidden"] = shown[1]
         pages[slug] = entry
     return {"version": PAGE_SOURCES_VERSION, "course": course_code,
             "section": section_number, "buildId": build_id, "pages": pages}

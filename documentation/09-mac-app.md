@@ -4503,7 +4503,10 @@ links are followed, a file that is gone. Anything refused opens what the press
 opened before (the section's `index.md`, or the vault when it has none) — a
 menu item that does nothing is the worse fault. The front page's entry may
 carry `shows`, the class it is only a single `![[…]]` of (ruling 1); that file
-opens while it is there. A hidden page opens anyway (ruling 4).
+opens while it is there, and its own `showsHidden` — not the front page's
+`hidden` — is the flag the trail line reads, so a visible front page showing
+a hidden class says "(hidden from students)". A hidden page opens anyway
+(ruling 4).
 
 The page is carried in `LockedPagesNoteRequest.page` and
 `ObsidianAddOnsRequest.page`, so after a reference course's note, the add-ons
@@ -4542,7 +4545,12 @@ SECTION press, never a course press: the file's place without `.md` ("opened
 Unit 1/Lesson 3 in Obsidian, the page the preview shows", with "(hidden from
 students)" when it is), or why the section opened as before — the fallback
 when no preview page was showing included (ruling 5). Words:
-`obsidianOpensThePreviewedPage.trail` and `.fallbacks`.
+`obsidianOpensThePreviewedPage.trail` and `.fallbacks`. The address and the
+list are read AT the press, but the line is written only once the press goes
+ahead: a second press while the first's add-ons scan is still running is
+turned away by `ObsidianFigureAddOnsThisRun.beingOpened` and does nothing, so
+it writes nothing (`notePreviewedPress`, after that guard — one press that
+opens, one line).
 
 ### Rejected
 

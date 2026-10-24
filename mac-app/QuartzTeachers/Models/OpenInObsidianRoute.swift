@@ -161,11 +161,16 @@ extension WorkspaceModel {
         lockAgain: @MainActor (Course) -> Void = ReferenceLock.ensureLockedInBackground
     ) -> Bool {
         let folder: URL = FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)
-        var page: URL? = nil
+        // Read at the press (the page on screen now), but written to the
+        // trail only once the press goes ahead: a second press while the
+        // add-ons scan runs does nothing, so it says nothing.
+        var answer: PreviewedPageSource.Answer? = nil
         if atThePreviewedPage, let sectionNumber {
-            page = previewedPageToOpen(course: course, sectionNumber: sectionNumber)
+            answer = previewedPageAnswer(course: course, sectionNumber: sectionNumber)
         }
+        let page: URL? = WorkspaceModel.pageToOpen(answer)
         if course.isKeptForReference {
+            notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
             lockAgain(course)
             if !LockedPagesNote.hasBeenShown(courseCode: course.code) {
                 lockedPagesNoteRequest = LockedPagesNoteRequest(course: course, folder: folder, page: page)
@@ -181,6 +186,7 @@ extension WorkspaceModel {
             answer: settings.obsidianFigureAddOns,
             suppressedThisRun: ObsidianFigureAddOnsThisRun.suppressed
         ) {
+            notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
             openObsidian(folder, page: page, course: course)
             return true
         }
@@ -188,6 +194,7 @@ extension WorkspaceModel {
         if ObsidianFigureAddOnsThisRun.beingOpened.contains(coursePath) {
             return false
         }
+        notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
         ObsidianFigureAddOnsThisRun.beingOpened.insert(coursePath)
         let scan = obsidianOpening.scan
         obsidianAddOnsWork = Task { @MainActor in
@@ -293,9 +300,9 @@ extension WorkspaceModel {
     }
 
     /// A section's press (#518): the file behind the page its preview is
-    /// showing, or nil to open the section as before — with the trail line
-    /// that says which, written for every section press (ruling 5).
-    private func previewedPageToOpen(course: Course, sectionNumber: Int) -> URL? {
+    /// showing, or why the section opens as before. Writes nothing; the
+    /// trail line is `notePreviewedPress`'s, once the press goes ahead.
+    private func previewedPageAnswer(course: Course, sectionNumber: Int) -> PreviewedPageSource.Answer {
         let address: String? = obsidianOpening.previewedAddress(workspaceURL?.path, course.code, sectionNumber)
         var listData: Data? = nil
         if address != nil {
@@ -303,17 +310,34 @@ extension WorkspaceModel {
                 courseFolder: course.directoryURL, sectionNumber: sectionNumber
             ))
         }
-        let answer: PreviewedPageSource.Answer = PreviewedPageSource.resolve(
+        return PreviewedPageSource.resolve(
             address: address, listData: listData, courseFolder: course.directoryURL
         )
-        ActivityTrail.note(
-            .pageOpenedInObsidian, PreviewedPageSource.trailWords(answer),
-            course: course.code, section: sectionNumber
-        )
+    }
+
+    /// The file a section's press opens, or nil for the section as before
+    /// (and for every course press, which has no answer).
+    private static func pageToOpen(_ answer: PreviewedPageSource.Answer?) -> URL? {
+        guard let answer else {
+            return nil
+        }
         if case .page(let file, _, _) = answer {
             return file
         }
         return nil
+    }
+
+    /// The trail line for a section's press that goes ahead — the page, or
+    /// why the section opened instead (ruling 5). A course press has no
+    /// answer and writes nothing.
+    private func notePreviewedPress(_ answer: PreviewedPageSource.Answer?, course: Course, sectionNumber: Int?) {
+        guard let answer, let sectionNumber else {
+            return
+        }
+        ActivityTrail.note(
+            .pageOpenedInObsidian, PreviewedPageSource.trailWords(answer),
+            course: course.code, section: sectionNumber
+        )
     }
 
     /// What Open in Obsidian does once the scan is back.
