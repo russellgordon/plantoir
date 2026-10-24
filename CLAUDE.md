@@ -889,7 +889,7 @@ Four things that cost a day each if you do not know them:
   that is true of the MCP list as well as the local one. **Windows'
   `plantoir-mcp.exe` serves 42: the mac's 37 before #610 plus five of its own;
   since #610 the mac has one Windows lacks (`open_in_obsidian`)** — so the two MCP surfaces are still not the same
-  product, five tools wider on the Windows side; which five, and why, is in
+  product, five tools wider on the Windows side (four net, since #610 gave the mac one Windows lacks); which five, and why, is in
   `documentation/10-local-ai-assistant.md` → "The two MCP surfaces are not the
   same product" (issue #66, now closed, is where the count was first measured).
 
