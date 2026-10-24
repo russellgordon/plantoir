@@ -7864,14 +7864,19 @@ product failure. The preflight now does three things.
   `windows-app\Vendor\runtime` and is exported to the launchers. The run
   refuses if the runtime has no `manifest.json` or no `vendor\pyodide`.
 
-**The mac's `verify-deploy.sh` is exposed the same way. This is for it to know, and
-to MATCH if it wants to (#665).** It reads the CHECKOUT's `contracts/`
-(`check_engine_folder`'s `toolchain.json`). It builds from the working
-folder's own `.toolchain/`, which it reads for `PREVIEW_RULE_FILE` and the
-launchers run. Nothing refreshes that folder but the app. On the mac the
-image tag hashes `.toolchain/`, so a stale mirror is a stale IMAGE as well,
-which still looks healthy. The cure is the same: refresh the folder's
-recipe from the checkout before judging it.
+**The mac's `verify-deploy.sh` matched both halves of this in #665.** It
+mirrors the checkout's working tree into the folder before it judges
+anything (the three `.sh` launchers, the `.toolchain/` root files and
+`recipeFolders`, `__pycache__` skipped on both sides), rebuilds from scratch
+when anything differed, and diffs the folder again at the end. Its
+Cloudflare wait goes one step further than the one below: production must
+serve the front page AND the borrowed page of runnable code byte for byte,
+and that page carries a mark made fresh for every run, because the front
+page alone cannot tell two deployments apart when only static files or
+headers moved. Windows owes matching the mark (the `windows` issue opened
+from #665); the reasoning and the measurements are in
+`documentation/07-deployment.md` → "`verify-deploy.sh` — the publishing
+harness".
 
 **Cloudflare propagation** (the second trap at the same cut). Production
 was still serving the previous deployment when the single Cloudflare leg
