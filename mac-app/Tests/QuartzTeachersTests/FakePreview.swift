@@ -42,7 +42,8 @@ final class FakePreview {
                   running previewIsRunning: Bool = true,
                   showing: SectionWindowControllers.PreviewState? = nil,
                   refusingToDeploy refusal: String? = nil,
-                  answeringLaterClasses laterClassesAnswer: LaterClassesAnswer = .nothingToAsk) {
+                  answeringLaterClasses laterClassesAnswer: LaterClassesAnswer = .nothingToAsk,
+                  pressingObsidian obsidianPress: OpenInObsidianPress = .noWindow) {
         events = []
         // `running` is kept for the callers that only care whether there is
         // something to stop; `showing` is for the tests that care WHICH of the
@@ -104,6 +105,13 @@ final class FakePreview {
                         self?.events.append("askAboutClassesDatedLater")
                     }
                     return laterClassesAnswer
+                },
+                // #610: the window's Open in Obsidian, pressed by the
+                // assistant. Recorded in the same sequence, and answering
+                // with whatever the case says the press came to.
+                openInObsidian: { [weak self] in
+                    self?.events.append("openInObsidian")
+                    return obsidianPress
                 }
             )
         )

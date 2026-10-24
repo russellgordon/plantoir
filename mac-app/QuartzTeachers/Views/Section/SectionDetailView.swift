@@ -642,7 +642,12 @@ struct SectionDetailView: View {
                         await askAboutClassesDatedLater(route: "the assistant's deploy", askedByTheAssistant: true)
                     },
                     // #518: what Open in Obsidian opens for this section.
-                    previewedPage: { previewedPagePath() }
+                    previewedPage: { previewedPagePath() },
+                    // #610: the assistant presses this window's own Open in
+                    // Obsidian, on this window's model, as the button does.
+                    openInObsidian: {
+                        await workspace.openInObsidianAndWait(course: course, sectionNumber: sectionNumber)
+                    }
                 )
             )
             // A function asked for from this row's context menu before this

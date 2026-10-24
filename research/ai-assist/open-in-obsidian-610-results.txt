@@ -1,0 +1,393 @@
+#610 - open_in_obsidian shown to the local model, on the mac. Measured
+2026-10-24 (05:47-07:24 EDT), BOTH tiers, three arms, against the rule in
+open-in-obsidian-610-preregistration.txt (committed 82811c5e4 and pushed
+before the first request). RESULT: FAILS on BOTH tiers. Zero polarity
+inversions anywhere, but rule (b) (no regression) and rule (c) (no theft)
+fail on each tier. So, as pre-registered: open_in_obsidian is hidden from the
+local model (hiddenFromTheLocalModel; the local list is back to 13 and
+LOCAL_DIGEST to 46b96562...2cd96cb6, the regenerated toolSchemas.local and
+tools.local parsed-equal to the base's), it stays on the MCP surface (38),
+where it refuses, and the window reaches it through exact phrasings matched
+in code (every openInObsidian.accepted sentence). The description was not
+reworded and no second arm was run.
+
+CONDITIONS (as pre-registered, with one deviation)
+  Mac16,8 (Apple M4 Pro), 48 GiB, macOS 26.6. mac-app/Vendor/llama
+  llama-server b10435 (cmp-identical to the Debug build's
+  Resources/llama/llama-server), Metal, port 8610,
+  AssistServerHost.serverArguments verbatim (--reasoning off AND
+  --reasoning-budget 0, --n-gpu-layers 999, --jinja, --parallel 1,
+  --threads 4, --host 127.0.0.1), --ctx-size 8192 / 16384. One server per
+  arm per tier, own PID, stopped after the arm.
+  SMALLER qwen2.5-1.5b-instruct-q4_k_m.gguf (the app's copy, read-only,
+          1,117,320,736 bytes).
+  LARGER  qwen3-4b-q4_k_m.gguf from AssistModelTier.downloadURL,
+          2,497,280,256 bytes (== downloadBytes), session scratchpad,
+          deleted after the run.
+  10 greedy trials, the app's body. Dateline "(Today is 2026-10-24, a
+  Saturday.)".
+  BEFORE / BEFORE' = git archive of origin/dev 31c71d748 (whole tree), tools
+  = its tools-from-contract.py local (13, 46b96562...2cd96cb6); two server
+  sessions. AFTER = the branch at the implementation, contract regenerated
+  by `Plantoir --write-contracts` from its Debug build: 14 tools, the 13
+  unchanged and in order plus open_in_obsidian (parsed check: OK), local
+  digest c846bf8b...ceedad43, MCP 38 a7c0823d... -> 89641d12...a129fbc20a.
+  System prompt literal byte-equal between the arms (AssistAgent.swift
+  unchanged).
+  DEVIATION: "nothing else heavy beside it" did not hold. Another session's
+  verify.sh and this session's own builds and must-fail test runs ran
+  alongside (load averages 22-67, recorded at each arm boundary). Greedy
+  decoding on Metal does not read the clock, and BEFORE and BEFORE' agree
+  on every probe of every suite on both tiers, so the routing counts are not
+  in question; the latencies below are.
+  Raw: open-in-obsidian-610-raw.txt.
+
+TOTALS                                   BEFORE   BEFORE'  AFTER
+  smaller  M1a trimmed, 29 probes         210/290  210/290  180/290
+  smaller  M1b the mac's shelf, 19         140/190  140/190  130/190
+  smaller  M1c teachers-say, 25            219/250  219/250  190/250
+  smaller  M1d next-class rows (scored)    300      300      300
+  smaller  polarity inversions             0        0        0
+  smaller  M2 accepted -> open_in_obsidian 0/70     0/70     70/70
+  larger   M1a trimmed, 29 probes         290/290  290/290  290/290
+  larger   M1b the mac's shelf, 19         170/190  170/190  150/190
+  larger   M1c teachers-say, 25            240/250  240/250  250/250
+  larger   M1d next-class rows (scored)    310      310      310
+  larger   polarity inversions             0        0        0
+  larger   M2 accepted -> open_in_obsidian 0/70     0/70     70/70
+  BEFORE vs BEFORE': identical on every probe of every suite, both tiers -
+  this Mac's band on an identical surface was zero, so min(BEFORE, BEFORE')
+  is BEFORE everywhere.
+  Prompt tokens (M2 median): smaller 2732 -> 2854, larger 2734 -> 2856
+  (+122, the one schema). Latency is not reported as a finding (deviation).
+
+THE RULE, TIER BY TIER
+  (a) PASS on both: the lists differ by exactly the appended tool.
+  (d) PASS on both: zero inversions in every suite and every arm.
+  (e) PASS on both: every accepted sentence reached open_in_obsidian 10/10
+      on AFTER (70/70 each tier; before it, the smaller sent "Open this in
+      Obsidian" and "Open this page in Obsidian" to rebuild_preview 10/10).
+  (b) FAILS on both - probes below min(BEFORE, BEFORE') on AFTER:
+    smaller M1a  "card: undo"                     10 -> 0  (declined; answered in code by the app)
+                 "HIDE - the inversion case"      10 -> 0  (declined)
+                 "typos"                          10 -> 0  (publish_pages, cut off at the cap)
+    smaller M1b  "shelf: undo"                    10 -> 0  (declined; answered in code)
+                 "shelf: preview"                 10 -> 0  (check_section; answered in code)
+    smaller M1c  "next: next day's lesson"        10 -> 0  (cut off at the cap)
+                 "dates: what dates"              10 -> 0  (cut off at the cap)
+                 "ctl cancel_scheduled"            9 -> 0  (declined)
+    smaller M1d  "Start a new unit for the meetings" 10 -> 0 (check_section)
+    larger  M1b  "shelf: publish by name"         10 -> 0  (publish_class_on; answered in code)
+                 "shelf: publish a unit"          10 -> 0  (publish_class_on; answered in code)
+    Rose: smaller "shelf: publish a unit" 0 -> 10 (answered in code by the
+    app) and the M1d pointed row "Start a new unit?" 0 -> 10 (it left a
+    write with a date for add_next_class); larger M1c 240 -> 250 ("ctl
+    read_page" 0 -> 10). A rise does not offset a fall under rule (b).
+  (c) FAILS on both:
+    "Open Unit 2, Day 3" (a near miss) went to open_in_obsidian 10/10 on
+    BOTH tiers (smaller: from rebuild_preview 10/10; larger: from read_page
+    10/10) - the tool cannot take a page, so it would have opened whatever
+    the preview showed. On the smaller tier "Edit Unit 2, Day 3 so the quiz
+    is on Friday" also left check_section 10/10 for publish_pages 10/10 (a
+    write). No M1 probe chose open_in_obsidian on either tier.
+  Recorded only: "Open Unit 2, Day 3 in Obsidian" - check_section (smaller)
+  / read_page (larger) before, open_in_obsidian 10/10 after on both.
+
+TWO FINDINGS ABOUT THE SURFACE AS IT SHIPS (BEFORE and BEFORE', unchanged
+by this piece; reported, not acted on here)
+  - larger tier: "Open my website" -> deploy_section 10/10 in every arm.
+  - larger tier: "Edit Unit 2, Day 3 so the quiz is on Friday" ->
+    publish_pages 10/10 in every arm (a plan card in the default mode).
+
+PER-PROBE TABLES (BEFORE / BEFORE' / AFTER), made from the raw logs by the
+session's summarise.py; M1d rows score add_next_class + declined less any
+unit/days key (pointed) or add_next_class (control), as pre-registered; M2
+cells are open_in_obsidian/declined/read/other and the tools chosen.
+====================================================================================================
+TIER small
+-- M1a  (BEFORE / BEFORE' / AFTER; rule b: AFTER >= min)
+   card: publish by name                                             10    10    10
+   card: publish tomorrow                                            10    10    10
+   card: unpublish by name                                           10    10    10
+   card: unpublish, mistake                                          10    10    10
+   card: plan a publish                                              10    10    10
+   card: check the section                                           10    10    10
+   card: rebuild preview                                             10    10    10
+   card: undo                                                        10    10     0  REGRESSION
+   card: deploy now                                                   0     0     0
+   card: schedule a deploy                                            0     0     0
+   card: cancel the deploy                                           10    10    10
+   publish tomorrow, with links                                       0     0     0
+   publish by name, informal                                         10    10    10
+   HIDE - the inversion case                                         10    10     0  REGRESSION
+   hide, informal (verbatim cue)                                     10    10    10
+   hide, phrased as a mistake                                        10    10    10
+   list pages                                                        10    10    10
+   read                                                               0     0     0
+   check section                                                     10    10    10
+   rebuild preview                                                   10    10    10
+   undo                                                              10    10    10
+   schedule a deploy                                                  0     0     0
+   deploy now                                                         0     0     0
+   cancel scheduled deploy                                           10    10    10
+   no course named: publish                                           0     0     0
+   no course named: hide                                             10    10    10
+   deletion - no such tool                                            0     0     0
+   out of scope                                                      10    10    10
+   typos                                                             10    10     0  REGRESSION
+   TOTAL                                                            210   210   180
+-- M1b  (BEFORE / BEFORE' / AFTER; rule b: AFTER >= min)
+   shelf: publish by name                                            10    10    10
+   shelf: publish tomorrow                                           10    10    10
+   shelf: publish Monday                                             10    10    10
+   shelf: publish a unit                                              0     0    10
+   shelf: unpublish by name                                          10    10    10
+   shelf: unpublish a unit                                           10    10    10
+   shelf: undo                                                       10    10     0  REGRESSION
+   shelf: check the section                                          10    10    10
+   shelf: preview                                                    10    10     0  REGRESSION
+   shelf: add next class                                             10    10    10
+   shelf: start a new unit                                           10    10    10
+   shelf: more days                                                  10    10    10
+   shelf: duplicate a class                                          10    10    10
+   shelf: when are my classes                                        10    10    10
+   shelf: revised dates                                               0     0     0
+   shelf: re-date                                                     0     0     0
+   shelf: deploy now                                                  0     0     0
+   shelf: deploy at 6:30                                              0     0     0
+   shelf: cancel the deploy                                          10    10    10
+   TOTAL                                                            140   140   130
+-- M1c  (BEFORE / BEFORE' / AFTER; rule b: AFTER >= min)
+   next: an entry                                                    10    10    10
+   next: tomorrow's page                                             10    10    10
+   next: start                                                       10    10    10
+   next: add                                                         10    10    10
+   next: make a page                                                 10    10    10
+   next: next day's lesson                                           10    10     0  REGRESSION
+   dates: when meet                                                  10    10    10
+   dates: what dates                                                 10    10     0  REGRESSION
+   dates: know timetable                                             10    10    10
+   dates: days left                                                  10    10    10
+   ctl list_pages                                                    10    10    10
+   ctl read_page                                                     10    10    10
+   ctl check_section                                                  0     0     0
+   ctl publish_class_on                                               0     0     0
+   ctl publish_pages                                                 10    10    10
+   ctl unpublish_pages                                               10    10    10
+   ctl rebuild_preview                                               10    10    10
+   ctl undo_last_change                                              10    10    10
+   ctl deploy_section                                                10    10    10
+   ctl schedule_deploy                                                0     0     0
+   ctl cancel_scheduled                                               9     9     0  REGRESSION
+   ctl residue: not undo                                             10    10    10
+   ctl decline: delete                                               10    10    10
+   ctl decline: weather                                              10    10    10
+   ctl vague                                                         10    10    10
+   TOTAL                                                            219   219   190
+-- M1d  (BEFORE / BEFORE' / AFTER; rule b: AFTER >= min)
+   pointed-a: Make the next class the first day of a new unit        10    10    10
+   pointed-a: We're starting a new unit tomorrow, add the page       10    10    10
+   pointed-a: Start the next unit                                    10    10    10
+   pointed-a: Add the next class for the next unit                   10    10    10
+   pointed-a: Start a new unit?                                       0     0    10
+   pointed-a: Don't start a new unit, just add the next class        10    10    10
+   pointed-a: Start a new module                                     10    10    10
+   pointed-a: Start a new unit for the meetings                      10    10     0  REGRESSION
+   pointed-b: The next class begins Unit 3                           10    10    10
+   pointed-b: Add the next class to Unit 3                           10    10    10
+   pointed-b: Add the next class as Unit 2, Day 8                    10    10    10
+   pointed-b: Add the next class as Unit 3, Day 7                    10    10    10
+   pointed-b: Add the next class to Unit three                       10    10    10
+   pointed-b: Add the next class to Module 4                         10    10    10
+   pointed-b: Add the next meeting to Unit 2                         10    10    10
+   pointed-c: Add the next two classes                               10    10    10
+   pointed-c: Add three classes                                      10    10    10
+   pointed-c: Add three days to Unit 2, please                       10    10    10
+   pointed-c: Add pages for the next three classes                   10    10    10
+   pointed-c: Add the next 2 classes                                 10    10    10
+   pointed-c: Add a couple of class pages                            10    10    10
+   pointed-c: Add the next two meetings                              10    10    10
+   pointed-a: Add the next class, review day before the next unit    10    10    10
+   pointed-a: Add the next class in the current unit, not the nex    10    10    10
+   pointed-a: Add the next class for next week                       10    10    10
+   control: Add the next class                                       10    10    10
+   control: Add an entry for the next class                          10    10    10
+   control: Add tomorrow's class page                                10    10    10
+   control: Start the next class                                     10    10    10
+   control: Make a page for our next class                           10    10    10
+   control: Add the next class page for this unit                    10    10    10
+   TOTAL                                                            300   300   300
+-- before inversions: trimmed 0, mac shelf 0; M1 lines naming open_in_obsidian: 0
+-- beforeprime inversions: trimmed 0, mac shelf 0; M1 lines naming open_in_obsidian: 0
+-- after inversions: trimmed 0, mac shelf 0; M1 lines naming open_in_obsidian: 0
+-- M2 (tool/declined/read/other) per arm
+   accepted  Open this in Obsidian                        | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10 | 10/0/0/0 open_in_obsidian:10
+   accepted  Open this page in Obsidian                   | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10 | 10/0/0/0 open_in_obsidian:10
+   accepted  Edit this page in Obsidian                   | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  I want to edit this in Obsidian              | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  Take me to this page in Obsidian             | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10 | 10/0/0/0 open_in_obsidian:10
+   accepted  open in obsidian                             | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  Show me this in Obsidian                     | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10 | 10/0/0/0 open_in_obsidian:10
+   nearMiss  Open the preview                             | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10
+   nearMiss  Show me the preview                          | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10
+   nearMiss  Open my website                              | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10
+   nearMiss  Open Unit 2, Day 3                           | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10 | 10/0/0/0 open_in_obsidian:10
+   nearMiss  Edit Unit 2, Day 3 so the quiz is on Friday  | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10 | 0/0/0/10 publish_pages:10
+   nearMiss  What's on this page?                         | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10
+   recorded  Open Unit 2, Day 3 in Obsidian               | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10 | 10/0/0/0 open_in_obsidian:10
+-- before accepted set to open_in_obsidian: (0, 70)
+-- beforeprime accepted set to open_in_obsidian: (0, 70)
+-- after accepted set to open_in_obsidian: (70, 70)
+====================================================================================================
+TIER large
+-- M1a  (BEFORE / BEFORE' / AFTER; rule b: AFTER >= min)
+   card: publish by name                                             10    10    10
+   card: publish tomorrow                                            10    10    10
+   card: unpublish by name                                           10    10    10
+   card: unpublish, mistake                                          10    10    10
+   card: plan a publish                                              10    10    10
+   card: check the section                                           10    10    10
+   card: rebuild preview                                             10    10    10
+   card: undo                                                        10    10    10
+   card: deploy now                                                  10    10    10
+   card: schedule a deploy                                           10    10    10
+   card: cancel the deploy                                           10    10    10
+   publish tomorrow, with links                                      10    10    10
+   publish by name, informal                                         10    10    10
+   HIDE - the inversion case                                         10    10    10
+   hide, informal (verbatim cue)                                     10    10    10
+   hide, phrased as a mistake                                        10    10    10
+   list pages                                                        10    10    10
+   read                                                              10    10    10
+   check section                                                     10    10    10
+   rebuild preview                                                   10    10    10
+   undo                                                              10    10    10
+   schedule a deploy                                                 10    10    10
+   deploy now                                                        10    10    10
+   cancel scheduled deploy                                           10    10    10
+   no course named: publish                                          10    10    10
+   no course named: hide                                             10    10    10
+   deletion - no such tool                                           10    10    10
+   out of scope                                                      10    10    10
+   typos                                                             10    10    10
+   TOTAL                                                            290   290   290
+-- M1b  (BEFORE / BEFORE' / AFTER; rule b: AFTER >= min)
+   shelf: publish by name                                            10    10     0  REGRESSION
+   shelf: publish tomorrow                                           10    10    10
+   shelf: publish Monday                                             10    10    10
+   shelf: publish a unit                                             10    10     0  REGRESSION
+   shelf: unpublish by name                                          10    10    10
+   shelf: unpublish a unit                                           10    10    10
+   shelf: undo                                                       10    10    10
+   shelf: check the section                                          10    10    10
+   shelf: preview                                                    10    10    10
+   shelf: add next class                                             10    10    10
+   shelf: start a new unit                                           10    10    10
+   shelf: more days                                                  10    10    10
+   shelf: duplicate a class                                          10    10    10
+   shelf: when are my classes                                        10    10    10
+   shelf: revised dates                                               0     0     0
+   shelf: re-date                                                     0     0     0
+   shelf: deploy now                                                 10    10    10
+   shelf: deploy at 6:30                                             10    10    10
+   shelf: cancel the deploy                                          10    10    10
+   TOTAL                                                            170   170   150
+-- M1c  (BEFORE / BEFORE' / AFTER; rule b: AFTER >= min)
+   next: an entry                                                    10    10    10
+   next: tomorrow's page                                             10    10    10
+   next: start                                                       10    10    10
+   next: add                                                         10    10    10
+   next: make a page                                                 10    10    10
+   next: next day's lesson                                           10    10    10
+   dates: when meet                                                  10    10    10
+   dates: what dates                                                 10    10    10
+   dates: know timetable                                             10    10    10
+   dates: days left                                                  10    10    10
+   ctl list_pages                                                    10    10    10
+   ctl read_page                                                      0     0    10
+   ctl check_section                                                 10    10    10
+   ctl publish_class_on                                              10    10    10
+   ctl publish_pages                                                 10    10    10
+   ctl unpublish_pages                                               10    10    10
+   ctl rebuild_preview                                               10    10    10
+   ctl undo_last_change                                              10    10    10
+   ctl deploy_section                                                10    10    10
+   ctl schedule_deploy                                               10    10    10
+   ctl cancel_scheduled                                              10    10    10
+   ctl residue: not undo                                             10    10    10
+   ctl decline: delete                                               10    10    10
+   ctl decline: weather                                              10    10    10
+   ctl vague                                                         10    10    10
+   TOTAL                                                            240   240   250
+-- M1d  (BEFORE / BEFORE' / AFTER; rule b: AFTER >= min)
+   pointed-a: Make the next class the first day of a new unit        10    10    10
+   pointed-a: We're starting a new unit tomorrow, add the page       10    10    10
+   pointed-a: Start the next unit                                    10    10    10
+   pointed-a: Add the next class for the next unit                   10    10    10
+   pointed-a: Start a new unit?                                      10    10    10
+   pointed-a: Don't start a new unit, just add the next class        10    10    10
+   pointed-a: Start a new module                                     10    10    10
+   pointed-a: Start a new unit for the meetings                      10    10    10
+   pointed-b: The next class begins Unit 3                           10    10    10
+   pointed-b: Add the next class to Unit 3                           10    10    10
+   pointed-b: Add the next class as Unit 2, Day 8                    10    10    10
+   pointed-b: Add the next class as Unit 3, Day 7                    10    10    10
+   pointed-b: Add the next class to Unit three                       10    10    10
+   pointed-b: Add the next class to Module 4                         10    10    10
+   pointed-b: Add the next meeting to Unit 2                         10    10    10
+   pointed-c: Add the next two classes                               10    10    10
+   pointed-c: Add three classes                                      10    10    10
+   pointed-c: Add three days to Unit 2, please                       10    10    10
+   pointed-c: Add pages for the next three classes                   10    10    10
+   pointed-c: Add the next 2 classes                                 10    10    10
+   pointed-c: Add a couple of class pages                            10    10    10
+   pointed-c: Add the next two meetings                              10    10    10
+   pointed-a: Add the next class, review day before the next unit    10    10    10
+   pointed-a: Add the next class in the current unit, not the nex    10    10    10
+   pointed-a: Add the next class for next week                       10    10    10
+   control: Add the next class                                       10    10    10
+   control: Add an entry for the next class                          10    10    10
+   control: Add tomorrow's class page                                10    10    10
+   control: Start the next class                                     10    10    10
+   control: Make a page for our next class                           10    10    10
+   control: Add the next class page for this unit                    10    10    10
+   TOTAL                                                            310   310   310
+-- before inversions: trimmed 0, mac shelf 0; M1 lines naming open_in_obsidian: 0
+-- beforeprime inversions: trimmed 0, mac shelf 0; M1 lines naming open_in_obsidian: 0
+-- after inversions: trimmed 0, mac shelf 0; M1 lines naming open_in_obsidian: 0
+-- M2 (tool/declined/read/other) per arm
+   accepted  Open this in Obsidian                        | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  Open this page in Obsidian                   | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  Edit this page in Obsidian                   | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  I want to edit this in Obsidian              | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  Take me to this page in Obsidian             | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  open in obsidian                             | 0/10/0/0 (declined):10 | 0/10/0/0 (declined):10 | 10/0/0/0 open_in_obsidian:10
+   accepted  Show me this in Obsidian                     | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10 | 10/0/0/0 open_in_obsidian:10
+   nearMiss  Open the preview                             | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10
+   nearMiss  Show me the preview                          | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10 | 0/0/0/10 rebuild_preview:10
+   nearMiss  Open my website                              | 0/0/0/10 deploy_section:10 | 0/0/0/10 deploy_section:10 | 0/0/0/10 deploy_section:10
+   nearMiss  Open Unit 2, Day 3                           | 0/0/10/0 read_page:10 | 0/0/10/0 read_page:10 | 10/0/0/0 open_in_obsidian:10
+   nearMiss  Edit Unit 2, Day 3 so the quiz is on Friday  | 0/0/0/10 publish_pages:10 | 0/0/0/10 publish_pages:10 | 0/0/0/10 publish_pages:10
+   nearMiss  What's on this page?                         | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10 | 0/0/10/0 check_section:10
+   recorded  Open Unit 2, Day 3 in Obsidian               | 0/0/10/0 read_page:10 | 0/0/10/0 read_page:10 | 10/0/0/0 open_in_obsidian:10
+-- before accepted set to open_in_obsidian: (0, 70)
+-- beforeprime accepted set to open_in_obsidian: (0, 70)
+-- after accepted set to open_in_obsidian: (70, 70)
+====================================================================================================
+RULE FAILURES: 16
+   small M1a card: undo [10, 10, 0]
+   small M1a HIDE - the inversion case [10, 10, 0]
+   small M1a typos [10, 10, 0]
+   small M1b shelf: undo [10, 10, 0]
+   small M1b shelf: preview [10, 10, 0]
+   small M1c next: next day's lesson [10, 10, 0]
+   small M1c dates: what dates [10, 10, 0]
+   small M1c ctl cancel_scheduled [9, 9, 0]
+   small M1d pointed-a: Start a new unit for the meetings [10, 10, 0]
+   small M2 theft: Open Unit 2, Day 3
+   small M2 nearMiss moved: Open Unit 2, Day 3 (rebuild_preview 10 -> 0)
+   small M2 nearMiss moved: Edit Unit 2, Day 3 so the quiz is on Friday (check_section 10 -> 0)
+   large M1b shelf: publish by name [10, 10, 0]
+   large M1b shelf: publish a unit [10, 10, 0]
+   large M2 theft: Open Unit 2, Day 3
+   large M2 nearMiss moved: Open Unit 2, Day 3 (read_page 10 -> 0)

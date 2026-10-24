@@ -878,16 +878,18 @@ Four things that cost a day each if you do not know them:
   probes that had been perfect. A small model reads a sentence naming another
   tool as a recommendation, not a boundary. The rule went into Swift instead.
 - **Adding a tool is a routing change.** On the mac the local model is shown
-  13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
-  is shown 37 (`.mcpTools`, the 22 plus fifteen: six that ask for judgement
+  13 of the 23 tools that exist (`AssistToolRunner.localTools`; #610's
+  `open_in_obsidian` is hidden from it because the routing measurement
+  regressed, and the window reaches it through fixed phrasings instead); an MCP client
+  is shown 38 (`.mcpTools`, the 23 plus fifteen: six that ask for judgement
   about meaning — the three curriculum tools and #209's three for the How I
   Teach page — #96's start-of-year pair, and seven more: `list_courses`, `explain_publishing`, `back_up_course` and the
   `add_classes` and `make_room_for_classes` pairs). The local 13's full digest is pinned
   (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades, and
   that is true of the MCP list as well as the local one. **Windows'
-  `plantoir-mcp.exe` serves 42: the mac's 37 plus five of its own; the mac has
-  none Windows lacks** — so the two MCP surfaces are still not the same
-  product, five tools wider on the Windows side; which five, and why, is in
+  `plantoir-mcp.exe` serves 42: the mac's 37 before #610 plus five of its own;
+  since #610 the mac has one Windows lacks (`open_in_obsidian`)** — so the two MCP surfaces are still not the same
+  product, five tools wider on the Windows side (four net, since #610 gave the mac one Windows lacks); which five, and why, is in
   `documentation/10-local-ai-assistant.md` → "The two MCP surfaces are not the
   same product" (issue #66, now closed, is where the count was first measured).
 

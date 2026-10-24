@@ -48,8 +48,8 @@ near-total failure. `trimmed-surface-suite.py` is the suite the current numbers
 come from.
 
 `local` (the default) is what the on-device model is shown — 13 tools, and the
-list the routing figures were measured against. `mcp` is the 32 Claude Code
-sees.
+list the routing figures were measured against. `mcp` is the 38 Claude Code
+sees (it said 32 until #610; it was already 37 by then).
 """
 import json
 import pathlib
