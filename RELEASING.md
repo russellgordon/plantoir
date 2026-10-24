@@ -469,6 +469,28 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    any lacks its window's own corners (#375; `website/SCREENSHOTS.md` → "The
    one rule") — retake that picture, never mask it.
 
+   **It also carries plantoir.app's mirror, and refuses without it (#578).**
+   `site/mirror/` holds the files the website builder falls back to when
+   their own host does not answer — today GeoGebra's bundle,
+   `mirror/geogebra/geogebra-math-apps-bundle-5-4-933-1.zip`, 33,461,640
+   bytes, the second address in `contracts/toolchain.json` → `pins` →
+   `geogebra` → `urls`. It is git-ignored and never committed: `build.py`
+   fills it from `$PLANTOIR_MIRROR_CACHE` (else
+   `~/Library/Caches/Plantoir-dev/mirror`), downloading each file from its
+   `source` the first time and checking its SHA-256, and `--deploy` refuses
+   ("Not deploying: plantoir.app's mirror …") while a file `website/site.json`
+   → `mirror` lists is missing or is not its SHA-256 — so deploy from a
+   machine that has the network, or the cache. **After the first deploy that
+   carries it, run `python3 website/build.py --verify-deploy` and read the
+   mirror line: it fetches each file back and must say "SHA-256 matching".**
+   That is the only proof Netlify serves a file this size (the next largest
+   on the site is about 1.1 MB); until it has said so, the image build's
+   fallback 404s and only download.geogebra.org stands between a teacher's
+   first build and a failure. When a pin moves, ADD the new file to
+   `site.json` → `mirror` (`website/test_mirror.py` fails until you do) and
+   keep the old one while any supported release still names it: a released
+   app's Dockerfile names its own mirror address.
+
 ## The update feed (macOS)
 
 Since #204 a released Plantoir on a Mac asks
