@@ -307,8 +307,13 @@ final class ToolchainReadiness {
 
     /// Settles the state from the copy's outcome, and writes the trail line
     /// Windows writes for the same copy (#473): once per copy that changed
-    /// or failed something, never for the pass that finds nothing to do.
-    private func apply(_ outcome: WorkspaceModel.MirrorOutcome, to workspaceURL: URL, startedAt: Date) {
+    /// or failed something — and, since #663, once per copy that had to READ
+    /// any file to compare it — never for the pass that compares every file
+    /// by length and time and finds nothing to do.
+    ///
+    /// Internal rather than private so the suite can hand it an outcome and
+    /// read the line it leaves (`ToolchainFingerprintTests`).
+    func apply(_ outcome: WorkspaceModel.MirrorOutcome, to workspaceURL: URL, startedAt: Date) {
         let key: String = FolderIdentity.canonicalPath(workspaceURL.path)
         tasks.removeValue(forKey: key)
         let seconds: String = String(format: "%.1f", Date().timeIntervalSince(startedAt))
@@ -316,23 +321,46 @@ final class ToolchainReadiness {
             states[key] = .ready
         } else {
             states[key] = .failed(message: ToolchainReadinessWording.couldNotGetReady)
-            AppLog.interface.error("could not refresh .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(outcome.failed) file(s) failed, \(outcome.changed) written")
+            AppLog.interface.error("could not refresh .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(outcome.failed) file(s) failed, \(outcome.changed) written, \(outcome.compared) compared, \(outcome.readInFull) read in full")
         }
-        if outcome.changed > 0 {
-            AppLog.interface.info("refreshed .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(outcome.changed) file(s) in \(seconds, privacy: .public)s")
+        if outcome.changed > 0 || outcome.readInFull > 0 {
+            AppLog.interface.info("refreshed .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(outcome.changed) file(s), \(outcome.compared) compared, \(outcome.readInFull) read in full, in \(seconds, privacy: .public)s")
         }
-        if outcome.changed > 0 || outcome.failed > 0 {
-            var sentence: String
-            if outcome.failed == 0 {
-                sentence = "got the working folder ready: \(outcome.changed) file(s) brought up to date in \(seconds) s"
-            } else {
-                sentence = "could not finish getting the working folder ready: \(outcome.failed) file(s) could not be copied or removed, \(outcome.changed) brought up to date, in \(seconds) s"
-                if let firstFailure = outcome.firstFailure {
-                    sentence += " — first: \(firstFailure)"
-                }
-            }
+        if ToolchainReadiness.leavesALine(outcome) {
+            let sentence: String = ToolchainReadiness.trailSentence(for: outcome, seconds: seconds)
             ActivityTrail.note(.workingFolderToolsCopied, sentence + " (\(workspaceURL.path))")
         }
+    }
+
+    /// Whether a copy leaves a line on the trail: it changed something,
+    /// failed something, or had to read a file to compare it (#663).
+    nonisolated static func leavesALine(_ outcome: WorkspaceModel.MirrorOutcome) -> Bool {
+        return outcome.changed > 0 || outcome.failed > 0 || outcome.readInFull > 0
+    }
+
+    /// The trail's sentence for one copy, without the folder.
+    ///
+    /// Since #663 it says how many files were compared with a copy already
+    /// there and, in brackets, how many of those had to be read in full —
+    /// each only when it is above 0, so a folder filled from nothing reads
+    /// exactly as it did before. The same two counts as Windows' line
+    /// (#559); the mac keeps its own punctuation ("file(s)", the colon).
+    nonisolated static func trailSentence(for outcome: WorkspaceModel.MirrorOutcome, seconds: String) -> String {
+        var comparedClause: String = ""
+        if outcome.compared > 0 {
+            comparedClause = ", \(outcome.compared) compared"
+            if outcome.readInFull > 0 {
+                comparedClause += " (\(outcome.readInFull) read in full)"
+            }
+        }
+        if outcome.failed == 0 {
+            return "got the working folder ready: \(outcome.changed) file(s) brought up to date\(comparedClause) in \(seconds) s"
+        }
+        var sentence: String = "could not finish getting the working folder ready: \(outcome.failed) file(s) could not be copied or removed, \(outcome.changed) brought up to date\(comparedClause), in \(seconds) s"
+        if let firstFailure = outcome.firstFailure {
+            sentence += " — first: \(firstFailure)"
+        }
+        return sentence
     }
 }
 
