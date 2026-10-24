@@ -7,6 +7,7 @@ discovers only scripts/test_*.py). Run by the cut-release skill before a cut
 and by hand after touching website/update_feed.py or website/update_feeds.py:
 
     python3 website/test_update_feed.py
+    python3 website/test_update_feed.py MacUpdateWindowNotesTests -v   # the notes only: no hdiutil, no Sparkle
 
 Every signature here is made with a THROWAWAY key generated in a temporary
 folder (openssl ed25519 → its 32-byte seed), never the plantoir-macos key.
@@ -73,6 +74,83 @@ def make_dmg(folder: Path, version: str, build_number: str, public_key: str) -> 
     subprocess.run(["hdiutil", "create", "-fs", "APFS", "-volname", "Plantoir", "-srcfolder", str(stage),
                     "-ov", "-format", "UDZO", str(dmg)], check=True, capture_output=True)
     return dmg
+
+
+class MacUpdateWindowNotesTests(unittest.TestCase):
+    """What the Mac's update window shows from the approved notes. No DMG, no
+    hdiutil and no Sparkle, so it runs on its own (the module docstring says how)."""
+
+    def test_the_approved_notes_render_for_the_mac_window(self) -> None:
+        """The cut-release skill's own notes shape (website/testdata/release-notes-template.md,
+        kept in step with the skill below): headings, bullets, bold, code and links become
+        HTML; the Downloads section, its checksum table, Windows-only lines and the
+        one-platform sentence about Windows are not shown to a Mac (the slice-2 review's M1)."""
+        template = (WEBSITE / "testdata" / "release-notes-template.md").read_text(encoding="utf-8")
+        section = update_feed.notes_section("1.3.2", "3100", template, False)
+        for gone in ("|", "**", "SHA-256", "Downloads", "Course Settings opens faster", "Windows:",
+                     "(macOS)", "(Windows)", "5708cc", "no changes", "stays at 1.3.1"):
+            self.assertNotIn(gone, section, f"{gone!r} reached the update window")
+        for kept in ("<p>Plantoir 1.3.2 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself.</p>",
+                     "<h3>New</h3>", "<h3>Improved</h3>", "<h3>Fixed</h3>",
+                     "<li>Plantoir finds its own new versions and asks before installing one.</li>",
+                     '<a href="https://plantoir.app/support.html">the support page</a>',
+                     "<code>brackets</code>"):
+            self.assertIn(kept, section)
+        skill = (WEBSITE.parent / ".claude" / "skills" / "cut-release" / "SKILL.md").read_text(encoding="utf-8")
+        for shape in ("| File | Size | SHA-256 |", '"(Windows)"', "**New**, **Improved**, **Fixed**"):
+            self.assertIn(shape, skill, f"The skill no longer writes {shape!r}; update the fixture and the renderer")
+
+    def test_the_renderers_edge_cases(self) -> None:
+        """An emptied heading is dropped, a quote is a quote, and backticks keep their stars."""
+        notes = "**New**\n\n- Mac thing.\n\n**Fixed**\n\n- Only Windows. (Windows)\n\n> Update both Macs first.\n\n- Use `**star**` here."
+        section = update_feed.notes_section("1.3.2", "3100", notes, False)
+        self.assertIn("<h3>New</h3>", section)
+        self.assertIn("<h3>Fixed</h3>", section, "Fixed still has the quote and the code line under it")
+        only_windows = update_feed.notes_section("1.3.2", "3100", "**New**\n\n- Mac.\n\n**Fixed**\n\n- Windows. (Windows)", False)
+        self.assertNotIn("<h3>Fixed</h3>", only_windows, "An emptied heading was shown")
+        self.assertIn("<blockquote><p>Update both Macs first.</p></blockquote>", section)
+        self.assertNotIn("&gt; Update", section)
+        self.assertIn("<code>**star**</code>", section)
+        self.assertNotIn("<code><strong>", section)
+
+    def test_notes_are_text_never_markup(self) -> None:
+        section = update_feed.notes_section("1.3.2", "3100", "- <script>alert(1)</script>", False)
+        self.assertNotIn("<script>", section)
+        self.assertIn("&lt;script&gt;", section)
+
+    def test_the_windows_sentence_goes_wherever_it_sits(self) -> None:
+        """The skill's "Windows: no changes" sentence is taken out of the Mac's notes whether it
+        is a line of its own or a sentence inside the first paragraph, plain or bold (#658).
+        The first four inputs are real: 1.8.7, 1.8.6, 1.7.2 and 1.4.4 as they were approved.
+        The last two mention Windows without being that sentence, and must survive."""
+        cases = [
+            ("Plantoir 1.8.7 is for the Mac. **Windows: no changes** — the Windows download stays at 1.8.6 "
+             "on plantoir.app until it catches up. Plantoir 1.4.0 or later on the Mac will offer this update "
+             "by itself. The fixes to your class websites reach each site the next time you deploy it.",
+             "Plantoir 1.8.7 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself. "
+             "The fixes to your class websites reach each site the next time you deploy it."),
+            ("Plantoir 1.8.6 is for the Mac. **Windows: no changes** — the Windows download stays at 1.8.5 "
+             "on plantoir.app until it catches up.",
+             "Plantoir 1.8.6 is for the Mac."),
+            ("Plantoir 1.7.2 is for the Mac. Windows: no changes — the Windows download stays at 1.7.1, and "
+             "Windows gets these in a later release. Plantoir 1.4.0 or later on the Mac will offer this update "
+             "by itself.",
+             "Plantoir 1.7.2 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself."),
+            ("Plantoir 1.4.4 is for the Mac. Windows: no changes in this release; the Windows download stays "
+             "at 1.4.3. Plantoir 1.4.0 or later on a Mac will offer this update by itself.",
+             "Plantoir 1.4.4 is for the Mac. Plantoir 1.4.0 or later on a Mac will offer this update by itself."),
+            ("Windows: no changes in this release — the Windows download is still 1.3.1.", None),
+            ("**Windows: no changes.** The Mac gets two fixes.", "The Mac gets two fixes."),
+            ("- On Windows: the window opens faster.", "- On Windows: the window opens faster."),
+            ("Plantoir 1.8.7 is for the Mac and for Windows.", "Plantoir 1.8.7 is for the Mac and for Windows."),
+        ]
+        for given, expected in cases:
+            with self.subTest(given=given[:40]):
+                kept = update_feed.notes_for_the_mac(given)
+                if expected is None:
+                    self.assertEqual(kept, [], "The whole line is the sentence, so nothing is left")
+                else:
+                    self.assertEqual(kept, [expected])
 
 
 class UpdateFeedTests(unittest.TestCase):
@@ -235,43 +313,6 @@ class UpdateFeedTests(unittest.TestCase):
         with self.assertRaises(update_feed.Refusal):
             update_feed.build_feed("1.3.3", self.dmg_two, "- x", False, self.updates, ed_key_file=self.key,
                                    rehearsal=self.updates / "macos.xml", download_prefix="https://x/")
-
-    def test_the_approved_notes_render_for_the_mac_window(self) -> None:
-        """The cut-release skill's own notes shape (website/testdata/release-notes-template.md,
-        kept in step with the skill below): headings, bullets, bold, code and links become
-        HTML; the Downloads section, its checksum table, Windows-only lines and the
-        one-platform sentence about Windows are not shown to a Mac (the slice-2 review's M1)."""
-        template = (WEBSITE / "testdata" / "release-notes-template.md").read_text(encoding="utf-8")
-        section = update_feed.notes_section("1.3.2", "3100", template, False)
-        for gone in ("|", "**", "SHA-256", "Downloads", "Course Settings opens faster", "Windows:",
-                     "(macOS)", "(Windows)", "5708cc"):
-            self.assertNotIn(gone, section, f"{gone!r} reached the update window")
-        for kept in ("<h3>New</h3>", "<h3>Improved</h3>", "<h3>Fixed</h3>",
-                     "<li>Plantoir finds its own new versions and asks before installing one.</li>",
-                     '<a href="https://plantoir.app/support.html">the support page</a>',
-                     "<code>brackets</code>"):
-            self.assertIn(kept, section)
-        skill = (WEBSITE.parent / ".claude" / "skills" / "cut-release" / "SKILL.md").read_text(encoding="utf-8")
-        for shape in ("| File | Size | SHA-256 |", '"(Windows)"', "**New**, **Improved**, **Fixed**"):
-            self.assertIn(shape, skill, f"The skill no longer writes {shape!r}; update the fixture and the renderer")
-
-    def test_the_renderers_edge_cases(self) -> None:
-        """An emptied heading is dropped, a quote is a quote, and backticks keep their stars."""
-        notes = "**New**\n\n- Mac thing.\n\n**Fixed**\n\n- Only Windows. (Windows)\n\n> Update both Macs first.\n\n- Use `**star**` here."
-        section = update_feed.notes_section("1.3.2", "3100", notes, False)
-        self.assertIn("<h3>New</h3>", section)
-        self.assertIn("<h3>Fixed</h3>", section, "Fixed still has the quote and the code line under it")
-        only_windows = update_feed.notes_section("1.3.2", "3100", "**New**\n\n- Mac.\n\n**Fixed**\n\n- Windows. (Windows)", False)
-        self.assertNotIn("<h3>Fixed</h3>", only_windows, "An emptied heading was shown")
-        self.assertIn("<blockquote><p>Update both Macs first.</p></blockquote>", section)
-        self.assertNotIn("&gt; Update", section)
-        self.assertIn("<code>**star**</code>", section)
-        self.assertNotIn("<code><strong>", section)
-
-    def test_notes_are_text_never_markup(self) -> None:
-        section = update_feed.notes_section("1.3.2", "3100", "- <script>alert(1)</script>", False)
-        self.assertNotIn("<script>", section)
-        self.assertIn("&lt;script&gt;", section)
 
     # MARK: checking (website/update_feeds.py, run by build.py)
 
