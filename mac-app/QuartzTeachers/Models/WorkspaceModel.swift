@@ -1457,6 +1457,12 @@ class WorkspaceModel {
     /// why this is not an `Int` (#476): a count of successes cannot say
     /// whether the folder is now up to date, and the state that skips the
     /// next pass depends on it.
+    ///
+    /// Since #663 it also says how many files were COMPARED with a copy that
+    /// was already there, and how many of those had to be READ IN FULL to
+    /// answer — the same two counts Windows' `CopyResult` keeps (#559). The
+    /// second is what a slow first launch is explained by: a pass that reads
+    /// twelve thousand files and changes none used to leave no trace at all.
     nonisolated struct MirrorOutcome: Equatable, Sendable {
 
         // MARK: - Stored properties
@@ -1469,11 +1475,21 @@ class WorkspaceModel {
         /// needs and a count cannot give.
         var firstFailure: String? = nil
 
+        /// Files that already had a copy, compared with it — by length and
+        /// time, by fingerprint, or by reading (#663).
+        var compared: Int = 0
+
+        /// Of `compared`, the files read in full to compare them: the copy
+        /// hashed, or both files read (#663).
+        var readInFull: Int = 0
+
         // MARK: - Functions
 
         nonisolated static func += (left: inout MirrorOutcome, right: MirrorOutcome) {
             left.changed += right.changed
             left.failed += right.failed
+            left.compared += right.compared
+            left.readInFull += right.readInFull
             if left.firstFailure == nil {
                 left.firstFailure = right.firstFailure
             }
@@ -1487,11 +1503,33 @@ class WorkspaceModel {
     /// change while the app runs, and writes into one folder. It touches no
     /// model state and no shared set, so there is nothing here for a
     /// background thread to race against. Answers how many files it wrote.
+    ///
+    /// Since #663 it compares by fingerprint where it can: the bundle's
+    /// manifest (`toolchain.hashes`, written by the build) and the folder's
+    /// index from the last pass (`ToolchainMirrorPass`). A bundle with no
+    /// manifest — or one that no longer describes its files — is compared
+    /// exactly as before. The index is written once, whole, after a pass that
+    /// failed nothing. `resourcesURL` and `indexFolder` are the tests' seams:
+    /// the app passes neither.
     nonisolated static func copyToolchainFiles(
-        into workspaceURL: URL, firstChange: (@Sendable () -> Void)? = nil
+        into workspaceURL: URL,
+        from resourcesURL: URL? = Bundle.main.resourceURL,
+        indexFolder: URL = ToolchainFingerprints.indexFolder(),
+        firstChange: (@Sendable () -> Void)? = nil
     ) -> MirrorOutcome {
         let toolchainURL: URL = workspaceURL.appendingPathComponent(".toolchain")
         var changed: MirrorOutcome = MirrorOutcome()
+        guard let resourcesURL else {
+            return changed
+        }
+        let fileManager: FileManager = FileManager.default
+        let indexURL: URL = ToolchainFingerprints.indexURL(forWorkingFolder: workspaceURL, in: indexFolder)
+        let pass: ToolchainMirrorPass = ToolchainMirrorPass(
+            bundled: ToolchainFingerprints.read(
+                resourcesURL.appendingPathComponent(ToolchainFingerprints.manifestName)
+            ),
+            applied: ToolchainFingerprints.read(indexURL)
+        )
         var announced: Bool = false
         // Says once, the moment a file is actually written or removed — the
         // banner's cue (#476); a pass that changes nothing never says it.
@@ -1501,25 +1539,39 @@ class WorkspaceModel {
                 firstChange?()
             }
         }
+        // The manifest (`ToolchainFingerprints.manifestName`) sits beside
+        // these at the Resources root and is none of them, so it is never
+        // mirrored. `BuildScripts/write_toolchain_hashes.py` carries the same
+        // two lists; keep them in step (ToolchainFingerprintTests).
         var rootFiles: [String] = ["Dockerfile"]
         rootFiles += ["setup.sh", "preview.sh", "deploy.sh"]
         rootFiles += ["setup.bat", "preview.bat", "deploy.bat"]
         rootFiles += ["setup.ps1", "preview.ps1", "deploy.ps1"]
         for name in rootFiles {
-            if let sourceURL = Bundle.main.url(forResource: name, withExtension: nil) {
-                changed += WorkspaceModel.syncFile(from: sourceURL, to: toolchainURL.appendingPathComponent(name))
+            let sourceURL: URL = resourcesURL.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: sourceURL.path) {
+                changed += WorkspaceModel.syncFile(
+                    from: sourceURL, to: toolchainURL.appendingPathComponent(name), pass: pass, relative: name
+                )
                 noteProgress()
             }
         }
         // Whole folders, mirrored (extraneous files removed — they would
         // change the hash and force rebuilds for nothing).
-        for folderName in ["patches", "scripts", "support", "contracts"] {
-            if let sourceURL = Bundle.main.url(forResource: folderName, withExtension: nil) {
+        for folderName in WorkspaceModel.mirroredFolders {
+            let sourceURL: URL = resourcesURL.appendingPathComponent(folderName)
+            if fileManager.fileExists(atPath: sourceURL.path) {
                 changed += WorkspaceModel.syncDirectory(
                     from: sourceURL, to: toolchainURL.appendingPathComponent(folderName),
-                    firstChange: announced ? nil : { announced = true; firstChange?() }
+                    firstChange: announced ? nil : { announced = true; firstChange?() },
+                    pass: pass, relativeRoot: folderName
                 )
             }
+        }
+        if changed.failed == 0 && pass.indexChanged() {
+            // Best effort: a missing index costs the next pass reads, never
+            // correctness.
+            try? ToolchainFingerprints.write(pass.next, to: indexURL)
         }
         // The guidance for assistants (#454) is NOT written here: its failure
         // must never hold the folder back from Preview and Deploy (review S1),
@@ -1528,9 +1580,31 @@ class WorkspaceModel {
         return changed
     }
 
+    /// The four folders `copyToolchainFiles` mirrors whole.
+    nonisolated static let mirroredFolders: [String] = ["patches", "scripts", "support", "contracts"]
+
     /// Copies one file when the destination differs or is missing.
-    nonisolated static func syncFile(from sourceURL: URL, to destinationURL: URL) -> MirrorOutcome {
+    ///
+    /// With a `pass` (`copyToolchainFiles` only, since #663), a same-length
+    /// copy whose time differs is compared by hash when the manifest and the
+    /// index both still describe their files — the bundle's file is then not
+    /// read at all; by hashing the copy alone when only the manifest does;
+    /// and otherwise by reading both, as it always was. Without one — the
+    /// launcher `BuilderWarmUp` places, the assistants' skills — this is the
+    /// pre-#663 comparison.
+    nonisolated static func syncFile(
+        from sourceURL: URL, to destinationURL: URL,
+        pass: ToolchainMirrorPass? = nil, relative: String? = nil
+    ) -> MirrorOutcome {
         let fileManager: FileManager = FileManager.default
+        // One `stat` of each, used by every question below: this runs for
+        // twelve thousand files on the pass a teacher waits through.
+        let sourceStamp: ToolchainFingerprints.Stamp? = ToolchainFingerprints.stamp(of: sourceURL)
+        let copyStamp: ToolchainFingerprints.Stamp? = ToolchainFingerprints.stamp(of: destinationURL)
+        var bundledHash: String? = nil
+        if let pass, let relative {
+            bundledHash = pass.bundledHash(relative, stamp: sourceStamp)
+        }
 
         // The cheap question first: same size, same modification date.
         //
@@ -1539,22 +1613,68 @@ class WorkspaceModel {
         // prove they match cost 3.8 seconds — every time the courses were
         // reloaded, which is after every rename, backup, restore and archive.
         // Two stat calls answer the same question for almost all of them.
-        if WorkspaceModel.filesLookIdentical(sourceURL, destinationURL) {
-            return MirrorOutcome()
+        if ToolchainFingerprints.lookIdentical(sourceStamp, copyStamp) {
+            if let pass, let relative, let copyStamp {
+                if let bundledHash {
+                    pass.remember(relative, stamp: copyStamp, sha256: bundledHash)
+                } else {
+                    // A Sparkle delta keeps the OLD install's time on every
+                    // file it did not change, so the new build's manifest
+                    // describes none of them and this cheap match is how they
+                    // are compared. What the index already knew about the
+                    // copy is kept, so the next FULL install can still answer
+                    // from fingerprints (documentation/09, M2).
+                    pass.keepWhatIsStillKnown(relative, stamp: copyStamp)
+                }
+            }
+            return MirrorOutcome(compared: 1)
+        }
+
+        let compared: Int = copyStamp == nil ? 0 : 1
+        var readInFull: Int = 0
+        var sameLength: Bool = false
+        if let copyStamp, let sourceStamp {
+            sameLength = copyStamp.length == sourceStamp.length
+        }
+
+        // Same length, different time — every file in the bundle after a
+        // rebuild or an install that restamped it (#663). The fingerprints
+        // answer without reading the bundle's file.
+        if sameLength, let pass, let relative, let bundledHash {
+            var copyHash: String? = pass.appliedHash(relative, stamp: copyStamp)
+            if copyHash == nil {
+                readInFull = 1
+                copyHash = ToolchainFingerprints.sha256(of: destinationURL)
+            }
+            if copyHash == bundledHash {
+                WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
+                pass.remember(relative, copy: destinationURL, sha256: bundledHash)
+                return MirrorOutcome(compared: compared, readInFull: readInFull)
+            }
         }
 
         guard let sourceData = try? Data(contentsOf: sourceURL) else {
             // A bundle file that cannot be read is a failure too (#476): the
             // folder is not up to date, whatever else was written.
-            return MirrorOutcome(changed: 0, failed: 1, firstFailure: "\(sourceURL.lastPathComponent): could not be read from the app")
+            return MirrorOutcome(
+                changed: 0, failed: 1,
+                firstFailure: "\(sourceURL.lastPathComponent): could not be read from the app",
+                compared: compared, readInFull: readInFull
+            )
         }
-        if let existing = try? Data(contentsOf: destinationURL), existing == sourceData {
-            // Same bytes, different stamp — which is every file in the bundle
-            // the first time the app is rebuilt. Copy the stamp across so the
-            // cheap check can answer next time instead of re-reading 61 MB
-            // for the rest of the session.
-            WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
-            return MirrorOutcome()
+        if sameLength && bundledHash == nil {
+            readInFull = 1
+            if let existing = try? Data(contentsOf: destinationURL), existing == sourceData {
+                // Same bytes, different stamp — which is every file in the
+                // bundle the first time the app is rebuilt. Copy the stamp
+                // across so the cheap check can answer next time instead of
+                // re-reading 61 MB for the rest of the session.
+                WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
+                if let pass, let relative {
+                    pass.remember(relative, copy: destinationURL, sha256: ToolchainFingerprints.sha256(of: sourceData))
+                }
+                return MirrorOutcome(compared: compared, readInFull: readInFull)
+            }
         }
         do {
             try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1563,13 +1683,22 @@ class WorkspaceModel {
                 try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destinationURL.path)
             }
             WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
-            return MirrorOutcome(changed: 1, failed: 0)
+            if let pass, let relative {
+                // The bytes just written are in hand, so the index learns the
+                // copy even when no manifest vouched for the bundle's file.
+                pass.remember(
+                    relative, copy: destinationURL,
+                    sha256: bundledHash ?? ToolchainFingerprints.sha256(of: sourceData)
+                )
+            }
+            return MirrorOutcome(changed: 1, failed: 0, compared: compared, readInFull: readInFull)
         } catch {
             // Counted, not swallowed (#476): `mirrorToolchain` marks the
             // folder fresh only when this is zero.
             return MirrorOutcome(
                 changed: 0, failed: 1,
-                firstFailure: "\(destinationURL.lastPathComponent): \(error.localizedDescription)"
+                firstFailure: "\(destinationURL.lastPathComponent): \(error.localizedDescription)",
+                compared: compared, readInFull: readInFull
             )
         }
     }
@@ -1582,24 +1711,13 @@ class WorkspaceModel {
     /// reading 122 MB to answer a question two stat calls almost always
     /// answer correctly. The dates only line up because `syncFile` stamps
     /// what it writes — see `copyModificationDate`.
+    ///
+    /// Since #663 this asks `stat` once per file (`ToolchainFingerprints.lookIdentical`),
+    /// the same question `syncFile` asks, so there is one definition of it.
     nonisolated static func filesLookIdentical(_ oneURL: URL, _ otherURL: URL) -> Bool {
-        let wanted: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey]
-        guard let one = try? oneURL.resourceValues(forKeys: wanted),
-              let other = try? otherURL.resourceValues(forKeys: wanted),
-              let oneSize = one.fileSize,
-              let otherSize = other.fileSize,
-              let oneDate = one.contentModificationDate,
-              let otherDate = other.contentModificationDate else {
-            return false
-        }
-        if oneSize != otherSize {
-            return false
-        }
-        // A tolerance rather than equality: a date makes a round trip through
-        // the file system as a floating-point number of seconds, and an exact
-        // comparison can fail on the last bit for two stamps that are the
-        // same moment. A millisecond is far tighter than any real edit.
-        return abs(oneDate.timeIntervalSince(otherDate)) < 0.001
+        return ToolchainFingerprints.lookIdentical(
+            ToolchainFingerprints.stamp(of: oneURL), ToolchainFingerprints.stamp(of: otherURL)
+        )
     }
 
     /// Gives the copy the original's modification date, so the cheap check
@@ -1638,8 +1756,13 @@ class WorkspaceModel {
         return nil
     }
 
+    /// A true mirror: copies what differs and removes what should not be
+    /// there. `pass` and `relativeRoot` (the folder's name inside the recipe,
+    /// so a file's key in the manifest is `scripts/build_site.py`) are given
+    /// by `copyToolchainFiles` only (#663).
     nonisolated static func syncDirectory(
-        from sourceURL: URL, to destinationURL: URL, firstChange: (() -> Void)? = nil
+        from sourceURL: URL, to destinationURL: URL, firstChange: (() -> Void)? = nil,
+        pass: ToolchainMirrorPass? = nil, relativeRoot: String? = nil
     ) -> MirrorOutcome {
         let fileManager: FileManager = FileManager.default
         var changed: MirrorOutcome = MirrorOutcome()
@@ -1658,7 +1781,14 @@ class WorkspaceModel {
                         continue
                     }
                     sourceFiles.insert(relative)
-                    changed += WorkspaceModel.syncFile(from: fileURL, to: destinationURL.appendingPathComponent(relative))
+                    var key: String? = nil
+                    if let relativeRoot {
+                        key = relativeRoot + "/" + relative
+                    }
+                    changed += WorkspaceModel.syncFile(
+                        from: fileURL, to: destinationURL.appendingPathComponent(relative),
+                        pass: pass, relative: key
+                    )
                     if !announced && changed.changed + changed.failed > 0 {
                         announced = true
                         firstChange?()

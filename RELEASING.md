@@ -205,6 +205,17 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    **410 MB** (ULMO; 410,488,446 bytes at the #312 rehearsal) rather than 59 MB — the notarization upload takes
    correspondingly longer ("The update feed (macOS)" → "Deltas" for why
    updates stay small).
+   **After installing the DMG over the previous version, check the tools copy
+   read nothing (#663):** open a working folder the previous version had
+   already opened, and the first launch's `working folder tools copied` line
+   carries no "(K read in full)" bracket. Two exceptions, both expected: the
+   FIRST version with #663 (1.9.0) has no index yet, so it reads each copy
+   once ("12912 compared (12912 read in full)") and never again; and a folder
+   kept up to date only by deltas until now may read the copies its index
+   does not know. If any other launch reads, check that
+   `Contents/Resources/toolchain.hashes` exists and that one file's ticks in
+   it match the bundled file's (`documentation/09-mac-app.md` → "Comparing
+   without reading (#663)").
 4a. **Take the marketing screenshots, BEFORE anything is published**: the
    `marketing-screenshots` skill (`python3 website/shots/capture.py --scenes`,
    both colour schemes) against the build being released; commit the images;

@@ -5536,9 +5536,16 @@ slow.
   bundle's, and the build scripts read file times. Deferred until measured
   cold, not done.
 
-The mac's mirror has the same design and the same flaw
-(`WorkspaceModel.filesLookIdentical` / `syncFile`); GitHub #663 asks it to
-match, counts on the trail included.
+The mac matches since #663 (09 → "Comparing without reading (#663)"),
+counts on the trail included. Two differences worth knowing, neither of
+them work for this side: its manifest is written from the bundle by a build
+phase, after Xcode's copy has restamped every file (the same place this
+side's `.hashes` is written, from the built output after MSBuild's copy), so
+it carries the bundle's exact times; and it found no installer rounding to allow for — a
+DMG and a Sparkle full install keep every time to the tick, while a Sparkle
+DELTA keeps the old install's time on every unchanged file, which is why
+the mac carries an index entry forward whenever it still describes its
+copy.
 
 ### What was rejected
 
@@ -5598,8 +5605,8 @@ full** to answer; each is said only when it is above 0, so a folder filled
 from nothing reads exactly as it did. The second line above is what 1.7.1 →
 1.7.2 would have written: the old line said "14 files" and nothing about the
 twelve thousand it read twice, which is why #559 took a measurement session
-to explain. Windows-only for now — the mac's line lacks the counts (GitHub
-#663).
+to explain. The mac's line carries the same counts since #663, in its own
+punctuation ("file(s)", a colon).
 
 Since #477 the scheduled run's own copy writes it with the course and
 section, "got the working folder ready for a scheduled deploy — …", and a
