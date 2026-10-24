@@ -28,6 +28,7 @@ import how_i_teach
 import page_visibility
 import page_features
 import figures
+import geogebra
 import swift_blocks
 import site_said
 import print_settings
@@ -1575,13 +1576,14 @@ def _wire_list_page_toc(layout_ts: Path) -> None:
 
 def _wire_transformers_index(index_ts: Path) -> None:
     """Export the figures transformer (#485 E1), the runnable code's (#455),
-    the self-check quizzes' (#563), the task boxes' (#519) and the picture
-    sizes' (#612) beside Quartz's own."""
+    the self-check quizzes' (#563), the task boxes' (#519), the picture
+    sizes' (#612) and the GeoGebra sketches' (#578) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
                          ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks"),
-                         ("PlantoirPictureSizes", "./plantoirPictureSizes")):
+                         ("PlantoirPictureSizes", "./plantoirPictureSizes"),
+                         ("PlantoirGeoGebra", "./plantoirGeoGebra")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1671,6 +1673,32 @@ def _wire_quizzes_transformer(config_ts: Path) -> None:
         print("⚠️ Could not add the self-check questions: the site's settings have changed shape.")
         return
     text = text[:at] + "\n" + indent + "Plugin.PlantoirQuizzes()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_geogebra_transformer(config_ts: Path) -> None:
+    """Put the GeoGebra sketches' transformer (#578) straight AFTER the
+    figures transformer and so BEFORE the self-check quizzes': a sketch in a
+    question is then a finished figure when the quiz transformer packages the
+    question (plan section 3.6). Anchored on PlantoirFigures, and wired AFTER
+    the quizzes' own step, so on a fresh site and on one wired before #578
+    alike the order is Figures, GeoGebra, Quizzes: the quizzes' step also
+    inserts straight after Figures, and whichever runs second lands
+    between."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirGeoGebra(" in text:
+        return
+    anchor = "Plugin.PlantoirFigures(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the GeoGebra sketches: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not add the GeoGebra sketches: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirGeoGebra()," + text[at:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -2062,7 +2090,9 @@ def wire_quartz_additions(output_dir: Path) -> None:
     in afterBody; its exports ride the two index edits), the self-check
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
-    button's component), the task boxes' one (#519: its transformer after
+    button's component), the GeoGebra sketches' one (#578: its transformer
+    straight after the figures' and so before the quizzes'; export, script
+    and styles ride as the quizzes' do), the task boxes' one (#519: its transformer after
     the quizzes'; export, script and styles ride as the quizzes' do), the
     picture sizes' one (#612: its transformer after the task boxes'; its
     export rides the transformers index, and its one style rule rides the
@@ -2089,6 +2119,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz" / "plugins" / "transformers" / "index.ts", _wire_transformers_index),
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
+        (output_dir / "quartz.config.ts", _wire_geogebra_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_picture_sizes_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
@@ -2232,6 +2263,33 @@ def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, ful
         shutil.rmtree(output_dir / "quartz" / figures.WORKSPACE, ignore_errors=True)
         return {"counts": {figures.GRAPH_ENGINE: 0}, "fonts": [], "problems": [], "notes": [],
                 "drawn": 0, "fromBefore": 0, "figures": 0}
+
+
+def _prepare_geogebra(content_root: Path, output_dir: Path, course_dir: Path, full_rebuild: bool) -> dict:
+    """
+    GeoGebra sketches (#578; scripts/geogebra.py), ALWAYS: every
+    ```geogebra and ~~~geogebra fence on the pages students can see, by the
+    gate's own visibility rule, read, its file found and checked (or its
+    geogebra.org sketch fetched ONCE and kept beside the course's built
+    sites, in .geogebra-cache, under the fence's key), and handed to the
+    site's transformer. `full_rebuild` is passed so the choice is visible:
+    geogebra.prepare keeps the saved copies through a full rebuild
+    (geogebraFences.cache). Never stops a build: if this cannot run, every
+    fence stays a plain code block and the build says so in one line.
+    """
+    try:
+        pages = geogebra.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            _vault_source_of, skip=_is_media_name)
+        cache_root = toolchain_paths.merged_output_root(course_dir) / geogebra.CACHE_FOLDER
+        return geogebra.prepare(pages, output_dir, content_root, cache_root=cache_root,
+                                full_rebuild=full_rebuild)
+    except Exception as error:
+        print(f"⚠️ Could not prepare the GeoGebra sketches: {error}")
+        shutil.rmtree(output_dir / "quartz" / geogebra.WORKSPACE, ignore_errors=True)
+        shutil.rmtree(output_dir / "quartz" / "static" / geogebra.THUMBNAILS, ignore_errors=True)
+        return {"counts": {geogebra.ENGINE: 0}, "problems": [], "notes": [], "sketches": 0, "shown": 0}
 
 
 def _count_runner_pages(content_root: Path) -> dict:
@@ -9271,6 +9329,8 @@ def build_section_site(
     # the checks, so a figure that cannot be drawn is said where every folder
     # problem is said.
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
+    # GeoGebra sketches (#578), ALWAYS, for the same reason.
+    geogebra_here = _prepare_geogebra(content_root, output_dir, course_dir, full_rebuild)
     # Runnable code (#455), ALWAYS: which language engines this site carries.
     runner_pages_here = _count_runner_pages(content_root)
     # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into
@@ -9318,6 +9378,8 @@ def build_section_site(
         # Runnable Swift blocks with no program (#493).
         "swift_problems": swift_blocks.health_finding_facts(swift_here),
         "quiz_problems": quiz_problems_here,
+        # GeoGebra sketches that cannot be shown (#578).
+        "geogebra_problems": geogebra.health_finding_facts(geogebra_here),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)
@@ -9489,6 +9551,7 @@ def build_section_site(
     # rather than a Run button that can never work (codeRunnerBlocks.siteDisagrees).
     gated_counts = dict(print_pages_here["counts"])
     gated_counts.update(figures_here["counts"])
+    gated_counts.update(geogebra_here["counts"])
     gated_counts.update(runner_pages_here)
     gated_outcome = page_features.install_gated_assets(output_dir, gated_counts)
     carried_runner_engines = set()

@@ -1,15 +1,16 @@
 ---
 name: plantoir-math-graphs
-description: Use when a Plantoir course page needs a graph of a function, a parabola or line, a linear system, a geometry or similar-triangles diagram, a number line, a probability tree, a circuit, or any drawn figure - anything that would be "graph", "plot", "sketch", "diagram", "TikZ", "triangle", "tree diagram" or "circuit". Says when to use an interactive functionplot graph and when a static TikZ diagram, gives complete patterns to paste (parabola with its parent, two lines meeting, labelled similar triangles, a number line), the limits, what to avoid, and how a figure that cannot be drawn shows up.
+description: Use when a Plantoir course page needs a graph of a function, a parabola or line, a linear system, a geometry or similar-triangles diagram, a number line, a probability tree, a circuit, or any drawn figure - anything that would be "graph", "plot", "sketch", "diagram", "TikZ", "triangle", "tree diagram" or "circuit" - and a GeoGebra sketch students drag, a slider, or a .ggb file. Says when to use an interactive functionplot graph, a static TikZ diagram and a GeoGebra sketch, gives complete patterns to paste (parabola with its parent, two lines meeting, labelled similar triangles, a number line), the limits, what to avoid, and how a figure that cannot be drawn shows up.
 ---
 
 # Graphs and diagrams on a Plantoir page
 
 This working folder holds courses for Plantoir, which turns each course
 (`courses/<CODE>/`, an Obsidian vault of Markdown pages) into a class
-website. A page can carry two kinds of drawn figure, each written as a
+website. A page can carry three kinds of figure, each written as a
 fenced block of plain text in the page itself - never a picture file, an
-embed, Desmos, GeoGebra links, an iframe or an image from another website:
+embed, Desmos, a geogebra.org link or iframe, or an image from another
+website:
 
 - ` ```functionplot ` - an interactive **graph of y = f(x)**. Drawn in the
   student's browser from the site's own files; with a mouse or trackpad a
@@ -18,6 +19,10 @@ embed, Desmos, GeoGebra links, an iframe or an image from another website:
 - ` ```tikz ` - a **precise static diagram** in LaTeX's TikZ. Plantoir draws
   it once, when the site is built, into a crisp picture that follows the
   site's light or dark theme and prints black on white.
+- ` ```geogebra ` - a **GeoGebra sketch** students drag, with sliders and
+  points that move: from a `.ggb` file, from GeoGebra commands, or from
+  geogebra.org. The class website serves GeoGebra itself; the sketch opens
+  when a student taps it, and prints as a picture of it (section 10).
 
 This file is managed by Plantoir and is replaced when Plantoir updates; do
 not edit it.
@@ -33,14 +38,19 @@ not edit it.
 | Labelled triangles, angles, circles, transformations on a grid | `tikz` | exact positions and labels |
 | A number line, an inequality, a probability tree, a Venn diagram | `tikz` | |
 | A circuit (`circuitikz`), a molecule (`chemfig`), a commutative diagram (`tikz-cd`) | `tikz` | |
+| Points or a shape students DRAG, a slider, "what changes and what stays the same" | `geogebra` | the only one students can change |
+| A sketch the teacher already made in GeoGebra, or found on geogebra.org | `geogebra` with `file:` or `material_id:` | used as it is |
 | A flowchart or a timeline | Mermaid (` ```mermaid `) | not a maths figure |
 
-**Not possible** - say so plainly and offer the nearest thing: an
-animation, a graph a student can type into, shading between curves, or
-points on a functionplot graph. A slider is for GeoGebra, which Plantoir
-adds in its next release: say so, and offer the nearest static thing now -
-for "y = a(x - 2)^2 with a slider for a", two or three curves with chosen
-values of `a` on one functionplot graph, beside the parent `y = x^2`.
+A GeoGebra sketch costs a student a tap and about 3 to 5 MB the first
+time; use one when moving something IS the lesson, and a functionplot
+graph or a TikZ diagram when looking is enough.
+
+**Not possible in functionplot or TikZ** - points students drag, a
+slider, a graph a student can type into, an animation: those are a
+GeoGebra sketch (section 10) - for "y = a(x - 2)^2 with a slider for a",
+`a = Slider(-3, 3, 0.5)` then `f(x) = a(x - 2)^2` and `g(x) = x^2`.
+Shading between curves is TikZ (`\fill` with a closed path).
 
 ## 2. functionplot: the fence
 
@@ -221,7 +231,7 @@ At the top level, inside a callout (folded or not - every line starting
 `> `, e.g. a worked solution in `> [!success]- Answer 2`), or in a list
 item, indented under it or opened on the item's own line (`1. ```tikz`)
 with the following lines indented to match. The language word is exactly
-`tikz` or `functionplot`, lowercase.
+`tikz`, `functionplot` or `geogebra`, lowercase.
 
 ## 6. Limits
 
@@ -234,7 +244,8 @@ with the following lines indented to match. The language word is exactly
   rather than taller. Graphs print at the `bounds` written, whatever a
   student zoomed to. Printing a page is the `plantoir-printing` skill.
 - functionplot cannot: label or mark points, shade regions, draw vertical
-  lines, show inequalities, take parameters or sliders. Use TikZ for those.
+  lines, show inequalities, take parameters or sliders. Use TikZ for the
+  first four, a GeoGebra sketch for parameters and sliders.
 
 ## 7. How a problem shows up
 
@@ -261,7 +272,10 @@ remembered, so it is quick.
 - In functionplot: `**`, `ln`, `pi`, `e`, `|x|`, `sin x`, `x(x - 1)`,
   settings below the functions, bounds that hide what matters.
 - A picture, screenshot or embed of a graph that a fence can draw.
-- Promising interactivity functionplot does not have (sliders, points).
+- Promising interactivity functionplot does not have (sliders, points) -
+  that is a GeoGebra sketch.
+- A geogebra.org `<iframe>` or link: a ` ```geogebra ` block with
+  `material_id:` shows the same sketch from the class website.
 
 ## 9. In Obsidian
 
@@ -280,3 +294,79 @@ remembered, so it is quick.
   add-ons, Obsidian asks whether they trust its author; the answer that turns
   them on is "Trust author and enable plugins". Settings > Community plugins
   in Obsidian shows which add-ons the course has and whether they are on.
+
+## 10. GeoGebra sketches students drag
+
+````
+```geogebra
+file: Slope Angle Conjecture.ggb
+alt: Three right triangles that share one marked angle, set by a slider; points B, E and H resize them.
+caption: Drag B, E or H. Then move the angle slider.
+```
+````
+
+Say which sketch in ONE of three ways:
+
+1. **A file.** `file:` names a `.ggb` saved from GeoGebra, put beside the
+   page (or in `Media`); a relative path such as `Unit 4/Slope.ggb` from
+   the course folder works too. At most 20 MB.
+2. **Commands**, one per line, exactly as typed in GeoGebra's Input Bar,
+   after the settings - on their own, or after `file:` or `material_id:`
+   to change the sketch it opened:
+
+   ````
+   ```geogebra
+   alt: The parabola y = a(x - 2)^2 beside y = x^2, with a slider for a.
+   a = Slider(-3, 3, 0.5)
+   f(x) = a(x - 2)^2
+   g(x) = x^2
+   SetColor(g, "gray")
+   ```
+   ````
+
+   `//` starts a line that is only a note. GeoGebra reads the commands
+   only in the student's browser, so a mistake shows under the sketch as
+   "Line 4 couldn't run: …" in GeoGebra's own words - open the sketch in
+   the preview once to check.
+3. **A sketch on geogebra.org.** `material_id:` with its id or address
+   (`material_id: https://www.geogebra.org/m/ju3f2kbg`). Plantoir keeps a
+   copy the FIRST time the site is built and never asks geogebra.org
+   again for that block, so students never wait on geogebra.org. To get a
+   sketch the teacher has since changed there, change the block - add or
+   raise `version: 2` - and the next preview fetches it again. The sketch
+   is shown with its author and its licence (CC BY-NC-SA) under it.
+
+Settings, before the commands, one `key: value` per line, in small
+letters (a `---` line after them is allowed): `file`, `material_id`,
+`alt` (**always** - what a screen reader says instead of the sketch),
+`caption` (a line under it), `app` (`classic`, `graphing`, `geometry` or
+`3d`), `width` and `height` (pixels; a commands sketch is 800 by 500, a
+file keeps its own size, and a wide sketch is scaled down to the page),
+`toolbar` and `algebra` (`true` or `false`), and `version` (does nothing
+but change the block). Use `file:` or `material_id:`, never both.
+
+- **Where it can go**: anywhere a functionplot fence can (section 5), and
+  in a self-check question's QUESTION or EXPLANATION - never inside one
+  of its choices (the `plantoir-quizzes` skill).
+- **On paper** it prints as a picture of the sketch as the student left
+  it (its thumbnail if never opened), with "Made with GeoGebra".
+- **`file:` is plain text, not a link.** Renaming the `.ggb` in Obsidian
+  does not change the `file:` line, and Copy a Page does not copy the
+  file. Keep the name in step, or put the `.ggb` in `Media`, where it is
+  found by its name from any page.
+- **Obsidian hides `.ggb` files** in its file list until Settings > Files
+  and links > "Detect all file extensions" is turned on; the file is
+  there either way. Obsidian shows the block as text. A community add-on
+  (vanabel/obsidian-geogebra, which reads the same settings) draws it
+  inside Obsidian on a computer, loading GeoGebra from geogebra.org; it is
+  optional and unreviewed, the website does not need it, and installing
+  it is the teacher's choice, not yours.
+- **English only**: GeoGebra's own words in a sketch are in English.
+
+A sketch that cannot be shown stays a block of text on the page, and the
+preview says which page, which block and which line:
+
+```
+plantoir: error: Unit 4/Slope.md: geogebra block 1, line 3: Slope.ggb isn't beside the page, in the course folder or in Media (a renamed file or a copied page keeps the old name here - put the .ggb in Media, or change the file: line)
+plantoir: note: Unit 4/Slope.md: geogebra block 2: it has no alt: line, so a screen reader only says “A GeoGebra sketch.”
+```

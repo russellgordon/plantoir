@@ -138,7 +138,15 @@ The image is layered as follows (in order):
    A floor, not an exact version, and the floor is in the line's text, so
    raising it re-runs the layer. Why, what was measured and what was
    rejected: [The certificate store](#the-certificate-store-639-v190).
-7. **Overwrite five Quartz source files with patched versions** from
+7. **GeoGebra Math Apps 5.4.933.1 → `/opt/vendor/geogebra` (#578)** — its own
+   layer straight after the certificate store it downloads through: the zip
+   from download.geogebra.org, retried, then from plantoir.app's mirror of the
+   same file, one `sha256sum -c` whichever answered, then
+   `scripts/geogebra_engine.py adapt`. Only that script is copied in (to
+   `/tmp`, never baked), so editing any other script never downloads the
+   33.5 MB again. What it keeps, the six replacements and the mirror:
+   [`/opt/vendor/geogebra`](#optvendorgeogebra-578).
+8. **Overwrite five Quartz source files with patched versions** from
    [`patches/`](../patches/) — three components and two filter files:
    - `patches/Explorer.tsx` → `quartz/components/Explorer.tsx`
    - `patches/FolderContent.tsx` → `quartz/components/pages/FolderContent.tsx`
@@ -153,7 +161,7 @@ The image is layered as follows (in order):
    logic — and would be fragile to express as regex edits. They implement the
    *expandable vs. plain-link folder* behaviour in the sidebar; the details
    are in [customizations §A](06-quartz-customizations.md#a-components-replaced-at-image-build-time).
-8. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
+9. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
    2026-09-18: `toolchain_paths.py`, `contracts.py`, `site_health.py`,
    `class_pages.py`, `page_visibility.py`, `stop_preview.py`,
    `setup_course.py`, `build_site.py`, `deploy.py`, `social_card.py` and
@@ -175,7 +183,7 @@ The image is layered as follows (in order):
    with `ast` and fails if one is missing. `verify.sh` runs it BEFORE the image
    build, because it answers in a tenth of a second what the build answers in
    three minutes.
-9. **Copy `support/` → `/opt/support/`** — data files consumed by the
+10. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to
      formal and short names, so the wizard can auto-fill "ICS3U →
@@ -216,7 +224,7 @@ The image is layered as follows (in order):
    Together these are most of the recipe's file count (11,378 files as of
    August 2026), which is why the launchers' image-tag hash has to batch
    its work — see [launcher scripts](03-launcher-scripts.md).
-10. **Bake the launcher scripts into `/opt/export/`** and register an
+11. **Bake the launcher scripts into `/opt/export/`** and register an
    `export-scripts` command:
    ```bash
    docker run --rm -v "$PWD:/out" teaching-quartz:src-<hash8> export-scripts
@@ -228,7 +236,7 @@ The image is layered as follows (in order):
    converts the `.bat` and `.ps1` files to CRLF line endings — `cmd.exe` can
    misparse LF-only batch files, and the repo itself stores everything with
    LF.
-11. **Default state**: working directory `/teaching`, command `/bin/bash`.
+12. **Default state**: working directory `/teaching`, command `/bin/bash`.
 
 **Gone since #334: `cp -r /opt/quartz /opt/quartz-site`**, which used to be
 step 7 — a spare copy of the scaffold that nothing read (the build copies
@@ -377,6 +385,118 @@ every Run, and no folder publish offline); downloading it when a site is
 built (a build would need the network); the scaffold's `static/` (every site
 would carry 13.5 MB); Skulpt (a Python-2-era subset students would outgrow);
 JupyterLite or Custom Frames (a whole notebook per page).
+
+### `/opt/vendor/geogebra` (#578)
+
+**What it is.** GeoGebra Math Apps **5.4.933.1**, the engine a page's
+` ```geogebra ` sketches run on in the student's browser (the fence, its
+build pass and the site's loader are in 05 → "GeoGebra sketches: what the
+build does" and 06 → Q; this section is the engine and where it comes
+from). Gated like the engines above:
+`page_features.GATED_ASSETS["geogebra"]`, so a section's site carries it
+(`static/geogebra/`) only while a page students can see has a sketch, and a
+site without one is byte for byte as before.
+
+**Where it comes from, and why twice.** `https://download.geogebra.org/
+installers/5.4/geogebra-math-apps-bundle-5-4-933-1.zip` — 33,461,640 bytes,
+SHA-256 `40909594…15ec0c`, Last-Modified 2026-10-19. **The host is flaky:**
+4 of 8 connections timed out on 2026-10-23 (about 20:35 EDT), and guessed
+older version URLs 404, so a pinned version can vanish upstream. The layer
+therefore runs `curl --retry 6 --retry-all-errors --retry-delay 5
+--connect-timeout 30 --speed-limit 1024 --speed-time 60` against it and, if
+that fails, the same command against **`https://plantoir.app/mirror/geogebra/
+geogebra-math-apps-bundle-5-4-933-1.zip`** — then ONE `sha256sum -c`, so
+whichever host answered, only the pinned bytes get past it. The two addresses
+are `contracts/toolchain.json` → `pins` → `geogebra` → `urls`, and the
+Dockerfile's `ARG GEOGEBRA_URL`/`GEOGEBRA_MIRROR` must be those two exactly
+(`scripts/test_geogebra_engine.py`). The mirror is `website/mirror.py`: the
+file is NEVER committed (33.5 MB in every clone, and every bump kept in
+history), `site/mirror/` is git-ignored and filled by `website/build.py` from a
+cache outside the repository, and `build.py --deploy` refuses while it is
+missing or not its SHA-256 — a mirror that 404s is invisible until the day
+GeoGebra's host is down and a teacher's first build fails. Until the first
+deploy that carries it has been read back by `--verify-deploy` (RELEASING.md
+step 6), the fallback 404s and the primary is all there is. Netlify documents
+no per-file limit (only 54,000 files per directory); the largest file on
+plantoir.app before this was 1,102,789 bytes, so the first deploy is the
+proof.
+
+**What the image keeps** — `geogebra_engine.py adapt`, standard library only,
+the ONE recipe (Windows' `fetch-runtime.ps1` runs the same script into
+`runtime\vendor\geogebra`, so both platforms carry identical bytes). Of the
+bundle's 486 files (121 MB unpacked): `deployggb.js` (37,188 bytes),
+`HTML5/5.0/css/` (43 files) and the **`web3d` codebase** (72 files after
+pruning) — `web3d` serves every app (classic, graphing, geometry, 3d; all four
+measured in Chromium and WebKit), `web` is the non-3D duplicate and
+`webSimple` has no toolbar or algebra view, so neither is kept, nor
+`GeoGebra.html`. Inside `web3d` it leaves out **the 83 language files**
+(`js/properties_keys_*.js`, 23 MB — English is built into the engine, and a
+missing language falls back to English, measured with `lang=fr`), `html/`
+(sign-in callbacks), `sworker-locked.js` and `web3d.nocache.mjs`; it keeps all
+15 deferred fragments (CAS and 3D, 14 MB) and the fonts. Plus a `README.txt`
+(version, licence, attribution, what was removed, the six changes):
+**117 files, 27,093,283 bytes** (8.95 MB gzipped), `fileCount` and `bytes` in
+the pin. A first sketch on a page downloads about 2.9 MB of it, gzipped (19
+requests, measured); the rest is fetched only by what a sketch uses.
+
+**The six replacements, and why there are any.** Under the policy a Netlify
+publish sends (`script-src 'self' 'unsafe-eval' <hashes>`,
+`scripts/netlify_badge.py`; Cloudflare and the preview send none) the STOCK
+engine never loads, in Chromium or WebKit: GWT's loader injects its 7.9 MB
+main file as inline script text on any host but `127.0.0.1`, `localhost` and
+`apps-builds.` (so every browser check of this serves on `[::1]`), deferred
+fragments are installed as inline `<script>` text, nine resources go into
+`<head>` as inline scripts, and the zip library starts a `blob:` worker. So
+`geogebra_engine.REPLACEMENTS` makes six exact text replacements, **each
+required to match exactly once in the file as it stands at that step** — zero
+or two matches means GeoGebra changed the file and the reasoning no longer
+holds, so the step refuses and writes nothing (staging folder, then rename):
+
+| # | File | Becomes |
+|---|---|---|
+| 1 | `web3d.nocache.js` | the main file always loads as a same-origin `<script src>` (`if(location.protocol.startsWith(cb)&&!g){` → `if(false){`) |
+| 2 | `web3d.nocache.js` | `__installRunAsyncCode` runs a fragment with `eval` |
+| 3 | `web3d.nocache.js` | the loader's hidden frame goes under `<html>` (`o.body.appendChild(a)` → `o.documentElement.appendChild(a)`): Quartz's page navigation replaces `<body>` and took the frame with it, after which Chromium loaded no second sketch until a reload |
+| 4 | `…cache.js` | a resource GeoGebra adds to `<head>` is marked `type='text/x-plantoir-geogebra'` (inert; its id still answers GeoGebra's "already added?"), appended, and run with `$wnd.eval` |
+| 5 | `…cache.js` | fflate's async `zip` calls `zipSync` and the callback on `setTimeout(0)` — no worker |
+| 6 | `…cache.js` | the same for `unzip` with `unzipSync` |
+
+Result (measured 2026-10-23, the real policy, Chromium 1243 and WebKit 2359):
+loads from a file, from base64 and from commands, all four apps, and
+cross-origin isolated (COOP+COEP) too — zero violations, zero off-site
+requests. The pin's `files` hash `deployggb.js`, `web3d.nocache.js`
+(`b4f3a5f0…27fe`) and the cache.js (`676326d5…1e68`) AFTER all six; only
+nocache.js carries the frame fix, so the cache.js hash is the one the
+measurement harness produced, and nocache.js's is not. verify.sh checks the
+image: the file count, bytes and three hashes, each replacement's text present
+once and GeoGebra's gone, no language file, no `web/` or `webSimple/`, and the
+README. Re-measure all six before the pin moves.
+
+**Licence.** GeoGebra's apps are free to use for **non-commercial**
+purposes, with the notice "Made with GeoGebra®" and a link to
+https://www.geogebra.org (licence page updated Nov 2025); language and
+interface files CC BY-NC-SA 4.0. **The six changes rest on the EUPL 1.2**,
+the licence of GeoGebra's source code, which the engine's two changed files
+are: the EUPL permits modifying and redistributing it with a notice of what
+changed and a pointer to the source, which `README.txt` carries
+(https://github.com/geogebra/geogebra). They do NOT rest on the
+non-commercial grant's "copy, distribute, modify", which is the clause for
+GeoGebra's Materials (installers, web services, graphics), not its code
+(stage-1 review, 2026-10-24). The engine used as GeoGebra's product, with
+its style and interface files, stays under the non-commercial licence. We
+redistribute in three places — the mirror, the Windows installer, every
+class site with a sketch — all permitted non-commercially. **Free while Plantoir is free: if Plantoir is ever sold, contact
+office@geogebra.org first.** `THIRD_PARTY_LICENSES.md` has the row.
+
+**Rejected:** widening the site's policy (`worker-src blob:` alone is not
+enough; replacements 1–3 would need `'unsafe-inline'`, which the hashes
+disable and which would let Netlify's badge back in); pinning about ten
+inline hashes (fonts vary, and one missed hash is broken lettering,
+silently); a run-time patch of `head.appendChild` (it cannot reach 1–2, which
+run in GWT's frame before any of our code); loading GeoGebra from geogebra.org
+(a third party on every page, blocked by the same policy) or `material_id` in
+deployggb (it calls geogebra.org); committing the zip; one download with no
+fallback (4 of 8 timed out).
 
 ### The Swift image (#493, v1.8.0)
 
@@ -796,6 +916,7 @@ measurement), on an M4 Pro with Colima at 6 CPUs / 12 GiB, 2026-09-26:
 | `npm install -g wrangler@4.80.0` | 65.1 MB | |
 | `git clone` of Quartz | 42.0 MB → **2.3 MB** at depth 1 | |
 | Quartz's `npm install` | 128.0 MB | the largest |
+| GeoGebra (#578) | 33.5 MB | the zip (33,461,640 bytes); its own late layer, so a teacher who has built before downloads only this, once, at the first preview after updating; NOT in the total below |
 | certificate store (#639, added 2026-10-23) | 10.4 MB | measured on its own, after #334, so NOT in the total below; mostly apt's lists, and an install that changes nothing for a no-cache build, which NodeSource's script already upgraded |
 | **Total** | **≈382 MB → ≈342 MB** | #334's stages only (≈352 MB with #639's layer); #312's VM counter read 389.8 MB in a fresh VM |
 

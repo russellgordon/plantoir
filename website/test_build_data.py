@@ -443,6 +443,11 @@ WINDOWS_PICTURE_OWED: dict = {
     # #570), and site.json's runnable-swift became windows: true with them.
     "quiz-math": "too tall for the 1280 x 860 window at 2x: quiz-math.js refuses it (767 pt) (#590)",
     "quiz-code-run": "too tall for the 1280 x 860 window at 2x: quiz-code-run.js refuses it (744 pt) (#590)",
+    # The Visualizations page's GeoGebra figure (#578): the Windows runtime
+    # does not carry GeoGebra yet (fetch-runtime.ps1, #578's windows issue),
+    # so there is no Windows preview of the sketch to photograph. It leaves
+    # this list with site.json's availability geogebra -> windows: true.
+    "geogebra-sketch": "the Windows runtime does not carry GeoGebra yet (#578's windows issue)",
 }
 
 
@@ -492,6 +497,42 @@ class QuizzesPagePictureTests(unittest.TestCase):
                         self.assertTrue(picture.is_file(), f"{picture.name} is missing")
 
 
+class VisualizationsPageGeoGebraTests(unittest.TestCase):
+
+    def test_the_geogebra_section_shows_its_picture_in_both_appearances(self):
+        # #578: the GeoGebra section of /visualizations/ shows MPM2D's
+        # slope-angle page with its sketch opened (capture.py --geogebra),
+        # light AND dark, Mac only until the Windows runtime carries the
+        # engine (site.json availability -> geogebra).
+        import re
+        page = (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8")
+        self.assertIn('<section id="geogebra">', page)
+        self.assertEqual(re.findall(r"\{\{shot:([a-z0-9-]+)\}\}", page), ["geogebra-sketch"])
+        self.assertIn("{{availability:geogebra}}", page)
+        self.assertNotIn("next release", page)
+        manifest = json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))
+        shot = {entry["id"]: entry for entry in manifest["shots"]}["geogebra-sketch"]
+        self.assertEqual(shot["capture"]["scene"], "geogebra")
+        self.assertNotIn("awaiting_capture", shot)
+        self.assertIs(shot.get("windows"), False)
+        self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).is_file())
+        site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
+        self.assertIs(site["availability"]["features"]["geogebra"]["windows"], False)
+        for suffix in ("light", "dark"):
+            for extension in ("png", "webp"):
+                picture = build.IMAGE_DIR / f"geogebra-sketch-{suffix}.{extension}"
+                self.assertTrue(picture.is_file(), f"{picture.name} is missing")
+
+    @unittest.skipUnless(sys.platform == "darwin", "capture.py is the Mac's")
+    def test_the_geogebra_scene_takes_only_its_own(self):
+        sys.path.insert(0, str(build.WEBSITE / "shots"))
+        import capture
+        self.assertEqual([shot["id"] for shot in capture.shots_of_kind("preview-page", scene="geogebra")],
+                         ["geogebra-sketch"])
+        self.assertEqual([shot["id"] for shot in capture.shots_of_kind("preview-page", scene="print-set")],
+                         ["print-page"])
+
+
 class FrontPageQuizTests(unittest.TestCase):
 
     def test_the_front_page_shows_a_quiz_and_links_the_quizzes_page(self):
@@ -523,7 +564,7 @@ class PreviewPageSceneTests(unittest.TestCase):
         for shot in self.manifest_shots():
             if shot["capture"].get("kind") in ("preview-page", "handout"):
                 with self.subTest(shot=shot["id"]):
-                    self.assertIn(shot["capture"].get("scene"), ("print-set", "code", "quizzes"))
+                    self.assertIn(shot["capture"].get("scene"), ("print-set", "code", "quizzes", "geogebra"))
 
     def test_the_windows_print_set_takes_only_its_own(self):
         sys.path.insert(0, str(build.WEBSITE / "shots"))

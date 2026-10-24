@@ -4841,7 +4841,7 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently", "geogebraSketchesNotReady"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
         "reversed": {
           "check": "linksIntoHiddenPages",
@@ -5355,6 +5355,39 @@
             ],
             "sentence": "Plantoir and the website read 11 self-check questions in MPM2D Section 1 differently.",
             "detailEndsWith": "; “Lists”, question 10, line 41: students see a short note in place of Check and Show answer, though Plantoir found nothing wrong with it - the website says a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out, then preview the course again; and 1 more."
+          }
+        ]
+      },
+      {
+        "name": "geogebraSketchesNotReady",
+        "sentence": "A GeoGebra sketch on “{page}” in {course} Section {section} can’t be shown.",
+        "sentenceForSeveral": "{count} GeoGebra sketches in {course} Section {section} can’t be shown.",
+        "detail": "Students see the sketch’s lines as you wrote them, instead of a sketch they can move, until it is fixed in your notes: {sketches}.",
+        "sketchLine": "“{page}”, sketch {block}, line {line}: {reason}",
+        "sketchLineNoLine": "“{page}”, sketch {block}: {reason}",
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's geogebra fences from 1; {line} is the line in the teacher's own file - the setting's line when the problem is a setting, the opening fence's line otherwise - and sketchLineNoLine is used when it cannot be found (a page the build wrote itself); {reason} is geogebraFences.words.reasons[reason] filled with the sketch's {file}, {name}, {value}, {id}, {megabytes} and {limit}. `sentence` when ONE sketch cannot be shown and `sentenceForSeveral` otherwise ({count} sketches). `detail` names at most ten, joined with \"; \" (a reason can hold a comma), then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per section build.",
+        "why": "#578: a sketch that cannot be shown stays the plain code block it was (its settings and commands, as written), and the teacher, who previews in the app and never reads the build's console, has to be told where - page, sketch and line - or students see the lines for good. An assistant reads the same facts on `plantoir: error:` lines. It never stops a build: one sketch must not keep a whole site from being built or deployed. Not repairable: only the teacher knows which file was meant. A sketch with no description (alt:) is NOT a finding, only a `plantoir: note:` line, as figuresCouldNotBeDrawn treats a diagram without one.",
+        "cases": [
+          {
+            "name": "one sketch whose file is not there",
+            "course": "MPM2D",
+            "section": 1,
+            "sketches": [{"page": "Unit 3/The Slope-Angle Conjecture", "block": 1, "line": 22, "reason": "fileNotFound", "file": "Slope Angle.ggb"}],
+            "sentence": "A GeoGebra sketch on “Unit 3/The Slope-Angle Conjecture” in MPM2D Section 1 can’t be shown.",
+            "detail": "Students see the sketch’s lines as you wrote them, instead of a sketch they can move, until it is fixed in your notes: “Unit 3/The Slope-Angle Conjecture”, sketch 1, line 22: Slope Angle.ggb isn't beside the page, in the course folder or in Media (a renamed file or a copied page keeps the old name here - put the .ggb in Media, or change the file: line)."
+          },
+          {
+            "name": "two sketches, one with no line",
+            "course": "MPM2D",
+            "section": 2,
+            "sketches": [
+              {"page": "Lines", "block": 1, "line": 4, "reason": "appNotKnown", "value": "cas"},
+              {"page": "Lines", "block": 2, "line": null, "reason": "nothingToShow"}
+            ],
+            "sentence": "2 GeoGebra sketches in MPM2D Section 2 can’t be shown.",
+            "detail": "Students see the sketch’s lines as you wrote them, instead of a sketch they can move, until it is fixed in your notes: “Lines”, sketch 1, line 4: app: can be classic, graphing, geometry or 3d, not “cas”; “Lines”, sketch 2: there is nothing to show - add a file: line, a material_id: line, or GeoGebra commands."
           }
         ]
       }
@@ -23977,7 +24010,7 @@
       "sectionEnd": "<!-- END PLANTOIR -->",
       "source": "support/agent_guidance",
       "pageAuthoringSkill": {
-        "rule": "The skill `plantoir-page-authoring` (#596) sits beside the four feature skills in support/agent_guidance/skills and reaches a working folder the same way: the one an assistant reads FIRST for any page, listing every way content is written for a site - settings, text, callouts and folding, Mermaid, tables, maths, checklists, success-criteria headings and My Progress (from 1.8.2), links, embedding, footnotes, tags, Media pictures and PDFs, YouTube, Vimeo, GeoGebra and PhET, %% notes, publish:, folders and index pages, class pages and their dates, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and a routing table naming each skill in routesTo rather than repeating it. The root AGENTS.md and CLAUDE.md sections name it in their FIRST bullet. Every example in it is built and read back as the feature it claims by verify.sh 6n (the skill's fences are read from the skill itself).",
+        "rule": "The skill `plantoir-page-authoring` (#596) sits beside the four feature skills in support/agent_guidance/skills and reaches a working folder the same way: the one an assistant reads FIRST for any page, listing every way content is written for a site - settings, text, callouts and folding, Mermaid, tables, maths, checklists, success-criteria headings and My Progress (from 1.8.2), links, embedding, footnotes, tags, Media pictures and PDFs, YouTube, Vimeo and PhET, GeoGebra sketches as a ```geogebra block (#578: the geogebra.org iframe advice is retired), %% notes, publish:, folders and index pages, class pages and their dates, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and a routing table naming each skill in routesTo rather than repeating it. The root AGENTS.md and CLAUDE.md sections name it in their FIRST bullet. Every example in it is built and read back as the feature it claims by verify.sh 6n (the skill's fences are read from the skill itself).",
         "skill": "plantoir-page-authoring",
         "routesTo": [
           "plantoir-printing",
@@ -24788,7 +24821,7 @@
       }
     },
     "agentGuidance": {
-      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): when to use which fence, the syntax, four complete patterns, the measured list of packages, the limits, what to avoid, what cannot be done, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Measured (doc 09): Codex reads the root AGENTS.md only when started at the working folder or below a `.git`; started inside a course of a folder that is not a git repository it reads none.",
+      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): when to use which fence, the syntax, four complete patterns, a GeoGebra sketch three ways with `version:`, Obsidian's hidden .ggb and what Copy a Page and a rename do not follow (#578, section 10), the measured list of packages, the limits, what to avoid, what cannot be done, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Measured (doc 09): Codex reads the root AGENTS.md only when started at the working folder or below a `.git`; started inside a course of a folder that is not a git repository it reads none.",
       "skill": "plantoir-math-graphs"
     },
     "knownLimits": [
@@ -24797,6 +24830,236 @@
       "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so it cannot be installed from Obsidian's own Browse list; without it Obsidian shows a functionplot fence as plain text, while the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site once it is installed and switched on in the course. obsidianAddOnsForFigures (#495) says which app adds them, and where.",
       "A site opened as files on a computer, rather than served, shows a diagram's lettering in the browser's own font: browsers do not load fonts beside a page opened that way.",
       "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5)."
+    ]
+  },
+  "geogebraFences": {
+    "rule": "#578 (v1.9.0). A ```geogebra fence (or ~~~geogebra) on a page students can see becomes a GeoGebra sketch they can drag, opened with a tap and served by the class site itself - never by geogebra.org. Python prepares and Quartz places, as for figureFences: scripts/geogebra.py reads every fence on the pages students can see (by the gate's own visibility rule), finds the sketch's file, takes its size and its thumbnail, and hands the site's transformer (support/quartz/plugins/transformers/plantoirGeoGebra.ts) a manifest in quartz/plantoir-geogebra/; the loader (support/quartz/components/scripts/geogebra.inline.ts) loads GeoGebra's engine from static/geogebra only when a student taps. A fence that cannot be shown stays the plain code block it always was, and the teacher is told where (siteHealth -> geogebraSketchesNotReady, and a `plantoir: error:` line). A site with no sketch carries no static/geogebra, no manifest, and its pages are byte for byte as before.",
+    "fences": {
+      "rule": "The info string's FIRST WORD, exactly `geogebra` (the name the Obsidian GeoGebra plugin registers); backticks or tildes; at any quote depth, in a list item, %% comments removed - figureFences.fences' reader (markdown_code.fenced_blocks), a fence opened after a second container on a list marker's line excluded, as figures exclude it. Pages students can see are found with TWO page scans, one for ```geogebra and one for ~~~geogebra, merged by path: the scan's must_contain is a plain substring test, so one scan alone misses every ~~~ fence (plan review finding 9).",
+      "cases": [
+        {"name": "a geogebra fence", "page": "Intro.\n\n```geogebra\nf(x) = x^2\n```\n", "found": [{"block": 1, "line": 3}]},
+        {"name": "tildes", "page": "~~~geogebra\nf(x) = x^2\n~~~\n", "found": [{"block": 1, "line": 1}]},
+        {"name": "GeoGebra in capitals is not a sketch", "page": "```GeoGebra\nf(x) = x^2\n```\n", "found": []},
+        {"name": "the first word of the info string", "page": "```geogebra title=\"x\"\nf(x) = x^2\n```\n", "found": [{"block": 1, "line": 1}]},
+        {"name": "inside a folded callout", "page": "> [!example]- A sketch\n> ```geogebra\n> f(x) = x^2\n> ```\n", "found": [{"block": 1, "line": 2}]},
+        {"name": "two on a page", "page": "```geogebra\nf(x) = x\n```\n\n~~~geogebra\ng(x) = 2x\n~~~\n", "found": [{"block": 1, "line": 1}, {"block": 2, "line": 5}]}
+      ]
+    },
+    "settings": {
+      "rule": "Ruling Q1: `key: value` lines, the Obsidian GeoGebra plugin's keys. Leading lines whose key is one of `known` are settings; the FIRST line that is not a known `key: value` starts the commands - so GeoGebra's own `a: x + y = 3` (a line named a) is a command, never a setting. A `---` line straight after the settings ends them; a block that OPENS with `---` is read up to the next `---`, and there an unknown key is a setting that is left out with a note (unknownSetting). Blank lines before and among the settings are skipped. A value may be wrapped in one pair of quotes, which are taken off; `file:` may be written as an Obsidian link ([[name]]), whose brackets are taken off too - it is still plain text to Obsidian (knownLimits). Keys are lowercase, exactly. `version:` does nothing but change the fence: it is the documented way to make a changed geogebra.org sketch be fetched again (cache). Exactly one of `file` and `material_id`, or neither with at least one command.",
+      "known": ["file", "material_id", "app", "height", "width", "alt", "caption", "toolbar", "algebra", "version"],
+      "apps": ["classic", "graphing", "geometry", "3d"],
+      "numbers": ["height", "width"],
+      "switches": ["toolbar", "algebra"],
+      "cases": [
+        {"name": "a file with its description and height", "body": "file: Slope Angle Conjecture.ggb\nalt: Three right triangles sharing one angle.\nheight: 480", "settings": {"file": "Slope Angle Conjecture.ggb", "alt": "Three right triangles sharing one angle.", "height": 480}, "commands": [], "problems": [], "notes": []},
+        {"name": "commands alone", "body": "f(x) = x^2\nA = (1, 2)", "settings": {}, "commands": [{"line": 1, "text": "f(x) = x^2"}, {"line": 2, "text": "A = (1, 2)"}], "problems": [], "notes": []},
+        {"name": "settings, then commands", "body": "alt: A parabola and a point on it.\nf(x) = x^2\nA = Point(f)", "settings": {"alt": "A parabola and a point on it."}, "commands": [{"line": 2, "text": "f(x) = x^2"}, {"line": 3, "text": "A = Point(f)"}], "problems": [], "notes": []},
+        {"name": "GeoGebra's own colon is a command", "body": "a: x + y = 3\nb: x - y = 1", "settings": {}, "commands": [{"line": 1, "text": "a: x + y = 3"}, {"line": 2, "text": "b: x - y = 1"}], "problems": [], "notes": []},
+        {"name": "a --- line ends the settings", "body": "file: Lines.ggb\n---\nSetValue(a, 2)", "settings": {"file": "Lines.ggb"}, "commands": [{"line": 3, "text": "SetValue(a, 2)"}], "problems": [], "notes": []},
+        {"name": "a --- block at the top, with a key that is not a setting", "body": "---\nfile: Lines.ggb\nzoom: 2\n---\nSetValue(a, 2)", "settings": {"file": "Lines.ggb"}, "commands": [{"line": 5, "text": "SetValue(a, 2)"}], "problems": [], "notes": [{"reason": "unknownSetting", "blockLine": 3, "name": "zoom"}]},
+        {"name": "blank lines and // lines are skipped, line numbers kept", "body": "alt: A line.\n\n// the line itself\nf(x) = 2x + 1\n", "settings": {"alt": "A line."}, "commands": [{"line": 4, "text": "f(x) = 2x + 1"}], "problems": [], "notes": []},
+        {"name": "quotes and link brackets come off", "body": "file: [[Lines.ggb]]\ncaption: \"Drag B: what stays the same?\"", "settings": {"file": "Lines.ggb", "caption": "Drag B: what stays the same?"}, "commands": [], "problems": [], "notes": []},
+        {"name": "version is a setting", "body": "file: Lines.ggb\nversion: 2", "settings": {"file": "Lines.ggb", "version": "2"}, "commands": [], "problems": [], "notes": []},
+        {"name": "a size in pixels", "body": "width: 600px\nheight: 400\ntoolbar: true\nalgebra: no\nf(x) = x", "settings": {"width": 600, "height": 400, "toolbar": true, "algebra": false}, "commands": [{"line": 5, "text": "f(x) = x"}], "problems": [], "notes": []},
+        {"name": "an app GeoGebra does not have", "body": "app: cas\nf(x) = x", "settings": {}, "commands": [{"line": 2, "text": "f(x) = x"}], "problems": [{"reason": "appNotKnown", "blockLine": 1, "value": "cas"}], "notes": []},
+        {"name": "a height that is not a number", "body": "height: tall\nf(x) = x", "settings": {}, "commands": [{"line": 2, "text": "f(x) = x"}], "problems": [{"reason": "numberExpected", "blockLine": 1, "name": "height", "value": "tall"}], "notes": []},
+        {"name": "a switch that is not true or false", "body": "toolbar: sometimes\nf(x) = x", "settings": {}, "commands": [{"line": 2, "text": "f(x) = x"}], "problems": [{"reason": "trueOrFalseExpected", "blockLine": 1, "name": "toolbar", "value": "sometimes"}], "notes": []},
+        {"name": "both a file and a geogebra.org sketch", "body": "file: Lines.ggb\nmaterial_id: ju3f2kbg", "settings": {"file": "Lines.ggb", "material_id": "ju3f2kbg"}, "commands": [], "problems": [{"reason": "fileAndMaterialBoth", "blockLine": 2}], "notes": []},
+        {"name": "nothing to show", "body": "alt: An empty sketch.\n", "settings": {"alt": "An empty sketch."}, "commands": [], "problems": [{"reason": "nothingToShow", "blockLine": null}], "notes": []},
+        {"name": "an empty fence", "body": "", "settings": {}, "commands": [], "problems": [{"reason": "nothingToShow", "blockLine": null}], "notes": []},
+        {"name": "a --- block that is never closed", "body": "---\nfile: Lines.ggb\nSetValue(a, 2)", "settings": {}, "commands": [], "problems": [{"reason": "settingsNotClosed", "blockLine": 1}], "notes": []},
+        {"name": "file: with no name", "body": "file:\nalt: Lines.", "settings": {"file": "", "alt": "Lines."}, "commands": [], "problems": [{"reason": "fileHasNoName", "blockLine": 1}], "notes": []},
+        {"name": "a setting in capitals is a command, and said", "body": "File: Lines.ggb\nf(x) = x", "settings": {}, "commands": [{"line": 1, "text": "File: Lines.ggb"}, {"line": 2, "text": "f(x) = x"}], "problems": [], "notes": [{"reason": "settingAmongCommands", "blockLine": 1, "name": "File"}]},
+        {"name": "a setting after the commands began is a command, and said", "body": "alt: A line.\nf(x) = 2x\nheight: 400", "settings": {"alt": "A line."}, "commands": [{"line": 2, "text": "f(x) = 2x"}, {"line": 3, "text": "height: 400"}], "problems": [], "notes": [{"reason": "settingAmongCommands", "blockLine": 3, "name": "height"}]},
+        {"name": "GeoGebra's own name with a colon is not said", "body": "a: x + y = 3\nslope: Slope(a)", "settings": {}, "commands": [{"line": 1, "text": "a: x + y = 3"}, {"line": 2, "text": "slope: Slope(a)"}], "problems": [], "notes": []}
+      ]
+    },
+    "commands": {
+      "rule": "#578 stage 3. The fence's commands run once the sketch has opened (after a file: or material_id: sketch loads, or alone), one line at a time, in order, as typed in GeoGebra's Input Bar. A line GeoGebra refuses is shown under the sketch as words.site.lineCouldNotRun, {line} the line in the fence (from 1, the settings counted) and {said} GeoGebra's OWN words - the message lines of its error dialog, joined with spaces, without its title or buttons. How a refusal is known, measured 2026-10-24 in Chromium 1243 and WebKit 2359 on the adapted engine: evalCommand's answer CANNOT be used - it is false for scripting commands that work (SetValue, SetColor, ZoomIn) and for real errors alike, and asyncEvalCommand resolves \"\" for both, before any dialog; GeoGebra's error dialog tells them apart, but it is added 1 to 10 ms AFTER the line returns, a few tasks later. So after each line the loader also runs `endOfLine`, a command GeoGebra does not know: its dialog ALWAYS comes and always after the line's own (every case below, in order, both engines), so a dialog that arrives before it is the line's. Each dialog is read and removed as it is added (a MutationObserver), before it is drawn, and the wait ends when the marker's dialog arrives - no clock, only a last-resort `giveUpSeconds` for all the lines together. Dialogs are on while the lines run and turned off after (setErrorDialogsActive), so nothing a student does opens one. A line that does nothing and is not an error (SetValue of a name that does not exist) raises nothing and is not said: knownLimits. REJECTED: evalCommand's answer (would report every SetValue); asyncEvalCommand (resolves before the dialog); waiting a fixed time after each line for a dialog that may not come (a guess that flickers on a slower machine); checking the commands at build time (would need GeoGebra's parser in the build).",
+      "endOfLine": "PlantoirEndOfLine()",
+      "giveUpSeconds": 10,
+      "cases": [
+        {"text": "SetValue(a, 3)", "said": null},
+        {"text": "SetColor(f, \"red\")", "said": null},
+        {"text": "ZoomIn(-5, -5, 5, 5)", "said": null},
+        {"text": "A = (1, 2)", "said": null},
+        {"text": "Circle((0,0), 2)", "said": null},
+        {"text": "SetValue(zz, 3)", "said": null},
+        {"text": "Foo(1)", "said": "Unknown command : Foo"},
+        {"text": "k(x) = sin(x", "said": "Unbalanced brackets k(x) = sin(x"},
+        {"text": "f(x) = x^2 +* 3", "said": "Please check your input"},
+        {"text": "Segment(A)", "said": "Command Segment: Illegal number of arguments: 1 Syntax: Segment( <Point>, <Point> ) Segment( <Point>, <Length> )"}
+      ]
+    },
+    "materialIds": {
+      "rule": "`material_id:` takes a sketch's id or any geogebra.org address that names one: /m/ID, /classic/ID, /graphing/ID, /geometry/ID, /3d/ID, /calculator/ID, /material/show/id/ID, /material/iframe/id/ID, with or without anything after it. An id is 4 to 16 letters and digits. Anything else is materialNotUnderstood.",
+      "cases": [
+        {"value": "ju3f2kbg", "id": "ju3f2kbg"},
+        {"value": "https://www.geogebra.org/m/ju3f2kbg", "id": "ju3f2kbg"},
+        {"value": "https://www.geogebra.org/m/ju3f2kbg#material/abc", "id": "ju3f2kbg"},
+        {"value": "geogebra.org/classic/ju3f2kbg?embed", "id": "ju3f2kbg"},
+        {"value": "https://www.geogebra.org/material/iframe/id/ju3f2kbg/width/700/height/400/border/888888", "id": "ju3f2kbg"},
+        {"value": "https://www.geogebra.org/material/show/id/1234567", "id": "1234567"},
+        {"value": "https://www.geogebra.org/3d/abcd1234", "id": "abcd1234"},
+        {"value": "https://example.org/m/ju3f2kbg", "id": null},
+        {"value": "a sketch about slopes", "id": null},
+        {"value": "https://www.geogebra.org/u/rwhg", "id": null}
+      ]
+    },
+    "fetch": {
+      "rule": "#578 stage 4. A `material_id:` sketch is copied from geogebra.org ONCE (cache), by two requests: GeoGebra's public materials API for what the sketch is (`api`, {id} the sketch's id) and then the .ggb of its ONE applet. Measured 2026-10-24 by one request for ju3f2kbg by hand (HTTP 200, 1,598 bytes of application/json): `title` (\"Slope Angle Conjecture\"), `visibility` (\"S\"), `deleted` (false), `creator.displayname` (\"Russell Gordon\" - the author the attribution names), and `elements`, one per part of the page, each with a `type`; the applet is the element of type \"G\", whose `url` is the .ggb (https://www.geogebra.org/resource/ju3f2kbg/…/material-ju3f2kbg.ggb, 1,594,544 bytes, holding its own geogebra_thumbnail.png - so the element's `previewUrl` picture is NOT fetched: one request fewer, and the thumbnail is made exactly as for a teacher's file). No element of type G is materialHasNoSketch; more than one is materialHasSeveralSketches; an answer of 403, 404 or 410, or `deleted: true`, is materialNotFound; anything else - no network, more than `requestSeconds`, another answer, a redirect to a host not in `hosts`, more than files.largestFileMegabytes - is materialCouldNotBeFetched. https only, and a redirect is followed only to one of `hosts`. A .ggb that is not a GeoGebra file is materialHasNoSketch and is NOT kept. Tests never call the real API: scripts/test_geogebra.py serves both answers from a local server of its own, through the same code.",
+      "api": "https://api.geogebra.org/v1.0/materials/{id}?scope=extended&embed=creator",
+      "hosts": ["api.geogebra.org", "www.geogebra.org", "geogebra.org", "cdn.geogebra.org"],
+      "requestSeconds": 15
+    },
+    "cache": {
+      "rule": "Ruling Q2 and plan review finding 2: FETCH ONCE, kept by the FENCE. A geogebra.org sketch is saved in `folder` beside the course's built sites (`<builds>/<course>/.geogebra-cache`, outside the teacher's folder and shared by the course's sections) as `<key>.ggb` and `<key>.json` (its id, title and author), where key is the fence's own key (keys: figureRules.keyOf of the fence body) - NOT the sketch's id. A build whose fence has a saved copy asks geogebra.org NOTHING; change anything in the fence (the documented way: add or change `version: 2`) and the next build fetches it again, which is how a teacher gets a sketch they changed on geogebra.org. Spaces at the ends of lines and Windows line endings keep the key (keys). `--full-rebuild` leaves the saved copies alone: there is one way to fetch again, the fence, and a full rebuild while geogebra.org cannot be reached must not turn a working sketch into a folder problem. Every build that uses a copy touches it, and a copy unused for `pruneDays` goes (figures.PRUNE_DAYS, the same rule). No saved copy and geogebra.org out of reach: materialCouldNotBeFetched, a folder problem, and the fence stays code. The site's copy is written to quartz/static/geogebra-sketches/<the key's first 16 hex digits>.ggb - a geogebra.org sketch has no file in content/ for Quartz to publish - and its thumbnail as a teacher's file's is. REJECTED: asking geogebra.org on every build (a class site would change under the teacher, and every preview would need the network); keying by the id (an edited sketch could never be fetched again without a command neither app has); clearing on --full-rebuild (figures do, for a different reason: a new drawing engine draws differently).",
+      "folder": ".geogebra-cache",
+      "pruneDays": 90,
+      "cases": [
+        {"name": "no saved copy: fetched once, then kept", "saved": false, "online": true, "fullRebuild": false, "builds": 2, "requests": 2, "shown": true, "reason": null},
+        {"name": "a saved copy: geogebra.org is asked nothing", "saved": true, "online": true, "fullRebuild": false, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "a saved copy and no network: shown", "saved": true, "online": false, "fullRebuild": false, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "a full rebuild keeps the saved copy", "saved": true, "online": false, "fullRebuild": true, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "no saved copy and no network: a folder problem", "saved": false, "online": false, "fullRebuild": false, "builds": 1, "requests": 1, "shown": false, "reason": "materialCouldNotBeFetched"},
+        {"name": "the fence changed (version: 2): fetched again", "saved": true, "online": true, "fullRebuild": false, "builds": 1, "requests": 2, "shown": true, "reason": null, "fenceChanged": true}
+      ]
+    },
+    "files": {
+      "rule": "`file:` names a .ggb by its name or a relative path, looked up by LISTING each folder (exact spelling first, then one that differs only in capitals or Unicode form, as page_features._find_in_media does - Netlify and Cloudflare are case-sensitive): beside the page first, then from the top of the course folder, then by its file name alone in the Media folder. It must be a zip holding geogebra.xml (read, never unpacked) and at most `largestFileMegabytes`. The site publishes the file ONCE: Quartz already publishes every file under content/ that is not a page (its Assets emitter), so the manifest records the file's path in content/ and the transformer makes its address with Quartz's own slugifyFilePath - the function that emitter uses - so the two cannot disagree. REJECTED: copying it into static/ as well (the example course's 1,594,544-byte sketch would be carried twice, 3,221,572 bytes instead of 1,627,028 with its thumbnail); taking the source out of content/ (a page that links the file for download would break, and Media there mirrors the teacher's own folder, which the build never edits).",
+      "largestFileMegabytes": 20,
+      "notPublished": {
+        "rule": "Stage 2 review item 6. Quartz leaves some files out of the site, and a sketch made from one could never open, so such a file is NOT FOUND (fileNotFound, said once) rather than found and then missing: a file under a folder at the TOP of the course folder that Quartz's ignorePatterns name (exactly these spellings, measured with Quartz's own globby in the image 2026-10-24: `private/a.ggb` and `templates/c.ggb` were left out, `Private/f.ggb` and `U/private/b.ggb` were published), and a file with any part of its path starting with a dot (the file walk skips those: `.hid/d.ggb` and `U/.h/e.ggb` were left out).",
+        "folders": ["private", "templates", ".obsidian"]
+      },
+      "cases": [
+        {"name": "beside the page", "files": ["Unit 1/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/Lines.ggb", "reason": null},
+        {"name": "a path from the course folder", "files": ["Sketches/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Sketches/Lines.ggb", "found": "Sketches/Lines.ggb", "reason": null},
+        {"name": "in Media by its name alone", "files": ["Media/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Media/Lines.ggb", "reason": null},
+        {"name": "a page copied without its sketch finds it in Media", "files": ["Media/Lines.ggb"], "page": "Unit 2/Copied.md", "value": "Old Unit/Lines.ggb", "found": "Media/Lines.ggb", "reason": null},
+        {"name": "capitals that differ", "files": ["Unit 1/lines.GGB"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/lines.GGB", "reason": null},
+        {"name": "the exact spelling wins", "files": ["Unit 1/lines.ggb", "Unit 1/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/Lines.ggb", "reason": null},
+        {"name": "beside the page wins over Media", "files": ["Unit 1/Lines.ggb", "Media/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/Lines.ggb", "reason": null},
+        {"name": "renamed in Obsidian, so not found", "files": ["Unit 1/Lines (final).ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "no such file", "files": [], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "not a zip", "files": ["Unit 1/Lines.ggb:notAZip"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "notAGeoGebraFile"},
+        {"name": "a zip without geogebra.xml", "files": ["Unit 1/Lines.ggb:noXml"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "notAGeoGebraFile"},
+        {"name": "a path cannot leave the course folder", "files": ["Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "../../Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in the private folder Quartz leaves out", "files": ["private/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "private/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in the templates folder Quartz leaves out", "files": ["templates/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "templates/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in a folder whose name starts with a dot", "files": ["Unit 1/.drafts/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": ".drafts/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "a folder called private that is not at the top is published", "files": ["Unit 1/private/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "private/Lines.ggb", "found": "Unit 1/private/Lines.ggb", "reason": null}
+      ]
+    },
+    "keys": {
+      "rule": "A sketch is looked up by figureFences.cacheKey's rule - SHA-256 of the tidied fence body (figureRules.keyOf, figures.key_of) - REUSED, so Python and the site agree by a rule both already run. The body is the text inside the fence AFTER the quote markers of its depth are taken off (the site's mdast code value; markdown_code's body), so a sketch in a callout has the same key as the same fence at the top level. Each case is run by scripts/test_geogebra.py and, through the site's own Markdown reader in Node, by scripts/check_geogebra_rules_against_the_site.py (verify.sh).",
+      "cases": [
+        {"name": "at the top of the page", "page": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a callout: the same key", "page": "> [!example] Lines\n> ```geogebra\n> file: Lines.ggb\n> alt: Two lines.\n> ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a callout in a callout: the same key", "page": "> [!note] Look\n> > [!example]- Lines\n> > ```geogebra\n> > file: Lines.ggb\n> > alt: Two lines.\n> > ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a list item: the same key", "page": "- Look at this:\n\n  ```geogebra\n  file: Lines.ggb\n  alt: Two lines.\n  ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in tildes: the same key", "page": "~~~geogebra\nfile: Lines.ggb\nalt: Two lines.\n~~~\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "with Windows line endings: the same key", "page": "```geogebra\r\nfile: Lines.ggb\r\nalt: Two lines.\r\n```\r\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "with spaces at the ends of lines: the same key", "page": "```geogebra\nfile: Lines.ggb   \nalt: Two lines.  \n```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "version: changed: a NEW key, so a geogebra.org sketch is fetched again", "page": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\nversion: 2\n```\n", "key": "b2860a5dc41e377506fe67fb1e0953dd666b405e254519081eb8ef703c6c13b6"},
+        {"name": "in a quiz's question: the same key (stage 5)", "page": "> [!quiz] Drag A.\n> ```geogebra\n> file: Lines.ggb\n> alt: Two lines.\n> ```\n> - [x] a\n> - [ ] b\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a quiz's explanation: the same key (stage 5)", "page": "> [!quiz] Pick one.\n> - [x] a\n> - [ ] b\n>\n> > [!explain]- Why\n> > ```geogebra\n> > file: Lines.ggb\n> > alt: Two lines.\n> > ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a quiz's explanation, with commands that look like a choice and a list (stage 5)", "page": "> [!quiz] Which line falls?\n> - [ ] y = 2x\n> - [x] y = -x + 3\n>\n> > [!explain]- Why\n> > ```geogebra\n> > alt: The line.\n> > -x + y = 3\n> > - [x] 2\n> > [1, 2]\n> > ```\n", "key": "2b39f61c95053033293f63a38649345c3d91b0d1e691289ebd32d941b870df23"}
+      ]
+    },
+    "manifest": {
+      "rule": "quartz/plantoir-geogebra/manifest.json: {version, words (words.site), attribution, pages: {page: {key: entry}}} - by PAGE (its path in the site's content, in NFC: the transformer's file.data.relativePath, normalised the same way), then by the fence's key, because the same fence text on two pages can name two different files beside them, and each page must show its own (stage 2 review item 1; `cases`). An entry is {ok: true, app, width, height (the sketch's own size, from geogebra.xml's first <euclidianView><size>, or the fence's width:/height:, which the applet is made at and then scaled down to fit the page), alt, caption, commands [{line, text}], toolbar, algebra, source {kind: file, contentPath} or null for commands alone, thumbnail {name, width, height} or null, attribution {kind}, size (openSketch's {size}, filled)}. Only sketches that can be shown are in it: anything else stays a code block. No sketch on the site, no folder. Thumbnails (the .ggb's own geogebra_thumbnail.png) go to quartz/static/geogebra-sketches/<the first 16 hex digits of the picture's own SHA-256>.png - so one sketch named by several fences is one picture - a folder removed when there are none.",
+      "workspace": "plantoir-geogebra",
+      "thumbnails": "geogebra-sketches",
+      "cases": [
+        {"name": "the same fence on two pages, each with its own file beside it, and on a third with none", "files": ["Unit 1/Lines.ggb:one", "Unit 2/Lines.ggb:two"], "pages": {"Unit 1/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "Unit 2/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "Unit 3/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n"}, "shown": {"Unit 1/Lesson.md": "Unit 1/Lines.ggb", "Unit 2/Lesson.md": "Unit 2/Lines.ggb"}, "problems": [{"page": "Unit 3/Lesson", "reason": "fileNotFound"}]}
+      ]
+    },
+    "quizzes": {
+      "rule": "#578 stage 5. A sketch works in a self-check question's QUESTION (before the choices) and in its EXPLANATION ([!explain]), and is REFUSED in a CHOICE: quizCallouts.words.problems.sketchInAChoice, in quizCallouts.recognise.order after choicesAndAnswer, found by quizzes.py (a ```geogebra or ~~~geogebra fence opened inside an item of the quiz's boxed list) and by the site (quizRules.QuizModel.sketchInAChoice: a plantoirGeoGebra node - or a geogebra code block the build could not show - inside an item of the first boxed list), whether or not the sketch itself can be shown, so the two agree. A sketch in a plain list in the question, or anywhere outside the boxed list, is fine. Every shape is a quizCallouts.recognise case, run by test_quizzes.py and planted on verify.sh's Quiz Fixture (6k), so the safety net (quizCallouts.safetyNet) stays silent; the keys of a fence in a question and in an explanation are keys cases.",
+      "whyNotInAChoice": "A choice is a click target: its label wraps the box, so a drag on a point would toggle the answer; and the shuffle moves the choices (quiz.inline.ts fieldset.appendChild, on load and again after every print, reapplyOrder). REJECTED: allowing it and putting the applet back after each move.",
+      "order": "Wired Figures, GeoGebra, Quizzes, Tasks (build_site._wire_geogebra_transformer; test_geogebra.py WiringTests). MEASURED (2026-10-24, the dev-test image, one quiz page with a sketch in a question, an explanation and a choice): GeoGebra wired after Quizzes built the same HTML byte for byte; the one difference was the quiz page's search text, which the quizzes' html stage makes again from the tree AFTER the sketch's card is in. Fixed by withoutAnswers reading a sketch as its figcaption alone - what Description, which runs before the card, reads on every other page - so the order is pinned by the wiring test, not by anything a student sees.",
+      "node": "The markdown stage's figure is a node of type plantoirGeoGebra with data.hName, never a raw html node. MEASURED: an html node renders the same page (Quartz parses raw HTML into elements), but the quiz reader recognises a sketch by the node's type, so with an html node a sketch in a choice was read as a working question while the folder check refused it - the must-fail.",
+      "explanation": "The card sits inside the hidden explanation, so nothing of the engine is fetched until the explanation is shown AND its button tapped (browser-checks/geogebra_applet.mjs: zero engine requests after the page loads and after the answer is checked, then the sketch opens). Start again hides it with the explanation.",
+      "print": "Print moves choices only (restoreOrder / reapplyOrder), never a question or an explanation, so a sketch open in a question of a shuffled quiz is the same applet, still working, after a print (the browser check). On paper a quiz prints as its question, its sketch as geogebraFences.print says.",
+      "searchText": "A quiz page's search text and summary read a sketch as its description alone, never its button, commands or attribution (plantoirQuizzes.ts withoutAnswers; verify.sh 6i-g reads the quiz page's search text)."
+    },
+    "siteCarriesEngine": {
+      "rule": "The #454 gate: static/geogebra (the pruned, adapted engine - toolchain.json -> pins -> geogebra, 117 files, about 27 MB) only while a page students can see has a sketch that can be shown (page_features.GATED_ASSETS -> geogebra; the count is pages, from scripts/geogebra.py). None of it is fetched until a student taps; a site with no sketch carries none of it.",
+      "cases": [
+        {"name": "no sketches", "pages": [{"text": "Just words.", "visible": true}], "geogebra": 0},
+        {"name": "a sketch students can see", "pages": [{"text": "```geogebra\nf(x) = x^2\n```\n", "visible": true}], "geogebra": 1},
+        {"name": "a sketch in tildes", "pages": [{"text": "~~~geogebra\nf(x) = x^2\n~~~\n", "visible": true}], "geogebra": 1},
+        {"name": "only on a page students cannot see", "pages": [{"text": "---\npublish: false\n---\n```geogebra\nf(x) = x^2\n```\n", "visible": false}], "geogebra": 0},
+        {"name": "a sketch that cannot be shown", "pages": [{"text": "```geogebra\nfile: Nowhere.ggb\n```\n", "visible": true}], "geogebra": 0}
+      ]
+    },
+    "engine": {
+      "rule": "What a tap loads, measured 2026-10-23 on the slope-angle sketch: deployggb.js, then GeoGebra's web3d codebase from static/geogebra/HTML5/5.0/web3d/ (setHTML5Codebase, offline), then the sketch, handed over as ggbBase64 after a same-origin fetch. The applet is made with language en (English is built in; the language files are left out), no menu bar, no input bar, no right-click menu, the reset icon, shift-drag zoom, the fence's toolbar:/algebra:, and scaleContainerClass so a wide sketch is scaled down to the page (700 px on a laptop, 374 px on a phone, measured). A second sketch on a later page loads in 0.14 to 0.6 s: the engine stays.",
+      "firstLoadBytes": {"raw": 9034254, "gzipped": 2864256, "requests": 19},
+      "sizeBytes": "openSketch's {size} is the sketch's own bytes plus firstLoadBytes.gzipped (class sites are sent compressed), in megabytes to one decimal place, through words.site.sketchSize."
+    },
+    "spa": {
+      "rule": "Quartz's page change replaces <body> and drops every <head> child without spa-preserve. What keeps a second sketch working is GeoGebra's hidden loader frame going under <html>, which the page change keeps (geogebra_engine.py replacement 3): measured with it reverted, Chromium 155 opened no sketch after a page change until a reload, under the policy and cross-origin isolated alike. deployggb.js is loaded once and marked spa-preserve. Each applet is removed (api.remove) when the page changes, and that takes GeoGebra's own styles and libraries out of <head> (measured: 8 libraries, then 0), which the next tap puts back - so a second sketch opens in about 255 ms, not 0.6 s. REJECTED: the plan's MutationObserver marking what GeoGebra adds to <head> spa-preserve - measured in stage 2, it changes nothing while api.remove runs (0 libraries kept either way, and every sketch opened without it); and leaving applets in place so their libraries stay (each keeps its memory and its listeners for the rest of the visit)."
+    },
+    "print": {
+      "rule": "A loaded applet prints its canvas cropped (measured), so the handout's prepare step and the browser's beforeprint put a picture of the sketch as it stands now (api.getPNGBase64, synchronous) beside it, and the print styles show that picture instead of the applet. Nothing on the page is moved or replaced, so there is nothing to put back after the print (#576's rule holds without a restore). A sketch that was never opened prints its thumbnail; one with neither prints its description. The button never prints; the attribution always does, in its print form with the addresses as plain text (attribution)."
+    },
+    "attribution": {
+      "rule": "GeoGebra's licence asks for the notice \"Made with GeoGebra®\" and a link to https://www.geogebra.org on every applet (toolchain.json -> pins -> geogebra). On screen: words.site.madeWith, linked to engineUrl, under every sketch. A sketch from geogebra.org (CC BY-NC-SA 4.0) also names its author, linked to the sketch on geogebra.org (materialUrl), and the licence (licenceName, linked to licenceUrl): the author is the materials API's creator.displayname, else the user name, else the sketch's own address (fetch), so a card never says \"by\" and nothing. A sketch from the teacher's own file names no author or licence: the file is theirs, and nothing in it says either. On paper a link cannot be followed, so the print form is one short line (printAttributionFile, or printAttributionMaterial) with the addresses printed under it as plain text, in small type.",
+      "engineUrl": "https://www.geogebra.org",
+      "materialUrl": "https://www.geogebra.org/m/{id}",
+      "licenceUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+    },
+    "policy": {
+      "rule": "Under the policy a Netlify publish sends (scripts/netlify_badge.py: script-src 'self' 'unsafe-eval' <hashes>) the stock engine never loads; the six replacements of geogebra_engine.py make it load with that policy unchanged. Every browser check serves on [::1], never 127.0.0.1 or localhost: GeoGebra's loader runs its main file as inline text on those two hosts (and apps-builds.), which would test a path no class site takes. browser-checks/geogebra_applet.mjs proves it on a clone of a built site with the publish's own _headers: zero refusals by the policy, zero requests off the site."
+    },
+    "words": {
+      "note": "English, as data: the site's words appear on a page students read, the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {file} is the name as the fence gives it, {name} a setting's name, {value} what it was given, {line} a line of the fence, {said} GeoGebra's own words, {author} a geogebra.org author, {id} a sketch's id, {megabytes} and {limit} sizes.",
+      "site": {
+        "openSketch": "Open the sketch ({size})",
+        "sketchSize": "about {megabytes} MB",
+        "loading": "Opening the sketch…",
+        "couldNotLoad": "This sketch couldn't be opened. Check the connection, then try again.",
+        "lineCouldNotRun": "Line {line} couldn't run: {said}",
+        "commandsSummary": "What this sketch is made from",
+        "madeWith": "Made with GeoGebra®",
+        "createdBy": "by {author}",
+        "licenceName": "CC BY-NC-SA 4.0",
+        "printAttributionMaterial": "Made with GeoGebra · by {author} · CC BY-NC-SA 4.0",
+        "printAttributionFile": "Made with GeoGebra · geogebra.org",
+        "untitledSketch": "A GeoGebra sketch.",
+        "printNote": "On the class website, this sketch can be moved."
+      },
+      "reasons": {
+        "fileNotFound": "{file} isn't beside the page, in the course folder or in Media (a renamed file or a copied page keeps the old name here - put the .ggb in Media, or change the file: line)",
+        "notAGeoGebraFile": "{file} isn't a GeoGebra file - save the sketch from GeoGebra as a .ggb file",
+        "fileTooLarge": "{file} is {megabytes} MB, and a sketch can be at most {limit} MB",
+        "fileAndMaterialBoth": "use file: or material_id:, not both",
+        "materialNotUnderstood": "“{value}” isn't a geogebra.org sketch or its address",
+        "materialNotFound": "geogebra.org has no sketch {id} that anyone can open",
+        "materialCouldNotBeFetched": "geogebra.org could not be reached to keep a copy of sketch {id} - preview again while this computer is online",
+        "materialHasSeveralSketches": "sketch {id} on geogebra.org holds several sketches - name one of them instead",
+        "materialHasNoSketch": "{id} on geogebra.org is not a sketch",
+        "appNotKnown": "app: can be classic, graphing, geometry or 3d, not “{value}”",
+        "numberExpected": "{name}: needs a number of pixels, such as 480, not “{value}”",
+        "trueOrFalseExpected": "{name}: needs true or false, not “{value}”",
+        "nothingToShow": "there is nothing to show - add a file: line, a material_id: line, or GeoGebra commands",
+        "engineMissing": "this copy of Plantoir can't show GeoGebra sketches",
+        "missingAlt": "it has no alt: line, so a screen reader only says “A GeoGebra sketch.”",
+        "unknownSetting": "{name} isn't a GeoGebra setting, so it was left out",
+        "settingsNotClosed": "the --- line that opens the settings has no --- line to close it, so everything after it would be read as settings",
+        "fileHasNoName": "file: needs the name of a .ggb file",
+        "settingAmongCommands": "“{name}:” is read as a GeoGebra command, not a setting - settings go first, in small letters, before the commands"
+      }
+    },
+    "knownLimits": [
+      "`file:` is plain text, not a link: Obsidian's rename does not rewrite it, and Copy a Page does not carry the file (it copies a page's links and embeds). Both are said as fileNotFound naming the line, and the Media lookup by file name is what makes \"put the .ggb in Media\" the fix.",
+      "English only: the language files are left out of the engine (23 MB), and every applet is made with language en.",
+      "A command that does nothing without being an error - SetValue of a name that does not exist - raises no dialog and is not said (commands). Commands are not checked at build time: GeoGebra's parser runs only in the browser, so a refused line is first seen on the page, by whoever opens the sketch.",
+      "Obsidian hides .ggb files unless Settings -> Files and links -> Detect all file extensions is on.",
+      "The open sketch's box keeps the sketch's own shape and hides what spills out of it (geogebra.scss: height auto, overflow hidden - documentation/06 Q3), so the keyboard GeoGebra may open INSIDE its applet on a touchscreen, for a fence with `algebra: true`, could be cut off at the box's bottom edge. Unmeasured: no touchscreen was tried (an iPad and Edge on a touch laptop are to be checked later); on a desktop browser no keyboard opens."
     ]
   },
   "previewStartPage": {
@@ -27467,6 +27730,7 @@
         "choiceWithoutBox",
         "twoAnswers",
         "choicesAndAnswer",
+        "sketchInAChoice",
         "oneChoice",
         "noCorrectChoice",
         "noAnswerLine",
@@ -28037,6 +28301,73 @@
           "markdown": "<div>\n> [!quiz] Shown in HTML.\n> > [!answer]-\n> > 4\n</div>\n",
           "quizzes": [],
           "untouched": true
+        },
+        {
+          "name": "aSketchInAChoice",
+          "markdown": "> [!quiz] Which sketch shows a line?\n> - [x] This one\n>   ```geogebra\n>   alt: A line, in a choice.\n>   y = x\n>   ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "sketchInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInACalloutInAChoice",
+          "markdown": "> [!quiz] Which sketch shows a line?\n> - [x] This one\n>   > [!note] The sketch\n>   > ```geogebra\n>   > alt: A line, in a note in a choice.\n>   > y = x\n>   > ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "sketchInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInTheQuestionWithCommandsThatLookLikeChoices",
+          "markdown": "> [!quiz] Drag A. Which is the slope of the line?\n> ```geogebra\n> alt: A line, in a question.\n> -x + y = 3\n> - [x] 2\n> [1, 2]\n> ```\n> - [x] -1\n> - [ ] 2\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInTheExplanation",
+          "markdown": "> [!quiz] Which line falls?\n> - [ ] y = 2x\n> - [x] y = -x + 3\n>\n> > [!explain]- Why\n> > Its slope is -1.\n> > ```geogebra\n> > alt: A line, in an explanation.\n> > -x + y = 3\n> > ```\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                1
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInAListThatIsNotTheChoices",
+          "markdown": "> [!quiz] Look first:\n> - the line\n>   ```geogebra\n>   alt: A line, in a list that is not the choices.\n>   y = x\n>   ```\n>\n> Which is its slope?\n>\n> - [x] 1\n> - [ ] 2\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
         }
       ]
     },
@@ -28732,6 +29063,7 @@
         "emptyAlternative": "answer line {n} has an empty answer between its | marks",
         "badTolerance": "answer line {n} has a ± that is not a number ± a number, like 3.14 ± 0.01",
         "unknownOption": "“{option}” is not a quiz setting - the only one is shuffle",
+        "sketchInAChoice": "a GeoGebra sketch sits inside one of its choices, where dragging the sketch would pick that choice - put the sketch in the question, above the choices, or in its explanation",
         "choicesInHtml": "a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out",
       "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
         "readDifferently": "the site and the folder check read this question differently - preview the site again, and if this line comes back, rewrite it from one of the patterns in the plantoir-quizzes skill"
