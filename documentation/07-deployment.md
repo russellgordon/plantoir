@@ -1462,6 +1462,119 @@ must NOT answer 200 (it prints what Cloudflare does answer, so this file can
 record it). A folder publish is checked to carry no marker
 (`check_no_marker_folder`).
 
+**Cloudflare's production address, waited for (#665).** `wrangler pages
+deploy` returns when Cloudflare has ACCEPTED the upload, not when
+`<project>.pages.dev` serves it. Every Cloudflare leg used to be judged the
+moment the launcher returned, and at Windows' 1.8.5 cut one leg was judged
+against the PREVIOUS deployment: eight checks failed, and two minutes later
+all of them passed. Each of the three Cloudflare legs (alone, paired with
+Netlify, paired with a folder) now keeps a copy of what it uploaded
+(`snapshot_cloudflare_upload`, called the moment the leg returns, because in
+the folder pairing the next leg can rebuild the section before production is
+judged) and polls production every 5 s, for at most 120 s
+(`wait_for_cloudflare_production`), until it serves BOTH the front page and
+the borrowed page of runnable code byte for byte as uploaded. A 404 is "not
+yet" (a brand-new project's first publish). Not switching is ONE failure
+that says so, and the run then judges what production does serve: never a
+skip, never an exit — the failure is the information. Each wait's seconds go
+into the Result block's measured lines on every run.
+
+The second page is the part Windows' version lacked. The built site carries
+nothing unique per build (`build_site.py`'s build id goes to the host output
+folder, not into `public/`), so a front page equal to the upload cannot tell
+this deployment from the last one whenever only static files or headers
+moved — `static/pyodide/*`, `_headers`, KaTeX's files: the class of change
+this harness exists to catch, and the shape of the 1.8.5 failure list. So
+the borrowed page carries a mark made fresh for every run
+(`RUN_MARK`, `plantoir-verify-deploy-run-<UTC time>-<pid>`), and the previous
+run's deployment cannot carry it. Within one run the later legs publish the
+same bytes as the first, so the leg the wait really protects is a run's
+FIRST Cloudflare leg. The snapshot refuses (one failure) a leg whose log does
+not name this section's build in `Deploying from local build:` — read with
+the `\r` stripped, since the log is a terminal transcript and every line
+ends in `\r\n` (measured) — or whose page lacks the mark.
+
+Rejected: *the front page only* (Windows' oracle as it was; weak for exactly
+the static-files-only change above, and kept as half of this test); *fetching
+`<hash>.<project>.pages.dev`* (Windows measured it resolving later than
+production on a first publish, and it is not the address a teacher hands
+out); *Cloudflare's API* (`canonical_deployment`) — it says what the control
+plane decided, not what the edge serves, and the gap between the two IS the
+race; *a fixed sleep* (a guessed duration, which is the rule against waiting
+out a race); *writing a build id into `public/` from `build_site.py`* — it
+would change every teacher's site and the shared Python for a harness's need.
+
+**Measured 2026-10-23** (M4 Pro, home network, `ada1o-s1-2026-testing.pages.dev`):
+the run's first Cloudflare leg (the one whose predecessor
+was the previous run's deployment) was served by production **6 s** after its
+upload returned — the fetch at 0 s still got the old deployment, so the race
+is real on the mac too, not only at Windows' cut; the leg paired with Netlify
+**1 s**, the leg paired with a folder **0 s** of waiting (2 s after its
+upload, the folder leg having run between). That run: **171 passed, 0
+failed, 0 skipped**. Windows measured 0–1 s typically and under two minutes at
+the 1.8.5 cut; a run that waits 0 s on every leg still justifies the wait,
+because the cut proved minutes are possible.
+
+**`./verify-deploy.sh --self-test`** proves the wait offline in about 20 s,
+with no credentials, no Docker and nothing borrowed from any folder: a stub
+server on 127.0.0.1 serves the OLD bytes for the first K requests to a path
+and the NEW after (`VERIFY_DEPLOY_CF_POLL=1`, `VERIFY_DEPLOY_CF_WAIT=8`, the
+only use of those two overrides). Eight cases: the control (fetched at once,
+the old page: the race reproduced), switching after 3 requests, never
+switching (exactly one failure, at the cap, and the function returns), a
+first publish's 404s, the static-files-only change (same front page, the
+runnable-code page switches late), a `\r\n` log line, a log naming another
+section, and an upload without the run's mark. Proved must-fail on copies of
+the script: with the wait returning at once, 4 of the 8 fail; comparing the
+front page only fails the static-files case; without the `\r` strip the two
+transcript cases fail.
+
+**This checkout's recipe, mirrored first (#665).** The checks read the
+CHECKOUT's `contracts/` (`check_engine_folder`'s `toolchain.json`), but the
+launchers run the working folder's own `.sh` files and `.toolchain/`, which
+only the app refreshes — and the image tag hashes `.toolchain/`, so a stale
+mirror is a stale IMAGE that looks healthy. Measured 2026-10-23 on
+`~/Desktop/plantoir-overnight` against origin/dev: 27 differences under
+`scripts/`, 20 under `support/`, 6 under `contracts/`, plus
+`.toolchain/Dockerfile`, `.toolchain/preview.sh` and the folder's
+`preview.sh`; at the 1.8.7 cut the stale folder cost three failures against
+a product that was fine. The preflight now mirrors, from the WORKING TREE
+(what the checks read), the three `.sh` launchers at the folder's top, the
+`.toolchain/` root files (`Dockerfile` and the nine launchers, the app's
+`rootFiles`), and every folder `contracts/toolchain.json` → `recipeFolders`
+names — read from the contract, never a fifth hand-kept list. Files with
+`cp -p`, folders with `rsync -a --delete --exclude=__pycache__
+--exclude=.DS_Store`, so dates are kept and the app's size-and-date check
+finds nothing to redo. Python's caches are never copied, because
+`toolchain_hash` in `preview.sh` does not prune `__pycache__` and one copied
+cache would be a new image tag; one already in the folder is left alone
+(measured: macOS's openrsync keeps an excluded destination file under
+`--delete`, and its `-i` prints nothing, so the count comes from
+`diff -rq` before the copy instead). When anything differed, the section is
+rebuilt with `preview.sh --build-only --full-rebuild` in the FOREGROUND
+before the serve starts its ten-minute announce wait — some of
+`build_site.py`'s edits run only when the scaffold is first copied, and an
+image rebuild can take most of ten minutes on its own (measured below). It
+refuses a folder with no `preview.sh` or no `.toolchain/Dockerfile`, and
+`~/Desktop/Class Websites` by name; it warns, without refusing, when
+`Plantoir` is running, because an app that touches the folder mirrors its
+OWN bundled copy back. So the folder is diffed again at the end, and a
+difference then is a failure ("something re-mirrored it during the run").
+The mirror stays in the folder afterwards. The Result block prints the
+commit, the uncommitted-change count and how many differences were mirrored.
+
+Rejected: *refusing on a mismatch* (it hands the runner the remedy every
+time — Windows' reasoning, #630); *`git archive HEAD`* (it recreates the
+mismatch whenever the tree has changes); *the screenshot harness's
+`mirror_toolchain`* (`website/shots/capture.py`) — a cross-tool import from
+bash for twenty lines of copying; its `rsync -a --delete` carries
+`__pycache__` across, which would move the image tag; and it leaves the
+launchers at the folder's top alone, which are what the harness runs.
+The same run mirrored **57** differences (the measurement above, plus one
+more file under `contracts/` by the time it ran), rebuilt the section from
+scratch in **32 s** (the image's layers were cached), and found the folder
+still on this checkout's recipe at the end.
+
 ## The scheduled task never refuses over FOLDER PROBLEMS
 
 Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map
