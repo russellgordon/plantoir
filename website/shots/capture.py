@@ -22,7 +22,9 @@ Run it from the top of the repository::
     python3 website/shots/capture.py --code
 
     # The Visualizations page's GeoGebra figure (#578): MPM2D's slope-angle
-    # page with its sketch opened, from a preview in --print-folder:
+    # page with its sketch opened, from a preview in --print-folder, which
+    # this one REQUIRES (a folder made before the page was in the example
+    # content is refused before anything is written into it):
     python3 website/shots/capture.py --geogebra --print-folder ~/some/new/folder
 
 See website/README.md, "Regenerating every image", and scenes.py.
@@ -2147,9 +2149,12 @@ def capture_geogebra_set(folder: Path) -> list[str]:
     (`--print-folder`; the course is the print set's), built by THIS tree's
     recipe as committed (`git archive HEAD`), as the Code page's figures are:
     the app plays no part in a picture of a class site, and the engine is in
-    the website builder that recipe makes. A folder made before the page was
-    in the example content does not have it, and is refused rather than
-    photographed as a 404: name a new folder, or delete that one.
+    the website builder that recipe makes. `--print-folder` has no default
+    here: ~/Plantoir Print is the print set's, and one made before the page
+    was in the example content does not have it. A folder whose MPM2D does not have the page is
+    refused rather than photographed as a 404 - BEFORE the recipe is
+    mirrored into it when the course is already there, so a refused folder
+    is left as it was: name a new folder, or delete that one.
 
     Returns the pictures taken, as `<id>-light` / `<id>-dark`.
     """
@@ -2157,8 +2162,18 @@ def capture_geogebra_set(folder: Path) -> list[str]:
     if not shots:
         raise SystemExit("shots.json has no preview-page shot in the geogebra scene.")
     announce(f"Photographing the GeoGebra figure, in {folder}")
+    code = PRINT_COURSE_CONFIG["course_code"]
+    if workspace_has_course(folder, code):
+        # Already made: look for the page before anything is written here.
+        refuse_folder_without_geogebra_pages(folder, shots)
     recipe = committed_recipe()
     provision_print_course(folder, resources=recipe)
+    refuse_folder_without_geogebra_pages(folder, shots)
+    return photograph_preview_shots(folder, shots)
+
+
+def refuse_folder_without_geogebra_pages(folder: Path, shots: list[dict]) -> None:
+    """Stop, naming the page, when a shot's page is not in the folder's course."""
     for shot in shots:
         # The address is the file's path with each space a dash; the file's
         # own dashes stay (The-Slope-Angle-Conjecture is The Slope-Angle
@@ -2174,7 +2189,6 @@ def capture_geogebra_set(folder: Path) -> list[str]:
         if not found:
             raise SystemExit(f"{shot['capture']['path']} is not in {folder}: it was made before the page was in "
                              "the example content. Name another folder with --print-folder, or delete this one.")
-    return photograph_preview_shots(folder, shots)
 
 
 # ---------- The Quizzes page (#587) ----------
@@ -2287,11 +2301,13 @@ def main() -> int:
     parser.add_argument("--print-set", action="store_true",
                         help="only photograph what printing does: a printable maths page with its Print "
                              "button, both appearances, and the handout it prints (v1.7.0)")
-    parser.add_argument("--print-folder", default=str(PRINT_FOLDER),
+    parser.add_argument("--print-folder", default=None,
                         help="the working folder the print pictures are taken in (made when absent; "
-                             "must be inside your home folder)")
+                             "must be inside your home folder; ~/Plantoir Print for --print-set, "
+                             "and required for --geogebra)")
     parser.add_argument("--geogebra", action="store_true",
-                        help="only the Visualizations page's GeoGebra figure: a preview of MPM2D in --print-folder (#578)")
+                        help="only the Visualizations page's GeoGebra figure: a preview of MPM2D in "
+                             "--print-folder, which it requires (#578)")
     parser.add_argument("--code", action="store_true",
                         help="only photograph the Code page's figures: runnable Python and Swift blocks "
                              "after Run, and a quiz just checked, from previews of the marketing folder (#562)")
@@ -2355,7 +2371,7 @@ def main() -> int:
         return refuse_drawn_corners()
 
     if arguments.print_set:
-        folder = Path(arguments.print_folder).expanduser()
+        folder = Path(arguments.print_folder or PRINT_FOLDER).expanduser()
         if Path.home() not in folder.parents:
             raise SystemExit("The print folder has to be inside your home folder, or the site builder sees it as empty.")
         SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -2369,6 +2385,9 @@ def main() -> int:
         return refuse_drawn_corners()
 
     if arguments.geogebra:
+        if not arguments.print_folder:
+            parser.error("--geogebra needs --print-folder: a new folder inside your home folder "
+                         "(~/Plantoir Print is the print set's, and may predate the sketch's page)")
         folder = Path(arguments.print_folder).expanduser()
         if Path.home() not in folder.parents:
             raise SystemExit("The folder has to be inside your home folder, or the site builder sees it as empty.")

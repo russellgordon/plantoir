@@ -3983,7 +3983,12 @@ onto that box for the page width it measured when it opened and never
 corrects them, so the 1430 × 759 slope-angle sketch, drawn 334 px tall in a
 630 px column, sat in a box left 482 px tall — a white band under it,
 found in the stage-7 screenshot (WebKit, 2026-10-24) and invisible to every
-check that only asked whether the box was zero-sized. A tap that has not opened a sketch in 60 s says
+check that only asked whether the box was zero-sized. **Known limit,
+unmeasured:** `overflow: hidden` would also cut off the keyboard GeoGebra
+may open inside its applet on a touchscreen for a fence with
+`algebra: true` (`geogebraFences.knownLimits`). No touchscreen was tried —
+an iPad and Edge on a touch laptop are to be checked later; a desktop
+browser opens no keyboard. A tap that has not opened a sketch in 60 s says
 `couldNotLoad` and the button works again. A geogebra.org sketch is fetched
 from the site's own copy in `static/geogebra-sketches/` (05 → item 9), never
 from geogebra.org.

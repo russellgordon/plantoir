@@ -25058,7 +25058,8 @@
       "`file:` is plain text, not a link: Obsidian's rename does not rewrite it, and Copy a Page does not carry the file (it copies a page's links and embeds). Both are said as fileNotFound naming the line, and the Media lookup by file name is what makes \"put the .ggb in Media\" the fix.",
       "English only: the language files are left out of the engine (23 MB), and every applet is made with language en.",
       "A command that does nothing without being an error - SetValue of a name that does not exist - raises no dialog and is not said (commands). Commands are not checked at build time: GeoGebra's parser runs only in the browser, so a refused line is first seen on the page, by whoever opens the sketch.",
-      "Obsidian hides .ggb files unless Settings -> Files and links -> Detect all file extensions is on."
+      "Obsidian hides .ggb files unless Settings -> Files and links -> Detect all file extensions is on.",
+      "The open sketch's box keeps the sketch's own shape and hides what spills out of it (geogebra.scss: height auto, overflow hidden - documentation/06 Q3), so the keyboard GeoGebra may open INSIDE its applet on a touchscreen, for a fence with `algebra: true`, could be cut off at the box's bottom edge. Unmeasured: no touchscreen was tried (an iPad and Edge on a touch laptop are to be checked later); on a desktop browser no keyboard opens."
     ]
   },
   "previewStartPage": {
