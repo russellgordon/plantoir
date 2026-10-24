@@ -1963,7 +1963,7 @@ fi
 # function-plot are prebuilt files, so a lockfile is built from their pins.
 # Only npm's STDOUT is read - offline npm prints its JSON there, an `npm error`
 # line on stderr, and exits 1 either way. The registry not answering is a SKIP
-# that says nothing was audited, never a pass; output that is not JSON, or a
+# that says no tree counts as audited until every tree can be, never a pass; output that is not JSON, or a
 # tree whose lockfile is gone, is a FAIL. The record of each run is
 # research/npm-audit/<date>.md; RELEASING.md step 2 revisits it at every cut.
 NPM_AUDIT_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'NPMAUDITPY'

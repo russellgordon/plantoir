@@ -15,7 +15,7 @@ of the same trees). It prints one line per BLOCKING advisory, then the counts:
             contract names that has no audit, no lockfile (ENOLOCK) or output
             that is not JSON; or a tree the contract does not name
     exit 2  the advisory database could not be reached, and nothing failed:
-            the caller SKIPS, saying nothing was audited. Never a pass.
+            the caller SKIPS, saying no tree counts as audited until every tree can be. Never a pass.
 
 Low and moderate advisories that are not accepted are REPORTED, not failed. An
 accepted advisory the audit no longer reports is STALE: said, never failed,

@@ -705,7 +705,7 @@ They change when the pin changes, and that is where they are reviewed.
 - **SKIP** only when npm's own JSON has no `metadata` and its `message` says
   the audit request failed. For `pagedjs` and `function-plot` it is also a
   SKIP when their lockfile step failed with a network error. The SKIP says
-  nothing was audited. One unreachable tree skips the whole gate, so a
+  no tree counts as audited until every tree can be. One unreachable tree skips the whole gate, so a
   half-audit cannot read green. A blocking finding in another tree still
   fails.
 - Only npm's STDOUT is read. Offline, `npm audit --json` prints
@@ -775,9 +775,12 @@ advisory. Either upgrade, in its own piece, or accept it with its reason.
 `runtime\vendor\function-plot`). It uses Windows' own npm and goes through
 the same `scripts/npm_audit.py compare` against the same list. The
 comparator's tests (`scripts/test_npm_audit.py`, stdlib) already run there
-through `PythonToolchainTests`. A win32-only optional package
-(`@esbuild/win32-x64`, sharp's win32 binaries) can give a Windows-only
-finding. Decide it, and add it to the shared list under its tree.
+through `PythonToolchainTests`. Only the wrangler tree can give a
+Windows-only finding: its lockfile is built from the INSTALLED copy, while
+the Quartz and tikz-engine lockfiles and the pin-made pagedjs and
+function-plot lockfiles already list every platform's optional packages
+identically. Decide such a finding, and add it to the shared list under its
+tree.
 
 ### What the first build downloads (measured for #334)
 
