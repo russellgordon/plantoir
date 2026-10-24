@@ -99,6 +99,9 @@ def refuse(mac: PretendMac, launcher: str, leg: str, course: str, section: str) 
     environment["PATH"] = f"{mac.bin}:{environment.get('PATH', '/usr/bin:/bin')}"
     environment["FAKE"] = str(mac.fake)
     environment["HOME"] = str(mac.home)
+    # The app hands every launcher its trail folder (#664); one inherited from
+    # the shell running these tests would send the line out of the scratch HOME.
+    environment.pop("PLANTOIR_TRAIL_DIR", None)
     # The words the pretend ps lists for this run itself; this run never
     # counts, so they only have to be there.
     environment["PREVIEWED"] = f"{course} {section}"

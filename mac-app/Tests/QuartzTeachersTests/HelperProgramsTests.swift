@@ -94,6 +94,66 @@ final class HelperProgramsTests: XCTestCase {
         )
     }
 
+    // MARK: - The trail folder (GitHub #664)
+
+    /// Every launcher is told where the app's trail is, so its own lines land
+    /// there and not in the folder it would work out from `HOME` (which
+    /// `--state-dir` leaves real). The app's value wins over an inherited one:
+    /// a shell or an older copy of Plantoir must never send this app's
+    /// launcher lines into a trail that is not this app's.
+    func testEnvironmentHandsTheLauncherTheAppsTrailFolder() {
+        let home: URL = URL(fileURLWithPath: "/Users/pretend")
+        let trail: URL = URL(fileURLWithPath: "/Users/pretend/state/Library/Logs/Plantoir", isDirectory: true)
+        let fresh: [String: String] = HelperPrograms.environment(
+            basedOn: ["HOME": "/Users/pretend"], inHomeFolder: home, bundledHelpers: nil, trailFolder: trail
+        )
+        XCTAssertEqual(fresh[HelperPrograms.trailFolderVariable], trail.path)
+        let inherited: [String: String] = [
+            "HOME": "/Users/pretend",
+            HelperPrograms.trailFolderVariable: "/elsewhere"
+        ]
+        let overridden: [String: String] = HelperPrograms.environment(
+            basedOn: inherited, inHomeFolder: home, bundledHelpers: nil, trailFolder: trail
+        )
+        XCTAssertEqual(overridden[HelperPrograms.trailFolderVariable], trail.path)
+        XCTAssertEqual(overridden["HOME"], "/Users/pretend", "only the trail moves, never HOME")
+    }
+
+    /// Left to its default, the folder is the one `ActivityTrail` writes to
+    /// right now — under a test run, the test's throwaway trail — so the
+    /// unit suite's real launchers never write into the teacher's trail.
+    func testTheDefaultIsTheFolderTheAppsOwnTrailIsWrittenTo() {
+        let result: [String: String] = HelperPrograms.environment(basedOn: ["HOME": "/Users/pretend"])
+        XCTAssertEqual(result[HelperPrograms.trailFolderVariable], ActivityTrail.store.folderURL.path)
+        XCTAssertNotEqual(
+            result[HelperPrograms.trailFolderVariable],
+            ProblemReportStore.defaultFolderURL().path,
+            "under a test run the launchers must not be pointed at the real trail"
+        )
+    }
+
+    /// The name the launchers read, from the shared contract both apps run,
+    /// and the launcher's function reads that same name.
+    func testTheVariableIsTheOneTheContractAndTheLaunchersName() throws {
+        let repository: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let contractURL: URL = repository
+            .appendingPathComponent("contracts")
+            .appendingPathComponent("app-rules.json")
+        let data: Data = try Data(contentsOf: contractURL)
+        let root: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let rule: [String: Any] = try XCTUnwrap(root["launcherTrailFolder"] as? [String: Any])
+        let variable: String = try XCTUnwrap(rule["variable"] as? String)
+        XCTAssertEqual(HelperPrograms.trailFolderVariable, variable)
+        for launcher in ["setup.sh", "preview.sh", "deploy.sh"] {
+            let text: String = try String(contentsOf: repository.appendingPathComponent(launcher), encoding: .utf8)
+            XCTAssertTrue(text.contains("${" + variable + ":-}"), "\(launcher) does not read \(variable)")
+        }
+    }
+
     // MARK: - The app's own copies (GitHub #312)
 
     /// The launcher installs from the app only when told where the app's
