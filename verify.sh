@@ -1429,6 +1429,46 @@ else
   cat /tmp/verify_payload_figures.log
 fi
 
+# Every GeoGebra sketch in the example courses is ready to open (#578): its
+# file found beside its page as a teacher's first preview finds it, read as a
+# sketch, with its description - and the payload's tree standing for the
+# course folder. Nothing is fetched: a payload names no geogebra.org sketch
+# (the linter refuses one), so a fetch here is a failure.
+if docker run --rm "$DEV_TEST_IMAGE" python3 -c '
+import sys, tempfile
+from pathlib import Path
+sys.path.insert(0, "/opt/scripts")
+import geogebra, toolchain_paths
+class NoFetching:
+    def __getattr__(self, name):
+        raise RuntimeError("a payload sketch asked geogebra.org for something")
+root = toolchain_paths.SUPPORT_DIR / "example_content"
+counted = {"sketches": 0, "shown": 0, "pages": 0, "problems": 0, "notes": 0}
+for tree in sorted(list(root.glob("*/shared")) + list(root.glob("*/per_section"))):
+    pages = []
+    for page in sorted(tree.rglob("*.md")):
+        text = page.read_text(encoding="utf-8")
+        if "```geogebra" in text or "~~~geogebra" in text:
+            path = page.relative_to(tree).as_posix()
+            pages.append({"place": path[:-3], "path": path, "text": text, "source": text})
+    if not pages:
+        continue
+    work = Path(tempfile.mkdtemp())
+    outcome = geogebra.prepare(pages, work, tree, cache_root=work / "cache", fetcher=NoFetching())
+    counted["pages"] += len(pages)
+    for name in ("sketches", "shown"):
+        counted[name] += outcome[name]
+    counted["problems"] += len(outcome["problems"])
+    counted["notes"] += len(outcome["notes"])
+print(str(counted["shown"]) + " of " + str(counted["sketches"]) + " sketch(es) on " + str(counted["pages"]) + " page(s)")
+sys.exit(1 if counted["problems"] or counted["notes"] or counted["shown"] == 0 or counted["shown"] != counted["sketches"] else 0)
+' >/tmp/verify_payload_geogebra.log 2>&1; then
+  pass "every GeoGebra sketch in the example courses is ready to open, its file found beside its page and with its description ($(tail -1 /tmp/verify_payload_geogebra.log), #578)"
+else
+  fail "a GeoGebra sketch in the example courses cannot be shown - a file not found or not a sketch, or no description (#578)"
+  cat /tmp/verify_payload_geogebra.log
+fi
+
 # ---- The date and title writers, against what the site reads ----
 # GitHub #199. `contracts/file-formats.json` -> `datesAndTitles.writingCases`
 # says what the built site reads from each page a writer produces; this runs
