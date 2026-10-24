@@ -3975,9 +3975,39 @@ as `ggbBase64`, and makes the applet with the web3d codebase, offline, in
 English (the language files are left out of the engine), no menu bar, no
 input bar, no right-click menu, the reset icon, shift-drag zoom, the fence's
 `toolbar:`/`algebra:`, at the sketch's own size, scaled down to the page
-(`scaleContainerClass`). Commands run after it loads (stage 3 adds reading
-GeoGebra's own error dialog per line). A tap that has not opened a sketch in
-60 s says `couldNotLoad` and the button works again.
+(`scaleContainerClass`). A tap that has not opened a sketch in 60 s says
+`couldNotLoad` and the button works again. A geogebra.org sketch is fetched
+from the site's own copy in `static/geogebra-sketches/` (05 → item 9), never
+from geogebra.org.
+
+**The fence's commands** (#578 stage 3, `geogebraFences.commands`) run once
+the sketch has opened, one line at a time, and a line GeoGebra refuses is
+shown under the sketch — `lineCouldNotRun`, "Line {line} couldn't run:
+{said}", with GeoGebra's OWN words. Measured on the adapted engine,
+Chromium 1243 and WebKit 2359: **`evalCommand`'s answer cannot be used** —
+it is `false` for scripting commands that work (`SetValue`, `SetColor`,
+`ZoomIn`) and for real errors alike, and `asyncEvalCommand` resolves `""`
+for both, before any dialog. GeoGebra's error dialog tells them apart, but it
+is added 1–10 ms AFTER the line returns, a few tasks later — so reading the
+page straight after a line finds nothing, and waiting a fixed time would be a
+guess. What the loader does instead: after each line it also runs
+`endOfLine` (`PlantoirEndOfLine()`), a command GeoGebra does not know. Its
+dialog always comes, and always after the line's own (every contract case,
+in order, in both engines), so any dialog that arrives before the marker's is
+the line's. A MutationObserver on the applet reads each dialog's message
+lines (`.dialogContent .gwt-Label`, without the title or buttons) and removes
+it as it is added, before it is drawn; the wait ends when the marker's
+dialog arrives — 1 to 9 ms a line — with a 10-second last resort for all the
+lines together. Dialogs are on while the lines run (`errorDialogsActive`) and
+turned off after, so nothing a student does opens one. The refused lines do
+not print. `browser-checks/geogebra_applet.mjs` plants every contract case in
+the fixture's commands sketch and reads exactly the refused ones, in
+GeoGebra's words, and that `SetValue(a, 3)` set `a` to 3; its must-fail (the
+loader reading `evalCommand`'s answer) reported every working scripting line.
+**Rejected:** `evalCommand`'s answer; `asyncEvalCommand`; a fixed wait after
+each line; checking commands at build time (GeoGebra's parser runs only in
+the browser). A line that does nothing without being an error (`SetValue` of
+a name that does not exist) raises nothing and is not said — a known limit.
 
 **The policy.** A published Netlify site is sent `script-src 'self'
 'unsafe-eval' <hashes>` (netlify_badge.py). The stock engine never loads
@@ -4034,9 +4064,17 @@ GeoGebra's licence asks for "Made with GeoGebra®" and a link to
 https://www.geogebra.org on every applet: the link is under every sketch on
 screen, and on paper, where a link cannot be followed, one short line
 ("Made with GeoGebra · geogebra.org") with the address printed under it as
-plain text. A sketch from geogebra.org (stage 4) also names its author and
-the CC BY-NC-SA 4.0 licence, linked on screen and printed as text. The
-addresses are contract values (`geogebraFences.attribution`).
+plain text. A sketch from geogebra.org (stage 4) is CC BY-NC-SA 4.0, which
+asks for the author, the source and the licence: under it, "Made with
+GeoGebra® · by {author} · CC BY-NC-SA 4.0", the author linked to the sketch on
+geogebra.org (`https://www.geogebra.org/m/{id}`) and the licence to
+`https://creativecommons.org/licenses/by-nc-sa/4.0/` (`rel="license"`); on
+paper "Made with GeoGebra · by {author} · CC BY-NC-SA 4.0" with the three
+addresses printed under it as text. The author is the API's
+`creator.displayname`, else the user name, else the sketch's own address, so
+the card never says "by" and nothing. A sketch from the teacher's own file
+names no author or licence: the file is theirs, and nothing in it says
+either. The addresses are contract values (`geogebraFences.attribution`).
 
 ### Q5. Dark theme
 

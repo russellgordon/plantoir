@@ -81,6 +81,15 @@
     }
   }
 
+  // The fence's lines GeoGebra refused, each in its own words (stage 3).
+  .pl-geogebra-lines {
+    margin: 0.5rem auto 0;
+    max-width: min(100%, var(--pl-geogebra-width, 800px));
+    padding-left: 1.2rem;
+    font-size: 0.9em;
+    color: var(--darkgray);
+  }
+
   .pl-geogebra-caption {
     margin-top: 0.4rem;
     text-align: center;
@@ -122,6 +131,7 @@
   .pl-figure.pl-geogebra {
     .pl-geogebra-open,
     .pl-geogebra-message,
+    .pl-geogebra-lines,
     .pl-geogebra-attribution,
     .pl-geogebra-applet {
       display: none !important;

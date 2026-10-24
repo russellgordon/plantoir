@@ -24875,6 +24875,23 @@
         {"name": "GeoGebra's own name with a colon is not said", "body": "a: x + y = 3\nslope: Slope(a)", "settings": {}, "commands": [{"line": 1, "text": "a: x + y = 3"}, {"line": 2, "text": "slope: Slope(a)"}], "problems": [], "notes": []}
       ]
     },
+    "commands": {
+      "rule": "#578 stage 3. The fence's commands run once the sketch has opened (after a file: or material_id: sketch loads, or alone), one line at a time, in order, as typed in GeoGebra's Input Bar. A line GeoGebra refuses is shown under the sketch as words.site.lineCouldNotRun, {line} the line in the fence (from 1, the settings counted) and {said} GeoGebra's OWN words - the message lines of its error dialog, joined with spaces, without its title or buttons. How a refusal is known, measured 2026-10-24 in Chromium 1243 and WebKit 2359 on the adapted engine: evalCommand's answer CANNOT be used - it is false for scripting commands that work (SetValue, SetColor, ZoomIn) and for real errors alike, and asyncEvalCommand resolves \"\" for both, before any dialog; GeoGebra's error dialog tells them apart, but it is added 1 to 10 ms AFTER the line returns, a few tasks later. So after each line the loader also runs `endOfLine`, a command GeoGebra does not know: its dialog ALWAYS comes and always after the line's own (every case below, in order, both engines), so a dialog that arrives before it is the line's. Each dialog is read and removed as it is added (a MutationObserver), before it is drawn, and the wait ends when the marker's dialog arrives - no clock, only a last-resort `giveUpSeconds` for all the lines together. Dialogs are on while the lines run and turned off after (setErrorDialogsActive), so nothing a student does opens one. A line that does nothing and is not an error (SetValue of a name that does not exist) raises nothing and is not said: knownLimits. REJECTED: evalCommand's answer (would report every SetValue); asyncEvalCommand (resolves before the dialog); waiting a fixed time after each line for a dialog that may not come (a guess that flickers on a slower machine); checking the commands at build time (would need GeoGebra's parser in the build).",
+      "endOfLine": "PlantoirEndOfLine()",
+      "giveUpSeconds": 10,
+      "cases": [
+        {"text": "SetValue(a, 3)", "said": null},
+        {"text": "SetColor(f, \"red\")", "said": null},
+        {"text": "ZoomIn(-5, -5, 5, 5)", "said": null},
+        {"text": "A = (1, 2)", "said": null},
+        {"text": "Circle((0,0), 2)", "said": null},
+        {"text": "SetValue(zz, 3)", "said": null},
+        {"text": "Foo(1)", "said": "Unknown command : Foo"},
+        {"text": "k(x) = sin(x", "said": "Unbalanced brackets k(x) = sin(x"},
+        {"text": "f(x) = x^2 +* 3", "said": "Please check your input"},
+        {"text": "Segment(A)", "said": "Command Segment: Illegal number of arguments: 1 Syntax: Segment( <Point>, <Point> ) Segment( <Point>, <Length> )"}
+      ]
+    },
     "materialIds": {
       "rule": "`material_id:` takes a sketch's id or any geogebra.org address that names one: /m/ID, /classic/ID, /graphing/ID, /geometry/ID, /3d/ID, /calculator/ID, /material/show/id/ID, /material/iframe/id/ID, with or without anything after it. An id is 4 to 16 letters and digits. Anything else is materialNotUnderstood.",
       "cases": [
@@ -24888,6 +24905,25 @@
         {"value": "https://example.org/m/ju3f2kbg", "id": null},
         {"value": "a sketch about slopes", "id": null},
         {"value": "https://www.geogebra.org/u/rwhg", "id": null}
+      ]
+    },
+    "fetch": {
+      "rule": "#578 stage 4. A `material_id:` sketch is copied from geogebra.org ONCE (cache), by two requests: GeoGebra's public materials API for what the sketch is (`api`, {id} the sketch's id) and then the .ggb of its ONE applet. Measured 2026-10-24 by one request for ju3f2kbg by hand (HTTP 200, 1,598 bytes of application/json): `title` (\"Slope Angle Conjecture\"), `visibility` (\"S\"), `deleted` (false), `creator.displayname` (\"Russell Gordon\" - the author the attribution names), and `elements`, one per part of the page, each with a `type`; the applet is the element of type \"G\", whose `url` is the .ggb (https://www.geogebra.org/resource/ju3f2kbg/…/material-ju3f2kbg.ggb, 1,594,544 bytes, holding its own geogebra_thumbnail.png - so the element's `previewUrl` picture is NOT fetched: one request fewer, and the thumbnail is made exactly as for a teacher's file). No element of type G is materialHasNoSketch; more than one is materialHasSeveralSketches; an answer of 403, 404 or 410, or `deleted: true`, is materialNotFound; anything else - no network, more than `requestSeconds`, another answer, a redirect to a host not in `hosts`, more than files.largestFileMegabytes - is materialCouldNotBeFetched. https only, and a redirect is followed only to one of `hosts`. A .ggb that is not a GeoGebra file is materialHasNoSketch and is NOT kept. Tests never call the real API: scripts/test_geogebra.py serves both answers from a local server of its own, through the same code.",
+      "api": "https://api.geogebra.org/v1.0/materials/{id}?scope=extended&embed=creator",
+      "hosts": ["api.geogebra.org", "www.geogebra.org", "geogebra.org", "cdn.geogebra.org"],
+      "requestSeconds": 15
+    },
+    "cache": {
+      "rule": "Ruling Q2 and plan review finding 2: FETCH ONCE, kept by the FENCE. A geogebra.org sketch is saved in `folder` beside the course's built sites (`<builds>/<course>/.geogebra-cache`, outside the teacher's folder and shared by the course's sections) as `<key>.ggb` and `<key>.json` (its id, title and author), where key is the fence's own key (keys: figureRules.keyOf of the fence body) - NOT the sketch's id. A build whose fence has a saved copy asks geogebra.org NOTHING; change anything in the fence (the documented way: add or change `version: 2`) and the next build fetches it again, which is how a teacher gets a sketch they changed on geogebra.org. Spaces at the ends of lines and Windows line endings keep the key (keys). `--full-rebuild` leaves the saved copies alone: there is one way to fetch again, the fence, and a full rebuild while geogebra.org cannot be reached must not turn a working sketch into a folder problem. Every build that uses a copy touches it, and a copy unused for `pruneDays` goes (figures.PRUNE_DAYS, the same rule). No saved copy and geogebra.org out of reach: materialCouldNotBeFetched, a folder problem, and the fence stays code. The site's copy is written to quartz/static/geogebra-sketches/<the key's first 16 hex digits>.ggb - a geogebra.org sketch has no file in content/ for Quartz to publish - and its thumbnail as a teacher's file's is. REJECTED: asking geogebra.org on every build (a class site would change under the teacher, and every preview would need the network); keying by the id (an edited sketch could never be fetched again without a command neither app has); clearing on --full-rebuild (figures do, for a different reason: a new drawing engine draws differently).",
+      "folder": ".geogebra-cache",
+      "pruneDays": 90,
+      "cases": [
+        {"name": "no saved copy: fetched once, then kept", "saved": false, "online": true, "fullRebuild": false, "builds": 2, "requests": 2, "shown": true, "reason": null},
+        {"name": "a saved copy: geogebra.org is asked nothing", "saved": true, "online": true, "fullRebuild": false, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "a saved copy and no network: shown", "saved": true, "online": false, "fullRebuild": false, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "a full rebuild keeps the saved copy", "saved": true, "online": false, "fullRebuild": true, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "no saved copy and no network: a folder problem", "saved": false, "online": false, "fullRebuild": false, "builds": 1, "requests": 1, "shown": false, "reason": "materialCouldNotBeFetched"},
+        {"name": "the fence changed (version: 2): fetched again", "saved": true, "online": true, "fullRebuild": false, "builds": 1, "requests": 2, "shown": true, "reason": null, "fenceChanged": true}
       ]
     },
     "files": {
@@ -24959,7 +24995,7 @@
       "rule": "A loaded applet prints its canvas cropped (measured), so the handout's prepare step and the browser's beforeprint put a picture of the sketch as it stands now (api.getPNGBase64, synchronous) beside it, and the print styles show that picture instead of the applet. Nothing on the page is moved or replaced, so there is nothing to put back after the print (#576's rule holds without a restore). A sketch that was never opened prints its thumbnail; one with neither prints its description. The button never prints; the attribution always does, in its print form with the addresses as plain text (attribution)."
     },
     "attribution": {
-      "rule": "GeoGebra's licence asks for the notice \"Made with GeoGebra®\" and a link to https://www.geogebra.org on every applet (toolchain.json -> pins -> geogebra). On screen: words.site.madeWith, linked to engineUrl, under every sketch. A sketch from geogebra.org (CC BY-NC-SA 4.0) also names its author, linked to the sketch on geogebra.org (materialUrl), and the licence (licenceName, linked to licenceUrl) - from stage 4. A sketch from the teacher's own file names no author or licence: the file is theirs, and nothing in it says either. On paper a link cannot be followed, so the print form is one short line (printAttributionFile, or printAttributionMaterial) with the addresses printed under it as plain text, in small type.",
+      "rule": "GeoGebra's licence asks for the notice \"Made with GeoGebra®\" and a link to https://www.geogebra.org on every applet (toolchain.json -> pins -> geogebra). On screen: words.site.madeWith, linked to engineUrl, under every sketch. A sketch from geogebra.org (CC BY-NC-SA 4.0) also names its author, linked to the sketch on geogebra.org (materialUrl), and the licence (licenceName, linked to licenceUrl): the author is the materials API's creator.displayname, else the user name, else the sketch's own address (fetch), so a card never says \"by\" and nothing. A sketch from the teacher's own file names no author or licence: the file is theirs, and nothing in it says either. On paper a link cannot be followed, so the print form is one short line (printAttributionFile, or printAttributionMaterial) with the addresses printed under it as plain text, in small type.",
       "engineUrl": "https://www.geogebra.org",
       "materialUrl": "https://www.geogebra.org/m/{id}",
       "licenceUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
@@ -25009,6 +25045,7 @@
     "knownLimits": [
       "`file:` is plain text, not a link: Obsidian's rename does not rewrite it, and Copy a Page does not carry the file (it copies a page's links and embeds). Both are said as fileNotFound naming the line, and the Media lookup by file name is what makes \"put the .ggb in Media\" the fix.",
       "English only: the language files are left out of the engine (23 MB), and every applet is made with language en.",
+      "A command that does nothing without being an error - SetValue of a name that does not exist - raises no dialog and is not said (commands). Commands are not checked at build time: GeoGebra's parser runs only in the browser, so a refused line is first seen on the page, by whoever opens the sketch.",
       "Obsidian hides .ggb files unless Settings -> Files and links -> Detect all file extensions is on."
     ]
   },

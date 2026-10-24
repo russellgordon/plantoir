@@ -2378,9 +2378,9 @@ students get a sketch they can drag, opened with a tap and served by the
 class site itself. The same split as the figures above: **Python prepares
 and Quartz places.** `scripts/geogebra.py` does everything that can fail;
 the site's transformer and loader (06 → Q) only read what it left. The rules
-and cases: `contracts/shared-rules.json` → `geogebraFences`. (Stage 2 of
-#578: file sketches and commands; a `material_id:` sketch from geogebra.org
-is read and refused as `materialCouldNotBeFetched` until stage 4 fetches it.)
+and cases: `contracts/shared-rules.json` → `geogebraFences`. Three kinds of
+sketch: a teacher's `.ggb` (`file:`), GeoGebra commands alone, and a sketch
+on geogebra.org (`material_id:`, fetched once and kept — item 9).
 
 1. **When.** ALWAYS section, straight after the figures pass and BEFORE the
    folder checks (`_prepare_geogebra`), so a sketch that cannot be shown is
@@ -2470,6 +2470,54 @@ is read and refused as `materialCouldNotBeFetched` until stage 4 fetches it.)
    sketch with no `alt:` is a `plantoir: note:` only. **No new trail event**:
    problems reach the trail through the existing folder-problem line, as the
    figures' do.
+9. **A sketch from geogebra.org: FETCHED ONCE, kept by the fence** (#578
+   stage 4; ruling Q2 and plan review finding 2; `geogebraFences.fetch` and
+   `.cache`). The first build that meets a `material_id:` fence asks
+   GeoGebra's public materials API
+   (`https://api.geogebra.org/v1.0/materials/{id}?scope=extended&embed=creator`)
+   what the sketch is, then downloads the `.ggb` of its ONE applet (the
+   element of type `G`), checks it as a teacher's file is checked, and only
+   then saves it in **`<builds>/<course>/.geogebra-cache/`** — beside the
+   course's built sites, outside the teacher's folder, shared by the sections
+   (08 names it) — as `<key>.ggb` plus `<key>.json` (id, title, author),
+   **keyed by the fence's own key**, not the sketch's id. A build whose fence
+   has a saved copy asks geogebra.org NOTHING. Changing the fence — the skill
+   says: add or change `version: 2` — gives a new key, so the next build
+   fetches again: that is how a teacher gets a sketch they edited on
+   geogebra.org, with no new button in either app (none exists, and none was
+   invented). `--full-rebuild` leaves the copies alone (`_prepare_geogebra`
+   passes `full_rebuild` and `geogebra.prepare` deliberately ignores it); a
+   copy unused for 90 days goes (`figures.PRUNE_DAYS`, the same rule). The
+   site's copy is written to `quartz/static/geogebra-sketches/<key[:16]>.ggb`
+   — a geogebra.org sketch has no file in `content/` for Quartz to publish —
+   and the card names the author and the licence (06 → Q4). Said: "📐
+   Sketches from geogebra.org: 1 copied now, 0 kept from before." Problems:
+   no copy and no network (or a timeout, a server error, a redirect off
+   geogebra.org's hosts) is `materialCouldNotBeFetched`, a folder problem,
+   and the fence stays code; 403/404/410 or `deleted` is `materialNotFound`;
+   no applet is `materialHasNoSketch`, two or more `materialHasSeveralSketches`;
+   a download that is not a GeoGebra file is `materialHasNoSketch` and is
+   never kept.
+
+   **Measured** (2026-10-24, one request for ju3f2kbg by hand): HTTP 200,
+   1,598 bytes of JSON — `title`, `visibility` "S", `deleted` false,
+   `creator.displayname` "Russell Gordon", and one `elements` entry of type
+   `G` whose `url` is the 1,594,544-byte `.ggb`. That `.ggb` holds its own
+   `geogebra_thumbnail.png`, so the element's `previewUrl` picture is not
+   fetched (one request fewer, and the same thumbnail path as a teacher's
+   file). The image's Python trusts 148 certificate authorities by default,
+   so https to geogebra.org needs nothing added. **Tests never call the real
+   API**: `test_geogebra.py` `MaterialTests` serves both answers from a local
+   server of its own, through the same code, and counts the requests where
+   they arrive; verify.sh plants a saved copy for an id geogebra.org does not
+   have, so a build that asked anyway would fail rather than pass.
+   **Must-fails** (copy-and-restore, each red): keyed by the id → four
+   tests; a request despite a saved copy → three; `--full-rebuild` clearing
+   → the cache case. **Rejected:** asking every build (a class site would
+   change under the teacher, and every preview would need the network);
+   keying by the id (an edited sketch could never be fetched again); clearing
+   on a full rebuild (figures do, because a new engine draws differently — a
+   reason that does not apply here); fetching the preview picture as well.
 
 **`file:` is plain text, not a link.** Obsidian's rename does not rewrite
 it, and Copy a Page does not carry the file (it copies a page's links and
