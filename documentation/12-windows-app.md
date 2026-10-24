@@ -650,10 +650,12 @@ the evening before by UI-suite runs that had all been started with
   server as well. A server started by an outside door (Claude Code, Codex) is
   never handed it.
 - **The launchers' own refusal lines** (`Write-TrailLine` in `preview.ps1`
-  and `deploy.ps1`; the mac's `note_on_the_trail`) still use the real path.
-  **Not fixed here**: it is a toolchain change on both platforms, #664
-  (`PLANTOIR_TRAIL_DIR`, trail only, never the builds root). No current test
-  triggers a refusal.
+  and `deploy.ps1`) still use the real path here. The mac's
+  `note_on_the_trail` follows `PLANTOIR_TRAIL_DIR` since #664, and the mac
+  app sets it always (doc 03 → "Where a launcher's own trail lines go");
+  the Windows half is still owed, by the `windows` issue opened from #664,
+  against `contracts/app-rules.json` → `launcherTrailFolder` (trail only,
+  never the builds root). No current UI test triggers a refusal.
 
 **What a driven run must not touch**, and what now checks it: the real trail,
 settings, startup log, scheduled-deploy wrappers and pending sentinels, and

@@ -2054,6 +2054,57 @@
     ],
     "setupNote" : "**Both scripts also forward an argument they do not recognise**, so `--install-example` alone reaches the Python too — the mac passes the `--` separator and Windows does not, and both work. Checked 2026-08-16 rather than assumed, because the two calls looking different is exactly the kind of thing that turns out to be a silent bug. Pass the separator: it is the documented form in both launchers' help, and it keeps working if either ever starts rejecting unknown flags the way `preview.sh` already does."
   },
+  "launcherTrailFolder" : {
+    "appliesOn" : [
+      "mac",
+      "windows"
+    ],
+    "appliesOnWhy" : "Both apps can be started with --state-dir, which moves the app's own trail into the state folder while every launcher it starts keeps the real home folder. The mac's launchers read the variable since GitHub #664; Windows' preview.ps1 and deploy.ps1 owe the same reading (the windows issue opened from #664).",
+    "cases" : [
+      {
+        "expect" : "{scratch}/state/Logs/Plantoir",
+        "name" : "set to an absolute folder",
+        "value" : "{scratch}/state/Logs/Plantoir"
+      },
+      {
+        "expect" : "default",
+        "name" : "not set"
+      },
+      {
+        "expect" : "default",
+        "name" : "set but empty",
+        "value" : ""
+      },
+      {
+        "expect" : "default",
+        "name" : "a relative path",
+        "value" : "state/Logs/Plantoir"
+      },
+      {
+        "expect" : "{scratch}/state/Logs/Plantoir",
+        "name" : "an absolute folder with a trailing separator",
+        "value" : "{scratch}/state/Logs/Plantoir/"
+      }
+    ],
+    "casesNote" : "Each case runs the launcher's REAL trail-writing function with a scratch home folder and the variable as given (no `value` means it is not set at all). `{scratch}` is a scratch folder the test makes, and a test may write `/` as its own platform's separator. `default` is the folder the launcher computes for itself: `$HOME/Library/Logs/Plantoir` on the mac, `%LOCALAPPDATA%\\Plantoir\\Logs` on Windows. The line must land in the expected folder and nowhere else.",
+    "note" : "Where a launcher writes its own lines on the breadcrumb trail (a refusal, or the launcher's own lines from a publish it runs - on Windows Task Scheduler runs deploy.ps1; on the Mac the app runs a scheduled publish itself, so those lines are the app's). The app hands over its trail folder in this variable, and a launcher takes it only when it is an absolute path.",
+    "rejected" : [
+      {
+        "option" : "Set the variable only when the app runs with --state-dir.",
+        "why" : "The unit suite's integration tests run real launchers from a test host whose own trail is a throwaway folder and which has no --state-dir, so their refusal lines would still land in the real trail. It would also need a second branch to REMOVE a stale value inherited from whatever started the app. Setting it always costs nothing in the plain app, where the value is the folder the launcher would have computed anyway."
+      },
+      {
+        "option" : "Hand the launcher a redirected HOME instead.",
+        "why" : "HOME also decides the builds root and where the helper programs live, which --state-dir deliberately keeps real (#154, #641): a UI test builds into the real builds root and cleans it up. Only the trail moves."
+      },
+      {
+        "option" : "Accept a relative value, resolved against the working folder.",
+        "why" : "A stray relative value would start a trail inside the teacher's working folder, beside their courses. Nothing that sets the variable on purpose has any reason to hand over anything but a full path."
+      }
+    ],
+    "rule" : "A launcher writes its trail lines into the folder named by the variable when it is an absolute path, without a trailing separator, and into its own default folder otherwise. It moves the trail ONLY: the builds root, the helper programs and everything else still follow the home folder. The app sets the variable in EVERY launcher's environment, to its own trail folder, overriding any value it inherited.",
+    "variable" : "PLANTOIR_TRAIL_DIR"
+  },
   "linkRules" : {
     "browserSafe" : {
       "cases" : [

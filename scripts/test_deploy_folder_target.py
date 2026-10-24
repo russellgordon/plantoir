@@ -108,6 +108,9 @@ def _run_launcher(folder: Path, to_folder: str):
     """
     environment = dict(os.environ)
     environment["HOME"] = str(folder / "home")
+    # The app hands every launcher its trail folder (#664); one inherited from
+    # the shell running these tests would send the line out of the scratch HOME.
+    environment.pop("PLANTOIR_TRAIL_DIR", None)
     environment.pop("PWD", None)
     environment["RSYNC_RSH"] = "false"
     (folder / "home").mkdir(exist_ok=True)

@@ -10165,7 +10165,15 @@ test assembly and add a source-scan test — not the Swift mechanism.
 takes `HOME` from its environment, and that is the real one — so a UI test
 running a REAL `preview.sh` or `deploy.sh` under `--state-dir` would still
 build into the real builds folder and could fetch helper programs into the
-real `tools/`. Every UI test that launches through `IsolatedLaunch` runs stub
+real `tools/`. **Their trail lines are the one exception, since #664:**
+`HelperPrograms.environment` always hands every launcher
+`PLANTOIR_TRAIL_DIR` = `ActivityTrail.store.folderURL`, and
+`note_on_the_trail` writes there when it is an absolute path, so a launcher's
+own refusal line lands in the state folder's trail rather than the real one.
+Builds and tools still follow `HOME`. A UI test that drives a launcher
+refusal is therefore safe for the trail now; none does yet, because no
+current UI path reaches a refusal cheaply (doc 03 → "Where a launcher's own
+trail lines go"). Every UI test that launches through `IsolatedLaunch` runs stub
 launchers only (`StubLaunchers.writeStubPreviewScript`, the stub `deploy.sh`
 in `NewSiteDialogUITests`). The one exception is the marketing captures
 (`MarketingScreenshotTests`, `AssistantTreeDump`), which drive the REAL

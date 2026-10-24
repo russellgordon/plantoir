@@ -66,6 +66,16 @@ nonisolated enum HelperPrograms {
     /// `contracts/app-rules.json` → `helperBootstrap` for why.
     static let bundledHelpersVariable: String = "PLANTOIR_BUNDLED_HELPERS"
 
+    /// The variable that tells a launcher which folder this app keeps its
+    /// breadcrumb trail in, so the lines a launcher writes for itself (a
+    /// refusal, a line from a publish the launcher itself runs) land beside the app's own (GitHub
+    /// #664). Without it a launcher works the folder out from `HOME`, which
+    /// `--state-dir` deliberately leaves real, so an app keeping its trail in
+    /// a state folder had its launchers' lines written into the real trail.
+    /// It moves the trail ONLY: the builds root and the helper programs still
+    /// follow `HOME`. `contracts/app-rules.json` → `launcherTrailFolder`.
+    static let trailFolderVariable: String = "PLANTOIR_TRAIL_DIR"
+
     // MARK: - Functions
 
     /// `~/Library/Application Support/Plantoir/tools/bin` — the folder the
@@ -131,7 +141,8 @@ nonisolated enum HelperPrograms {
     }
 
     /// The whole environment for a helper: what it would have inherited, with
-    /// `PATH` replaced. `HOME` and everything else survive untouched.
+    /// `PATH` replaced and the trail folder named. `HOME` and everything else
+    /// survive untouched.
     ///
     /// `PLANTOIR_BUNDLED_HELPERS` is added when this app carries its own
     /// copies, and REMOVED when it does not, so a value inherited from some
@@ -141,13 +152,22 @@ nonisolated enum HelperPrograms {
     /// launchd starts through Plantoir itself — so all of them can install
     /// from the app; a launcher typed at the command line has no such
     /// variable and downloads, as it always has.
+    ///
+    /// `PLANTOIR_TRAIL_DIR` is ALWAYS set, to the folder the app's own trail
+    /// is written to, replacing any inherited value. Always rather than only
+    /// under `--state-dir`: in the plain app it names the folder the launcher
+    /// would have worked out anyway, so nothing changes there, and under a
+    /// test run it names the test's throwaway trail, so a real launcher the
+    /// unit suite starts never writes into the teacher's trail either.
     static func environment(
         basedOn inherited: [String: String] = ProcessInfo.processInfo.environment,
         inHomeFolder homeFolder: URL = RealHome.forFiles,
-        bundledHelpers: URL? = bundledHelpersDirectory()
+        bundledHelpers: URL? = bundledHelpersDirectory(),
+        trailFolder: URL = ActivityTrail.store.folderURL
     ) -> [String: String] {
         var result: [String: String] = inherited
         result["PATH"] = pathValue(inheriting: inherited["PATH"], inHomeFolder: homeFolder)
+        result[trailFolderVariable] = trailFolder.path
         if let bundledHelpers {
             result[bundledHelpersVariable] = bundledHelpers.path
         } else {
