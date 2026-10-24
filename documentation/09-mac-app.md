@@ -8461,10 +8461,13 @@ twelve thousand files and changed none wrote no line.
   `copyToolchainFiles` and everything under `patches/`, `scripts/`,
   `support/`, `contracts/`; 12,912 lines today), the same four tab-separated
   fields as Windows — relative path with `/`, length, UTC time in .NET ticks,
-  SHA-256. **This is the one real difference from Windows**, whose manifest
-  is written from the build tree: here it is written after the copy, so its
-  times are the bundle's own exact times and no source-tree time ever has to
-  survive Xcode. It sits at the Resources root, in none of the four folders,
+  SHA-256. The same arrangement as Windows, whose `.hashes` is written from
+  the built output after MSBuild's copy (`Plantoir.csproj`); here it is
+  written after Xcode's copy, so its times are the bundle's own exact times
+  and no source-tree time ever has to survive Xcode. **The one real difference
+  from Windows is the installer:** Inno rounds times to 2 s, the DMG and
+  Sparkle keep them to the tick, so the mac trusts a fingerprint within 1 ms
+  on both sides. It sits at the Resources root, in none of the four folders,
   so it is never mirrored.
   - Incremental: a line whose length and time still match the previous
     manifest keeps its hash unread, and the file is written whole (temporary
@@ -8591,7 +8594,7 @@ twelve thousand files and changed none wrote no line.
 copying on every time mismatch, keeping the index beside `.toolchain`,
 copying into a temporary folder and renaming):
 
-- **A manifest written from the source tree**, as Windows does. Xcode
+- **A manifest written from the source tree.** Xcode
   restamps every file it copies (M0), so it would describe no file the app
   carries and trust nothing.
 - **Hashing the bundle at first launch and caching it.** That IS the cold

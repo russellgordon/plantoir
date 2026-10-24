@@ -5538,9 +5538,10 @@ slow.
 
 The mac matches since #663 (09 → "Comparing without reading (#663)"),
 counts on the trail included. Two differences worth knowing, neither of
-them work for this side: its manifest is written FROM THE BUNDLE by a build
-phase, after Xcode's copy has restamped every file, so it carries the
-bundle's exact times; and it found no installer rounding to allow for — a
+them work for this side: its manifest is written from the bundle by a build
+phase, after Xcode's copy has restamped every file (the same place this
+side's `.hashes` is written, from the built output after MSBuild's copy), so
+it carries the bundle's exact times; and it found no installer rounding to allow for — a
 DMG and a Sparkle full install keep every time to the tick, while a Sparkle
 DELTA keeps the old install's time on every unchanged file, which is why
 the mac carries an index entry forward whenever it still describes its

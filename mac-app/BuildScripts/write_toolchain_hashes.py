@@ -14,11 +14,13 @@ the same four as Windows' `Toolchain\\.hashes` (#559):
     relative/path  length  UTC time in .NET ticks  SHA-256 (lower-case hex)
 
 Written FROM THE BUNDLE, after the copy, so the times are the bundle's own
-exact times. That is the one way the mac differs from Windows, whose manifest
-is written from the build tree: Xcode's folder-reference copy restamps every
-file it copies (0 of 12,901 files kept the checkout's time, measured
-2026-10-23), so a manifest written from the source tree would describe no file
-the app carries.
+exact times - the same arrangement as Windows, whose .hashes is written from
+the built output after MSBuild's copy (Plantoir.csproj). It has to be the
+bundle: Xcode's folder-reference copy restamps every file it copies (0 of
+12,901 files kept the checkout's time, measured 2026-10-23), so a manifest
+written from the source tree would describe no file the app carries. The real
+difference from Windows is the installer: Inno rounds times to 2 s, the DMG
+and Sparkle keep them to the tick, so the mac trusts within 1 ms.
 
 Incremental: a file whose length and time still match the previous manifest's
 line keeps that line's hash without being read, so a build that copied nothing
