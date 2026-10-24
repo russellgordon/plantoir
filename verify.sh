@@ -2030,7 +2030,7 @@ NPMAUDITPY
 if [[ "$NPM_AUDIT_REPORT" == OK* ]]; then
   pass "The image's npm packages have no high or critical advisory that contracts/toolchain.json does not accept (#667): ${NPM_AUDIT_REPORT#OK }"
 elif [[ "$NPM_AUDIT_REPORT" == SKIPPED* ]]; then
-  skip "The image's npm packages were not checked for known vulnerabilities (#667): the advisory database could not be reached (${NPM_AUDIT_REPORT#SKIPPED }) - nothing was audited"
+  skip "The image's npm packages were not checked for known vulnerabilities (#667): the advisory database could not be reached (${NPM_AUDIT_REPORT#SKIPPED }) - no tree counts as audited until every tree can be"
 else
   fail "The image's npm packages have a new or raised high or critical advisory (#667): ${NPM_AUDIT_REPORT#PROBLEMS }. Decide it in contracts/toolchain.json -> npmAudit and research/npm-audit/"
 fi
