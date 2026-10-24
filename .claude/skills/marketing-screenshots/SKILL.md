@@ -211,7 +211,12 @@ python3 website/shots/capture.py --sites    # the class sites and the phone
 python3 website/shots/capture.py --print-set   # what printing does: a preview of MPM2D (~/Plantoir Print)
 python3 website/shots/capture.py --code        # the Code page: previews of ICS3U and ICS4U (~/Plantoir Marketing)
 python3 website/shots/capture.py --quizzes     # the Quizzes page: previews of MCV4U, SCH3U, ENG2D (~/Desktop/Teaching) and ICS3U
+python3 website/shots/capture.py --geogebra --print-folder ~/<new folder>   # the Visualizations page's GeoGebra figure: a preview of MPM2D
 ```
+
+`--geogebra` judges itself too (the sketch opened, its canvas drawn, its
+bottom inside the window); still look: the whole sketch and its "Made with
+GeoGebra" line in frame, and no white band under the sketch inside its box.
 
 `--code` judges itself like `--print-set`: a prepare script presses Run or
 Check and must see "Finished." (or the quiz's "Right!") before the picture,

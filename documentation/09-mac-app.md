@@ -30,7 +30,7 @@ interfaces automatically.
 | Deploy | Runs [`deploy.sh`](07-deployment.md) with output streamed into the app (prompts answered inline); if a preview is running or building, stops it and awaits container cleanup first; the finished live-site link wears the section's custom domain when one is set |
 | New Course | Writes the collected answers as `course_config.json`, then runs the real `./setup.sh`, accepting each prompt's default — the wizard re-reads the file as its saved answers, so scaffolding/backups/Quartz patches are all the wizard's own work |
 | Add Section | Context-click a course; scaffolds the new section the way the wizard would, mirroring sibling sections' frontmatter, and gives every course-level page with per-section keys a pair for the new section — found with the build's own fence rule and spliced in by line, so the page's fence, body and line endings never move (#175; `contracts/course-management.json` → `sectionNumbers.addingKeysToAPage`) |
-| Open in Obsidian | Registers the course folder in Obsidian's own vault registry when needed and opens the section at its `index.md`; first asks about, or adds, Obsidian's add-ons for a course's diagrams and graphs (#495) |
+| Open in Obsidian | Registers the course folder in Obsidian's own vault registry when needed and opens the section at its `index.md` — or, pressed for a section whose preview is showing a page, the file behind that page (#518); first asks about, or adds, Obsidian's add-ons for a course's diagrams and graphs (#495) |
 
 Beyond the actions, the app owns delivery and resources:
 
@@ -2911,7 +2911,9 @@ meeting — interactive and with the point marked, labelled similar triangles,
 a number line), the measured package list, the limits on paper and time,
 how a failure shows up, what to avoid, and what cannot be done (a slider
 is for GeoGebra, arriving in the next release, with several curves for
-several values of the parameter offered meanwhile).
+several values of the parameter offered meanwhile — as of 2026-10-09;
+sliders arrived with GeoGebra sketches in #578, and the skill's §10 now
+teaches them).
 Every pattern in it is drawn by the real engines (the same check as verify's
 payload figures). Scratch working folder with the guidance as the app
 mirrors it and `courses/MPM2D/Unit 2/Parabolas.md` (vertex form, the example
@@ -2965,8 +2967,11 @@ section where `include_my_progress` is off - `false`, or a per-section map
 read as `include_curriculum_coverage` is; checked against #545 as merged),
 wikilinks versus Markdown links
 (`[words](Page Name.md)` is not a link), `![[page]]`, footnotes, tags,
-Media pictures and PDFs, YouTube (`![](watch address)`), Vimeo, GeoGebra and
-PhET (the site's own `<iframe>` on one line), `%%` notes, `publish:` and
+Media pictures and PDFs, YouTube (`![](watch address)`), Vimeo and
+PhET (the site's own `<iframe>` on one line), GeoGebra (since #578 the
+` ```geogebra ` fence in all three ways — a `.ggb` beside the page, typed
+commands, or `material_id:` — and never a geogebra.org `<iframe>`, which
+the skill now says to replace with `material_id:` of the same id), `%%` notes, `publish:` and
 `draft:`'s opposite polarity, folders and `index.md`, class pages and the
 dates they give, Key Links - and a routing table naming the four feature
 skills (`printablePages.agentGuidance.pageAuthoringSkill.routesTo`) instead of
@@ -3831,7 +3836,9 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   — since #495 to ONE call, inside `ObsidianOpening.open`, which every open
   goes through so a test can drive the route without reaching Obsidian; the
   route also asks about Obsidian's add-ons for diagrams and graphs first
-  ("Obsidian's add-ons for diagrams and graphs (#495)").
+  ("Obsidian's add-ons for diagrams and graphs (#495)"). Since #518 a
+  SECTION's press passes `atThePreviewedPage: true` and opens the page its
+  preview shows ("Open in Obsidian opens the page the preview shows (#518)").
 - **Delete removes the selected sidebar row — by asking.** The key runs the
   menu item `contracts/shared-rules.json` → `sidebarDeleteKey` names (Remove
   Course…, Remove Section…, Delete Backup…, Delete Archive…) through
@@ -4464,6 +4471,141 @@ of the Option alternate, Alt read at the click, WebView2's `SourceChanged` and
 `ContentLoading` in place of KVO and didCommit, and the page kept in its own
 file — `12-windows-app.md` → "Preview at Last Viewed on Windows (#514, the
 mac's #504)".
+
+## Open in Obsidian opens the page the preview shows (#518)
+
+A section's Open in Obsidian — the section window's toolbar button, Section ▸
+Open in Obsidian and a section row's context menu — opens the Markdown file
+behind the page that section's preview is showing, instead of the section's
+front page. Course ▸ Open in Obsidian, Course Settings' button, a course row's
+menu and the How I Teach row are unchanged (Russell's ruling 3: the page
+belongs to a section; the course press names the course — this departs from
+the issue's wording, which named the Course menu, by ruling). The rules and
+every case are `contracts/shared-rules.json` → `obsidianOpensThePreviewedPage`;
+the list's format is `file-formats.json` → `pageSourcesList`; when the build
+writes it is `05-build-pipeline.md` → "Which file each page came from (#518)".
+
+### The channel: the section window's own web view, read at the press
+
+The preview is not in Safari: it is the section window's `WKWebView`
+(`WebPreviewController.webView`), and the window already registers what it
+alone can do in `SectionWindowControllers` (the assistant's preview and deploy
+closures). It now registers one more, `previewedPage`, which returns
+`PreviewStartPage.rememberedPath(page: webView.url, previewRoot:)` — the path
+below the run's root, query and fragment stripped — while `previewURL` is set,
+and nil otherwise (building, stopped, Rebuild Preview under way).
+`WorkspaceModel.openInObsidian(course:sectionNumber:atThePreviewedPage:)`
+asks it through `ObsidianOpening.previewedAddress`, so the sidebar and the menu
+bar reach the page as well as the toolbar, and a test replaces the question.
+No new registry: the plan's `PreviewedPages` would have been a second
+folder/course/section-keyed table beside the one that already exists.
+
+Then `PreviewedPageSource.resolve(address:listData:courseFolder:)`: decode
+once, NFC both sides, '' → `index`, an address ending '/' → `<it>index` first
+and then without the slash, any other → itself then `/index`; refuse a
+`collided` entry, a non-`.md` file, a file outside the course folder after
+links are followed, a file that is gone. Anything refused opens what the press
+opened before (the section's `index.md`, or the vault when it has none) — a
+menu item that does nothing is the worse fault. The front page's entry may
+carry `shows`, the class it is only a single `![[…]]` of (ruling 1); that file
+opens while it is there, and its own `showsHidden` — not the front page's
+`hidden` — is the flag the trail line reads, so a visible front page showing
+a hidden class says "(hidden from students)". A hidden page opens anyway
+(ruling 4).
+
+The page is carried in `LockedPagesNoteRequest.page` and
+`ObsidianAddOnsRequest.page`, so after a reference course's note, the add-ons
+offer or the reopen question it is still the page that opens. Every open in
+the route goes through ONE helper, `openObsidian(_:page:course:)`, which calls
+`ObsidianOpening.openPage` (→ `FolderActions.openPageInObsidian`, the door
+#329 made for the How I Teach page) or `ObsidianOpening.open` (the folder
+door). The folder door cannot be used for a page: `obsidianTarget(forFolder:)`
+looks for `<page>/index.md`, finds nothing and opens the vault — the trap #329
+recorded. `ObsidianFigureAddOnsTests.testEveryRouteIsStillTheOneFunction` was
+updated deliberately to pin one call of each.
+
+### The link, measured
+
+`obsidian://open?path=<absolute path>` stays (a vault name is ambiguous
+across working folders). `FolderActions.obsidianURL` now writes `+` as `%2B`;
+`URLComponents` leaves it raw. The plan said a raw `+` reads as a space — that
+was NOT what was measured: Obsidian 1.13.7's main process (`main.js`, the
+link parser) decodes the query with `decodeURIComponent`, and an isolated
+Obsidian (own `HOME` and `--user-data-dir`, mock keychain, debugging port, a
+scratch vault, the link as its last argument — the path `main.js` takes for a
+link at startup, so nothing reached Russell's running Obsidian; his registry
+byte-identical afterwards) opened `C++ Basics.md` from both spellings, on
+1.13.7 and on 1.14.4. `%2B` is kept because to a form-style parser
+(`URLSearchParams`) a raw `+` IS a space, and it costs nothing. The same run,
+9 links × 2 versions, all opened the right file and none created one: spaces,
+`+` both ways, `&` (`%26`), a comma (a class page), a hidden page, and a
+decomposed (NFD) name reached by a decomposed AND by a composed link. Script
+and results: the session scratchpad (`r518/live/`), summarised in the
+closing comment.
+
+### Trail
+
+`activityTrail.mustRecord` → **"page opened in Obsidian"**, written for every
+SECTION press, never a course press: the file's place without `.md` ("opened
+Unit 1/Lesson 3 in Obsidian, the page the preview shows", with "(hidden from
+students)" when it is), or why the section opened as before — the fallback
+when no preview page was showing included (ruling 5). Words:
+`obsidianOpensThePreviewedPage.trail` and `.fallbacks`. The address and the
+list are read AT the press, but the line is written only once the press goes
+ahead: a second press while the first's add-ons scan is still running is
+turned away by `ObsidianFigureAddOnsThisRun.beingOpened` and does nothing, so
+it writes nothing (`notePreviewedPress`, after that guard — one press that
+opens, one line).
+
+### A fourth door: the in-app assistant (#610)
+
+Since [#610](https://github.com/russellgordon/plantoir/issues/610) the in-app
+assistant's `open_in_obsidian` is a section press too. It does not call the
+route itself: `AssistToolRunner` is built over its OWN `WorkspaceModel` (it
+asserts `!isShownInAWindow`), and the route's questions —
+`lockedPagesNoteRequest`, `obsidianAddOnsOfferRequest`,
+`obsidianReopenRequest` — are presented only by the window that owns the
+model, so a press on the runner's model would set a request nobody shows and
+open nothing. Instead the section window registers a fourth closure in
+`SectionWindowControllers.Controller`, `openInObsidian`, which runs
+`workspace.openInObsidianAndWait(course:sectionNumber:)` on the WINDOW's model
+— the button's own route (`pressOpenInObsidian`, the private core both callers
+share; `openInObsidian(...)` keeps its `@discardableResult Bool` so none of
+its ten call sites moved). `openInObsidianAndWait` waits for the add-ons scan
+when one started and returns `OpenInObsidianPress`: `.opened(answer)` with the
+answer read ONCE at the press (the reply names the page from it, never from a
+second look at the web view —
+`testTheAssistantsPressReadsThePageOnceAndReportsThePageThatOpened`),
+`.waitingForAnAnswer` when a question is up, `.alreadyOpening` for a second
+press during a scan (no trail line, as today), and `.noWindow`, the default of
+a window that registers nothing. The trail line is the route's, written once
+per press (`testTheAssistantsPressLeavesOneTrailLine`); the assistant adds
+only its usual turn line. With no section window on screen the runner brings
+one up with `revealSectionOnScreen`, as a rebuild or a deploy does; a freshly
+opened window shows no preview page, so that press opens the section and says
+why. The verb itself — its sentences, the MCP refusal, why it is read-only,
+and the routing measurement — is in `10-local-ai-assistant.md` → "#610: Open
+in Obsidian from the assistant".
+
+### Rejected
+
+AppleScript to Safari's front tab (needs the Automation permission, never
+re-asked once denied, and Safari's tab is not this section's preview); the
+live-reload websocket (server to page only); a file written by injected
+script (a second channel to keep in step); the page last viewed (#504 ignores
+the app's own loads on purpose, so after Rebuild Preview or a press of the
+front page it names a page no longer shown — ruling 2); working the file out
+from the address in the app (a section's page over a shared one, `_index` and
+Quartz's slugging can only be undone by the build); `obsidian://open?vault=`;
+an `otherBuild` refusal on `buildId` (the app never learns which build a
+preview shows, and `.build-id` moves on Rebuild before the list does); a new
+`PreviewedPages` registry (above).
+
+**On Windows**: it inherits the list free (shared Python, native build) and
+owes reading `CoreWebView2.Source` at the press through its `PreviewStartPage`
+normaliser, the resolution cases, the page through its Open in Obsidian
+route, and the trail event — the `windows` issue for #518. The assistant's door (#610) is a separate `windows` issue: the call is
+answered by the APP, pressing the section window's own Open in Obsidian.
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
@@ -8315,7 +8457,9 @@ folder ready after an update (#473)"), with the mac's differences named:**
 - **The trail line** `working folder tools copied` is written on both
   platforms now (its contract entry lost `appliesOn: ["windows"]`): once per
   copy that changed or failed something, the counts, the seconds, and the
-  first file that failed. `BuilderWarmUp`, which copies the same recipe into
+  first file that failed. Since #663 also once per copy that had to READ a
+  file to compare it, with how many were compared and read in full
+  ("Comparing without reading (#663)", below). `BuilderWarmUp`, which copies the same recipe into
   its own folder, builds nothing from a copy that failed, since the image
   would carry the wrong tag.
 
@@ -8328,6 +8472,182 @@ up to date in 3.8 s"). Before this piece the same launch would have shown
 its window at about 4 s. The number that matters, launch to a usable
 window, no longer depends on the copy at all — Windows' sentence, true here
 too.
+
+#### Comparing without reading (#663, 2026-10-24)
+
+The mac's half of Windows #559 (12 → "Comparing without reading (#559)").
+**What was wrong** is the same on both: `syncFile` trusted a copy when its
+length AND time matched the bundled file, and when only the length matched
+it read BOTH files in full, compared them and restamped the copy. So a
+pass cost what the number of DIFFERENT TIMES made it cost, not the number of
+changed files — and Xcode's folder-reference copy restamps every file it
+copies (the planner counted 0 of 12,901 resource files in a Debug bundle
+carrying the checkout's time), so every full install of a new build gives
+every file a new time. The trail said nothing about it: a pass that read
+twelve thousand files and changed none wrote no line.
+
+**What it does now — Windows' design, with the mac's differences named.**
+
+- **The build writes a manifest FROM THE BUNDLE.** A post-build phase in
+  `project.yml` ("Write the toolchain's fingerprints") runs
+  `BuildScripts/write_toolchain_hashes.py` on
+  `$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH`, after Xcode's
+  resource copy and before code signing. It writes `Resources/toolchain.hashes`:
+  one line per file the mirror copies (the ten root files in
+  `copyToolchainFiles` and everything under `patches/`, `scripts/`,
+  `support/`, `contracts/`; 12,912 lines today), the same four tab-separated
+  fields as Windows — relative path with `/`, length, UTC time in .NET ticks,
+  SHA-256. The same arrangement as Windows, whose `.hashes` is written from
+  the built output after MSBuild's copy (`Plantoir.csproj`); here it is
+  written after Xcode's copy, so its times are the bundle's own exact times
+  and no source-tree time ever has to survive Xcode. **The one real difference
+  from Windows is the installer:** Inno rounds times to 2 s, the DMG and
+  Sparkle keep them to the tick, so the mac trusts a fingerprint within 1 ms
+  on both sides. It sits at the Resources root, in none of the four folders,
+  so it is never mirrored.
+  - Incremental: a line whose length and time still match the previous
+    manifest keeps its hash unread, and the file is written whole (temporary
+    file, rename) and only when it changes. **Measured** (M4 Pro, warm): a
+    full write hashes 12,912 files in 1.09–2.46 s (three runs: 2.46, 1.18,
+    1.09); a build that copied nothing new costs 0.55 s and rewrites nothing.
+  - **Runs on every build** (`basedOnDependencyAnalysis: false`): a folder
+    reference is tracked by its directory's time (Trap 1), so dependency
+    analysis on the four folders would let a build that copied an edited
+    script skip the phase.
+  - **The script sandbox.** The target leaves `ENABLE_USER_SCRIPT_SANDBOXING`
+    unset, which Xcode 26.6 resolves to NO for it. Measured under YES
+    anyway, so a later default cannot break it quietly: with no declared
+    inputs the sandbox refused Python even the script
+    (`deny(1) file-read-data …/write_toolchain_hashes.py`, build failed);
+    with the script, the four FOLDERS and the ten root files declared as
+    inputs it hashed all 12,912 files and wrote the same manifest byte for
+    byte. So the inputs are declared, the output is declared, and sandboxing
+    is not turned off.
+- **Each working folder gets an index**: the manifest last applied to it,
+  with each copy's own length and time read back from the disk. It lives at
+  `<RealHome.forFiles>/Library/Application Support/Plantoir/toolchain-index/<BuildOutputLocation.folderIdentifier>.hashes`,
+  so a `--state-dir` run and the unit suite keep their own, and it is
+  written whole, only after a pass that failed nothing and only when it
+  changed (`ToolchainFingerprints`, `ToolchainMirrorPass`, Models/).
+- **The comparison** (`syncFile` with a pass). One `stat` of each file, used
+  for every question below. Length and time equal → identical, as before.
+  Otherwise, at the same length: the manifest still describes the bundled
+  file AND the index still describes the copy → the two hashes are compared
+  and **the bundled file is not read at all**; only the manifest is trusted
+  → the copy alone is hashed; neither → both read, exactly as before. A
+  manifest that is missing, or a line that no longer matches its file,
+  falls back to that last case, so a stale manifest or a copy edited in
+  place costs reads, never a missed copy (`testAStaleManifestDoesNotSkipTheCopy`,
+  whose stale manifest carries exactly the copy's hash).
+  - **Trust is 1 ms on BOTH sides** — the tolerance `filesLookIdentical`
+    has always used. Windows trusts a bundled file up to 2 s older than its
+    manifest because Inno rounds every installed time down to 2 s; the mac
+    measured no rounding anywhere (below), so it has no reason to widen the
+    window in which a file that moved on is trusted.
+  - **The index outlives a delta's pass.** An index entry that still
+    describes its copy is carried into the next index even when the
+    manifest cannot vouch for the bundled file (`keepWhatIsStillKnown`), and
+    a copy written or compared by reading is learned from the bytes in hand.
+    That is a mac addition, forced by M2: after a Sparkle delta the new
+    build's manifest describes none of the unchanged files, and without it
+    the index emptied on the delta's pass and the next FULL install hashed
+    every copy again (`testAFullInstallAfterADeltaReadsNothing`, which
+    fails with it removed: 6 of 7 copies read).
+  - `BuilderWarmUp` calls `copyToolchainFiles` for its own folder and gets
+    the same pass, with an index keyed by that folder
+    (`testTheWarmUpsFolderIsComparedByFingerprintToo`). `AgentGuidance`'s
+    skills and `BuilderWarmUp`'s single `setup.sh` pass no manifest and take
+    the old comparison.
+- **Counts and the trail line.** `MirrorOutcome` gains `compared` (files
+  that already had a copy, however they were compared — the cheap match by
+  length and time counts, as on Windows) and `readInFull` (the copy hashed,
+  or both read). `working folder tools copied` now says
+  `got the working folder ready: N file(s) brought up to date, M compared (K read in full) in S s`,
+  each new clause only when above 0, the failure sentence with the same
+  counts — and it is written for a pass that READ anything even when it
+  changed nothing, never for the ordinary launch that matched every file by
+  length and time. Contract: `shared-rules.json` → `activityTrail.mustRecord`
+  → "working folder tools copied".
+
+**Measured** (Apple M4 Pro, 48 GB, macOS 26.6, Xcode 26.6, 2026-10-24).
+
+- **M1 — a DMG keeps every time.** The Debug bundle was staged with
+  `cp -a` (as `publish.sh` stages), put in a DMG with `hdiutil create -fs
+  APFS … -format UDZO` (`publish.sh`'s fallback), mounted, and copied out
+  three ways. Against the bundle's manifest, 12,912 of 12,912 files matched
+  **to the tick** at every step: the staged copy, the mounted DMG, `ditto`
+  out of it, `cp -Rp` out of it, and `FileManager.copyItem` out of it (the
+  call Sparkle's disk-image path makes). 0 within 1 ms, 0 outside. So a DMG
+  drag, or a Sparkle FULL install, gives the teacher exactly the bundle's
+  times and the manifest describes every file. (Finder's own drag was not
+  driven; `ditto` and `copyItem` are the copies it and Sparkle make.)
+- **M2 — a Sparkle delta keeps the OLD times.** Sparkle 2.9.6's
+  `BinaryDelta apply` (the pinned release's tool, SHA-256 checked) took a
+  `ditto` copy of the installed 1.8.6 (build 4076) to 1.8.7 (4167) with the
+  shipped `Plantoir4167-4076.delta`, in 21.3 s. Of the 1.8.7 recipe's 12,910
+  files, **none** carried 1.8.7's time; the 12,865 whose bytes did not change
+  kept 1.8.6's time to the tick, and the 26 changed and 19 added files got
+  the time they were written. So after a delta the build-time manifest
+  vouches for nothing — and nothing needs it: the working folder's copies
+  carry the same old times, and the cheap match answers for all but the
+  45 files the update actually touched. The manifest earns its keep on FULL
+  installs (M1) and rebuilds; the delta case is why the index is carried
+  forward (above). Sparkle's installer itself was not driven end to end:
+  `BinaryDelta apply` is the step that writes the new tree, and the move
+  into place is a rename.
+- **M0** (the planner's, not repeated): Xcode's folder copy does not keep the
+  checkout's times in Debug. Writing the manifest from the bundle makes the
+  question moot for Release too.
+- **M3 — the pass after a restamp, before and after.** A throwaway XCTest
+  (not committed) timed `copyToolchainFiles(into:)` against a scratch
+  working folder filled from the test host's own bundle (12,912 files,
+  ~80 MB), then restamped every bundled file and rewrote the manifest the
+  way the build phase does, three times; "before" is origin/dev's
+  `WorkspaceModel.swift` and `ToolchainReadiness.swift` swapped in. Warm
+  cache, Debug build, two rounds each:
+
+  | | Restamped pass 1, 2, 3 | Ordinary pass (nothing to do) |
+  |---|---|---|
+  | Before | 5.95, 3.25, 1.95 s; 2.94, 1.97, 1.98 s — every file read twice | 1.07 s; 1.03 s |
+  | After | 1.40, 1.43, 1.38 s; 1.45, 1.44, 1.41 s — 12,912 compared, 0 read in full | 0.98 s; 1.02 s |
+
+  Warm, on the fastest Mac there is, the saving is about half a second to
+  four and a half seconds; the first restamped pass of each "before" round
+  was the slowest because its reads were the least cached. **Cold cannot be
+  measured without a reboot**, and a cold read of 160 MB is where the old
+  pass was expensive; Windows measured 102–132 s cold against 11.2 s warm
+  for its read-both pass, which is the shape to expect on a slow disk.
+  - **Rejected on measurement: the first version** asked `stat` again for
+    every fingerprint question (manifest, index, remember) after
+    `filesLookIdentical`'s two resource lookups. It made the ORDINARY pass —
+    the one every launch pays — 0.4 s slower (1.45 s and 1.40 s against
+    1.03–1.07 s) and the restamped pass only 1.77–1.96 s. One `stat` per
+    file, shared by every question, brought both down to the table's
+    numbers; `filesLookIdentical` now asks the same `stat`, so there is one
+    definition of "looks identical".
+
+**Rejected**, beyond Windows' list (12 → #559, which applies here too —
+copying on every time mismatch, keeping the index beside `.toolchain`,
+copying into a temporary folder and renaming):
+
+- **A manifest written from the source tree.** Xcode
+  restamps every file it copies (M0), so it would describe no file the app
+  carries and trust nothing.
+- **Hashing the bundle at first launch and caching it.** That IS the cold
+  read this exists to avoid.
+- **Windows' one-sided 2 s rule for the manifest.** There is no installer
+  rounding on the mac to allow for (M1, M2).
+- **Turning `ENABLE_USER_SCRIPT_SANDBOXING` off for the target.** Not
+  needed: declared inputs work under the sandbox (above).
+
+**What a full install after deltas costs.** The index fills only on a pass
+the manifest can vouch for — a full install or a rebuild. A folder kept up
+to date by deltas alone has an index that knows only the files those
+deltas changed, so its next full install hashes the other copies once (one
+read each, not two) and is cheap from then on. The first version with this
+piece is the same case for every folder: installed from the DMG, its first
+launch reads each copy once; installed by a delta, it reads nothing (the
+times answer). **At the cut**, `RELEASING.md` step 4 asks for the check.
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 
@@ -9082,13 +9402,14 @@ and the deploy button — are the app's, not the tool's: over MCP the client is
 told which tools write (`readOnlyHint`) and does its own asking. The app itself answers the flag —
 `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` — rather
 than shipping a second binary, so no packaging step can leave it out. Claude
-Code is offered a LONGER list than the local model — 37 tools against 13
+Code is offered a LONGER list than the local model — 38 tools against 13
 (`assist-cases.json` → `toolSchemas.mcp` and `.local`), with the local model
-seeing exactly the thirteen its routing was measured against. The twenty-four
+seeing exactly the thirteen its routing was measured against. The twenty-five
 it does not see are off its list for several reasons (`AssistToolSurface.localTools`
-says each). Nine of them are among the twenty-two tools both surfaces share:
+says each). Ten of them are among the twenty-three tools both surfaces share:
 the seven `plan_` twins, which plan mode calls in code from the write the model
-already chose; `remember_timetable`, because dates a model supplies may be
+already chose; `open_in_obsidian` (#610), whose measured routing regressed, so
+the window matches its phrasings in code; `remember_timetable`, because dates a model supplies may be
 invented and the schedule sheet records them instead; and `re_date_classes`,
 whose phrasings are matched in code. The other fifteen are served
 only over MCP: reading the curriculum and pointing a page at the expectations
@@ -10059,7 +10380,15 @@ test assembly and add a source-scan test — not the Swift mechanism.
 takes `HOME` from its environment, and that is the real one — so a UI test
 running a REAL `preview.sh` or `deploy.sh` under `--state-dir` would still
 build into the real builds folder and could fetch helper programs into the
-real `tools/`. Every UI test that launches through `IsolatedLaunch` runs stub
+real `tools/`. **Their trail lines are the one exception, since #664:**
+`HelperPrograms.environment` always hands every launcher
+`PLANTOIR_TRAIL_DIR` = `ActivityTrail.store.folderURL`, and
+`note_on_the_trail` writes there when it is an absolute path, so a launcher's
+own refusal line lands in the state folder's trail rather than the real one.
+Builds and tools still follow `HOME`. A UI test that drives a launcher
+refusal is therefore safe for the trail now; none does yet, because no
+current UI path reaches a refusal cheaply (doc 03 → "Where a launcher's own
+trail lines go"). Every UI test that launches through `IsolatedLaunch` runs stub
 launchers only (`StubLaunchers.writeStubPreviewScript`, the stub `deploy.sh`
 in `NewSiteDialogUITests`). The one exception is the marketing captures
 (`MarketingScreenshotTests`, `AssistantTreeDump`), which drive the REAL

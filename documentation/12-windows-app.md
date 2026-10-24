@@ -650,10 +650,12 @@ the evening before by UI-suite runs that had all been started with
   server as well. A server started by an outside door (Claude Code, Codex) is
   never handed it.
 - **The launchers' own refusal lines** (`Write-TrailLine` in `preview.ps1`
-  and `deploy.ps1`; the mac's `note_on_the_trail`) still use the real path.
-  **Not fixed here**: it is a toolchain change on both platforms, #664
-  (`PLANTOIR_TRAIL_DIR`, trail only, never the builds root). No current test
-  triggers a refusal.
+  and `deploy.ps1`) still use the real path here. The mac's
+  `note_on_the_trail` follows `PLANTOIR_TRAIL_DIR` since #664, and the mac
+  app sets it always (doc 03 → "Where a launcher's own trail lines go");
+  the Windows half is still owed, by the `windows` issue opened from #664,
+  against `contracts/app-rules.json` → `launcherTrailFolder` (trail only,
+  never the builds root). No current UI test triggers a refusal.
 
 **What a driven run must not touch**, and what now checks it: the real trail,
 settings, startup log, scheduled-deploy wrappers and pending sentinels, and
@@ -5534,9 +5536,16 @@ slow.
   bundle's, and the build scripts read file times. Deferred until measured
   cold, not done.
 
-The mac's mirror has the same design and the same flaw
-(`WorkspaceModel.filesLookIdentical` / `syncFile`); GitHub #663 asks it to
-match, counts on the trail included.
+The mac matches since #663 (09 → "Comparing without reading (#663)"),
+counts on the trail included. Two differences worth knowing, neither of
+them work for this side: its manifest is written from the bundle by a build
+phase, after Xcode's copy has restamped every file (the same place this
+side's `.hashes` is written, from the built output after MSBuild's copy), so
+it carries the bundle's exact times; and it found no installer rounding to allow for — a
+DMG and a Sparkle full install keep every time to the tick, while a Sparkle
+DELTA keeps the old install's time on every unchanged file, which is why
+the mac carries an index entry forward whenever it still describes its
+copy.
 
 ### What was rejected
 
@@ -5596,8 +5605,8 @@ full** to answer; each is said only when it is above 0, so a folder filled
 from nothing reads exactly as it did. The second line above is what 1.7.1 →
 1.7.2 would have written: the old line said "14 files" and nothing about the
 twelve thousand it read twice, which is why #559 took a measurement session
-to explain. Windows-only for now — the mac's line lacks the counts (GitHub
-#663).
+to explain. The mac's line carries the same counts since #663, in its own
+punctuation ("file(s)", a colon).
 
 Since #477 the scheduled run's own copy writes it with the course and
 section, "got the working folder ready for a scheduled deploy — …", and a
@@ -7864,14 +7873,19 @@ product failure. The preflight now does three things.
   `windows-app\Vendor\runtime` and is exported to the launchers. The run
   refuses if the runtime has no `manifest.json` or no `vendor\pyodide`.
 
-**The mac's `verify-deploy.sh` is exposed the same way. This is for it to know, and
-to MATCH if it wants to (#665).** It reads the CHECKOUT's `contracts/`
-(`check_engine_folder`'s `toolchain.json`). It builds from the working
-folder's own `.toolchain/`, which it reads for `PREVIEW_RULE_FILE` and the
-launchers run. Nothing refreshes that folder but the app. On the mac the
-image tag hashes `.toolchain/`, so a stale mirror is a stale IMAGE as well,
-which still looks healthy. The cure is the same: refresh the folder's
-recipe from the checkout before judging it.
+**The mac's `verify-deploy.sh` matched both halves of this in #665.** It
+mirrors the checkout's working tree into the folder before it judges
+anything (the three `.sh` launchers, the `.toolchain/` root files and
+`recipeFolders`, `__pycache__` skipped on both sides), rebuilds from scratch
+when anything differed, and diffs the folder again at the end. Its
+Cloudflare wait goes one step further than the one below: production must
+serve the front page AND the borrowed page of runnable code byte for byte,
+and that page carries a mark made fresh for every run, because the front
+page alone cannot tell two deployments apart when only static files or
+headers moved. Windows owes matching the mark (the `windows` issue opened
+from #665); the reasoning and the measurements are in
+`documentation/07-deployment.md` → "`verify-deploy.sh` — the publishing
+harness".
 
 **Cloudflare propagation** (the second trap at the same cut). Production
 was still serving the previous deployment when the single Cloudflare leg
@@ -8009,7 +8023,11 @@ launcher writes for prepare:
 | 11 | `notDownloaded` | Offline, or a download that was not what was pinned. |
 | 12 | none, so the build says `notCompiled` | Another installation running, an unpack that failed, or the wait for another launcher gave up. |
 
-The reasons are the mac's own. `notDownloaded`'s
+The reasons are the mac's own, and since #642 (v1.9.0) the mac maps its
+image build's reasons to these same states (`codeRunnerBlocks.swift.mac` →
+`stateForReason`, held equal to this table by `test_swift_blocks.py`), writing
+`{reason: …}` beside `state` - a record nothing reads, which Windows may copy
+but need not. `notDownloaded`'s
 "(the first time downloads about {downloadGigabytes} GB)" is filled per
 platform (`swift.downloadGigabytes`: 1.3 on a Mac, 2.3 here), so the mac's
 rendered sentence is byte for byte what it was.

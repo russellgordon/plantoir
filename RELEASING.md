@@ -149,7 +149,8 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    in `windows-app/`; the mac unit suite passes. **Then open
    `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
    gaps, and step 2 says what to check in it. Then **actually publish a
-   section from an app** — see step 2 for why that is not optional.
+   section from an app** — see step 2 for why that is not optional. And
+   **revisit the npm audit** (#667): read verify.sh's npm-audit line (step 2).
 1a. **Minor releases (x.y.0) only: is Cloudflare Pages still safe?** Check
    Cloudflare's changelog for a Pages end-of-life date and whether Workers now
    takes custom domains with outside nameservers. Checklist step 1a says what
@@ -205,6 +206,17 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    **410 MB** (ULMO; 410,488,446 bytes at the #312 rehearsal) rather than 59 MB — the notarization upload takes
    correspondingly longer ("The update feed (macOS)" → "Deltas" for why
    updates stay small).
+   **After installing the DMG over the previous version, check the tools copy
+   read nothing (#663):** open a working folder the previous version had
+   already opened, and the first launch's `working folder tools copied` line
+   carries no "(K read in full)" bracket. Two exceptions, both expected: the
+   FIRST version with #663 (1.9.0) has no index yet, so it reads each copy
+   once ("12912 compared (12912 read in full)") and never again; and a folder
+   kept up to date only by deltas until now may read the copies its index
+   does not know. If any other launch reads, check that
+   `Contents/Resources/toolchain.hashes` exists and that one file's ticks in
+   it match the bundled file's (`documentation/09-mac-app.md` → "Comparing
+   without reading (#663)").
 4a. **Take the marketing screenshots, BEFORE anything is published**: the
    `marketing-screenshots` skill (`python3 website/shots/capture.py --scenes`,
    both colour schemes) against the build being released; commit the images;
@@ -297,6 +309,19 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > say nothing about the image. It DISCOVERS them rather than listing them,
    > so no number is kept in step by hand; this said "all fifteen" when there
    > were fifteen, on 2026-09-07, and there are eighteen as of 2026-09-09.)
+
+   **Revisit the npm audit** (#667). Read verify.sh's line about the image's
+   npm packages. A SKIP there means nothing was checked, so run verify.sh
+   again with the network. Then run `python3 scripts/npm_audit.py findings`
+   over that run's audits (verify.sh leaves them in `/tmp/verify_npm_audit/`).
+   Decide every new or raised advisory: upgrade it in its own piece, or
+   accept it with its exposure and reason in `contracts/toolchain.json` →
+   `npmAudit`. If anything changed, commit a new
+   `research/npm-audit/<date>.md`. Update `npmAudit.reviewed` either way. The
+   gate only fails on a NEW high or critical advisory, so a green line does
+   not mean the moderates were read; this step is where they are.
+   `documentation/02-docker-image.md` → "Known vulnerabilities in the image's
+   npm packages" says what each outcome means.
 
    **If the release changes anything under `scripts/`, the Dockerfile or a
    launcher, run the publishing verifier rather than smoking it by hand** —
@@ -468,6 +493,28 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    It first reads every picture the pages show a Mac visitor and refuses if
    any lacks its window's own corners (#375; `website/SCREENSHOTS.md` → "The
    one rule") — retake that picture, never mask it.
+
+   **It also carries plantoir.app's mirror, and refuses without it (#578).**
+   `site/mirror/` holds the files the website builder falls back to when
+   their own host does not answer — today GeoGebra's bundle,
+   `mirror/geogebra/geogebra-math-apps-bundle-5-4-933-1.zip`, 33,461,640
+   bytes, the second address in `contracts/toolchain.json` → `pins` →
+   `geogebra` → `urls`. It is git-ignored and never committed: `build.py`
+   fills it from `$PLANTOIR_MIRROR_CACHE` (else
+   `~/Library/Caches/Plantoir-dev/mirror`), downloading each file from its
+   `source` the first time and checking its SHA-256, and `--deploy` refuses
+   ("Not deploying: plantoir.app's mirror …") while a file `website/site.json`
+   → `mirror` lists is missing or is not its SHA-256 — so deploy from a
+   machine that has the network, or the cache. **After the first deploy that
+   carries it, run `python3 website/build.py --verify-deploy` and read the
+   mirror line: it fetches each file back and must say "SHA-256 matching".**
+   That is the only proof Netlify serves a file this size (the next largest
+   on the site is about 1.1 MB); until it has said so, the image build's
+   fallback 404s and only download.geogebra.org stands between a teacher's
+   first build and a failure. When a pin moves, ADD the new file to
+   `site.json` → `mirror` (`website/test_mirror.py` fails until you do) and
+   keep the old one while any supported release still names it: a released
+   app's Dockerfile names its own mirror address.
 
 ## The update feed (macOS)
 

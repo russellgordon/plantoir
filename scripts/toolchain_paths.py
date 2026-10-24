@@ -78,6 +78,35 @@ NPX = "npx.cmd" if os.name == "nt" else "npx"
 WRANGLER = "wrangler.cmd" if os.name == "nt" else "wrangler"
 
 
+# The one Node deprecation the site build is known to print, and silenced (#640).
+# Quartz v4.5.0's dependencies require Node's built-in `punycode`, and from
+# Node 21 every Quartz build prints "[DEP0040] DeprecationWarning: The
+# `punycode` module is deprecated" to stderr, which reaches the teacher's
+# console as machinery (CLAUDE.md rule 1). Node 20 printed nothing. Only that
+# one code is silenced - NOT NODE_NO_WARNINGS, which hides every warning,
+# including the ones a real break would print. `--disable-warning` is accepted
+# from Node 20.11 (measured on 20.20.2 and 22.23.4), so the flag is safe on
+# Windows' Node 20 runtime too.
+NODE_QUIET_DEPRECATION = "--disable-warning=DEP0040"
+
+
+def node_environment(base) -> dict:
+    """
+    A copy of `base` (an environment mapping) for running Node: everything in
+    it kept, with NODE_OPTIONS carrying NODE_QUIET_DEPRECATION. A NODE_OPTIONS
+    already set is kept and added to, and the flag is never written twice.
+    Every node the build starts - Quartz itself and the figure helper - is
+    given this, so none of them prints the punycode line.
+    """
+    environment = dict(base)
+    existing = environment.get("NODE_OPTIONS", "").strip()
+    options = existing.split()
+    if NODE_QUIET_DEPRECATION not in options:
+        options.append(NODE_QUIET_DEPRECATION)
+    environment["NODE_OPTIONS"] = " ".join(options)
+    return environment
+
+
 class _WriteOutcome:
     """Shaped like the CompletedProcess the old `tee` subprocess returned, so
     the call sites' returncode/stderr checks read on unchanged."""

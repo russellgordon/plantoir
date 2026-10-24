@@ -4,7 +4,7 @@ Plantoir's toolchain includes software written by other people. This file
 lists what is carried INSIDE the website builder or copied into a class
 website, under which licence, and where the licence text travels. It was
 started with #485 E1 (v1.7.0); later pieces add their own entries here
-(Pyodide and KaTeX with #455 and #494; the Swift runtime inside compiled Swift programs with #493; GeoGebra and PhET with #485 E2 and E3; the two Obsidian add-ons the macOS app carries with #495). Versions and hashes are pinned in
+(Pyodide and KaTeX with #455 and #494; the Swift runtime inside compiled Swift programs with #493; GeoGebra with #578; PhET with #485 E3; the two Obsidian add-ons the macOS app carries with #495). Versions and hashes are pinned in
 `contracts/toolchain.json` → `pins`.
 
 Tools the image installs only to BUILD (Node, Python, Quartz, wrangler,
@@ -24,6 +24,7 @@ teacher's site. Fonts a site carries for its own look are described in
 | **CPython and its standard library, inside Pyodide** — `pyodide.asm.wasm` and `python_stdlib.zip` | 3.14.2, as built by Pyodide 314.0.7 | PSF License Agreement (Python Software Foundation License Version 2), with the parts of the standard library under their own permissive terms as Python ships them | Named here: neither file carries a licence text (measured: no LICENSE in `python_stdlib.zip`), and the PSF text is the standard one at https://docs.python.org/3/license.html |
 | **The Swift standard library and runtime, inside each compiled Swift program** — every `static/swift-wasm/<key>.wasm` a page's ` ```swift run ` block was compiled to (#493): Embedded Swift's library (with its Unicode tables) or the full one, linked statically, and wasi-libc | Swift 6.4.0-RELEASE and its wasm SDK, as pinned in `contracts/toolchain.json` → `swiftImage` | Apache License 2.0 **with the Runtime Library Exception** (© Apple Inc. and the Swift project authors); wasi-libc is under Apache-2.0 WITH LLVM-exception, MIT and the musl licence (MIT) | The Runtime Library Exception waives the attribution requirement for programs compiled with Swift, so a site's programs carry no notice; named here so the record is complete. `static/swift/` holds only Plantoir's own code (the thread and its WASI shim) |
 | **KaTeX** — the stylesheet, copy-tex and woff2 faces a site's maths is styled and copied with, on EVERY site (#494) | 0.16.21 | MIT, © 2013-2020 Khan Academy and other contributors | `static/katex/LICENSE` beside the files |
+| **GeoGebra Math Apps** — the engine a page's ` ```geogebra ` sketches run on (#578): `deployggb.js`, the `web3d` codebase and its styles, with the 83 language files left out and six exact text replacements so it loads under a published site's content security policy (`scripts/geogebra_engine.py`) | 5.4.933.1 | GeoGebra's licence (https://www.geogebra.org/license): free to use for **non-commercial** purposes, with the notice "Made with GeoGebra®" and a link to https://www.geogebra.org; language and interface files CC BY-NC-SA 4.0. The engine's code is GeoGebra's source code under the **EUPL 1.2**, and the six changes are modifications made and redistributed under the EUPL, with the notice of what changed and a pointer to GeoGebra's source (https://github.com/geogebra/geogebra) in `README.txt`; the engine used with its style and interface files stays under the non-commercial licence. A sketch uploaded to geogebra.org is CC BY-NC-SA 4.0 and is credited to its author, with links to it and the licence, wherever it is shown. **Free while Plantoir is free: if Plantoir is ever sold, contact office@geogebra.org first.** Redistributed in three places, all permitted non-commercially: plantoir.app's mirror of the zip, the Windows installer, every class site with a sketch | `static/geogebra/README.txt` names the version, the licence, the attribution, what was left out and the six changes; every sketch carries the "Made with GeoGebra®" link on the page |
 | **BaKoMa Computer Modern TrueType fonts** — the lettering of a page's ` ```tikz ` diagrams; only the faces the site's diagrams name (#485 E1) | as shipped in node-tikzjax 1.0.5 | BaKoMa Fonts Licence, © 1994, 1995 Basil K. Malyshev: copying and distribution permitted with the notice; embedding in SVG and printing needs no notice | `static/tikz/LICENCE` beside the faces |
 
 ## Carried inside the app, written into a course on the teacher's yes
@@ -49,6 +50,12 @@ carries the same files: `website/assets/function-plot.js` (function-plot
 packages named in the row above; licence in `function-plot-LICENSE.txt`
 beside it) and the BaKoMa faces `cmmi10.ttf` and `cmr10.ttf` (licence in
 `cm-fonts-LICENCE.txt` beside them).
+
+GeoGebra's zip itself (`geogebra-math-apps-bundle-5-4-933-1.zip`, 33,461,640
+bytes) is also served from `https://plantoir.app/mirror/geogebra/`, unchanged,
+as the fallback the image build fetches when download.geogebra.org does not
+answer (#578). It is filled into `site/mirror/` from a cache outside the
+repository by `website/build.py` and is never committed.
 
 ## Carried inside the website builder only
 

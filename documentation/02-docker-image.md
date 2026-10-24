@@ -83,7 +83,9 @@ The image is layered as follows (in order):
    must appear in (`dockerfileContains`, `windowsRuntimeContains`) and a test
    on each platform holds its own file against them, so a pin raised in one
    place cannot quietly stay put in the other.
-3. **Node.js 20 + tools** — installed from NodeSource. Quartz is a Node
+3. **Node.js 22.23.4, pinned exactly, + tools** — installed from NodeSource
+   (`setup_22.x`, then `nodejs=22.23.4-1nodesource1`; Node 20 until #640,
+   see "Node 22 (#640)" below). Quartz is a Node
    program (`npx quartz build`). Also installed: `curl`, `git` (needed to
    clone Quartz), `lsof` (used to kill a previous preview server holding
    the requested port, 8081–8084), `dos2unix`/`unix2dos` (line-ending
@@ -93,10 +95,13 @@ The image is layered as follows (in order):
 4. **`npm install -g wrangler@4.80.0`** — Cloudflare's own deploy CLI,
    used by `deploy.py` when a course publishes to Cloudflare Pages (see
    [deployment](07-deployment.md)). It is pinned, and pinned **below
-   4.100** deliberately: from that version wrangler requires Node 22, and
-   this image ships Node 20 because that is the version Quartz v4.5.0 is
-   known-good against. If Node is ever raised, revalidate Quartz *before*
-   chasing a newer CLI. The pin also keeps the image reproducible and stops
+   4.87** deliberately: 4.87.0 is the first wrangler whose `engines.node` is
+   `>=22.0.0` (4.80.0 to 4.86.0 say `>=20.3.0`; this said 4.100 until #640,
+   which was never a boundary). The image runs Node 22 since #640, but the
+   pin is shared with Windows, whose runtime stays on Node 20 until its own
+   issue lands — so the ceiling is Windows' now, and moving wrangler is its
+   own piece once both platforms run 22. If Node is ever raised, revalidate
+   Quartz *before* chasing a newer CLI. The pin also keeps the image reproducible and stops
    an upstream CLI change from breaking a teacher's publishing mid-term.
    Note this adds an npm-registry dependency to the image build, alongside
    the Debian and GitHub sources.
@@ -133,7 +138,15 @@ The image is layered as follows (in order):
    A floor, not an exact version, and the floor is in the line's text, so
    raising it re-runs the layer. Why, what was measured and what was
    rejected: [The certificate store](#the-certificate-store-639-v190).
-7. **Overwrite five Quartz source files with patched versions** from
+7. **GeoGebra Math Apps 5.4.933.1 → `/opt/vendor/geogebra` (#578)** — its own
+   layer straight after the certificate store it downloads through: the zip
+   from download.geogebra.org, retried, then from plantoir.app's mirror of the
+   same file, one `sha256sum -c` whichever answered, then
+   `scripts/geogebra_engine.py adapt`. Only that script is copied in (to
+   `/tmp`, never baked), so editing any other script never downloads the
+   33.5 MB again. What it keeps, the six replacements and the mirror:
+   [`/opt/vendor/geogebra`](#optvendorgeogebra-578).
+8. **Overwrite five Quartz source files with patched versions** from
    [`patches/`](../patches/) — three components and two filter files:
    - `patches/Explorer.tsx` → `quartz/components/Explorer.tsx`
    - `patches/FolderContent.tsx` → `quartz/components/pages/FolderContent.tsx`
@@ -148,7 +161,7 @@ The image is layered as follows (in order):
    logic — and would be fragile to express as regex edits. They implement the
    *expandable vs. plain-link folder* behaviour in the sidebar; the details
    are in [customizations §A](06-quartz-customizations.md#a-components-replaced-at-image-build-time).
-8. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
+9. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
    2026-09-18: `toolchain_paths.py`, `contracts.py`, `site_health.py`,
    `class_pages.py`, `page_visibility.py`, `stop_preview.py`,
    `setup_course.py`, `build_site.py`, `deploy.py`, `social_card.py` and
@@ -170,7 +183,7 @@ The image is layered as follows (in order):
    with `ast` and fails if one is missing. `verify.sh` runs it BEFORE the image
    build, because it answers in a tenth of a second what the build answers in
    three minutes.
-9. **Copy `support/` → `/opt/support/`** — data files consumed by the
+10. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to
      formal and short names, so the wizard can auto-fill "ICS3U →
@@ -211,7 +224,7 @@ The image is layered as follows (in order):
    Together these are most of the recipe's file count (11,378 files as of
    August 2026), which is why the launchers' image-tag hash has to batch
    its work — see [launcher scripts](03-launcher-scripts.md).
-10. **Bake the launcher scripts into `/opt/export/`** and register an
+11. **Bake the launcher scripts into `/opt/export/`** and register an
    `export-scripts` command:
    ```bash
    docker run --rm -v "$PWD:/out" teaching-quartz:src-<hash8> export-scripts
@@ -223,7 +236,7 @@ The image is layered as follows (in order):
    converts the `.bat` and `.ps1` files to CRLF line endings — `cmd.exe` can
    misparse LF-only batch files, and the repo itself stores everything with
    LF.
-11. **Default state**: working directory `/teaching`, command `/bin/bash`.
+12. **Default state**: working directory `/teaching`, command `/bin/bash`.
 
 **Gone since #334: `cp -r /opt/quartz /opt/quartz-site`**, which used to be
 step 7 — a spare copy of the scaffold that nothing read (the build copies
@@ -373,6 +386,118 @@ built (a build would need the network); the scaffold's `static/` (every site
 would carry 13.5 MB); Skulpt (a Python-2-era subset students would outgrow);
 JupyterLite or Custom Frames (a whole notebook per page).
 
+### `/opt/vendor/geogebra` (#578)
+
+**What it is.** GeoGebra Math Apps **5.4.933.1**, the engine a page's
+` ```geogebra ` sketches run on in the student's browser (the fence, its
+build pass and the site's loader are in 05 → "GeoGebra sketches: what the
+build does" and 06 → Q; this section is the engine and where it comes
+from). Gated like the engines above:
+`page_features.GATED_ASSETS["geogebra"]`, so a section's site carries it
+(`static/geogebra/`) only while a page students can see has a sketch, and a
+site without one is byte for byte as before.
+
+**Where it comes from, and why twice.** `https://download.geogebra.org/
+installers/5.4/geogebra-math-apps-bundle-5-4-933-1.zip` — 33,461,640 bytes,
+SHA-256 `40909594…15ec0c`, Last-Modified 2026-10-19. **The host is flaky:**
+4 of 8 connections timed out on 2026-10-23 (about 20:35 EDT), and guessed
+older version URLs 404, so a pinned version can vanish upstream. The layer
+therefore runs `curl --retry 6 --retry-all-errors --retry-delay 5
+--connect-timeout 30 --speed-limit 1024 --speed-time 60` against it and, if
+that fails, the same command against **`https://plantoir.app/mirror/geogebra/
+geogebra-math-apps-bundle-5-4-933-1.zip`** — then ONE `sha256sum -c`, so
+whichever host answered, only the pinned bytes get past it. The two addresses
+are `contracts/toolchain.json` → `pins` → `geogebra` → `urls`, and the
+Dockerfile's `ARG GEOGEBRA_URL`/`GEOGEBRA_MIRROR` must be those two exactly
+(`scripts/test_geogebra_engine.py`). The mirror is `website/mirror.py`: the
+file is NEVER committed (33.5 MB in every clone, and every bump kept in
+history), `site/mirror/` is git-ignored and filled by `website/build.py` from a
+cache outside the repository, and `build.py --deploy` refuses while it is
+missing or not its SHA-256 — a mirror that 404s is invisible until the day
+GeoGebra's host is down and a teacher's first build fails. Until the first
+deploy that carries it has been read back by `--verify-deploy` (RELEASING.md
+step 6), the fallback 404s and the primary is all there is. Netlify documents
+no per-file limit (only 54,000 files per directory); the largest file on
+plantoir.app before this was 1,102,789 bytes, so the first deploy is the
+proof.
+
+**What the image keeps** — `geogebra_engine.py adapt`, standard library only,
+the ONE recipe (Windows' `fetch-runtime.ps1` runs the same script into
+`runtime\vendor\geogebra`, so both platforms carry identical bytes). Of the
+bundle's 486 files (121 MB unpacked): `deployggb.js` (37,188 bytes),
+`HTML5/5.0/css/` (43 files) and the **`web3d` codebase** (72 files after
+pruning) — `web3d` serves every app (classic, graphing, geometry, 3d; all four
+measured in Chromium and WebKit), `web` is the non-3D duplicate and
+`webSimple` has no toolbar or algebra view, so neither is kept, nor
+`GeoGebra.html`. Inside `web3d` it leaves out **the 83 language files**
+(`js/properties_keys_*.js`, 23 MB — English is built into the engine, and a
+missing language falls back to English, measured with `lang=fr`), `html/`
+(sign-in callbacks), `sworker-locked.js` and `web3d.nocache.mjs`; it keeps all
+15 deferred fragments (CAS and 3D, 14 MB) and the fonts. Plus a `README.txt`
+(version, licence, attribution, what was removed, the six changes):
+**117 files, 27,093,283 bytes** (8.95 MB gzipped), `fileCount` and `bytes` in
+the pin. A first sketch on a page downloads about 2.9 MB of it, gzipped (19
+requests, measured); the rest is fetched only by what a sketch uses.
+
+**The six replacements, and why there are any.** Under the policy a Netlify
+publish sends (`script-src 'self' 'unsafe-eval' <hashes>`,
+`scripts/netlify_badge.py`; Cloudflare and the preview send none) the STOCK
+engine never loads, in Chromium or WebKit: GWT's loader injects its 7.9 MB
+main file as inline script text on any host but `127.0.0.1`, `localhost` and
+`apps-builds.` (so every browser check of this serves on `[::1]`), deferred
+fragments are installed as inline `<script>` text, nine resources go into
+`<head>` as inline scripts, and the zip library starts a `blob:` worker. So
+`geogebra_engine.REPLACEMENTS` makes six exact text replacements, **each
+required to match exactly once in the file as it stands at that step** — zero
+or two matches means GeoGebra changed the file and the reasoning no longer
+holds, so the step refuses and writes nothing (staging folder, then rename):
+
+| # | File | Becomes |
+|---|---|---|
+| 1 | `web3d.nocache.js` | the main file always loads as a same-origin `<script src>` (`if(location.protocol.startsWith(cb)&&!g){` → `if(false){`) |
+| 2 | `web3d.nocache.js` | `__installRunAsyncCode` runs a fragment with `eval` |
+| 3 | `web3d.nocache.js` | the loader's hidden frame goes under `<html>` (`o.body.appendChild(a)` → `o.documentElement.appendChild(a)`): Quartz's page navigation replaces `<body>` and took the frame with it, after which Chromium loaded no second sketch until a reload |
+| 4 | `…cache.js` | a resource GeoGebra adds to `<head>` is marked `type='text/x-plantoir-geogebra'` (inert; its id still answers GeoGebra's "already added?"), appended, and run with `$wnd.eval` |
+| 5 | `…cache.js` | fflate's async `zip` calls `zipSync` and the callback on `setTimeout(0)` — no worker |
+| 6 | `…cache.js` | the same for `unzip` with `unzipSync` |
+
+Result (measured 2026-10-23, the real policy, Chromium 1243 and WebKit 2359):
+loads from a file, from base64 and from commands, all four apps, and
+cross-origin isolated (COOP+COEP) too — zero violations, zero off-site
+requests. The pin's `files` hash `deployggb.js`, `web3d.nocache.js`
+(`b4f3a5f0…27fe`) and the cache.js (`676326d5…1e68`) AFTER all six; only
+nocache.js carries the frame fix, so the cache.js hash is the one the
+measurement harness produced, and nocache.js's is not. verify.sh checks the
+image: the file count, bytes and three hashes, each replacement's text present
+once and GeoGebra's gone, no language file, no `web/` or `webSimple/`, and the
+README. Re-measure all six before the pin moves.
+
+**Licence.** GeoGebra's apps are free to use for **non-commercial**
+purposes, with the notice "Made with GeoGebra®" and a link to
+https://www.geogebra.org (licence page updated Nov 2025); language and
+interface files CC BY-NC-SA 4.0. **The six changes rest on the EUPL 1.2**,
+the licence of GeoGebra's source code, which the engine's two changed files
+are: the EUPL permits modifying and redistributing it with a notice of what
+changed and a pointer to the source, which `README.txt` carries
+(https://github.com/geogebra/geogebra). They do NOT rest on the
+non-commercial grant's "copy, distribute, modify", which is the clause for
+GeoGebra's Materials (installers, web services, graphics), not its code
+(stage-1 review, 2026-10-24). The engine used as GeoGebra's product, with
+its style and interface files, stays under the non-commercial licence. We
+redistribute in three places — the mirror, the Windows installer, every
+class site with a sketch — all permitted non-commercially. **Free while Plantoir is free: if Plantoir is ever sold, contact
+office@geogebra.org first.** `THIRD_PARTY_LICENSES.md` has the row.
+
+**Rejected:** widening the site's policy (`worker-src blob:` alone is not
+enough; replacements 1–3 would need `'unsafe-inline'`, which the hashes
+disable and which would let Netlify's badge back in); pinning about ten
+inline hashes (fonts vary, and one missed hash is broken lettering,
+silently); a run-time patch of `head.appendChild` (it cannot reach 1–2, which
+run in GWT's frame before any of our code); loading GeoGebra from geogebra.org
+(a third party on every page, blocked by the same policy) or `material_id` in
+deployggb (it calls geogebra.org); committing the zip; one download with no
+fallback (4 of 8 timed out).
+
 ### The Swift image (#493, v1.8.0)
 
 Runnable Swift blocks ([05 → Runnable Swift](05-build-pipeline.md#runnable-swift-what-the-launcher-and-the-build-do-493-v180))
@@ -491,7 +616,8 @@ compromised intermediate is refused only once its root is no longer trusted.
   `/etc/ca-certificates.conf` gains `!mozilla/Comodo_AAA_Services_root.crt`
   and `!mozilla/emSign_ECC_Root_CA_-_G3.crt`. Neither subject is left in any
   of the three places. The layer received 10.4 MB (mostly apt's lists) in 4 s.
-- **The fleet is mixed today.** NodeSource's `setup_20.x` itself runs
+- **The fleet is mixed today.** NodeSource's `setup_20.x` (measured on 20,
+  before #640; `setup_22.x` does the same) itself runs
   `apt install … ca-certificates`, so a build with NO cache — a brand-new
   teacher — already got deb13u1 before this change. Every Mac that has built
   before holds the apt line's layer cached (here, built 2026-10-17 and reused
@@ -501,10 +627,13 @@ compromised intermediate is refused only once its root is no longer trusted.
   G1", "emSign Root CA - C1" and "emSign ECC Root CA - C3". Debian removed
   exactly the two above. That is a finding, not a gate: the
   check names the two removed subjects and does not curate trust of its own.
-- **Node 20's built-in store** (v20.20.2 in the image, 144 roots, used by
-  wrangler for Cloudflare) does NOT read this file: it already lacks AAA
-  Certificate Services but still trusts emSign ECC Root CA - G3 and the three
-  above. That exposure belongs to the Node 22 piece, #640, not to this layer.
+- **Node's own built-in store** (`tls.rootCertificates`, used by wrangler for
+  Cloudflare) does NOT read this file. On Node 20.20.2 it held 144 roots and
+  still trusted emSign ECC Root CA - G3 (and the three above), though not AAA
+  Certificate Services. Since #640 the image runs Node 22.23.4, whose store
+  holds **116** roots and neither subject; of the four emSign roots only
+  emSign Root CA - G1 is left, as in Debian's. verify.sh checks Node's store
+  under the `node` pin ("Node 22 (#640)" below).
 - **The Swift image is not changed and does not pick this up.**
   `teaching-quartz-swift:src-747b0982` carries 20250419 (150 certificates).
   `ca-certificates` is on its FIRST apt line (`support/swift/Dockerfile`), so
@@ -552,6 +681,227 @@ among them OpenSSL itself (`libssl3t64` 3.5.6 → 3.5.7), which is the library
 `urllib` runs on — a follow-up issue decides between a digest bump and
 naming the package.
 
+### Node 22 (#640, v1.9.0)
+
+The image moved from an unpinned `setup_20.x` to **Node 22.23.4, pinned
+exactly** (`nodejs=22.23.4-1nodesource1`). Node 20 has been end-of-life since
+2026-04-30, and the unpinned line let the image and Windows' runtime drift to
+different patch releases (#636). 22.23.4 is the 2026-10-20 security release
+(npm 10.9.9, OpenSSL 3.5.9). **Node 22 is itself end-of-life on 2027-04-30**,
+so Quartz 5 (#512) or Node 24 has to land before then.
+
+**Why an `=` pin here when #639's is a floor.** NodeSource's `node_22.x
+nodistro` keeps its history: on arm64 `apt-cache madison nodejs` lists every
+version from 22.5.0 to 22.23.4, and amd64's Packages file has 22.23.4 down
+past 22.22.0 (measured 2026-10-23). So the pin does not break a first build
+the day 22.23.5 ships, the opposite of Debian's security archive.
+`setup_22.x` writes `/etc/apt/preferences.d/nodejs` (Pin-Priority 600 for
+deb.nodesource.com), so the `=` resolves from NodeSource, not Debian.
+
+**wrangler's engines, measured** (`npm view 'wrangler@>=4.80.0' engines.node`,
+2026-10-23): 4.80.0 to 4.86.0 say `>=20.3.0`; 4.87.0 to 4.152.0 (the current
+`latest`) say `>=22.0.0`; none needs 24 yet. The pin's old reason, "below
+4.100", was thirteen minors late — the pin itself was always safe. wrangler
+stays at 4.80.0 and runs on 22 (`wrangler --version`, `wrangler pages --help`
+exit 0); `mustStayBelow` is now `"4.87"` because Windows' runtime is still on
+Node 20.18.1 and the pin is shared. The contract records wrangler's own
+engines as `nodeEngine` (`>=20.3.0`): verify.sh reads it out of the image's
+wrangler `package.json`, and the mac suite checks the `node` pin satisfies it.
+
+**Measured, before (dev's recipe) and after, on an M4 Pro, Colima, arm64,
+in an isolated buildx builder:**
+
+| | Node 20 | Node 22 |
+|---|---|---|
+| `node --version` / npm | v20.20.2 / 10.8.2 | **v22.23.4** / 10.9.9 |
+| `wrangler --version` | 4.80.0 | 4.80.0 |
+| OpenSSL / undici | 3.0.19 / 6.24.1 | 3.5.9 / 6.29.1 |
+| global `WebSocket` | undefined | a function |
+| `tls.rootCertificates` | 144, four emSign roots incl. ECC Root CA - G3 | **116**, emSign Root CA - G1 only, neither #639 subject |
+| image size (`docker images`; in brackets, the compressed size `docker inspect` reports) | 1.80 GB (409,188,226 bytes compressed) | 1.85 GB (419,682,603 bytes compressed) |
+| cold build | 87 s | 84 s |
+| Quartz + tikz engine `npm ls --all --long` | 665 lines | identical, no EBADENGINE, same lockfile |
+
+**The site is the same.** One EXC2O course tree built in both images, twice
+each: after removing timestamps and Quartz's random Explorer ids, and
+comparing order-insensitively, the same 336 files with **0 differences**. The
+remaining raw differences are run-to-run noise that Node 20 shows against
+itself (9–49 files between two Node 20 runs: the Explorer id, `<time
+datetime>`, and the order of equal-dated pages on tag and folder pages). A
+TikZ figure's cache entry is byte-identical (engine id `469d55e0a0342d07`),
+so diagrams cached under Node 20 stay valid. Native packages (sharp,
+lightningcss, @napi-rs/simple-git, esbuild) are N-API or standalone binaries,
+so nothing rebuilds per Node version.
+
+**The one new behaviour: a deprecation line in the console.** On Node 22
+every Quartz build printed ``(node:N) [DEP0040] DeprecationWarning: The
+`punycode` module is deprecated`` (Quartz v4.5.0's dependencies require the
+built-in), which reaches the app's console — machinery a teacher should not
+see (CLAUDE.md rule 1). `scripts/toolchain_paths.py` → `node_environment`
+adds `--disable-warning=DEP0040` to `NODE_OPTIONS` for Quartz (build_site.py)
+and for the figure helper (figures.py), keeping any `NODE_OPTIONS` already
+set and never writing the flag twice. The figure helper was measured silent
+on Node 22 with and without it (a diagram and a graph, stderr empty); it is
+routed anyway so every node the build starts is under one rule, and a later
+deprecation cannot become the reason given when the helper fails to start. It is accepted from Node 20.11
+(measured on 20.20.2 and 22.23.4), so Windows' Node 20 runtime inherits it
+safely. `scripts/test_node_warnings.py` pins the helper and both callers;
+verify.sh fails if the main build's log carries a `[DEP` code at all (Node's
+own prefix, not the word "DeprecationWarning", which a page could carry).
+
+**Rejected:**
+
+- **Node 24** — the ruling on #636 is 22; Quartz's own v4 line runs on 22;
+  24 buys a year (EOL 2028-04-30) but is a second, unmeasured jump. Noted for
+  #512.
+- **A floating `setup_22.x`** — the image and Windows drift again, which is
+  #636's own finding about 20.x.
+- **A late `nodejs` layer that leaves the apt line alone** — it saves existing
+  teachers only the apt layer (about 90 MB, estimated), because wrangler,
+  Quartz and the rest below must rebuild anyway to be installed by the new
+  npm; it carries Node 20's files as dead weight and gives an image no
+  no-cache build reproduces.
+- **`NODE_NO_WARNINGS=1`** — hides every warning, including the ones a real
+  break would print.
+- **Removing `mustStayBelow` now** — Windows' suite reads it, and the ceiling
+  still holds for Windows' Node 20.
+
+**For Windows:** the runtime (`windows-app/Vendor/fetch-runtime.ps1`) stays
+on Node 20.18.1 until its own `windows` issue moves it to the same 22.23.4;
+that issue adds `windowsRuntimeContains` to the `node` pin with the bump.
+
+### Known vulnerabilities in the image's npm packages (#667, v1.9.0)
+
+The image carries five JavaScript trees. `verify.sh` audits all five against
+npm's advisory database at every run, inside the image and with the image's
+own npm. `scripts/npm_audit.py` then compares the result with an accepted
+list kept as authored text in `contracts/toolchain.json` → `npmAudit`. The
+gate fails on a **new** high or critical advisory: one the list does not
+accept for that tree, or one the list accepted at a lower severity than the
+database now gives it. It does not fail on an advisory that has already been
+looked at and decided. The ruling on #667 was to accept every current finding,
+record the reason, and upgrade nothing this release.
+
+**What is audited, and how each lockfile is obtained.** `npm audit` reads a
+lockfile, so each tree needs one:
+
+| Tree (`npmAudit.trees`) | In the image | Lockfile | Packages |
+|---|---|---|---|
+| `quartz` | `/opt/quartz` | Quartz v4.5.0's own `package-lock.json`, dev dependencies included | 614 |
+| `tikz-engine` | `/opt/vendor/tikz-engine` | `support/figures/package-lock.json` (`npm ci --omit=dev`) | 133 |
+| `wrangler` | `/usr/lib/node_modules/wrangler` | **none**: a global install keeps no lockfile (`npm audit` there says `ENOLOCK`). One is built from the INSTALLED tree: the folder is copied into an empty project, then `npm install --package-lock-only --ignore-scripts` runs. With no lockfile present, npm starts its ideal tree from the actual one, so the lockfile records the installed versions: miniflare, undici, ws, sharp and esbuild were checked against `npm ls`. This needs no network. | 35 |
+| `pagedjs` | `/opt/vendor/pagedjs/paged.min.js` | built from the pin's version in an empty project | 18 |
+| `function-plot` | `/opt/vendor/function-plot/function-plot.js` | built from the pin's version | 28 |
+
+**The limit on the last two.** They are prebuilt files. A lockfile built from
+the pin resolves the package's declared dependencies as they are TODAY. The
+file, though, bundles whatever those dependencies were when it was published.
+So an advisory against `pagedjs@0.4.3` or `function-plot@1.25.4` themselves
+is caught exactly, and their bundled dependencies only approximately. That is
+still worth doing: these are the two trees whose code runs in a student's
+browser. The versions passed in (`wrangler`, `pagedjs`, `functionPlot`) are
+read from the pins, never retyped.
+
+**Not audited, and why.** GeoGebra's applet is a bundle with no npm tree.
+Pyodide is Python and WebAssembly. KaTeX is inside the `quartz` tree. Latin
+Modern is a Debian font package, and Debian's packages are another tool's job.
+**npm and corepack** ship inside Node itself and move with the `node` pin
+(#640). Their dependencies are not an installed tree that `npm audit` reads.
+They change when the pin changes, and that is where they are reviewed.
+
+**What fails, what is reported, what is skipped.**
+
+- A high or critical advisory not accepted for its tree, or accepted at a
+  lower severity than it has now: **FAIL**, naming tree, package, id and
+  title.
+- An unaccepted low or moderate advisory is **reported**, not failed.
+- An accepted advisory that is no longer reported is **stale**. It is
+  reported, never failed, because an upgrade is what makes an entry stale.
+- A tree whose lockfile is gone (`ENOLOCK`, or the folder missing) for
+  `quartz`, `tikz-engine` or `wrangler`: **FAIL**. The image changed. This is
+  not a skip.
+- Output that does not parse as JSON, or JSON in a shape the comparator does
+  not know: **FAIL**, never SKIP.
+- **SKIP** only when npm's own JSON has no `metadata` and its `message` says
+  the audit request failed. For `pagedjs` and `function-plot` it is also a
+  SKIP when their lockfile step failed with a network error. The SKIP says
+  no tree counts as audited until every tree can be. One unreachable tree skips the whole gate, so a
+  half-audit cannot read green. A blocking finding in another tree still
+  fails.
+- Only npm's STDOUT is read. Offline, `npm audit --json` prints
+  `{"message":"request to https://registry.npmjs.org/-/npm/v1/security/audits/quick failed, reason: getaddrinfo EAI_AGAIN …"}`
+  on stdout, puts an `npm error` line on stderr, and exits 1. With findings it
+  also exits 1. Neither stderr nor the exit code says anything the JSON does
+  not (measured with `docker run --network none`, 2026-10-24).
+
+**How a finding is accepted.** Add it under `npmAudit.accepted`, grouped by
+tree and package. Give the advisory's id and the severity it has TODAY, an
+`exposure` (student's browser, the teacher's build only, the teacher's Mac
+during a preview, Cloudflare deploy only, or not run) and a `reason`. Record
+it in a new `research/npm-audit/<date>.md`. Each tree is decided on its own,
+because one advisory can be harmless in one tree and not in another: ws's two
+advisories are accepted for `quartz` (the preview's live reload) and,
+separately, for `wrangler` (miniflare, which a deploy never starts). Every
+advisory is listed, low and moderate included. That is what makes a later
+severity RAISE fail, and a raise is the one way an accepted id becomes newly
+dangerous.
+
+**Measured 2026-10-24** (`research/npm-audit/2026-10-24.md`, image
+`quartz-teacher:dev-test`, Node 22.23.4, npm 10.9.9): **81 (tree, advisory)
+pairs**. `quartz` has 51 (39 high, 10 moderate, 2 low) across 14 packages.
+`wrangler` has 30 (11 high, 13 moderate, 6 low) across undici, sharp, ws and
+esbuild. That makes 50 high and **0 critical**. `tikz-engine`, `pagedjs` and
+`function-plot` have none. Nothing a student's browser runs is affected. The
+nearest is the moderate in mdast-util-to-hast (an unsanitised `class`
+attribute): its OUTPUT reaches students, but only the teacher writes the
+Markdown it reads. The 15 xmldom advisories are in a package nothing runs:
+pixi.js's, for the Graph view build_site.py removes. A built site has no
+`pixi` or `xmldom` string. The undici advisories touch only a Cloudflare
+deploy, and are fixed in wrangler > 4.113.0, which waits on Windows' Node 22.
+The audit takes about 22 s online. Offline it takes about 2.5 min (npm's
+retries), and only then. One more exposure fact, not this piece's to fix: the
+preview ports are published on every interface (`lsof` shows `TCP *:8133` and
+others held by Colima's forwarder), so the accepted ws and serve-handler
+denials of service are reachable from the school network while a preview
+runs.
+
+**Revisited at every cut** (RELEASING.md step 2). Read verify.sh's npm-audit
+line; a SKIP means it was not checked, so run it again online. Then run
+`python3 scripts/npm_audit.py findings …` and decide each new or raised
+advisory. Either upgrade, in its own piece, or accept it with its reason.
+
+**REJECTED.**
+
+- **Upgrading now.** The ruling on #667 is no upgrades this release. Quartz's
+  tree moves with Quartz 5 (#512). wrangler moves in its own piece once
+  Windows runs Node 22 (its pin's `mustStayBelow`).
+- **Auditing in the image build.** It would need the network on every build,
+  and it would fail an unchanged recipe, and a teacher's first build, the day
+  an advisory is published. verify.sh is the developer's gate, and that is
+  where this belongs.
+- **`npm audit --audit-level=high` alone.** It cannot say "accepted", so a
+  known advisory would turn every run red. That is exactly what the issue
+  rules out.
+- **The host's npm against copied lockfiles.** The image's npm 10.9.9 is the
+  one that matters, and verify.sh already has the image.
+- **Auditing nothing for pagedjs and function-plot ("no lockfile").** They are
+  the two trees that reach students' browsers.
+- **Unpacking their dist files** to identify the libraries bundled inside.
+  `npm audit` cannot read a bundle.
+
+**For Windows:** the same audit over the runtime's copies, at each tree's
+`windowsRuntime` (`runtime\quartz`, `runtime\wrangler`,
+`runtime\vendor\tikz-engine`, `runtime\vendor\pagedjs`,
+`runtime\vendor\function-plot`). It uses Windows' own npm and goes through
+the same `scripts/npm_audit.py compare` against the same list. The
+comparator's tests (`scripts/test_npm_audit.py`, stdlib) already run there
+through `PythonToolchainTests`. Only the wrangler tree can give a
+Windows-only finding: its lockfile is built from the INSTALLED copy, while
+the Quartz and tikz-engine lockfiles and the pin-made pagedjs and
+function-plot lockfiles already list every platform's optional packages
+identically. Decide such a finding, and add it to the shared list under its
+tree.
+
 ### What the first build downloads (measured for #334)
 
 Per container (`/sys/class/net/eth0/statistics/rx_bytes` inside each
@@ -566,8 +916,16 @@ measurement), on an M4 Pro with Colima at 6 CPUs / 12 GiB, 2026-09-26:
 | `npm install -g wrangler@4.80.0` | 65.1 MB | |
 | `git clone` of Quartz | 42.0 MB → **2.3 MB** at depth 1 | |
 | Quartz's `npm install` | 128.0 MB | the largest |
+| GeoGebra (#578) | 33.5 MB | the zip (33,461,640 bytes); its own late layer, so a teacher who has built before downloads only this, once, at the first preview after updating; NOT in the total below |
 | certificate store (#639, added 2026-10-23) | 10.4 MB | measured on its own, after #334, so NOT in the total below; mostly apt's lists, and an install that changes nothing for a no-cache build, which NodeSource's script already upgraded |
 | **Total** | **≈382 MB → ≈342 MB** | #334's stages only (≈352 MB with #639's layer); #312's VM counter read 389.8 MB in a fresh VM |
+
+**Since #640 (2026-10-23)** the apt line's text changed (`setup_22.x` and
+the `nodejs=` pin), so every teacher who has built before re-downloads that
+line and everything after it once — about 330 MB by this table's numbers
+(apt, wrangler, the clone, Quartz's `npm install`, the tikz engine, Pyodide,
+the certificate layer), not re-measured. That piece's own cold build was 84 s
+in an isolated builder, against 87 s on Node 20.
 
 Time here: 49–52 s cold with the base cached; an incremental rebuild after a
 script edit is 5 s, every heavy layer `CACHED`. A teacher's fresh 3-CPU / 4 GB

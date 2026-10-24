@@ -143,10 +143,11 @@ whose choices refer to their position ("All of the above", "Both A and B",
 ## 4. Graphs, pictures and code inside a question
 
 Anything a page can hold works inside a question, a choice and an
-explanation. Put it on the lines under its choice, lined up under the
-choice's `[`: after the `> ` that starts every line of the quiz, two more
-spaces (`>   ```functionplot`, as below). How to write the graph itself is
-in the `plantoir-math-graphs` skill; how to write runnable code - Python (` ```python run `) or Swift
+explanation - except a GeoGebra sketch in a choice (below). Put it on the
+lines under its choice, lined up under the choice's `[`: after the `> `
+that starts every line of the quiz, two more spaces (`>   ```functionplot`,
+as below). How to write the graph itself is in the `plantoir-math-graphs`
+skill; how to write runnable code - Python (` ```python run `) or Swift
 (` ```swift run `) - is in the `plantoir-runnable-code` skill (a runnable
 block also needs `codeRunner: true` at the top of the page).
 
@@ -208,6 +209,29 @@ An explanation with code to run (page has `codeRunner: true`):
 
 Give every graph an `alt:` line: it is what a screen reader says for a
 choice that is a graph.
+
+**A GeoGebra sketch** (a ` ```geogebra ` block) works in the QUESTION -
+on the lines after the title, before the choices - and in the
+EXPLANATION, where it stays closed until the student has answered and taps
+it. **Never put one inside a choice**: dragging a point would pick the
+choice, so the website refuses it and the folder problem says "a GeoGebra
+sketch sits inside one of its choices". Ask "which sketch shows…" with the
+sketch in the question and words as the choices instead. How to write the
+sketch itself (`file:`, `material_id:` or GeoGebra commands, and `alt:`)
+is in the `plantoir-page-authoring` skill, and every setting in the
+GeoGebra section of `plantoir-math-graphs`.
+
+````markdown
+> [!quiz] Drag A along the line. What is the line's slope?
+> ```geogebra
+> alt: The line y = -x + 3 with a point A on it.
+> f(x) = -x + 3
+> A = Point(f)
+> ```
+> - [x] -1
+> - [ ] 1
+> - [ ] 3
+````
 
 ## 5. A five-question check (paste, then change)
 
@@ -283,7 +307,14 @@ plantoir: error: Units/Linear Relations.md: quiz 3, line 41: none of its choices
 ```
 
 `quiz 3` is the third quiz on that page, and the line is in the teacher's
-file. Fix the quiz and preview again. After adding or changing quizzes,
+file. Fix the quiz and preview again.
+
+Now and then the website reads a question differently from the way Plantoir
+checked it - most often a line of HTML straight after the question - so
+students may see the short note even though nothing above was reported. The
+next Preview names that question in the folder problems too, with its page
+and line. Write it more plainly, the way the patterns above show (the
+question, then its choices or its `[!answer]`), and preview again. After adding or changing quizzes,
 **preview the section and answer each one** - right and wrong - before
 publishing.
 

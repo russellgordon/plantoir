@@ -1,22 +1,24 @@
 import Foundation
 
-/// The twenty-two tools that exist, and the thirteen of them the local model
-/// is shown — plus the twelve only an MCP client is offered (`mcpOnlyTools`),
-/// thirty-four in all on that surface.
+/// The twenty-three tools that exist, and the thirteen of them the local model
+/// is shown — plus the fifteen only an MCP client is offered (`mcpOnlyTools`),
+/// thirty-eight in all on that surface. (This said twenty-two, twelve and
+/// thirty-four until #610; the last two were already stale.)
 ///
 /// It was fifteen when routing accuracy was measured, and the seven that came
 /// after — reading and recording a section's timetable, adding the next class
 /// page, and re-dating a whole section — were added on purpose, knowing the
 /// cost. A small local model routes worse the more it is shown, so the number
 /// is worth re-measuring rather than assuming the old figure still holds.
-/// `localTools` is the answer to that pressure: nine of the twenty-two are
+/// `localTools` is the answer to that pressure: ten of the twenty-three are
 /// never NAMED by the model, so they are not put in front of it.
 ///
-/// **Keep these three numbers right.** They are 22, 13 and 9 as this is
-/// written, and all three are now pinned — `AssistCurriculumMentionsTests`
-/// asserts 22 and 13, and `testTheHiddenToolsAreStillServedToClaudeCode`
-/// asserts that the nine it names ARE the set difference, so hiding a tenth
-/// tool fails a test rather than quietly making this sentence wrong.
+/// **Keep these three numbers right.** They are 23, 13 and 10 as this is
+/// written (#610 added `open_in_obsidian` and hid it), and all three are
+/// pinned — `AssistCurriculumMentionsTests` asserts 23 and 13, and
+/// `testTheHiddenToolsAreStillServedToClaudeCode` asserts that the ten it
+/// names ARE the set difference, so hiding an eleventh tool fails a test
+/// rather than quietly making this sentence wrong.
 ///
 /// **A pin does not protect the PROSE, and the obvious lesson here is the
 /// wrong one.** It is tempting to read the rot as "9 was the unpinned one, so
@@ -97,6 +99,7 @@ extension AssistToolRunner {
         addNextClassTool,
         planReDateClassesTool,
         reDateClassesTool,
+        openInObsidianTool,
     ]
 
     /// The tools the LOCAL model is actually shown.
@@ -105,7 +108,7 @@ extension AssistToolRunner {
     /// matched phrasing, an MCP client; this is only what the model is asked
     /// to choose between, and every schema in the list costs it context and
     /// accuracy. A local model that names something NOT on this list is
-    /// refused rather than obeyed (#327). Nine are left out — the seven `plan_` twins, plus the two
+    /// refused rather than obeyed (#327). Ten are left out — the seven `plan_` twins, plus the three
     /// named in `hiddenFromTheLocalModel` below — and none of them loses a
     /// teacher anything:
     ///
@@ -128,7 +131,16 @@ extension AssistToolRunner {
     /// to reach through a router that is right four times in five. It stays on
     /// the MCP surface, where the client can hold a bigger list and a person
     /// is reading every step.
-    static let hiddenFromTheLocalModel: Set<String> = ["remember_timetable", "re_date_classes"]
+    ///
+    /// `open_in_obsidian` (#610) is here because it was MEASURED: shown to
+    /// the local model, the smaller assistant lost nine probes it had always
+    /// answered (the hide inversion case among them, 10/10 to 0/10) and took
+    /// "Open Unit 2, Day 3" and an edit request away from the tools they
+    /// reach today (research/ai-assist/open-in-obsidian-610-results.txt). So
+    /// the window reaches it through exact phrasings matched in code
+    /// (`AssistCardCommand`), and an MCP client still sees it, where it
+    /// refuses: that process has no window to press.
+    static let hiddenFromTheLocalModel: Set<String> = ["remember_timetable", "re_date_classes", "open_in_obsidian"]
 
     /// The list above, with the plans and the hidden names taken out.
     private static func narrowedForTheLocalModel(
@@ -293,6 +305,30 @@ extension AssistToolRunner {
         description: "TEACHERS SAY: \"what do students see right now?\", \"is anything broken?\", "
                    + "\"what's live?\". Check a section's website as students would meet it, "
                    + "changing nothing.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+        ],
+        required: ["course", "section"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    /// Presses the section window's own Open in Obsidian (#610). No `page`
+    /// argument: the page is the one ON SCREEN, never one the model names
+    /// (#518 ruling 2), and a small model fills an optional argument it is
+    /// offered (#411). Read-only — it writes no page — so it meets no
+    /// approval card, no plan twin and no reference-course refusal. Its
+    /// description shares no word with `rebuild_preview`'s but the
+    /// TEACHERS SAY marker and "open", the verb of its own name: the two
+    /// are near-synonyms to a small router, and "on screen" was taken out
+    /// for that reason (plan review finding 5). Measured against the local
+    /// model and kept OFF its list (`hiddenFromTheLocalModel`): the window
+    /// reaches it through fixed phrasings; research/ai-assist/open-in-obsidian-610-*.
+    private static let openInObsidianTool: AssistToolDefinition = AssistToolDefinition(
+        name: "open_in_obsidian",
+        description: "TEACHERS SAY: \"open this in Obsidian\", \"edit this in Obsidian\". Open this note in "
+                   + "Obsidian, altering nothing.",
         parameters: [
             "course": courseHelp,
             "section": sectionHelp,

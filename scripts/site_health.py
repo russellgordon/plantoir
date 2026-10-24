@@ -268,6 +268,48 @@ def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
+def geogebra_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every GeoGebra sketch this build cannot show (#578),
+    never one per sketch. Each is named through sketchLine (its line in the
+    teacher's file) or sketchLineNoLine, and the reason through
+    geogebraFences.words.reasons; every value is filled in one pass.
+    """
+    entry = table["geogebraSketchesNotReady"]
+    problems = facts.get("geogebra_problems") or []
+    reasons = contracts.section(CONTRACT_FILE, "geogebraFences", "words", "reasons")
+    limit = contracts.section(CONTRACT_FILE, "geogebraFences", "files", "largestFileMegabytes")
+    named = []
+    for problem in problems[:MOST_PAGES_NAMED]:
+        reason_text = reasons.get(problem.get("reason") or "", reasons["nothingToShow"])
+        reason = filled(reason_text, {"file": problem.get("file") or "",
+                                      "name": problem.get("name") or "",
+                                      "value": problem.get("value") or "",
+                                      "id": problem.get("id") or "",
+                                      "megabytes": problem.get("megabytes") or "",
+                                      "limit": limit})
+        fill = {"page": problem.get("page", ""), "block": problem.get("block", 1), "reason": reason}
+        if problem.get("line") is not None:
+            fill["line"] = problem["line"]
+            piece = entry["sketchLine"]
+        else:
+            piece = entry["sketchLineNoLine"]
+        named.append(filled(piece, fill))
+    if len(problems) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": problems[0].get("page", "") if problems else "",
+        "count": len(problems),
+        # "; " rather than ", ": a reason can hold a comma.
+        "sketches": "; ".join(named),
+    }
+    return finding(
+        "geogebraSketchesNotReady", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(problems) == 1 else "sentenceForSeveral",
+    )
+
+
 def swift_finding(facts: dict, course: str, section, table: dict, windows=None) -> Finding:
     """
     ONE finding for every runnable Swift block this build has no program
@@ -393,8 +435,9 @@ def quizzes_finding(facts: dict, course: str, section, table: dict) -> Finding:
 def site_disagreements_finding(facts: dict, course: str, section, table: dict) -> Finding:
     """
     ONE finding for every runnable block the SITE showed as plain code
-    (#567: codeRunnerBlocks.siteDisagrees), never one per block. The one check
-    said from the site's build rather than before it: scripts/site_said.py
+    (#567: codeRunnerBlocks.siteDisagrees), never one per block. One of the
+    two checks said from the site's build rather than before it (the other is
+    quizzes_read_differently_finding, #644): scripts/site_said.py
     hands the blocks the site's transformer recorded to this function, and
     the result is printed with `announce`. Each block is named through
     blockLine or blockLineNoLine, its language by the table row's displayName
@@ -435,6 +478,58 @@ def site_disagreements_finding(facts: dict, course: str, section, table: dict) -
         "runnableCodeShownAsPlainCode", course, section, table,
         extra_fill=extra,
         sentence_key="sentence" if len(blocks) == 1 else "sentenceForSeveral",
+    )
+
+
+def quizzes_read_differently_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every self-check question the SITE read differently from
+    the folder check (#644: quizCallouts.safetyNet), never one per question -
+    one piece per `plantoir: error:` line the site's safety net printed.
+    Said from the site's build, beside site_disagreements_finding and in the
+    same call (scripts/site_said.py). Each is named through the same four
+    pieces quizzes_finding uses, and its reason through the check's own
+    `reasons`; shownWithNote's {problem} is quizCallouts.words.problems[the
+    problem the site found] filled with the site's values. Every value is
+    filled in one pass.
+    """
+    entry = table["quizzesReadDifferently"]
+    quizzes = facts.get("quiz_disagreements") or []
+    reasons = entry["reasons"]
+    problems = contracts.section(CONTRACT_FILE, "quizCallouts", "words", "problems")
+    named = []
+    for quiz in quizzes[:MOST_PAGES_NAMED]:
+        reason_text = reasons.get(quiz.get("reason") or "", reasons["countedDifferently"])
+        problem_text = problems.get(quiz.get("problem") or "", problems["nothingToCheck"])
+        problem = filled(problem_text, {key: value for key, value in (quiz.get("fill") or {}).items()})
+        fill = {"page": quiz.get("page", ""), "reason": filled(reason_text, {"problem": problem})}
+        numbered = quiz.get("n") is not None
+        has_line = quiz.get("line") is not None
+        if numbered:
+            fill["n"] = quiz["n"]
+        if has_line:
+            fill["line"] = quiz["line"]
+        if numbered and has_line:
+            piece = entry["quizLine"]
+        elif numbered:
+            piece = entry["quizLineNoLine"]
+        elif has_line:
+            piece = entry["quizLineNotNumbered"]
+        else:
+            piece = entry["quizPageOnly"]
+        named.append(filled(piece, fill))
+    if len(quizzes) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(quizzes) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": quizzes[0].get("page", "") if quizzes else "",
+        "count": len(quizzes),
+        # "; " rather than ", ": a reason holds commas.
+        "quizzes": "; ".join(named),
+    }
+    return finding(
+        "quizzesReadDifferently", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(quizzes) == 1 else "sentenceForSeveral",
     )
 
 
@@ -488,7 +583,22 @@ def findings(facts: dict, course: str, section) -> list:
                                runnable block the SITE showed as plain code
                                (#567). Never given by build_site.py: only
                                scripts/site_said.py, from the site's build,
-                               says this finding - and says it alone.
+                               says this finding - with quiz_disagreements
+                               only beside it.
+    * `quiz_disagreements`   — [{"page": place, "n": the quiz's place or None,
+                               "line": n or None, "reason": the check's
+                               reasons key, "problem": the site's
+                               quizCallouts.words.problems key for
+                               shownWithNote, "fill": its values}], each a
+                               `plantoir: error:` line the site's quiz safety
+                               net printed (#644). Never given by
+                               build_site.py: scripts/site_said.py says it,
+                               after site_disagreements, in the same call.
+    * `geogebra_problems`    — [{"page": place, "block": n, "line": n or None,
+                               "reason": geogebraFences.words.reasons key,
+                               "file", "name", "value", "id", "megabytes"
+                               where they apply}], each a GeoGebra sketch
+                               that cannot be shown (#578)
     """
     table = _checks_by_name()
     found = []
@@ -562,6 +672,14 @@ def findings(facts: dict, course: str, section) -> list:
     # (#567). In practice it arrives alone, from scripts/site_said.py.
     if facts.get("site_disagreements"):
         found.append(site_disagreements_finding(facts, course, section, table))
+    # After everything above, so the existing examples keep their order
+    # (#644). From scripts/site_said.py too, after the code's finding.
+    if facts.get("quiz_disagreements"):
+        found.append(quizzes_read_differently_finding(facts, course, section, table))
+    # After everything above, so the existing examples keep their order
+    # (#578). From build_site.py, beside the figures' and the quizzes'.
+    if facts.get("geogebra_problems"):
+        found.append(geogebra_finding(facts, course, section, table))
 
     return found
 

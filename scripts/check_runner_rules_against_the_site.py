@@ -25,7 +25,9 @@ Three halves:
    code and one `plantoir: error:` line, and no line for a page students
    cannot see; and (#567) the emitter plantoirSiteSaid.ts after it, which
    says the blocks the transformer recorded as ONE runnableCodeShownAsPlainCode
-   marker through the build's Python (scripts/site_said.py), once per process.
+   marker through the build's Python (scripts/site_said.py), once per process
+   - and (#644) the quiz safety net's records beside them, ONE
+   quizzesReadDifferently marker from the same call, after the code's.
    Since #493 also every `swift.cacheKey` case (the site's
    normalising and key), and Swift blocks whose program the build has, could
    not make, or never saw.
@@ -59,6 +61,20 @@ Three halves:
    of every ```python and ```swift block in support/example_content,
    scripts/fixtures/runner-colour and the Swift gate's programs (verify.sh
    mounts both folders).
+6. Text that wraps (#653, contracts/shared-rules.json -> textFenceWrapping):
+   `support/quartz/plugins/transformers/textWrapRule.ts` is bundled with the
+   rest, and every `fence.cases` case is run twice in Node - through
+   wrapsText(lang, meta), and as a page: "```" + fence + "\\nx\\n```\\n" is
+   parsed by Quartz's own remark-parse and remark-gfm, whose code node must
+   carry exactly the case's `lang` and `meta` (so a case that is not what the
+   parser makes of its fence fails, rather than passing on data no page can
+   produce), and codeRunner.ts's second markdown plugin must then wrap it in
+   div.plantoir-text-wrap exactly when `wraps`, leaving `lang` and `meta` as
+   they were. Then one page holding a flagged block at the top level, in a
+   list item, a quote, a callout and a quiz's explanation (every one wrapped,
+   nothing else), and a `codeRunner: true` page whose ```python run wrap block
+   is a runner and is not wrapped, and whose ```text run wrap block is wrapped
+   and is not a runner (`text` is not a runner language).
 """
 import json
 import os
@@ -77,6 +93,7 @@ import toolchain_paths  # noqa: E402
 
 RULE_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunnerRule.ts"
 TRANSFORMER_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "codeRunner.ts"
+WRAP_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "textWrapRule.ts"
 SITE_SAID_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "emitters" / "plantoirSiteSaid.ts"
 ISOLATION_MJS = toolchain_paths.SUPPORT_DIR / "quartz" / "cli" / "plantoirIsolation.mjs"
 COLOUR_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "components" / "scripts" / "codeRunnerColour.ts"
@@ -100,6 +117,7 @@ import remarkGfm from "remark-gfm"
 import { createHash } from "crypto"
 import { LANGUAGES, runnerFor, findRunners, filled, normaliseProgram, asksFor } from "RULE_TS"
 import { CodeRunnerFences, programKey } from "TRANSFORMER_TS"
+import { wrapsText } from "WRAP_TS"
 import { PlantoirSiteSaid, forgetWhatWasSaid } from "SITE_SAID_TS"
 import { pageVerdict, headersFor, PAGE_HEADERS, ENGINE_HEADERS, ENGINE_FOLDERS, ALLOWED_HOSTS } from "ISOLATION_MJS"
 
@@ -290,9 +308,19 @@ const siteSaidRuns = []
     ["Units/Strings.md", page, undefined],
     ["Units/Hidden.md", page, false],
   ]
+  // #644: what the quiz transformer records, laid on the pages by hand
+  // (plantoirQuizzes.ts needs Quartz's callout parser; verify.sh runs it end
+  // to end).
+  const quizRecords = {
+    "Units/Loops.md": [{ page: "Units/Loops.md", n: null, line: null, reason: "countedDifferently" }],
+    "Units/Strings.md": [{ page: "Units/Strings.md", n: 1, line: 7, reason: "shownWithNote", problem: "choicesInHtml", fill: {} }],
+    "Units/Hidden.md": [{ page: "Units/Hidden.md", n: 1, line: 3, reason: "shownWorking" }],
+  }
   const runs = [
     { name: "three blocks on two pages, and a hidden page", carried: [], emits: 2 },
     { name: "nothing disagrees", carried: ["pyodide"], emits: 1 },
+    { name: "quizzes on two pages, and a hidden page", carried: ["pyodide"], emits: 2, quizzes: true },
+    { name: "blocks and quizzes together", carried: [], emits: 1, quizzes: true },
   ]
   for (const run of runs) {
     count += 1
@@ -312,6 +340,7 @@ const siteSaidRuns = []
       const tree = parse(text)
       const file = { value: text, data: { frontmatter: { codeRunner: true, publish }, slug: path.slice(0, -3), relativePath: path } }
       transform(tree, file)
+      if (run.quizzes) file.data.plantoirQuizDisagreements = quizRecords[path]
       content.push([tree, file])
     }
     console.log = log
@@ -341,7 +370,85 @@ const siteSaidRuns = []
     siteSaidRuns.push({ name: run.name, lines, printed, ms })
   }
 }
-console.log(JSON.stringify({ count, failures, siteSaidRuns }))
+// Text that wraps (#653): every case through the rule, then as a page
+// through Quartz's own parser and the transformer's second plugin.
+const wrapping = JSON.parse(readFileSync(process.argv[4], "utf-8"))
+const wrapPages = CodeRunnerFences().markdownPlugins()[1]()
+let wrapCases = 0
+for (const c of wrapping.fence.cases) {
+  count += 1
+  wrapCases += 1
+  if (wrapsText(c.lang, c.meta) !== c.wraps) failures.push(`textFenceWrapping ${c.name}: wrapsText says ${!c.wraps}`)
+  const text = "```" + c.fence + "\nx\n```\n"
+  const tree = parse(text)
+  const node = tree.children[0]
+  if (!node || node.type !== "code" || node.lang !== c.lang || (node.meta ?? null) !== c.meta) {
+    failures.push(`textFenceWrapping ${c.name}: Quartz's parser reads ${JSON.stringify(c.fence)} as ${JSON.stringify([node?.lang, node?.meta])}, not the case's lang and meta`)
+    continue
+  }
+  wrapPages(tree, { value: text, data: { frontmatter: {}, slug: "Units/Wrap", relativePath: "Units/Wrap.md" } })
+  const top = tree.children[0]
+  const wrapped = top.type === "plantoirTextWrap" && top.data?.hName === "div"
+    && JSON.stringify(top.data?.hProperties) === JSON.stringify({ className: ["plantoir-text-wrap"] })
+    && top.children.length === 1 && top.children[0] === node
+  if (wrapped !== c.wraps || (!c.wraps && top !== node)) failures.push(`textFenceWrapping ${c.name}: the transformer ${wrapped ? "wrapped" : "did not wrap"} it`)
+  if (node.lang !== c.lang || (node.meta ?? null) !== c.meta) failures.push(`textFenceWrapping ${c.name}: the transformer changed lang or meta`)
+}
+// Where a flagged block can sit: every one wrapped, nothing else.
+{
+  count += 1
+  const F = "```"
+  const body = "x " + "y ".repeat(60)
+  const page = [
+    F + "text wrap", body, F, "",
+    "- a list item", "", "  " + F + "text wrap", "  " + body, "  " + F, "",
+    "> a quote", ">", "> " + F + "text wrap", "> " + body, "> " + F, "",
+    "> [!note]- Folded", "> " + F + "text wrap", "> " + body, "> " + F, "",
+    "> [!quiz] Which?", "> - [x] a", "> - [ ] b", ">", "> > [!explain]- Why", "> > " + F + "text wrap", "> > " + body, "> > " + F, "",
+    F + "text", body, F, "",
+    F + "python wrap", "print(1)", F, "",
+  ].join("\n")
+  const tree = parse(page)
+  wrapPages(tree, { value: page, data: { frontmatter: {}, slug: "Units/Wrap", relativePath: "Units/Wrap.md" } })
+  const seen = []
+  const walk = (node, inside) => {
+    if (node.type === "code") seen.push([node.lang, node.meta ?? null, inside])
+    for (const child of node.children ?? []) walk(child, inside || node.type === "plantoirTextWrap")
+  }
+  walk(tree, false)
+  const want = [["text", "wrap", true], ["text", "wrap", true], ["text", "wrap", true], ["text", "wrap", true], ["text", "wrap", true], ["text", null, false], ["python", "wrap", false]]
+  if (JSON.stringify(seen) !== JSON.stringify(want)) failures.push(`textFenceWrapping, where a block sits: ${JSON.stringify(seen)}`)
+}
+// A runnable block keeps its runner and is never wrapped, whichever plugin runs.
+{
+  count += 1
+  const site = mkdtempSync(join(tmpdir(), "plantoir-runner-site-"))
+  mkdirSync(join(site, "quartz"))
+  writeFileSync(join(site, "quartz", "plantoir_code_runner.json"), JSON.stringify({ words, carried: ["pyodide"], limits: {} }))
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25)
+  process.chdir(site)
+  const text = "```python run wrap\nprint(1)\n```\n"
+  const tree = parse(text)
+  const file = { value: text, data: { frontmatter: { codeRunner: true }, slug: "Units/Run", relativePath: "Units/Run.md" } }
+  transform(tree, file)
+  wrapPages(tree, file)
+  process.chdir(home)
+  const dump = JSON.stringify(tree)
+  if (!dump.includes('"plantoirRunner"') || dump.includes('"plantoirTextWrap"')) failures.push(`textFenceWrapping, python run wrap: ${dump.slice(0, 300)}`)
+  // text is not a runner language: the same page's ```text run wrap is
+  // wrapped and gets no runner.
+  count += 1
+  const textRun = "```text run wrap\nx\n```\n"
+  const textTree = parse(textRun)
+  const textFile = { value: textRun, data: { frontmatter: { codeRunner: true }, slug: "Units/Run", relativePath: "Units/Run.md" } }
+  process.chdir(site)
+  transform(textTree, textFile)
+  wrapPages(textTree, textFile)
+  process.chdir(home)
+  const textDump = JSON.stringify(textTree)
+  if (textDump.includes('"plantoirRunner"') || textTree.children[0]?.type !== "plantoirTextWrap") failures.push(`textFenceWrapping, text run wrap: ${textDump.slice(0, 300)}`)
+}
+console.log(JSON.stringify({ count, failures, siteSaidRuns, wrapCases }))
 """
 
 
@@ -412,12 +519,65 @@ def check_what_the_site_said(runs: list) -> list:
     if not failures:
         print(f"plantoirSiteSaid.ts: one finding for three blocks, said once, in {several['ms'][0]:.0f} ms "
               f"(a second emit {several['ms'][1]:.1f} ms; a site where nothing disagrees {quiet['ms'][0]:.1f} ms)")
+    failures += check_the_quizzes_the_site_said(by_name, prefix)
+    return failures
+
+
+def check_the_quizzes_the_site_said(by_name: dict, prefix: str) -> list:
+    """
+    #644: the quiz safety net's records alone are ONE quizzesReadDifferently
+    marker (pages in path order, the hidden page named nowhere, a second
+    emit silent); beside blocks of code they are a SECOND marker after the
+    code's, printed by the same single call.
+    """
+    failures = []
+    alone = by_name.get("quizzes on two pages, and a hidden page")
+    together = by_name.get("blocks and quizzes together")
+    if alone is None or together is None:
+        return ["plantoirSiteSaid: the Node half did not run the quiz cases"]
+    check = None
+    for entry in contracts.section("shared-rules", "siteHealth", "checks"):
+        if entry["name"] == "quizzesReadDifferently":
+            check = entry
+
+    def names(printed):
+        found = []
+        for line in printed.splitlines():
+            if prefix in line:
+                found.append(json.loads(line[line.index(prefix) + len(prefix):]))
+        return found
+
+    markers = names(alone["printed"][0])
+    if [marker.get("name") for marker in markers] != ["quizzesReadDifferently"]:
+        failures.append(f"plantoirSiteSaid: the quizzes alone printed {alone['printed'][0]!r}")
+    else:
+        finding = markers[0]
+        expected = (check["sentenceForSeveral"].replace("{count}", "2").replace("{course}", "ICS3U")
+                    .replace("{section}", "1"))
+        if finding.get("sentence") != expected:
+            failures.append(f"plantoirSiteSaid: the quizzes' finding is {finding}")
+        detail = finding.get("detail", "")
+        first = detail.find("“Unit 1/Loops”: ")
+        second = detail.find("“Unit 1/Strings”, question 1, line 7: ")
+        if first < 0 or second < first:
+            failures.append(f"plantoirSiteSaid: the quizzes' detail is not in page order: {detail}")
+        if "Hidden" in alone["printed"][0]:
+            failures.append("plantoirSiteSaid: the hidden page's quiz was named")
+    if len(alone["printed"]) != 2 or alone["printed"][1] != "":
+        failures.append(f"plantoirSiteSaid: a second emit said {alone['printed'][1:]!r}")
+    both = names(together["printed"][0])
+    if [marker.get("name") for marker in both] != ["runnableCodeShownAsPlainCode", "quizzesReadDifferently"]:
+        failures.append(f"plantoirSiteSaid: blocks and quizzes printed {together['printed'][0]!r}")
+    if not failures:
+        print(f"plantoirSiteSaid.ts: the quiz safety net's lines are one more finding, after the code's, "
+              f"from the same call ({together['ms'][0]:.0f} ms for both)")
     return failures
 
 
 def run_the_rules_in_node(folder: Path) -> list:
     entry = folder / "runner.mjs"
     entry.write_text(RUNNER.replace("RULE_TS", str(RULE_TS)).replace("TRANSFORMER_TS", str(TRANSFORMER_TS))
+                     .replace("WRAP_TS", str(WRAP_TS))
                      .replace("SITE_SAID_TS", str(SITE_SAID_TS))
                      .replace("ISOLATION_MJS", str(ISOLATION_MJS)), encoding="utf-8")
     bundle = folder / "runner.bundle.mjs"
@@ -428,10 +588,14 @@ def run_the_rules_in_node(folder: Path) -> list:
     rules.write_text(json.dumps(contracts.section("shared-rules", "codeRunnerBlocks")), encoding="utf-8")
     said = folder / "site_said.json"
     said.write_text(json.dumps(site_said_payload()), encoding="utf-8")
-    output = subprocess.run(["node", str(bundle), str(rules), str(said)], check=True, capture_output=True,
-                            text=True).stdout
+    wrapping = folder / "textFenceWrapping.json"
+    wrapping.write_text(json.dumps(contracts.section("shared-rules", "textFenceWrapping")), encoding="utf-8")
+    output = subprocess.run(["node", str(bundle), str(rules), str(said), str(wrapping)], check=True,
+                            capture_output=True, text=True).stdout
     result = json.loads(output.strip().splitlines()[-1])
     print(f"codeRunnerRule.ts: {result['count']} contract cases run in Node over Quartz's own parser")
+    print(f"textWrapRule.ts: {result.get('wrapCases', 0)} textFenceWrapping cases through the rule and through "
+          f"Quartz's own parser and the transformer, every place a block sits, python run wrap a runner and text run wrap not one (#653)")
     return result["failures"] + check_what_the_site_said(result.get("siteSaidRuns") or [])
 
 

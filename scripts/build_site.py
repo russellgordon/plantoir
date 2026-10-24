@@ -28,6 +28,7 @@ import how_i_teach
 import page_visibility
 import page_features
 import figures
+import geogebra
 import swift_blocks
 import site_said
 import print_settings
@@ -1575,13 +1576,14 @@ def _wire_list_page_toc(layout_ts: Path) -> None:
 
 def _wire_transformers_index(index_ts: Path) -> None:
     """Export the figures transformer (#485 E1), the runnable code's (#455),
-    the self-check quizzes' (#563), the task boxes' (#519) and the picture
-    sizes' (#612) beside Quartz's own."""
+    the self-check quizzes' (#563), the task boxes' (#519), the picture
+    sizes' (#612) and the GeoGebra sketches' (#578) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
                          ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks"),
-                         ("PlantoirPictureSizes", "./plantoirPictureSizes")):
+                         ("PlantoirPictureSizes", "./plantoirPictureSizes"),
+                         ("PlantoirGeoGebra", "./plantoirGeoGebra")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1671,6 +1673,32 @@ def _wire_quizzes_transformer(config_ts: Path) -> None:
         print("⚠️ Could not add the self-check questions: the site's settings have changed shape.")
         return
     text = text[:at] + "\n" + indent + "Plugin.PlantoirQuizzes()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_geogebra_transformer(config_ts: Path) -> None:
+    """Put the GeoGebra sketches' transformer (#578) straight AFTER the
+    figures transformer and so BEFORE the self-check quizzes': a sketch in a
+    question is then a finished figure when the quiz transformer packages the
+    question (plan section 3.6). Anchored on PlantoirFigures, and wired AFTER
+    the quizzes' own step, so on a fresh site and on one wired before #578
+    alike the order is Figures, GeoGebra, Quizzes: the quizzes' step also
+    inserts straight after Figures, and whichever runs second lands
+    between."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirGeoGebra(" in text:
+        return
+    anchor = "Plugin.PlantoirFigures(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the GeoGebra sketches: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not add the GeoGebra sketches: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirGeoGebra()," + text[at:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -1924,13 +1952,13 @@ def _wire_site_said_emitter(config_ts: Path) -> None:
         return
     anchor = "Plugin.Assets(),"
     if text.count(anchor) != 1:
-        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        print("⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): the site's settings have changed shape.")
         return
     at = text.index(anchor)
     line_start = text.rfind("\n", 0, at) + 1
     indent = text[line_start:at]
     if indent.strip():
-        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        print("⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): the site's settings have changed shape.")
         return
     text = text[:line_start] + indent + "Plugin.PlantoirSiteSaid(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
@@ -2062,7 +2090,9 @@ def wire_quartz_additions(output_dir: Path) -> None:
     in afterBody; its exports ride the two index edits), the self-check
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
-    button's component), the task boxes' one (#519: its transformer after
+    button's component), the GeoGebra sketches' one (#578: its transformer
+    straight after the figures' and so before the quizzes'; export, script
+    and styles ride as the quizzes' do), the task boxes' one (#519: its transformer after
     the quizzes'; export, script and styles ride as the quizzes' do), the
     picture sizes' one (#612: its transformer after the task boxes'; its
     export rides the transformers index, and its one style rule rides the
@@ -2089,6 +2119,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz" / "plugins" / "transformers" / "index.ts", _wire_transformers_index),
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
+        (output_dir / "quartz.config.ts", _wire_geogebra_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_picture_sizes_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
@@ -2179,7 +2210,7 @@ def _vault_source_of(page):
     return source[0] if source is not None else None
 
 
-def _check_quizzes(content_root: Path, output_dir: Path) -> list:
+def _check_quizzes(content_root: Path, output_dir: Path) -> tuple:
     """
     Self-check quizzes (#563; scripts/quizzes.py), ALWAYS: every `> [!quiz]`
     on the pages students can see, by the gate's own visibility rule, read
@@ -2188,7 +2219,9 @@ def _check_quizzes(content_root: Path, output_dir: Path) -> list:
     file, and becomes the `quiz_problems` fact for the quizzesNotReady
     finding. Then quartz/plantoir_quiz.json (the words) and
     quartz/plantoir_quiz_pages.json (what was found where, for the site's
-    safety net) are written, on every build. Never stops a build: if this
+    safety net) are written, on every build. Answers the problems and (#644)
+    each examined page's place by its path in the site's content, which
+    _write_site_said hands the site's emitter. Never stops a build: if this
     cannot run, the site still renders every quiz by its own reading.
     """
     checked = None
@@ -2204,7 +2237,9 @@ def _check_quizzes(content_root: Path, output_dir: Path) -> list:
         quizzes.write_quiz_files(output_dir, checked)
     except OSError as error:
         print(f"⚠️ Could not set up the self-check questions: {error}")
-    return checked["problems"] if checked is not None else []
+    if checked is None:
+        return [], {}
+    return checked["problems"], checked.get("places") or {}
 
 
 def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, full_rebuild: bool) -> dict:
@@ -2228,6 +2263,33 @@ def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, ful
         shutil.rmtree(output_dir / "quartz" / figures.WORKSPACE, ignore_errors=True)
         return {"counts": {figures.GRAPH_ENGINE: 0}, "fonts": [], "problems": [], "notes": [],
                 "drawn": 0, "fromBefore": 0, "figures": 0}
+
+
+def _prepare_geogebra(content_root: Path, output_dir: Path, course_dir: Path, full_rebuild: bool) -> dict:
+    """
+    GeoGebra sketches (#578; scripts/geogebra.py), ALWAYS: every
+    ```geogebra and ~~~geogebra fence on the pages students can see, by the
+    gate's own visibility rule, read, its file found and checked (or its
+    geogebra.org sketch fetched ONCE and kept beside the course's built
+    sites, in .geogebra-cache, under the fence's key), and handed to the
+    site's transformer. `full_rebuild` is passed so the choice is visible:
+    geogebra.prepare keeps the saved copies through a full rebuild
+    (geogebraFences.cache). Never stops a build: if this cannot run, every
+    fence stays a plain code block and the build says so in one line.
+    """
+    try:
+        pages = geogebra.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            _vault_source_of, skip=_is_media_name)
+        cache_root = toolchain_paths.merged_output_root(course_dir) / geogebra.CACHE_FOLDER
+        return geogebra.prepare(pages, output_dir, content_root, cache_root=cache_root,
+                                full_rebuild=full_rebuild)
+    except Exception as error:
+        print(f"⚠️ Could not prepare the GeoGebra sketches: {error}")
+        shutil.rmtree(output_dir / "quartz" / geogebra.WORKSPACE, ignore_errors=True)
+        shutil.rmtree(output_dir / "quartz" / "static" / geogebra.THUMBNAILS, ignore_errors=True)
+        return {"counts": {geogebra.ENGINE: 0}, "problems": [], "notes": [], "sketches": 0, "shown": 0}
 
 
 def _count_runner_pages(content_root: Path) -> dict:
@@ -2300,14 +2362,17 @@ def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Pa
 
 
 def _write_site_said(output_dir: Path, content_root: Path, course_code, section_number,
-                     swift_here: dict) -> None:
+                     swift_here: dict, quiz_places: dict = None) -> None:
     """
     quartz/plantoir_site_said.json (#567; scripts/site_said.py): which Python
     the site's emitter runs to say the runnable blocks it showed as plain code
     as ONE folder problem (siteHealth -> runnableCodeShownAsPlainCode), where
     each page that opts in came from in the course folder, and which Swift
     blocks swiftCouldNotBePrepared already names. The pages are the ones
-    students can see, by the gate's own rule, read from the build's copies.
+    students can see, by the gate's own rule, read from the build's copies;
+    each page the quiz check examined is added by its place too (#644,
+    quizzesReadDifferently, said in the same call), unless it is already
+    there, so a code page keeps its `source`.
     Never stops a build: if this cannot run, the site keeps its
     `plantoir: error:` lines and says no finding.
     """
@@ -2320,13 +2385,16 @@ def _write_site_said(output_dir: Path, content_root: Path, course_code, section_
             source = _vault_source_of(content_root / page["path"])
             places[page["path"]] = {"place": page["place"],
                                     "source": str(source) if source is not None else None}
+        for path, place in (quiz_places or {}).items():
+            if path not in places:
+                places[path] = {"place": place, "source": None}
         swift_named = []
         for problem in swift_here.get("problems") or []:
             swift_named.append([problem.get("page", ""), problem.get("block", 1)])
         site_said.write_side_file(output_dir, course_code, section_number, places, swift_named,
                                   content_root)
     except Exception as error:
-        print(f"⚠️ Could not let the website say which blocks of code show as plain code: {error}")
+        print(f"⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): {error}")
 
 
 LOCALES_SRC_CANDIDATES = [
@@ -3432,6 +3500,184 @@ def _write_visible_places(host_output_dir: Path, places: list, build_id: str,
             "buildId": build_id, "places": places})
     except OSError as error:
         print(f"⚠️  Could not note which pages this site shows: {error}")
+
+
+# === #518: which file in the course folder each page of the site came from ===
+# Open in Obsidian, pressed while a section's preview is showing, opens the
+# file behind the page on screen. The app knows the page's ADDRESS; only the
+# build knows which file it was made from (a per-section page that replaced a
+# shared one, a folder's `_index`, a name Quartz slugged), so the build writes
+# the answer down, in both modes - a preview never reaches the publish branch
+# that writes the visible-pages list - and both apps read the same file.
+# `contracts/file-formats.json` -> `pageSourcesList` is the format;
+# `contracts/shared-rules.json` -> `obsidianOpensThePreviewedPage` is how the
+# app reads it. Outside `public/`, so no deploy uploads it.
+
+PAGE_SOURCES_FILE = ".page-sources.json"
+PAGE_SOURCES_VERSION = 1
+
+
+def page_slug_as_quartz_serves(relative: Path) -> str | None:
+    """
+    The address below the site's root that Quartz serves this content file
+    at, or None when Quartz does not make a page of it.
+
+    Quartz 4.5.0 makes pages of `.md` files only, matched exactly (a `.MD`
+    file is not a page: build.ts globs `**/*.md`), and its `slugifyFilePath`
+    treats a last segment `_index` as `index` - the two places measured
+    (2026-10-21, 38 names) where `_quartz_page_slug` alone disagreed with it.
+    """
+    if not relative.name.endswith(".md"):
+        return None
+    slug = _quartz_page_slug(relative)
+    if slug == "_index":
+        return "index"
+    if slug.endswith("/_index"):
+        return slug[:-len("_index")] + "index"
+    return slug
+
+
+def _body_without_settings(text: str) -> str:
+    """A page's text below its settings block, or all of it when it has none."""
+    lines = text.replace("\r\n", "\n").split("\n")
+    if not lines or lines[0].strip() != "---":
+        return text
+    for index in range(1, len(lines)):
+        if _is_frontmatter_fence(lines[index]):
+            return "\n".join(lines[index + 1:])
+    return text
+
+
+def _front_page_embed_source(section_index: Path, content_root: Path,
+                             course_dir: Path) -> tuple[str, bool] | None:
+    """
+    Russell's ruling on #518 (2026-10-23): when the section's front page is
+    ONLY a single `![[...]]` line below its settings, Open in Obsidian opens
+    the class page it shows rather than the one-line front page. The page is
+    named the way the build's own date pass reads the line
+    (`_class_embed_target`); a name that matches no page, or more than one,
+    leaves the front page itself, because guessing would open the wrong file.
+    Read from the TEACHER's file, not the build's copy, which the build gives
+    a title and may give the section marker.
+
+    Answers the class page's file and whether students are kept from IT -
+    the front page can be visible while the class it embeds is hidden, and
+    the trail says "(hidden from students)" of the file that opens (ruling
+    4), so `showsHidden` is that class's own flag, never the front page's.
+    """
+    try:
+        text = section_index.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    lines = []
+    for line in _body_without_settings(text).split("\n"):
+        if line.strip():
+            lines.append(line)
+    if len(lines) != 1:
+        return None
+    target = _class_embed_target(lines[0])
+    if target is None:
+        return None
+    matches = []
+    for page in content_root.rglob("*.md"):
+        if page.name.endswith(".md") and page.stem.lower() == target:
+            matches.append(page)
+    if len(matches) != 1:
+        return None
+    source = _vault_relative_source(matches[0], course_dir, content_root)
+    if source is None:
+        return None
+    try:
+        hidden = _is_draft(matches[0].read_text(encoding="utf-8"))
+    except Exception:
+        hidden = False
+    return source, hidden
+
+
+def _vault_relative_source(copied: Path, course_dir: Path,
+                           content_root: Path | None = None) -> str | None:
+    """The file `copied` came from, as a POSIX path below the course folder -
+    or None when the build made it, the file is gone, or it is not in the
+    course folder.
+
+    One correction on the way: the per-section folder copy credits EVERY file
+    under a folder it copied to the section, so when a folder name is both
+    shared and per-section, a shared page copied there first is credited to a
+    section file that does not exist. The file that made the page is then the
+    shared one at the same place in the course folder, which is what is
+    listed. (The record itself is left alone here; that trap is a toolchain
+    issue of its own, #518's plan.)"""
+    found = _vault_sources.get(copied)
+    if found is None:
+        return None
+    source, is_section_page = found
+    if not source.is_file() and is_section_page and content_root is not None:
+        try:
+            shared = course_dir / copied.relative_to(content_root)
+        except ValueError:
+            shared = None
+        if shared is not None and shared.is_file():
+            source = shared
+    if not source.is_file():
+        return None
+    try:
+        return source.resolve().relative_to(course_dir.resolve()).as_posix()
+    except (ValueError, OSError):
+        return None
+
+
+def page_sources(content_root: Path, course_dir: Path, course_code: str,
+                 section_number: int, build_id: str | None) -> dict:
+    """
+    This build's address -> file list (`pageSourcesList`): for every page
+    Quartz will serve, the file in the course folder it came from, and
+    whether students see it. An address two files both slug to is listed as
+    `collided` with no file, so the app can say why it opened the section
+    instead; a page the build made itself (My Progress, a coverage map) is
+    not listed at all.
+    """
+    candidates = {}
+    for page in sorted(content_root.rglob("*.md")):
+        slug = page_slug_as_quartz_serves(page.relative_to(content_root))
+        if slug is None:
+            continue
+        candidates.setdefault(slug, []).append(page)
+    pages = {}
+    for slug in sorted(candidates):
+        found = candidates[slug]
+        if len(found) > 1:
+            pages[slug] = {"collided": True}
+            continue
+        source = _vault_relative_source(found[0], course_dir, content_root)
+        if source is None:
+            continue
+        try:
+            hidden = _is_draft(found[0].read_text(encoding="utf-8"))
+        except Exception:
+            hidden = False
+        entry = {"source": source, "hidden": hidden}
+        if slug == "index":
+            section_index = course_dir / source
+            shown = _front_page_embed_source(section_index, content_root, course_dir)
+            if shown is not None:
+                entry["shows"] = shown[0]
+                entry["showsHidden"] = shown[1]
+        pages[slug] = entry
+    return {"version": PAGE_SOURCES_VERSION, "course": course_code,
+            "section": section_number, "buildId": build_id, "pages": pages}
+
+
+def _write_page_sources(host_output_dir: Path, content_root: Path, course_dir: Path,
+                        course_code: str, section_number: int,
+                        build_id: str | None) -> None:
+    """Written immediately before Quartz runs, after every pass that adds,
+    removes or renames a page, in a preview and a publish alike. Never fails
+    a build: without the list the app opens the section, as it always did."""
+    try:
+        _write_json_atomically(host_output_dir / PAGE_SOURCES_FILE, page_sources(
+            content_root, course_dir, course_code, section_number, build_id))
+    except Exception as error:
+        print(f"⚠️  Could not note which file each page came from: {error}")
 
 
 def _find_class_reachable_pages(content_root: Path) -> set[Path]:
@@ -9083,6 +9329,8 @@ def build_section_site(
     # the checks, so a figure that cannot be drawn is said where every folder
     # problem is said.
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
+    # GeoGebra sketches (#578), ALWAYS, for the same reason.
+    geogebra_here = _prepare_geogebra(content_root, output_dir, course_dir, full_rebuild)
     # Runnable code (#455), ALWAYS: which language engines this site carries.
     runner_pages_here = _count_runner_pages(content_root)
     # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into
@@ -9090,7 +9338,7 @@ def build_section_site(
     swift_here = _prepare_runnable_swift(content_root, output_dir, course_dir)
     # Self-check quizzes (#563), ALWAYS: the folder check, and the two files
     # the site reads.
-    quiz_problems_here = _check_quizzes(content_root, output_dir)
+    quiz_problems_here, quiz_places_here = _check_quizzes(content_root, output_dir)
 
     health_facts = {
         "coverage_wanted": coverage_wanted,
@@ -9130,6 +9378,8 @@ def build_section_site(
         # Runnable Swift blocks with no program (#493).
         "swift_problems": swift_blocks.health_finding_facts(swift_here),
         "quiz_problems": quiz_problems_here,
+        # GeoGebra sketches that cannot be shown (#578).
+        "geogebra_problems": geogebra.health_finding_facts(geogebra_here),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)
@@ -9301,6 +9551,7 @@ def build_section_site(
     # rather than a Run button that can never work (codeRunnerBlocks.siteDisagrees).
     gated_counts = dict(print_pages_here["counts"])
     gated_counts.update(figures_here["counts"])
+    gated_counts.update(geogebra_here["counts"])
     gated_counts.update(runner_pages_here)
     gated_outcome = page_features.install_gated_assets(output_dir, gated_counts)
     carried_runner_engines = set()
@@ -9313,7 +9564,8 @@ def build_section_site(
         print(f"⚠️ Could not set up the code students run: {error}")
     # What the site's emitter needs to say a block it shows as plain code as a
     # folder problem (#567), ALWAYS, beside the runner's words.
-    _write_site_said(output_dir, content_root, course_code, section_number, swift_here)
+    _write_site_said(output_dir, content_root, course_code, section_number, swift_here,
+                     quiz_places_here)
     # KaTeX from the site itself (#494), ALWAYS and on every site: the
     # stylesheet, copy-tex and the woff2 faces the maths is set in.
     install_katex_assets(output_dir)
@@ -9415,9 +9667,19 @@ def build_section_site(
     # its node_modules/.bin), which needs network and floats the version.
     # The absolute path also puts the section's work dir on the serve
     # process's command line - what the native stop matches on.
-    env = os.environ.copy()
+    # node_environment adds `--disable-warning=DEP0040` to NODE_OPTIONS, so
+    # Quartz on Node 22 does not print its punycode deprecation into the
+    # teacher's console (#640; toolchain_paths says why only that one).
+    env = toolchain_paths.node_environment(os.environ)
     env.setdefault("TZ", "UTC")
     env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # 2024-01-01T00:00:00Z
+
+    # #518: which file each page came from, for Open in Obsidian. Here, the
+    # last moment before Quartz reads the content, so no later pass can add
+    # or remove a page the list does not know about - and before the branch,
+    # because a preview needs it as much as a publish.
+    _write_page_sources(host_output_dir, content_root, course_dir, course_code,
+                        section_number, _this_build_id)
 
     if build_only:
         # A preview for THIS section may still be serving, and it does not stop

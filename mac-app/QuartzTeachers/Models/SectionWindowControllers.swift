@@ -1,7 +1,7 @@
 import Foundation
 
 /// The section windows that are on screen, and the work each one owns: its
-/// preview, and its deploy.
+/// preview, its deploy, and its Open in Obsidian (#610).
 ///
 /// **Why a registry of closures rather than a request an observer notices.**
 /// The assistant needs to do three things in order — stop the preview, change
@@ -115,6 +115,24 @@ final class SectionWindowControllers {
         /// Defaults to nothing to ask, for a window that has no question.
         var askAboutClassesDatedLater: () async -> LaterClassesAnswer = {
             return .nothingToAsk
+        }
+
+        /// The address below the preview's root of the page this window's
+        /// preview is showing at this moment, read from its web view — or
+        /// nil when no page is showing (#518, Open in Obsidian). Defaults to
+        /// none, for a window that has no preview.
+        var previewedPage: () -> String? = {
+            return nil
+        }
+
+        /// Press this window's Open in Obsidian, as the toolbar button does,
+        /// and say what the press came to (#610, the in-app assistant's
+        /// `open_in_obsidian`). The window's own model runs it, because the
+        /// questions the press can ask are shown only by the window that owns
+        /// the model. Defaults to `.noWindow`, for a window that has no
+        /// button to press.
+        var openInObsidian: () async -> OpenInObsidianPress = {
+            return .noWindow
         }
 
         // MARK: - Functions

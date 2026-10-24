@@ -328,6 +328,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-29 | **My Progress under the class folder in the sidebar, and its emitter (#545)** | `quartz/components/scripts/explorer.inline.ts`, `quartz.config.ts`, `quartz/plugins/emitters/index.ts` | `pin_my_progress_in_sidebar` adds, once, an import of `progressRules.pinnedOrder` and one data line rewritten on every build (`{slug, after}`: the page's slug, or `""` when this build made none, and the class folders' slug segments), and loops over `pinnedOrder(orderedTopLevel, …)` — `orderedTopLevel` is a `const` (plan review F1). `_wire_emitters_index` exports `PlantoirProgress` (and, since #567, `PlantoirSiteSaid`, each export with its own check); `_wire_progress_emitter` puts it straight before `Plugin.Assets()`, and `_wire_site_said_emitter` puts `Plugin.PlantoirSiteSaid()` between the two (05 → "The safety net becomes a folder problem"). Every build, idempotent; a script or settings file of another shape warns and is left alone (the page then sorts last, or no manifest is written). Section L. |
 | C2-30 | **The sidebar scrolls only itself (#611)** | `quartz/components/scripts/explorer.inline.ts` | `patch_explorer_scroll_in_sidebar_only` (marker `PLANTOIR-SIDEBAR-SCROLL`) replaces Quartz's one `activeElement.scrollIntoView({ behavior: "smooth" })` — which scrolled the PAGE as well as the sidebar, 300-600 px down a long page as it opened — with a scroll of the sidebar's own list: none when the current page's entry is inside a closed folder, none when it is already in view, otherwise `scrollTop` set once, at once, centring it. Every build, idempotent, run straight after C2-3's expand-on-navigate patch; a script of another shape warns and is left alone. `patches/explorer.inline.ts` keeps Quartz's line (A2 unchanged). Section O. |
 | C2-31 | **Font stacks quoted one family at a time, and the system-font choice on the system stack (#629)** | `quartz/util/theme.ts` | Quartz's `joinStyles` wrote `--bodyFont: "<choice>", <fallback>`, quoting the WHOLE choice, so the "System fonts" choice — stored as `"Helvetica, Arial"` by both apps and `setup_course.py` — became ONE family of that name, which no machine has. The browser fell through to the fallback's `system-ui`: Chrome's platform-font query (`CSS.getPlatformFontsForNode`, Chrome for Testing 155.0.8059.39, this Mac, 2026-10-22/23) reports `.SF NS` (San Francisco), so Helvetica was never shown. **Russell's ruling (2026-10-22): those sites keep looking as they do** — San Francisco on a Mac, Segoe UI on Windows. So `patch_font_variable_stacks` adds `cssFontStack`: each family is quoted on its own, CSS keywords (`serif`, `system-ui`, `-apple-system`…) are left bare, and the system choice gets Quartz's fallback ALONE (`system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, …`), which puts system-ui and Segoe UI ahead of Helvetica and Arial. Measured: the same query reports `.SF NS` for the old and the new stack. A single family comes out byte for byte as before, so a Google-font site's stylesheet does not change (`scripts/test_font_variables.py` runs the patched TypeScript under node and compares). Every build, idempotent, anchored on the three v4.5.0 lines (each must match once) and warning without editing anything otherwise; the helper is a RAW Python string, because `/["\\]/g` in an ordinary one loses a backslash and every course's build fails on an unterminated regular expression (caught in review; the test pins the text). **Rejected:** quoting each family with Helvetica first, as the planner first proposed — measured to render Helvetica, a visible change to every system-font site that Russell turned down; changing the STORED value (to `"system-ui, Helvetica, Arial"` or similar) — every existing `course_config.json`, the Windows catalogue, the contract cases in `shared-rules.json`, the mac goldens, `setup_course.py`'s detection, C2-19's filter and `social_card.py` all key on the literal, and old folders would still carry the old one, so the build is the one place that fixes all of them; Python writing the stacks as literals into `theme.ts` — typography lives in `quartz.config.ts` (C1-11, full rebuild only), so two sources could disagree; editing Quartz's `DEFAULT_SANS_SERIF`, which buys nothing. Not affected: the Google request (C2-19 already drops stacks), the printed page (#499's `print.scss` sets its own font variables), the social card. The label for the choice now says "System fonts (each device's own)" in the mac app and in `setup_course.py`, and the mac's font editor previews it in the system font rather than Helvetica. **Windows inherits the CSS free** (shared `build_site.py` against its bundled Quartz v4.5.0; a different `theme.ts` would only warn) and says the same label since #648 (`FontCatalog.PairingLabel`, `WorkspaceTests.SystemPairingLabel`). |
+| C2-32 | **```text wrap: a text block's lines wrap (#653)** | `quartz/plugins/transformers/textWrapRule.ts`, `codeRunner.ts`'s second markdown plugin, `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, every build) | A ```text fence with `wrap` in its info string is wrapped in `div.plantoir-text-wrap` at the markdown stage, on every page; on screen its lines wrap at the window's width with each line's number on its first row and `…` in the gutter on the rest; code fences never wrap and `wrap` after them is ignored silently; print and the handout are untouched. Every other block is byte for byte as before. No new wiring: the plugin rides `CodeRunnerFences`' place straight before `SyntaxHighlighting`. Section P says why and what was measured. |
 
 ### C3. Content-level transformations (every build)
 
@@ -1674,12 +1675,12 @@ every site — I8 has the numbers.
 | File | What it does |
 |---|---|
 | `support/quartz/plugins/transformers/codeRunnerRule.ts` | The rules, with nothing of Quartz's: the language table (`LANGUAGES`, the literal mirror of `codeRunnerBlocks.languages`), `runnerFor` (the fence rule), `runnerId`, `findRunners` (document order, per-language numbering, and the nested-container skip below), the `{language}` filler and FNV-1a. `check_runner_rules_against_the_site.py` bundles it with Quartz's own parser and runs every case in Node. |
-| `support/quartz/plugins/transformers/codeRunner.ts` | `CodeRunnerFences`, wired straight BEFORE `Plugin.SyntaxHighlighting(` in `quartz.config.ts`: on a `codeRunner: true` page it wraps each runnable block, at the MARKDOWN stage, in `<div class="plantoir-runner" data-runner-id data-runner-flags data-runner-language data-runner-runtime data-runner-engine data-original>`. A wrapper rather than attributes because rehype-pretty-code 0.14 drops every property on `<pre>` and `<code>` (measured 2026-10-09); the wrapper survives at the top level, in lists, in quotes and in folded callouts, and the block inside is highlighted exactly as before (the meta is left alone). `data-original` is mdast's `value`, the teacher's code exactly. Reads `quartz/plantoir_code_runner.json` with `fs` (mtime-cached) for the engines the site carries (I6). |
+| `support/quartz/plugins/transformers/codeRunner.ts` | `CodeRunnerFences`, wired straight BEFORE `Plugin.SyntaxHighlighting(` in `quartz.config.ts`: on a `codeRunner: true` page it wraps each runnable block, at the MARKDOWN stage, in `<div class="plantoir-runner" data-runner-id data-runner-flags data-runner-language data-runner-runtime data-runner-engine data-original>`. A wrapper rather than attributes because rehype-pretty-code 0.14 drops every property on `<pre>` and `<code>` (measured 2026-10-09); the wrapper survives at the top level, in lists, in quotes and in folded callouts, and the block inside is highlighted exactly as before (the meta is left alone). `data-original` is mdast's `value`, the teacher's code exactly. Reads `quartz/plantoir_code_runner.json` with `fs` (mtime-cached) for the engines the site carries (I6). Since #653 its `markdownPlugins()` returns a SECOND plugin, on every page: a ```text wrap block wrapped in `div.plantoir-text-wrap` (section P). |
 | `support/quartz/components/CodeRunner.tsx` | Renders NOTHING. Placed at the head of `sharedPageComponents.afterBody` (Quartz renders `page-footer` on every page whatever it holds, so no page's HTML changes), it carries the script and styles into the site's one `postscript.js` and `index.css`. |
 | `support/quartz/components/scripts/codeRunner.inline.ts` | Everything in the browser (I2–I5). Imports `quartz/plantoir_code_runner.json` (words and limits; bundled by esbuild, as the patched explorer imports `course_config.json`). |
 | `support/quartz/components/scripts/codeRunnerColour.ts` | The editor's colours (#585, I12): the Python and Swift tokenizers, each line's start state, and `reusePlan` (which original line a current line may show Shiki's spans for). No DOM, no imports; the check bundles it beside the image's Shiki. |
 | `support/quartz/components/styles/codeRunner.scss` | Every rule under `.plantoir-runner`; the editor's font is the site's code font at `max(16px, …)`; touch targets 44 px; the editor's frame, coloured copy, gutter and the colour categories' classes (I12). |
-| `support/quartz/components/styles/codeLines.scss` | `@use`d by `codeRunner.scss`, and the one stylesheet here NOT under `.plantoir-runner`: every code block's line-number gutter and hairline, and no ligatures in code, on every page of every site (#585, I12, C2-28). |
+| `support/quartz/components/styles/codeLines.scss` | `@use`d by `codeRunner.scss`, and the one stylesheet here NOT under `.plantoir-runner`: every code block's line-number gutter and hairline, and no ligatures in code, on every page of every site (#585, I12, C2-28); since #653 also the screen-only look of a ```text wrap block (section P, C2-32). |
 | `support/gated/pyodide/plantoir-worker.js` | The thread a page's Python runs in, laid over `VENDOR_DIR/pyodide` by the gate, so it reaches a site only beside the engine it starts (I3). |
 
 ### I2. The block on the page
@@ -1844,7 +1845,9 @@ never shows "isn't on this site yet" for ever because of it. So:
   `plantoirSiteSaid.ts` says them as ONE folder problem
   (`runnableCodeShownAsPlainCode`) through `scripts/site_said.py`, on the
   first build of the process only — 05 → "The safety net becomes a folder
-  problem".
+  problem". Since #644 the same emitter, in the same call, also says the
+  quiz safety net's lines (`file.data.plantoirQuizDisagreements`, J2) as
+  `quizzesReadDifferently`, after the code's finding.
 - both sides split the info string on the SAME separators (`INFO_SPACE`:
   tab, space and Unicode's space separators, NBSP — Option-Space — among
   them; review N2: micromark leaves `python<NBSP>run` all in `lang`, and the
@@ -2516,6 +2519,11 @@ for touched lines only); the gutter inside the textarea's padding
 for the scroll (above); the plan's reuse key (above); ligatures in static
 code (the ruling: one look everywhere).
 
+Every block scrolls sideways on screen, with one exception since #653: a
+```text wrap block wraps its lines, keeping this gutter's numbers on each
+line's first row and drawing `…` in the same gutter style on the rest
+(section P).
+
 ## J. Self-check quizzes (#563, v1.8.0)
 
 The first half of #511. A `> [!quiz]` callout at the left edge of a page
@@ -2583,7 +2591,17 @@ other five, which differ between two builds of the same image).
   task list renders `<input checked disabled>`, the answer key on screen).
   A `$...$` answer is shown through the page's own parser (`this.parse`):
   only a parsed formula node carries what rehype-katex renders (review S9;
-  measured, the revealed answer holds `.katex`).
+  measured, the revealed answer holds `.katex`). Then the safety net
+  (`quizCallouts.safetyNet`, 05 → "The safety net"): for a published page
+  the folder check examined, it compares the site's reading with
+  `quartz/plantoir_quiz_pages.json` and prints a `plantoir: error:` line
+  where the two differ. Since #644 each printed line is also RECORDED on the
+  page's `file.data.plantoirQuizDisagreements` (`QuizDisagreement`: page,
+  place, the folder check's line, a `quizzesReadDifferently.reasons` key and,
+  for `shownWithNote`, the problem the site found), inside the same branch,
+  so one line is one record. The emitter `plantoirSiteSaid.ts` says them as
+  ONE `quizzesReadDifferently` folder problem (05 → "…and the quiz safety
+  net").
 * **HTML** (after Description, before Latex). The question's id, the
   choices' `aria-labelledby` and `aria-describedby`, blanks
   (`<code>____</code>`, M4) made into boxes, and the page's search text and
@@ -3720,6 +3738,447 @@ its second step's guard (`"expandOnNavigate:" not in src`) is then false and
 the options line is skipped. The current page's folder therefore never
 springs open on a page change. Its own issue; fixing it makes an entry in an
 open folder the common case, which this fix already handles.
+
+## P. Text that wraps (#653, v1.9.0)
+
+A teacher pasting an error message, a paragraph of sample output or a long
+URL into a ```text block got a block that scrolls sideways, which on a phone
+hides most of it. Russell's rulings (the issue, 2026-10-23): `text` fences
+ONLY, opted in with the word `wrap` (```text wrap); scrolling stays the
+default; `python wrap` and every other code fence is ignored silently and the
+runnable-code reader never sees `wrap` as a flag; each line keeps its number
+and every continued row shows `…` in the gutter, as BBEdit does; printing
+keeps print.scss's wrapping. The rule, every fence case and the limits are
+`contracts/shared-rules.json` → `textFenceWrapping`.
+
+### P1. The files (all in `support/quartz/`, installed every build)
+
+| File | What it does |
+|---|---|
+| `plugins/transformers/textWrapRule.ts` | `wrapsText(lang, meta)`: the info string joined and split on `codeRunnerRule.INFO_SPACE`, first word exactly `text`, `wrap` any later word. Nothing of Quartz's in it, so the check bundles it alone. |
+| `plugins/transformers/codeRunner.ts` | `markdownPlugins()`' SECOND plugin: on every page, each flagged `code` node is replaced by `{type: "plantoirTextWrap", data: {hName: "div", hProperties: {className: ["plantoir-text-wrap"]}}, children: [code]}`. `lang` and `meta` are left as written. |
+| `components/styles/codeLines.scss` | The look, in `@media screen` only, scoped to `.plantoir-text-wrap pre:not(.plantoir-flowing)`. |
+
+### P2. How, and why this way
+
+- **A wrapper, not an attribute.** rehype-pretty-code 0.14 writes
+  `data-language="text"` for ```text wrap and keeps no trace of the meta,
+  and drops every property put on `<pre>` or `<code>` (#455 measured it on
+  2026-10-09; re-measured for #653). A markdown-stage wrapper is the #455
+  pattern; with it removed the page's HTML is byte for byte the build
+  without the plugin. `text wrap {2}` still highlights line 2.
+- **One more plugin in an existing place.** It is `CodeRunnerFences`'
+  second markdown plugin, so it already runs straight before
+  `SyntaxHighlighting` (`build_site.wire_quartz_additions`); no config
+  anchor edit, and `test_quartz_additions_wiring.py` is unchanged.
+- **Both pseudo-elements absolute, and a plain padding hang.** The line is
+  `position: relative` with `padding-left: calc(0.25rem + (digits + 1.75)ch
+  + 1px)` - exactly the number's box (digits, 0.75ch padding, the 1 px
+  hairline) and the 1ch gap codeLines.scss gives it, so text starts at the
+  same x as in a scrolling block. `::before` (the number) and `::after` (the
+  ellipses) sit at `top: 0; left: 0.25rem`.
+- **The ellipses are text.** `::after { content: "\a …" × 80; white-space:
+  pre; overflow: hidden; top: 0; bottom: 0 }`: its first row is the empty
+  first line, each later row an ellipsis, in the code font at the code's own
+  line-height, clipped to the line's height - so they cannot drift from the
+  rows. It wears `plantoir-gutter`, so colour, font, right alignment, width,
+  padding and hairline are the number's (ruling R3, one gutter style); the
+  hairline therefore runs the line's full height.
+- **Hidden from screen readers** by the alt-text form `content: … / ""`,
+  written after the plain declaration so a browser without it keeps the
+  ellipses (P6).
+- **Screen only, and never the handout.** On paper `print.scss` already
+  wraps every block with its own hang (`[data-plantoir-line]`); the handout
+  is a Paged.js iframe in SCREEN media, but `print.inline.ts` marks every
+  non-diagram `pre` in its clone `plantoir-flowing`, and the selector's
+  `pre:not(.plantoir-flowing)` keeps print.scss in charge there.
+- **The copy button copies the block as written.** Quartz's
+  `clipboard.inline.ts` copies `code.innerText`; generated content is not in
+  it and a soft wrap is no line break.
+
+### P3. Measured (2026-10-23, M4 Pro, macOS 26.6)
+
+On HTML made by the image's rehype-pretty-code 0.14.0 / shiki 1.26.2 and a
+real built `index.css`, Chrome for Testing 155.0.8059.39 and Playwright
+WebKit (playwright-core 1.63.0, WebKit 26.6, kept in the scratchpad only):
+
+- **Geometry, 900 px, light**: every row of every wrapped line starts at one
+  x - 148.92 px in the 120-line block, the same x as its one-row lines and
+  as the old build's text (140.52 px in two-digit blocks); `::after` is rows
+  × line-height exactly (4 × 25.6 = 102.4 px); `--plantoir-digits` 3. WebKit
+  identical within 0.02 px. A 1,002-line block at 390 px: digits 4, every
+  row of lines 1000-1002 at 73.3 px; indented and tab-led lines keep their
+  leading white space on row 1. Dark at 390 px: no problems.
+- **The unbreakable line**: with the number inline (the issue's sketch) a
+  420-character URL at 390 px took 10 rows with row 1 empty; with both
+  pseudos absolute, 9 rows, row 1 full, in both engines.
+- **Unflagged blocks** (`text`, `python wrap`) still scroll in both engines;
+  **print** (`media: print`): every block's line height, padding, text
+  indent, white-space, `::after` content and `::before` position identical to
+  the build without the change (7 of 7).
+- **Screen readers**: Chrome's accessibility tree held 125 `…` text nodes on
+  the test page without the alt text, 0 with it. Sass 1.79.4 + lightningcss
+  1.29.2 with Quartz's own targets keep both declarations, plain first.
+- **Relayout cost, and why 80 rows** (plan review finding 2). Each line lays
+  out the whole ellipsis string. One relayout of a page holding a 1,002-line
+  wrapped block at 390 px (the article's width changed ten times, the median
+  of five loads): WebKit 0.9 ms unwrapped, 17.7 ms with a one-row string,
+  **63.5 ms with 80 rows**, 132.3 ms with 200; a 120-line block 0.1 ms
+  unwrapped, 7.6 ms with 80, 15.4 ms with 200. Chromium 153 stays at
+  3.4-3.6 ms whatever the count. 80 rows halves WebKit's cost against the
+  plan's 200 and still covers a line of about 7,800 characters at 1512 px (97 a row on the built page) or 2,800 at 390 px.
+- **Size**: the whole screen block is 1,830 bytes of the built `index.css` (78,215), once per site; the 80-row string twice is about 1 KB of it.
+- **The real build** (verify.sh, the planted Wrap Fixture, Chrome for
+  Testing 155): `text_wrap.mjs` printed "120 lines, 132 rows at 1512 px and
+  152 at 390 px, digits 3, every row at x 378.75 px, line 101's 5 rows full
+  from the first, about 97 characters a row at 1512 px", the copy button's
+  text 120 lines and 2,174 characters, and nothing out of place in light,
+  dark or at 390 px. The same built page in Playwright WebKit 26.6 and
+  Chromium 153: identical - 132 and 152 rows, every row at 378.8 px (63.8 px
+  at 390), line 101 in 5 and 12 rows with its first row full, the text and
+  python wrap blocks scrolling, the highlighted line tinted; one relayout of
+  the real page 8.2-8.5 ms in WebKit, 0.4-0.5 ms in Chromium.
+
+### P4. The checks
+
+- `scripts/check_runner_rules_against_the_site.py` (in the image, under
+  verify.sh): every `textFenceWrapping.fence.cases` case through `wrapsText`,
+  and as a page - `"```" + fence + "\nx\n```\n"` parsed by Quartz's own
+  remark-parse + remark-gfm, whose code node must carry exactly the case's
+  `lang` and `meta` (a case no page can produce fails), then wrapped by the
+  plugin exactly when `wraps`; a page with a flagged block at the top level,
+  in a list item, a quote, a callout and a quiz's explanation; and a
+  `codeRunner: true` page's ```python run wrap, a runner and never wrapped.
+  The guard case `codeRunnerBlocks.fences.cases` → "wrap is not a flag
+  (#653)" runs there and in `test_page_features.py` (so Windows'
+  `PythonToolchainTests` runs it too).
+- verify.sh plants **Wrap Fixture** (a ```text wrap {2,101} block of 120
+  lines - long lines 2 and 100, line 101 a URL of 420 characters, 102 led by
+  four spaces, 103 by a tab - a ```text and a ```python wrap block, and a
+  flagged block in a folded callout, a list item and a quiz's explanation)
+  and **Wrap Plain Twin** (the first three without the word). **6o** reads
+  the build: four wrappers and the right four, the first three blocks byte
+  for byte the twin's, the class on no other page but the skill's example,
+  and `index.css`'s screen-only rule with 80 rows and alt text. **6n** builds
+  the page-authoring skill's ```text wrap example.
+- `browser-checks/text_wrap.mjs` (Chrome for Testing, beside the sidebar
+  check): at 1512 px light, dark and 390 px - FIRST that the block is
+  wrapped and its `code` does not scroll; the two unflagged blocks scroll a
+  row a line; rows by height equal rows of text, every row at one x, line
+  101's first row full; each line's number box (top, one row) and ellipsis
+  box (full height, one right edge) by CDP; highlighted lines tinted; the
+  callout's (opened), list item's and quiz explanation's (answered) blocks
+  wrap; then print media and a `plantoir-flowing` pre laid out as a plain
+  block, and the copy button's text the block as written.
+- **Must-fail, proven by copy-and-restore** (the closing comment has the
+  output): `wrapsText` returning false fails every wrapping case of the check script (19 lines when measured, before the twentieth case was added);
+  on a copy of the built site, the CSS rule deleted, the wrapper divs
+  stripped, `::before` set back to `position: static`, `::after` content
+  `none`, and a real `…` put into a line's text each fail text_wrap.mjs at
+  the step named for them: the rule deleted and the wrappers stripped at
+  step 1 ("is in its wrapper and scrolls sideways", "is in no wrapper and
+  scrolls sideways"), `::before` static at step 3 ("line 101 (one unbreakable
+  run) has no text on its first row", 13 rows off the one x), `::after`
+  `none` at step 4 ("no ellipsis box", and the three nested blocks), a `…`
+  in line 2's text at step 8 ("it holds an ellipsis; a long line is not
+  whole").
+
+### P5. Rejected
+
+The number inline with a `text-indent` hang (the issue's sketch, and
+print.scss's handout approach): an unbreakable line leaves row 1 empty. An
+SVG data-URI ellipsis repeated by background: no web font, a colour per
+theme, and a repeat period that is a guess at the line-height. JavaScript
+counting rows: breaks under live reload, print and isolated pages, and is
+not needed. `wrap` for code fences: Russell's ruling - code is read by
+column. A folder problem for `python wrap`: noise for a harmless word; the
+skill says where the flag belongs. Attributes on `<pre>`: dropped by
+rehype-pretty-code 0.14. A separate wired plugin: a fourth config anchor
+edit for ten lines. A Python mirror of the rule: nothing in the build reads
+it. Continuation rows indented to the line's own leading white space (VS
+Code's "same" indent): not possible in CSS alone. 200 rows of ellipses: see
+the relayout numbers in P3.
+
+### P6. Known limits
+
+The four in `textFenceWrapping.knownLimits`: a line of more than 81 rows
+shows ellipses on its first 80 continuation rows only; Safari before 17.4
+does not know `content: … / ""`, keeps the plain declaration, shows the
+ellipses and lets a screen reader read each one (accepted: the other order
+would lose the ellipses there altogether); Obsidian shows the block
+unwrapped (not measured); the copy button sits over the first row's right
+end on hover, as over any block. Windows inherits all of it with
+`support/quartz`; its `windows` issue owes a look in Edge and Narrator.
+
+## Q. GeoGebra sketches (#578, v1.9.0)
+
+A ` ```geogebra ` fence becomes a sketch students can drag, opened with a
+tap, from the site's own copy of GeoGebra and of the sketch — never from
+geogebra.org. The build half is
+[05 → GeoGebra sketches](05-build-pipeline.md#geogebra-sketches-what-the-build-does-578-v190);
+the engine and its six replacements are 02 → "/opt/vendor/geogebra"; the
+rules are `contracts/shared-rules.json` → `geogebraFences`.
+
+### Q1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/plantoirGeoGebra.ts` — the transformer, wired by
+  `build_site._wire_geogebra_transformer` straight AFTER
+  `Plugin.PlantoirFigures()` and so BEFORE `Plugin.PlantoirQuizzes()`
+  (plan 3.4; measured in stage 5 not to change a quiz page's HTML either
+  way — Q7). The step is anchored on Figures
+  and runs AFTER the quizzes' own step, which also inserts straight after
+  Figures; whichever runs second lands between, so a fresh site and one
+  wired before #578 both read Figures, GeoGebra, Quizzes, Tasks
+  (`test_geogebra.py` `WiringTests`). Exported from
+  `plugins/transformers/index.ts`.
+- `components/scripts/geogebra.inline.ts` and
+  `components/styles/geogebra.scss` — carried by `PlantoirMetaLine`, as the
+  figures' are. Every style is under `.pl-geogebra`; the script does nothing
+  until a tap.
+- The key comes from `figureRules.js` (`keyOf`), shared with the figures.
+
+### Q2. Two stages
+
+The **markdown stage** turns a fence the manifest knows into
+`<figure class="pl-figure pl-geogebra">` holding only a hidden figcaption
+(the description). It is an mdast node with `data.hName`, never a raw html
+node: the quiz reader recognises a sketch by that node's type (Q7 —
+measured, an html node renders the same page but lets a sketch in a choice
+through). Description runs before it, so a page's summary is its words, never
+the sketch's commands (verify.sh 6i-g reads the meta description). The
+**html stage** puts in the card: the sketch's thumbnail, a button "Open the
+sketch (about 4.5 MB)" — the sketch plus the engine's first load, so a
+student on a school network knows what a tap costs — a caption when the
+fence gives one, the commands in a `<details>` for a reader without scripts,
+and the attribution. The sketch's address is `slugifyFilePath` of its path
+in `content/`, the function Quartz's Assets emitter publishes it with, so
+the file is on the site once and the card names exactly that file
+(browser-checks/geogebra_applet.mjs counts the files with the sketch's
+SHA-256: one; must-fail with a second copy in `static/`: two). A fence the
+manifest does not know stays the code block it was.
+
+**The manifest is read by page, then by fence** (stage 2 review item 1): the
+transformer looks a sketch up under its page's `file.data.relativePath`,
+NFC-normalised as the build normalises it, and only then by the fence's key.
+Keyed by the fence alone, the same fence text on two pages (`file:
+Lines.ggb` beside each) would show ONE of the two files on both pages, and a
+page whose file is missing would show another page's sketch while its folder
+problem said it could not be shown. `geogebraFences.manifest.cases` pins it
+in Python; verify.sh plants a page whose fence is the first fixture's word
+for word, with a different `Lines.ggb` beside it, and reads the address its
+card names.
+
+### Q3. Loading, on a tap
+
+`geogebra.inline.ts`: a tap loads `static/geogebra/deployggb.js` once
+(marked `spa-preserve`), fetches the sketch from the site and hands it over
+as `ggbBase64`, and makes the applet with the web3d codebase, offline, in
+English (the language files are left out of the engine), no menu bar, no
+input bar, no right-click menu, the reset icon, shift-drag zoom, the fence's
+`toolbar:`/`algebra:`, at the sketch's own size, scaled down to the page
+(`scaleContainerClass`). The box it is scaled into keeps the sketch's own
+shape (`aspect-ratio` from `--pl-geogebra-ratio`, `height: auto !important`,
+`overflow: hidden`, in `geogebra.scss`): GeoGebra writes a width and height
+onto that box for the page width it measured when it opened and never
+corrects them, so the 1430 × 759 slope-angle sketch, drawn 334 px tall in a
+630 px column, sat in a box left 482 px tall — a white band under it,
+found in the stage-7 screenshot (WebKit, 2026-10-24) and invisible to every
+check that only asked whether the box was zero-sized. **Known limit,
+unmeasured:** `overflow: hidden` would also cut off the keyboard GeoGebra
+may open inside its applet on a touchscreen for a fence with
+`algebra: true` (`geogebraFences.knownLimits`). No touchscreen was tried —
+an iPad and Edge on a touch laptop are to be checked later; a desktop
+browser opens no keyboard. A tap that has not opened a sketch in 60 s says
+`couldNotLoad` and the button works again. A geogebra.org sketch is fetched
+from the site's own copy in `static/geogebra-sketches/` (05 → item 9), never
+from geogebra.org.
+
+**The fence's commands** (#578 stage 3, `geogebraFences.commands`) run once
+the sketch has opened, one line at a time, and a line GeoGebra refuses is
+shown under the sketch — `lineCouldNotRun`, "Line {line} couldn't run:
+{said}", with GeoGebra's OWN words. Measured on the adapted engine,
+Chromium 1243 and WebKit 2359: **`evalCommand`'s answer cannot be used** —
+it is `false` for scripting commands that work (`SetValue`, `SetColor`,
+`ZoomIn`) and for real errors alike, and `asyncEvalCommand` resolves `""`
+for both, before any dialog. GeoGebra's error dialog tells them apart, but it
+is added 1–10 ms AFTER the line returns, a few tasks later — so reading the
+page straight after a line finds nothing, and waiting a fixed time would be a
+guess. What the loader does instead: after each line it also runs
+`endOfLine` (`PlantoirEndOfLine()`), a command GeoGebra does not know. Its
+dialog always comes, and always after the line's own (every contract case,
+in order, in both engines), so any dialog that arrives before the marker's is
+the line's. A MutationObserver on the applet reads each dialog's message
+lines (`.dialogContent .gwt-Label`, without the title or buttons) and removes
+it as it is added, before it is drawn; the wait ends when the marker's
+dialog arrives — 1 to 9 ms a line — with a 10-second last resort for all the
+lines together. Dialogs are on while the lines run (`errorDialogsActive`) and
+turned off after, so nothing a student does opens one. The refused lines do
+not print. `browser-checks/geogebra_applet.mjs` plants every contract case in
+the fixture's commands sketch and reads exactly the refused ones, in
+GeoGebra's words, and that `SetValue(a, 3)` set `a` to 3; its must-fail (the
+loader reading `evalCommand`'s answer) reported every working scripting line.
+**Rejected:** `evalCommand`'s answer; `asyncEvalCommand`; a fixed wait after
+each line; checking commands at build time (GeoGebra's parser runs only in
+the browser). A line that does nothing without being an error (`SetValue` of
+a name that does not exist) raises nothing and is not said — a known limit.
+Unmeasured, and so said here rather than relied on: a dialog GeoGebra
+opened while the SKETCH was loading, still open when the lines start, would
+arrive before the first line's marker and be blamed on line 1 (stage 3+4
+review item 4).
+
+**A failed fetch is not remembered** (stage 3+4 review item 4). With no
+saved copy, every build asks geogebra.org again, and a build while it does
+not answer waits up to `fetch.requestSeconds` (15 s) for each request — the
+materials API and then the `.ggb` — before saying
+`materialCouldNotBeFetched` for that sketch. A download cut off on the way
+(fewer bytes than its `Content-Length`, or a chunked answer that stops) is
+the same problem, and nothing is kept from it; whatever else a fetch raises
+is that one sketch's problem too, so the teacher's own `file:` sketches on
+the same site are never taken down with it (05 → item 9).
+
+**The policy.** A published Netlify site is sent `script-src 'self'
+'unsafe-eval' <hashes>` (netlify_badge.py). The stock engine never loads
+under it; the six replacements make it load unchanged (02). Every browser
+check serves on `[::1]`: GeoGebra's loader runs its 7.9 MB main file as
+INLINE text on `127.0.0.1`, `localhost` and `apps-builds.`, a path no class
+site takes. Measured with the stock `web3d.nocache.js` and `cache.js` put
+back in the clone: no sketch opened, and Chrome said "Executing inline script
+violates the following Content Security Policy directive".
+
+**Quartz's page change.** It replaces `<body>` and drops every `<head>` child
+without `spa-preserve`. Each applet is removed (`api.remove`) when the page
+changes, which also takes GeoGebra's own styles and libraries out of
+`<head>` (measured: 8, then 0); the next tap puts them back, and a second
+sketch opens in about 255 ms rather than 0.6 s. What keeps it working is
+GeoGebra's hidden loader frame going under `<html>`, which Quartz keeps
+(replacement 3): measured with it reverted in the clone, Chromium 155 opened
+no sketch after a page change, plainly served and cross-origin isolated.
+**Rejected:** the plan's MutationObserver marking what GeoGebra adds to
+`<head>` `spa-preserve` — measured in stage 2, it changed nothing while
+`api.remove` runs (0 kept either way) and every sketch opened without it;
+and leaving applets in place so their libraries stay (each keeps its memory
+and listeners for the rest of the visit).
+
+**What `api.remove()` leaves behind** (stage 2 review, measured in Chromium
+over 45 applets opened and removed one page change at a time): about 9
+listeners, 18 detached nodes and 0.1 MB per applet — the heap went from 27.6
+to 32.0 MB — while `<head>` stays clean (46 children before, 35 after: what
+GeoGebra added is gone). A student would have to open hundreds of sketches in
+one visit for it to matter; a reload clears it. An iPad could not be measured
+here.
+
+**A tap that finishes after the page changed marks nothing** (stage 2 review
+item 3). The loader counts Quartz's page changes (`pageChanges`, raised in
+the page's cleanup); a sketch whose `appletOnLoad` or 60-second give-up
+arrives after the count moved is removed at once and touches no figure —
+`figure.isConnected` alone is not enough, because Quartz's page change can
+keep an element that looks the same on the new page.
+
+### Q4. On paper, and the attribution
+
+A loaded applet prints its canvas cropped (measured in the plan), so the
+handout's prepare step and ⌘P's `beforeprint` put a picture of each open
+sketch beside it (`api.getPNGBase64`, which answers at once — `beforeprint`
+gives no time to wait), and the print styles show that picture in place of
+the applet. Nothing is moved or replaced, so nothing has to be put back after
+the print (#576's rule holds without a restore). A sketch that was never
+opened prints its thumbnail; one with neither prints its description. The
+button never prints. Headless Chrome's `printToPDF` fires `beforeprint`
+(measured), so ⌘P is covered by the browser check; Safari is checked by hand
+as for #576.
+
+GeoGebra's licence asks for "Made with GeoGebra®" and a link to
+https://www.geogebra.org on every applet: the link is under every sketch on
+screen, and on paper, where a link cannot be followed, one short line
+("Made with GeoGebra · geogebra.org") with the address printed under it as
+plain text. A sketch from geogebra.org (stage 4) is CC BY-NC-SA 4.0, which
+asks for the author, the source and the licence: under it, "Made with
+GeoGebra® · by {author} · CC BY-NC-SA 4.0", the author linked to the sketch on
+geogebra.org (`https://www.geogebra.org/m/{id}`) and the licence to
+`https://creativecommons.org/licenses/by-nc-sa/4.0/` (`rel="license"`); on
+paper "Made with GeoGebra · by {author} · CC BY-NC-SA 4.0" with the three
+addresses printed under it as text. The author is the API's
+`creator.displayname`, else the user name, else the sketch's own address, so
+the card never says "by" and nothing. A sketch from the teacher's own file
+names no author or licence: the file is theirs, and nothing in it says
+either. The addresses are contract values (`geogebraFences.attribution`).
+
+### Q5. Dark theme
+
+The card follows the theme; the applet stays white, because GeoGebra has no
+dark applet, inside it.
+
+### Q6. Measured (2026-10-24, M4 Pro, macOS 26.6, Chrome for Testing 155)
+
+On the verify fixture's clone, served on `[::1]` under the publish's own
+`_headers`, plain and then cross-origin isolated (COOP + COEP): nothing
+fetched before a tap; the planted sketch open in 582–612 ms, 16 requests,
+8,917,110 bytes as served and 2,835,223 compressed; a sketch from commands
+40 ms after; after a page change 253–259 ms and back again 253–263 ms; 0
+refusals by the policy, 0 requests off the site (the theme's own font
+requests before the first tap are Quartz's, not GeoGebra's). The slope-angle
+sketch (1,594,544 bytes): 698–769 ms, 18 requests, 10,644,945 bytes
+(4,473,431 compressed — the button said "about 4.5 MB").
+
+### Q7. In a self-check question (#578 stage 5, `geogebraFences.quizzes`)
+
+A sketch works in a quiz's **question** (the lines after its title, before
+the choices) and in its **explanation**, and is **refused in a choice**:
+`quizCallouts.words.problems.sketchInAChoice`, in `recognise.order` after
+`choicesAndAnswer`. A choice is a click target — its label wraps the box,
+so dragging a point would pick it — and the shuffle moves the choices
+(`fieldset.appendChild`, on load and after every print). **Rejected:**
+allowing it and putting the applet back after each move. Both sides find it
+the same way, so the safety net stays silent: `quizzes.py` notes a
+geogebra fence opened inside an item of the boxed list (`_fence_language`);
+the site (`modelOf` → `QuizModel.sketchInAChoice`) looks for a
+`plantoirGeoGebra` node — or a geogebra code block the build could not show,
+since the folder check refuses it either way — inside an item of the first
+boxed list. A sketch in a plain list in the question is fine. Four
+`recognise` cases (a sketch in a choice; in the question with commands that
+read like choices, `- [x] 2` and `[1, 2]`; in an explanation; in a plain
+list) are run by `test_quizzes.py` and planted on verify.sh's Quiz Fixture
+(6k). Three `keys` cases put a fence in a question and in an explanation,
+and `check_geogebra_rules_against_the_site.py` now runs every page through
+the quizzes' own text hook (`nestedTitlesOwnTheirLine`, which adds a line
+after a nested callout's title) before the site's Markdown reader, as a
+build does.
+
+**Measured** (2026-10-24, the dev-test image, one page with a sketch in a
+question, one in an explanation and one in a choice):
+- **The transformer order changes no HTML.** GeoGebra wired after Quizzes
+  built the page byte for byte the same (one random explorer id apart);
+  the one difference was the page's search text. Quartz's Description runs
+  before the sketch's card exists, but the quizzes' html stage makes the
+  search text and summary AGAIN from the finished tree — so with GeoGebra
+  first, a quiz page's search text carried "Open the sketch (about 2.9 MB)"
+  and "Made with GeoGebra®". `withoutAnswers` now reads a
+  `figure.pl-geogebra` as its figcaption alone, what Description reads on
+  every other page. The order stays Figures, GeoGebra, Quizzes, Tasks,
+  pinned by `WiringTests`.
+- **An html node renders the same page** (Quartz parses raw HTML into
+  elements), so `data.hName` is not about the look: the quiz reader finds a
+  sketch by the node's TYPE, and with an html node a sketch in a choice was
+  read as a working question while the folder check refused it.
+- **In an explanation**, nothing of the engine is fetched when the page
+  loads, nor once the question is answered and the explanation shown —
+  only when its button is tapped (`geogebra_applet.mjs` step 9, both
+  phases: 0 and 0 requests, then the sketch open in about 255 ms).
+- **After a print** (`beforeprint` then `afterprint`, which put a shuffled
+  quiz's choices in Markdown order and back), a sketch open in the question
+  is the same applet in the same place, outside the choices, and still runs
+  a command (`plantoirAfterPrint = 7` reads back 7). Print moves choices
+  only.
+
+**Must-fails** (each red, then restored; the site's by a mounted copy of
+the one file in a scratch build, the repository untouched): GeoGebra wired
+after Quizzes → both `WiringTests`; an `html` node → the choice case read as
+`single` on the site and the safety net's `readDifferently` line; the
+`sketchInAChoice` check removed → `test_quizzes.py`'s recognise case, and on
+the site the same `single` and safety-net line; one quote marker taken off a
+quoted fence's lines (`markdown_code._QUOTE_MARKERS`) → `test_geogebra.py`
+`test_every_key_case`, and in the build the explanation's sketch left as
+code; the search-text branch removed → 6i-g's quiz-page check.
 
 ## E. Summary: what is *not* customized
 

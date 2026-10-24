@@ -302,9 +302,15 @@ class _Helper:
     a thread so the clock works on Windows too (no `select` on a pipe)."""
 
     def __init__(self, command: list):
+        # The same Node environment as Quartz's (#640), so every node the
+        # build starts is under one rule. Measured on Node 22.23.4 the helper
+        # prints nothing to stderr with or without it (a diagram and a graph);
+        # it is here so a deprecation a later engine triggers cannot become
+        # complaints[0], the reason given when the helper does not start.
         self.process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace", bufsize=1)
+            text=True, encoding="utf-8", errors="replace", bufsize=1,
+            env=toolchain_paths.node_environment(os.environ))
         self.lines = queue.Queue()
         self.complaints = []
         threading.Thread(target=self._read, daemon=True).start()

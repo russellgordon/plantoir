@@ -44,6 +44,16 @@
 //
 // The page's own script (components/scripts/codeRunner.inline.ts) builds the
 // editor and the buttons on top of the wrapper.
+//
+// Text that wraps (#653) rides here too, as markdownPlugins()' SECOND plugin:
+// on EVERY page (no `codeRunner:` gate), a ```text fence whose info string
+// holds `wrap` (textWrapRule.wrapsText) is wrapped in
+// <div class="plantoir-text-wrap"> and nothing else changes - its `lang` and
+// `meta` are left as written, so the highlighter treats it exactly as before.
+// It shares this plugin's place straight before SyntaxHighlighting rather
+// than being a plugin of its own, because a fourth wired plugin would be a
+// config anchor edit in build_site.py for ten lines (rejected in the #653
+// plan). codeLines.scss styles the wrapper.
 
 import { Root as MdRoot, Code } from "mdast"
 import { createHash } from "crypto"
@@ -51,6 +61,7 @@ import { readFileSync, statSync } from "fs"
 import { join } from "path"
 import { QuartzTransformerPlugin } from "../types"
 import { asksFor, findRunners, filled, MdNode, normaliseProgram, unclosedFenceBefore } from "./codeRunnerRule"
+import { TEXT_WRAP_CLASS, wrapsText } from "./textWrapRule"
 
 type RunnerFile = { words: Record<string, string>; carried: string[] }
 // quartz/plantoir-runners/<engine>.json, for a `prebuilt` language (#493):
@@ -207,6 +218,34 @@ export const CodeRunnerFences: QuartzTransformerPlugin = () => ({
           ;(runner.parent.children as unknown[])[runner.index] = wrapper
         }
       },
+      // #653: every page, opted in or not.
+      () => (tree: MdRoot) => {
+        wrapTextFences(tree as unknown as WrapNode)
+      },
     ]
   },
 })
+
+type WrapNode = { type: string; lang?: string | null; meta?: string | null; children?: WrapNode[] }
+
+// Each ```text wrap block, wherever it sits (the top level, a list item, a
+// quote, a callout, a quiz's explanation), put inside the wrapper in place.
+function wrapTextFences(node: WrapNode): void {
+  const children = node.children
+  if (children === undefined) {
+    return
+  }
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index]
+    if (child.type === "code" && wrapsText(child.lang, child.meta)) {
+      const wrapper = {
+        type: "plantoirTextWrap",
+        data: { hName: "div", hProperties: { className: [TEXT_WRAP_CLASS] } },
+        children: [child],
+      }
+      children[index] = wrapper as unknown as WrapNode
+    } else {
+      wrapTextFences(child)
+    }
+  }
+}

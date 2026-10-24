@@ -24,6 +24,12 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import markdown_code  # noqa: E402
 
+# GeoGebra sketches (#578): the build's own fence reader and file lookup, so
+# a payload's sketch is found exactly as a teacher's first preview finds it.
+import os  # noqa: E402
+os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPO_ROOT / "contracts"))
+import geogebra  # noqa: E402
+
 # Runnable Python (#455, #561): the rules every page keeps, and the judgement
 # table of a payload that has one. Its own file, so it can be run alone.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -374,6 +380,28 @@ def lint(course_code: str) -> int:
             elif block["lang"] == "functionplot":
                 if not re.search(r"^\s*alt\s*:\s*\S", block["body"], re.M):
                     problems.append(f"{rel}: the functionplot fence at line {block['line']} has no alt: setting")
+
+        # GeoGebra sketches (#578): a payload's sketch is a file shipped
+        # beside its page (or in the payload's Media), never geogebra.org -
+        # a teacher's first preview must not need it - and it has an alt:.
+        # The file is looked up as the build looks it up, with the payload's
+        # tree (shared/ or per_section/) standing for the course folder -
+        # not the two merged as the installer merges them, a limit the
+        # SKILL names (stage 6 review item 5).
+        for sketch in geogebra.sketches_on_page(text):
+            read = geogebra.read_fence(sketch["body"])
+            settings = read["settings"]
+            where = f"{rel}: the geogebra fence at line {sketch['line']}"
+            for problem in read["problems"]:
+                problems.append(f"{where}: {problem.get('reason', problem)}")
+            if "material_id" in settings:
+                problems.append(f"{where} names a geogebra.org sketch - ship the .ggb beside the page and use file:")
+            if not settings.get("alt"):
+                problems.append(f"{where} has no alt: setting")
+            if settings.get("file"):
+                tree = root / page.relative_to(root).parts[0]
+                if geogebra.find_file(settings["file"], page.relative_to(tree).as_posix(), tree) is None:
+                    problems.append(f"{where}: {settings['file']} is not beside the page or in the payload's Media")
 
         fallen = fence_lines_that_fall_out(text)
         if fallen:

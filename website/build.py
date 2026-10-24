@@ -41,6 +41,7 @@ import json
 import re
 import shutil
 
+import mirror
 import update_feeds
 import windows_feed
 import struct
@@ -927,7 +928,7 @@ def output_path(slug: str) -> Path:
     return OUTPUT / slug / "index.html"
 
 
-def build(check_only: bool) -> int:
+def build(check_only: bool, deploying: bool = False) -> int:
     site = read_json(WEBSITE / "site.json")
     shot_list = read_json(WEBSITE / "shots.json")["shots"]
     shots = {}
@@ -1037,6 +1038,16 @@ def build(check_only: bool) -> int:
         problems.extend(windows_feed.problems_with(windows_feed_file))
     if not check_only:
         update_feeds.copy_feeds(feed_source, OUTPUT / "updates")
+
+    # The mirror the image build falls back to (#578): the list is checked in
+    # both modes, the files are put into site/mirror/ only when writing - and
+    # a missing one is downloaded with retries only for a deploy, which
+    # refuses without it; any other build tries once (mirror.fill).
+    problems.extend(mirror.entry_problems(site, read_json(REPO / "contracts" / "toolchain.json")["pins"]))
+    if not check_only:
+        attempts = mirror.ATTEMPTS if deploying else 1
+        for line in mirror.fill(site, OUTPUT, attempts=attempts):
+            print(line)
 
     problems.extend(broken_fragment_problems(rendered))
     problems.extend(redirect_problems(site, site_slugs(pages), rendered))
@@ -1278,8 +1289,8 @@ def main() -> int:
         "--verify-deploy",
         action="store_true",
         help="build nothing; fetch https://plantoir.app and confirm it is serving "
-             "the version in site.json (exit 0 match, 1 unknown/network problem, "
-             "2 confirmed mismatch)",
+             "the version in site.json, its update feeds and its mirror (exit 0 match, "
+             "1 unknown/network problem, 2 confirmed mismatch)",
     )
     arguments = parser.parse_args()
     if arguments.verify_deploy:
@@ -1290,12 +1301,15 @@ def main() -> int:
         feeds = netlify_deploy.verify_feeds_live()
         if feeds == "mismatch" or (feeds == "unknown" and outcome == "match"):
             outcome = feeds
+        mirrored = netlify_deploy.verify_mirror_live()
+        if mirrored == "mismatch" or (mirrored == "unknown" and outcome == "match"):
+            outcome = mirrored
         return {"match": 0, "mismatch": 2, "unknown": 1}[outcome]
     if arguments.check and (arguments.deploy or arguments.serve):
         parser.error("--check writes nothing, so there is nothing to deploy or preview")
     if arguments.deploy and arguments.serve:
         parser.error("--serve is for looking before you deploy; run --deploy after")
-    result = build(check_only=arguments.check)
+    result = build(check_only=arguments.check, deploying=arguments.deploy)
     if arguments.serve:
         if result != 0:
             print("Serving anyway — fix the warnings above and refresh.", file=sys.stderr)
@@ -1322,6 +1336,10 @@ def main() -> int:
             return 1
         refusal = release_readiness_refusal(read_json(WEBSITE / "site.json"),
                                             read_json(WEBSITE / "shots.json"))
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return 1
+        refusal = mirror.deploy_refusal(read_json(WEBSITE / "site.json"), OUTPUT)
         if refusal:
             print(refusal, file=sys.stderr)
             return 1
