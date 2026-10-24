@@ -242,6 +242,21 @@ In a sentence, `print()` in single backticks is code too.
   yourself" - is the `plantoir-runnable-code` skill's ` ```python run `
   block, not this one.
 
+Plain text whose lines are long - an error message, sample output, a
+paragraph to copy - can wrap instead of scrolling sideways: write `text wrap`
+after the backticks.
+
+````markdown
+```text wrap
+FileNotFoundError: [Errno 2] No such file or directory: 'scores.csv' - the program looked in the folder it was started from, not the folder the file was saved in.
+```
+````
+
+- Each line keeps its number; a line that wraps shows … beside its later
+  rows. Copying the block copies the lines as written.
+- Only `text` wraps. Code never does, because code is read by column, and
+  `wrap` after any other language (` ```python wrap `) is ignored.
+
 ## 10. Checklists students tick
 
 ```markdown

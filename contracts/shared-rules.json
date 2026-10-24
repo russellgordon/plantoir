@@ -25072,6 +25072,15 @@
           "meta": "run",
           "optedIn": false,
           "runner": false
+        },
+        {
+          "name": "wrap is not a flag (#653)",
+          "lang": "python",
+          "meta": "run wrap",
+          "optedIn": true,
+          "runner": true,
+          "flags": [],
+          "why": "`wrap` belongs to ```text fences only (textFenceWrapping); after `run` it is a word the row does not list, ignored like any other, so the block runs and nothing wraps."
         }
       ],
       "pageShapes": {
@@ -27076,6 +27085,179 @@
       "The not-live rule's two readers differ in edge cases Quartz never emits or that were not measured to break (review N3): frame words inside a <textarea> read as a frame to the preview's rule and not to the publish's (the stricter one errs safe); a CSS `@import \"https://...\"` written without url() is seen by neither; and a cross-origin <audio><source> is named with the frame's words (notLiveFrame) rather than notLiveOther.",
       "Find in the page counts an editable block's code twice, and a drag selection that runs through the block copies its line numbers: the coloured copy and the gutter are aria-hidden and cannot be selected on their own, but find-in-page and a selection that crosses them still read them (#585 plan review S6).",
       "The Swift tokenizer ships with no caller yet: every Swift block is read-only and shows Shiki's own highlighted copy, so codeRunnerColour.ts colours Swift only in the contract's cases and the check's agreement score until an editable Swift block exists (#579). Its row's `colour` is already \"swift\", so that block needs no further wiring."
+    ]
+  },
+  "textFenceWrapping": {
+    "note": "#653 (v1.9.0). A plain text block can wrap its long lines instead of scrolling sideways: ```text wrap. Implemented once, in support/quartz (plugins/transformers/textWrapRule.ts, the second markdown plugin of codeRunner.ts, components/styles/codeLines.scss), so Windows inherits it with the build; run by scripts/check_runner_rules_against_the_site.py, verify.sh's Wrap Fixture checks and browser-checks/text_wrap.mjs. documentation/06-quartz-customizations.md -> P. No trail event: the app does nothing new a teacher sees.",
+    "rule": "#653 (Russell, 2026-10-23). A ```text fence may opt in to wrapping with the word `wrap` in its info string (```text wrap): its lines wrap at the width of the window instead of scrolling sideways. Without the word nothing changes - every block scrolls, as before, and its HTML is byte for byte what it was. Code never wraps, because code is read by column: `wrap` after any other language (```python wrap) is ignored silently - no folder problem, no build line - and the runnable-code reader never treats it as a flag (codeRunnerBlocks.fences.cases, 'wrap is not a flag (#653)'). On paper nothing changes either: print.scss wraps every block, flagged or not, as it always has.",
+    "fence": {
+      "rule": "The info string (mdast's `lang`, then `meta`) joined and split on codeRunnerRule's INFO_SPACE, as codeRunnerBlocks.fences splits it; the first word is exactly `text` (lowercase, as Q1), and `wrap` is any later word, exactly. Read by support/quartz/plugins/transformers/textWrapRule.ts (wrapsText) on every page, opted in to anything or not; the block is wrapped at the markdown stage in <div class=\"plantoir-text-wrap\">, because rehype-pretty-code 0.14 drops every property on <pre> and <code> and keeps no trace of the meta (measured 2026-10-09 for #455, again for #653). A title holding the word ` wrap ` counts: chosen, not discovered, as codeRunnerBlocks S5.",
+      "casesRule": "`fence` is the info string exactly as typed after the three backticks; `lang` and `meta` are what Quartz's own parser (remark-parse + remark-gfm, the image's) makes of it, MEASURED, not reasoned; `wraps` is the verdict. scripts/check_runner_rules_against_the_site.py runs every case twice: wrapsText(lang, meta) must equal `wraps`; and the page \"```\" + fence + \"\\nx\\n```\\n\" is parsed by that parser, whose code node must carry exactly this `lang` and `meta` (so a case that is not what the parser makes of its fence fails rather than passing on data no page can produce), and then run through codeRunner.ts's second markdown plugin, which must wrap it exactly when `wraps`. A leading space in `meta` is therefore not a case: micromark never writes one.",
+      "cases": [
+          {
+            "name": "the plain case",
+            "fence": "text wrap",
+            "lang": "text",
+            "meta": "wrap",
+            "wraps": true
+          },
+          {
+            "name": "a text block without the word scrolls, as before",
+            "fence": "text",
+            "lang": "text",
+            "meta": null,
+            "wraps": false
+          },
+          {
+            "name": "two spaces",
+            "fence": "text  wrap",
+            "lang": "text",
+            "meta": "wrap",
+            "wraps": true
+          },
+          {
+            "name": "a tab",
+            "fence": "text\twrap",
+            "lang": "text",
+            "meta": "wrap",
+            "wraps": true
+          },
+          {
+            "name": "a trailing space",
+            "fence": "text wrap ",
+            "lang": "text",
+            "meta": "wrap ",
+            "wraps": true
+          },
+          {
+            "name": "a no-break space (Option-Space): micromark leaves it all in lang",
+            "fence": "text\u00a0wrap",
+            "lang": "text\u00a0wrap",
+            "meta": null,
+            "wraps": true,
+            "why": "Split on INFO_SPACE, as codeRunnerBlocks.fences splits it (#455 review N2). What it does NOT do is make the block read as plain `text` further on: rehype-pretty-code 0.14 renders it with data-language=\"text\u00a0wrap\", the no-break space kept, not \"text\" (measured 2026-10-23 in the image, for #653's review). The wrapper still wraps it, and its lines are intact."
+          },
+          {
+            "name": "no-break spaces, then highlighted lines",
+            "fence": "text\u00a0\u00a0wrap {3}",
+            "lang": "text\u00a0\u00a0wrap",
+            "meta": "{3}",
+            "wraps": true,
+            "why": "As the case above: wrapped, and line 3 still highlighted, but rehype-pretty-code 0.14 renders it with data-language=\"text\u00a0\u00a0wrap\", both no-break spaces kept, not \"text\" (measured 2026-10-23 in the image)."
+          },
+          {
+            "name": "with highlighted lines after it",
+            "fence": "text wrap {2}",
+            "lang": "text",
+            "meta": "wrap {2}",
+            "wraps": true
+          },
+          {
+            "name": "with highlighted lines before it",
+            "fence": "text {2} wrap",
+            "lang": "text",
+            "meta": "{2} wrap",
+            "wraps": true
+          },
+          {
+            "name": "a code fence: code never wraps",
+            "fence": "python wrap",
+            "lang": "python",
+            "meta": "wrap",
+            "wraps": false,
+            "why": "Ignored silently: no folder problem and no build line, and the block scrolls as every code block does."
+          },
+          {
+            "name": "a runnable block: neither wraps nor loses its Run button",
+            "fence": "python run wrap",
+            "lang": "python",
+            "meta": "run wrap",
+            "wraps": false
+          },
+          {
+            "name": "text run wrap: text is not a runner language, so it wraps and gets no Run button",
+            "fence": "text run wrap",
+            "lang": "text",
+            "meta": "run wrap",
+            "wraps": true,
+            "why": "`run` is just another word after `text` (codeRunnerBlocks reads runners for its LANGUAGES only), so the block wraps; the check script also runs it on a `codeRunner: true` page through the runner transformer and requires no runner."
+          },
+          {
+            "name": "TEXT in capitals is not text (Q1)",
+            "fence": "TEXT wrap",
+            "lang": "TEXT",
+            "meta": "wrap",
+            "wraps": false
+          },
+          {
+            "name": "txt is not text",
+            "fence": "txt wrap",
+            "lang": "txt",
+            "meta": "wrap",
+            "wraps": false
+          },
+          {
+            "name": "plaintext is not text",
+            "fence": "plaintext wrap",
+            "lang": "plaintext",
+            "meta": "wrap",
+            "wraps": false
+          },
+          {
+            "name": "no language: Quartz reads wrap AS the language",
+            "fence": "wrap",
+            "lang": "wrap",
+            "meta": null,
+            "wraps": false
+          },
+          {
+            "name": "a space before the word changes nothing: it is still the language",
+            "fence": " wrap",
+            "lang": "wrap",
+            "meta": null,
+            "wraps": false
+          },
+          {
+            "name": "wrapped is not wrap",
+            "fence": "text wrapped",
+            "lang": "text",
+            "meta": "wrapped",
+            "wraps": false
+          },
+          {
+            "name": "a title that is the word, quoted, is not the word",
+            "fence": "text title=\"wrap\"",
+            "lang": "text",
+            "meta": "title=\"wrap\"",
+            "wraps": false
+          },
+          {
+            "name": "a title holding the word on its own counts (chosen, not discovered, as codeRunnerBlocks S5)",
+            "fence": "text title=\"Sample wrap output\"",
+            "lang": "text",
+            "meta": "title=\"Sample wrap output\"",
+            "wraps": true
+          }
+      ]
+    },
+    "look": "On screen only (@media screen, and never in the handout's pre.plantoir-flowing): white-space pre-wrap with overflow-wrap anywhere, so indentation is kept and a URL breaks anywhere. Each source line keeps its number on its FIRST visual row; every later row shows `…` in the gutter, in the number's colour and font, right-aligned (codeLines.scss's plantoir-gutter mixin), and the hairline runs the line's full height. Every row's text starts at one x - the number box's width - whatever the line holds. Both pseudo-elements are absolute in the gutter, so a line that is one unbreakable run fills its first row (an inline number made that row empty, measured). The ellipses are one string of 80 rows the line clips, so they share the code's own line-height and cannot drift. Highlighted lines keep their tint and bar across every row; the 100- and 1000-line widths hold. Hidden from screen readers (content alt \"\"). The copy button copies the block as written: no ellipsis and no line break where a line wrapped. No JavaScript.",
+    "knownLimits": [
+      "A source line that wraps onto more than 81 rows shows ellipses on its first 80 continuation rows only (about 7,800 characters at 1512 px, where a row holds 97 on the built page, and about 2,800 at a phone's 390 px). 80 rather than 200 because WebKit lays the whole string out for every line: a 1,002-line wrapped block at 390 px relays out in 63.5 ms with 80 rows against 132.3 ms with 200, 17.7 ms with one and 0.9 ms unwrapped (Playwright WebKit 26.6, median of five loads, M4 Pro; a 120-line block 7.6 ms). Chromium 153 is 3.4 to 3.6 ms whatever the count.",
+      "Safari before 17.4 does not know the `content: ... / \"\"` form and keeps the plain declaration before it, so it shows the ellipses AND a screen reader there reads each one aloud. Accepted rather than dropped: the other way round, an older Safari would lose the ellipses altogether.",
+      "Obsidian ignores the extra word, so the editor shows the block unwrapped (not measured in Obsidian; the info string's first word is the language there too).",
+      "The page's copy button sits over the first row's right end on hover, as it does over a scrolling block."
+    ],
+    "rejected": [
+      "The number inline with a text-indent hang (the issue's sketch, and print.scss's handout approach): an unbreakable line (a URL) moves whole to its second row and leaves the first holding only its number (measured at 390 px).",
+      "An SVG data-URI ellipsis repeated as a background: no web font, a colour of its own per theme, and a repeat period that is a guess at the line-height.",
+      "JavaScript counting rows: breaks under live reload, print and isolated pages, and is not needed.",
+      "`wrap` for code fences: Russell's ruling - code is read by column.",
+      "A folder problem for `python wrap`: noise for a harmless word; the page-authoring skill says where the flag belongs.",
+      "Attributes on <pre> or <code>: rehype-pretty-code 0.14 drops them.",
+      "A separate wired plugin: a fourth config anchor edit in build_site.py for ten lines.",
+      "A Python mirror of the rule: nothing in the build reads it.",
+      "Continuation rows indented to the line's own leading white space (VS Code's \"same\" indent): not possible in CSS alone.",
+      "200 rows of ellipses (the plan's first number): WebKit's relayout cost doubles for rows no real text block reaches (knownLimits)."
     ]
   },
   "netlifyPageAddresses": {

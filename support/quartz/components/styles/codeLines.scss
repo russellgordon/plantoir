@@ -51,6 +51,77 @@
   --plantoir-digits: 4;
 }
 
+// ```text wrap (#653): a text block that opts in wraps its long lines at the
+// window's width instead of scrolling sideways. The transformer
+// (plugins/transformers/codeRunner.ts, textWrapRule.ts) puts such a block in
+// div.plantoir-text-wrap; nothing else carries the class, so every other
+// block is untouched. Each source line keeps its number on its FIRST row and
+// every later row shows an ellipsis in the gutter, as BBEdit does.
+//
+// * Screen only. On paper print.scss already wraps every block with its own
+//   hanging indent, and the handout (a SCREEN-media iframe) marks its every
+//   non-diagram <pre> plantoir-flowing, so `:not(.plantoir-flowing)` leaves
+//   print.scss's rule governing there as well.
+// * Both pseudo-elements are ABSOLUTE in the gutter and the line hangs by a
+//   plain padding-left as wide as the number's box (digits + padding +
+//   hairline + the 1ch gap of the rule above). Rejected: the number inline
+//   with a text-indent hang (the issue's sketch, and the handout's way) - the
+//   inline number is a place a line may break, so a line that is one
+//   unbreakable run (a URL) moved WHOLE to its second row and left the first
+//   holding only its number (measured at 390 px: 10 rows, row 1 empty; this
+//   way 9 rows, row 1 full, in Chrome and WebKit alike).
+// * The ellipses are TEXT: one string of 80 rows, each "\a …", the first row
+//   empty, clipped to the line's own height. They are set in the code's font
+//   at the code's own line-height, so they cannot drift from the rows they
+//   sit beside. Rejected: an SVG ellipsis repeated as a background - no web
+//   font, a colour of its own per theme, and a repeat period that would be a
+//   guess at the line-height. 80 rows rather than 200 (plan review): WebKit
+//   lays the whole string out for every line - a 1,002-line block at 390 px
+//   relays out in 63.5 ms with 80 rows, 132 ms with 200, 0.9 ms unwrapped
+//   (documentation/06 -> P3).
+//   A line longer than 81 rows shows its ellipses on its first 80
+//   continuation rows only (textFenceWrapping.knownLimits).
+// * `content: ... / ""` hides them from a screen reader (Chrome's tree held
+//   125 ellipses on the test page without it, 0 with it). The plain
+//   declaration comes first, so a browser without the alt-text form (Safari
+//   before 17.4) keeps the ellipses and reads them.
+// * The copy button is untouched: generated content is not in innerText, and
+//   a soft wrap is no line break, so a wrapped block copies as written.
+$plantoir-wrap-ellipses: "";
+@for $row from 1 through 80 {
+  $plantoir-wrap-ellipses: $plantoir-wrap-ellipses + "\a …";
+}
+
+@media screen {
+  :root .plantoir-text-wrap pre:not(.plantoir-flowing) > code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  :root .plantoir-text-wrap pre:not(.plantoir-flowing) > code > [data-line] {
+    position: relative;
+    padding-left: calc(0.25rem + (var(--plantoir-digits, 2) + 1.75) * 1ch + 1px);
+  }
+
+  :root .plantoir-text-wrap pre:not(.plantoir-flowing) > code > [data-line]::before,
+  :root .plantoir-text-wrap pre:not(.plantoir-flowing) > code > [data-line]::after {
+    position: absolute;
+    top: 0;
+    left: 0.25rem;
+    margin-right: 0;
+  }
+
+  :root .plantoir-text-wrap pre:not(.plantoir-flowing) > code > [data-line]::after {
+    @include plantoir-gutter;
+    content: $plantoir-wrap-ellipses;
+    content: $plantoir-wrap-ellipses / "";
+    bottom: 0;
+    overflow: hidden;
+    white-space: pre;
+    pointer-events: none;
+  }
+}
+
 // Every code element, inline code in prose included (Russell: "No
 // ligatures anywhere. Let's be consistent.").
 :root pre,
