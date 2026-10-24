@@ -41,6 +41,8 @@ final class AssistToolRunnerTests: XCTestCase {
             // its twin and an MCP client can call it; OFF the local list, so
             // the model's own choices are unchanged by it.
             "plan_re_date_classes", "re_date_classes",
+            // The section window's Open in Obsidian, pressed (#610).
+            "open_in_obsidian",
         ]
 
         var names: Set<String> = []
@@ -51,17 +53,19 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertEqual(AssistToolRunner.tools.count, expected.count, "A tool is defined twice.")
     }
 
-    /// What the LOCAL model is shown: thirteen of the twenty-two.
+    /// What the LOCAL model is shown: thirteen of the twenty-three.
     ///
-    /// Nine are left off because the model never has to NAME them, and every
+    /// Ten are left off because the model never has to NAME them, and every
     /// schema in the prompt costs a small router accuracy. The seven `plan_`
     /// twins are called IN CODE by plan mode, which builds the call from the
     /// write the model already chose; `remember_timetable` is off because dates
     /// the model supplies are dates it may have invented, and a wrong one
     /// silently puts a class on the wrong day; `re_date_classes` is off because
     /// its phrasings are matched in code and it is far too large a change to
-    /// reach through a router. All nine still RUN — they are hidden from the
-    /// list, not removed from the surface.
+    /// reach through a router; `open_in_obsidian` is off because shown to the
+    /// smaller assistant it cost probes it had always answered (#610, measured)
+    /// and its phrasings are matched in code. All ten still RUN — they are
+    /// hidden from the list, not removed from the surface.
     @MainActor
     func testTheLocalModelIsShownExactlyThirteenToolsAndNoPlans() throws {
         let expected: Set<String> = [
@@ -117,9 +121,11 @@ final class AssistToolRunnerTests: XCTestCase {
             "plan_publish_class_on", "plan_publish_pages", "plan_unpublish_pages",
             "plan_scheduled_deploy", "plan_remember_timetable", "plan_add_next_class",
             "plan_re_date_classes", "remember_timetable", "re_date_classes",
+            // #610: measured, and hidden; reached through fixed phrasings.
+            "open_in_obsidian",
         ]
 
-        // Named above so a reader can see WHICH nine, and checked here so the
+        // Named above so a reader can see WHICH ten, and checked here so the
         // naming cannot fall behind the code.
         var shownToTheLocalModel: Set<String> = []
         for definition in AssistToolRunner.localTools {

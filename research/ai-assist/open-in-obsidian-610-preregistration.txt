@@ -1,0 +1,121 @@
+#610 - open_in_obsidian, the assistant's Open in Obsidian, shown to the local model
+PRE-REGISTRATION. Written and committed BEFORE the first model request of this
+run (mac, branch issue/610-open-in-obsidian-verb, 2026-10-24). Russell's
+ruling of 2026-10-24: the local model is shown the verb too; routing is
+re-measured on this Mac; on ANY regression the tool is hidden from the local
+model, stays on the MCP surface, the assistant window keeps the verb through
+fixed phrasings matched in code, and the closing comment says so.
+
+WHAT CHANGES FOR THE MODEL
+  One tool is appended to AssistToolRunner.tools, so the local list goes from
+  13 to 14 (it is not a plan_ twin and not hidden) and the MCP list from 37 to
+  38. Nothing else the model reads moves: no other description, no schema, no
+  system prompt byte. Fixed BEFORE this file was committed (plan review
+  finding 5), and NOT reworded after any result:
+    name         open_in_obsidian
+    description  TEACHERS SAY: "open this in Obsidian", "edit this in Obsidian". Open this note in Obsidian, altering nothing.
+    parameters   course (the shared courseHelp), section (the shared
+                 sectionHelp), both required - check_section's two exactly.
+    flags        readOnly true, needsApproval false.
+  The description shares no word with rebuild_preview's except the
+  "TEACHERS SAY" marker every described tool carries and "open", the verb of
+  the tool's own name, which the model reads in `open_in_obsidian` whatever
+  the description says ("on screen", "page", "changing", "the" and "show"
+  were taken out for that reason). "Obsidian" appears in no other tool's
+  description.
+
+ARMS
+  BEFORE   origin/dev 31c71d74883d2a979a3ae1fb8d1c7fa7d7c7fc2e (the branch's
+           base), the WHOLE tree taken by `git archive` (plan review finding
+           4: the suites read AssistAgent.swift, AssistModelClient.swift,
+           Views/Assist/AssistSupportingViews.swift and support/*); tools =
+           its own tools-from-contract.py local. Its own server session.
+  BEFORE'  the same archive, the same tools, the same evening, in a SEPARATE
+           server session: the measured noise band on this Mac.
+  AFTER    this branch once implemented: tools = tools-from-contract.py local
+           of the contract `Plantoir --write-contracts contracts` regenerated
+           from the branch's Debug build (run twice). Its own server session.
+  Checked before any AFTER request, parsed: AFTER's local list is BEFORE's
+  list, unchanged and in order, with exactly `open_in_obsidian` appended.
+  toolhash.py digests recorded for both. The system prompt literal
+  (AssistAgent.systemPrompt) is checked byte-equal between the arms.
+  M2 (below) is not in the base tree: on BEFORE and BEFORE' it is the
+  branch's script run with BEFORE's tools, its sentences read from the
+  branch's contract -> openInObsidian.
+
+CONDITIONS
+  Mac16,8 (Apple M4 Pro), 48 GiB, macOS 26.6. llama-server b10435
+  (mac-app/Vendor/llama, fetched by fetch-llama.sh; the same binary the
+  Debug build carries, checked with cmp), Metal.
+  AssistServerHost.serverArguments verbatim: --model, --port 8610, --host
+  127.0.0.1, --ctx-size by tier, --reasoning off AND --reasoning-budget 0,
+  --threads 4 (AssistHardwareBudget.threadCount on this Mac: 8 performance
+  cores / 2), --n-gpu-layers 999, --jinja, --parallel 1. Own PIDs only; the
+  server is stopped after each arm on each tier. Nothing else heavy beside it.
+  SMALLER qwen2.5-1.5b-instruct-q4_k_m.gguf, ctx 8192: the app's own copy in
+          ~/Library/Application Support/Plantoir/models, read-only, size
+          1,117,320,736 (== downloadBytes).
+  LARGER  qwen3-4b-q4_k_m.gguf, ctx 16384: downloaded 2026-10-24 from
+          AssistModelTier.downloadURL into the session scratchpad; size
+          2,497,280,256 (== downloadBytes; no published SHA exists, so the
+          size is the check, as #440's was). Deleted at the end.
+  10 greedy trials (temperature 0, the app's body). Dateline appended in the
+  mac's form for 2026-10-24.
+
+SUITES, per tier, per arm
+  M1a trimmed-surface-suite.py <tools> 10 --date-appended --real-course
+      --course VVH2O --prompt shipped --app-body --port 8610      (29 probes)
+  M1b the same with --mac-shelf                     (the mac's own shelf)
+  M1c teachers-say-suite.py 8610 10 <tools with ICS3U -> EXC2O>  (25 probes)
+  M1d next-class-unit-probes.py 8610 10 <tools> --course VVH2O
+      (every nextClassUnits `pointed` row and every `runs` row marked
+      reachesModel, read from the arm's own contract)
+  M2  open-in-obsidian-610-probes.py 8610 10 <tools> --course VVH2O
+      (contracts/assist-cases.json -> openInObsidian: 7 accepted, 6
+      nearMisses, 1 recordedOnly; every sentence sent to the model)
+
+PASS RULE (all must hold, on EACH tier; one local list, so a failure on
+either tier is the fallback for both)
+  (a) the arms' local tool lists differ by exactly the one appended tool
+      (parsed), and scripts/test_tool_surface_digest.py passes on the branch
+      with the new digest.
+  (b) NO REGRESSION: on every M1a-M1d probe, AFTER's correct count is at
+      least min(BEFORE, BEFORE'). A probe at 10/10 in both BEFORE arms must
+      stay 10/10. For M1d a row's count is its trials that reached
+      add_next_class or were declined with no unit/days key (a `pointed`
+      row) or that reached add_next_class (a control).
+      WHY min(BEFORE, BEFORE') and not #440's "identical": #440's surface
+      was byte-equal before and after, so ANY move was a harness or arm
+      fault. Here the surface differs by one schema, so the prompt differs
+      and a greedy run may legitimately move inside this Mac's own
+      run-to-run band; BEFORE' measures that band on the identical surface
+      the same evening, and the rule forbids AFTER falling below the lower
+      of the two. It is not a tolerance: a probe that never moved in the band
+      may not move at all.
+  (c) NO THEFT: no M1 probe and no M2 nearMiss sends open_in_obsidian in any
+      trial. And every M2 nearMiss keeps the tool it gets without the verb:
+      its count for the tool (or decline) chosen most often across BEFORE and
+      BEFORE' is at least min(BEFORE, BEFORE') on AFTER.
+  (d) VETO: zero polarity inversions in every suite, every arm.
+  (e) every M2 `accepted` sentence reaches open_in_obsidian, a decline, or
+      one of the four reads (list_pages, read_page, check_section,
+      read_remembered_timetable) in 10/10 on AFTER - never any other tool
+      (rebuild_preview included: it is a write on the surface's own readOnly
+      flag). On the LARGER tier the accepted set reaches open_in_obsidian in
+      at least 90% of its trials (63 of 70).
+  Recorded, deciding nothing: prompt tokens before and after (one more
+  schema), median ms, completion tokens; the recordedOnly sentence ("Open
+  Unit 2, Day 3 in Obsidian", which names a page the tool cannot take).
+
+IF ANY RULE FAILS (plan section 9; director's ruling 2026-10-24)
+  open_in_obsidian goes into hiddenFromTheLocalModel: the local list is back
+  to 13 and LOCAL_DIGEST to 46b96562...2cd96cb6 (proved byte for byte); it
+  stays on the MCP surface (38), where it refuses; the window reaches the
+  verb through exact fixed phrasings in AssistCardCommand, matched in code.
+  The failed arm stays in the results as the record. The description is not
+  reworded and a second arm is not run: steering with words is forbidden for
+  a measured reason (doc 10).
+
+OUTPUT
+  open-in-obsidian-610-results.txt (conditions, per-probe tables, verdicts)
+  open-in-obsidian-610-raw.txt (every suite's output, in order)

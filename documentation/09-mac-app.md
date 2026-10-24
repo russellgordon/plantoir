@@ -4557,6 +4557,36 @@ turned away by `ObsidianFigureAddOnsThisRun.beingOpened` and does nothing, so
 it writes nothing (`notePreviewedPress`, after that guard — one press that
 opens, one line).
 
+### A fourth door: the in-app assistant (#610)
+
+Since [#610](https://github.com/russellgordon/plantoir/issues/610) the in-app
+assistant's `open_in_obsidian` is a section press too. It does not call the
+route itself: `AssistToolRunner` is built over its OWN `WorkspaceModel` (it
+asserts `!isShownInAWindow`), and the route's questions —
+`lockedPagesNoteRequest`, `obsidianAddOnsOfferRequest`,
+`obsidianReopenRequest` — are presented only by the window that owns the
+model, so a press on the runner's model would set a request nobody shows and
+open nothing. Instead the section window registers a fourth closure in
+`SectionWindowControllers.Controller`, `openInObsidian`, which runs
+`workspace.openInObsidianAndWait(course:sectionNumber:)` on the WINDOW's model
+— the button's own route (`pressOpenInObsidian`, the private core both callers
+share; `openInObsidian(...)` keeps its `@discardableResult Bool` so none of
+its ten call sites moved). `openInObsidianAndWait` waits for the add-ons scan
+when one started and returns `OpenInObsidianPress`: `.opened(answer)` with the
+answer read ONCE at the press (the reply names the page from it, never from a
+second look at the web view —
+`testTheAssistantsPressReadsThePageOnceAndReportsThePageThatOpened`),
+`.waitingForAnAnswer` when a question is up, `.alreadyOpening` for a second
+press during a scan (no trail line, as today), and `.noWindow`, the default of
+a window that registers nothing. The trail line is the route's, written once
+per press (`testTheAssistantsPressLeavesOneTrailLine`); the assistant adds
+only its usual turn line. With no section window on screen the runner brings
+one up with `revealSectionOnScreen`, as a rebuild or a deploy does; a freshly
+opened window shows no preview page, so that press opens the section and says
+why. The verb itself — its sentences, the MCP refusal, why it is read-only,
+and the routing measurement — is in `10-local-ai-assistant.md` → "#610: Open
+in Obsidian from the assistant".
+
 ### Rejected
 
 AppleScript to Safari's front tab (needs the Automation permission, never
@@ -4574,7 +4604,8 @@ preview shows, and `.build-id` moves on Rebuild before the list does); a new
 **On Windows**: it inherits the list free (shared Python, native build) and
 owes reading `CoreWebView2.Source` at the press through its `PreviewStartPage`
 normaliser, the resolution cases, the page through its Open in Obsidian
-route, and the trail event — the `windows` issue for #518.
+route, and the trail event — the `windows` issue for #518. The assistant's door (#610) is a separate `windows` issue: the call is
+answered by the APP, pressing the section window's own Open in Obsidian.
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
@@ -9371,13 +9402,14 @@ and the deploy button — are the app's, not the tool's: over MCP the client is
 told which tools write (`readOnlyHint`) and does its own asking. The app itself answers the flag —
 `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` — rather
 than shipping a second binary, so no packaging step can leave it out. Claude
-Code is offered a LONGER list than the local model — 37 tools against 13
+Code is offered a LONGER list than the local model — 38 tools against 13
 (`assist-cases.json` → `toolSchemas.mcp` and `.local`), with the local model
-seeing exactly the thirteen its routing was measured against. The twenty-four
+seeing exactly the thirteen its routing was measured against. The twenty-five
 it does not see are off its list for several reasons (`AssistToolSurface.localTools`
-says each). Nine of them are among the twenty-two tools both surfaces share:
+says each). Ten of them are among the twenty-three tools both surfaces share:
 the seven `plan_` twins, which plan mode calls in code from the write the model
-already chose; `remember_timetable`, because dates a model supplies may be
+already chose; `open_in_obsidian` (#610), whose measured routing regressed, so
+the window matches its phrasings in code; `remember_timetable`, because dates a model supplies may be
 invented and the schedule sheet records them instead; and `re_date_classes`,
 whose phrasings are matched in code. The other fifteen are served
 only over MCP: reading the curriculum and pointing a page at the expectations

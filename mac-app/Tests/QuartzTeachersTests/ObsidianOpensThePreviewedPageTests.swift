@@ -313,6 +313,91 @@ final class ObsidianOpensThePreviewedPageTests: XCTestCase {
         XCTAssertEqual(made.log.openedFolders, [])
     }
 
+    // MARK: - The assistant's press (#610)
+
+    /// The address is read ONCE, at the press, and the press reports the
+    /// answer that opened — so the reply can never name a page other than
+    /// the one Obsidian was handed, even when the preview moves on at once.
+    func testTheAssistantsPressReadsThePageOnceAndReportsThePageThatOpened() async throws {
+        let made: Driven = try drive(address: "Unit-1/Lesson-3", pages: [
+            "Unit-1/Lesson-3": ["source": "Unit 1/Lesson 3.md", "hidden": false],
+            "Unit-1/Lesson-4": ["source": "Unit 1/Lesson 4.md", "hidden": false],
+        ])
+        try Data("Another lesson.\n".utf8).write(to: made.course.directoryURL.appendingPathComponent("Unit 1/Lesson 4.md"))
+        // The preview shows Lesson 3 at the first look and Lesson 4 at any
+        // later one.
+        let log: Log = made.log
+        made.workspace.obsidianOpening.previewedAddress = { _, _, _ in
+            log.addressAsked += 1
+            if log.addressAsked == 1 {
+                return "Unit-1/Lesson-3"
+            }
+            return "Unit-1/Lesson-4"
+        }
+        let press: OpenInObsidianPress = await made.workspace.openInObsidianAndWait(
+            course: made.course, sectionNumber: 1
+        ) { _ in }
+        XCTAssertEqual(made.log.openedPages, [made.course.directoryURL.appendingPathComponent("Unit 1/Lesson 3.md").path])
+        guard case .opened(let answer) = press, case .page(_, let place, _) = answer else {
+            XCTFail("the press did not report a page: \(press)")
+            return
+        }
+        XCTAssertEqual(place, "Unit 1/Lesson 3", "the page that opened, not the page on screen now")
+        XCTAssertEqual(
+            AssistToolRunner.sentence(for: press, course: made.course.code, section: "1"),
+            AssistWording.openedThePageInObsidian(page: "Lesson 3")
+        )
+        XCTAssertEqual(made.log.addressAsked, 1, "one look at the window per press")
+    }
+
+    /// One press, one trail line — the route's, never a second from the
+    /// assistant's side.
+    func testTheAssistantsPressLeavesOneTrailLine() async throws {
+        let made: Driven = try drive(address: "Unit-1/Lesson-3")
+        _ = await made.workspace.openInObsidianAndWait(course: made.course, sectionNumber: 1) { _ in }
+        let line: String = PreviewedPageSource.trailWords(
+            .page(URL(fileURLWithPath: "/"), place: "Unit 1/Lesson 3", hidden: false))
+        XCTAssertEqual(SaveEnablesTests.occurrences(of: line, in: trail()), 1, trail())
+    }
+
+    /// The add-ons offer put up by the press: nothing has opened yet.
+    func testTheAssistantsPressReportsTheOfferWaiting() async throws {
+        let made: Driven = try drive(address: "Unit-1/Lesson-3", answer: .notAsked, figures: true)
+        let press: OpenInObsidianPress = await made.workspace.openInObsidianAndWait(
+            course: made.course, sectionNumber: 1
+        ) { _ in }
+        XCTAssertEqual(press, .waitingForAnAnswer)
+        XCTAssertNotNil(made.workspace.obsidianAddOnsOfferRequest)
+        XCTAssertEqual(made.log.openedPages, [])
+        XCTAssertEqual(made.log.openedFolders, [])
+    }
+
+    /// A course kept for reference asks for the locked-pages note first, as
+    /// the button does.
+    func testTheAssistantsPressOnAReferenceCourseAsksForTheNoteFirst() async throws {
+        LockedPagesNote.defaults = TestDefaults.make()
+        defer { LockedPagesNote.defaults = PlantoirDefaults.shared }
+        let made: Driven = try drive(address: "Unit-1/Lesson-3")
+        made.course.configuration.keptForReference = true
+        let press: OpenInObsidianPress = await made.workspace.openInObsidianAndWait(
+            course: made.course, sectionNumber: 1
+        ) { _ in }
+        XCTAssertEqual(press, .waitingForAnAnswer)
+        XCTAssertNotNil(made.workspace.lockedPagesNoteRequest)
+        XCTAssertEqual(made.log.openedPages, [])
+    }
+
+    /// A press while an earlier one's scan runs does nothing, and says so.
+    func testASecondAssistantPressDuringTheScanSaysItIsAlreadyOpening() async throws {
+        let made: Driven = try drive(address: "Unit-1/Lesson-3", answer: .notAsked, figures: true)
+        XCTAssertFalse(made.workspace.openInObsidian(course: made.course, sectionNumber: 1, atThePreviewedPage: true))
+        let press: OpenInObsidianPress = await made.workspace.openInObsidianAndWait(
+            course: made.course, sectionNumber: 1
+        ) { _ in }
+        XCTAssertEqual(press, .alreadyOpening)
+        await made.workspace.obsidianAddOnsWork?.value
+    }
+
     // MARK: - The wiring
 
     func testTheSectionPressesAskForThePageAndTheCoursePressDoesNot() throws {
@@ -321,6 +406,8 @@ final class ObsidianOpensThePreviewedPageTests: XCTestCase {
         XCTAssertTrue(detail.contains("workspace.openInObsidian(course: course, sectionNumber: sectionNumber, atThePreviewedPage: true)"),
                       "the section window's toolbar button")
         XCTAssertTrue(detail.contains("previewedPage: { previewedPagePath() }"), "the window says which page it shows")
+        XCTAssertTrue(detail.contains("await workspace.openInObsidianAndWait(course: course, sectionNumber: sectionNumber)"),
+                      "the assistant presses the window's own Open in Obsidian, on the window's model (#610)")
         XCTAssertTrue(detail.contains("PreviewStartPage.rememberedPath(page: previewController.webView.url, previewRoot: previewRoot)"),
                       "the page ON SCREEN, not the page last viewed")
         let sidebar: String = try String(contentsOf: views.appendingPathComponent("SidebarView.swift"), encoding: .utf8)

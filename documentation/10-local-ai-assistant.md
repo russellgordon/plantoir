@@ -1882,6 +1882,14 @@ deploy's own build running inside the container. The rule is in
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `stopPreview`.
 
+**A third button since #610: Open in Obsidian.** The in-app assistant's
+`open_in_obsidian` presses the section window's own Open in Obsidian, through
+the same registry (`SectionWindowControllers.Controller.openInObsidian`), and
+for a reason that is stronger than the console's: the route's questions — the
+locked-pages note, the add-ons offer, the reopen question — are presented only
+by the window that owns the model, so the runner's own model could not ask
+them at all. See "#610: Open in Obsidian from the assistant" below.
+
 **With no window open, the LOCAL assistant opens one** rather than running
 silently — this used to be unconditional, and a teacher who asked the local
 assistant to deploy while no section window happened to be open would watch
@@ -2938,13 +2946,16 @@ configuration is updated in memory as it is written to disk. Windows'
 deliberately: a server that silently swapped its courses under a conversation
 would be worse than one that has to be restarted.
 
-Claude Code is offered a **longer** list than the local model: 37 tools
-against 13 — the twenty-two that exist, plus fifteen served only over MCP
+Claude Code is offered a **longer** list than the local model: 38 tools
+against 13 — the twenty-three that exist (twenty-two until #610 added
+`open_in_obsidian`, which the local model is NOT shown; see "#610: Open in
+Obsidian from the assistant"), plus fifteen served only over MCP
 (#209's three How I Teach tools and #96's start-of-year pair, both 2026-09-26;
 see "Getting a section ready for the start of the year" below).
 (Windows' separate `plantoir-mcp.exe` serves 42 — 40 since #340 brought the How I
 Teach tools there on 2026-09-30, 42 since bundle 6a's start-of-year pair — the
-mac's 37 plus five of its own; the mac has none Windows lacks; "The two MCP surfaces are not the same
+mac's 37 before #610 plus five of its own; since #610 the mac has ONE Windows
+lacks, `open_in_obsidian`, owed by the `windows` issue for #610, which takes it to 43; "The two MCP surfaces are not the same
 product" below names them. [Issue #66](https://github.com/russellgordon/plantoir/issues/66),
 which recorded the gap when the counts differed, is closed.) Six of the extra ones ask for judgement about meaning — reading the
 curriculum and deciding which expectations a page addresses, and reading or
@@ -3879,14 +3890,14 @@ for behaviour only one platform has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 37-tool MCP one (32 until #209 added three
-How I Teach tools and #96 the start-of-year pair; `toolDescriptions` pins all
-37). (It said 23; corrected
+the 13-tool local surface and the 38-tool MCP one (32 until #209 added three
+How I Teach tools and #96 the start-of-year pair, 37 until #610 added
+`open_in_obsidian`; `toolDescriptions` pins all 38). (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
-serves 42: the mac's 37 plus five of its own (40 after #340 on 2026-09-30, 42 after bundle 6a's start-of-year pair); the mac has none Windows lacks — see "The two MCP surfaces are not
+serves 42: the mac's 37 (before #610) plus five of its own (40 after #340 on 2026-09-30, 42 after bundle 6a's start-of-year pair); since #610 the mac has one Windows lacks, `open_in_obsidian` (owed, 42 → 43) — see "The two MCP surfaces are not
 the same product" below; `AssistSurfaceContractTests`' own comment there still
 says "the contract carries the mac's 32", which is Windows' to correct.) The mac's own test has
-pinned that sum for longer than the prose said so; it is 22 + 15 MCP-only = 37: 22 + 10 = 32 once all six of the tools sorted as the mac's landed on 2026-09-08, then #209's three How I Teach tools and #96's start-of-year pair. What the two
+pinned that sum for longer than the prose said so; it is 23 + 15 MCP-only = 38 since #610 (22 + 15 = 37 before it): 22 + 10 = 32 once all six of the tools sorted as the mac's landed on 2026-09-08, then #209's three How I Teach tools and #96's start-of-year pair. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
 
@@ -4804,8 +4815,9 @@ same rules — the model is simply shown fewer.
   through a router that is right four times in five. Like the others it still
   RUNS, and Claude Code still sees it.
 
-Result: 22 tools down to **13** for the model — the seven `plan_` twins,
-`remember_timetable` and `re_date_classes` are the nine taken off the list.
+Result: 23 tools down to **13** for the model — the seven `plan_` twins,
+`remember_timetable`, `re_date_classes` and (since #610, measured)
+`open_in_obsidian` are the ten taken off the list.
 (An earlier draft of this note said 12; the cuts named above come to 13, and
 the code and its tests say 13. It then said 20 down to 13 with six twins and
 seven taken off, which was true when it was written and had gone stale by
@@ -7659,6 +7671,112 @@ will eventually ask why the two are not the same.
   that pin the Claude door's greeting, script and configuration **to the byte**
   were added FIRST, before anything was touched, precisely so the extraction can
   be done later and proved not to have moved anything.
+
+## #610: Open in Obsidian from the assistant
+
+**What it does.** "Open this in Obsidian", typed in a section's assistant
+window, presses that section window's own Open in Obsidian — the button #518
+made open the page the preview shows. The tool is `open_in_obsidian`
+(`course`, `section`, both required, as `check_section` has them; the window
+binding supplies both). There is no `page` argument: the page is the one ON
+SCREEN (#518 ruling 2), never one the model names, and a small model fills an
+optional argument it is offered (#411). It is `readOnly` and not
+`needsApproval`, so it meets no approval card (only deploying does: it reaches
+students), no plan twin (`planTwinName` is nil for a read-only tool), no
+reference-course refusal (the route itself locks the pages again and asks for
+the locked-pages note, as the button does), and neither the building gate
+(#433) nor the menu gate (#457). The outcome ends the turn in code
+(`answered`/`refused`): a second lap would only invent a follow-up.
+
+**Why through the window, and in what order** (`AssistToolRunner.openInObsidian`):
+the course and section are found first (the reply names them); then an
+assistant working from another app (`surface == .mcp`) is refused
+(`wording.openInObsidianIsInTheSectionWindow`) — that process builds no Scene
+graph, so there is no preview to read and no window to ask in, and nothing is
+pressed or opened; then a Mac with no Obsidian (`wording.obsidianIsNotOnThisMac`,
+read through `ObsidianOpening.isInstalled`, the button's own condition); then
+the window, brought up with `revealSectionOnScreen` as a rebuild or a deploy
+brings it, and pressed through `SectionWindowControllers.Controller.openInObsidian`,
+which runs `WorkspaceModel.openInObsidianAndWait` on the WINDOW's model —
+required, not chosen: the runner's own model is never a window's, and the
+route's questions are shown only by the window that owns them
+(`09-mac-app.md` → "A fourth door: the in-app assistant (#610)"). The press
+reports `OpenInObsidianPress`, and the reply is made from it:
+`wording.openedThePageInObsidian` (the page as the sidebar names it, from the
+answer read ONCE at the press — whether it is hidden from students is the
+trail's to say), `openedTheSectionNoPageShowing`, `openedTheSectionPageNotFound`
+(every other fallback), `obsidianOpensAfterTheQuestion` (a question is up; it
+never says "opened"), `obsidianIsAlreadyOpening`, and
+`openInObsidianFoundNoWindow` when no window came. The trail line is #518's
+"page opened in Obsidian", written once by the route; there is no new event
+(`shared-rules.json` → `activityTrail.mustRecord` and
+`obsidianOpensThePreviewedPage.rule` name the assistant as a door).
+
+**Why it is on the MCP surface at all**: `mcpTools = tools + mcpOnlyTools`
+by construction, so a tool the window runs is served to an outside assistant
+too — where it only refuses. Not put in `mcpOnlyTools`, which would take it
+out of the window's reach.
+
+**Measured, and NOT shown to the local model.** Russell's ruling of 2026-10-24
+was to show it to the local model, re-measure routing on this Mac, and make it
+MCP-only for the model on any regression. That ruling supersedes the comment
+on #610 of 2026-10-23 and ruling 6 of the #518 rulings ("code-matched
+phrasing, no tool-surface change") — and the measurement then landed on what
+they had asked for. Pre-registered and committed before the first request
+(`research/ai-assist/open-in-obsidian-610-preregistration.txt`): three arms
+(the base, the base again as this Mac's noise band, and the branch), both
+tiers, 10 greedy trials, M4 Pro, b10435 Metal, the app's flags; pass rule
+`min(BEFORE, BEFORE')` per probe, no theft, zero inversions. The description
+was fixed first and shares no word with `rebuild_preview`'s but "TEACHERS
+SAY" and "open" (plan review finding 5). Results
+(`…-results.txt`, `…-raw.txt`): BEFORE and BEFORE' identical on every probe;
+zero inversions in every arm; every accepted sentence reached the tool 70/70
+on both tiers — and it **failed rule (b) and rule (c) on BOTH tiers**. On the
+smaller assistant nine probes it had always answered fell 10 → 0 (trimmed
+210 → 180/290, teachers-say 219 → 190/250), "HIDE - the inversion case" among
+them (declined), and "typos" and two teachers-say probes now ran to the cap;
+on the larger, two shelf phrasings fell 10 → 0 (both answered in code by the
+app, so no teacher would meet those two). On both, the near miss "Open Unit 2,
+Day 3" went to `open_in_obsidian` 10/10 — the tool cannot take a page, so it
+would have opened whatever the preview showed — and on the smaller "Edit
+Unit 2, Day 3 so the quiz is on Friday" moved from `check_section` to
+`publish_pages`. One more schema is +122 prompt tokens.
+
+**So, as pre-registered:** `open_in_obsidian` is in `hiddenFromTheLocalModel`
+(the local list is 13, `LOCAL_DIGEST` is `46b96562…2cd96cb6` again, and the
+regenerated `toolSchemas.local` and `tools.local` are parsed-equal to the
+base's), it stays on the MCP surface (38, refusing there), and the window
+reaches it through exact fixed phrasings in `AssistCardCommand` — every
+`contracts/assist-cases.json` → `openInObsidian.accepted` sentence, no
+arguments, pinned by `OpenInObsidianPhrasingsTests` (every accepted sentence
+matches; no `nearMisses` or `recordedOnly` one does) and by
+`nearMisses.phrasings` ("open unit 2, day 3 in obsidian" and three more). The
+model is never asked (the scenario "open in Obsidian typed in the window …",
+`expectModelRequests` 0). The trimmed suite's interception mirror reads
+`cardPhrasings.matches`, so it learns the shapes with no edit.
+
+**Rejected.** Opening the section's front page from the MCP process with
+`FolderActions` directly (it skips the add-ons offer and the reference note —
+the "one command, two behaviours" fault the HIG sweep removed); a `page`
+argument (above); MCP-only with no phrasing in the window (Russell, 2026-10-23:
+that process has no preview, so it would give a teacher nothing); rewording
+the description after the result, or a second arm (steering with words is
+forbidden here for a measured reason — "Steer the model with code"). Two
+things the BEFORE arms showed about the surface as it ships, NOT changed here:
+on the larger tier "Open my website" deploys (`deploy_section` 10/10) and the
+edit request above becomes a `publish_pages` plan, in every arm.
+
+**A test-harness change worth knowing.** Proving the must-fails found that a
+scripted engine reply which the runner hands back (`shouldContinue`) loops for
+ever — the agent has no lap cap and the stub answered the same call every
+lap. The mac scenario runner now serves the scripted reply to the FIRST
+request only and plain text after it, so such a regression fails on
+`expectModelRequests` in seconds. Windows' runner should do the same.
+
+**Windows** owes the tool on `plantoir-mcp.exe` (42 → 43, refusing there),
+the call answered by the APP pressing the section window's own Open in
+Obsidian (the shape of Windows' `deploy_section` hand-back), the fixed
+phrasings, and the scenarios — the `windows` issue for #610.
 
 ## Telling an outside assistant how the course is taught (#209)
 

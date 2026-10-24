@@ -26,6 +26,62 @@
         "arguments" : {
 
         },
+        "phrasing" : "open this in obsidian",
+        "tool" : "open_in_obsidian"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "open this page in obsidian",
+        "tool" : "open_in_obsidian"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "open in obsidian",
+        "tool" : "open_in_obsidian"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "edit this in obsidian",
+        "tool" : "open_in_obsidian"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "edit this page in obsidian",
+        "tool" : "open_in_obsidian"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "i want to edit this in obsidian",
+        "tool" : "open_in_obsidian"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "take me to this page in obsidian",
+        "tool" : "open_in_obsidian"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "show me this in obsidian",
+        "tool" : "open_in_obsidian"
+      },
+      {
+        "arguments" : {
+
+        },
         "phrasing" : "what courses do i have?",
         "tool" : "list_courses"
       },
@@ -1700,7 +1756,7 @@
       "tools",
       "toolSchemas"
     ],
-    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits, undoFiles — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
+    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits, undoFiles, openInObsidian — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
   },
   "hideIsUnpublish" : {
     "accepted" : [
@@ -2586,7 +2642,11 @@
       "don't hide unit 2, day 3",
       "make room for a meeting at period 3",
       "make room for a meeting at block 2",
-      "make room for one meeting at section 2"
+      "make room for one meeting at section 2",
+      "open unit 2, day 3 in obsidian",
+      "edit unit 2, day 3 in obsidian",
+      "don't open this in obsidian",
+      "open this in obsidian and publish it"
     ]
   },
   "nextClassUnits" : {
@@ -3269,6 +3329,29 @@
     ]
   },
   "note" : "Generated from the macOS app by `Plantoir --assist-contract`. Do not hand-edit; see contracts/README.md.",
+  "openInObsidian" : {
+    "accepted" : [
+      "Open this in Obsidian",
+      "Open this page in Obsidian",
+      "Edit this page in Obsidian",
+      "I want to edit this in Obsidian",
+      "Take me to this page in Obsidian",
+      "open in obsidian",
+      "Show me this in Obsidian"
+    ],
+    "nearMisses" : [
+      "Open the preview",
+      "Show me the preview",
+      "Open my website",
+      "Open Unit 2, Day 3",
+      "Edit Unit 2, Day 3 so the quiz is on Friday",
+      "What's on this page?"
+    ],
+    "note" : "#610: open_in_obsidian, the assistant's Open in Obsidian. `accepted` are sentences that ask for the page on screen in Obsidian; `nearMisses` must keep the tool they get without it. Both are READ by research/ai-assist/open-in-obsidian-610-probes.py, never retyped; the measurement and its pass rule are research/ai-assist/open-in-obsidian-610-preregistration.txt. `recordedOnly` sentences are measured and decide nothing. MEASURED 2026-10-24 and FAILED on both tiers (open-in-obsidian-610-results.txt), so the tool is hidden from the local model and every `accepted` sentence is a fixed shape matched in code (cardPhrasings.matches -> open_in_obsidian, no arguments: the page is the window's); a runner checks each one matches and that no `nearMisses` or `recordedOnly` sentence does. The page-naming ones and their kin are in nearMisses.phrasings too.",
+    "recordedOnly" : [
+      "Open Unit 2, Day 3 in Obsidian"
+    ]
+  },
   "pagesNamingNoPage" : {
     "cases" : [
       {
@@ -4634,9 +4717,150 @@
         "name" : "the make-room card says Undo will not take it back when other classes move (proposed from Windows, #530)",
         "when" : "decline",
         "why" : "PROPOSED from Windows with #530 (2026-10-16). Making room at Unit 1, Day 2 renames Day 2 and Day 3 (to Day 3 and Day 4) and moves them onto later class days, so the make-room records no undo entry, and the card is where a teacher can still say no: it must say wording.makingRoomCannotBeUndone BEFORE Go (class-planning.json -> duplication.undoRule says the same of the duplicate). Windows' assistant card left it out until #530; only the Section menu's card carried its FromTheMenu twin. The mac's makeRoomPlan has carried it on the card since the warning was written, so this is expected green there. Declined, so nothing is written."
+      },
+      {
+        "expectEvents" : [
+          "openInObsidian"
+        ],
+        "expectReply" : "wording.openedThePageInObsidian",
+        "given" : {
+          "obsidianPage" : "Unit 2, Day 3",
+          "obsidianPress" : "page",
+          "sectionWindowOpen" : true
+        },
+        "name" : "open in Obsidian presses the section window's own button and names the page it opened (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. The in-app assistant presses the section window's OWN Open in Obsidian (the event `openInObsidian`), so the page on screen, the locked-pages note and the add-ons offer are the button's, and the route writes its one trail line. The reply names the page from the answer read at the press - the page that opened - as the sidebar names it (`given.obsidianPage`). Whether the page is hidden from students is the trail's to say, not the reply's."
+      },
+      {
+        "expectEvents" : [
+          "openInObsidian"
+        ],
+        "expectReply" : "wording.openedTheSectionNoPageShowing",
+        "given" : {
+          "obsidianPress" : "noPageShowing",
+          "sectionWindowOpen" : true
+        },
+        "name" : "open in Obsidian with no page of the preview showing opens the section and says so (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. The window's press fell back to the section (#518 ruling 5) because no preview page was showing; the reply says the section opened, and why."
+      },
+      {
+        "expectEvents" : [
+          "openInObsidian"
+        ],
+        "expectReply" : "wording.openedTheSectionPageNotFound",
+        "given" : {
+          "obsidianPress" : "notInTheList",
+          "sectionWindowOpen" : true
+        },
+        "name" : "open in Obsidian whose page could not be placed opens the section and says so (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. Every fallback other than 'no page showing' (no list, not in the list, two files at one address, outside the course, file gone) is one sentence to the teacher; the trail line says which."
+      },
+      {
+        "expectEvents" : [
+          "openInObsidian"
+        ],
+        "expectReply" : "wording.obsidianOpensAfterTheQuestion",
+        "given" : {
+          "obsidianPress" : "waitingForAnAnswer",
+          "sectionWindowOpen" : true
+        },
+        "name" : "open in Obsidian that put a question up in the window does not say it opened (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. The press asked the locked-pages note or the add-ons question first, so nothing has opened yet: the reply names the window where the question is up, and must not say 'opened'."
+      },
+      {
+        "expectEvents" : [
+          "openInObsidian"
+        ],
+        "expectReply" : "wording.obsidianIsAlreadyOpening",
+        "given" : {
+          "obsidianPress" : "alreadyOpening",
+          "sectionWindowOpen" : true
+        },
+        "name" : "open in Obsidian while an earlier press is still looking the course over (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. A second press during the add-ons scan does nothing and writes no trail line, as a second click on the button does; the reply says Obsidian is already opening."
+      },
+      {
+        "expectEvents" : [
+
+        ],
+        "expectReply" : "wording.openInObsidianFoundNoWindow",
+        "given" : {
+
+        },
+        "name" : "open in Obsidian with no window for the section that could be brought up opens nothing (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. With no section window open the in-app assistant brings one up as a rebuild or a deploy does; when none comes (the test runner has no way to open one), nothing is pressed and the teacher is told to open the section and ask again. Nothing is opened from the assistant's side directly: that would skip the add-ons offer and the reference note."
+      },
+      {
+        "expectEvents" : [
+
+        ],
+        "expectReply" : "wording.obsidianIsNotOnThisMac",
+        "given" : {
+          "obsidianInstalled" : false,
+          "obsidianPress" : "page",
+          "sectionWindowOpen" : true
+        },
+        "name" : "open in Obsidian on a Mac without Obsidian presses nothing (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. The window's button is greyed out without Obsidian, so the verb refuses rather than pressing it and opening nothing. `given.obsidianInstalled` absent means installed."
+      },
+      {
+        "expectEvents" : [
+
+        ],
+        "expectReply" : "wording.openInObsidianIsInTheSectionWindow",
+        "given" : {
+          "obsidianPress" : "page",
+          "sectionWindowOpen" : true,
+          "surface" : "mcp"
+        },
+        "name" : "open in Obsidian from another app's assistant is refused before any window is pressed (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. An assistant working from another app runs in a process with no preview to read and no window to ask the add-ons or locked-pages question in, so it is refused FIRST (before the Obsidian check), and nothing is pressed or opened. The tool is on that surface at all only because the MCP list is every tool plus the MCP-only ones, by construction."
+      },
+      {
+        "expectEvents" : [
+          "openInObsidian"
+        ],
+        "expectReply" : "wording.obsidianOpensAfterTheQuestion",
+        "given" : {
+          "keptForReference" : true,
+          "obsidianPress" : "waitingForAnAnswer",
+          "sectionWindowOpen" : true
+        },
+        "name" : "open in Obsidian on a course kept for reference runs, not refused (#610)",
+        "when" : "open_in_obsidian",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. It writes no page, so the reference-course write gate does not meet it; the window's route locks the pages again and asks for the locked-pages note, as the button does - which is the question this case's press reports. `given.keptForReference` marks the fixture's course kept for reference before the call."
+      },
+      {
+        "expectEvents" : [
+          "openInObsidian"
+        ],
+        "expectModelRequests" : 0,
+        "expectTranscriptContains" : [
+          "tool(open_in_obsidian): wording.openedThePageInObsidian"
+        ],
+        "given" : {
+          "obsidianPage" : "Unit 2, Day 3",
+          "obsidianPress" : "page",
+          "pending" : "open_in_obsidian",
+          "saying" : [
+            "Open this in Obsidian"
+          ],
+          "sectionWindowOpen" : true
+        },
+        "name" : "open in Obsidian typed in the window is answered in code and presses the window's own button (#610)",
+        "when" : "say",
+        "why" : "#610 (2026-10-24): open_in_obsidian, the assistant's Open in Obsidian. MEASURED and kept off the local model's list: shown it, the smaller assistant lost nine probes it had always answered (the hide inversion case 10/10 to 0/10 among them) and both tiers sent \"Open Unit 2, Day 3\" to it (research/ai-assist/open-in-obsidian-610-results.txt). So the window reaches the verb through exact phrasings matched in code - openInObsidian.accepted, every one a fixed shape - and the model is never asked (expectModelRequests 0). Read-only: no card, no plan twin; the window's own button is pressed and the turn ends there."
       }
     ],
-    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging. `given.visibleClasses`, when present, lays out those class pages, published, in section 1 before the call (the first is the first class); `given.arguments` is merged into the direct call's arguments, which are otherwise just the course and section (#96). `given.modelReply`, when present (#411), is the engine's WHOLE reply to every request: `finishReason` (e.g. \"length\", the engine saying it stopped at the cap) and either `toolCall` - `name`, and `arguments` as the model's own TEXT so a half-written call can be scripted, `{course}` standing for the fixture's course - or `content`. With `saying` and no card meant to match, such a case names no `pending`. A runner that can see launcher runs and window actions asserts none happened for a \"length\" reply, so the case cannot pass vacuously. Since #475 (2026-10-08): `given.classesDatedLater` lays out three published class pages in section 1 - Unit 2, Day 3 dated the fixture's today, Unit 2, Day 4 the next class day, and Unit 2, Day 5 two days after that - so Unit 2, Day 5 is flagged (class-planning.json -> futureDatedClasses); `given.laterClassesAnswer` (goAhead or cancelled) is what the section window's question answers, recorded as the event `askAboutClassesDatedLater` - absent, the window has nothing to ask and records no such event; `given.surface` \"mcp\" runs the call as an assistant working from another app does; `given.laterClassesKeptAll` writes every flagged class into the kept record first, as Keep All and Deploy does."
+    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging. `given.visibleClasses`, when present, lays out those class pages, published, in section 1 before the call (the first is the first class); `given.arguments` is merged into the direct call's arguments, which are otherwise just the course and section (#96). `given.modelReply`, when present (#411), is the engine's WHOLE reply to every request: `finishReason` (e.g. \"length\", the engine saying it stopped at the cap) and either `toolCall` - `name`, and `arguments` as the model's own TEXT so a half-written call can be scripted, `{course}` standing for the fixture's course - or `content`. With `saying` and no card meant to match, such a case names no `pending`. A runner that can see launcher runs and window actions asserts none happened for a \"length\" reply, so the case cannot pass vacuously. Since #475 (2026-10-08): `given.classesDatedLater` lays out three published class pages in section 1 - Unit 2, Day 3 dated the fixture's today, Unit 2, Day 4 the next class day, and Unit 2, Day 5 two days after that - so Unit 2, Day 5 is flagged (class-planning.json -> futureDatedClasses); `given.laterClassesAnswer` (goAhead or cancelled) is what the section window's question answers, recorded as the event `askAboutClassesDatedLater` - absent, the window has nothing to ask and records no such event; `given.surface` \"mcp\" runs the call as an assistant working from another app does; `given.laterClassesKeptAll` writes every flagged class into the kept record first, as Keep All and Deploy does. Since #610 (2026-10-24): `given.obsidianPress` is what the section window's Open in Obsidian press comes to - `page` (the page the preview showed opened; its title as the sidebar names it is `given.obsidianPage`, default `Unit 1, Day 1`, and a `{page}` in the expected sentence is filled with it), `noPageShowing` or `notInTheList` (the section opened instead), `waitingForAnAnswer` (a question is up in the window) or `alreadyOpening` - recorded as the event `openInObsidian` when the assistant presses it; `given.obsidianInstalled` false means Obsidian is not on this Mac (absent: it is); `given.keptForReference` marks the fixture's course kept for reference before the call."
   },
   "scheduleAndCancel" : {
     "accepted" : [
@@ -4789,6 +5013,7 @@
       "list_curriculum_expectations" : "List this course's curriculum expectations with their FULL WORDING, changing nothing. Call this when a teacher asks you to point a page at the expectations it covers. Read the page first, then read these, then decide which genuinely fit — that judgement is yours to make and the tools cannot make it. Propose the codes to the teacher with your reasons and let them choose; do not add expectations they have not agreed to.",
       "list_pages" : "List the pages in one section of a course, as paths relative to the working folder.",
       "make_room_for_classes" : "TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". Insert one or more classes part-way through a unit: the later days of that unit are renumbered, every link that pointed at them is rewritten, the classes that follow move onto later class days, and the new pages arrive unpublished.\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is backed up first. Once other classes have moved, \"undo that\" can no longer take this back and the backup is the way out — so tell the teacher to look the section over in Plantoir before deploying anything.",
+      "open_in_obsidian" : "TEACHERS SAY: \"open this in Obsidian\", \"edit this in Obsidian\". Open this note in Obsidian, altering nothing.",
       "plan_add_classes" : "Work out what adding several class pages to a unit would do, and change nothing. Shows what each page would be called and the day it would land on. Call this first and show the teacher what it said.",
       "plan_add_next_class" : "TEACHERS SAY: \"what would the next class page be?\", \"which day comes next?\", \"show me before you add it\". Work out which page adding the next class would create and which day it would fall on, WITHOUT changing anything.",
       "plan_curriculum_mentions" : "Work out what adding curriculum transclusions to a page would do, changing nothing. Show the teacher what it says — it quotes each expectation's wording so they can tell whether it fits their lesson without looking it up — then wait for them to agree.",
@@ -4868,7 +5093,8 @@
       "plan_add_next_class",
       "add_next_class",
       "plan_re_date_classes",
-      "re_date_classes"
+      "re_date_classes",
+      "open_in_obsidian"
     ],
     "local" : [
       "list_pages",
@@ -5960,6 +6186,30 @@
               "website" : {
                 "description" : "Either \"new\" or \"same\", when a teacher rolling this section over to a new year has said which website they want. LEAVE THE KEY OUT otherwise — any other text counts as a rollover and asks the teacher which website they want, which an ordinary re-dating must never do.",
                 "type" : "string"
+              }
+            },
+            "required" : [
+              "course",
+              "section"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"open this in Obsidian\", \"edit this in Obsidian\". Open this note in Obsidian, altering nothing.",
+          "name" : "open_in_obsidian",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
               }
             },
             "required" : [

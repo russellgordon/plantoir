@@ -529,6 +529,62 @@ nonisolated enum AssistWording {
         return "The preview for \(course) Section \(section) did not finish building: \(reason)"
     }
 
+    // MARK: - Opening a page in Obsidian (#610)
+
+    /// The section window's Open in Obsidian handed Obsidian the page its
+    /// preview was showing. Names the page as the teacher reads it in the
+    /// sidebar; whether it is hidden from students is the trail's to say.
+    static func openedThePageInObsidian(page: String) -> String {
+        return "Opened \(page) in Obsidian."
+    }
+
+    /// No page of the preview was showing, so the section opened, as the
+    /// button did before #518.
+    static func openedTheSectionNoPageShowing(course: String, section: String) -> String {
+        return "No page of the preview was showing, so Obsidian opened \(course) Section \(section) "
+             + "instead."
+    }
+
+    /// A page was showing but could not be matched to one of the course's
+    /// own pages (any other reason the route falls back); the trail says
+    /// which.
+    static func openedTheSectionPageNotFound(course: String, section: String) -> String {
+        return "Obsidian opened \(course) Section \(section), because the page on screen could not be "
+             + "matched to one of the course's own pages."
+    }
+
+    /// The press put a question up in the section window — the note about a
+    /// course kept for reference, or the offer of Obsidian's add-ons — and
+    /// Obsidian opens once it is answered. Never says "opened".
+    static func obsidianOpensAfterTheQuestion(course: String, section: String) -> String {
+        return "There is a question waiting in the \(course) Section \(section) window. Obsidian "
+             + "opens once you have answered it."
+    }
+
+    /// An earlier press is still looking the course over.
+    static func obsidianIsAlreadyOpening(course: String) -> String {
+        return "Obsidian is already opening \(course). It will be on screen in a moment."
+    }
+
+    /// Nothing on this Mac opens Obsidian's links; the button is greyed out
+    /// for the same reason.
+    static let obsidianIsNotOnThisMac: String =
+        "Obsidian is not on this Mac, so there is nothing to open the page in. Install it from "
+        + "obsidian.md, then ask again."
+
+    /// An assistant working from another app has no window to read the page
+    /// on screen from, or to ask the add-ons question in.
+    static func openInObsidianIsInTheSectionWindow(course: String, section: String) -> String {
+        return "Opening a page in Obsidian happens in Plantoir itself: open \(course) Section "
+             + "\(section) there and press Open in Obsidian. Nothing was opened."
+    }
+
+    /// The in-app assistant could not bring a window for the section up.
+    static func openInObsidianFoundNoWindow(course: String, section: String) -> String {
+        return "Open \(course) Section \(section) in Plantoir, then ask again. No window is showing "
+             + "it, so nothing was opened in Obsidian."
+    }
+
     // MARK: - Taking something back
 
     /// Every one of these is a whole sentence with a subject and a verb, and

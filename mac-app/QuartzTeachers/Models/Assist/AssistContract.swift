@@ -18,13 +18,14 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** Thirteen top-level keys of the
+/// **What it deliberately does NOT generate.** Fourteen top-level keys of the
 /// cases file are hand-written and are preserved on every run: `nearMisses`,
 /// `scenarios`, `promptHistory`, `deployAtATime`, `windowBinding`,
 /// `hideIsUnpublish`, `echoedRequest`, `linksQuestion` (#167),
 /// `pagesNamingNoPage` (#197), `toolDescriptions` (#114),
 /// `scheduleAndCancel` (#424, proposed from Windows; read here since #449),
-/// `nextClassUnits` (#440) and `undoFiles` (#555). Nothing
+/// `nextClassUnits` (#440), `undoFiles` (#555) and `openInObsidian` (#610).
+/// Nothing
 /// in the code says which near-miss phrasings are worth guarding, which ORDER
 /// events must happen in, which spellings of a time a teacher actually types,
 /// or which arguments a window takes back from the model and which it refuses
@@ -309,6 +310,25 @@ enum AssistContract {
             "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
             "sectionIsBeingDeployed": AssistWording.sectionIsBeingDeployed(course: course, section: section),
             "previewIsRebuilding": AssistWording.previewIsRebuilding(course: course, section: section),
+            // The assistant's Open in Obsidian (#610).
+            "openedThePageInObsidian": AssistWording.openedThePageInObsidian(page: pagePlaceholder),
+            "openedTheSectionNoPageShowing": AssistWording.openedTheSectionNoPageShowing(
+                course: course, section: section
+            ),
+            "openedTheSectionPageNotFound": AssistWording.openedTheSectionPageNotFound(
+                course: course, section: section
+            ),
+            "obsidianOpensAfterTheQuestion": AssistWording.obsidianOpensAfterTheQuestion(
+                course: course, section: section
+            ),
+            "obsidianIsAlreadyOpening": AssistWording.obsidianIsAlreadyOpening(course: course),
+            "obsidianIsNotOnThisMac": AssistWording.obsidianIsNotOnThisMac,
+            "openInObsidianIsInTheSectionWindow": AssistWording.openInObsidianIsInTheSectionWindow(
+                course: course, section: section
+            ),
+            "openInObsidianFoundNoWindow": AssistWording.openInObsidianFoundNoWindow(
+                course: course, section: section
+            ),
             "builtWithNoWindowOpen": AssistWording.builtWithNoWindowOpen(course: course, section: section),
             "rebuiltForACallerWithNoWindow": AssistWording.rebuiltForACallerWithNoWindow(
                 course: course, section: section
@@ -1068,7 +1088,8 @@ enum AssistContract {
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
                   + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
                   + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, "
-                  + "pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits, undoFiles — "
+                  + "pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits, undoFiles, "
+                  + "openInObsidian — "
                   + "is hand-written "
                   + "intent and is PRESERVED by a regeneration, so "
                   + "a case may be proposed from either platform. Listing them rather than naming "
