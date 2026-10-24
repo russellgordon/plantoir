@@ -593,6 +593,16 @@ else
   fail "font variables: each family in a stack quoted on its own, the system-font choice on the system stack, a single family byte for byte as before (scripts/test_font_variables.py, #629)"
   cat /tmp/verify_font_variables_test.log
 fi
+# Nothing the build starts in Node prints a deprecation into the teacher's
+# console (#640): NODE_OPTIONS carries --disable-warning=DEP0040 for Quartz
+# and the figure helper alike. Section 5 reads the real build log for it.
+# Stdlib only.
+if (cd scripts && python3 test_node_warnings.py) >/tmp/verify_node_warnings_test.log 2>&1; then
+  pass "Node's punycode deprecation silenced for Quartz and the figure helper, that one warning only, an existing NODE_OPTIONS kept (scripts/test_node_warnings.py, #640)"
+else
+  fail "Node's punycode deprecation is not silenced for every node the build starts, or more than it is silenced (scripts/test_node_warnings.py, #640)"
+  cat /tmp/verify_node_warnings_test.log
+fi
 if (cd scripts && python3 test_quartz_additions_wiring.py) >/tmp/verify_quartz_wiring_test.log 2>&1; then
   pass "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
 else
@@ -1849,6 +1859,79 @@ if [[ "$CA_STORE_REPORT" == OK* ]]; then
   pass "The image's certificate store is ${CA_STORE_REPORT#OK } (#639)"
 else
   fail "The image's certificate store does not match contracts/toolchain.json -> caCertificates: ${CA_STORE_REPORT#PROBLEMS }"
+fi
+
+# Node, and the wrangler that runs on it (#640). The image's `node --version`
+# is exactly the contract's pin; wrangler is the pinned version and RUNS on it
+# (`--version` exits 0); its own package.json's engines.node is what the
+# contract records as wrangler -> nodeEngine, which the mac suite checks the
+# node pin satisfies; and Node's OWN built-in store (tls.rootCertificates,
+# which wrangler uses - not Debian's file above) trusts neither of
+# caCertificates' mustNotTrust subjects and still holds more than 100 roots,
+# so an empty store cannot pass.
+NODE_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'NODEPY'
+import json, subprocess, sys
+pins = {p["pin"]: p for p in json.load(open("contracts/toolchain.json"))["pins"]}
+node, wrangler, store = pins["node"], pins["wrangler"], pins["caCertificates"]
+inside = r"""
+const { execFileSync } = require("child_process");
+const { X509Certificate } = require("crypto");
+const names = JSON.parse(process.argv[1]);
+const subjects = [];
+for (const pem of require("tls").rootCertificates) {
+  subjects.push(new X509Certificate(pem).subject);
+}
+let wranglerSays = "";
+try {
+  wranglerSays = execFileSync("wrangler", ["--version"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+} catch (error) {
+  wranglerSays = "FAILED " + String(error.message).slice(0, 200);
+}
+const trusted = [];
+for (const name of names) {
+  for (const subject of subjects) {
+    if (subject.split("\n").includes("CN=" + name)) { trusted.push(name); break; }
+  }
+}
+console.log(JSON.stringify({
+  node: process.version,
+  npm: execFileSync("npm", ["--version"], { encoding: "utf8" }).trim(),
+  wrangler: wranglerSays.trim(),
+  engines: require("/usr/lib/node_modules/wrangler/package.json").engines.node,
+  count: subjects.length,
+  trusted: trusted,
+}));
+"""
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "node", "-e", inside, json.dumps(store["mustNotTrust"])],
+                     capture_output=True, text=True)
+try:
+    found = json.loads(run.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    print("PROBLEMS Node could not be asked: " + (run.stderr.strip()[-300:] or "no output"))
+    sys.exit(0)
+problems = []
+if found["node"] != "v" + node["value"]:
+    problems.append(f"node is {found['node']}, not v{node['value']}")
+if found["wrangler"].startswith("FAILED") or wrangler["value"] not in found["wrangler"]:
+    problems.append(f"wrangler {wrangler['value']} does not run on it: {found['wrangler'][:200]}")
+if found["engines"] != wrangler["nodeEngine"]:
+    problems.append(f"wrangler's engines say {found['engines']}, the contract's nodeEngine {wrangler['nodeEngine']}")
+if found["trusted"]:
+    problems.append("Node's own store trusts " + " and ".join(found["trusted"]))
+if found["count"] <= 100:
+    problems.append(f"Node's own store holds {found['count']} roots, not more than 100")
+if problems:
+    print("PROBLEMS " + "; ".join(problems))
+else:
+    print(f"OK Node {found['node']} (npm {found['npm']}), wrangler {wrangler['value']} runs on it with engines "
+          f"{found['engines']}, and Node's own store holds {found['count']} roots and trusts neither "
+          + " nor ".join(store["mustNotTrust"]))
+NODEPY
+)"
+if [[ "$NODE_REPORT" == OK* ]]; then
+  pass "The image runs ${NODE_REPORT#OK } (#640)"
+else
+  fail "The image's Node does not match contracts/toolchain.json -> node and wrangler: ${NODE_REPORT#PROBLEMS }"
 fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
@@ -3246,6 +3329,18 @@ if script -q /tmp/verify_main_build.log ./preview.sh EXC2O 1 --image "$DEV_TEST_
   pass "preview.sh completed against $DEV_TEST_IMAGE"
 else
   fail "preview.sh exited non-zero"
+fi
+# Nothing Node printed reached the console (#640). On Node 22 every Quartz
+# build printed "(node:N) [DEP0040] DeprecationWarning: The `punycode` module
+# is deprecated" until build_site.py's node_environment silenced it -
+# machinery in the teacher's console (CLAUDE.md rule 1). The match is Node's
+# own "[DEP" code prefix rather than the word "DeprecationWarning", which the
+# course's own pages or a future message could legitimately carry, and which
+# says nothing about which deprecation it was.
+if grep -q '\[DEP[0-9]' /tmp/verify_main_build.log; then
+  fail "The build printed a Node deprecation into the console: $(grep -o '\[DEP[0-9]*\][^(]*' /tmp/verify_main_build.log | sort -u | head -3 | tr '\n' ' ')(#640)"
+else
+  pass "The build printed no Node deprecation into the console (#640)"
 fi
 
 # -------------------- 6. Post-flight checks --------------------

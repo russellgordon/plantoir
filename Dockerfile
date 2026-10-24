@@ -36,19 +36,34 @@ RUN pip install python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0
 
 # Install Node.js (needed for Quartz) and other tools (incl. dos2unix)
 # fonts-noto-color-emoji: the colour emoji drawn onto social cards.
+#
+# Node 22.23.4, PINNED EXACTLY (#640, v1.9.0). Node 20 has been end-of-life
+# since 2026-04-30, and an unpinned `setup_20.x` let the image and Windows'
+# runtime drift to different patch releases (#636). An `=` pin is safe here,
+# unlike the certificate store's floor below: NodeSource keeps its history
+# (measured 2026-10-23, every 22.x from 22.5.0 on arm64, back past 22.22.0 on
+# amd64), so this line does not break a first build the day 22.23.5 ships.
+# `setup_22.x` pins NodeSource above Debian (Pin-Priority 600), so the version
+# resolves from NodeSource. Quartz v4.5.0 was revalidated on it: an identical
+# npm tree, and the same 336 files for the EXC2O example as on Node 20.
+# Node 22 is itself end-of-life on 2027-04-30, so Quartz 5 (#512) or Node 24
+# has to land before then. contracts/toolchain.json -> pins -> node and
+# documentation/02 -> "Node 22 (#640)" carry what was measured and rejected.
 RUN apt-get update && apt-get install -y curl git lsof dos2unix fonts-noto-color-emoji rsync \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs=22.23.4-1nodesource1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Cloudflare's own deploy CLI, used by deploy.py for the Pages publishing
-# target. It is pinned, and deliberately pinned BELOW 4.100: from 4.100 on,
-# wrangler requires Node 22, while this image ships Node 20 because that is
-# what Quartz v4.5.0 is known-good against. Raising Node to satisfy a newer
-# CLI would mean revalidating every teacher's site build, which is a far
-# larger risk than staying on the newest Node-20 wrangler. The exact pin also
-# keeps the image reproducible and stops an upstream CLI change from breaking
-# publishing for a teacher mid-semester.
+# target. It is pinned, and deliberately pinned BELOW 4.87: 4.87.0 is the
+# first wrangler whose engines need Node 22 (`npm view`, 2026-10-23: 4.80.0
+# to 4.86.0 say >=20.3.0, 4.87.0 on say >=22.0.0; this comment said 4.100
+# until #640, thirteen minors late). This image runs Node 22 now,
+# but the pin is shared with Windows, whose runtime stays on Node 20 until its
+# own issue lands - so the pin stays below the first version Windows cannot run.
+# Moving wrangler is its own piece, once both platforms run Node 22. The
+# exact pin also keeps the image reproducible and stops an upstream CLI
+# change from breaking publishing for a teacher mid-semester.
 RUN npm install -g wrangler@4.80.0 && npm cache clean --force
 
 # Clone Quartz v4.5.0 into /opt/quartz

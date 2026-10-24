@@ -7,11 +7,14 @@ import XCTest
 /// launchers build the image from the recipe and tag it by a hash of the whole
 /// context — but both apps DEPEND on them, and the reasons are invisible from
 /// the version numbers. `wrangler@4.80.0` looks like something to bump; it is
-/// pinned below 4.100 because 4.100 needs Node 22 while the image ships Node 20,
-/// which is what Quartz v4.5.0 is known-good against. Raising either for a good
-/// local reason breaks every teacher's site build, and the person doing it will
-/// be reading the Dockerfile, not this contract — so the test names the reason
-/// in its failure.
+/// pinned below 4.87 because 4.87.0 is the first wrangler whose engines need
+/// Node 22, and while the image runs Node 22 since #640, the pin is shared with
+/// Windows, whose runtime stays on Node 20 until its own issue lands. The other
+/// direction matters too: the image's Node must satisfy wrangler's own engines,
+/// or publishing to Cloudflare breaks with every site build still green.
+/// Raising either for a good local reason can break every teacher's site build
+/// or publish, and the person doing it will be reading the Dockerfile, not this
+/// contract — so the test names the reason in its failure.
 final class ToolchainContractTests: XCTestCase {
 
     // MARK: - The pins
@@ -55,7 +58,7 @@ final class ToolchainContractTests: XCTestCase {
     }
 
     /// The pin with a rule attached rather than just a number.
-    func testWranglerStaysBelowTheVersionThatNeedsNode22() throws {
+    func testWranglerStaysBelowTheVersionWindowsNode20CannotRun() throws {
         var pinned: String = ""
         var ceiling: String = ""
         for pin in try ToolchainContractTests.array("pins") where pin["pin"] as? String == "wrangler" {
@@ -68,9 +71,57 @@ final class ToolchainContractTests: XCTestCase {
         XCTAssertEqual(pinnedParts.first, ceilingParts.first, "A different major version needs a rethink")
         XCTAssertLessThan(
             pinnedParts[1], ceilingParts[1],
-            "wrangler \(pinned) is at or past \(ceiling), which requires Node 22 — and this image ships "
-            + "Node 20 because that is what Quartz v4.5.0 is known-good against. Revalidate Quartz on a "
-            + "newer Node BEFORE raising this."
+            "wrangler \(pinned) is at or past \(ceiling), whose engines require Node 22. The image runs "
+            + "Node 22 (#640), but the pin is shared with Windows, whose runtime still ships Node 20. Move "
+            + "Windows' runtime to Node 22 BEFORE raising this, and retire mustStayBelow on both platforms then."
+        )
+    }
+
+    /// The other direction: the image's Node must satisfy wrangler's own
+    /// `engines.node`, which the contract records as `nodeEngine` and verify.sh
+    /// reads back out of the image. A Node pin lowered below it, or a wrangler
+    /// raised past it, breaks publishing to Cloudflare while every site build
+    /// stays green.
+    func testTheImagesNodeSatisfiesWranglersEngines() throws {
+        var nodeVersion: String = ""
+        var engine: String = ""
+        for pin in try ToolchainContractTests.array("pins") {
+            let name: String = (pin["pin"] as? String) ?? ""
+            if name == "node" {
+                nodeVersion = try XCTUnwrap(pin["value"] as? String)
+            }
+            if name == "wrangler" {
+                engine = try XCTUnwrap(
+                    pin["nodeEngine"] as? String,
+                    "The wrangler pin must say which Node its engines need (nodeEngine), as wrangler's "
+                    + "own package.json does."
+                )
+            }
+        }
+
+        // Only the one shape wrangler has ever used is understood. Anything
+        // else fails loudly rather than being compared wrongly.
+        XCTAssertTrue(
+            engine.hasPrefix(">="),
+            "wrangler's nodeEngine is \"\(engine)\"; this test understands only \">=X.Y.Z\"."
+        )
+        let floor: [Int] = ToolchainContractTests.numbers(in: String(engine.dropFirst(2)))
+        let node: [Int] = ToolchainContractTests.numbers(in: nodeVersion)
+
+        var nodeIsAtLeastTheFloor: Bool = true
+        for position in 0..<3 {
+            if node[position] > floor[position] {
+                break
+            }
+            if node[position] < floor[position] {
+                nodeIsAtLeastTheFloor = false
+                break
+            }
+        }
+        XCTAssertTrue(
+            nodeIsAtLeastTheFloor,
+            "The image runs Node \(nodeVersion), but wrangler's engines need \(engine): publishing to "
+            + "Cloudflare would break. Raise Node, or keep wrangler at a version whose engines it satisfies."
         )
     }
 
