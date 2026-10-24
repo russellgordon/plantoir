@@ -18,8 +18,16 @@ So every geogebraFences.keys case (and every fences case's count and line)
 is read here by mdast-util-from-markdown, with GitHub's extensions, from
 Quartz's own node_modules - the reader under remark-parse - and hashed by
 the site's figureRules.js.
+
+Every page goes through the quizzes' own text hook first
+(quizRules.nestedTitlesOwnTheirLine, bundled from quizRules.ts with the
+image's esbuild), as the site's build does before any Markdown is read: it
+adds a line after a nested callout's title inside a quiz, and a fence in a
+quiz's explanation must keep its key through it (#578 stage 5). A page with
+no quiz comes back from it unchanged.
 """
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -32,6 +40,8 @@ import contracts  # noqa: E402
 import toolchain_paths  # noqa: E402
 
 RULES_JS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "figureRules.js"
+QUIZ_RULES_TS = toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "quizRules.ts"
+ESBUILD = toolchain_paths.QUARTZ_DIR / "node_modules" / "esbuild" / "bin" / "esbuild"
 
 RUNNER = r"""
 import { readFileSync } from "fs"
@@ -42,7 +52,9 @@ const { fromMarkdown } = await import(pathToFileURL(modules + "/mdast-util-from-
 const { gfm } = await import(pathToFileURL(modules + "/micromark-extension-gfm/index.js").href)
 const { gfmFromMarkdown } = await import(pathToFileURL(modules + "/mdast-util-gfm/index.js").href)
 const block = JSON.parse(readFileSync(process.argv[3], "utf-8"))
-const codes = (page) => {
+const { nestedTitlesOwnTheirLine } = await import(pathToFileURL(process.argv[5]).href)
+const codes = (written) => {
+  const page = nestedTitlesOwnTheirLine(written)
   const tree = fromMarkdown(page, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] })
   const found = []
   const walk = (node) => {
@@ -76,8 +88,14 @@ def main() -> int:
         shutil.copyfile(RULES_JS, work / "figureRules.js")
         (work / "runner.mjs").write_text(RUNNER, encoding="utf-8")
         (work / "block.json").write_text(json.dumps(block), encoding="utf-8")
+        (work / "quizHook.ts").write_text(
+            f'export {{ nestedTitlesOwnTheirLine }} from {json.dumps(str(QUIZ_RULES_TS))}\n', encoding="utf-8")
+        subprocess.run([str(ESBUILD), str(work / "quizHook.ts"), "--bundle", "--format=esm", "--platform=node",
+                        f"--outfile={work / 'quizHook.mjs'}", "--log-level=warning"], check=True,
+                       env=dict(os.environ, NODE_PATH=str(toolchain_paths.QUARTZ_DIR / "node_modules")))
         said = subprocess.run(["node", str(work / "runner.mjs"), str(work / "figureRules.js"),
-                               str(work / "block.json"), str(toolchain_paths.QUARTZ_DIR / "node_modules")],
+                               str(work / "block.json"), str(toolchain_paths.QUARTZ_DIR / "node_modules"),
+                               str(work / "quizHook.mjs")],
                               capture_output=True, text=True)
         if said.returncode != 0:
             failures.append("the rules did not run in Node: " + said.stderr.strip()[-400:])

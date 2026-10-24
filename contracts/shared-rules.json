@@ -24962,7 +24962,10 @@
         {"name": "in tildes: the same key", "page": "~~~geogebra\nfile: Lines.ggb\nalt: Two lines.\n~~~\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
         {"name": "with Windows line endings: the same key", "page": "```geogebra\r\nfile: Lines.ggb\r\nalt: Two lines.\r\n```\r\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
         {"name": "with spaces at the ends of lines: the same key", "page": "```geogebra\nfile: Lines.ggb   \nalt: Two lines.  \n```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
-        {"name": "version: changed: a NEW key, so a geogebra.org sketch is fetched again", "page": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\nversion: 2\n```\n", "key": "b2860a5dc41e377506fe67fb1e0953dd666b405e254519081eb8ef703c6c13b6"}
+        {"name": "version: changed: a NEW key, so a geogebra.org sketch is fetched again", "page": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\nversion: 2\n```\n", "key": "b2860a5dc41e377506fe67fb1e0953dd666b405e254519081eb8ef703c6c13b6"},
+        {"name": "in a quiz's question: the same key (stage 5)", "page": "> [!quiz] Drag A.\n> ```geogebra\n> file: Lines.ggb\n> alt: Two lines.\n> ```\n> - [x] a\n> - [ ] b\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a quiz's explanation: the same key (stage 5)", "page": "> [!quiz] Pick one.\n> - [x] a\n> - [ ] b\n>\n> > [!explain]- Why\n> > ```geogebra\n> > file: Lines.ggb\n> > alt: Two lines.\n> > ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a quiz's explanation, with commands that look like a choice and a list (stage 5)", "page": "> [!quiz] Which line falls?\n> - [ ] y = 2x\n> - [x] y = -x + 3\n>\n> > [!explain]- Why\n> > ```geogebra\n> > alt: The line.\n> > -x + y = 3\n> > - [x] 2\n> > [1, 2]\n> > ```\n", "key": "2b39f61c95053033293f63a38649345c3d91b0d1e691289ebd32d941b870df23"}
       ]
     },
     "manifest": {
@@ -24972,6 +24975,15 @@
       "cases": [
         {"name": "the same fence on two pages, each with its own file beside it, and on a third with none", "files": ["Unit 1/Lines.ggb:one", "Unit 2/Lines.ggb:two"], "pages": {"Unit 1/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "Unit 2/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "Unit 3/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n"}, "shown": {"Unit 1/Lesson.md": "Unit 1/Lines.ggb", "Unit 2/Lesson.md": "Unit 2/Lines.ggb"}, "problems": [{"page": "Unit 3/Lesson", "reason": "fileNotFound"}]}
       ]
+    },
+    "quizzes": {
+      "rule": "#578 stage 5. A sketch works in a self-check question's QUESTION (before the choices) and in its EXPLANATION ([!explain]), and is REFUSED in a CHOICE: quizCallouts.words.problems.sketchInAChoice, in quizCallouts.recognise.order after choicesAndAnswer, found by quizzes.py (a ```geogebra or ~~~geogebra fence opened inside an item of the quiz's boxed list) and by the site (quizRules.QuizModel.sketchInAChoice: a plantoirGeoGebra node - or a geogebra code block the build could not show - inside an item of the first boxed list), whether or not the sketch itself can be shown, so the two agree. A sketch in a plain list in the question, or anywhere outside the boxed list, is fine. Every shape is a quizCallouts.recognise case, run by test_quizzes.py and planted on verify.sh's Quiz Fixture (6k), so the safety net (quizCallouts.safetyNet) stays silent; the keys of a fence in a question and in an explanation are keys cases.",
+      "whyNotInAChoice": "A choice is a click target: its label wraps the box, so a drag on a point would toggle the answer; and the shuffle moves the choices (quiz.inline.ts fieldset.appendChild, on load and again after every print, reapplyOrder). REJECTED: allowing it and putting the applet back after each move.",
+      "order": "Wired Figures, GeoGebra, Quizzes, Tasks (build_site._wire_geogebra_transformer; test_geogebra.py WiringTests). MEASURED (2026-10-24, the dev-test image, one quiz page with a sketch in a question, an explanation and a choice): GeoGebra wired after Quizzes built the same HTML byte for byte; the one difference was the quiz page's search text, which the quizzes' html stage makes again from the tree AFTER the sketch's card is in. Fixed by withoutAnswers reading a sketch as its figcaption alone - what Description, which runs before the card, reads on every other page - so the order is pinned by the wiring test, not by anything a student sees.",
+      "node": "The markdown stage's figure is a node of type plantoirGeoGebra with data.hName, never a raw html node. MEASURED: an html node renders the same page (Quartz parses raw HTML into elements), but the quiz reader recognises a sketch by the node's type, so with an html node a sketch in a choice was read as a working question while the folder check refused it - the must-fail.",
+      "explanation": "The card sits inside the hidden explanation, so nothing of the engine is fetched until the explanation is shown AND its button tapped (browser-checks/geogebra_applet.mjs: zero engine requests after the page loads and after the answer is checked, then the sketch opens). Start again hides it with the explanation.",
+      "print": "Print moves choices only (restoreOrder / reapplyOrder), never a question or an explanation, so a sketch open in a question of a shuffled quiz is the same applet, still working, after a print (the browser check). On paper a quiz prints as its question, its sketch as geogebraFences.print says.",
+      "searchText": "A quiz page's search text and summary read a sketch as its description alone, never its button, commands or attribution (plantoirQuizzes.ts withoutAnswers; verify.sh 6i-g reads the quiz page's search text)."
     },
     "siteCarriesEngine": {
       "rule": "The #454 gate: static/geogebra (the pruned, adapted engine - toolchain.json -> pins -> geogebra, 117 files, about 27 MB) only while a page students can see has a sketch that can be shown (page_features.GATED_ASSETS -> geogebra; the count is pages, from scripts/geogebra.py). None of it is fetched until a student taps; a site with no sketch carries none of it.",
@@ -27717,6 +27729,7 @@
         "choiceWithoutBox",
         "twoAnswers",
         "choicesAndAnswer",
+        "sketchInAChoice",
         "oneChoice",
         "noCorrectChoice",
         "noAnswerLine",
@@ -28287,6 +28300,62 @@
           "markdown": "<div>\n> [!quiz] Shown in HTML.\n> > [!answer]-\n> > 4\n</div>\n",
           "quizzes": [],
           "untouched": true
+        },
+        {
+          "name": "aSketchInAChoice",
+          "markdown": "> [!quiz] Which sketch shows a line?\n> - [x] This one\n>   ```geogebra\n>   alt: A line, in a choice.\n>   y = x\n>   ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "sketchInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInTheQuestionWithCommandsThatLookLikeChoices",
+          "markdown": "> [!quiz] Drag A. Which is the slope of the line?\n> ```geogebra\n> alt: A line, in a question.\n> -x + y = 3\n> - [x] 2\n> [1, 2]\n> ```\n> - [x] -1\n> - [ ] 2\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInTheExplanation",
+          "markdown": "> [!quiz] Which line falls?\n> - [ ] y = 2x\n> - [x] y = -x + 3\n>\n> > [!explain]- Why\n> > Its slope is -1.\n> > ```geogebra\n> > alt: A line, in an explanation.\n> > -x + y = 3\n> > ```\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                1
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInAListThatIsNotTheChoices",
+          "markdown": "> [!quiz] Look first:\n> - the line\n>   ```geogebra\n>   alt: A line, in a list that is not the choices.\n>   y = x\n>   ```\n>\n> Which is its slope?\n>\n> - [x] 1\n> - [ ] 2\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
         }
       ]
     },
@@ -28982,6 +29051,7 @@
         "emptyAlternative": "answer line {n} has an empty answer between its | marks",
         "badTolerance": "answer line {n} has a ± that is not a number ± a number, like 3.14 ± 0.01",
         "unknownOption": "“{option}” is not a quiz setting - the only one is shuffle",
+        "sketchInAChoice": "a GeoGebra sketch sits inside one of its choices, where dragging the sketch would pick that choice - put the sketch in the question, above the choices, or in its explanation",
         "choicesInHtml": "a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out",
       "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
         "readDifferently": "the site and the folder check read this question differently - preview the site again, and if this line comes back, rewrite it from one of the patterns in the plantoir-quizzes skill"

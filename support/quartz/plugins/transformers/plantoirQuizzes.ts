@@ -458,6 +458,26 @@ function renderQuiz(
   content.children = children
 }
 
+// A GeoGebra sketch anywhere inside a node (#578 stage 5): the fence as the
+// sketches' transformer leaves it - a "plantoirGeoGebra" node, built with
+// data.hName, never raw html, which is what lets this see it - or still a
+// ```geogebra code block when the build could not show it (the folder check
+// refuses a sketch in a choice either way, so the site does too).
+const SKETCH_NODE = "plantoirGeoGebra"
+const SKETCH_LANGUAGE = "geogebra"
+
+function holdsSketch(node: AnyNode): boolean {
+  if (node.type === SKETCH_NODE || (node.type === "code" && node.lang === SKETCH_LANGUAGE)) {
+    return true
+  }
+  for (const child of node.children ?? []) {
+    if (holdsSketch(child)) {
+      return true
+    }
+  }
+  return false
+}
+
 function modelOf(quiz: AnyNode, source: string[]): QuizModel {
   const title = quiz.children?.[0]
   const titleHtml = title && title.type === "html" ? String((title as unknown as Html).value) : ""
@@ -467,6 +487,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
   const answers: string[][] = []
   let blanks = blanksInTitle(titleHtml)
   let htmlChoices = false
+  let sketchInAChoice = false
   for (const child of content?.children ?? []) {
     const kind = calloutKind(child)
     if (child.type === "list") {
@@ -476,6 +497,9 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
           choices = []
           for (const item of child.children ?? []) {
             choices.push(item.checked === true ? true : item.checked === false ? false : null)
+            if (holdsSketch(item)) {
+              sketchInAChoice = true
+            }
           }
         }
       }
@@ -498,6 +522,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
     answers,
     blanks,
     htmlChoices,
+    sketchInAChoice,
   }
 }
 
@@ -848,6 +873,20 @@ function withoutAnswers(node: any): any {
     const classes = classesOf(node)
     if (classes.includes("plantoir-quiz-answer") || classes.includes("plantoir-quiz-explain")) {
       return null
+    }
+    if (node.tagName === "figure" && classes.includes("pl-geogebra")) {
+      // A GeoGebra sketch reads as its description alone (#578 stage 5), as
+      // Description - which runs before the sketch's card is put in - read
+      // it on every page without a quiz: never the button, the commands or
+      // the attribution. Measured: without this, a quiz page's search text
+      // carried "Open the sketch (about 2.9 MB)" and "Made with GeoGebra®".
+      const captions: any[] = []
+      for (const child of node.children ?? []) {
+        if (child?.type === "element" && child.tagName === "figcaption") {
+          captions.push(child)
+        }
+      }
+      return { ...node, children: captions }
     }
   }
   if (Array.isArray(node.children)) {
