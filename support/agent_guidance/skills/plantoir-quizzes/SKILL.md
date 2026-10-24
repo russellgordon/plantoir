@@ -143,7 +143,7 @@ whose choices refer to their position ("All of the above", "Both A and B",
 ## 4. Graphs, pictures and code inside a question
 
 Anything a page can hold works inside a question, a choice and an
-explanation. Put it on the lines under its choice, lined up under the
+explanation - except a GeoGebra sketch in a choice (below). Put it on the lines under its choice, lined up under the
 choice's `[`: after the `> ` that starts every line of the quiz, two more
 spaces (`>   ```functionplot`, as below). How to write the graph itself is
 in the `plantoir-math-graphs` skill; how to write runnable code - Python (` ```python run `) or Swift
@@ -208,6 +208,28 @@ An explanation with code to run (page has `codeRunner: true`):
 
 Give every graph an `alt:` line: it is what a screen reader says for a
 choice that is a graph.
+
+**A GeoGebra sketch** (a ` ```geogebra ` block) works in the QUESTION -
+on the lines after the title, before the choices - and in the
+EXPLANATION, where it stays closed until the student has answered and taps
+it. **Never put one inside a choice**: dragging a point would pick the
+choice, so the website refuses it and the folder problem says "a GeoGebra
+sketch sits inside one of its choices". Ask "which sketch shows…" with the
+sketch in the question and words as the choices instead. How to write the
+sketch itself (`file:`, `material_id:` or GeoGebra commands, and `alt:`)
+is in the `plantoir-page-authoring` skill.
+
+````markdown
+> [!quiz] Drag A along the line. What is the line's slope?
+> ```geogebra
+> alt: The line y = -x + 3 with a point A on it.
+> f(x) = -x + 3
+> A = Point(f)
+> ```
+> - [x] -1
+> - [ ] 1
+> - [ ] 3
+````
 
 ## 5. A five-question check (paste, then change)
 

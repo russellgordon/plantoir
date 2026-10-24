@@ -2581,7 +2581,10 @@ runnable-code count (`_check_quizzes`):
    line holding only one tag - swallows what follows it to the next empty
    line, as the site reads both: quiz syntax in one at the page's level is
    no quiz, and a list of choices in one makes the quiz `choicesInHtml`, on
-   both sides); a nested `> [!answer]` or
+   both sides; a ` ```geogebra ` or ` ~~~geogebra ` fence opened inside an
+   item of the choices makes it `sketchInAChoice` — #578 stage 5, 06 → Q7 —
+   whether or not the sketch itself can be shown, because the site refuses
+   it either way); a nested `> [!answer]` or
    `> [!explain]` at the
    quiz's own level is that callout; the rest is the question, whose
    paragraphs (and title) are where blanks are counted. `verdict` - the

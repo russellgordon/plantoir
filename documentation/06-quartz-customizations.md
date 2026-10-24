@@ -3924,8 +3924,8 @@ rules are `contracts/shared-rules.json` → `geogebraFences`.
 - `plugins/transformers/plantoirGeoGebra.ts` — the transformer, wired by
   `build_site._wire_geogebra_transformer` straight AFTER
   `Plugin.PlantoirFigures()` and so BEFORE `Plugin.PlantoirQuizzes()`
-  (plan 3.4: a sketch in a question must be a finished figure when the quiz
-  transformer packages it — #578 stage 5). The step is anchored on Figures
+  (plan 3.4; measured in stage 5 not to change a quiz page's HTML either
+  way — Q7). The step is anchored on Figures
   and runs AFTER the quizzes' own step, which also inserts straight after
   Figures; whichever runs second lands between, so a fresh site and one
   wired before #578 both read Figures, GeoGebra, Quizzes, Tasks
@@ -3942,8 +3942,9 @@ rules are `contracts/shared-rules.json` → `geogebraFences`.
 The **markdown stage** turns a fence the manifest knows into
 `<figure class="pl-figure pl-geogebra">` holding only a hidden figcaption
 (the description). It is an mdast node with `data.hName`, never a raw html
-node, so the quiz reader sees a figure rather than markup (stage 5 pins
-that). Description runs before it, so a page's summary is its words, never
+node: the quiz reader recognises a sketch by that node's type (Q7 —
+measured, an html node renders the same page but lets a sketch in a choice
+through). Description runs before it, so a page's summary is its words, never
 the sketch's commands (verify.sh 6i-g reads the meta description). The
 **html stage** puts in the card: the sketch's thumbnail, a button "Open the
 sketch (about 4.5 MB)" — the sketch plus the engine's first load, so a
@@ -4106,6 +4107,66 @@ refusals by the policy, 0 requests off the site (the theme's own font
 requests before the first tap are Quartz's, not GeoGebra's). The slope-angle
 sketch (1,594,544 bytes): 698–769 ms, 18 requests, 10,644,945 bytes
 (4,473,431 compressed — the button said "about 4.5 MB").
+
+### Q7. In a self-check question (#578 stage 5, `geogebraFences.quizzes`)
+
+A sketch works in a quiz's **question** (the lines after its title, before
+the choices) and in its **explanation**, and is **refused in a choice**:
+`quizCallouts.words.problems.sketchInAChoice`, in `recognise.order` after
+`choicesAndAnswer`. A choice is a click target — its label wraps the box,
+so dragging a point would pick it — and the shuffle moves the choices
+(`fieldset.appendChild`, on load and after every print). **Rejected:**
+allowing it and putting the applet back after each move. Both sides find it
+the same way, so the safety net stays silent: `quizzes.py` notes a
+geogebra fence opened inside an item of the boxed list (`_fence_language`);
+the site (`modelOf` → `QuizModel.sketchInAChoice`) looks for a
+`plantoirGeoGebra` node — or a geogebra code block the build could not show,
+since the folder check refuses it either way — inside an item of the first
+boxed list. A sketch in a plain list in the question is fine. Four
+`recognise` cases (a sketch in a choice; in the question with commands that
+read like choices, `- [x] 2` and `[1, 2]`; in an explanation; in a plain
+list) are run by `test_quizzes.py` and planted on verify.sh's Quiz Fixture
+(6k). Three `keys` cases put a fence in a question and in an explanation,
+and `check_geogebra_rules_against_the_site.py` now runs every page through
+the quizzes' own text hook (`nestedTitlesOwnTheirLine`, which adds a line
+after a nested callout's title) before the site's Markdown reader, as a
+build does.
+
+**Measured** (2026-10-24, the dev-test image, one page with a sketch in a
+question, one in an explanation and one in a choice):
+- **The transformer order changes no HTML.** GeoGebra wired after Quizzes
+  built the page byte for byte the same (one random explorer id apart);
+  the one difference was the page's search text. Quartz's Description runs
+  before the sketch's card exists, but the quizzes' html stage makes the
+  search text and summary AGAIN from the finished tree — so with GeoGebra
+  first, a quiz page's search text carried "Open the sketch (about 2.9 MB)"
+  and "Made with GeoGebra®". `withoutAnswers` now reads a
+  `figure.pl-geogebra` as its figcaption alone, what Description reads on
+  every other page. The order stays Figures, GeoGebra, Quizzes, Tasks,
+  pinned by `WiringTests`.
+- **An html node renders the same page** (Quartz parses raw HTML into
+  elements), so `data.hName` is not about the look: the quiz reader finds a
+  sketch by the node's TYPE, and with an html node a sketch in a choice was
+  read as a working question while the folder check refused it.
+- **In an explanation**, nothing of the engine is fetched when the page
+  loads, nor once the question is answered and the explanation shown —
+  only when its button is tapped (`geogebra_applet.mjs` step 9, both
+  phases: 0 and 0 requests, then the sketch open in about 255 ms).
+- **After a print** (`beforeprint` then `afterprint`, which put a shuffled
+  quiz's choices in Markdown order and back), a sketch open in the question
+  is the same applet in the same place, outside the choices, and still runs
+  a command (`plantoirAfterPrint = 7` reads back 7). Print moves choices
+  only.
+
+**Must-fails** (each red, then restored; the site's by a mounted copy of
+the one file in a scratch build, the repository untouched): GeoGebra wired
+after Quizzes → both `WiringTests`; an `html` node → the choice case read as
+`single` on the site and the safety net's `readDifferently` line; the
+`sketchInAChoice` check removed → `test_quizzes.py`'s recognise case, and on
+the site the same `single` and safety-net line; one quote marker taken off a
+quoted fence's lines (`markdown_code._QUOTE_MARKERS`) → `test_geogebra.py`
+`test_every_key_case`, and in the build the explanation's sketch left as
+code; the search-text branch removed → 6i-g's quiz-page check.
 
 ## E. Summary: what is *not* customized
 
