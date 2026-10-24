@@ -226,6 +226,11 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
             element("div", { className: ["pl-geogebra-applet"], hidden: true }, []),
             element("p", { className: ["pl-geogebra-message"], role: "status", hidden: true }, []),
           ]
+          // A caption, when the fence gives one, under the sketch; the
+          // description stays the figcaption, what a screen reader reads.
+          if (entry.caption) {
+            children.push(element("p", { className: ["pl-geogebra-caption"] }, [text(entry.caption)]))
+          }
           if (entry.commands.length > 0) {
             const lines = entry.commands.map((command) => command.text).join("\n")
             children.push(
@@ -237,18 +242,9 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
           }
           children.push(element("p", { className: ["pl-geogebra-print-note"] }, [text(words.printNote)]))
           children.push(...attribution(entry, words, known.attribution))
-          // The description stays what a screen reader reads; a caption, when
-          // the fence gives one, is shown above it.
           const caption = node.children.find(
             (child) => child.type === "element" && child.tagName === "figcaption",
           ) as Element | undefined
-          if (caption !== undefined && entry.caption) {
-            caption.properties = { className: ["pl-geogebra-caption"] }
-            caption.children = [
-              text(entry.caption),
-              element("span", { className: ["pl-sr-only"] }, [text(" " + entry.alt)]),
-            ]
-          }
           node.children = caption !== undefined ? [...children, caption] : children
         })
       },

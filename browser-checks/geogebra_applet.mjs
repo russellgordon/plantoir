@@ -44,6 +44,7 @@ import { createServer } from "node:http"
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
+import { gzipSync } from "node:zlib"
 
 const [chromePath, siteFolder, pageA, pageB, sketchFile] = process.argv.slice(2)
 if (!chromePath || !siteFolder || !pageA || !pageB || !sketchFile) {
@@ -184,6 +185,7 @@ async function connect(chunk) {
   let refusedInLog = []
   let offSite = []
   let tapped = false
+  let fetchedSinceTap = []
   let engineRequests = 0
   let bytes = 0
   socket.onmessage = (event) => {
@@ -198,6 +200,7 @@ async function connect(chunk) {
       requests.set(message.params.requestId, url)
       if (tapped && !url.startsWith(origin) && !url.startsWith("data:") && !url.startsWith("blob:") && !url.startsWith("about:")) offSite.push(url)
       if (url.includes("/static/geogebra/")) engineRequests += 1
+      if (tapped && url.startsWith(origin)) fetchedSinceTap.push(url)
     }
     if (message.method === "Network.loadingFinished") {
       bytes += message.params.encodedDataLength ?? 0
@@ -229,6 +232,7 @@ async function connect(chunk) {
   // what the network carried meanwhile.
   const tap = async (index) => {
     tapped = true
+    fetchedSinceTap = []
     const before = bytes
     const ready = await waitFor(`document.querySelectorAll("figure.pl-geogebra .pl-geogebra-open").length > ${index}`, 40)
     if (!ready) return { opened: false, ms: null, bytes: 0, why: "no such sketch on the page" }
@@ -236,7 +240,14 @@ async function connect(chunk) {
     const opened = await waitFor(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; if (f && f.classList.contains("pl-geogebra-loaded") && f.querySelector(".pl-geogebra-applet canvas")) { window.__plantoirOpened = performance.now(); return true } return false })()`)
     const ms = opened ? Math.round(await evaluate("window.__plantoirOpened - window.__plantoirTap")) : null
     const message = opened ? "" : await evaluate(`document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-message").textContent`)
-    return { opened, ms, bytes: bytes - before, why: message, frame: await frameUnderHtml() }
+    // What a host that compresses (Netlify, Cloudflare) would send for it.
+    let compressed = 0
+    for (const url of new Set(fetchedSinceTap)) {
+      try {
+        compressed += gzipSync(readFileSync(join(siteFolder, decodeURIComponent(new URL(url).pathname)))).length
+      } catch {}
+    }
+    return { opened, ms, bytes: bytes - before, compressed, requests: new Set(fetchedSinceTap).size, why: message, frame: await frameUnderHtml() }
   }
   // GeoGebra's hidden loader frame: under <html>, which Quartz's page change
   // keeps (the engine's replacement 3), never under <body>, which it
@@ -314,7 +325,7 @@ async function connect(chunk) {
       for (const line of refusedInLog) problems.push(`${phase}: the browser said: ${line}`)
       for (const violation of violations) problems.push(`${phase}: securitypolicyviolation ${violation}`)
       for (const url of offSite) problems.push(`${phase}: a request left the site: ${url}`)
-      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms, after a page change ${second.ms} ms, back again ${third.ms} ms, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
+      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms, after a page change ${second.ms} ms, back again ${third.ms} ms, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
     }
     clearTimeout(timer)
     if (problems.length > 0) return finish(1, "FAIL: " + problems.join("\n"))

@@ -263,6 +263,15 @@ class PassTests(unittest.TestCase):
         self.assertEqual([path.read_bytes() for path in pictures], [PNG])
         self.assertEqual(entry["thumbnail"]["width"], 2)
 
+    def test_one_file_on_several_fences_is_one_picture(self):
+        self.space.file("Lines.ggb", a_sketch())
+        pages = [self.space.page("A.md", "```geogebra\nfile: Lines.ggb\nalt: One.\n```\n"),
+                 self.space.page("B.md", "```geogebra\nfile: Lines.ggb\nalt: Two.\n```\n")]
+        self.space.prepare(pages)
+        self.assertEqual(len(self.manifest()["sketches"]), 2)
+        pictures = list((self.space.output / "quartz" / "static" / geogebra.THUMBNAILS).iterdir())
+        self.assertEqual(len(pictures), 1)
+
     def test_the_fence_size_wins_and_commands_alone_have_a_size(self):
         self.space.file("Lines.ggb", a_sketch(700, 400))
         pages = [self.space.page("A.md", "```geogebra\nfile: Lines.ggb\nwidth: 500\nheight: 300\n```\n"),
