@@ -68,7 +68,7 @@ nonisolated enum HelperPrograms {
 
     /// The variable that tells a launcher which folder this app keeps its
     /// breadcrumb trail in, so the lines a launcher writes for itself (a
-    /// refusal, a publish launchd started) land beside the app's own (GitHub
+    /// refusal, a line from a publish the launcher itself runs) land beside the app's own (GitHub
     /// #664). Without it a launcher works the folder out from `HOME`, which
     /// `--state-dir` deliberately leaves real, so an app keeping its trail in
     /// a state folder had its launchers' lines written into the real trail.
