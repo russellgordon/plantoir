@@ -2090,7 +2090,9 @@ def wire_quartz_additions(output_dir: Path) -> None:
     in afterBody; its exports ride the two index edits), the self-check
     quizzes' one (#563: its transformer after the figures'; its export rides
     the transformers index, and its script and styles ride the Print
-    button's component), the task boxes' one (#519: its transformer after
+    button's component), the GeoGebra sketches' one (#578: its transformer
+    straight after the figures' and so before the quizzes'; export, script
+    and styles ride as the quizzes' do), the task boxes' one (#519: its transformer after
     the quizzes'; export, script and styles ride as the quizzes' do), the
     picture sizes' one (#612: its transformer after the task boxes'; its
     export rides the transformers index, and its one style rule rides the

@@ -3910,6 +3910,125 @@ unwrapped (not measured); the copy button sits over the first row's right
 end on hover, as over any block. Windows inherits all of it with
 `support/quartz`; its `windows` issue owes a look in Edge and Narrator.
 
+## Q. GeoGebra sketches (#578, v1.9.0)
+
+A ` ```geogebra ` fence becomes a sketch students can drag, opened with a
+tap, from the site's own copy of GeoGebra and of the sketch — never from
+geogebra.org. The build half is
+[05 → GeoGebra sketches](05-build-pipeline.md#geogebra-sketches-what-the-build-does-578-v190);
+the engine and its six replacements are 02 → "/opt/vendor/geogebra"; the
+rules are `contracts/shared-rules.json` → `geogebraFences`.
+
+### Q1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/plantoirGeoGebra.ts` — the transformer, wired by
+  `build_site._wire_geogebra_transformer` straight AFTER
+  `Plugin.PlantoirFigures()` and so BEFORE `Plugin.PlantoirQuizzes()`
+  (plan 3.4: a sketch in a question must be a finished figure when the quiz
+  transformer packages it — #578 stage 5). The step is anchored on Figures
+  and runs AFTER the quizzes' own step, which also inserts straight after
+  Figures; whichever runs second lands between, so a fresh site and one
+  wired before #578 both read Figures, GeoGebra, Quizzes, Tasks
+  (`test_geogebra.py` `WiringTests`). Exported from
+  `plugins/transformers/index.ts`.
+- `components/scripts/geogebra.inline.ts` and
+  `components/styles/geogebra.scss` — carried by `PlantoirMetaLine`, as the
+  figures' are. Every style is under `.pl-geogebra`; the script does nothing
+  until a tap.
+- The key comes from `figureRules.js` (`keyOf`), shared with the figures.
+
+### Q2. Two stages
+
+The **markdown stage** turns a fence the manifest knows into
+`<figure class="pl-figure pl-geogebra">` holding only a hidden figcaption
+(the description). It is an mdast node with `data.hName`, never a raw html
+node, so the quiz reader sees a figure rather than markup (stage 5 pins
+that). Description runs before it, so a page's summary is its words, never
+the sketch's commands (verify.sh 6i-g reads the meta description). The
+**html stage** puts in the card: the sketch's thumbnail, a button "Open the
+sketch (about 4.5 MB)" — the sketch plus the engine's first load, so a
+student on a school network knows what a tap costs — a caption when the
+fence gives one, the commands in a `<details>` for a reader without scripts,
+and the attribution. The sketch's address is `slugifyFilePath` of its path
+in `content/`, the function Quartz's Assets emitter publishes it with, so
+the file is on the site once and the card names exactly that file
+(browser-checks/geogebra_applet.mjs counts the files with the sketch's
+SHA-256: one; must-fail with a second copy in `static/`: two). A fence the
+manifest does not know stays the code block it was.
+
+### Q3. Loading, on a tap
+
+`geogebra.inline.ts`: a tap loads `static/geogebra/deployggb.js` once
+(marked `spa-preserve`), fetches the sketch from the site and hands it over
+as `ggbBase64`, and makes the applet with the web3d codebase, offline, in
+English (the language files are left out of the engine), no menu bar, no
+input bar, no right-click menu, the reset icon, shift-drag zoom, the fence's
+`toolbar:`/`algebra:`, at the sketch's own size, scaled down to the page
+(`scaleContainerClass`). Commands run after it loads (stage 3 adds reading
+GeoGebra's own error dialog per line). A tap that has not opened a sketch in
+60 s says `couldNotLoad` and the button works again.
+
+**The policy.** A published Netlify site is sent `script-src 'self'
+'unsafe-eval' <hashes>` (netlify_badge.py). The stock engine never loads
+under it; the six replacements make it load unchanged (02). Every browser
+check serves on `[::1]`: GeoGebra's loader runs its 7.9 MB main file as
+INLINE text on `127.0.0.1`, `localhost` and `apps-builds.`, a path no class
+site takes. Measured with the stock `web3d.nocache.js` and `cache.js` put
+back in the clone: no sketch opened, and Chrome said "Executing inline script
+violates the following Content Security Policy directive".
+
+**Quartz's page change.** It replaces `<body>` and drops every `<head>` child
+without `spa-preserve`. Each applet is removed (`api.remove`) when the page
+changes, which also takes GeoGebra's own styles and libraries out of
+`<head>` (measured: 8, then 0); the next tap puts them back, and a second
+sketch opens in about 255 ms rather than 0.6 s. What keeps it working is
+GeoGebra's hidden loader frame going under `<html>`, which Quartz keeps
+(replacement 3): measured with it reverted in the clone, Chromium 155 opened
+no sketch after a page change, plainly served and cross-origin isolated.
+**Rejected:** the plan's MutationObserver marking what GeoGebra adds to
+`<head>` `spa-preserve` — measured in stage 2, it changed nothing while
+`api.remove` runs (0 kept either way) and every sketch opened without it;
+and leaving applets in place so their libraries stay (each keeps its memory
+and listeners for the rest of the visit).
+
+### Q4. On paper, and the attribution
+
+A loaded applet prints its canvas cropped (measured in the plan), so the
+handout's prepare step and ⌘P's `beforeprint` put a picture of each open
+sketch beside it (`api.getPNGBase64`, which answers at once — `beforeprint`
+gives no time to wait), and the print styles show that picture in place of
+the applet. Nothing is moved or replaced, so nothing has to be put back after
+the print (#576's rule holds without a restore). A sketch that was never
+opened prints its thumbnail; one with neither prints its description. The
+button never prints. Headless Chrome's `printToPDF` fires `beforeprint`
+(measured), so ⌘P is covered by the browser check; Safari is checked by hand
+as for #576.
+
+GeoGebra's licence asks for "Made with GeoGebra®" and a link to
+https://www.geogebra.org on every applet: the link is under every sketch on
+screen, and on paper, where a link cannot be followed, one short line
+("Made with GeoGebra · geogebra.org") with the address printed under it as
+plain text. A sketch from geogebra.org (stage 4) also names its author and
+the CC BY-NC-SA 4.0 licence, linked on screen and printed as text. The
+addresses are contract values (`geogebraFences.attribution`).
+
+### Q5. Dark theme
+
+The card follows the theme; the applet stays white, because GeoGebra has no
+dark applet, inside it.
+
+### Q6. Measured (2026-10-24, M4 Pro, macOS 26.6, Chrome for Testing 155)
+
+On the verify fixture's clone, served on `[::1]` under the publish's own
+`_headers`, plain and then cross-origin isolated (COOP + COEP): nothing
+fetched before a tap; the planted sketch open in 582–612 ms, 16 requests,
+8,917,110 bytes as served and 2,835,223 compressed; a sketch from commands
+40 ms after; after a page change 253–259 ms and back again 253–263 ms; 0
+refusals by the policy, 0 requests off the site (the theme's own font
+requests before the first tap are Quartz's, not GeoGebra's). The slope-angle
+sketch (1,594,544 bytes): 698–769 ms, 18 requests, 10,644,945 bytes
+(4,473,431 compressed — the button said "about 4.5 MB").
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
