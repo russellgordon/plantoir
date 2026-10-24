@@ -75,10 +75,14 @@ download joins the release, with what 1.8.7 brought the Mac:
   plan is to decide whether to combine them into one place for every kept
   copy of a course, or to give archives the same browsing that backups have.
   ([#573](https://github.com/russellgordon/plantoir/issues/573))
-- **GeoGebra on your pages.** Interactive maths with sliders, draggable
-  points and constructions, written as a few lines in a note. Students tap
-  to load it; nothing loads until then. (Graphs students can move, and TikZ
-  diagrams, are already here.)
+- **GeoGebra sketches on your pages.** Sliders, points to drag and
+  constructions, in three ways: put a sketch you saved from GeoGebra beside
+  the page, type GeoGebra commands in the note, or name a sketch on
+  geogebra.org (Plantoir keeps a copy the first time the site is built).
+  Sketches work in self-check quiz questions too. Students tap to open
+  one; nothing loads until then, and it comes from your own class site.
+  On the Mac first. (Graphs students can move, and TikZ diagrams, are
+  already here.)
   ([#578](https://github.com/russellgordon/plantoir/issues/578))
 - **Printing on Windows:** a handout printed on Windows should look the same
   as one printed on a Mac
@@ -136,8 +140,8 @@ download joins the release, with what 1.8.7 brought the Mac:
   Google Gemini and Antigravity
   ([#508](https://github.com/russellgordon/plantoir/issues/508)).
 - **The rest of self-check quizzes**, building on what arrives in 1.8: an
-  answer key when you print, and questions that use GeoGebra (1.9) and PhET
-  (2.0).
+  answer key when you print, and questions that use PhET (2.0). Questions
+  with a GeoGebra sketch arrive with GeoGebra itself, in 1.9.
   ([#511](https://github.com/russellgordon/plantoir/issues/511))
 
 ---

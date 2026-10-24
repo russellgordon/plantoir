@@ -13,8 +13,8 @@ matches the task before writing:
   (`.claude/skills/plantoir-page-authoring/SKILL.md`) - every way content can
   be written for the site (callouts, diagrams, tables, maths, checklists,
   success criteria, links, embedding one page in another, pictures and PDFs
-  in Media, videos, GeoGebra and PhET, hidden pages and `publish:`, folders,
-  class pages and their dates). Read it first; it says which of the skills
+  in Media, videos, GeoGebra sketches and PhET, hidden pages and
+  `publish:`, folders, class pages and their dates). Read it first; it says which of the skills
   below to read as well.
 - **Printable pages** - worksheets, handouts, practice sets, answer keys, or
   any page "students will print", or a page that should hand out an existing
@@ -26,12 +26,14 @@ matches the task before writing:
   first (a LaTeX source, the PDF and its answer key from one file), where
   the files go, and how every answer is checked. It says when a printable
   page is the better fit.
-- **Graphs and diagrams** - a graph of a function (a parabola beside its
-  parent, two lines meeting), a geometry or similar-triangles figure, a
-  number line, a probability tree, a circuit, anything to be "plotted" or
-  "drawn": the `plantoir-math-graphs` skill
+- **Graphs, diagrams and GeoGebra sketches** - a graph of a function (a
+  parabola beside its parent, two lines meeting), a geometry or
+  similar-triangles figure, a number line, a probability tree, a circuit,
+  anything to be "plotted" or "drawn", and a GeoGebra sketch students drag
+  or a slider: the `plantoir-math-graphs` skill
   (`.claude/skills/plantoir-math-graphs/SKILL.md`) - which fence to write,
-  complete patterns to paste, and what cannot be done (no sliders).
+  complete patterns to paste, a GeoGebra sketch three ways, and what
+  cannot be done.
 - **Code students run** - "make this example runnable", a Python program
   students edit and run in the browser, a Swift program students run with
   their own input, a program that reads input, "try it yourself": the

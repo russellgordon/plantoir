@@ -72,3 +72,6 @@ support/obsidian_defaults/.obsidian/themes/Minimal/theme.css     -text
 # into LF under its signature.
 website/updates/*.xml            -text
 website/updates/*.xml.signature  -text
+
+# GeoGebra sketches (#578): a .ggb is a zip, shipped as saved from GeoGebra.
+*.ggb     binary

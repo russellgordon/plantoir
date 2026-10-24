@@ -38,6 +38,12 @@ import script from "./scripts/print.inline"
 import figuresStyle from "./styles/figures.scss"
 // @ts-ignore
 import figuresScript from "./scripts/figures.inline"
+// GeoGebra sketches (#578) ride along for the same reason: any content page
+// might hold one. Every style is under .pl-geogebra and the script does
+// nothing until a student taps a sketch's button.
+import geogebraStyle from "./styles/geogebra.scss"
+// @ts-ignore
+import geogebraScript from "./scripts/geogebra.inline"
 // The sidebar's page marker (#515) rides along for the same reason: Quartz
 // writes ONE index.css for every page, so a style any component carries
 // reaches the sidebar of every page, folder and tag pages included. It changes
@@ -240,8 +246,8 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, sidebarPageMarkerStyle, picturesStyle, quizStyle, tasksStyle, progressStyle)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, geogebraStyle, sidebarPageMarkerStyle, picturesStyle, quizStyle, tasksStyle, progressStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
-  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, quizScript, tasksScript, progressScript, headingAnchorScript)
+  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, geogebraScript, quizScript, tasksScript, progressScript, headingAnchorScript)
   return PlantoirMetaLine
 }) satisfies QuartzComponentConstructor<QuartzComponent>

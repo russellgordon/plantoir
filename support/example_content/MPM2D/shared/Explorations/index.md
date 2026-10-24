@@ -20,6 +20,7 @@ being stuck is the work, as [[Why Struggle Is the Point]] explains.
 | [[The Handshake Problem]] | How many handshakes for $n$ people? |
 | [[Squares Against Doubling]] | Two rules, one race: does squaring beat doubling? |
 | [[Maximum Enclosure]] | How much pasture can one fence hold? |
+| [[The Slope-Angle Conjecture]] | Does one angle always give the same slope? |
 | [[How Tall Is the Flagpole]] | How do you measure the unclimbable? |
 
 Hints nudge; they never march. Ask, and you get a question back — see

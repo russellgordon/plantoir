@@ -268,6 +268,48 @@ def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
+def geogebra_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every GeoGebra sketch this build cannot show (#578),
+    never one per sketch. Each is named through sketchLine (its line in the
+    teacher's file) or sketchLineNoLine, and the reason through
+    geogebraFences.words.reasons; every value is filled in one pass.
+    """
+    entry = table["geogebraSketchesNotReady"]
+    problems = facts.get("geogebra_problems") or []
+    reasons = contracts.section(CONTRACT_FILE, "geogebraFences", "words", "reasons")
+    limit = contracts.section(CONTRACT_FILE, "geogebraFences", "files", "largestFileMegabytes")
+    named = []
+    for problem in problems[:MOST_PAGES_NAMED]:
+        reason_text = reasons.get(problem.get("reason") or "", reasons["nothingToShow"])
+        reason = filled(reason_text, {"file": problem.get("file") or "",
+                                      "name": problem.get("name") or "",
+                                      "value": problem.get("value") or "",
+                                      "id": problem.get("id") or "",
+                                      "megabytes": problem.get("megabytes") or "",
+                                      "limit": limit})
+        fill = {"page": problem.get("page", ""), "block": problem.get("block", 1), "reason": reason}
+        if problem.get("line") is not None:
+            fill["line"] = problem["line"]
+            piece = entry["sketchLine"]
+        else:
+            piece = entry["sketchLineNoLine"]
+        named.append(filled(piece, fill))
+    if len(problems) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": problems[0].get("page", "") if problems else "",
+        "count": len(problems),
+        # "; " rather than ", ": a reason can hold a comma.
+        "sketches": "; ".join(named),
+    }
+    return finding(
+        "geogebraSketchesNotReady", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(problems) == 1 else "sentenceForSeveral",
+    )
+
+
 def swift_finding(facts: dict, course: str, section, table: dict, windows=None) -> Finding:
     """
     ONE finding for every runnable Swift block this build has no program
@@ -552,6 +594,11 @@ def findings(facts: dict, course: str, section) -> list:
                                net printed (#644). Never given by
                                build_site.py: scripts/site_said.py says it,
                                after site_disagreements, in the same call.
+    * `geogebra_problems`    — [{"page": place, "block": n, "line": n or None,
+                               "reason": geogebraFences.words.reasons key,
+                               "file", "name", "value", "id", "megabytes"
+                               where they apply}], each a GeoGebra sketch
+                               that cannot be shown (#578)
     """
     table = _checks_by_name()
     found = []
@@ -629,6 +676,10 @@ def findings(facts: dict, course: str, section) -> list:
     # (#644). From scripts/site_said.py too, after the code's finding.
     if facts.get("quiz_disagreements"):
         found.append(quizzes_read_differently_finding(facts, course, section, table))
+    # After everything above, so the existing examples keep their order
+    # (#578). From build_site.py, beside the figures' and the quizzes'.
+    if facts.get("geogebra_problems"):
+        found.append(geogebra_finding(facts, course, section, table))
 
     return found
 

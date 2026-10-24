@@ -206,6 +206,35 @@ RUN apt-get update \
  && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' ca-certificates)" ge 20250419+deb13u1 \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# GeoGebra (#578): the engine a class site's ```geogebra sketches run on,
+# GeoGebra Math Apps 5.4.933.1, prepared into /opt/vendor/geogebra beside the
+# other engines and under the same gate - a section's site carries it
+# (static/geogebra, 27 MB) only while a page students can see has a sketch.
+# scripts/geogebra_engine.py is the ONE recipe (Windows runs it too): it checks
+# the zip's SHA-256 again, keeps the web3d codebase, leaves out the 83 language
+# files, and makes six exact text replacements so the engine loads under a
+# published site's content security policy - each must match exactly once or
+# the build fails here, never on a teacher's page. download.geogebra.org is
+# FLAKY (4 of 8 connections timed out, 2026-10-23) and keeps no old versions,
+# so the download is retried, then fetched from plantoir.app's mirror of the
+# SAME zip, and checked against the same SHA-256 whichever answered. Late, its
+# own layer, after the certificate store it downloads through; the recipe is
+# copied to /tmp only (never baked), so editing any other script never
+# downloads it again.
+# Non-commercial licence with attribution; contracts/toolchain.json -> pins ->
+# geogebra and THIRD_PARTY_LICENSES.md carry the why.
+ARG GEOGEBRA_VERSION=5.4.933.1
+ARG GEOGEBRA_URL=https://download.geogebra.org/installers/5.4/geogebra-math-apps-bundle-5-4-933-1.zip
+ARG GEOGEBRA_MIRROR=https://plantoir.app/mirror/geogebra/geogebra-math-apps-bundle-5-4-933-1.zip
+COPY scripts/geogebra_engine.py /tmp/geogebra_engine.py
+RUN test "$(python3 /tmp/geogebra_engine.py version)" = "$GEOGEBRA_VERSION" \
+ && { curl -fsSL --retry 6 --retry-all-errors --retry-delay 5 --connect-timeout 30 --speed-limit 1024 --speed-time 60 -o /tmp/ggb.zip "$GEOGEBRA_URL" \
+      || { echo "GeoGebra's own download did not answer; trying plantoir.app's copy of the same file" \
+           && curl -fsSL --retry 6 --retry-all-errors --retry-delay 5 --connect-timeout 30 --speed-limit 1024 --speed-time 60 -o /tmp/ggb.zip "$GEOGEBRA_MIRROR"; }; } \
+ && echo "409095947e065bce5bde20b8a6d56a60e2b3cb3cce6947e817a802513515ec0c  /tmp/ggb.zip" | sha256sum -c - \
+ && python3 /tmp/geogebra_engine.py adapt /tmp/ggb.zip /opt/vendor/geogebra \
+ && rm -f /tmp/ggb.zip /tmp/geogebra_engine.py
+
 # Copy patched Quartz components into place
 COPY patches/Explorer.tsx /opt/quartz/quartz/components/Explorer.tsx
 COPY patches/FolderContent.tsx /opt/quartz/quartz/components/pages/FolderContent.tsx
@@ -248,6 +277,10 @@ COPY scripts/print_settings.py /opt/scripts/print_settings.py
 # through support/figures/plantoir-figures.mjs, caches, and gates what the site
 # carries. Imported by build_site.py by bare name.
 COPY scripts/figures.py /opt/scripts/figures.py
+# GeoGebra sketches (#578): reads the ```geogebra fences, finds and checks
+# each sketch's file, and gates the engine the site carries. Imported by
+# build_site.py by bare name.
+COPY scripts/geogebra.py /opt/scripts/geogebra.py
 # Runnable Swift (#493): which blocks the launcher must compile (`plan`, run by
 # preview.sh through docker exec before the build) and what the build gives
 # the site (`prepare`). Imported by build_site.py by bare name.

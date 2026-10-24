@@ -34,6 +34,10 @@ export type QuizModel = {
   // A list of choices that an HTML block swallowed (a `<div>` or a line
   // holding only a tag straight before it): the site reads it as HTML.
   htmlChoices?: boolean
+  // A GeoGebra sketch (a ```geogebra fence, #578 stage 5) inside one of the
+  // boxed list's choices: refused, because a choice is a click target - a
+  // drag on a point would pick it - and the shuffle moves the choices.
+  sketchInAChoice?: boolean
 }
 
 export type QuizKind = "single" | "multiple" | "short" | "fill"
@@ -261,6 +265,9 @@ export function verdict(model: QuizModel): Verdict {
   const hasAnswer = model.answers.length === 1
   if (hasChoices && hasAnswer) {
     return problem("choicesAndAnswer")
+  }
+  if (hasChoices && model.sketchInAChoice) {
+    return problem("sketchInAChoice")
   }
   if (hasChoices) {
     if (model.choices.length === 1) {

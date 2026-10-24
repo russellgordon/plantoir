@@ -2370,6 +2370,191 @@ build on a compile error (ruling Q1); clearing the cache on `--full-rebuild`;
 a hand-bumped toolchain version in the key; caching a failure that was not
 the compiler's; one job folder per course.
 
+## GeoGebra sketches: what the build does (#578, v1.9.0)
+
+A teacher writes a ` ```geogebra ` fence — `file:` naming a `.ggb` saved
+from GeoGebra, or GeoGebra commands one per line, as in its Input Bar — and
+students get a sketch they can drag, opened with a tap and served by the
+class site itself. The same split as the figures above: **Python prepares
+and Quartz places.** `scripts/geogebra.py` does everything that can fail;
+the site's transformer and loader (06 → Q) only read what it left. The rules
+and cases: `contracts/shared-rules.json` → `geogebraFences`. Three kinds of
+sketch: a teacher's `.ggb` (`file:`), GeoGebra commands alone, and a sketch
+on geogebra.org (`material_id:`, fetched once and kept — item 9).
+
+1. **When.** ALWAYS section, straight after the figures pass and BEFORE the
+   folder checks (`_prepare_geogebra`), so a sketch that cannot be shown is
+   said where every folder problem is said. It never stops a build.
+2. **Which pages — TWO scans.** `geogebra.pages_students_see` runs
+   `figures.pages_students_see` once with `must_contain="```geogebra"` and
+   once with `"~~~geogebra"`, merged by path. `must_contain` is a plain
+   substring test, so one scan alone never reads a page whose only sketch is
+   in tildes (plan review finding 9; `test_geogebra.py`
+   `test_a_tilde_fence_is_found_by_the_page_scan` is its must-fail, measured
+   red with the second scan taken out).
+3. **Reading a fence** (`read_fence`, ruling Q1): leading `key: value` lines
+   whose key is one of the Obsidian GeoGebra plugin's (`file`,
+   `material_id`, `app`, `height`, `width`, `alt`, `caption`, `toolbar`,
+   `algebra`) or `version` are settings; the first line that is not starts
+   the commands, so GeoGebra's own `a: x + y = 3` is a command. A `---` line
+   ends the settings; a block that opens with `---` is read to the next one.
+   `version:` does nothing but change the fence — the documented way to make
+   a changed geogebra.org sketch be fetched again (stage 4). Every case is in
+   `geogebraFences.settings.cases`. Three slips are said at build time
+   (stage 2 review item 4), because otherwise a student would be the first
+   to see them: a `---` block that is never closed is a problem
+   (`settingsNotClosed` — it would have read every command as a setting and
+   left it out); `file:` with no name is `fileHasNoName`, not a
+   `fileNotFound` naming nothing; and a KNOWN key written among the commands
+   — in capitals (`File: x.ggb`), or after the line that started the
+   commands — is a `plantoir: note:` (`settingAmongCommands`), since it will
+   run as a GeoGebra command that GeoGebra refuses. Only a known key is
+   noted, so GeoGebra's own `slope: Slope(a)` passes silently. **A note is
+   not a folder problem** (stage 3+4 review item 3): it is a line in the
+   build's own output, which the app does not show the teacher, so the one
+   who sees the slip is usually the student, under the sketch: "Line {n}
+   couldn't run" (`lineCouldNotRun`, Q3 in 06). And not every such line is
+   refused: `height: 400` among the commands is a GeoGebra command that
+   makes a NUMBER called `height`, so the sketch opens, the box keeps its
+   own height, and nothing is said on the page at all.
+4. **The key.** A sketch is found by `figures.key_of` — figureFences'
+   `cacheKey` rule, REUSED, so the build and the site (which hashes the mdast
+   code value with `figureRules.keyOf`) agree by a rule both already run.
+   `check_geogebra_rules_against_the_site.py` runs every `keys` case through
+   the site's own Markdown reader in the image: a callout, a callout in a
+   callout, a list item, tildes, Windows line endings and trailing spaces
+   give the same key; `version: 2` gives a new one.
+5. **The file, and why it is published ONCE** (plan review finding 4).
+   `find_file` looks the name up by LISTING each folder — exact spelling
+   first, then one differing only in capitals or Unicode form (Netlify and
+   Cloudflare are case-sensitive) — beside the page, then from the top of the
+   course folder, then by its file name alone in `Media`. It must be a zip
+   holding `geogebra.xml` (read, never unpacked; size from its first
+   `<euclidianView><size>`, the app from `<geogebra app=…>`) and at most
+   20 MB. **A file Quartz leaves out of the site is not found** (stage 2
+   review item 6): one under `private/`, `templates/` or `.obsidian/` at the
+   top of the course folder (Quartz's `ignorePatterns`, root only and
+   case-sensitive — measured with Quartz's own globby in the image:
+   `private/a.ggb` left out, `Private/f.ggb` and `U/private/b.ggb`
+   published), or with any part of its path starting with a dot (the file
+   walk skips those). Said once as `fileNotFound`, never found here and then
+   missing on the site. **Nothing is copied:** Quartz's Assets emitter already publishes
+   every file under `content/` that is not a page, at `slugifyFilePath` of
+   its path, so the manifest records the path in `content/` and the
+   transformer makes the address with that same function. Measured on the
+   slope-angle sketch: 1,594,544 bytes on the site once, plus its 32,484-byte
+   thumbnail — against 3,221,572 had it been copied into `static/` as well.
+   **Rejected:** copying it (twice the bytes); taking the source out of
+   `content/` (a page linking the file for download would break, and
+   `content/Media` mirrors the teacher's own folder, which the build never
+   edits). A file beside a page reaches the site only from a folder the
+   course SHARES: a page listed by name in `shared_files` brings no file with
+   it, so the guidance says to keep a sketch beside a page in a folder, or in
+   `Media`.
+6. **What the site gets.** `quartz/plantoir-geogebra/manifest.json` — the
+   site's words and the attribution addresses from the contract, and, by
+   PAGE and then by fence key (06 → Q2: the same fence on two pages can name
+   two files), per sketch its app, size (the fence's `width:`/`height:` win), description,
+   caption, commands with their lines, toolbar/algebra, where its file is in
+   `content/`, its thumbnail, and the size the button names (the sketch's
+   bytes plus the engine's first load, 2,864,256 bytes gzipped: "about
+   4.5 MB" for the slope-angle sketch, measured 4,473,431 compressed). The
+   `.ggb`'s own `geogebra_thumbnail.png` goes to
+   `quartz/static/geogebra-sketches/`, named by its own SHA-256 so one file
+   on several fences is one picture. No sketch that can be shown: neither
+   folder, and every fence stays the code block it was.
+7. **The gate.** `counts["geogebra"]` — pages students can see with a sketch
+   that can be shown — goes to `page_features.install_gated_assets`, which
+   copies `/opt/vendor/geogebra` (02 → "/opt/vendor/geogebra": 117 files,
+   27,093,283 bytes) to `static/geogebra` only then, and takes it out when
+   none is left ("📐 This site carries GeoGebra for the sketches on 2
+   pages."). A build without the engine says `engineMissing` and shows none.
+8. **What the teacher and an assistant are told.** One folder problem per
+   section build, `geogebraSketchesNotReady` (page, sketch, line — the
+   setting's own line for a setting, the opening fence's otherwise; at most
+   ten), never offered a repair; one `plantoir: error:` line per sketch
+   (`Investigations/GeoGebra Missing.md: geogebra block 1, line 8: …`); a
+   sketch with no `alt:` is a `plantoir: note:` only. **No new trail event**:
+   problems reach the trail through the existing folder-problem line, as the
+   figures' do.
+9. **A sketch from geogebra.org: FETCHED ONCE, kept by the fence** (#578
+   stage 4; ruling Q2 and plan review finding 2; `geogebraFences.fetch` and
+   `.cache`). The first build that meets a `material_id:` fence asks
+   GeoGebra's public materials API
+   (`https://api.geogebra.org/v1.0/materials/{id}?scope=extended&embed=creator`)
+   what the sketch is, then downloads the `.ggb` of its ONE applet (the
+   element of type `G`), checks it as a teacher's file is checked, and only
+   then saves it in **`<builds>/<course>/.geogebra-cache/`** — beside the
+   course's built sites, outside the teacher's folder, shared by the sections
+   (08 names it) — as `<key>.ggb` plus `<key>.json` (id, title, author),
+   **keyed by the fence's own key**, not the sketch's id. A build whose fence
+   has a saved copy asks geogebra.org NOTHING. Changing the fence — the skill
+   says: add or change `version: 2` — gives a new key, so the next build
+   fetches again: that is how a teacher gets a sketch they edited on
+   geogebra.org, with no new button in either app (none exists, and none was
+   invented). `--full-rebuild` leaves the copies alone (`_prepare_geogebra`
+   passes `full_rebuild` and `geogebra.prepare` deliberately ignores it); a
+   copy unused for 90 days goes (`figures.PRUNE_DAYS`, the same rule). The
+   site's copy is written to `quartz/static/geogebra-sketches/<key[:16]>.ggb`
+   — a geogebra.org sketch has no file in `content/` for Quartz to publish —
+   and the card names the author and the licence (06 → Q4). Said: "📐
+   Sketches from geogebra.org: 1 copied now, 0 kept from before." Problems:
+   no copy and no network (or a timeout, a server error, a redirect off
+   geogebra.org's hosts) is `materialCouldNotBeFetched`, a folder problem,
+   and the fence stays code; 403/404/410 or `deleted` is `materialNotFound`;
+   no applet is `materialHasNoSketch`, two or more `materialHasSeveralSketches`;
+   a download that is not a GeoGebra file is `materialHasNoSketch` and is
+   never kept. **A download cut off on the way** (stage 3+4 review items 1
+   and 2) is `materialCouldNotBeFetched` and is never kept: a body shorter
+   than its `Content-Length` (`read(n)` returns what came rather than
+   raising, so `MaterialFetcher._get` compares the two) and a chunked answer
+   that stops (`http.client.IncompleteRead`, an `HTTPException` and NOT an
+   `OSError`, which is why both fetch paths name it). Whatever else a fetch
+   raises is that ONE sketch's `materialCouldNotBeFetched` (`_material`'s
+   catch), so `_prepare_geogebra`'s catch-all — which drops the whole
+   manifest — is never reached by a fetch, and the `file:` sketches on the
+   same site are prepared as ever. Tests: `test_a_cut_off_download_…`
+   (three stub answers: the API cut short, the `.ggb` cut short, the `.ggb`
+   chunked and cut) and `test_a_failed_fetch_takes_no_other_sketch_down`;
+   must-fails, each red: the `HTTPException` catch removed, the length
+   check removed, the per-sketch catch removed. A failed fetch is not
+   remembered: 06 → Q3 says what that costs a build.
+
+   **Measured** (2026-10-24, one request for ju3f2kbg by hand): HTTP 200,
+   1,598 bytes of JSON — `title`, `visibility` "S", `deleted` false,
+   `creator.displayname` "Russell Gordon", and one `elements` entry of type
+   `G` whose `url` is the 1,594,544-byte `.ggb`. That `.ggb` holds its own
+   `geogebra_thumbnail.png`, so the element's `previewUrl` picture is not
+   fetched (one request fewer, and the same thumbnail path as a teacher's
+   file). The image's Python trusts 148 certificate authorities by default,
+   so https to geogebra.org needs nothing added. **Tests never call the real
+   API**: `test_geogebra.py` `MaterialTests` serves both answers from a local
+   server of its own, through the same code, and counts the requests where
+   they arrive; verify.sh plants a saved copy for an id geogebra.org does not
+   have, so a build that asked anyway would fail rather than pass.
+   **Must-fails** (copy-and-restore, each red): keyed by the id → four
+   tests; a request despite a saved copy → three; `--full-rebuild` clearing
+   → the cache case. **Rejected:** asking every build (a class site would
+   change under the teacher, and every preview would need the network);
+   keying by the id (an edited sketch could never be fetched again); clearing
+   on a full rebuild (figures do, because a new engine draws differently — a
+   reason that does not apply here); fetching the preview picture as well.
+
+**`file:` is plain text, not a link.** Obsidian's rename does not rewrite
+it, and Copy a Page does not carry the file (it copies a page's links and
+embeds; below, "`Media` is mirrored WHOLE"). Both arrive as `fileNotFound`
+naming the line, and the lookup by file name in `Media` is what makes "put
+the .ggb in Media" the fix.
+
+**Measured** (2026-10-24, M4 Pro, macOS 26.6, Chrome for Testing 155, the
+verify fixture, a clone served on `[::1]` under the publish's own
+`_headers`): the planted sketch opened in 582–612 ms from the tap, 16
+requests, 8,917,110 bytes as served (2,835,223 compressed); a sketch from
+commands on the same page 40 ms; after Quartz's page change 253–259 ms;
+cross-origin isolated the same; 0 refusals, 0 requests off the site. The
+slope-angle sketch (1.6 MB, with its picture): 698–769 ms, 18 requests,
+10,644,945 bytes (4,473,431 compressed).
+
 ## Self-check quizzes: what the build does (#563, v1.8.0)
 
 A `> [!quiz]` callout at the left edge of a page becomes a question students
@@ -2396,7 +2581,10 @@ runnable-code count (`_check_quizzes`):
    line holding only one tag - swallows what follows it to the next empty
    line, as the site reads both: quiz syntax in one at the page's level is
    no quiz, and a list of choices in one makes the quiz `choicesInHtml`, on
-   both sides); a nested `> [!answer]` or
+   both sides; a ` ```geogebra ` or ` ~~~geogebra ` fence opened inside an
+   item of the choices makes it `sketchInAChoice` — #578 stage 5, 06 → Q7 —
+   whether or not the sketch itself can be shown, because the site refuses
+   it either way); a nested `> [!answer]` or
    `> [!explain]` at the
    quiz's own level is that callout; the rest is the question, whose
    paragraphs (and title) are where blanks are counted. `verdict` - the
@@ -3554,3 +3742,9 @@ by reading the site: nothing links to those files until the page is published.
 It is written down because "why is last year's PDF on my site already?" is a
 question somebody will ask, and the answer is a rule about `Media` rather than
 anything the copy did.
+
+A GeoGebra sketch named by `file:` (#578) is the one file Copy a Page leaves
+behind: the fence's `file:` line is plain text, not a link or an embed, so
+the copy does not see it and the copied page's sketch is `fileNotFound`
+until the `.ggb` is put in the destination's `Media` (where the build's
+lookup finds it by its name alone) or the line is changed.

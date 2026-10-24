@@ -392,9 +392,22 @@ def verify_feeds_live() -> str:
     return outcome
 
 
+def verify_mirror_live() -> str:
+    """Every file site.json -> mirror lists is served back with its SHA-256
+    (#578). Advisory after a deploy, like verify_live."""
+    import mirror
+    return mirror.verify_live(read_config())
+
+
 def deploy() -> int:
     if not (SITE_DIR / "index.html").exists():
         raise SystemExit("site/ has no index.html — run website/build.py first.")
+    # The same refusal build.py --deploy makes (#578), here too because this
+    # module can be run on its own to deploy whatever site/ already holds.
+    import mirror
+    refusal = mirror.deploy_refusal(read_config(), SITE_DIR)
+    if refusal:
+        raise SystemExit(refusal)
     site_id = read_site_id()
     token = read_token()
 
@@ -449,6 +462,7 @@ def deploy() -> int:
             # into a failing exit code. See verify_live()'s docstring.
             verify_live()
             verify_feeds_live()
+            verify_mirror_live()
             return 0
         if state in ("error", "failed"):
             raise SystemExit(f"❌ Netlify reports the deploy state '{state}'.")
@@ -470,5 +484,8 @@ if __name__ == "__main__":
         feeds = verify_feeds_live()
         if feeds == "mismatch" or (feeds == "unknown" and outcome == "match"):
             outcome = feeds
+        mirrored = verify_mirror_live()
+        if mirrored == "mismatch" or (mirrored == "unknown" and outcome == "match"):
+            outcome = mirrored
         raise SystemExit({"match": 0, "mismatch": 2, "unknown": 1}[outcome])
     raise SystemExit(deploy())

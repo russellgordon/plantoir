@@ -3910,6 +3910,276 @@ unwrapped (not measured); the copy button sits over the first row's right
 end on hover, as over any block. Windows inherits all of it with
 `support/quartz`; its `windows` issue owes a look in Edge and Narrator.
 
+## Q. GeoGebra sketches (#578, v1.9.0)
+
+A ` ```geogebra ` fence becomes a sketch students can drag, opened with a
+tap, from the site's own copy of GeoGebra and of the sketch — never from
+geogebra.org. The build half is
+[05 → GeoGebra sketches](05-build-pipeline.md#geogebra-sketches-what-the-build-does-578-v190);
+the engine and its six replacements are 02 → "/opt/vendor/geogebra"; the
+rules are `contracts/shared-rules.json` → `geogebraFences`.
+
+### Q1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/plantoirGeoGebra.ts` — the transformer, wired by
+  `build_site._wire_geogebra_transformer` straight AFTER
+  `Plugin.PlantoirFigures()` and so BEFORE `Plugin.PlantoirQuizzes()`
+  (plan 3.4; measured in stage 5 not to change a quiz page's HTML either
+  way — Q7). The step is anchored on Figures
+  and runs AFTER the quizzes' own step, which also inserts straight after
+  Figures; whichever runs second lands between, so a fresh site and one
+  wired before #578 both read Figures, GeoGebra, Quizzes, Tasks
+  (`test_geogebra.py` `WiringTests`). Exported from
+  `plugins/transformers/index.ts`.
+- `components/scripts/geogebra.inline.ts` and
+  `components/styles/geogebra.scss` — carried by `PlantoirMetaLine`, as the
+  figures' are. Every style is under `.pl-geogebra`; the script does nothing
+  until a tap.
+- The key comes from `figureRules.js` (`keyOf`), shared with the figures.
+
+### Q2. Two stages
+
+The **markdown stage** turns a fence the manifest knows into
+`<figure class="pl-figure pl-geogebra">` holding only a hidden figcaption
+(the description). It is an mdast node with `data.hName`, never a raw html
+node: the quiz reader recognises a sketch by that node's type (Q7 —
+measured, an html node renders the same page but lets a sketch in a choice
+through). Description runs before it, so a page's summary is its words, never
+the sketch's commands (verify.sh 6i-g reads the meta description). The
+**html stage** puts in the card: the sketch's thumbnail, a button "Open the
+sketch (about 4.5 MB)" — the sketch plus the engine's first load, so a
+student on a school network knows what a tap costs — a caption when the
+fence gives one, the commands in a `<details>` for a reader without scripts,
+and the attribution. The sketch's address is `slugifyFilePath` of its path
+in `content/`, the function Quartz's Assets emitter publishes it with, so
+the file is on the site once and the card names exactly that file
+(browser-checks/geogebra_applet.mjs counts the files with the sketch's
+SHA-256: one; must-fail with a second copy in `static/`: two). A fence the
+manifest does not know stays the code block it was.
+
+**The manifest is read by page, then by fence** (stage 2 review item 1): the
+transformer looks a sketch up under its page's `file.data.relativePath`,
+NFC-normalised as the build normalises it, and only then by the fence's key.
+Keyed by the fence alone, the same fence text on two pages (`file:
+Lines.ggb` beside each) would show ONE of the two files on both pages, and a
+page whose file is missing would show another page's sketch while its folder
+problem said it could not be shown. `geogebraFences.manifest.cases` pins it
+in Python; verify.sh plants a page whose fence is the first fixture's word
+for word, with a different `Lines.ggb` beside it, and reads the address its
+card names.
+
+### Q3. Loading, on a tap
+
+`geogebra.inline.ts`: a tap loads `static/geogebra/deployggb.js` once
+(marked `spa-preserve`), fetches the sketch from the site and hands it over
+as `ggbBase64`, and makes the applet with the web3d codebase, offline, in
+English (the language files are left out of the engine), no menu bar, no
+input bar, no right-click menu, the reset icon, shift-drag zoom, the fence's
+`toolbar:`/`algebra:`, at the sketch's own size, scaled down to the page
+(`scaleContainerClass`). The box it is scaled into keeps the sketch's own
+shape (`aspect-ratio` from `--pl-geogebra-ratio`, `height: auto !important`,
+`overflow: hidden`, in `geogebra.scss`): GeoGebra writes a width and height
+onto that box for the page width it measured when it opened and never
+corrects them, so the 1430 × 759 slope-angle sketch, drawn 334 px tall in a
+630 px column, sat in a box left 482 px tall — a white band under it,
+found in the stage-7 screenshot (WebKit, 2026-10-24) and invisible to every
+check that only asked whether the box was zero-sized. **Known limit,
+unmeasured:** `overflow: hidden` would also cut off the keyboard GeoGebra
+may open inside its applet on a touchscreen for a fence with
+`algebra: true` (`geogebraFences.knownLimits`). No touchscreen was tried —
+an iPad and Edge on a touch laptop are to be checked later; a desktop
+browser opens no keyboard. A tap that has not opened a sketch in 60 s says
+`couldNotLoad` and the button works again. A geogebra.org sketch is fetched
+from the site's own copy in `static/geogebra-sketches/` (05 → item 9), never
+from geogebra.org.
+
+**The fence's commands** (#578 stage 3, `geogebraFences.commands`) run once
+the sketch has opened, one line at a time, and a line GeoGebra refuses is
+shown under the sketch — `lineCouldNotRun`, "Line {line} couldn't run:
+{said}", with GeoGebra's OWN words. Measured on the adapted engine,
+Chromium 1243 and WebKit 2359: **`evalCommand`'s answer cannot be used** —
+it is `false` for scripting commands that work (`SetValue`, `SetColor`,
+`ZoomIn`) and for real errors alike, and `asyncEvalCommand` resolves `""`
+for both, before any dialog. GeoGebra's error dialog tells them apart, but it
+is added 1–10 ms AFTER the line returns, a few tasks later — so reading the
+page straight after a line finds nothing, and waiting a fixed time would be a
+guess. What the loader does instead: after each line it also runs
+`endOfLine` (`PlantoirEndOfLine()`), a command GeoGebra does not know. Its
+dialog always comes, and always after the line's own (every contract case,
+in order, in both engines), so any dialog that arrives before the marker's is
+the line's. A MutationObserver on the applet reads each dialog's message
+lines (`.dialogContent .gwt-Label`, without the title or buttons) and removes
+it as it is added, before it is drawn; the wait ends when the marker's
+dialog arrives — 1 to 9 ms a line — with a 10-second last resort for all the
+lines together. Dialogs are on while the lines run (`errorDialogsActive`) and
+turned off after, so nothing a student does opens one. The refused lines do
+not print. `browser-checks/geogebra_applet.mjs` plants every contract case in
+the fixture's commands sketch and reads exactly the refused ones, in
+GeoGebra's words, and that `SetValue(a, 3)` set `a` to 3; its must-fail (the
+loader reading `evalCommand`'s answer) reported every working scripting line.
+**Rejected:** `evalCommand`'s answer; `asyncEvalCommand`; a fixed wait after
+each line; checking commands at build time (GeoGebra's parser runs only in
+the browser). A line that does nothing without being an error (`SetValue` of
+a name that does not exist) raises nothing and is not said — a known limit.
+Unmeasured, and so said here rather than relied on: a dialog GeoGebra
+opened while the SKETCH was loading, still open when the lines start, would
+arrive before the first line's marker and be blamed on line 1 (stage 3+4
+review item 4).
+
+**A failed fetch is not remembered** (stage 3+4 review item 4). With no
+saved copy, every build asks geogebra.org again, and a build while it does
+not answer waits up to `fetch.requestSeconds` (15 s) for each request — the
+materials API and then the `.ggb` — before saying
+`materialCouldNotBeFetched` for that sketch. A download cut off on the way
+(fewer bytes than its `Content-Length`, or a chunked answer that stops) is
+the same problem, and nothing is kept from it; whatever else a fetch raises
+is that one sketch's problem too, so the teacher's own `file:` sketches on
+the same site are never taken down with it (05 → item 9).
+
+**The policy.** A published Netlify site is sent `script-src 'self'
+'unsafe-eval' <hashes>` (netlify_badge.py). The stock engine never loads
+under it; the six replacements make it load unchanged (02). Every browser
+check serves on `[::1]`: GeoGebra's loader runs its 7.9 MB main file as
+INLINE text on `127.0.0.1`, `localhost` and `apps-builds.`, a path no class
+site takes. Measured with the stock `web3d.nocache.js` and `cache.js` put
+back in the clone: no sketch opened, and Chrome said "Executing inline script
+violates the following Content Security Policy directive".
+
+**Quartz's page change.** It replaces `<body>` and drops every `<head>` child
+without `spa-preserve`. Each applet is removed (`api.remove`) when the page
+changes, which also takes GeoGebra's own styles and libraries out of
+`<head>` (measured: 8, then 0); the next tap puts them back, and a second
+sketch opens in about 255 ms rather than 0.6 s. What keeps it working is
+GeoGebra's hidden loader frame going under `<html>`, which Quartz keeps
+(replacement 3): measured with it reverted in the clone, Chromium 155 opened
+no sketch after a page change, plainly served and cross-origin isolated.
+**Rejected:** the plan's MutationObserver marking what GeoGebra adds to
+`<head>` `spa-preserve` — measured in stage 2, it changed nothing while
+`api.remove` runs (0 kept either way) and every sketch opened without it;
+and leaving applets in place so their libraries stay (each keeps its memory
+and listeners for the rest of the visit).
+
+**What `api.remove()` leaves behind** (stage 2 review, measured in Chromium
+over 45 applets opened and removed one page change at a time): about 9
+listeners, 18 detached nodes and 0.1 MB per applet — the heap went from 27.6
+to 32.0 MB — while `<head>` stays clean (46 children before, 35 after: what
+GeoGebra added is gone). A student would have to open hundreds of sketches in
+one visit for it to matter; a reload clears it. An iPad could not be measured
+here.
+
+**A tap that finishes after the page changed marks nothing** (stage 2 review
+item 3). The loader counts Quartz's page changes (`pageChanges`, raised in
+the page's cleanup); a sketch whose `appletOnLoad` or 60-second give-up
+arrives after the count moved is removed at once and touches no figure —
+`figure.isConnected` alone is not enough, because Quartz's page change can
+keep an element that looks the same on the new page.
+
+### Q4. On paper, and the attribution
+
+A loaded applet prints its canvas cropped (measured in the plan), so the
+handout's prepare step and ⌘P's `beforeprint` put a picture of each open
+sketch beside it (`api.getPNGBase64`, which answers at once — `beforeprint`
+gives no time to wait), and the print styles show that picture in place of
+the applet. Nothing is moved or replaced, so nothing has to be put back after
+the print (#576's rule holds without a restore). A sketch that was never
+opened prints its thumbnail; one with neither prints its description. The
+button never prints. Headless Chrome's `printToPDF` fires `beforeprint`
+(measured), so ⌘P is covered by the browser check; Safari is checked by hand
+as for #576.
+
+GeoGebra's licence asks for "Made with GeoGebra®" and a link to
+https://www.geogebra.org on every applet: the link is under every sketch on
+screen, and on paper, where a link cannot be followed, one short line
+("Made with GeoGebra · geogebra.org") with the address printed under it as
+plain text. A sketch from geogebra.org (stage 4) is CC BY-NC-SA 4.0, which
+asks for the author, the source and the licence: under it, "Made with
+GeoGebra® · by {author} · CC BY-NC-SA 4.0", the author linked to the sketch on
+geogebra.org (`https://www.geogebra.org/m/{id}`) and the licence to
+`https://creativecommons.org/licenses/by-nc-sa/4.0/` (`rel="license"`); on
+paper "Made with GeoGebra · by {author} · CC BY-NC-SA 4.0" with the three
+addresses printed under it as text. The author is the API's
+`creator.displayname`, else the user name, else the sketch's own address, so
+the card never says "by" and nothing. A sketch from the teacher's own file
+names no author or licence: the file is theirs, and nothing in it says
+either. The addresses are contract values (`geogebraFences.attribution`).
+
+### Q5. Dark theme
+
+The card follows the theme; the applet stays white, because GeoGebra has no
+dark applet, inside it.
+
+### Q6. Measured (2026-10-24, M4 Pro, macOS 26.6, Chrome for Testing 155)
+
+On the verify fixture's clone, served on `[::1]` under the publish's own
+`_headers`, plain and then cross-origin isolated (COOP + COEP): nothing
+fetched before a tap; the planted sketch open in 582–612 ms, 16 requests,
+8,917,110 bytes as served and 2,835,223 compressed; a sketch from commands
+40 ms after; after a page change 253–259 ms and back again 253–263 ms; 0
+refusals by the policy, 0 requests off the site (the theme's own font
+requests before the first tap are Quartz's, not GeoGebra's). The slope-angle
+sketch (1,594,544 bytes): 698–769 ms, 18 requests, 10,644,945 bytes
+(4,473,431 compressed — the button said "about 4.5 MB").
+
+### Q7. In a self-check question (#578 stage 5, `geogebraFences.quizzes`)
+
+A sketch works in a quiz's **question** (the lines after its title, before
+the choices) and in its **explanation**, and is **refused in a choice**:
+`quizCallouts.words.problems.sketchInAChoice`, in `recognise.order` after
+`choicesAndAnswer`. A choice is a click target — its label wraps the box,
+so dragging a point would pick it — and the shuffle moves the choices
+(`fieldset.appendChild`, on load and after every print). **Rejected:**
+allowing it and putting the applet back after each move. Both sides find it
+the same way, so the safety net stays silent: `quizzes.py` notes a
+geogebra fence opened inside an item of the boxed list (`_fence_language`);
+the site (`modelOf` → `QuizModel.sketchInAChoice`) looks for a
+`plantoirGeoGebra` node — or a geogebra code block the build could not show,
+since the folder check refuses it either way — inside an item of the first
+boxed list. A sketch in a plain list in the question is fine. Four
+`recognise` cases (a sketch in a choice; in the question with commands that
+read like choices, `- [x] 2` and `[1, 2]`; in an explanation; in a plain
+list) are run by `test_quizzes.py` and planted on verify.sh's Quiz Fixture
+(6k). Three `keys` cases put a fence in a question and in an explanation,
+and `check_geogebra_rules_against_the_site.py` now runs every page through
+the quizzes' own text hook (`nestedTitlesOwnTheirLine`, which adds a line
+after a nested callout's title) before the site's Markdown reader, as a
+build does.
+
+**Measured** (2026-10-24, the dev-test image, one page with a sketch in a
+question, one in an explanation and one in a choice):
+- **The transformer order changes no HTML.** GeoGebra wired after Quizzes
+  built the page byte for byte the same (one random explorer id apart);
+  the one difference was the page's search text. Quartz's Description runs
+  before the sketch's card exists, but the quizzes' html stage makes the
+  search text and summary AGAIN from the finished tree — so with GeoGebra
+  first, a quiz page's search text carried "Open the sketch (about 2.9 MB)"
+  and "Made with GeoGebra®". `withoutAnswers` now reads a
+  `figure.pl-geogebra` as its figcaption alone, what Description reads on
+  every other page. The order stays Figures, GeoGebra, Quizzes, Tasks,
+  pinned by `WiringTests`.
+- **An html node renders the same page** (Quartz parses raw HTML into
+  elements), so `data.hName` is not about the look: the quiz reader finds a
+  sketch by the node's TYPE, and with an html node a sketch in a choice was
+  read as a working question while the folder check refused it.
+- **In an explanation**, nothing of the engine is fetched when the page
+  loads, nor once the question is answered and the explanation shown —
+  only when its button is tapped (`geogebra_applet.mjs` step 9, both
+  phases: 0 and 0 requests, then the sketch open in about 255 ms).
+- **After a print** (`beforeprint` then `afterprint`, which put a shuffled
+  quiz's choices in Markdown order and back), a sketch open in the question
+  is the same applet in the same place, outside the choices, and still runs
+  a command (`plantoirAfterPrint = 7` reads back 7). Print moves choices
+  only.
+
+**Must-fails** (each red, then restored; the site's by a mounted copy of
+the one file in a scratch build, the repository untouched): GeoGebra wired
+after Quizzes → both `WiringTests`; an `html` node → the choice case read as
+`single` on the site and the safety net's `readDifferently` line; the
+`sketchInAChoice` check removed → `test_quizzes.py`'s recognise case, and on
+the site the same `single` and safety-net line; one quote marker taken off a
+quoted fence's lines (`markdown_code._QUOTE_MARKERS`) → `test_geogebra.py`
+`test_every_key_case`, and in the build the explanation's sketch left as
+code; the search-text branch removed → 6i-g's quiz-page check.
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
