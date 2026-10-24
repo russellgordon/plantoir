@@ -112,6 +112,26 @@ class ListTests(unittest.TestCase):
 
 class FillTests(MirrorTestCase):
 
+    def test_a_build_that_is_not_a_deploy_tries_the_download_once(self):
+        # Stage-1 review: six 60-second tries stalled an offline build.py.
+        calls = []
+        def fake_download(url, destination, attempts=mirror.ATTEMPTS, pause=None):
+            calls.append(attempts)
+            raise OSError("offline")
+        real = mirror.download
+        mirror.download = fake_download
+        try:
+            mirror.fill(a_site(), self.output, cache=self.cache, attempts=1)
+            mirror.fill(a_site(), self.output, cache=self.cache)
+        finally:
+            mirror.download = real
+        self.assertEqual(calls, [1, mirror.ATTEMPTS])
+
+    def test_build_py_asks_for_retries_only_when_deploying(self):
+        source = (Path(__file__).resolve().parent / "build.py").read_text(encoding="utf-8")
+        self.assertIn("attempts = mirror.ATTEMPTS if deploying else 1", source)
+        self.assertIn("build(check_only=arguments.check, deploying=arguments.deploy)", source)
+
     def test_the_first_build_downloads_into_the_cache_and_copies_into_the_site(self):
         fetch = Fetcher()
         said = mirror.fill(a_site(), self.output, cache=self.cache, fetch=fetch)

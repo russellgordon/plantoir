@@ -928,7 +928,7 @@ def output_path(slug: str) -> Path:
     return OUTPUT / slug / "index.html"
 
 
-def build(check_only: bool) -> int:
+def build(check_only: bool, deploying: bool = False) -> int:
     site = read_json(WEBSITE / "site.json")
     shot_list = read_json(WEBSITE / "shots.json")["shots"]
     shots = {}
@@ -1040,10 +1040,13 @@ def build(check_only: bool) -> int:
         update_feeds.copy_feeds(feed_source, OUTPUT / "updates")
 
     # The mirror the image build falls back to (#578): the list is checked in
-    # both modes, the files are put into site/mirror/ only when writing.
+    # both modes, the files are put into site/mirror/ only when writing - and
+    # a missing one is downloaded with retries only for a deploy, which
+    # refuses without it; any other build tries once (mirror.fill).
     problems.extend(mirror.entry_problems(site, read_json(REPO / "contracts" / "toolchain.json")["pins"]))
     if not check_only:
-        for line in mirror.fill(site, OUTPUT):
+        attempts = mirror.ATTEMPTS if deploying else 1
+        for line in mirror.fill(site, OUTPUT, attempts=attempts):
             print(line)
 
     problems.extend(broken_fragment_problems(rendered))
@@ -1306,7 +1309,7 @@ def main() -> int:
         parser.error("--check writes nothing, so there is nothing to deploy or preview")
     if arguments.deploy and arguments.serve:
         parser.error("--serve is for looking before you deploy; run --deploy after")
-    result = build(check_only=arguments.check)
+    result = build(check_only=arguments.check, deploying=arguments.deploy)
     if arguments.serve:
         if result != 0:
             print("Serving anyway — fix the warnings above and refresh.", file=sys.stderr)
