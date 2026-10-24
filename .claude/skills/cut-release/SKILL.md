@@ -242,8 +242,11 @@ python3 website/update_feed.py macos --version <version> \
    Downloads table first. `--notes` is the SAME approved notes file: the
    generator drops, for the Mac's update window, the Downloads section with
    its checksum table, every line labelled "(Windows)", and the
-   "Windows: …" sentence — which is one more reason to label platform-only
-   lines as the style rules above say. Run it from the main checkout. Since
+   "Windows: …" sentence, whether it is a line of its own or a sentence in
+   the first paragraph, plain or bold (#658; until then only the line of its
+   own was dropped, and the notes of 1.4.4, 1.7.2 and 1.8.4 to 1.8.7 showed
+   it to Macs) — which is one more reason to label platform-only lines as
+   the style rules above say. Run it from the main checkout. Since
    2026-09-29 Sparkle's `generate_appcast` and `sign_update` there are on the
    `plantoir-macos` key's access list: "Always Allow", Russell's choice so a
    cut runs unattended. The trade-off he accepted is that those two tools can
