@@ -2911,7 +2911,9 @@ meeting — interactive and with the point marked, labelled similar triangles,
 a number line), the measured package list, the limits on paper and time,
 how a failure shows up, what to avoid, and what cannot be done (a slider
 is for GeoGebra, arriving in the next release, with several curves for
-several values of the parameter offered meanwhile).
+several values of the parameter offered meanwhile — as of 2026-10-09;
+sliders arrived with GeoGebra sketches in #578, and the skill's §10 now
+teaches them).
 Every pattern in it is drawn by the real engines (the same check as verify's
 payload figures). Scratch working folder with the guidance as the app
 mirrors it and `courses/MPM2D/Unit 2/Parabolas.md` (vertex form, the example
@@ -2965,8 +2967,11 @@ section where `include_my_progress` is off - `false`, or a per-section map
 read as `include_curriculum_coverage` is; checked against #545 as merged),
 wikilinks versus Markdown links
 (`[words](Page Name.md)` is not a link), `![[page]]`, footnotes, tags,
-Media pictures and PDFs, YouTube (`![](watch address)`), Vimeo, GeoGebra and
-PhET (the site's own `<iframe>` on one line), `%%` notes, `publish:` and
+Media pictures and PDFs, YouTube (`![](watch address)`), Vimeo and
+PhET (the site's own `<iframe>` on one line), GeoGebra (since #578 the
+` ```geogebra ` fence in all three ways — a `.ggb` beside the page, typed
+commands, or `material_id:` — and never a geogebra.org `<iframe>`, which
+the skill now says to replace with `material_id:` of the same id), `%%` notes, `publish:` and
 `draft:`'s opposite polarity, folders and `index.md`, class pages and the
 dates they give, Key Links - and a routing table naming the four feature
 skills (`printablePages.agentGuidance.pageAuthoringSkill.routesTo`) instead of

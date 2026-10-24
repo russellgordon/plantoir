@@ -110,9 +110,9 @@ angles, with a neighbouring group: can they tell you each of your
 angles from the sketch alone? The same idea measures what cannot be
 climbed in [[How Tall Is the Flagpole]].
 
-> [!note] The answer is not on this page
-> No conjecture is printed here. The sentence, and the evidence for it,
-> belong to your group.
+> [!note] Your group's sentence
+> The section above says where this exploration tends to lead, not what
+> to write. The sentence, and the evidence for it, are your group's.
 
 %%curriculum-start%%
 ## Curriculum connection

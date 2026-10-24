@@ -385,7 +385,9 @@ def lint(course_code: str) -> int:
         # beside its page (or in the payload's Media), never geogebra.org -
         # a teacher's first preview must not need it - and it has an alt:.
         # The file is looked up as the build looks it up, with the payload's
-        # tree (shared/ or per_section/) standing for the course folder.
+        # tree (shared/ or per_section/) standing for the course folder -
+        # not the two merged as the installer merges them, a limit the
+        # SKILL names (stage 6 review item 5).
         for sketch in geogebra.sketches_on_page(text):
             read = geogebra.read_fence(sketch["body"])
             settings = read["settings"]
