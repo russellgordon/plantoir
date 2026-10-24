@@ -650,6 +650,135 @@ own prefix, not the word "DeprecationWarning", which a page could carry).
 on Node 20.18.1 until its own `windows` issue moves it to the same 22.23.4;
 that issue adds `windowsRuntimeContains` to the `node` pin with the bump.
 
+### Known vulnerabilities in the image's npm packages (#667, v1.9.0)
+
+The image carries five JavaScript trees. `verify.sh` audits all five against
+npm's advisory database at every run, inside the image and with the image's
+own npm. `scripts/npm_audit.py` then compares the result with an accepted
+list kept as authored text in `contracts/toolchain.json` → `npmAudit`. The
+gate fails on a **new** high or critical advisory: one the list does not
+accept for that tree, or one the list accepted at a lower severity than the
+database now gives it. It does not fail on an advisory that has already been
+looked at and decided. The ruling on #667 was to accept every current finding,
+record the reason, and upgrade nothing this release.
+
+**What is audited, and how each lockfile is obtained.** `npm audit` reads a
+lockfile, so each tree needs one:
+
+| Tree (`npmAudit.trees`) | In the image | Lockfile | Packages |
+|---|---|---|---|
+| `quartz` | `/opt/quartz` | Quartz v4.5.0's own `package-lock.json`, dev dependencies included | 614 |
+| `tikz-engine` | `/opt/vendor/tikz-engine` | `support/figures/package-lock.json` (`npm ci --omit=dev`) | 133 |
+| `wrangler` | `/usr/lib/node_modules/wrangler` | **none**: a global install keeps no lockfile (`npm audit` there says `ENOLOCK`). One is built from the INSTALLED tree: the folder is copied into an empty project, then `npm install --package-lock-only --ignore-scripts` runs. With no lockfile present, npm starts its ideal tree from the actual one, so the lockfile records the installed versions: miniflare, undici, ws, sharp and esbuild were checked against `npm ls`. This needs no network. | 35 |
+| `pagedjs` | `/opt/vendor/pagedjs/paged.min.js` | built from the pin's version in an empty project | 18 |
+| `function-plot` | `/opt/vendor/function-plot/function-plot.js` | built from the pin's version | 28 |
+
+**The limit on the last two.** They are prebuilt files. A lockfile built from
+the pin resolves the package's declared dependencies as they are TODAY. The
+file, though, bundles whatever those dependencies were when it was published.
+So an advisory against `pagedjs@0.4.3` or `function-plot@1.25.4` themselves
+is caught exactly, and their bundled dependencies only approximately. That is
+still worth doing: these are the two trees whose code runs in a student's
+browser. The versions passed in (`wrangler`, `pagedjs`, `functionPlot`) are
+read from the pins, never retyped.
+
+**Not audited, and why.** GeoGebra's applet is a bundle with no npm tree.
+Pyodide is Python and WebAssembly. KaTeX is inside the `quartz` tree. Latin
+Modern is a Debian font package, and Debian's packages are another tool's job.
+**npm and corepack** ship inside Node itself and move with the `node` pin
+(#640). Their dependencies are not an installed tree that `npm audit` reads.
+They change when the pin changes, and that is where they are reviewed.
+
+**What fails, what is reported, what is skipped.**
+
+- A high or critical advisory not accepted for its tree, or accepted at a
+  lower severity than it has now: **FAIL**, naming tree, package, id and
+  title.
+- An unaccepted low or moderate advisory is **reported**, not failed.
+- An accepted advisory that is no longer reported is **stale**. It is
+  reported, never failed, because an upgrade is what makes an entry stale.
+- A tree whose lockfile is gone (`ENOLOCK`, or the folder missing) for
+  `quartz`, `tikz-engine` or `wrangler`: **FAIL**. The image changed. This is
+  not a skip.
+- Output that does not parse as JSON, or JSON in a shape the comparator does
+  not know: **FAIL**, never SKIP.
+- **SKIP** only when npm's own JSON has no `metadata` and its `message` says
+  the audit request failed. For `pagedjs` and `function-plot` it is also a
+  SKIP when their lockfile step failed with a network error. The SKIP says
+  nothing was audited. One unreachable tree skips the whole gate, so a
+  half-audit cannot read green. A blocking finding in another tree still
+  fails.
+- Only npm's STDOUT is read. Offline, `npm audit --json` prints
+  `{"message":"request to https://registry.npmjs.org/-/npm/v1/security/audits/quick failed, reason: getaddrinfo EAI_AGAIN …"}`
+  on stdout, puts an `npm error` line on stderr, and exits 1. With findings it
+  also exits 1. Neither stderr nor the exit code says anything the JSON does
+  not (measured with `docker run --network none`, 2026-10-24).
+
+**How a finding is accepted.** Add it under `npmAudit.accepted`, grouped by
+tree and package. Give the advisory's id and the severity it has TODAY, an
+`exposure` (student's browser, the teacher's build only, the teacher's Mac
+during a preview, Cloudflare deploy only, or not run) and a `reason`. Record
+it in a new `research/npm-audit/<date>.md`. Each tree is decided on its own,
+because one advisory can be harmless in one tree and not in another: ws's two
+advisories are accepted for `quartz` (the preview's live reload) and,
+separately, for `wrangler` (miniflare, which a deploy never starts). Every
+advisory is listed, low and moderate included. That is what makes a later
+severity RAISE fail, and a raise is the one way an accepted id becomes newly
+dangerous.
+
+**Measured 2026-10-24** (`research/npm-audit/2026-10-24.md`, image
+`quartz-teacher:dev-test`, Node 22.23.4, npm 10.9.9): **81 (tree, advisory)
+pairs**. `quartz` has 51 (39 high, 10 moderate, 2 low) across 14 packages.
+`wrangler` has 30 (11 high, 13 moderate, 6 low) across undici, sharp, ws and
+esbuild. That makes 50 high and **0 critical**. `tikz-engine`, `pagedjs` and
+`function-plot` have none. Nothing a student's browser runs is affected. The
+nearest is the moderate in mdast-util-to-hast (an unsanitised `class`
+attribute): its OUTPUT reaches students, but only the teacher writes the
+Markdown it reads. The 15 xmldom advisories are in a package nothing runs:
+pixi.js's, for the Graph view build_site.py removes. A built site has no
+`pixi` or `xmldom` string. The undici advisories touch only a Cloudflare
+deploy, and are fixed in wrangler > 4.113.0, which waits on Windows' Node 22.
+The audit takes about 22 s online. Offline it takes about 2.5 min (npm's
+retries), and only then. One more exposure fact, not this piece's to fix: the
+preview ports are published on every interface (`lsof` shows `TCP *:8133` and
+others held by Colima's forwarder), so the accepted ws and serve-handler
+denials of service are reachable from the school network while a preview
+runs.
+
+**Revisited at every cut** (RELEASING.md step 2). Read verify.sh's npm-audit
+line; a SKIP means it was not checked, so run it again online. Then run
+`python3 scripts/npm_audit.py findings …` and decide each new or raised
+advisory. Either upgrade, in its own piece, or accept it with its reason.
+
+**REJECTED.**
+
+- **Upgrading now.** The ruling on #667 is no upgrades this release. Quartz's
+  tree moves with Quartz 5 (#512). wrangler moves in its own piece once
+  Windows runs Node 22 (its pin's `mustStayBelow`).
+- **Auditing in the image build.** It would need the network on every build,
+  and it would fail an unchanged recipe, and a teacher's first build, the day
+  an advisory is published. verify.sh is the developer's gate, and that is
+  where this belongs.
+- **`npm audit --audit-level=high` alone.** It cannot say "accepted", so a
+  known advisory would turn every run red. That is exactly what the issue
+  rules out.
+- **The host's npm against copied lockfiles.** The image's npm 10.9.9 is the
+  one that matters, and verify.sh already has the image.
+- **Auditing nothing for pagedjs and function-plot ("no lockfile").** They are
+  the two trees that reach students' browsers.
+- **Unpacking their dist files** to identify the libraries bundled inside.
+  `npm audit` cannot read a bundle.
+
+**For Windows:** the same audit over the runtime's copies, at each tree's
+`windowsRuntime` (`runtime\quartz`, `runtime\wrangler`,
+`runtime\vendor\tikz-engine`, `runtime\vendor\pagedjs`,
+`runtime\vendor\function-plot`). It uses Windows' own npm and goes through
+the same `scripts/npm_audit.py compare` against the same list. The
+comparator's tests (`scripts/test_npm_audit.py`, stdlib) already run there
+through `PythonToolchainTests`. A win32-only optional package
+(`@esbuild/win32-x64`, sharp's win32 binaries) can give a Windows-only
+finding. Decide it, and add it to the shared list under its tree.
+
 ### What the first build downloads (measured for #334)
 
 Per container (`/sys/class/net/eth0/statistics/rx_bytes` inside each

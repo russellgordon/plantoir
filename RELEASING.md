@@ -149,7 +149,8 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    in `windows-app/`; the mac unit suite passes. **Then open
    `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
    gaps, and step 2 says what to check in it. Then **actually publish a
-   section from an app** — see step 2 for why that is not optional.
+   section from an app** — see step 2 for why that is not optional. And
+   **revisit the npm audit** (#667): read verify.sh's npm-audit line (step 2).
 1a. **Minor releases (x.y.0) only: is Cloudflare Pages still safe?** Check
    Cloudflare's changelog for a Pages end-of-life date and whether Workers now
    takes custom domains with outside nameservers. Checklist step 1a says what
@@ -308,6 +309,19 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > say nothing about the image. It DISCOVERS them rather than listing them,
    > so no number is kept in step by hand; this said "all fifteen" when there
    > were fifteen, on 2026-09-07, and there are eighteen as of 2026-09-09.)
+
+   **Revisit the npm audit** (#667). Read verify.sh's line about the image's
+   npm packages. A SKIP there means nothing was checked, so run verify.sh
+   again with the network. Then run `python3 scripts/npm_audit.py findings`
+   over that run's audits (verify.sh leaves them in `/tmp/verify_npm_audit/`).
+   Decide every new or raised advisory: upgrade it in its own piece, or
+   accept it with its exposure and reason in `contracts/toolchain.json` →
+   `npmAudit`. If anything changed, commit a new
+   `research/npm-audit/<date>.md`. Update `npmAudit.reviewed` either way. The
+   gate only fails on a NEW high or critical advisory, so a green line does
+   not mean the moderates were read; this step is where they are.
+   `documentation/02-docker-image.md` → "Known vulnerabilities in the image's
+   npm packages" says what each outcome means.
 
    **If the release changes anything under `scripts/`, the Dockerfile or a
    launcher, run the publishing verifier rather than smoking it by hand** —
