@@ -640,6 +640,22 @@ out on its text alone, and the issue says how to take it (the first two were
 `schedule` and `how-i-teach`, #367). Only an issue reference counts. `--check` also reports a link to `page/#section`
 whose section does not exist.
 
+**The GeoGebra figure (v1.9.0, #578, `--geogebra`).** `geogebra-sketch`
+(light and dark, Mac only — `windows: false`, owed by name in
+`WINDOWS_PICTURE_OWED` until the Windows runtime carries GeoGebra) is MPM2D's
+*The Slope-Angle Conjecture* with its sketch opened. It is taken from a
+preview of MPM2D made from its example content, as the print set's is, in
+the folder `--print-folder` names — a NEW one when the kept `~/Plantoir
+Print` predates the page, since the run refuses a folder without it — and
+built by this tree's recipe as committed (`git archive HEAD`), as `--code`
+is. `shots/prepare/geogebra-sketch.js` taps *Open the sketch*, waits for the
+applet's drawing canvas, scrolls instantly (the site scrolls smoothly, which
+a prepare script's two frames do not wait out) to put "The sketch" heading
+64 points below the window's top, and refuses a sketch whose bottom would be
+cut off. Provisioning answers `setup.sh`'s colour-scheme browser with Enter
+since 2026-10-24: it ends on "Enter to select", not a question, and the
+first run sat on it for ten minutes.
+
 ## What the pages read from data
 
 - **Counts.** `build.py`'s `site_counts()` counts `support/` at every build:
