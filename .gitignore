@@ -77,3 +77,7 @@ netsparkle*.key
 
 # site/updates/ is a build-time copy of website/updates/ (build.py); the deploy reads the working copy, and git would normalise the Windows feed's CR LF
 site/updates/
+# site/mirror/ holds the files plantoir.app serves for the website builder to fall back to
+# (#578: GeoGebra's 33.5 MB bundle). build.py fills it from a cache outside the repository;
+# the repository ships recipes, not binaries (website/mirror.py).
+site/mirror/
