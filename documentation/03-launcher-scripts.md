@@ -2567,7 +2567,9 @@ and what was measured.
 Most trail lines are written by the app, but a few are written by the
 launcher itself, through `note_on_the_trail` — a refusal (a preview while its
 section deploys, a deploy while that section is busy, a folder spelled two
-ways), and every line from a publish launchd started at six in the morning.
+ways), and the launcher's own lines from a publish it runs (on the Mac a
+scheduled publish is started by the app itself, so those lines are the app's;
+on Windows, Task Scheduler runs `deploy.ps1` and they are the launcher's).
 The function is the same in `setup.sh`, `preview.sh` and `deploy.sh`
 (`scripts/test_trail_lock.py` pins that), appends one
 `YYYY-MM-DD HH:MM:SS · sentence` line and waits for the folder lock the app

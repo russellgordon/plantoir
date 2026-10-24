@@ -2087,7 +2087,7 @@
       }
     ],
     "casesNote" : "Each case runs the launcher's REAL trail-writing function with a scratch home folder and the variable as given (no `value` means it is not set at all). `{scratch}` is a scratch folder the test makes, and a test may write `/` as its own platform's separator. `default` is the folder the launcher computes for itself: `$HOME/Library/Logs/Plantoir` on the mac, `%LOCALAPPDATA%\\Plantoir\\Logs` on Windows. The line must land in the expected folder and nowhere else.",
-    "note" : "Where a launcher writes its own lines on the breadcrumb trail (a refusal, a publish launchd or Task Scheduler ran). The app hands over its trail folder in this variable, and a launcher takes it only when it is an absolute path.",
+    "note" : "Where a launcher writes its own lines on the breadcrumb trail (a refusal, or the launcher's own lines from a publish it runs - on Windows Task Scheduler runs deploy.ps1; on the Mac the app runs a scheduled publish itself, so those lines are the app's). The app hands over its trail folder in this variable, and a launcher takes it only when it is an absolute path.",
     "rejected" : [
       {
         "option" : "Set the variable only when the app runs with --state-dir.",
