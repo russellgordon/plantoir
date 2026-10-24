@@ -654,6 +654,11 @@ fi
 # shares, the cache, the clock, the restart after a diagram that never
 # finishes, the gate and the words - against a stand-in engine, stdlib only.
 # The real engines are checked in the image below.
+if (cd scripts && python3 test_geogebra_engine.py) >/tmp/verify_geogebra_engine_test.log 2>&1; then
+  pass "GeoGebra's engine: the pinned zip, the web3d codebase kept, the language files left out, six replacements each made exactly once or nothing written, and the Dockerfile's two addresses and one hash (scripts/test_geogebra_engine.py, #578)"
+else
+  fail "GeoGebra's engine: the pinned zip, the six replacements and the Dockerfile layer (scripts/test_geogebra_engine.py, #578)"
+fi
 if (cd scripts && python3 test_figures.py) >/tmp/verify_figures_test.log 2>&1; then
   pass "diagrams and graphs: fences, tidying, the cache and its clock, what a site carries, and the words (scripts/test_figures.py, #485)"
 else
@@ -1813,6 +1818,84 @@ if [[ -z "$RUNNER_ENGINE_PROBLEMS" ]]; then
   pass "The image carries Pyodide at /opt/vendor/pyodide (the five pinned files and its README) and Quartz's katex at the pinned version, matching their pins (#455, #494)"
 else
   fail "The image's Pyodide or katex does not match contracts/toolchain.json: $RUNNER_ENGINE_PROBLEMS"
+fi
+# GeoGebra's engine (#578), by its pin: exactly `fileCount` files and `bytes`
+# bytes at /opt/vendor/geogebra, the three pinned files matching (hashed AFTER
+# the six replacements), each replacement's text present once and GeoGebra's
+# own text gone, none of the 83 language files, no web/ or webSimple/, and the
+# README naming the licence's attribution. The replacements are read from
+# scripts/geogebra_engine.py itself, so this cannot check a different six from
+# the ones the image made. The Dockerfile half - both addresses, the one
+# SHA-256 - is test_geogebra_engine.py's, run in the unit loop.
+GEOGEBRA_PROBLEMS="$(python3 - "$DEV_TEST_IMAGE" <<'GGPY'
+import json, subprocess, sys
+sys.path.insert(0, "scripts")
+import geogebra_engine
+pin = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "geogebra"][0]
+inside = r"""
+import hashlib, json, os, sys
+root = "/opt/vendor/geogebra"
+pinned, replacements = json.loads(sys.argv[1]), json.loads(sys.argv[2])
+files, total, languages, others = [], 0, 0, []
+for folder, _dirs, names in os.walk(root):
+    for name in names:
+        path = os.path.join(folder, name)
+        relative = os.path.relpath(path, root).replace(os.sep, "/")
+        files.append(relative)
+        total += os.path.getsize(path)
+        if "properties_keys_" in name:
+            languages += 1
+        if relative.startswith(("HTML5/5.0/web/", "HTML5/5.0/webSimple/")) or relative.endswith("GeoGebra.html"):
+            others.append(relative)
+hashes = {}
+for relative in pinned:
+    path = os.path.join(root, relative)
+    hashes[relative] = hashlib.sha256(open(path, "rb").read()).hexdigest() if os.path.isfile(path) else "missing"
+counts = []
+for file, old, new in replacements:
+    path = os.path.join(root, file)
+    text = open(path, encoding="utf-8").read() if os.path.isfile(path) else ""
+    counts.append([text.count(old), text.count(new)])
+readme = open(os.path.join(root, "README.txt"), encoding="utf-8").read() if os.path.isfile(os.path.join(root, "README.txt")) else ""
+print(json.dumps({"files": len(files), "bytes": total, "languages": languages, "others": others,
+                  "hashes": hashes, "counts": counts, "readme": readme}))
+"""
+replacements = [[file, old, new] for file, _purpose, old, new in geogebra_engine.REPLACEMENTS]
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "python3", "-c", inside,
+                      json.dumps(sorted(pin["files"])), json.dumps(replacements)],
+                     capture_output=True, text=True)
+problems = []
+try:
+    seen = json.loads(run.stdout)
+except ValueError:
+    print(f"/opt/vendor/geogebra could not be read: {run.stderr.strip()[-300:]}")
+    sys.exit(0)
+if seen["files"] != pin["fileCount"]:
+    problems.append(f"it holds {seen['files']} files, not the pinned {pin['fileCount']}")
+if seen["bytes"] != pin["bytes"]:
+    problems.append(f"it holds {seen['bytes']} bytes, not the pinned {pin['bytes']}")
+for relative, digest in sorted(pin["files"].items()):
+    if seen["hashes"].get(relative) != digest:
+        problems.append(f"{relative} is {seen['hashes'].get(relative)}, not the pinned {digest}")
+if seen["languages"]:
+    problems.append(f"{seen['languages']} language file(s) were not left out")
+if seen["others"]:
+    problems.append(f"it carries codebases a site does not use: {seen['others'][:3]}")
+if len(geogebra_engine.REPLACEMENTS) != 6:
+    problems.append(f"geogebra_engine.py names {len(geogebra_engine.REPLACEMENTS)} replacements, not six")
+for number, (old_count, new_count) in enumerate(seen["counts"], start=1):
+    if old_count != 0 or new_count != 1:
+        problems.append(f"replacement {number}: GeoGebra's text appears {old_count} time(s) and ours {new_count}")
+for needed in ("Made with GeoGebra", pin["value"], "https://www.geogebra.org", "NON-COMMERCIAL"):
+    if needed not in seen["readme"]:
+        problems.append(f"README.txt does not say {needed!r}")
+print("; ".join(problems))
+GGPY
+)"
+if [[ -z "$GEOGEBRA_PROBLEMS" ]]; then
+  pass "The image carries GeoGebra at /opt/vendor/geogebra, matching its pin: the pinned file count, bytes and hashes, the six replacements each made once, the 83 language files left out, and its README (#578)"
+else
+  fail "The image's GeoGebra does not match contracts/toolchain.json -> geogebra: $GEOGEBRA_PROBLEMS"
 fi
 # The certificate store (#639), by its pin: Debian's ca-certificates at
 # least the floor, neither root it distrusts left anywhere a TLS client here
