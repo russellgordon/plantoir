@@ -46,6 +46,7 @@ geogebraFences, and scripts/test_geogebra.py runs them. The reasons are in
 documentation/05-build-pipeline.md -> "GeoGebra sketches: what the build does".
 """
 
+import hashlib
 import json
 import re
 import shutil
@@ -607,7 +608,9 @@ def _entry_for(sketch, page, settings, commands, lines, content_root, largest, f
             width, height = read["size"]
         app = app or read["app"]
         if read["thumbnail"] is not None:
-            name = f"{sketch['key'][:16]}.png"
+            # Named by the picture's own bytes, so one sketch named by
+            # several fences is one picture on the site.
+            name = f"{hashlib.sha256(read['thumbnail']).hexdigest()[:16]}.png"
             thumbnails[name] = read["thumbnail"]
             picture_width, picture_height = _png_size(read["thumbnail"])
             thumbnail = {"name": name, "width": picture_width, "height": picture_height}

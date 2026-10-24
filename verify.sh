@@ -665,6 +665,16 @@ else
   fail "diagrams and graphs: fences, tidying, the cache and its clock, what a site carries, and the words (scripts/test_figures.py, #485)"
   cat /tmp/verify_figures_test.log
 fi
+# GeoGebra sketches (#578): every geogebraFences case - the fences, the
+# settings and commands, geogebra.org addresses, the file lookup, the keys,
+# the gate - the pass that writes the manifest and the thumbnails, the folder
+# problem, and where the transformer stands. Stdlib only.
+if (cd scripts && python3 test_geogebra.py) >/tmp/verify_geogebra_test.log 2>&1; then
+  pass "GeoGebra sketches: the fences, settings, commands, files (published once), keys, the gate, the manifest, the folder problem and the transformer's place (scripts/test_geogebra.py, #578)"
+else
+  fail "GeoGebra sketches: the fences, settings, commands, files, keys, gate or folder problem (scripts/test_geogebra.py, #578)"
+  cat /tmp/verify_geogebra_test.log
+fi
 
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
@@ -1356,6 +1366,18 @@ if docker run --rm \
 else
   fail "every figureFences case holds in the real engines (scripts/check_figure_rules_against_the_site.py, #485)"
   cat /tmp/verify_figure_rules_site.log
+fi
+# #578: the key every GeoGebra sketch is found by, through the SITE's own
+# Markdown reader in Node (a callout, a list item, tildes, Windows line
+# endings), hashed by the site's figureRules.js.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_geogebra_rules_against_the_site.py" /opt/scripts/check_geogebra_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_geogebra_rules_against_the_site.py \
+  >/tmp/verify_geogebra_rules_site.log 2>&1; then
+  pass "every geogebraFences key and fence case holds through the site's own Markdown reader: the site and the build find each sketch by the same key (scripts/check_geogebra_rules_against_the_site.py, #578)"
+else
+  fail "a geogebraFences key or fence case reads differently through the site's own Markdown reader (scripts/check_geogebra_rules_against_the_site.py, #578)"
+  cat /tmp/verify_geogebra_rules_site.log
 fi
 
 # ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
@@ -2268,6 +2290,9 @@ restore_hit_fixture() {
         "$HIT_COURSE/Printable Too Tall.md" \
         "$HIT_COURSE/Figures Fixture.md" "$HIT_COURSE/Figures Hidden.md" \
         "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
+        "$HIT_COURSE/Investigations/GeoGebra Fixture.md" "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
+        "$HIT_COURSE/Investigations/GeoGebra Missing.md" "$HIT_COURSE/Investigations/GeoGebra Hidden.md" \
+        "$HIT_COURSE/Discussions/GeoGebra Second.md" \
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Anchor Fixture.md" "$HIT_COURSE/Picture Fixture.md" \
@@ -3013,6 +3038,82 @@ y = ln(x)
 FIGURESFIXTURE
 printf -- '---\ntitle: Figures Hidden\npublish: false\n---\nA hidden graph (plantoir-figures-hidden-7f3a).\n\n```functionplot\ny = x^2\n```\n' \
   > "$HIT_COURSE/Figures Hidden.md"
+# #578: GeoGebra sketches. The planted sketch is made here, not committed (the
+# repository ships recipes, not binaries): a small construction GeoGebra
+# opens - two points, the segment between them and its slope - with a
+# thumbnail. In shared folders, because a file beside a page reaches the site
+# only from a folder the course shares (a page listed by name brings no file
+# with it). Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" <<'GGBPY'
+import struct, sys, zipfile, zlib
+def png(width, height):
+    rows = b"".join(b"\x00" + b"\xff\xff\xff" * width for _ in range(height))
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+xml = """<?xml version="1.0" encoding="utf-8"?>
+<geogebra format="5.0" version="5.4.933.1" app="classic" platform="w" id="plantoir-verify-578">
+<gui><font size="16"/></gui>
+<euclidianView>
+	<size  width="640" height="360"/>
+	<coordSystem xZero="320" yZero="180" scale="40" yscale="40"/>
+	<evSettings axes="true" grid="true" gridIsBold="false" pointCapturing="3" rightAngleStyle="1" checkboxSize="26" gridType="3"/>
+</euclidianView>
+<kernel><continuous val="false"/><decimals val="2"/><angleUnit val="degree"/><coordStyle val="0"/></kernel>
+<construction title="plantoir-verify-geogebra-sketch" author="" date="">
+<element type="point" label="A"><show object="true" label="true"/><coords x="-3" y="-1" z="1"/></element>
+<element type="point" label="B"><show object="true" label="true"/><coords x="3" y="2" z="1"/></element>
+<command name="Segment"><input a0="A" a1="B"/><output a0="f"/></command>
+<element type="segment" label="f"><show object="true" label="false"/></element>
+<expression label="m" exp="(y(B) - y(A)) / (x(B) - x(A))"/>
+<element type="numeric" label="m"><show object="true" label="true"/></element>
+</construction>
+</geogebra>
+"""
+with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as sketch:
+    sketch.writestr("geogebra.xml", xml)
+    sketch.writestr("geogebra_thumbnail.png", png(64, 36))
+GGBPY
+cat > "$HIT_COURSE/Investigations/GeoGebra Fixture.md" <<'GEOGEBRAFIXTURE'
+---
+title: GeoGebra Fixture
+---
+GeoGebra sketches planted by verify.sh (plantoir-geogebra-sentinel-5e1c).
+
+```geogebra
+file: GeoGebra Fixture Lines.ggb
+alt: Two points and the segment between them, with its slope (plantoir-alt-lines).
+caption: Drag A or B.
+```
+
+A sketch from commands:
+
+```geogebra
+alt: A parabola and a line (plantoir-alt-commands).
+f(x) = x^2
+g(x) = 2x + 1
+```
+
+> [!example]- In tildes, in a folded callout
+> ~~~geogebra
+> alt: A line in a callout (plantoir-alt-tilde).
+> h(x) = -x + 3
+> ~~~
+
+> [!note] A callout
+> > [!example] In a callout in a callout
+> > ```geogebra
+> > file: GeoGebra Fixture Lines.ggb
+> > alt: The same file again, in a callout in a callout (plantoir-alt-nested).
+> > ```
+GEOGEBRAFIXTURE
+printf -- '---\ntitle: GeoGebra Second\n---\nThe same sketch, from another folder (plantoir-geogebra-second).\n\n```geogebra\nfile: Investigations/GeoGebra Fixture Lines.ggb\nalt: The planted sketch again (plantoir-alt-second).\n```\n' \
+  > "$HIT_COURSE/Discussions/GeoGebra Second.md"
+printf -- '---\ntitle: GeoGebra Missing\n---\nA sketch whose file is not there.\n\n```geogebra\nalt: Misspelled.\nfile: GeoGebra Fixture Lnies.ggb\n```\n' \
+  > "$HIT_COURSE/Investigations/GeoGebra Missing.md"
+printf -- '---\ntitle: GeoGebra Hidden\npublish: false\n---\nA hidden sketch (plantoir-geogebra-hidden-5e1c).\n\n```geogebra\nf(x) = x^3\n```\n' \
+  > "$HIT_COURSE/Investigations/GeoGebra Hidden.md"
 # #502: a heading "Math" is id="math", which answered window.math, and a
 # heading "Exports" is id="exports", which answered window.exports - the two
 # names function-plot reads as its file runs (figureFences.pageIds). Drawn in
@@ -3890,6 +3991,81 @@ then
   pass "diagrams and graphs: every fence drawn as an SVG in the page or reported by page and line, the faces and function-plot carried by the site itself, descriptions free of lettering, a hidden graph nowhere (#485)"
 else
   fail "diagrams and graphs: one of the checks above failed (#485)"
+fi
+
+# ---- 6i-g. GeoGebra sketches (#578), as the build left them ----
+# The planted GeoGebra Fixture: every geogebra fence (the file beside the
+# page, commands alone, tildes in a folded callout, a callout in a callout) is
+# a card with its button, its size, its attribution and its description; the
+# sketch's file is in the site exactly ONCE (Quartz publishes it; nothing
+# copies it - geogebraFences.files), at the address the card names; the
+# site carries the pinned, adapted engine and the thumbnail; the page's
+# description is its words, not the commands; the misspelled file stays a
+# code block and is reported by page and line; a hidden page's sketch is
+# nowhere.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" <<'GGBCHECK'
+import hashlib, html, json, re, sys
+from pathlib import Path
+public, log, sketch = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+problems = []
+page_path = public / "Investigations" / "GeoGebra-Fixture.html"
+page = page_path.read_text(encoding="utf-8") if page_path.is_file() else ""
+if not page:
+    problems.append("Investigations/GeoGebra-Fixture.html was not built")
+figures = re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"[^>]*>(.*?)</figure>', page, re.S)
+if len(figures) != 4:
+    problems.append(f"{len(figures)} sketches on the page, not the 4 fences planted")
+specs = [json.loads(html.unescape(spec)) for spec, _ in figures]
+for alt in ("plantoir-alt-lines", "plantoir-alt-commands", "plantoir-alt-tilde", "plantoir-alt-nested"):
+    if not any(alt in body and 'class="pl-sr-only"' in body for _, body in figures):
+        problems.append(f"no sketch carries its description {alt} for a screen reader")
+for _, body in figures:
+    if "Open the sketch (about " not in body or '<a href="https://www.geogebra.org">Made with GeoGebra®</a>' not in body \
+            or "Made with GeoGebra · geogebra.org" not in body:
+        problems.append("a sketch lacks its button with its size, or its attribution on screen and in print form")
+        break
+digest = hashlib.sha256(sketch.read_bytes()).hexdigest() if sketch.is_file() else None
+copies = [path.relative_to(public).as_posix() for path in public.rglob("*") if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == digest]
+if copies != ["Investigations/GeoGebra-Fixture-Lines.ggb"]:
+    problems.append(f"the sketch's file is in the site as {copies}, not once at Investigations/GeoGebra-Fixture-Lines.ggb")
+named = sorted({spec["sketch"] for spec in specs if spec.get("sketch")})
+if named != ["Investigations/GeoGebra-Fixture-Lines.ggb"]:
+    problems.append(f"the cards name {named}, not the one published file")
+if [spec["commands"] for spec in specs][1:3] != [[{"line": 2, "text": "f(x) = x^2"}, {"line": 3, "text": "g(x) = 2x + 1"}], [{"line": 2, "text": "h(x) = -x + 3"}]]:
+    problems.append("the commands did not reach the cards as written, with their lines")
+pins = {pin["pin"]: pin for pin in json.load(open("contracts/toolchain.json"))["pins"]}
+engine = public / "static" / "geogebra"
+carried = [path for path in engine.rglob("*") if path.is_file()] if engine.is_dir() else []
+if len(carried) != pins["geogebra"]["fileCount"]:
+    problems.append(f"static/geogebra holds {len(carried)} files, not the pin's {pins['geogebra']['fileCount']}")
+for relative, wanted in pins["geogebra"]["files"].items():
+    path = engine / relative
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != wanted:
+        problems.append(f"static/geogebra/{relative} is not the pinned, adapted file")
+thumbnails = list((public / "static" / "geogebra-sketches").glob("*.png"))
+if len(thumbnails) != 1:
+    problems.append(f"{len(thumbnails)} thumbnails in static/geogebra-sketches, not 1 (one file, named by three fences on two pages)")
+description = re.search(r'<meta name="description" content="([^"]*)"', page)
+if not description or "f(x)" in description.group(1) or "plantoir-geogebra-sentinel-5e1c" not in description.group(1):
+    problems.append(f"the page's description is not its words: {description and description.group(1)!r}")
+missing = (public / "Investigations" / "GeoGebra-Missing.html").read_text(encoding="utf-8") if (public / "Investigations" / "GeoGebra-Missing.html").is_file() else ""
+if "pl-geogebra" in missing or "GeoGebra Fixture Lnies.ggb" not in missing:
+    problems.append("the sketch whose file is missing is not left as the code block it was")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+if "plantoir: error: Investigations/GeoGebra Missing.md: geogebra block 1, line 8: GeoGebra Fixture Lnies.ggb isn't beside the page" not in said:
+    problems.append("no plantoir: error line names Investigations/GeoGebra Missing.md, block 1, line 8")
+if not re.search(r'PLANTOIR_HEALTH: \{"name": "geogebraSketchesNotReady"[^\n]*GeoGebra Missing[^\n]*sketch 1, line 8', said):
+    problems.append("the build did not report the missing sketch as a folder problem naming page and line")
+if (public / "Investigations" / "GeoGebra-Hidden.html").exists() or any("plantoir-geogebra-hidden-5e1c" in p.read_text(encoding="utf-8", errors="ignore") for p in public.rglob("*.html")):
+    problems.append("the hidden page with a sketch reached the site")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+GGBCHECK
+then
+  pass "GeoGebra sketches: every fence a card with its button, size, description and attribution (on screen and for paper), the sketch's file published once at the address the cards name, the pinned adapted engine and the thumbnails carried, the description free of commands, a missing file left as code and reported by page and line, a hidden sketch nowhere (#578)"
+else
+  fail "GeoGebra sketches: one of the checks above failed (#578)"
 fi
 
 # ---- 6j. Runnable code (#455) and the site's own KaTeX (#494), as the build left them ----
@@ -5082,6 +5258,21 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_mermaid_draws.log
   fi
   rm -rf "$MERMAID_SITE"
+  # #578: GeoGebra sketches opened under the very policy a Netlify publish
+  # sends, on a clone with the publish's own _headers, served on [::1]
+  # (geogebraFences.policy) - and again cross-origin isolated.
+  GEOGEBRA_SITE="$(mktemp -d /tmp/plantoir-verify-geogebra.XXXXXX)"
+  cp -Rc "$SITE_PUBLIC/." "$GEOGEBRA_SITE/" 2>/dev/null || cp -R "$SITE_PUBLIC/." "$GEOGEBRA_SITE/"
+  rm -f "$GEOGEBRA_SITE/_headers"
+  (cd scripts && python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$GEOGEBRA_SITE") >/tmp/verify_geogebra_applet.log 2>&1 || true
+  if node browser-checks/geogebra_applet.mjs "$PRINT_CHROME" "$GEOGEBRA_SITE" /Investigations/GeoGebra-Fixture.html \
+       /Discussions/GeoGebra-Second.html "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" >>/tmp/verify_geogebra_applet.log 2>&1; then
+    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, browser-checks/geogebra_applet.mjs)"
+  else
+    fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, or were published twice (browser-checks/geogebra_applet.mjs, #578)"
+    cat /tmp/verify_geogebra_applet.log
+  fi
+  rm -rf "$GEOGEBRA_SITE"
   # #515: the sidebar's page dot, on the rows the browser draws.
   if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
@@ -5368,6 +5559,14 @@ for entry in os.listdir("/proc"):
     pass "and with no figure left, the site carries neither figure engine, nothing is drawn, and a page without figures is byte-identical (#485)"
   else
     fail "a site with no figures still carries static/function-plot or static/tikz, drew something, or changed a page without figures (#485)"
+  fi
+  # And no GeoGebra sketch (#578): no engine, no thumbnails, no sketch said.
+  if [[ -f "$SITE_INDEX" && ! -e "$SITE_PUBLIC/static/geogebra" && ! -e "$SITE_PUBLIC/static/geogebra-sketches" ]] \
+     && ! grep -q "GeoGebra sketch" /tmp/verify_old_container.log \
+     && ! grep -q "pl-geogebra" "$SITE_PUBLIC/Help-Sessions.html"; then
+    pass "and with no sketch left, the site carries no GeoGebra and no thumbnails, and says nothing of sketches (#578)"
+  else
+    fail "a site with no GeoGebra sketch still carries static/geogebra or static/geogebra-sketches, or spoke of sketches (#578)"
   fi
   # And no runnable code (#455): the engine is taken out again, while the
   # site's own KaTeX stays - every site carries it (#494).
