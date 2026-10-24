@@ -11,8 +11,8 @@ that matches the task before writing:
   concept page, a class page, a folder's front page or Key Links: every way
   content can be written for the site (callouts, diagrams, tables, maths,
   checklists, success criteria, links, embedding one page in another,
-  pictures and PDFs in Media, videos, GeoGebra and PhET, hidden pages and
-  `publish:`, folders, class pages and their dates) is in
+  pictures and PDFs in Media, videos, GeoGebra sketches and PhET, hidden
+  pages and `publish:`, folders, class pages and their dates) is in
   `.agents/skills/plantoir-page-authoring/SKILL.md` (the same file is at
   `.claude/skills/plantoir-page-authoring/SKILL.md`). Read it first; it
   says which of the skills below to read as well.
@@ -28,11 +28,12 @@ that matches the task before writing:
   `.agents/skills/plantoir-handouts/SKILL.md` (the same file is at
   `.claude/skills/plantoir-handouts/SKILL.md`). It says when a printable
   page is the better fit.
-- **Graphs and diagrams** - a graph of a function (a parabola beside its
-  parent, two lines meeting), a geometry or similar-triangles figure, a
-  number line, a probability tree, a circuit, anything to be "plotted" or
-  "drawn": which fence to write, complete patterns to paste, and what
-  cannot be done (no sliders) are in
+- **Graphs, diagrams and GeoGebra sketches** - a graph of a function (a
+  parabola beside its parent, two lines meeting), a geometry or
+  similar-triangles figure, a number line, a probability tree, a circuit,
+  anything to be "plotted" or "drawn", and a GeoGebra sketch students drag
+  or a slider: which fence to write, complete patterns to paste, a
+  GeoGebra sketch three ways, and what cannot be done are in
   `.agents/skills/plantoir-math-graphs/SKILL.md` (the same file is at
   `.claude/skills/plantoir-math-graphs/SKILL.md`).
 - **Code students run** - "make this example runnable", a Python program
