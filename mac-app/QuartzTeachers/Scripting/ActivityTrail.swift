@@ -1236,6 +1236,13 @@ nonisolated enum ActivityTrail {
         case previewStartedAtLastViewed = "preview started at the page last viewed"
         /// Settings ▸ Preview changed where Preview opens (#504): which.
         case previewStartPageChosenInSettings = "preview start page chosen in Settings"
+        /// A section's Open in Obsidian (#518): the place in the course
+        /// folder of the file behind the page its preview showed, and whether
+        /// the page is hidden — or why the section opened as before instead,
+        /// "no preview page was showing" included. Written for every press of
+        /// a section's Open in Obsidian, never a course's; never a page's
+        /// words.
+        case pageOpenedInObsidian = "page opened in Obsidian"
         /// Open in Obsidian asked about Obsidian's add-ons for diagrams and
         /// graphs (#495): the course and the answer — Add Them, Not Now, or
         /// Not Now with "don't ask again" — or why nothing was asked

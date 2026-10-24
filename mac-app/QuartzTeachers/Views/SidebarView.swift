@@ -1314,7 +1314,9 @@ struct SidebarView: View {
     func openInObsidianItem(course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
         Button("Open in Obsidian", systemImage: "square.and.pencil") {
             select(row)
-            workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
+            // #518: a SECTION row opens the page its preview shows, while it
+            // shows one; a course row (no section) opens the course.
+            workspace.openInObsidian(course: course, sectionNumber: sectionNumber, atThePreviewedPage: sectionNumber != nil)
         }
         .disabled(!FolderActions.obsidianIsInstalled)
     }
@@ -1333,8 +1335,9 @@ struct SidebarView: View {
         Button("Open in Obsidian", systemImage: "square.and.pencil") {
             select(row)
             // The one route (`WorkspaceModel.openInObsidian`), which locks
-            // the pages again and asks for the note the first time.
-            workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
+            // the pages again and asks for the note the first time — and, for
+            // a section row, opens the page its preview shows (#518).
+            workspace.openInObsidian(course: course, sectionNumber: sectionNumber, atThePreviewedPage: sectionNumber != nil)
         }
         .disabled(!FolderActions.obsidianIsInstalled)
         .accessibilityIdentifier("openInObsidian-\(course.code)")
@@ -1834,9 +1837,14 @@ struct SidebarView: View {
             if let course, let sectionNumber, let folder = workspace.workspaceURL {
                 reviseWithLocalAssistant(course: course, sectionNumber: sectionNumber, folder: folder)
             }
-        case .courseOpenInObsidian, .sectionOpenInObsidian:
+        case .courseOpenInObsidian:
             if let course {
                 workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
+            }
+        case .sectionOpenInObsidian:
+            // #518: the page the section's preview shows, while it shows one.
+            if let course {
+                workspace.openInObsidian(course: course, sectionNumber: sectionNumber, atThePreviewedPage: true)
             }
         case .courseShowInFinder:
             if let backup = workspace.selectedBackupItem {

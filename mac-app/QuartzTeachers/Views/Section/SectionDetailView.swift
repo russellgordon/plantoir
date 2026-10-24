@@ -494,7 +494,8 @@ struct SectionDetailView: View {
                     // The one route (#457, the HIG sweep): on a course kept
                     // for reference it re-locks the pages and shows the note
                     // the first time, as the row and the menu bar do.
-                    workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
+                    // #518: the page the preview shows, while it shows one.
+                    workspace.openInObsidian(course: course, sectionNumber: sectionNumber, atThePreviewedPage: true)
                 }
                 .disabled(!FolderActions.obsidianIsInstalled)
                 .help("Edit this section's pages in Obsidian")
@@ -639,7 +640,9 @@ struct SectionDetailView: View {
                     // it stops anything, as the Deploy button does.
                     askAboutClassesDatedLater: {
                         await askAboutClassesDatedLater(route: "the assistant's deploy", askedByTheAssistant: true)
-                    }
+                    },
+                    // #518: what Open in Obsidian opens for this section.
+                    previewedPage: { previewedPagePath() }
                 )
             )
             // A function asked for from this row's context menu before this
@@ -2455,6 +2458,17 @@ struct SectionDetailView: View {
         if let urlToOpen {
             NSWorkspace.shared.open(SectionDetailView.browserSafeURL(for: urlToOpen))
         }
+    }
+
+    /// The page this window's preview is showing at this moment, as its path
+    /// below the preview's root (#518) — the web view's own address, not the
+    /// page last viewed (#504), which ignores the app's own loads and so can
+    /// name a page that is no longer on screen. Nil unless a page is showing.
+    func previewedPagePath() -> String? {
+        guard previewURL != nil, let previewRoot else {
+            return nil
+        }
+        return PreviewStartPage.rememberedPath(page: previewController.webView.url, previewRoot: previewRoot)
     }
 
     /// Rewrites "localhost" to "127.0.0.1" for hand-off to a browser.
