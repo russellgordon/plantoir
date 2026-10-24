@@ -141,6 +141,24 @@ nonisolated enum ToolchainFingerprints {
         return hex
     }
 
+    /// Whether two files can be taken for the same file without reading them:
+    /// the same length, and times within a millisecond. A tolerance rather
+    /// than equality because a date used to make its round trip through the
+    /// file system as a floating-point number of seconds, and an exact
+    /// comparison could fail on the last bit for two stamps that are the same
+    /// moment; a millisecond is far tighter than any real edit. Nil on either
+    /// side — a file that is not there — is never identical.
+    static func lookIdentical(_ one: Stamp?, _ other: Stamp?) -> Bool {
+        guard let one, let other else {
+            return false
+        }
+        if one.length != other.length {
+            return false
+        }
+        let apart: Int64 = one.ticks > other.ticks ? one.ticks - other.ticks : other.ticks - one.ticks
+        return apart < ticksPerMillisecond
+    }
+
     /// The SHA-256 of bytes already in hand, in lower-case hex.
     static func sha256(of data: Data) -> String {
         var hex: String = ""
@@ -235,22 +253,22 @@ nonisolated final class ToolchainMirrorPass {
     // MARK: - Functions
 
     /// The bundled file's hash, if the manifest still describes it.
-    func bundledHash(_ relative: String, of sourceURL: URL) -> String? {
+    func bundledHash(_ relative: String, stamp: ToolchainFingerprints.Stamp?) -> String? {
         guard let entry = bundled?[relative] else {
             return nil
         }
-        if entry.stillDescribes(ToolchainFingerprints.stamp(of: sourceURL)) {
+        if entry.stillDescribes(stamp) {
             return entry.sha256
         }
         return nil
     }
 
     /// The copy's hash, if the last pass's index still describes it.
-    func appliedHash(_ relative: String, of copyURL: URL) -> String? {
+    func appliedHash(_ relative: String, stamp: ToolchainFingerprints.Stamp?) -> String? {
         guard let entry = applied?[relative] else {
             return nil
         }
-        if entry.stillDescribes(ToolchainFingerprints.stamp(of: copyURL)) {
+        if entry.stillDescribes(stamp) {
             return entry.sha256
         }
         return nil
@@ -263,17 +281,23 @@ nonisolated final class ToolchainMirrorPass {
         guard let stamp = ToolchainFingerprints.stamp(of: copyURL) else {
             return
         }
+        remember(relative, stamp: stamp, sha256: sha256)
+    }
+
+    /// The same, for a copy whose stamp was just read and has not been
+    /// touched since — the cheap match, which writes nothing.
+    func remember(_ relative: String, stamp: ToolchainFingerprints.Stamp, sha256: String) {
         next[relative] = ToolchainFingerprint(length: stamp.length, ticks: stamp.ticks, sha256: sha256)
     }
 
     /// Carries the last pass's entry for a copy into this pass's index, when
     /// it still describes the copy: the copy has not changed since its hash
     /// was taken, whatever the manifest can or cannot say about the bundle.
-    func keepWhatIsStillKnown(_ relative: String, copy copyURL: URL) {
+    func keepWhatIsStillKnown(_ relative: String, stamp: ToolchainFingerprints.Stamp) {
         guard let entry = applied?[relative] else {
             return
         }
-        if entry.stillDescribes(ToolchainFingerprints.stamp(of: copyURL)) {
+        if entry.stillDescribes(stamp) {
             next[relative] = entry
         }
     }
