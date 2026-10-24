@@ -117,6 +117,27 @@ class StubGeoGebra:
                 stub.requests.append(self.path)
                 path = self.path.split("?")[0]
                 base = f"http://127.0.0.1:{stub.port}"
+                if material_cut := {"/v1.0/materials/cutapi01": "short",
+                                    "/resource/cutggb01.ggb": "short",
+                                    "/resource/chunkcut1.ggb": "chunked"}.get(path):
+                    # A download cut off on the way (stage 3+4 review items
+                    # 1 and 2): fewer bytes than the answer promised, then
+                    # the connection closes.
+                    whole = stub.sketch if path.startswith("/resource/") else json.dumps({
+                        "id": "cutapi01", "creator": {"displayname": "A"},
+                        "elements": [{"type": "G", "url": f"{base}/resource/stubsketch.ggb"}]}).encode("utf-8")
+                    self.send_response(200)
+                    if material_cut == "short":
+                        self.send_header("Content-Length", str(len(whole)))
+                        self.end_headers()
+                        self.wfile.write(whole[:len(whole) // 2])
+                    else:
+                        self.send_header("Transfer-Encoding", "chunked")
+                        self.end_headers()
+                        self.wfile.write(f"{len(whole):x}\r\n".encode("ascii") + whole[:len(whole) // 2])
+                    self.wfile.flush()
+                    self.close_connection = True
+                    return None
                 if path.startswith("/v1.0/materials/"):
                     material = path.rsplit("/", 1)[1]
                     if material == "gone1234":
@@ -597,7 +618,9 @@ class MaterialTests(unittest.TestCase):
     def test_what_geogebra_org_says_is_said(self):
         for material, reason in (("gone1234", "materialNotFound"), ("brokenapi", "materialCouldNotBeFetched"),
                                  ("twoapplets", "materialHasSeveralSketches"), ("textonly", "materialHasNoSketch"),
-                                 ("notaggb1", "materialHasNoSketch"), ("awayaway", "materialCouldNotBeFetched")):
+                                 ("notaggb1", "materialHasNoSketch"), ("awayaway", "materialCouldNotBeFetched"),
+                                 ("cutapi01", "materialCouldNotBeFetched"), ("cutggb01", "materialCouldNotBeFetched"),
+                                 ("chunkcut1", "materialCouldNotBeFetched")):
             space = Space()
             try:
                 fence = f"```geogebra\nmaterial_id: {material}\n```\n"
@@ -608,6 +631,31 @@ class MaterialTests(unittest.TestCase):
                 self.assertFalse(space.cache.exists() and any(space.cache.iterdir()), material)
             finally:
                 space.close()
+
+    def test_a_failed_fetch_takes_no_other_sketch_down(self):
+        # Stage 3+4 review item 1: whatever a fetch raises is that sketch's
+        # problem; the file sketch on the same page and the next page's are
+        # in the manifest as ever.
+        class Exploding:
+            requests = 0
+
+            def material(self, material_id):
+                raise RuntimeError("something nobody expected")
+
+        self.space.file("Sketch.ggb", a_sketch())
+        page = self.space.page("A.md", "```geogebra\nfile: Sketch.ggb\nalt: A.\n```\n\n" + self.FENCE)
+        other = self.space.page("B.md", "```geogebra\nfile: Sketch.ggb\nalt: B.\n```\n")
+        outcome = self.space.prepare([page, other], fetcher=Exploding())
+        self.assertEqual([(problem["page"], problem["reason"]) for problem in outcome["problems"]],
+                         [("A", "materialCouldNotBeFetched")])
+        self.assertEqual(outcome["counts"]["geogebra"], 2)
+        self.assertEqual(sorted(entry["source"]["kind"] for entry in self.entries()), ["file", "file"])
+
+    def test_a_cut_off_download_is_could_not_fetch_and_kept_nowhere(self):
+        for material in ("cutapi01", "cutggb01", "chunkcut1"):
+            fetcher = self.stub.fetcher()
+            self.assertEqual(fetcher.material(material),
+                             {"ok": False, "reason": "materialCouldNotBeFetched"}, material)
 
     def test_a_host_that_is_not_geogebra_orgs_is_never_asked(self):
         fetcher = geogebra.MaterialFetcher(api=f"http://127.0.0.1:{self.stub.port}/v1.0/materials/{{id}}",

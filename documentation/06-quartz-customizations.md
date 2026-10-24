@@ -4008,6 +4008,20 @@ loader reading `evalCommand`'s answer) reported every working scripting line.
 each line; checking commands at build time (GeoGebra's parser runs only in
 the browser). A line that does nothing without being an error (`SetValue` of
 a name that does not exist) raises nothing and is not said — a known limit.
+Unmeasured, and so said here rather than relied on: a dialog GeoGebra
+opened while the SKETCH was loading, still open when the lines start, would
+arrive before the first line's marker and be blamed on line 1 (stage 3+4
+review item 4).
+
+**A failed fetch is not remembered** (stage 3+4 review item 4). With no
+saved copy, every build asks geogebra.org again, and a build while it does
+not answer waits up to `fetch.requestSeconds` (15 s) for each request — the
+materials API and then the `.ggb` — before saying
+`materialCouldNotBeFetched` for that sketch. A download cut off on the way
+(fewer bytes than its `Content-Length`, or a chunked answer that stops) is
+the same problem, and nothing is kept from it; whatever else a fetch raises
+is that one sketch's problem too, so the teacher's own `file:` sketches on
+the same site are never taken down with it (05 → item 9).
 
 **The policy.** A published Netlify site is sent `script-src 'self'
 'unsafe-eval' <hashes>` (netlify_badge.py). The stock engine never loads

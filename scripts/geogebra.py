@@ -52,6 +52,7 @@ documentation/05-build-pipeline.md -> "GeoGebra sketches: what the build does".
 """
 
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -219,8 +220,11 @@ def read_fence(body: str) -> dict:
         if text and not text.startswith("//"):
             commands.append({"line": index + 1, "text": text})
             # A setting written among the commands (in capitals, or after a
-            # line that started the commands) is run as a command, which
-            # GeoGebra refuses: said at build time, where the teacher reads.
+            # line that started the commands) is run as a command: said as a
+            # build NOTE. The app does not show the teacher notes, so the
+            # student usually sees it first, as "Line n couldn't run" - and
+            # `height: 400` is not refused at all: it makes a number called
+            # height (stage 3+4 review item 3; documentation/05 item 3).
             looks = _LOOKS_LIKE_SETTING.match(text)
             if looks is not None and looks.group(1).lower() in known:
                 notes.append({"reason": "settingAmongCommands", "blockLine": index + 1,
@@ -502,8 +506,16 @@ class MaterialFetcher:
         request = urllib.request.Request(url, headers={"User-Agent": "Plantoir", "Accept": "*/*"})
         with self.opener.open(request, timeout=self.timeout) as answer:
             data = answer.read(self.largest + 1)
+            promised = answer.headers.get("Content-Length")
         if len(data) > self.largest:
             raise urllib.error.URLError("larger than a sketch can be")
+        # A body shorter than its Content-Length is a download cut off on
+        # the way (stage 3+4 review item 2): read(amount) returns what came
+        # rather than raising, so it is measured here. A cut-off CHUNKED
+        # body raises http.client.IncompleteRead instead, caught by the
+        # caller with every other HTTPException.
+        if promised is not None and promised.strip().isdigit() and len(data) != int(promised.strip()):
+            raise urllib.error.URLError(f"{len(data)} of {promised.strip()} bytes arrived")
         return data
 
     def material(self, material_id: str) -> dict:
@@ -514,7 +526,11 @@ class MaterialFetcher:
             if error.code in (403, 404, 410):
                 return {"ok": False, "reason": "materialNotFound"}
             return {"ok": False, "reason": "materialCouldNotBeFetched"}
-        except (OSError, ValueError, urllib.error.URLError):
+        except (OSError, ValueError, http.client.HTTPException, urllib.error.URLError):
+            # http.client.HTTPException is not an OSError: a connection
+            # closed mid-answer (IncompleteRead, RemoteDisconnected's
+            # siblings) must say could-not-fetch, not stop the pass
+            # (stage 3+4 review item 1).
             return {"ok": False, "reason": "materialCouldNotBeFetched"}
         if not isinstance(described, dict) or described.get("deleted") is True:
             return {"ok": False, "reason": "materialNotFound"}
@@ -536,7 +552,7 @@ class MaterialFetcher:
             if error.code in (403, 404, 410):
                 return {"ok": False, "reason": "materialNotFound"}
             return {"ok": False, "reason": "materialCouldNotBeFetched"}
-        except (OSError, urllib.error.URLError):
+        except (OSError, ValueError, http.client.HTTPException, urllib.error.URLError):
             return {"ok": False, "reason": "materialCouldNotBeFetched"}
         creator = described.get("creator") if isinstance(described.get("creator"), dict) else {}
         # The name the attribution gives (CC BY-NC-SA asks for one): the
@@ -858,7 +874,15 @@ def _material(key: str, material_id: str, materials: dict) -> dict:
         return saved
     if materials["fetcher"] is None:
         materials["fetcher"] = MaterialFetcher()
-    answer = materials["fetcher"].material(material_id)
+    try:
+        answer = materials["fetcher"].material(material_id)
+    except Exception:
+        # Whatever else goes wrong while asking geogebra.org is this ONE
+        # sketch's problem (stage 3+4 review item 1): the file sketches on
+        # the same site, and every other fence, are prepared as ever, and
+        # build_site's catch-all - which drops the whole manifest - is
+        # never reached by a fetch.
+        answer = {"ok": False, "reason": "materialCouldNotBeFetched"}
     answer["id"] = material_id
     if answer["ok"]:
         materials["outcome"]["fetched"] += 1
