@@ -141,6 +141,15 @@ nonisolated enum ToolchainFingerprints {
         return hex
     }
 
+    /// The SHA-256 of bytes already in hand, in lower-case hex.
+    static func sha256(of data: Data) -> String {
+        var hex: String = ""
+        for byte in SHA256.hash(data: data) {
+            hex += String(format: "%02x", byte)
+        }
+        return hex
+    }
+
     /// Reads a manifest or an index; nil when there is none or it cannot be
     /// read. A line that does not parse is skipped, so that one file is simply
     /// read, as it was before #663.
@@ -255,6 +264,18 @@ nonisolated final class ToolchainMirrorPass {
             return
         }
         next[relative] = ToolchainFingerprint(length: stamp.length, ticks: stamp.ticks, sha256: sha256)
+    }
+
+    /// Carries the last pass's entry for a copy into this pass's index, when
+    /// it still describes the copy: the copy has not changed since its hash
+    /// was taken, whatever the manifest can or cannot say about the bundle.
+    func keepWhatIsStillKnown(_ relative: String, copy copyURL: URL) {
+        guard let entry = applied?[relative] else {
+            return
+        }
+        if entry.stillDescribes(ToolchainFingerprints.stamp(of: copyURL)) {
+            next[relative] = entry
+        }
     }
 
     /// Whether `next` says anything the index on disk does not.
