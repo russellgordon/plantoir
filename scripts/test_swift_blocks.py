@@ -838,11 +838,185 @@ class GotReadyMarkerTests(unittest.TestCase):
             with contextlib.redirect_stdout(printed):
                 swift_blocks.main(["swift_blocks.py", "got-ready", "--outcome=failed", "--course=ICS3U",
                                    "--section=1", f"--log={folder / 'not-there.log'}"])
-            self.assertEqual(self.parse(printed.getvalue().strip())["reason"], "unpack")
+            # A failure also says why, on the line before (#642).
+            lines = printed.getvalue().splitlines()
+            self.assertEqual(lines[0], self.mac["printed"]["unpack"])
+            self.assertEqual(self.parse(lines[-1])["reason"], "unpack")
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(swift_blocks.main(["swift_blocks.py", "got-ready", "--outcome=maybe"]), 2)
         finally:
             shutil.rmtree(folder, ignore_errors=True)
+
+
+class FailedBuildStateTests(unittest.TestCase):
+    """#642: after a failed Swift image build, `got-ready --outcome=failed
+    --state=PATH` reads the log ONCE and from that reading writes state.json
+    (codeRunnerBlocks.swift.mac.stateForReason), prints the teacher's sentence
+    (mac.printed) on the line before the marker, and names the same reason in
+    the marker. Until #642 preview.sh blamed the internet for every failure
+    and wrote {state: notDownloaded} whatever the log said."""
+
+    @classmethod
+    def setUpClass(cls):
+        use_the_repository_contract()
+        cls.mac = swift_rules("mac")
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp(prefix="plantoir-swift-failed-"))
+
+    def tearDown(self):
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def got_ready_failed(self, log_text: str, state_path):
+        import contextlib
+        import io
+        log = self.folder / "swift-build-1.log"
+        log.write_text(log_text, encoding="utf-8")
+        arguments = ["swift_blocks.py", "got-ready", "--outcome=failed", "--course=ICS3U", "--section=1",
+                     f"--log={log}"]
+        if state_path is not None:
+            arguments.append(f"--state={state_path}")
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            status = swift_blocks.main(arguments)
+        return status, printed.getvalue().splitlines()
+
+    def marker_of(self, line: str) -> dict:
+        self.assertTrue(line.startswith(swift_blocks.SWIFT_MARKER + " "), line)
+        return json.loads(line[len(swift_blocks.SWIFT_MARKER) + 1:])
+
+    def expected_state(self, reason: str) -> dict:
+        expected = {"reason": reason}
+        state = self.mac["stateForReason"][reason]
+        if state is not None:
+            expected["state"] = state
+        return expected
+
+    def test_every_reason_has_a_sentence_and_a_state_and_nothing_more(self):
+        rules = self.mac["reasonsFromTheBuildLog"]
+        reasons = []
+        for entry in rules["order"]:
+            reasons.append(entry["reason"])
+        reasons.append(rules["otherwise"])
+        self.assertEqual(sorted(reasons), sorted(self.mac["printed"].keys()))
+        self.assertEqual(sorted(reasons), sorted(self.mac["stateForReason"].keys()))
+        for reason, state in self.mac["stateForReason"].items():
+            if state is not None:
+                self.assertIn(state, swift_rules("reasons"), f"{reason} writes a state no block names")
+
+    def test_every_reason_case_writes_its_state_and_says_its_sentence_before_the_marker(self):
+        for case in self.mac["reasonCases"]:
+            with self.subTest(case["name"]):
+                state_path = self.folder / "state.json"
+                state_path.unlink(missing_ok=True)
+                status, lines = self.got_ready_failed("\n".join(case["log"]), state_path)
+                self.assertEqual(status, 0)
+                self.assertEqual(len(lines), 2, lines)
+                self.assertEqual(lines[0], self.mac["printed"][case["reason"]])
+                self.assertEqual(self.marker_of(lines[1])["reason"], case["reason"])
+                self.assertEqual(json.loads(state_path.read_text(encoding="utf-8")),
+                                 self.expected_state(case["reason"]))
+
+    def test_a_state_that_cannot_be_written_still_tells_the_teacher(self):
+        status, lines = self.got_ready_failed("#6 0.3 curl: (7) Failed to connect\n#6 ERROR: exit code: 7",
+                                              self.folder / "not-a-folder" / "state.json")
+        self.assertEqual(status, 0)
+        self.assertEqual(lines[0], self.mac["printed"]["offline"])
+        self.assertEqual(self.marker_of(lines[1])["reason"], "offline")
+
+    def test_without_state_nothing_is_written_and_the_sentence_is_still_said(self):
+        status, lines = self.got_ready_failed("#6 48.1 tar: Cannot write: No space left on device\n#6 ERROR: exit code: 2", None)
+        self.assertEqual(status, 0)
+        self.assertEqual(lines[0], self.mac["printed"]["noRoom"])
+        self.assertEqual(list(self.folder.glob("*.json")), [])
+
+    def test_other_endings_write_nothing_and_say_only_the_marker(self):
+        for outcome in ("built", "noRoom", "waited"):
+            with self.subTest(outcome):
+                import contextlib
+                import io
+                state_path = self.folder / "state.json"
+                printed = io.StringIO()
+                with contextlib.redirect_stdout(printed):
+                    swift_blocks.main(["swift_blocks.py", "got-ready", f"--outcome={outcome}",
+                                       "--course=ICS3U", f"--state={state_path}"])
+                self.assertEqual(len(printed.getvalue().splitlines()), 1)
+                self.assertFalse(state_path.exists(), "only a failed build writes state.json here")
+
+    def test_a_reason_the_contract_has_no_words_for_is_unpacks(self):
+        self.assertEqual(swift_blocks.state_after_failed_build("mystery"), {"reason": "unpack"})
+        self.assertEqual(swift_blocks.sentence_after_failed_build("mystery"), self.mac["printed"]["unpack"])
+        original = swift_blocks.reason_from_build_log
+        swift_blocks.reason_from_build_log = lambda text, rules=None: "mystery"
+        try:
+            state_path = self.folder / "state.json"
+            status, lines = self.got_ready_failed("anything", state_path)
+        finally:
+            swift_blocks.reason_from_build_log = original
+        self.assertEqual(status, 0)
+        self.assertEqual(lines[0], self.mac["printed"]["unpack"])
+        self.assertEqual(self.marker_of(lines[1])["reason"], "mystery", "the trail keeps what was read")
+        self.assertEqual(json.loads(state_path.read_text(encoding="utf-8")), {"reason": "unpack"})
+
+    def test_the_mac_maps_each_reason_to_the_state_windows_does(self):
+        """Windows' preview.ps1 turns swift_windows_fetch.ensure's exit into
+        state.json: 10 noRoom, 11 notDownloaded, anything else none (its
+        comment, and windows.ensureExit). The same failure must leave the
+        same state on both platforms."""
+        import swift_windows_fetch as fetch
+        state_for_exit = {fetch.NO_ROOM: "noRoom", fetch.NOT_DOWNLOADED: "notDownloaded",
+                          fetch.NOT_FINISHED: None}
+        original = fetch.free_gigabytes
+        fetch.free_gigabytes = lambda root: fetch.need_gigabytes() + 10
+        try:
+            for reason, state in self.mac["stateForReason"].items():
+                with self.subTest(reason):
+                    root = self.folder / f"windows-{reason}"
+
+                    def failing(root, say, reason=reason):
+                        raise fetch.Failed(reason, "test")
+                    status = fetch.ensure(root, lambda line: None, fetcher=failing)
+                    self.assertIn(status, state_for_exit)
+                    self.assertEqual(state_for_exit[status], state)
+        finally:
+            fetch.free_gigabytes = original
+
+    def test_what_is_written_is_what_each_block_and_the_folder_problem_then_say(self):
+        """The console line and the folder problem read the same problems, so
+        a state written here reaches both (reasons, siteHealth)."""
+        import site_health
+        space = Course()
+        try:
+            for case in self.mac["reasonCases"]:
+                with self.subTest(case["name"]):
+                    shutil.rmtree(space.cache_root, ignore_errors=True)
+                    space.cache_root.mkdir(parents=True)
+                    self.got_ready_failed("\n".join(case["log"]), space.cache_root / swift_blocks.STATE_FILE)
+                    written = json.loads((space.cache_root / swift_blocks.STATE_FILE).read_text(encoding="utf-8"))
+                    block_reason = written.get("state") or "notCompiled"
+                    space.said.clear()
+                    outcome = space.prepare([{"place": "Units/Strings", "codeRunner": True,
+                                              "body": f"```swift run\n{BLOCK_ONE}\n```\n",
+                                              "source": OPTED + f"```swift run\n{BLOCK_ONE}\n```\n"}])
+                    self.assertEqual(outcome["problems"][0]["reason"], block_reason)
+                    errors = [line for line in space.said if line.startswith("plantoir: error:")]
+                    self.assertEqual(errors, [swift_blocks.error_line(outcome["problems"][0],
+                                                                     swift_rules("room", "needGigabytes"),
+                                                                     windows=False)])
+                    self.assertTrue(errors[0].endswith(site_health.filled(
+                        swift_rules("reasons", block_reason),
+                        {"gigabytes": swift_rules("room", "needGigabytes"),
+                         "downloadGigabytes": swift_rules("downloadGigabytes", "mac")})), errors[0])
+                    found = site_health.swift_finding({"swift_problems": outcome["problems"]}, "ICS4U", 1,
+                                                      site_health._checks_by_name(), windows=False)
+                    several = site_health._checks_by_name()["swiftCouldNotBePrepared"]["reasonsForSeveral"]
+                    self.assertIn(site_health.filled(several[block_reason],
+                                                     {"gigabytes": swift_rules("room", "needGigabytes"),
+                                                      "downloadGigabytes": swift_rules("downloadGigabytes", "mac")}),
+                                  found.detail)
+        finally:
+            space.remove()
+
 
 if __name__ == "__main__":
     unittest.main()
