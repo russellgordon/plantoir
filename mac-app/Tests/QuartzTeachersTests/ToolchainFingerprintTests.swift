@@ -41,9 +41,10 @@ final class ToolchainFingerprintTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        // The home folder, as ToolchainMirrorTests does: the temporary folder
-        // is reached through the /var symlink, and a working folder is not.
-        root = FileManager.default.homeDirectoryForCurrentUser
+        // The suite's throwaway home (RealHomeTripwireTests): it is reached
+        // through the /var symlink, which the mirror's relative paths and
+        // `FolderIdentity.canonicalPath` both see through.
+        root = RealHome.forFiles
             .appendingPathComponent("plantoir-fingerprint-test-\(UUID().uuidString)")
         bundle = root.appendingPathComponent("Resources")
         workingFolder = root.appendingPathComponent("working folder")
