@@ -1704,6 +1704,7 @@ check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
 # Diagrams and graphs (#485 E1): the build's pass, and (in the loop) the
 # helper, its lockfile and the site's transformer, script and styles.
 check_baked scripts/figures.py            /opt/scripts/figures.py
+check_baked scripts/geogebra.py           /opt/scripts/geogebra.py
 # Runnable Swift (#493): plan and prepare; and (in the loop) the Swift image's
 # recipe, which the build hashes for its toolchain id, and the page's thread.
 check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
