@@ -123,6 +123,20 @@ OTHER_PLATFORM_LABEL = "(Windows)"
 OWN_PLATFORM_LABEL = "(macOS)"
 SECTIONS_NOT_SHOWN = ("downloads",)
 
+# The one-platform sentence the skill requires ("Windows: no changes — the
+# Windows download stays at …"), wherever it sits: a line of its own, or a
+# sentence inside the release's first paragraph, plain or **bold** (#658).
+# Since 1.7.2 the skill's notes put it mid-paragraph, after "Plantoir X is for
+# the Mac.", where a whole-line check never saw it.
+# A sentence starts at the start of the line or after ". " (or ".** "); it
+# ends at the first . ! or ? followed by a space or the end of the line, so
+# "1.8.6" and "plantoir.app" do not end it. "- On Windows: …" and "for the
+# Mac and for Windows." are not at a sentence start and are left alone.
+OTHER_PLATFORM_SENTENCE = re.compile(
+    r"(?:(?<=^)|(?<=[.!?] )|(?<=[.!?]\*\* ))"
+    r"(?:\*\*)?Windows:.*?[.!?](?:\*\*)?(?=\s|$)\s*",
+    re.IGNORECASE)
+
 
 def inline(text: str) -> str:
     """Escape a line, then turn back on what the notes template uses inline:
@@ -175,7 +189,13 @@ def notes_for_the_mac(notes_markdown: str) -> list[str]:
             continue
         # The one-platform sentence the skill requires ("Windows: no changes…")
         # is about the other download, not this one.
+        # Checked first because a "Windows:" line with no closing full stop is
+        # one the sentence pattern below does not match.
         if line.lower().startswith("windows:") or line.lower().startswith("- windows:"):
+            continue
+        # The same sentence inside a paragraph: take out the sentence, keep the rest.
+        line = OTHER_PLATFORM_SENTENCE.sub("", line).rstrip()
+        if line == "" and raw.strip() != "":
             continue
         kept.append(line.replace(" " + OWN_PLATFORM_LABEL, "").replace(OWN_PLATFORM_LABEL, "").rstrip())
     return kept
