@@ -2265,12 +2265,16 @@ def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, ful
                 "drawn": 0, "fromBefore": 0, "figures": 0}
 
 
-def _prepare_geogebra(content_root: Path, output_dir: Path) -> dict:
+def _prepare_geogebra(content_root: Path, output_dir: Path, course_dir: Path, full_rebuild: bool) -> dict:
     """
     GeoGebra sketches (#578; scripts/geogebra.py), ALWAYS: every
     ```geogebra and ~~~geogebra fence on the pages students can see, by the
-    gate's own visibility rule, read, its file found and checked, and handed
-    to the site's transformer. Never stops a build: if this cannot run, every
+    gate's own visibility rule, read, its file found and checked (or its
+    geogebra.org sketch fetched ONCE and kept beside the course's built
+    sites, in .geogebra-cache, under the fence's key), and handed to the
+    site's transformer. `full_rebuild` is passed so the choice is visible:
+    geogebra.prepare keeps the saved copies through a full rebuild
+    (geogebraFences.cache). Never stops a build: if this cannot run, every
     fence stays a plain code block and the build says so in one line.
     """
     try:
@@ -2278,7 +2282,9 @@ def _prepare_geogebra(content_root: Path, output_dir: Path) -> dict:
             content_root, _is_draft,
             lambda page: _place_in_the_course(page, content_root),
             _vault_source_of, skip=_is_media_name)
-        return geogebra.prepare(pages, output_dir, content_root)
+        cache_root = toolchain_paths.merged_output_root(course_dir) / geogebra.CACHE_FOLDER
+        return geogebra.prepare(pages, output_dir, content_root, cache_root=cache_root,
+                                full_rebuild=full_rebuild)
     except Exception as error:
         print(f"⚠️ Could not prepare the GeoGebra sketches: {error}")
         shutil.rmtree(output_dir / "quartz" / geogebra.WORKSPACE, ignore_errors=True)
@@ -9324,7 +9330,7 @@ def build_section_site(
     # problem is said.
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
     # GeoGebra sketches (#578), ALWAYS, for the same reason.
-    geogebra_here = _prepare_geogebra(content_root, output_dir)
+    geogebra_here = _prepare_geogebra(content_root, output_dir, course_dir, full_rebuild)
     # Runnable code (#455), ALWAYS: which language engines this site carries.
     runner_pages_here = _count_runner_pages(content_root)
     # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into

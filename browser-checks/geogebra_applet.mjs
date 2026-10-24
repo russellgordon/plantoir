@@ -28,7 +28,14 @@
 //    (before it, the page's own theme fetches its fonts, which is Quartz's
 //    and not GeoGebra's);
 // 6. the built site holds exactly ONE file with the sketch's SHA-256
-//    (geogebraFences.files: published once).
+//    (geogebraFences.files: published once);
+// 7. the sketch made from commands (stage 3) runs every line, and shows
+//    under it exactly the lines geogebraFences.commands.cases says GeoGebra
+//    refuses, each in GeoGebra's own words - and not one of the scripting
+//    lines that work (SetValue, SetColor, ZoomIn), which evalCommand's own
+//    answer would have reported; SetValue(a, 3) has set a to 3;
+// 8. the geogebra.org sketch on the second page (stage 4) opens from the
+//    site's own copy, with its author and licence linked.
 //
 // It prints a line starting "OK:" with the time from tap to sketch and the
 // bytes fetched, or "FAIL:" with what went wrong.
@@ -86,6 +93,7 @@ function filesWithHash(folder, digest) {
   walk(folder)
   return found
 }
+const contract = JSON.parse(readFileSync(new URL("../contracts/shared-rules.json", import.meta.url), "utf-8")).geogebraFences
 const sketchDigest = createHash("sha256").update(readFileSync(sketchFile)).digest("hex")
 const copies = filesWithHash(siteFolder, sketchDigest)
 
@@ -188,6 +196,7 @@ async function connect(chunk) {
   let fetchedSinceTap = []
   let engineRequests = 0
   let bytes = 0
+  let refusedLines = 0
   socket.onmessage = (event) => {
     const message = JSON.parse(event.data)
     if (message.id && waiting.has(message.id)) {
@@ -286,6 +295,20 @@ async function connect(chunk) {
       if (!first.opened) problems.push(`${phase}: the first sketch on ${pageA} did not open (${first.why})`)
       const commands = await tap(1)
       if (!commands.opened) problems.push(`${phase}: the sketch made from commands on ${pageA} did not open (${commands.why})`)
+      // 7: which of its lines GeoGebra refused, and in what words.
+      const ran = await waitFor(`document.querySelectorAll("figure.pl-geogebra")[1].dataset.geogebraCommands === "ran"`, 80)
+      const lines = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; const spec = JSON.parse(f.dataset.geogebra); const box = f.querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; return { commands: spec.commands, shown: Array.from(f.querySelectorAll(":scope > .pl-geogebra-lines li")).map((li) => li.textContent), a: api && typeof api.getValue === "function" ? api.getValue("a") : null, dialogs: f.querySelectorAll(".dialogComponent").length } })()`)
+      const said = new Map(contract.commands.cases.map((item) => [item.text, item.said]))
+      const wanted = []
+      for (const command of lines?.commands ?? []) {
+        const words = said.get(command.text)
+        if (words) wanted.push(contract.words.site.lineCouldNotRun.replace("{line}", String(command.line)).replace("{said}", words))
+      }
+      refusedLines = lines?.shown?.length ?? 0
+      if (!ran) problems.push(`${phase}: the commands sketch's lines did not finish running`)
+      else if (JSON.stringify(lines.shown) !== JSON.stringify(wanted)) problems.push(`${phase}: under the commands sketch: ${JSON.stringify(lines.shown)}, not the contract's ${JSON.stringify(wanted)}`)
+      if (lines?.a !== 3) problems.push(`${phase}: SetValue(a, 3) did not set a to 3 (a is ${lines?.a})`)
+      if (lines?.dialogs) problems.push(`${phase}: ${lines.dialogs} of GeoGebra's dialogs were left on the page`)
       if (isolated) {
         const crossOriginIsolated = await evaluate("window.crossOriginIsolated")
         if (crossOriginIsolated !== true) problems.push("isolated: the page was not cross-origin isolated - the phase would prove nothing")
@@ -312,6 +335,13 @@ async function connect(chunk) {
       if (!toB.changed) problems.push(`${phase}: Quartz's page change to ${pageB} did not happen`)
       const second = await tap(0)
       if (!second.opened) problems.push(`${phase}: after the page change, the sketch on ${pageB} did not open (${second.why})`)
+      // 8 (stage 4): the geogebra.org sketch on page B, from the site's own
+      // copy in static/ - its author and licence linked under it.
+      const material = await tap(1)
+      if (!material.opened) problems.push(`${phase}: the geogebra.org sketch on ${pageB} did not open (${material.why})`)
+      const credit = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; return Array.from(f.querySelectorAll(".pl-geogebra-attribution a")).map((a) => a.getAttribute("href")) })()`)
+      const wantedCredit = [contract.attribution.engineUrl, contract.attribution.materialUrl.replace("{id}", "plantoirvrfy578"), contract.attribution.licenceUrl]
+      if (JSON.stringify(credit) !== JSON.stringify(wantedCredit)) problems.push(`${phase}: the geogebra.org sketch's links are ${JSON.stringify(credit)}, not ${JSON.stringify(wantedCredit)}`)
       const backToA = await change(pageA)
       if (!backToA.changed) problems.push(`${phase}: Quartz's page change back to ${pageA} did not happen`)
       const third = await tap(0)
@@ -325,7 +355,7 @@ async function connect(chunk) {
       for (const line of refusedInLog) problems.push(`${phase}: the browser said: ${line}`)
       for (const violation of violations) problems.push(`${phase}: securitypolicyviolation ${violation}`)
       for (const url of offSite) problems.push(`${phase}: a request left the site: ${url}`)
-      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms, after a page change ${second.ms} ms, back again ${third.ms} ms, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
+      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
     }
     clearTimeout(timer)
     if (problems.length > 0) return finish(1, "FAIL: " + problems.join("\n"))

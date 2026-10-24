@@ -18,10 +18,15 @@ Run with:
 
     python3 scripts/test_geogebra.py
 """
+import http.server
 import io
 import json
+import os
 import shutil
+import socket
 import tempfile
+import threading
+import time
 import unittest
 import zipfile
 from pathlib import Path
@@ -71,9 +76,96 @@ def no_xml() -> bytes:
     return buffer.getvalue()
 
 
+def a_closed_port() -> int:
+    """A local port nothing listens on."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+    return port
+
+
+def an_offline_fetcher():
+    """A fetcher whose geogebra.org is a local port nothing answers on: what
+    a build without the network meets. Every test uses one of these or the
+    stub's - never the real API."""
+    port = a_closed_port()
+    return geogebra.MaterialFetcher(api=f"http://127.0.0.1:{port}/v1.0/materials/{{id}}",
+                                    hosts=["127.0.0.1"], schemes=["http"], timeout=2)
+
+
+class StubGeoGebra:
+    """
+    geogebra.org's two answers, served by a local server of our own
+    (geogebraFences.fetch): the materials API and the .ggb. It counts every
+    request it is sent, so "asked nothing" is measured where the asking
+    would arrive. Sketches: `stubsketch` (one applet), `twoapplets`,
+    `textonly`, `notaggb1` (its .ggb is not a GeoGebra file), `gone1234`
+    (404), `brokenapi` (500), `awayaway` (its .ggb redirects off the hosts).
+    """
+
+    def __init__(self):
+        stub = self
+        self.requests = []
+        self.sketch = a_sketch(1430, 759)
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *arguments):
+                pass
+
+            def do_GET(self):
+                stub.requests.append(self.path)
+                path = self.path.split("?")[0]
+                base = f"http://127.0.0.1:{stub.port}"
+                if path.startswith("/v1.0/materials/"):
+                    material = path.rsplit("/", 1)[1]
+                    if material == "gone1234":
+                        return self.answer(404, b'{"error": "not found"}')
+                    if material == "brokenapi":
+                        return self.answer(500, b"oops")
+                    applet = {"type": "G", "url": f"{base}/resource/{material}.ggb"}
+                    elements = {"twoapplets": [applet, dict(applet)],
+                                "textonly": [{"type": "T", "url": ""}]}.get(material, [applet])
+                    body = {"id": material, "title": "Slope Angle Conjecture", "visibility": "S",
+                            "deleted": False, "creator": {"displayname": "Russell Gordon"},
+                            "elements": elements}
+                    return self.answer(200, json.dumps(body).encode("utf-8"), "application/json")
+                if path == "/resource/notaggb1.ggb":
+                    return self.answer(200, b"<html>not a sketch</html>")
+                if path == "/resource/awayaway.ggb":
+                    self.send_response(302)
+                    self.send_header("Location", "http://localhost:1/elsewhere.ggb")
+                    self.end_headers()
+                    return None
+                if path.startswith("/resource/"):
+                    return self.answer(200, stub.sketch, "application/vnd.geogebra.file")
+                return self.answer(404, b"")
+
+            def answer(self, code, body, kind="text/plain"):
+                self.send_response(code)
+                self.send_header("Content-Type", kind)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self.server.server_address[1]
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def fetcher(self):
+        return geogebra.MaterialFetcher(api=f"http://127.0.0.1:{self.port}/v1.0/materials/{{id}}?scope=extended",
+                                        hosts=["127.0.0.1"], schemes=["http"], timeout=5)
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
 class Space:
-    """A site's content folder, its output folder, and a vendor folder with
-    (or without) GeoGebra's engine."""
+    """A site's content folder, its output folder, a vendor folder with
+    (or without) GeoGebra's engine, and the course's saved copies of
+    geogebra.org sketches (outside the content, as beside built sites)."""
 
     def __init__(self, engine=True):
         self.root = Path(tempfile.mkdtemp(prefix="plantoir-geogebra-test-"))
@@ -86,6 +178,8 @@ class Space:
             (self.vendor / "geogebra").mkdir(parents=True)
             (self.vendor / "geogebra" / "deployggb.js").write_text("// GeoGebra\n", encoding="utf-8")
         self.said = []
+        self.cache = self.root / "builds" / "COURSE" / geogebra.CACHE_FOLDER
+        self.fetcher = an_offline_fetcher()
 
     def file(self, relative: str, data: bytes):
         path = self.content.joinpath(*relative.split("/"))
@@ -96,9 +190,10 @@ class Space:
         self.file(relative, text.encode("utf-8"))
         return {"place": relative[:-3], "text": text, "source": source, "path": relative}
 
-    def prepare(self, pages):
+    def prepare(self, pages, fetcher=None, full_rebuild=False):
         return geogebra.prepare(pages, self.output, self.content, vendor_dir=self.vendor,
-                                printer=self.said.append)
+                                printer=self.said.append, cache_root=self.cache,
+                                fetcher=fetcher or self.fetcher, full_rebuild=full_rebuild)
 
     def scan(self):
         return geogebra.pages_students_see(self.content, lambda text: "publish: false" in text,
@@ -357,11 +452,10 @@ class PassTests(unittest.TestCase):
         finally:
             space.close()
 
-    def test_a_geogebra_org_sketch_is_not_fetched_yet(self):
-        outcome = self.space.prepare([self.space.page("A.md", "```geogebra\nmaterial_id: ju3f2kbg\n```\n")])
-        self.assertEqual([problem["reason"] for problem in outcome["problems"]], ["materialCouldNotBeFetched"])
+    def test_a_geogebra_org_address_that_is_not_one(self):
         outcome = self.space.prepare([self.space.page("A.md", "```geogebra\nmaterial_id: a sketch\n```\n")])
         self.assertEqual([problem["reason"] for problem in outcome["problems"]], ["materialNotUnderstood"])
+        self.assertEqual(self.space.fetcher.requests, 0)
 
     def test_the_teachers_files_are_never_written(self):
         self.space.file("Media/Lines.ggb", a_sketch())
@@ -380,11 +474,190 @@ class PassTests(unittest.TestCase):
         self.assertFalse((self.space.output / "quartz" / geogebra.WORKSPACE).exists())
         self.assertFalse((self.space.output / "quartz" / "static" / geogebra.THUMBNAILS).exists())
 
+    def test_the_manifest_carries_the_line_marker(self):
+        # Stage 3: the loader runs geogebraFences.commands.endOfLine after
+        # each line, and reads the dialogs before it as the line's.
+        self.space.prepare([self.space.page("A.md", "```geogebra\nf(x) = x\n```\n")])
+        self.assertEqual(self.manifest()["endOfLine"], rules("commands", "endOfLine"))
+        self.assertIn("{line}", rules("words", "site", "lineCouldNotRun"))
+        self.assertIn("{said}", rules("words", "site", "lineCouldNotRun"))
+        cases = rules("commands", "cases")
+        self.assertGreaterEqual(len([case for case in cases if case["said"] is None]), 5)
+        self.assertGreaterEqual(len([case for case in cases if case["said"]]), 3)
+        marker = rules("commands", "endOfLine").split("(")[0]
+        for case in cases:
+            self.assertNotIn(marker, case["text"])
+            if case["said"]:
+                self.assertNotIn(marker, case["said"])
+
     def test_the_manifest_carries_the_words_and_the_attribution(self):
         self.space.prepare([self.space.page("A.md", "```geogebra\nf(x) = x\n```\n")])
         manifest = self.manifest()
         self.assertEqual(manifest["words"], rules("words", "site"))
         self.assertEqual(manifest["attribution"]["engineUrl"], "https://www.geogebra.org")
+
+
+class MaterialTests(unittest.TestCase):
+    """A geogebra.org sketch, fetched ONCE and kept by the fence (stage 4),
+    against a local stub of geogebra.org - never the real API."""
+
+    FENCE = "```geogebra\nmaterial_id: https://www.geogebra.org/m/stubsketch\nalt: Three triangles.\n```\n"
+
+    def setUp(self):
+        self.space = Space()
+        self.stub = StubGeoGebra()
+
+    def tearDown(self):
+        self.stub.close()
+        self.space.close()
+
+    def entries(self):
+        manifest = json.loads((self.space.output / "quartz" / geogebra.WORKSPACE / "manifest.json")
+                              .read_text(encoding="utf-8"))
+        return [entry for page in manifest["pages"].values() for entry in page.values()]
+
+    def key(self, fence=None):
+        return geogebra.sketches_on_page(fence or self.FENCE)[0]["key"]
+
+    def seed(self, fence=None):
+        geogebra.SavedCopies(self.space.cache).put(self.key(fence), {
+            "id": "stubsketch", "title": "Slope Angle Conjecture", "author": "Russell Gordon",
+            "ggb": self.stub.sketch})
+
+    def test_every_cache_case(self):
+        cases = rules("cache", "cases")
+        self.assertGreaterEqual(len(cases), 6)
+        self.assertEqual(rules("cache", "folder"), geogebra.CACHE_FOLDER)
+        self.assertEqual(rules("cache", "pruneDays"), figures.PRUNE_DAYS)
+        for case in cases:
+            space = Space()
+            try:
+                fence = self.FENCE
+                if case["saved"]:
+                    geogebra.SavedCopies(space.cache).put(geogebra.sketches_on_page(fence)[0]["key"], {
+                        "id": "stubsketch", "title": "T", "author": "A", "ggb": self.stub.sketch})
+                if case.get("fenceChanged"):
+                    fence = fence.replace("alt: Three triangles.\n", "alt: Three triangles.\nversion: 2\n")
+                fetcher = self.stub.fetcher() if case["online"] else an_offline_fetcher()
+                before = len(self.stub.requests)
+                outcome = None
+                for _ in range(case["builds"]):
+                    outcome = space.prepare([space.page("A.md", fence)], fetcher=fetcher,
+                                            full_rebuild=case["fullRebuild"])
+                self.assertEqual(fetcher.requests, case["requests"], case["name"])
+                if case["online"]:
+                    # Measured where the asking would arrive, not only counted.
+                    self.assertEqual(len(self.stub.requests) - before, case["requests"], case["name"])
+                self.assertEqual(outcome["counts"]["geogebra"] == 1, case["shown"], case["name"])
+                self.assertEqual([problem["reason"] for problem in outcome["problems"]],
+                                 [case["reason"]] if case["reason"] else [], case["name"])
+            finally:
+                space.close()
+
+    def test_a_fetched_sketch_is_kept_under_the_fence_and_carried_once(self):
+        outcome = self.space.prepare([self.space.page("A.md", self.FENCE)], fetcher=self.stub.fetcher())
+        self.assertEqual((outcome["fetched"], outcome["fromBefore"]), (1, 0))
+        key = self.key()
+        self.assertTrue((self.space.cache / f"{key}.ggb").is_file())
+        self.assertEqual(json.loads((self.space.cache / f"{key}.json").read_text(encoding="utf-8")),
+                         {"id": "stubsketch", "title": "Slope Angle Conjecture", "author": "Russell Gordon"})
+        entry = self.entries()[0]
+        self.assertEqual(entry["source"], {"kind": "material",
+                                           "storePath": f"static/{geogebra.THUMBNAILS}/{key[:16]}.ggb"})
+        self.assertEqual(entry["attribution"], {"kind": "material", "author": "Russell Gordon",
+                                                "id": "stubsketch", "title": "Slope Angle Conjecture"})
+        self.assertEqual((entry["width"], entry["height"]), (1430, 759))
+        site = self.space.output / "quartz" / "static" / geogebra.THUMBNAILS
+        self.assertEqual((site / f"{key[:16]}.ggb").read_bytes(), self.stub.sketch)
+        self.assertEqual(sorted(path.suffix for path in site.iterdir()), [".ggb", ".png"])
+        self.assertIn("📐 Sketches from geogebra.org: 1 copied now, 0 kept from before.", self.space.said)
+        # Only the two requests, to the API and for the .ggb.
+        self.assertEqual([path.split("?")[0] for path in self.stub.requests],
+                         ["/v1.0/materials/stubsketch", "/resource/stubsketch.ggb"])
+
+    def test_one_fence_on_two_pages_is_fetched_once(self):
+        fetcher = self.stub.fetcher()
+        self.space.prepare([self.space.page("A.md", self.FENCE), self.space.page("B.md", self.FENCE)],
+                           fetcher=fetcher)
+        self.assertEqual(fetcher.requests, 2)
+        self.assertEqual(len(self.entries()), 2)
+
+    def test_keyed_by_the_fence_not_the_id(self):
+        # Must-fail for "key on the material id": two fences naming the same
+        # sketch are two saved copies, and changing one fetches it again.
+        self.seed()
+        other = self.FENCE.replace("alt: Three triangles.", "alt: Three triangles, again.")
+        fetcher = self.stub.fetcher()
+        self.space.prepare([self.space.page("A.md", self.FENCE), self.space.page("B.md", other)], fetcher=fetcher)
+        self.assertEqual(fetcher.requests, 2)
+        self.assertEqual(sorted(path.name for path in self.space.cache.iterdir()),
+                         sorted([f"{self.key()}.ggb", f"{self.key()}.json",
+                                 f"{self.key(other)}.ggb", f"{self.key(other)}.json"]))
+
+    def test_what_geogebra_org_says_is_said(self):
+        for material, reason in (("gone1234", "materialNotFound"), ("brokenapi", "materialCouldNotBeFetched"),
+                                 ("twoapplets", "materialHasSeveralSketches"), ("textonly", "materialHasNoSketch"),
+                                 ("notaggb1", "materialHasNoSketch"), ("awayaway", "materialCouldNotBeFetched")):
+            space = Space()
+            try:
+                fence = f"```geogebra\nmaterial_id: {material}\n```\n"
+                outcome = space.prepare([space.page("A.md", fence)], fetcher=self.stub.fetcher())
+                self.assertEqual([(problem["reason"], problem["id"]) for problem in outcome["problems"]],
+                                 [(reason, material)], material)
+                # Nothing is kept from an answer that could not be shown.
+                self.assertFalse(space.cache.exists() and any(space.cache.iterdir()), material)
+            finally:
+                space.close()
+
+    def test_a_host_that_is_not_geogebra_orgs_is_never_asked(self):
+        fetcher = geogebra.MaterialFetcher(api=f"http://127.0.0.1:{self.stub.port}/v1.0/materials/{{id}}",
+                                           hosts=["api.geogebra.org"], schemes=["http"], timeout=2)
+        self.assertEqual(fetcher.material("stubsketch")["reason"], "materialCouldNotBeFetched")
+        self.assertEqual(self.stub.requests, [])
+        https_only = geogebra.MaterialFetcher(api=f"http://127.0.0.1:{self.stub.port}/v1.0/materials/{{id}}",
+                                              hosts=["127.0.0.1"], timeout=2)
+        self.assertEqual(https_only.material("stubsketch")["reason"], "materialCouldNotBeFetched")
+        self.assertEqual(self.stub.requests, [])
+        # The contract's own: https, geogebra.org's hosts.
+        real = geogebra.MaterialFetcher()
+        self.assertEqual(real.schemes, ("https",))
+        self.assertTrue(real.api.startswith("https://api.geogebra.org/"))
+
+    def test_a_copy_unused_for_90_days_goes_and_one_in_use_stays(self):
+        self.seed()
+        old_fence = "```geogebra\nmaterial_id: stubsketch\nversion: old\n```\n"
+        self.seed(old_fence)
+        long_ago = time.time() - (figures.PRUNE_DAYS + 1) * 86400
+        for path in self.space.cache.iterdir():
+            os.utime(path, (long_ago, long_ago))
+        fetcher = self.stub.fetcher()
+        self.space.prepare([self.space.page("A.md", self.FENCE)], fetcher=fetcher)
+        # The fence in use was pruned too (it had not been used in 90 days)
+        # and fetched again; the old one is gone and stays gone.
+        names = sorted(path.name for path in self.space.cache.iterdir())
+        self.assertEqual(names, sorted([f"{self.key()}.ggb", f"{self.key()}.json"]))
+        self.assertEqual(fetcher.requests, 2)
+        # Used now, so the next build keeps it and asks nothing.
+        again = self.stub.fetcher()
+        self.space.prepare([self.space.page("A.md", self.FENCE)], fetcher=again)
+        self.assertEqual(again.requests, 0)
+        self.assertGreater((self.space.cache / f"{self.key()}.json").stat().st_mtime, long_ago + 86400)
+
+    def test_the_teachers_files_are_never_written(self):
+        page = self.space.page("A.md", self.FENCE)
+        before = self.space.tree()
+        self.space.prepare([page], fetcher=self.stub.fetcher())
+        self.assertEqual(self.space.tree(), before)
+
+    def test_without_the_engine_nothing_is_fetched(self):
+        space = Space(engine=False)
+        try:
+            fetcher = self.stub.fetcher()
+            outcome = space.prepare([space.page("A.md", self.FENCE)], fetcher=fetcher)
+            self.assertEqual([problem["reason"] for problem in outcome["problems"]], ["engineMissing"])
+            self.assertEqual(fetcher.requests, 0)
+        finally:
+            space.close()
 
 
 class WiringTests(unittest.TestCase):

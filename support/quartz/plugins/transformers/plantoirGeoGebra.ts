@@ -49,13 +49,18 @@ type Entry = {
   commands: Command[]
   toolbar: boolean
   algebra: boolean
-  source: { kind: string; contentPath: string } | null
+  // A teacher's file is published by Quartz from content/ (contentPath); a
+  // geogebra.org sketch has no file there, so the build wrote the site's
+  // copy into static/ (storePath, from the top of the site).
+  source: { kind: string; contentPath?: string; storePath?: string } | null
   thumbnail: { name: string; width: number; height: number } | null
   attribution: { kind: string; author?: string; id?: string }
   size: string
 }
 type Manifest = {
   words: Record<string, string>
+  // The command run after each of the fence's lines (geogebraFences.commands).
+  endOfLine: string
   attribution: Record<string, string>
   // By page (its path in the site's content, NFC), then by fence key:
   // the same fence on two pages can name two different files beside them.
@@ -190,10 +195,12 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
           if (entry === undefined) {
             return
           }
-          const sketch =
-            entry.source !== null && entry.source.kind === "file"
-              ? slugifyFilePath(entry.source.contentPath as FilePath)
-              : null
+          let sketch: string | null = null
+          if (entry.source !== null && entry.source.kind === "file" && entry.source.contentPath) {
+            sketch = slugifyFilePath(entry.source.contentPath as FilePath)
+          } else if (entry.source !== null && entry.source.kind === "material" && entry.source.storePath) {
+            sketch = entry.source.storePath
+          }
           node.properties.dataGeogebra = JSON.stringify({
             sketch,
             app: entry.app,
@@ -205,6 +212,8 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
             root,
             loading: words.loading,
             couldNotLoad: words.couldNotLoad,
+            lineCouldNotRun: words.lineCouldNotRun,
+            endOfLine: known.endOfLine,
           })
           node.properties.style = `--pl-geogebra-width: ${entry.width}px; --pl-geogebra-ratio: ${entry.width} / ${entry.height}`
 
