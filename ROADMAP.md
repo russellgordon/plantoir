@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 23 October 2026. The current release is **1.8.7** on the Mac and **1.8.6** on Windows.*
+*Last updated: 24 October 2026. The current release is **1.9.0** on the Mac and **1.8.7** on Windows.*
 
 A few things to know before you read on:
 
@@ -26,45 +26,57 @@ need to read those to use Plantoir.
 
 ---
 
-## Next: Windows catches up to 1.8.7
+## Next: Windows catches up to 1.9.0
 
-Plantoir 1.8.7 is out for the Mac. Windows stays on 1.8.6 until its own 1.8.7
-download joins the release, with what 1.8.7 brought the Mac:
+Plantoir 1.9.0 is out for the Mac. Windows stays on 1.8.7 until its own 1.9.0
+download joins the release, with what 1.9.0 brought the Mac:
 
-- **Problems with runnable code are shown in the app**, alongside the other
-  things Plantoir tells you about a folder, rather than only on the page
-  ([#650](https://github.com/russellgordon/plantoir/issues/650)).
-- **Print always opens the print window**, even on a long page with many code
-  blocks ([#651](https://github.com/russellgordon/plantoir/issues/651)), and a
-  page no longer jumps down as its sidebar draws
-  ([#646](https://github.com/russellgordon/plantoir/issues/646)).
-- **A curriculum folder renamed** to a name without "curriculum" is still
-  treated as curriculum
-  ([#647](https://github.com/russellgordon/plantoir/issues/647)).
-- **The Publish and Hide sheets:** showing the pages already visible is a
-  checkbox, and the sheet shrinks to its answer when it is done
-  ([#655](https://github.com/russellgordon/plantoir/issues/655)).
-- **Smaller things:** the "System fonts" label
-  ([#648](https://github.com/russellgordon/plantoir/issues/648)), the
-  sentence about Obsidian opening its settings after Trust
-  ([#656](https://github.com/russellgordon/plantoir/issues/656)), and a few
-  checks behind the scenes
-  ([#645](https://github.com/russellgordon/plantoir/issues/645),
-  [#649](https://github.com/russellgordon/plantoir/issues/649),
-  [#652](https://github.com/russellgordon/plantoir/issues/652),
-  [#657](https://github.com/russellgordon/plantoir/issues/657)).
+- **GeoGebra sketches on your pages** — a sketch saved beside the page, typed
+  GeoGebra commands, or a sketch from geogebra.org kept once; in quiz
+  questions too ([#687](https://github.com/russellgordon/plantoir/issues/687)).
+- **Text blocks that wrap** at the window's width, with their line numbers
+  kept ([#676](https://github.com/russellgordon/plantoir/issues/676)).
+- **Open in Obsidian goes to the page you're looking at**
+  ([#681](https://github.com/russellgordon/plantoir/issues/681)), and the
+  assistant can do it when you ask
+  ([#690](https://github.com/russellgordon/plantoir/issues/690)).
+- **A quiz the website reads differently** is shown among your folder's
+  problems ([#677](https://github.com/russellgordon/plantoir/issues/677)).
+- **The newer, supported engine** that draws your sites
+  ([#675](https://github.com/russellgordon/plantoir/issues/675)), with a
+  record of known weaknesses in the parts Plantoir carries
+  ([#685](https://github.com/russellgordon/plantoir/issues/685)).
+- **Windows fixes of its own:** a preview that did not rebuild after an edit
+  ([#671](https://github.com/russellgordon/plantoir/issues/671)); the line
+  shown when the disk fills while Swift is being set up
+  ([#672](https://github.com/russellgordon/plantoir/issues/672)); the Quizzes
+  page pictures on plantoir.app
+  ([#590](https://github.com/russellgordon/plantoir/issues/590)); and what a
+  scheduled publish does when the computer is asleep
+  ([#554](https://github.com/russellgordon/plantoir/issues/554)).
+- **Behind the scenes:** a few checks that both apps behave the same way
+  ([#659](https://github.com/russellgordon/plantoir/issues/659),
+  [#660](https://github.com/russellgordon/plantoir/issues/660),
+  [#661](https://github.com/russellgordon/plantoir/issues/661),
+  [#666](https://github.com/russellgordon/plantoir/issues/666),
+  [#673](https://github.com/russellgordon/plantoir/issues/673),
+  [#680](https://github.com/russellgordon/plantoir/issues/680),
+  [#682](https://github.com/russellgordon/plantoir/issues/682)).
 
 ---
 
-## Version 1.9
 
-- **Open in Obsidian goes to the page you're looking at.** While previewing a
-  page, Open in Obsidian will open the note that page came from, not just the
-  course — wherever it can tell which note that is. ([#518](https://github.com/russellgordon/plantoir/issues/518))
-- **My Progress, settings and more.** The My Progress page arrived on the
-  Mac in 1.8.2. Next: a switch and the list of success-criteria headings in
-  Course Settings, a way for students to narrow the page to a date or a unit,
-  and a check that it prints well.
+## Version 2.0
+
+- **PhET science simulations on your pages**, from the University of
+  Colorado's collection — projectile motion, gas laws, circuits, natural
+  selection and more. Students tap to open them; nothing loads until then.
+  ([#674](https://github.com/russellgordon/plantoir/issues/674))
+- **plantoir.app shows off science**, alongside the maths and coding it
+  already shows ([#485](https://github.com/russellgordon/plantoir/issues/485)).
+- **My Progress, settings and more.** A switch and the list of
+  success-criteria headings in Course Settings, a way for students to narrow
+  the page to a date or a unit, and a check that it prints well.
   ([#595](https://github.com/russellgordon/plantoir/issues/595))
 - **Reference courses, more flexible.** Add a ready-made course straight to
   your reference shelf — even for a course code you're already teaching —
@@ -75,33 +87,20 @@ download joins the release, with what 1.8.7 brought the Mac:
   plan is to decide whether to combine them into one place for every kept
   copy of a course, or to give archives the same browsing that backups have.
   ([#573](https://github.com/russellgordon/plantoir/issues/573))
-- **GeoGebra sketches on your pages.** Sliders, points to drag and
-  constructions, in three ways: put a sketch you saved from GeoGebra beside
-  the page, type GeoGebra commands in the note, or name a sketch on
-  geogebra.org (Plantoir keeps a copy the first time the site is built).
-  Sketches work in self-check quiz questions too. Students tap to open
-  one; nothing loads until then, and it comes from your own class site.
-  On the Mac first. (Graphs students can move, and TikZ diagrams, are
-  already here.)
-  ([#578](https://github.com/russellgordon/plantoir/issues/578))
 - **Printing on Windows:** a handout printed on Windows should look the same
   as one printed on a Mac
   ([#577](https://github.com/russellgordon/plantoir/issues/577)).
-- **Diagrams and fonts served by your own site**, as maths already is in 1.8,
-  so pages look right without reaching other websites.
+- **Diagrams and fonts served by your own site**, as maths and GeoGebra
+  already are, so pages look right without reaching other websites.
   ([#566](https://github.com/russellgordon/plantoir/issues/566))
-- **A measurement carried over from the Windows 1.8.5 catch-up:** what a
-  scheduled publish does when the computer is asleep
-  ([#554](https://github.com/russellgordon/plantoir/issues/554)).
+- Behind the scenes: a check before each release that every kind of diagram
+  and interactive page really draws on the published test sites
+  ([#597](https://github.com/russellgordon/plantoir/issues/597)).
 
 ---
 
-## Version 2.0 — interactive science
+## Version 2.1
 
-- **PhET science simulations on your pages**, from the University of
-  Colorado's collection — projectile motion, gas laws, circuits, natural
-  selection and more. Students tap to open them; nothing loads until then.
-  ([#485](https://github.com/russellgordon/plantoir/issues/485))
 - **A live circuit simulator** with real schematic symbols, for physics and
   Technological Education. Lower priority than the rest.
   ([#487](https://github.com/russellgordon/plantoir/issues/487))
@@ -131,8 +130,7 @@ download joins the release, with what 1.8.7 brought the Mac:
   behave the same way, and fixes to how plantoir.app's pictures are made.
 
 ---
-
-## Version 2.1
+## Version 2.2
 
 - **"Revise with…" in more places.** Use the Claude and Codex desktop apps,
   not just their command-line versions
@@ -141,8 +139,13 @@ download joins the release, with what 1.8.7 brought the Mac:
   ([#508](https://github.com/russellgordon/plantoir/issues/508)).
 - **The rest of self-check quizzes**, building on what arrives in 1.8: an
   answer key when you print, and questions that use PhET (2.0). Questions
-  with a GeoGebra sketch arrive with GeoGebra itself, in 1.9.
+  with a GeoGebra sketch arrived with GeoGebra itself, in 1.9.
   ([#511](https://github.com/russellgordon/plantoir/issues/511))
+- **Students choose their own colour scheme** on a published site
+  ([#606](https://github.com/russellgordon/plantoir/issues/606)).
+- Behind the scenes: trying the next major version of the engine Plantoir
+  builds sites with, only if it is measurably faster
+  ([#512](https://github.com/russellgordon/plantoir/issues/512)).
 
 ---
 
@@ -151,9 +154,6 @@ download joins the release, with what 1.8.7 brought the Mac:
 - **Ready-made courses that show off the interactive features**, especially
   Ontario maths, science and Technological Education courses.
   ([#513](https://github.com/russellgordon/plantoir/issues/513))
-- **Faster site building**, by trying the next major version of the engine
-  Plantoir builds sites with. Only worth doing if it is measurably faster.
-  ([#512](https://github.com/russellgordon/plantoir/issues/512))
 
 ---
 
