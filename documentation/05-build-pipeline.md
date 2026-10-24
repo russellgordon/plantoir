@@ -2400,7 +2400,16 @@ is read and refused as `materialCouldNotBeFetched` until stage 4 fetches it.)
    ends the settings; a block that opens with `---` is read to the next one.
    `version:` does nothing but change the fence — the documented way to make
    a changed geogebra.org sketch be fetched again (stage 4). Every case is in
-   `geogebraFences.settings.cases`.
+   `geogebraFences.settings.cases`. Three slips are said at build time
+   (stage 2 review item 4), because otherwise a student would be the first
+   to see them: a `---` block that is never closed is a problem
+   (`settingsNotClosed` — it would have read every command as a setting and
+   left it out); `file:` with no name is `fileHasNoName`, not a
+   `fileNotFound` naming nothing; and a KNOWN key written among the commands
+   — in capitals (`File: x.ggb`), or after the line that started the
+   commands — is a `plantoir: note:` (`settingAmongCommands`), since it will
+   run as a GeoGebra command that GeoGebra refuses. Only a known key is
+   noted, so GeoGebra's own `slope: Slope(a)` passes silently.
 4. **The key.** A sketch is found by `figures.key_of` — figureFences'
    `cacheKey` rule, REUSED, so the build and the site (which hashes the mdast
    code value with `figureRules.keyOf`) agree by a rule both already run.
@@ -2415,7 +2424,14 @@ is read and refused as `materialCouldNotBeFetched` until stage 4 fetches it.)
    course folder, then by its file name alone in `Media`. It must be a zip
    holding `geogebra.xml` (read, never unpacked; size from its first
    `<euclidianView><size>`, the app from `<geogebra app=…>`) and at most
-   20 MB. **Nothing is copied:** Quartz's Assets emitter already publishes
+   20 MB. **A file Quartz leaves out of the site is not found** (stage 2
+   review item 6): one under `private/`, `templates/` or `.obsidian/` at the
+   top of the course folder (Quartz's `ignorePatterns`, root only and
+   case-sensitive — measured with Quartz's own globby in the image:
+   `private/a.ggb` left out, `Private/f.ggb` and `U/private/b.ggb`
+   published), or with any part of its path starting with a dot (the file
+   walk skips those). Said once as `fileNotFound`, never found here and then
+   missing on the site. **Nothing is copied:** Quartz's Assets emitter already publishes
    every file under `content/` that is not a page, at `slugifyFilePath` of
    its path, so the manifest records the path in `content/` and the
    transformer makes the address with that same function. Measured on the
@@ -2429,8 +2445,9 @@ is read and refused as `materialCouldNotBeFetched` until stage 4 fetches it.)
    it, so the guidance says to keep a sketch beside a page in a folder, or in
    `Media`.
 6. **What the site gets.** `quartz/plantoir-geogebra/manifest.json` — the
-   site's words and the attribution addresses from the contract, and per
-   sketch its app, size (the fence's `width:`/`height:` win), description,
+   site's words and the attribution addresses from the contract, and, by
+   PAGE and then by fence key (06 → Q2: the same fence on two pages can name
+   two files), per sketch its app, size (the fence's `width:`/`height:` win), description,
    caption, commands with their lines, toolbar/algebra, where its file is in
    `content/`, its thumbnail, and the size the button names (the sketch's
    bytes plus the engine's first load, 2,864,256 bytes gzipped: "about

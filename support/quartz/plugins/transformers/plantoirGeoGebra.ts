@@ -57,7 +57,9 @@ type Entry = {
 type Manifest = {
   words: Record<string, string>
   attribution: Record<string, string>
-  sketches: Record<string, Entry>
+  // By page (its path in the site's content, NFC), then by fence key:
+  // the same fence on two pages can name two different files beside them.
+  pages: Record<string, Record<string, Entry>>
 }
 
 const WORKSPACE = join("quartz", "plantoir-geogebra")
@@ -82,6 +84,12 @@ function manifest(): Manifest | null {
     }
   }
   return cached.manifest
+}
+
+// This page's sketches, by fence key, or null.
+function sketchesOf(known: Manifest, file: { data: Record<string, unknown> }): Record<string, Entry> | null {
+  const page = String(file.data.relativePath ?? "").normalize("NFC")
+  return known.pages?.[page] ?? null
 }
 
 function text(value: string): ElementContent {
@@ -136,9 +144,10 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
   name: "PlantoirGeoGebra",
   markdownPlugins() {
     return [
-      () => (tree: MdRoot) => {
+      () => (tree: MdRoot, file) => {
         const known = manifest()
-        if (known === null) {
+        const sketches = known === null ? null : sketchesOf(known, file)
+        if (sketches === null) {
           return
         }
         visit(tree, "code", (node: Code, index, parent) => {
@@ -146,7 +155,7 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
             return
           }
           const key: string = keyOf(node.value)
-          const entry = known.sketches[key]
+          const entry = sketches[key]
           if (entry === undefined || !entry.ok) {
             return
           }
@@ -166,7 +175,8 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
     return [
       () => (tree: HtmlRoot, file) => {
         const known = manifest()
-        if (known === null) {
+        const sketches = known === null ? null : sketchesOf(known, file)
+        if (known === null || sketches === null) {
           return
         }
         const words = known.words
@@ -176,7 +186,7 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
             return
           }
           const key = String(node.properties?.dataGeogebraKey ?? "")
-          const entry = known.sketches[key]
+          const entry = sketches[key]
           if (entry === undefined) {
             return
           }

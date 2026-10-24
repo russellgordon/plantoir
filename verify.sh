@@ -2292,7 +2292,8 @@ restore_hit_fixture() {
         "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
         "$HIT_COURSE/Investigations/GeoGebra Fixture.md" "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
         "$HIT_COURSE/Investigations/GeoGebra Missing.md" "$HIT_COURSE/Investigations/GeoGebra Hidden.md" \
-        "$HIT_COURSE/Discussions/GeoGebra Second.md" \
+        "$HIT_COURSE/Discussions/GeoGebra Second.md" "$HIT_COURSE/Discussions/GeoGebra Same Fence.md" \
+        "$HIT_COURSE/Discussions/GeoGebra Fixture Lines.ggb" \
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Anchor Fixture.md" "$HIT_COURSE/Picture Fixture.md" \
@@ -3044,7 +3045,7 @@ printf -- '---\ntitle: Figures Hidden\npublish: false\n---\nA hidden graph (plan
 # thumbnail. In shared folders, because a file beside a page reaches the site
 # only from a folder the course shares (a page listed by name brings no file
 # with it). Removed by restore_hit_fixture.
-python3 - "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" <<'GGBPY'
+python3 - "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" "$HIT_COURSE/Discussions/GeoGebra Fixture Lines.ggb" <<'GGBPY'
 import struct, sys, zipfile, zlib
 def png(width, height):
     rows = b"".join(b"\x00" + b"\xff\xff\xff" * width for _ in range(height))
@@ -3073,6 +3074,13 @@ xml = """<?xml version="1.0" encoding="utf-8"?>
 """
 with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as sketch:
     sketch.writestr("geogebra.xml", xml)
+    sketch.writestr("geogebra_thumbnail.png", png(64, 36))
+# A DIFFERENT sketch with the same name in another folder, for the page whose
+# fence is word for word the first fixture's (stage 2 review item 1): each
+# page must show the file beside it. The same thumbnail, so the site still
+# carries one picture.
+with zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED) as sketch:
+    sketch.writestr("geogebra.xml", xml.replace("plantoir-verify-578", "plantoir-verify-578-discussions"))
     sketch.writestr("geogebra_thumbnail.png", png(64, 36))
 GGBPY
 cat > "$HIT_COURSE/Investigations/GeoGebra Fixture.md" <<'GEOGEBRAFIXTURE'
@@ -3110,6 +3118,8 @@ g(x) = 2x + 1
 GEOGEBRAFIXTURE
 printf -- '---\ntitle: GeoGebra Second\n---\nThe same sketch, from another folder (plantoir-geogebra-second).\n\n```geogebra\nfile: Investigations/GeoGebra Fixture Lines.ggb\nalt: The planted sketch again (plantoir-alt-second).\n```\n' \
   > "$HIT_COURSE/Discussions/GeoGebra Second.md"
+printf -- '---\ntitle: GeoGebra Same Fence\n---\nThe first fixture fence word for word, with a different file of the same name beside it (plantoir-geogebra-same-fence).\n\n```geogebra\nfile: GeoGebra Fixture Lines.ggb\nalt: Two points and the segment between them, with its slope (plantoir-alt-lines).\ncaption: Drag A or B.\n```\n' \
+  > "$HIT_COURSE/Discussions/GeoGebra Same Fence.md"
 printf -- '---\ntitle: GeoGebra Missing\n---\nA sketch whose file is not there.\n\n```geogebra\nalt: Misspelled.\nfile: GeoGebra Fixture Lnies.ggb\n```\n' \
   > "$HIT_COURSE/Investigations/GeoGebra Missing.md"
 printf -- '---\ntitle: GeoGebra Hidden\npublish: false\n---\nA hidden sketch (plantoir-geogebra-hidden-5e1c).\n\n```geogebra\nf(x) = x^3\n```\n' \
@@ -4028,6 +4038,11 @@ digest = hashlib.sha256(sketch.read_bytes()).hexdigest() if sketch.is_file() els
 copies = [path.relative_to(public).as_posix() for path in public.rglob("*") if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == digest]
 if copies != ["Investigations/GeoGebra-Fixture-Lines.ggb"]:
     problems.append(f"the sketch's file is in the site as {copies}, not once at Investigations/GeoGebra-Fixture-Lines.ggb")
+same_path = public / "Discussions" / "GeoGebra-Same-Fence.html"
+same = same_path.read_text(encoding="utf-8") if same_path.is_file() else ""
+same_specs = [json.loads(html.unescape(spec)) for spec in re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"', same)]
+if [spec.get("sketch") for spec in same_specs] != ["Discussions/GeoGebra-Fixture-Lines.ggb"]:
+    problems.append(f"the page whose fence is the first fixture's word for word names {[spec.get('sketch') for spec in same_specs]}, not the file beside it (stage 2 review item 1)")
 named = sorted({spec["sketch"] for spec in specs if spec.get("sketch")})
 if named != ["Investigations/GeoGebra-Fixture-Lines.ggb"]:
     problems.append(f"the cards name {named}, not the one published file")

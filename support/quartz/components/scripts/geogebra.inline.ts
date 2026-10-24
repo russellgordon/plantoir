@@ -56,6 +56,11 @@ const GIVE_UP_MS = 60000
 
 let deploy: Promise<boolean> | null = null
 let made = 0
+// Counts Quartz's page changes. A sketch that finishes opening after the
+// page it was tapped on has gone marks nothing on the page now showing
+// (stage 2 review item 3): its figure may be gone, or a figure on the new
+// page may happen to be the same element Quartz kept.
+let pageChanges = 0
 // The applets open on this page, by their figure.
 const open = new Map<HTMLElement, Api>()
 
@@ -130,6 +135,8 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
   if (spec === null || box === null || open.has(figure) || figure.dataset.geogebraOpening === "yes") {
     return
   }
+  const tappedOnPage = pageChanges
+  const samePage = () => tappedOnPage === pageChanges && figure.isConnected
   figure.dataset.geogebraOpening = "yes"
   button.disabled = true
   say(figure, spec.loading)
@@ -139,6 +146,9 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
       return
     }
     settled = true
+    if (!samePage()) {
+      return
+    }
     delete figure.dataset.geogebraOpening
     button.disabled = false
     box.hidden = true
@@ -169,7 +179,7 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
       appletOnLoad: (api: Api) => {
         // Finished after the page changed, or after the student was told
         // it did not open: removed at once, never left running.
-        if (settled || !figure.isConnected) {
+        if (settled || !samePage()) {
           settled = true
           try {
             api.remove()
@@ -271,6 +281,7 @@ document.addEventListener("nav", () => {
     window.addCleanup(() => button.removeEventListener("click", tapped))
   }
   window.addCleanup(() => {
+    pageChanges += 1
     for (const [figure, api] of open) {
       try {
         api.remove()

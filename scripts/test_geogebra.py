@@ -234,6 +234,32 @@ class ContractCaseTests(unittest.TestCase):
             self.assertEqual(found[0].detail, case["detail"], case["name"])
 
 
+    def test_every_manifest_case(self):
+        # Stage 2 review item 1: by page AND fence, so each page shows its
+        # own file and the folder problem names the page that cannot.
+        cases = rules("manifest", "cases")
+        self.assertGreaterEqual(len(cases), 1)
+        for case in cases:
+            space = Space()
+            try:
+                for entry in case["files"]:
+                    name, _, kind = entry.partition(":")
+                    space.file(name, a_sketch(width=600 if kind == "one" else 700))
+                pages = [space.page(path, text) for path, text in sorted(case["pages"].items())]
+                outcome = space.prepare(pages)
+                manifest = json.loads((space.output / "quartz" / geogebra.WORKSPACE / "manifest.json")
+                                      .read_text(encoding="utf-8"))
+                shown = {}
+                for page, sketches in manifest["pages"].items():
+                    for entry in sketches.values():
+                        shown[page] = entry["source"]["contentPath"]
+                self.assertEqual(shown, case["shown"], case["name"])
+                self.assertEqual([{"page": problem["page"], "reason": problem["reason"]}
+                                  for problem in outcome["problems"]], case["problems"], case["name"])
+            finally:
+                space.close()
+
+
 class PassTests(unittest.TestCase):
 
     def setUp(self):
@@ -246,12 +272,20 @@ class PassTests(unittest.TestCase):
         path = self.space.output / "quartz" / geogebra.WORKSPACE / "manifest.json"
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def entries(self) -> list:
+        """Every entry in the manifest, page by page."""
+        found = []
+        for page in sorted(self.manifest()["pages"]):
+            for key in sorted(self.manifest()["pages"][page]):
+                found.append(self.manifest()["pages"][page][key])
+        return found
+
     def test_a_file_sketch_is_published_once_with_its_thumbnail(self):
         self.space.file("Unit 1/Lines.ggb", a_sketch(700, 400))
         page = self.space.page("Unit 1/Lesson.md", "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n")
         outcome = self.space.prepare([page])
         self.assertEqual(outcome["counts"]["geogebra"], 1)
-        entry = list(self.manifest()["sketches"].values())[0]
+        entry = self.entries()[0]
         self.assertEqual(entry["source"], {"kind": "file", "contentPath": "Unit 1/Lines.ggb"})
         self.assertEqual((entry["width"], entry["height"]), (700, 400))
         self.assertEqual(entry["alt"], "Two lines.")
@@ -268,7 +302,7 @@ class PassTests(unittest.TestCase):
         pages = [self.space.page("A.md", "```geogebra\nfile: Lines.ggb\nalt: One.\n```\n"),
                  self.space.page("B.md", "```geogebra\nfile: Lines.ggb\nalt: Two.\n```\n")]
         self.space.prepare(pages)
-        self.assertEqual(len(self.manifest()["sketches"]), 2)
+        self.assertEqual(len(self.entries()), 2)
         pictures = list((self.space.output / "quartz" / "static" / geogebra.THUMBNAILS).iterdir())
         self.assertEqual(len(pictures), 1)
 
@@ -278,12 +312,12 @@ class PassTests(unittest.TestCase):
                  self.space.page("B.md", "```geogebra\nf(x) = x^2\n```\n")]
         self.space.prepare(pages)
         sizes = sorted((entry["width"], entry["height"], entry["source"] is None)
-                       for entry in self.manifest()["sketches"].values())
+                       for entry in self.entries())
         self.assertEqual(sizes, [(500, 300, False), (800, 500, True)])
 
     def test_the_size_on_the_button_counts_the_engine_too(self):
         self.space.prepare([self.space.page("B.md", "```geogebra\nf(x) = x^2\n```\n")])
-        entry = list(self.manifest()["sketches"].values())[0]
+        entry = self.entries()[0]
         megabytes = rules("engine", "firstLoadBytes", "gzipped") / 1_000_000
         self.assertEqual(entry["size"], f"about {round(megabytes, 1)} MB")
 
@@ -311,7 +345,7 @@ class PassTests(unittest.TestCase):
         outcome = self.space.prepare([self.space.page("A.md", "```geogebra\nf(x) = x\n```\n")])
         self.assertEqual(outcome["problems"], [])
         self.assertEqual([note["reason"] for note in outcome["notes"]], ["missingAlt"])
-        self.assertEqual(list(self.manifest()["sketches"].values())[0]["alt"],
+        self.assertEqual(self.entries()[0]["alt"],
                          rules("words", "site", "untitledSketch"))
 
     def test_without_the_engine_nothing_is_shown(self):
