@@ -74,6 +74,9 @@
       },
       "quizzes": {
         "windows": true
+      },
+      "geogebra": {
+        "windows": false
       }
     }
   },

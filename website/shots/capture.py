@@ -21,6 +21,10 @@ Run it from the top of the repository::
     # quiz just checked, from previews of the kept marketing folder:
     python3 website/shots/capture.py --code
 
+    # The Visualizations page's GeoGebra figure (#578): MPM2D's slope-angle
+    # page with its sketch opened, from a preview in --print-folder:
+    python3 website/shots/capture.py --geogebra --print-folder ~/some/new/folder
+
 See website/README.md, "Regenerating every image", and scenes.py.
 
 What it does, in order:
@@ -1021,7 +1025,8 @@ def shots_of_kind(kind: str, scene: str | None = None) -> list[dict]:
     named. A `preview-page` shot is a page of a local preview, and which
     preview depends on its scene: `print-set` photographs MPM2D in
     ~/Plantoir Print, `code` photographs ICS3U and ICS4U in the marketing
-    folder (#562). Taking every preview-page shot against the print preview
+    folder (#562), `geogebra` MPM2D's slope-angle page in a folder of its
+    own (#578). Taking every preview-page shot against the print preview
     would ask MPM2D's site for ICS3U's pages, and webwindow refuses the 404."""
     manifest = json.loads((WEBSITE / "shots.json").read_text(encoding="utf-8"))
     wanted: list[dict] = []
@@ -1855,13 +1860,14 @@ PRINT_FOLDER = Path.home() / "Plantoir Print"
 from print_set import PRINT_COURSE_CONFIG, write_course_config  # noqa: E402
 
 
-def provision_print_course(folder: Path) -> None:
+def provision_print_course(folder: Path, resources: Path | None = None) -> None:
     """Make MPM2D in the print folder from its example content, unless it is
     there. A payload page changed since then reaches the folder only when the
-    folder is made again: delete it and run --print-set."""
+    folder is made again: delete it and run --print-set. `resources` as for
+    mirror_toolchain (the GeoGebra figure passes the committed recipe)."""
     code = PRINT_COURSE_CONFIG["course_code"]
-    ensure_launchers(folder)
-    mirror_toolchain(folder)
+    ensure_launchers(folder, resources=resources)
+    mirror_toolchain(folder, resources=resources)
     if workspace_has_course(folder, code) and (folder / "courses" / code / "Exercises").is_dir():
         print(f"   {code} is already there.")
         return
@@ -2127,6 +2133,38 @@ def photograph_preview_shots(folder: Path, shots: list[dict]) -> list[str]:
     return taken
 
 
+# ---------- GeoGebra sketches on the Visualizations page (#578) ----------
+
+def capture_geogebra_set(folder: Path) -> list[str]:
+    """The Visualizations page's GeoGebra figure: MPM2D's The Slope-Angle
+    Conjecture with its sketch opened (a tap) and drawn, light and dark.
+
+    A preview of MPM2D made from its example content in a folder of its own
+    (`--print-folder`; the course is the print set's), built by THIS tree's
+    recipe as committed (`git archive HEAD`), as the Code page's figures are:
+    the app plays no part in a picture of a class site, and the engine is in
+    the website builder that recipe makes. A folder made before the page was
+    in the example content does not have it, and is refused rather than
+    photographed as a 404: name a new folder, or delete that one.
+
+    Returns the pictures taken, as `<id>-light` / `<id>-dark`.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from preview_pages_windows import page_label
+    shots = shots_of_kind("preview-page", scene="geogebra")
+    if not shots:
+        raise SystemExit("shots.json has no preview-page shot in the geogebra scene.")
+    announce(f"Photographing the GeoGebra figure, in {folder}")
+    recipe = committed_recipe()
+    provision_print_course(folder, resources=recipe)
+    for shot in shots:
+        page = folder / "courses" / page_label(shot["capture"])
+        if not page.is_file():
+            raise SystemExit(f"{page} is not in {folder}: it was made before the page was in the example "
+                             "content. Name another folder with --print-folder, or delete this one.")
+    return photograph_preview_shots(folder, shots)
+
+
 # ---------- The Quizzes page (#587) ----------
 
 def capture_quiz_set(marketing: Path, demo: Path, only: list[str] | None = None) -> list[str]:
@@ -2240,6 +2278,8 @@ def main() -> int:
     parser.add_argument("--print-folder", default=str(PRINT_FOLDER),
                         help="the working folder the print pictures are taken in (made when absent; "
                              "must be inside your home folder)")
+    parser.add_argument("--geogebra", action="store_true",
+                        help="only the Visualizations page's GeoGebra figure: a preview of MPM2D in --print-folder (#578)")
     parser.add_argument("--code", action="store_true",
                         help="only photograph the Code page's figures: runnable Python and Swift blocks "
                              "after Run, and a quiz just checked, from previews of the marketing folder (#562)")
@@ -2315,6 +2355,22 @@ def main() -> int:
         rebuild_site()
         announce("Checking every picture's corners")
         return refuse_drawn_corners()
+
+    if arguments.geogebra:
+        folder = Path(arguments.print_folder).expanduser()
+        if Path.home() not in folder.parents:
+            raise SystemExit("The folder has to be inside your home folder, or the site builder sees it as empty.")
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        keeping_awake = stay_awake()
+        try:
+            taken = capture_geogebra_set(folder)
+        finally:
+            keeping_awake.terminate()
+        announce("Checking every picture's corners")
+        result = refuse_drawn_corners()
+        promote_captured_shots(taken)
+        rebuild_site()
+        return result
 
     if arguments.code:
         SCRATCH.mkdir(parents=True, exist_ok=True)
