@@ -9397,13 +9397,14 @@ and the deploy button — are the app's, not the tool's: over MCP the client is
 told which tools write (`readOnlyHint`) and does its own asking. The app itself answers the flag —
 `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` — rather
 than shipping a second binary, so no packaging step can leave it out. Claude
-Code is offered a LONGER list than the local model — 37 tools against 13
+Code is offered a LONGER list than the local model — 38 tools against 13
 (`assist-cases.json` → `toolSchemas.mcp` and `.local`), with the local model
-seeing exactly the thirteen its routing was measured against. The twenty-four
+seeing exactly the thirteen its routing was measured against. The twenty-five
 it does not see are off its list for several reasons (`AssistToolSurface.localTools`
-says each). Nine of them are among the twenty-two tools both surfaces share:
+says each). Ten of them are among the twenty-three tools both surfaces share:
 the seven `plan_` twins, which plan mode calls in code from the write the model
-already chose; `remember_timetable`, because dates a model supplies may be
+already chose; `open_in_obsidian` (#610), whose measured routing regressed, so
+the window matches its phrasings in code; `remember_timetable`, because dates a model supplies may be
 invented and the schedule sheet records them instead; and `re_date_classes`,
 whose phrasings are matched in code. The other fifteen are served
 only over MCP: reading the curriculum and pointing a page at the expectations
