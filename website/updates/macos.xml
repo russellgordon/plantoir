@@ -7,7 +7,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <title>Plantoir</title>
         <item>
             <title>1.9.0</title>
-            <pubDate>Sat, 24 Oct 2026 08:39:50 -0400</pubDate>
+            <pubDate>Sat, 24 Oct 2026 09:49:34 -0400</pubDate>
             <link>https://plantoir.app/</link>
             <sparkle:criticalUpdate sparkle:version="3943"/>
             <sparkle:version>4307</sparkle:version>
@@ -5611,6 +5611,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: VJkzjnqVOTg6JgTTK/DSO6xZOFB6wdN+3vQLIZzhRiyJZLxk1kppZBnHq94Kdb8Ecw/eU4qwB9osJh69ah/zCg==
-length: 592633
+edSignature: BPyM4piCMZcmeKx2I6xcq7L8DDF24vll7MsHG4MhpFEHmdAs1L1H0vYy5C5IQvBJv0L3pzd5n8rHXx8eueEfCQ==
+length: 592571
 -->
