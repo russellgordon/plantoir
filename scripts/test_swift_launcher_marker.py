@@ -35,6 +35,9 @@ LOCK_LITERAL = '/tmp/plantoir-swift-build-$(id -u).lock'
 WAIT_LITERAL = 'if [ "$waited" -ge 1200 ]; then'
 MARKER = "PLANTOIR_SWIFT:"
 REAL_LOG = REPOSITORY_ROOT / "scripts" / "fixtures" / "swift-image-build" / "cached.log"
+# The fallback preview.sh prints itself when the website builder said nothing
+# a teacher can read (#642): its echo line, held equal to mac.printed.unpack.
+FALLBACK_START = 'echo "'
 
 DOCKER_STUB = """#!/bin/bash
 # The stand-in docker: every call is written down, and answered from $STUB.
@@ -47,6 +50,13 @@ case "$1" in
         cat "$STUB/plan" ;;
       *"swift_blocks.py got-ready"*)
         shift 2
+        # A builder that cannot be asked prints nothing; an older copy of the
+        # script prints only the marker (#642's fallback, both cases).
+        [ -f "$STUB/got-ready-silent" ] && exit 1
+        if [ -f "$STUB/got-ready-only-marker" ]; then
+          echo 'PLANTOIR_SWIFT: {"ready": false, "reason": "offline"}'
+          exit 0
+        fi
         PLANTOIR_CONTRACTS_DIR="$STUB_CONTRACTS" exec python3 "$STUB_SCRIPTS/swift_blocks.py" "$@" ;;
       "df -Pk /")
         echo "Filesystem 1024-blocks Used Available Capacity Mounted"
@@ -226,21 +236,64 @@ class SwiftLauncherMarkerTests(unittest.TestCase):
         self.assertEqual(marker["downloadedBytes"], 0)
 
     def test_a_failed_build_says_why(self):
+        """#642: the sentence is the one for the reason the log gives
+        (mac.printed), printed before the marker, and state.json is what
+        mac.stateForReason says. Until #642 every case here printed offline's
+        sentence and wrote {state: notDownloaded}."""
+        rules = the_mac_rules()["mac"]
         cases = [
             ("#6 0.31 curl: (6) Could not resolve host: download.swift.org\n#6 ERROR: exit code: 6\n", "offline"),
+            ("#6 180.77 curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)\n"
+             "#6 ERROR: exit code: 92\n", "offline"),
             ("#6 45.0 /tmp/swift.tar.gz: FAILED\n#6 45.0 sha256sum: WARNING: 1 computed checksum did NOT match\n"
              "#6 ERROR: exit code: 1\n", "damaged"),
             ("#6 48.1 tar: Cannot write: No space left on device\n#6 ERROR: exit code: 2\n", "noRoom"),
             ("#9 0.80 curl: (22) The requested URL returned error: 404\n#9 ERROR: exit code: 22\n", "unpack"),
         ]
         for log_text, reason in cases:
-            with self.subTest(reason):
+            with self.subTest(log_text.split("\n")[0]):
                 (self.stub / "image-present").unlink(missing_ok=True)
+                (self.root / "state.json").unlink(missing_ok=True)
                 self.set_build(log_text, 1)
-                marker = self.the_one_marker(self.run_block(), "Could not get Swift ready")
+                output = self.run_block()
+                marker = self.the_one_marker(output, rules["printed"][reason])
                 self.assertEqual(marker, {"course": "ICS3U", "section": 2, "ready": False, "reason": reason})
+                for other, sentence in rules["printed"].items():
+                    if other != reason:
+                        self.assertNotIn(sentence, output, f"{reason} also said {other}'s sentence")
+                expected = {"reason": reason}
+                if rules["stateForReason"][reason] is not None:
+                    expected["state"] = rules["stateForReason"][reason]
+                self.assertEqual(json.loads((self.root / "state.json").read_text(encoding="utf-8")), expected)
                 self.assertFalse(self.lock.exists(), "the build lock was not given back")
 
+    def test_a_builder_that_cannot_be_asked_still_tells_the_teacher(self):
+        """#642: when the website builder prints nothing, preview.sh prints
+        mac.printed.unpack itself and writes no state.json, so the blocks say
+        "preview the course again" rather than blaming the internet."""
+        (self.stub / "got-ready-silent").touch()
+        self.set_build("#6 0.31 curl: (6) Could not resolve host: download.swift.org\n#6 ERROR: exit code: 6\n", 1)
+        output = self.run_block()
+        self.assertIn(the_mac_rules()["mac"]["printed"]["unpack"], output)
+        self.assertEqual(self.markers_in(output), [], output)
+        self.assertFalse((self.root / "state.json").exists(), "a state.json nobody chose was written")
+        self.assertFalse(self.lock.exists(), "the build lock was not given back")
+
+    def test_a_builder_that_prints_only_the_marker_still_tells_the_teacher(self):
+        """#642, director's ruling 2: an older swift_blocks.py ignores --state
+        and prints the marker alone; the fallback fires then too, before it."""
+        (self.stub / "got-ready-only-marker").touch()
+        self.set_build("#6 ERROR: exit code: 1\n", 1)
+        output = self.run_block()
+        marker = self.the_one_marker(output, the_mac_rules()["mac"]["printed"]["unpack"])
+        self.assertEqual(marker["ready"], False)
+        self.assertFalse((self.root / "state.json").exists())
+
+    def test_the_fallback_is_mac_printed_unpack_word_for_word(self):
+        unpack = the_mac_rules()["mac"]["printed"]["unpack"]
+        self.assertIn(f'{FALLBACK_START}{unpack}"', self.block)
+        offline = the_mac_rules()["mac"]["printed"]["offline"]
+        self.assertNotIn(offline, self.block, "preview.sh still carries a failure's sentence of its own")
 
 if __name__ == "__main__":
     unittest.main()
