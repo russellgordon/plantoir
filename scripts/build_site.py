@@ -3444,6 +3444,184 @@ def _write_visible_places(host_output_dir: Path, places: list, build_id: str,
         print(f"⚠️  Could not note which pages this site shows: {error}")
 
 
+# === #518: which file in the course folder each page of the site came from ===
+# Open in Obsidian, pressed while a section's preview is showing, opens the
+# file behind the page on screen. The app knows the page's ADDRESS; only the
+# build knows which file it was made from (a per-section page that replaced a
+# shared one, a folder's `_index`, a name Quartz slugged), so the build writes
+# the answer down, in both modes - a preview never reaches the publish branch
+# that writes the visible-pages list - and both apps read the same file.
+# `contracts/file-formats.json` -> `pageSourcesList` is the format;
+# `contracts/shared-rules.json` -> `obsidianOpensThePreviewedPage` is how the
+# app reads it. Outside `public/`, so no deploy uploads it.
+
+PAGE_SOURCES_FILE = ".page-sources.json"
+PAGE_SOURCES_VERSION = 1
+
+
+def page_slug_as_quartz_serves(relative: Path) -> str | None:
+    """
+    The address below the site's root that Quartz serves this content file
+    at, or None when Quartz does not make a page of it.
+
+    Quartz 4.5.0 makes pages of `.md` files only, matched exactly (a `.MD`
+    file is not a page: build.ts globs `**/*.md`), and its `slugifyFilePath`
+    treats a last segment `_index` as `index` - the two places measured
+    (2026-10-21, 38 names) where `_quartz_page_slug` alone disagreed with it.
+    """
+    if not relative.name.endswith(".md"):
+        return None
+    slug = _quartz_page_slug(relative)
+    if slug == "_index":
+        return "index"
+    if slug.endswith("/_index"):
+        return slug[:-len("_index")] + "index"
+    return slug
+
+
+def _body_without_settings(text: str) -> str:
+    """A page's text below its settings block, or all of it when it has none."""
+    lines = text.replace("\r\n", "\n").split("\n")
+    if not lines or lines[0].strip() != "---":
+        return text
+    for index in range(1, len(lines)):
+        if _is_frontmatter_fence(lines[index]):
+            return "\n".join(lines[index + 1:])
+    return text
+
+
+def _front_page_embed_source(section_index: Path, content_root: Path,
+                             course_dir: Path) -> tuple[str, bool] | None:
+    """
+    Russell's ruling on #518 (2026-10-23): when the section's front page is
+    ONLY a single `![[...]]` line below its settings, Open in Obsidian opens
+    the class page it shows rather than the one-line front page. The page is
+    named the way the build's own date pass reads the line
+    (`_class_embed_target`); a name that matches no page, or more than one,
+    leaves the front page itself, because guessing would open the wrong file.
+    Read from the TEACHER's file, not the build's copy, which the build gives
+    a title and may give the section marker.
+
+    Answers the class page's file and whether students are kept from IT -
+    the front page can be visible while the class it embeds is hidden, and
+    the trail says "(hidden from students)" of the file that opens (ruling
+    4), so `showsHidden` is that class's own flag, never the front page's.
+    """
+    try:
+        text = section_index.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    lines = []
+    for line in _body_without_settings(text).split("\n"):
+        if line.strip():
+            lines.append(line)
+    if len(lines) != 1:
+        return None
+    target = _class_embed_target(lines[0])
+    if target is None:
+        return None
+    matches = []
+    for page in content_root.rglob("*.md"):
+        if page.name.endswith(".md") and page.stem.lower() == target:
+            matches.append(page)
+    if len(matches) != 1:
+        return None
+    source = _vault_relative_source(matches[0], course_dir, content_root)
+    if source is None:
+        return None
+    try:
+        hidden = _is_draft(matches[0].read_text(encoding="utf-8"))
+    except Exception:
+        hidden = False
+    return source, hidden
+
+
+def _vault_relative_source(copied: Path, course_dir: Path,
+                           content_root: Path | None = None) -> str | None:
+    """The file `copied` came from, as a POSIX path below the course folder -
+    or None when the build made it, the file is gone, or it is not in the
+    course folder.
+
+    One correction on the way: the per-section folder copy credits EVERY file
+    under a folder it copied to the section, so when a folder name is both
+    shared and per-section, a shared page copied there first is credited to a
+    section file that does not exist. The file that made the page is then the
+    shared one at the same place in the course folder, which is what is
+    listed. (The record itself is left alone here; that trap is a toolchain
+    issue of its own, #518's plan.)"""
+    found = _vault_sources.get(copied)
+    if found is None:
+        return None
+    source, is_section_page = found
+    if not source.is_file() and is_section_page and content_root is not None:
+        try:
+            shared = course_dir / copied.relative_to(content_root)
+        except ValueError:
+            shared = None
+        if shared is not None and shared.is_file():
+            source = shared
+    if not source.is_file():
+        return None
+    try:
+        return source.resolve().relative_to(course_dir.resolve()).as_posix()
+    except (ValueError, OSError):
+        return None
+
+
+def page_sources(content_root: Path, course_dir: Path, course_code: str,
+                 section_number: int, build_id: str | None) -> dict:
+    """
+    This build's address -> file list (`pageSourcesList`): for every page
+    Quartz will serve, the file in the course folder it came from, and
+    whether students see it. An address two files both slug to is listed as
+    `collided` with no file, so the app can say why it opened the section
+    instead; a page the build made itself (My Progress, a coverage map) is
+    not listed at all.
+    """
+    candidates = {}
+    for page in sorted(content_root.rglob("*.md")):
+        slug = page_slug_as_quartz_serves(page.relative_to(content_root))
+        if slug is None:
+            continue
+        candidates.setdefault(slug, []).append(page)
+    pages = {}
+    for slug in sorted(candidates):
+        found = candidates[slug]
+        if len(found) > 1:
+            pages[slug] = {"collided": True}
+            continue
+        source = _vault_relative_source(found[0], course_dir, content_root)
+        if source is None:
+            continue
+        try:
+            hidden = _is_draft(found[0].read_text(encoding="utf-8"))
+        except Exception:
+            hidden = False
+        entry = {"source": source, "hidden": hidden}
+        if slug == "index":
+            section_index = course_dir / source
+            shown = _front_page_embed_source(section_index, content_root, course_dir)
+            if shown is not None:
+                entry["shows"] = shown[0]
+                entry["showsHidden"] = shown[1]
+        pages[slug] = entry
+    return {"version": PAGE_SOURCES_VERSION, "course": course_code,
+            "section": section_number, "buildId": build_id, "pages": pages}
+
+
+def _write_page_sources(host_output_dir: Path, content_root: Path, course_dir: Path,
+                        course_code: str, section_number: int,
+                        build_id: str | None) -> None:
+    """Written immediately before Quartz runs, after every pass that adds,
+    removes or renames a page, in a preview and a publish alike. Never fails
+    a build: without the list the app opens the section, as it always did."""
+    try:
+        _write_json_atomically(host_output_dir / PAGE_SOURCES_FILE, page_sources(
+            content_root, course_dir, course_code, section_number, build_id))
+    except Exception as error:
+        print(f"⚠️  Could not note which file each page came from: {error}")
+
+
 def _find_class_reachable_pages(content_root: Path) -> set[Path]:
     """
     Find all pages in content_root that are reachable (directly or transitively)
@@ -9432,6 +9610,13 @@ def build_section_site(
     env = toolchain_paths.node_environment(os.environ)
     env.setdefault("TZ", "UTC")
     env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # 2024-01-01T00:00:00Z
+
+    # #518: which file each page came from, for Open in Obsidian. Here, the
+    # last moment before Quartz reads the content, so no later pass can add
+    # or remove a page the list does not know about - and before the branch,
+    # because a preview needs it as much as a publish.
+    _write_page_sources(host_output_dir, content_root, course_dir, course_code,
+                        section_number, _this_build_id)
 
     if build_only:
         # A preview for THIS section may still be serving, and it does not stop
