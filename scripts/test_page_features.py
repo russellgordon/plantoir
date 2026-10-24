@@ -211,6 +211,56 @@ class GateTests(unittest.TestCase):
         self.assertTrue(self.said, "a page asked for printing and nothing said the engine was missing")
 
 
+class GeoGebraGateTests(unittest.TestCase):
+    """#578: GeoGebra's engine (27 MB) reaches a site only when a page there has a sketch."""
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp(prefix="plantoir-gate-geogebra-"))
+        self.vendor = self.folder / "vendor"
+        engine = self.vendor / "geogebra"
+        (engine / "HTML5" / "5.0" / "web3d").mkdir(parents=True)
+        (engine / "deployggb.js").write_text("/* loader */\n", encoding="utf-8")
+        (engine / "HTML5" / "5.0" / "web3d" / "web3d.nocache.js").write_text("/* engine */\n", encoding="utf-8")
+        (engine / "README.txt").write_text("Made with GeoGebra\n", encoding="utf-8")
+        self.output = self.folder / "section1"
+        (self.output / "quartz" / "static").mkdir(parents=True)
+        self.said = []
+
+    def tearDown(self):
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def _gate(self, count):
+        return page_features.install_gated_assets(
+            self.output, {"geogebra": count}, vendor_dir=self.vendor, printer=self.said.append)
+
+    def test_the_engine_has_a_gate_and_words_of_its_own(self):
+        self.assertIn("geogebra", page_features.GATED_ASSETS)
+        self.assertEqual(set(page_features.ENGINE_WORDS["geogebra"]), {"missing", "carried", "failed"})
+
+    def test_a_page_with_a_sketch_copies_the_whole_engine_and_its_readme(self):
+        self._gate(1)
+        static = self.output / "quartz" / "static" / "geogebra"
+        self.assertTrue((static / "deployggb.js").is_file())
+        self.assertTrue((static / "HTML5" / "5.0" / "web3d" / "web3d.nocache.js").is_file())
+        self.assertTrue((static / "README.txt").is_file())
+        self.assertEqual(self.said, [page_features.ENGINE_WORDS["geogebra"]["carried"].format(pages=1, noun="page")])
+
+    def test_no_sketch_leaves_a_site_exactly_as_it_was_and_takes_away_an_old_copy(self):
+        before = sorted(str(path.relative_to(self.output)) for path in self.output.rglob("*"))
+        self._gate(0)
+        after = sorted(str(path.relative_to(self.output)) for path in self.output.rglob("*"))
+        self.assertEqual(before, after)
+        self._gate(2)
+        self._gate(0)
+        self.assertFalse((self.output / "quartz" / "static" / "geogebra").exists())
+
+    def test_a_missing_engine_is_said_in_its_own_words(self):
+        shutil.rmtree(self.vendor)
+        self._gate(3)
+        self.assertEqual(self.said, [page_features.ENGINE_WORDS["geogebra"]["missing"].format(pages=3)])
+        self.assertFalse((self.output / "quartz" / "static" / "geogebra").exists())
+
+
 class PrintPdfFindingTests(unittest.TestCase):
     """siteHealth -> printPdfNotFound: the teacher is told, in the app, not only the console."""
 

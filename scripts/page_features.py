@@ -24,6 +24,9 @@ real chain, inside the image, by `check_print_rules_against_the_site.py`.
 #485 E1 added `function-plot`, which no frontmatter key asks for: a
 ```functionplot fence on a page students can see does (scripts/figures.py
 counts them), and the build hands the count in beside the printable pages'.
+#578 adds `geogebra` the same way: a ```geogebra fence (scripts/geogebra.py,
+from stage 2) makes the site carry VENDOR_DIR/geogebra, the engine
+scripts/geogebra_engine.py prepared - 27 MB, so only a site with a sketch.
 
 #455 adds a third key, `codeRunner: true`, and with it the LANGUAGE TABLE
 (RUNNER_LANGUAGES, the literal mirror of contracts/shared-rules.json ->
@@ -85,7 +88,7 @@ RUNNER_WORDS_FILE = "plantoir_code_runner.json"
 # Which engine each opt-in key pulls into a site. The engine's folder under
 # VENDOR_DIR, and under the site's quartz/static, has the same name. Every
 # runnable language's engine rides the `codeRunner` key.
-GATED_ASSETS = {"pagedjs": "printable", "function-plot": "functionplot"}
+GATED_ASSETS = {"pagedjs": "printable", "function-plot": "functionplot", "geogebra": "geogebra"}
 for _row in RUNNER_LANGUAGES.values():
     GATED_ASSETS[_row["engine"]] = "codeRunner"
 
@@ -104,6 +107,12 @@ ENGINE_WORDS = {
                    "what draws graphs, so students will see each graph's text instead.",
         "carried": "📈 This site carries what draws the graphs on {pages} {noun}.",
         "failed": "⚠️ Could not set up the graphs: {error}",
+    },
+    "geogebra": {
+        "missing": "⚠️ {pages} page(s) have a GeoGebra sketch, but this copy of Plantoir is missing "
+                   "GeoGebra, so the sketches will not open for students.",
+        "carried": "📐 This site carries GeoGebra for the sketches on {pages} {noun}.",
+        "failed": "⚠️ Could not set up GeoGebra for the sketches: {error}",
     },
 }
 # A runnable language's engine is said in the words of what it is for: the
