@@ -130,6 +130,49 @@ targets:
       - framework: Vendor/Sparkle/Sparkle.framework
         embed: true
         codeSign: true
+    postBuildScripts:
+      # The fingerprints the working-folder mirror compares by (#663): one
+      # line per file it copies, with length, time and SHA-256, written FROM
+      # THE BUNDLE after Xcode has copied the resources and before it signs
+      # them. From the bundle and not the checkout, because Xcode's folder
+      # copy restamps every file it copies (measured: 0 of 12,901 kept the
+      # checkout's time), so a manifest of the source tree would describe no
+      # file the app carries. Runs on every build (basedOnDependencyAnalysis:
+      # false): a folder reference is tracked by its DIRECTORY's time (Trap 1),
+      # so dependency analysis on the four folders would let a build that
+      # copied an edited script skip it. The script reuses the last manifest's hash wherever length
+      # and time still match, so a build that copied nothing new reads
+      # nothing. The inputs are declared for the script sandbox, not for
+      # dependency analysis: this target leaves ENABLE_USER_SCRIPT_SANDBOXING
+      # at Xcode's default for a project that does not set it (NO), and the
+      # phase was measured working under YES too (2026-10-23, Xcode 26.6) —
+      # with no inputs the sandbox refused to let Python read even this
+      # script; with these, folders included, it hashed all 12,912 files and
+      # wrote the same manifest byte for byte.
+      # documentation/09-mac-app.md → "Comparing without reading (#663)".
+      - name: Write the toolchain's fingerprints
+        script: |
+          /usr/bin/python3 -I "${PROJECT_DIR}/BuildScripts/write_toolchain_hashes.py" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+        inputFiles:
+          - $(PROJECT_DIR)/BuildScripts/write_toolchain_hashes.py
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/patches
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/scripts
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/support
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/contracts
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Dockerfile
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/setup.sh
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/preview.sh
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/deploy.sh
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/setup.bat
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/preview.bat
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/deploy.bat
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/setup.ps1
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/preview.ps1
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/deploy.ps1
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/toolchain.hashes
+        basedOnDependencyAnalysis: false
+        showEnvVars: false
     info:
       path: QuartzTeachers/Info.plist
       properties:
