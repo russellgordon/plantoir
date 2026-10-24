@@ -170,7 +170,8 @@ def heading_text(line: str) -> str | None:
 def notes_for_the_mac(notes_markdown: str) -> list[str]:
     """The approved notes, less what a Mac's update window must not show:
     the Downloads section (its checksum table and the line under it), every
-    line labelled for Windows, and table rows anywhere. "(macOS)" labels are
+    line labelled for Windows, the "Windows: …" status sentence wherever it
+    sits in the first paragraph, and table rows anywhere. "(macOS)" labels are
     dropped, since every line in this window is about the Mac."""
     kept: list[str] = []
     skipping_section = False
