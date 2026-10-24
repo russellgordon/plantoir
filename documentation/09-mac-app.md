@@ -8421,7 +8421,9 @@ folder ready after an update (#473)"), with the mac's differences named:**
 - **The trail line** `working folder tools copied` is written on both
   platforms now (its contract entry lost `appliesOn: ["windows"]`): once per
   copy that changed or failed something, the counts, the seconds, and the
-  first file that failed. `BuilderWarmUp`, which copies the same recipe into
+  first file that failed. Since #663 also once per copy that had to READ a
+  file to compare it, with how many were compared and read in full
+  ("Comparing without reading (#663)", below). `BuilderWarmUp`, which copies the same recipe into
   its own folder, builds nothing from a copy that failed, since the image
   would carry the wrong tag.
 
@@ -8434,6 +8436,182 @@ up to date in 3.8 s"). Before this piece the same launch would have shown
 its window at about 4 s. The number that matters, launch to a usable
 window, no longer depends on the copy at all — Windows' sentence, true here
 too.
+
+#### Comparing without reading (#663, 2026-10-24)
+
+The mac's half of Windows #559 (12 → "Comparing without reading (#559)").
+**What was wrong** is the same on both: `syncFile` trusted a copy when its
+length AND time matched the bundled file, and when only the length matched
+it read BOTH files in full, compared them and restamped the copy. So a
+pass cost what the number of DIFFERENT TIMES made it cost, not the number of
+changed files — and Xcode's folder-reference copy restamps every file it
+copies (the planner counted 0 of 12,901 resource files in a Debug bundle
+carrying the checkout's time), so every full install of a new build gives
+every file a new time. The trail said nothing about it: a pass that read
+twelve thousand files and changed none wrote no line.
+
+**What it does now — Windows' design, with the mac's differences named.**
+
+- **The build writes a manifest FROM THE BUNDLE.** A post-build phase in
+  `project.yml` ("Write the toolchain's fingerprints") runs
+  `BuildScripts/write_toolchain_hashes.py` on
+  `$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH`, after Xcode's
+  resource copy and before code signing. It writes `Resources/toolchain.hashes`:
+  one line per file the mirror copies (the ten root files in
+  `copyToolchainFiles` and everything under `patches/`, `scripts/`,
+  `support/`, `contracts/`; 12,912 lines today), the same four tab-separated
+  fields as Windows — relative path with `/`, length, UTC time in .NET ticks,
+  SHA-256. The same arrangement as Windows, whose `.hashes` is written from
+  the built output after MSBuild's copy (`Plantoir.csproj`); here it is
+  written after Xcode's copy, so its times are the bundle's own exact times
+  and no source-tree time ever has to survive Xcode. **The one real difference
+  from Windows is the installer:** Inno rounds times to 2 s, the DMG and
+  Sparkle keep them to the tick, so the mac trusts a fingerprint within 1 ms
+  on both sides. It sits at the Resources root, in none of the four folders,
+  so it is never mirrored.
+  - Incremental: a line whose length and time still match the previous
+    manifest keeps its hash unread, and the file is written whole (temporary
+    file, rename) and only when it changes. **Measured** (M4 Pro, warm): a
+    full write hashes 12,912 files in 1.09–2.46 s (three runs: 2.46, 1.18,
+    1.09); a build that copied nothing new costs 0.55 s and rewrites nothing.
+  - **Runs on every build** (`basedOnDependencyAnalysis: false`): a folder
+    reference is tracked by its directory's time (Trap 1), so dependency
+    analysis on the four folders would let a build that copied an edited
+    script skip the phase.
+  - **The script sandbox.** The target leaves `ENABLE_USER_SCRIPT_SANDBOXING`
+    unset, which Xcode 26.6 resolves to NO for it. Measured under YES
+    anyway, so a later default cannot break it quietly: with no declared
+    inputs the sandbox refused Python even the script
+    (`deny(1) file-read-data …/write_toolchain_hashes.py`, build failed);
+    with the script, the four FOLDERS and the ten root files declared as
+    inputs it hashed all 12,912 files and wrote the same manifest byte for
+    byte. So the inputs are declared, the output is declared, and sandboxing
+    is not turned off.
+- **Each working folder gets an index**: the manifest last applied to it,
+  with each copy's own length and time read back from the disk. It lives at
+  `<RealHome.forFiles>/Library/Application Support/Plantoir/toolchain-index/<BuildOutputLocation.folderIdentifier>.hashes`,
+  so a `--state-dir` run and the unit suite keep their own, and it is
+  written whole, only after a pass that failed nothing and only when it
+  changed (`ToolchainFingerprints`, `ToolchainMirrorPass`, Models/).
+- **The comparison** (`syncFile` with a pass). One `stat` of each file, used
+  for every question below. Length and time equal → identical, as before.
+  Otherwise, at the same length: the manifest still describes the bundled
+  file AND the index still describes the copy → the two hashes are compared
+  and **the bundled file is not read at all**; only the manifest is trusted
+  → the copy alone is hashed; neither → both read, exactly as before. A
+  manifest that is missing, or a line that no longer matches its file,
+  falls back to that last case, so a stale manifest or a copy edited in
+  place costs reads, never a missed copy (`testAStaleManifestDoesNotSkipTheCopy`,
+  whose stale manifest carries exactly the copy's hash).
+  - **Trust is 1 ms on BOTH sides** — the tolerance `filesLookIdentical`
+    has always used. Windows trusts a bundled file up to 2 s older than its
+    manifest because Inno rounds every installed time down to 2 s; the mac
+    measured no rounding anywhere (below), so it has no reason to widen the
+    window in which a file that moved on is trusted.
+  - **The index outlives a delta's pass.** An index entry that still
+    describes its copy is carried into the next index even when the
+    manifest cannot vouch for the bundled file (`keepWhatIsStillKnown`), and
+    a copy written or compared by reading is learned from the bytes in hand.
+    That is a mac addition, forced by M2: after a Sparkle delta the new
+    build's manifest describes none of the unchanged files, and without it
+    the index emptied on the delta's pass and the next FULL install hashed
+    every copy again (`testAFullInstallAfterADeltaReadsNothing`, which
+    fails with it removed: 6 of 7 copies read).
+  - `BuilderWarmUp` calls `copyToolchainFiles` for its own folder and gets
+    the same pass, with an index keyed by that folder
+    (`testTheWarmUpsFolderIsComparedByFingerprintToo`). `AgentGuidance`'s
+    skills and `BuilderWarmUp`'s single `setup.sh` pass no manifest and take
+    the old comparison.
+- **Counts and the trail line.** `MirrorOutcome` gains `compared` (files
+  that already had a copy, however they were compared — the cheap match by
+  length and time counts, as on Windows) and `readInFull` (the copy hashed,
+  or both read). `working folder tools copied` now says
+  `got the working folder ready: N file(s) brought up to date, M compared (K read in full) in S s`,
+  each new clause only when above 0, the failure sentence with the same
+  counts — and it is written for a pass that READ anything even when it
+  changed nothing, never for the ordinary launch that matched every file by
+  length and time. Contract: `shared-rules.json` → `activityTrail.mustRecord`
+  → "working folder tools copied".
+
+**Measured** (Apple M4 Pro, 48 GB, macOS 26.6, Xcode 26.6, 2026-10-24).
+
+- **M1 — a DMG keeps every time.** The Debug bundle was staged with
+  `cp -a` (as `publish.sh` stages), put in a DMG with `hdiutil create -fs
+  APFS … -format UDZO` (`publish.sh`'s fallback), mounted, and copied out
+  three ways. Against the bundle's manifest, 12,912 of 12,912 files matched
+  **to the tick** at every step: the staged copy, the mounted DMG, `ditto`
+  out of it, `cp -Rp` out of it, and `FileManager.copyItem` out of it (the
+  call Sparkle's disk-image path makes). 0 within 1 ms, 0 outside. So a DMG
+  drag, or a Sparkle FULL install, gives the teacher exactly the bundle's
+  times and the manifest describes every file. (Finder's own drag was not
+  driven; `ditto` and `copyItem` are the copies it and Sparkle make.)
+- **M2 — a Sparkle delta keeps the OLD times.** Sparkle 2.9.6's
+  `BinaryDelta apply` (the pinned release's tool, SHA-256 checked) took a
+  `ditto` copy of the installed 1.8.6 (build 4076) to 1.8.7 (4167) with the
+  shipped `Plantoir4167-4076.delta`, in 21.3 s. Of the 1.8.7 recipe's 12,910
+  files, **none** carried 1.8.7's time; the 12,865 whose bytes did not change
+  kept 1.8.6's time to the tick, and the 26 changed and 19 added files got
+  the time they were written. So after a delta the build-time manifest
+  vouches for nothing — and nothing needs it: the working folder's copies
+  carry the same old times, and the cheap match answers for all but the
+  45 files the update actually touched. The manifest earns its keep on FULL
+  installs (M1) and rebuilds; the delta case is why the index is carried
+  forward (above). Sparkle's installer itself was not driven end to end:
+  `BinaryDelta apply` is the step that writes the new tree, and the move
+  into place is a rename.
+- **M0** (the planner's, not repeated): Xcode's folder copy does not keep the
+  checkout's times in Debug. Writing the manifest from the bundle makes the
+  question moot for Release too.
+- **M3 — the pass after a restamp, before and after.** A throwaway XCTest
+  (not committed) timed `copyToolchainFiles(into:)` against a scratch
+  working folder filled from the test host's own bundle (12,912 files,
+  ~80 MB), then restamped every bundled file and rewrote the manifest the
+  way the build phase does, three times; "before" is origin/dev's
+  `WorkspaceModel.swift` and `ToolchainReadiness.swift` swapped in. Warm
+  cache, Debug build, two rounds each:
+
+  | | Restamped pass 1, 2, 3 | Ordinary pass (nothing to do) |
+  |---|---|---|
+  | Before | 5.95, 3.25, 1.95 s; 2.94, 1.97, 1.98 s — every file read twice | 1.07 s; 1.03 s |
+  | After | 1.40, 1.43, 1.38 s; 1.45, 1.44, 1.41 s — 12,912 compared, 0 read in full | 0.98 s; 1.02 s |
+
+  Warm, on the fastest Mac there is, the saving is about half a second to
+  four and a half seconds; the first restamped pass of each "before" round
+  was the slowest because its reads were the least cached. **Cold cannot be
+  measured without a reboot**, and a cold read of 160 MB is where the old
+  pass was expensive; Windows measured 102–132 s cold against 11.2 s warm
+  for its read-both pass, which is the shape to expect on a slow disk.
+  - **Rejected on measurement: the first version** asked `stat` again for
+    every fingerprint question (manifest, index, remember) after
+    `filesLookIdentical`'s two resource lookups. It made the ORDINARY pass —
+    the one every launch pays — 0.4 s slower (1.45 s and 1.40 s against
+    1.03–1.07 s) and the restamped pass only 1.77–1.96 s. One `stat` per
+    file, shared by every question, brought both down to the table's
+    numbers; `filesLookIdentical` now asks the same `stat`, so there is one
+    definition of "looks identical".
+
+**Rejected**, beyond Windows' list (12 → #559, which applies here too —
+copying on every time mismatch, keeping the index beside `.toolchain`,
+copying into a temporary folder and renaming):
+
+- **A manifest written from the source tree.** Xcode
+  restamps every file it copies (M0), so it would describe no file the app
+  carries and trust nothing.
+- **Hashing the bundle at first launch and caching it.** That IS the cold
+  read this exists to avoid.
+- **Windows' one-sided 2 s rule for the manifest.** There is no installer
+  rounding on the mac to allow for (M1, M2).
+- **Turning `ENABLE_USER_SCRIPT_SANDBOXING` off for the target.** Not
+  needed: declared inputs work under the sandbox (above).
+
+**What a full install after deltas costs.** The index fills only on a pass
+the manifest can vouch for — a full install or a rebuild. A folder kept up
+to date by deltas alone has an index that knows only the files those
+deltas changed, so its next full install hashes the other copies once (one
+read each, not two) and is cheap from then on. The first version with this
+piece is the same case for every folder: installed from the DMG, its first
+launch reads each copy once; installed by a delta, it reads nothing (the
+times answer). **At the cut**, `RELEASING.md` step 4 asks for the check.
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 
