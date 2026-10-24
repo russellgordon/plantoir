@@ -25,6 +25,27 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 </ul>
 <h3>Improved</h3>
 <ul>
+<li><strong>The website builder runs on a newer engine.</strong> Your sites look exactly the same. Plantoir also keeps a record of the known weaknesses in the parts it carries, and checks for new serious ones every time its tests run.</li>
+<li><strong>A quiz the website reads differently from the way Plantoir read it</strong> is now listed among your folder&#x27;s problems, naming the page and the quiz, instead of appearing only in the build&#x27;s console.</li>
+<li><strong>When Plantoir can&#x27;t get Swift ready</strong> for a course&#x27;s runnable programs, it now says why: not enough free space, a download that arrived damaged, or something else. Before, it always blamed the internet connection.</li>
+<li><strong>Getting a working folder ready after an update is quicker.</strong> Plantoir trusts a list of what it ships instead of reading every file twice, and the breadcrumb trail says how many files it compared.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li><strong>The Mac update window no longer shows the Windows status line</strong> that belongs on the release page.</li>
+</ul>
+</div>
+<div data-sparkle-version="4307">
+<h2>Plantoir 1.9.0</h2>
+<p>Plantoir 1.9.0 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself. The changes to your class websites reach each site the next time you deploy it; the first preview after updating takes a few minutes longer while Plantoir rebuilds its website builder (about 360 MB downloaded once).</p>
+<h3>New</h3>
+<ul>
+<li><strong>GeoGebra sketches on your pages.</strong> Put a GeoGebra file beside a page, type GeoGebra commands in a block, or name a sketch from geogebra.org, and students get a sketch they can drag and explore — on a page or inside a quiz question, opened with a tap, served from your own class site with no visit to geogebra.org. The ready-made MPM2D course has one: The Slope-Angle Conjecture. The sketch&#x27;s credit line appears on screen and in print.</li>
+<li><strong>Text blocks that wrap.</strong> Start a block with ```<code> </code>`<code>text wrap </code>``` and long lines wrap at the window&#x27;s width instead of scrolling sideways; each line keeps its number and continuation lines show a small ellipsis in the margin, the way BBEdit does. Code blocks never wrap.</li>
+<li><strong>Open in Obsidian goes to the page you are looking at.</strong> From a section&#x27;s window, menu or row, Open in Obsidian opens the Markdown file behind the page the preview is showing, including hidden pages, and falls back to the vault when it cannot tell. You can also ask the assistant: &quot;open this page in Obsidian&quot;.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
 <li><strong>The website builder runs on a newer, supported engine.</strong> The old one stopped receiving security fixes in April; your sites look exactly the same. Plantoir also keeps a record of known weaknesses in the parts it carries, and checks for new serious ones every time its tests run.</li>
 <li><strong>A quiz the website reads differently from the way Plantoir read it</strong> is now listed among your folder&#x27;s problems, naming the page and the quiz, instead of appearing only in the build&#x27;s console.</li>
 <li><strong>When Plantoir can&#x27;t get Swift ready</strong> for a course&#x27;s runnable programs, it now says why: not enough free space, a download that arrived damaged, or something else. Before, it always blamed the internet connection.</li>
@@ -5611,6 +5632,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: VJkzjnqVOTg6JgTTK/DSO6xZOFB6wdN+3vQLIZzhRiyJZLxk1kppZBnHq94Kdb8Ecw/eU4qwB9osJh69ah/zCg==
-length: 592633
+edSignature: T6tz46iUcxw2LapvMw8flV0DXPVuC+DU7RCDfeC4pzcsZZ7wg44JeVL9IpIqDvo0BAyUCE7DrzKJ9sSa7r6fDg==
+length: 595296
 -->
