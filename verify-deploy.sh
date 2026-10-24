@@ -333,6 +333,14 @@ trap restore_what_was_borrowed EXIT INT TERM
 
 # ---------------------------------------------------------------- preflight
 hdr "Preflight — refuse clearly rather than half-running"
+# The teacher's own folder is never a test folder: this run rewrites its
+# recipe, its destinations and its sites.
+CANONICAL_FOLDER=$(cd "$WORKING_FOLDER" 2>/dev/null && /bin/pwd -P)
+CLASS_WEBSITES=$(cd "$HOME/Desktop/Class Websites" 2>/dev/null && /bin/pwd -P)
+if [ -n "$CANONICAL_FOLDER" ] && [ "$CANONICAL_FOLDER" = "$CLASS_WEBSITES" ]; then
+  echo "  ❌ $WORKING_FOLDER is the teaching folder (Class Websites); run this against a test folder"
+  exit 1
+fi
 [ -f "$CONFIG" ] || { echo "  ❌ No course at $CONFIG"; exit 1; }
 ok "course found: $COURSE section $SECTION in $WORKING_FOLDER"
 cp "$CONFIG" "$ORIGINAL_CONFIG"
@@ -349,6 +357,82 @@ else
   skip "no Cloudflare credentials — Cloudflare cases will be skipped, not failed"
 fi
 CF_ACCOUNT=$(security find-generic-password -s "containerized-quartz-cloudflare-account" -w 2>/dev/null || echo "")
+
+# ------------------------------------- the recipe the launchers run (#665)
+# The checks read THIS checkout's contracts/ (check_engine_folder), but the
+# launchers run the folder's own .sh files and .toolchain/, which only the app
+# refreshes - and the image tag hashes .toolchain/, so a stale mirror is a
+# stale IMAGE that looks perfectly healthy. Measured 2026-10-23 on
+# ~/Desktop/plantoir-overnight against origin/dev: 27 differences under
+# scripts/, 20 under support/, 6 under contracts/, plus .toolchain/Dockerfile,
+# .toolchain/preview.sh and the folder's preview.sh. At the 1.8.7 cut it cost
+# three failures against a product that was fine.
+#
+# MIRRORED rather than refused, as Windows does (#630): mirroring is what the
+# app does to a folder it touches, and a refusal would only hand the runner
+# the remedy every time. From the WORKING TREE, which is what the checks read;
+# `git archive HEAD` was rejected because it recreates the mismatch whenever
+# the tree has changes. The folder list is READ from contracts/toolchain.json
+# -> recipeFolders, never a fifth hand-kept copy. Python's caches are never
+# copied: preview.sh's toolchain_hash does not prune __pycache__, so one
+# copied cache would be a new image tag. A cache already in the folder is left
+# alone (openrsync keeps an excluded file on --delete; measured). -p and -a
+# keep modification dates, so the app's size-and-date check finds nothing to
+# redo. The mirror STAYS: the folder is a test folder, and the app re-mirrors
+# its own bundled copy whenever it next touches it.
+REPO="$(cd "$(dirname "$0")" && pwd)"
+RECIPE_LAUNCHERS="setup.sh preview.sh deploy.sh"
+RECIPE_ROOT_FILES="Dockerfile setup.sh preview.sh deploy.sh setup.bat preview.bat deploy.bat setup.ps1 preview.ps1 deploy.ps1"
+RECIPE_FOLDERS=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["recipeFolders"]["folders"]))' "$REPO/contracts/toolchain.json" 2>/dev/null)
+recipe_differences() {  # how many places the folder's recipe differs from this checkout's
+  local n=0 name folder
+  for name in $RECIPE_LAUNCHERS; do cmp -s "$REPO/$name" "$WORKING_FOLDER/$name" || n=$((n+1)); done
+  for name in $RECIPE_ROOT_FILES; do cmp -s "$REPO/$name" "$WORKING_FOLDER/.toolchain/$name" || n=$((n+1)); done
+  for folder in $RECIPE_FOLDERS; do
+    if [ -d "$WORKING_FOLDER/.toolchain/$folder" ]; then
+      n=$((n + $(diff -rq --exclude=__pycache__ --exclude=.DS_Store "$REPO/$folder" "$WORKING_FOLDER/.toolchain/$folder" 2>/dev/null | wc -l)))
+    else
+      n=$((n+1))
+    fi
+  done
+  echo "$n"
+}
+mirror_recipe() {
+  local name folder
+  for name in $RECIPE_LAUNCHERS; do
+    cmp -s "$REPO/$name" "$WORKING_FOLDER/$name" || cp -p "$REPO/$name" "$WORKING_FOLDER/$name" || return 1
+  done
+  for name in $RECIPE_ROOT_FILES; do
+    cmp -s "$REPO/$name" "$WORKING_FOLDER/.toolchain/$name" || cp -p "$REPO/$name" "$WORKING_FOLDER/.toolchain/$name" || return 1
+  done
+  for folder in $RECIPE_FOLDERS; do
+    mkdir -p "$WORKING_FOLDER/.toolchain/$folder" \
+      && rsync -a --delete --exclude=__pycache__ --exclude=.DS_Store "$REPO/$folder/" "$WORKING_FOLDER/.toolchain/$folder/" \
+      || return 1
+  done
+}
+if [ -z "$RECIPE_FOLDERS" ]; then
+  echo "  ❌ could not read the recipe's folders from $REPO/contracts/toolchain.json"; exit 1
+fi
+if [ ! -f "$WORKING_FOLDER/preview.sh" ] || [ ! -f "$WORKING_FOLDER/.toolchain/Dockerfile" ]; then
+  echo "  ❌ $WORKING_FOLDER has no preview.sh or no .toolchain/Dockerfile, so it is not a working folder to mirror a recipe into"; exit 1
+fi
+RECIPE_COMMIT=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "not a checkout")
+RECIPE_DIRTY=$(git -C "$REPO" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+RECIPE_CHANGED=$(recipe_differences)
+if [ "$RECIPE_CHANGED" -eq 0 ]; then
+  ok "the folder already runs this checkout's recipe (launchers and .toolchain, nothing differed)"
+else
+  mirror_recipe || { echo "  ❌ this checkout's recipe could not be mirrored into $WORKING_FOLDER; refusing to judge it against whatever the folder had"; exit 1; }
+  RECIPE_LEFT=$(recipe_differences)
+  if [ "$RECIPE_LEFT" -ne 0 ]; then
+    echo "  ❌ mirrored this checkout's recipe, but $RECIPE_LEFT difference(s) remain; refusing to run"; exit 1
+  fi
+  ok "mirrored this checkout's recipe into the folder: $RECIPE_CHANGED difference(s) removed (the mirror stays; the app re-mirrors its own copy when it next touches the folder)"
+fi
+if pgrep -x Plantoir >/dev/null 2>&1; then
+  echo "  ⚠️  Plantoir is running: if it touches this folder during the run it mirrors its OWN copy back, and the Result block will say so"
+fi
 
 # --------------------------------------------------------------- helpers
 # Every deploy is driven through expect, because a first publish to Netlify
@@ -747,6 +831,19 @@ RUNNERPAGE
 # one before it, when nothing else in the built site differs.
 printf '\nThis run: %s.\n' "$RUN_MARK" >>"$RUNNER_PAGE"
 ok "a page of runnable code borrowed into section $SECTION (removed on any exit)"
+# A changed recipe means a new image, and patches that run only when Quartz's
+# scaffold is first copied: so the section is rebuilt from scratch, in the
+# foreground, BEFORE the serve below starts its ten-minute announce wait (an
+# image rebuild alone can take most of that).
+if [ "$RECIPE_CHANGED" -ne 0 ]; then
+  RECIPE_BUILD_START=$(date +%s)
+  if ( cd "$WORKING_FOLDER" && ./preview.sh "$COURSE" "$SECTION" --build-only --full-rebuild >"$WORK/build-recipe.log" 2>&1 ); then
+    ok "the recipe changed, so the section was rebuilt from scratch with it ($(( $(date +%s) - RECIPE_BUILD_START )) s)"
+  else
+    no "the section did not build from scratch with this checkout's recipe (see $WORK/build-recipe.log)"
+  fi
+  MEASURED+=("Rebuilding from scratch after the recipe changed: $(( $(date +%s) - RECIPE_BUILD_START )) s")
+fi
 ( cd "$WORKING_FOLDER" && nohup ./preview.sh "$COURSE" "$SECTION" >"$WORK/preview.log" 2>&1 & )
 PREVIEW_PORT=""
 for _ in $(seq 1 120); do
@@ -1001,8 +1098,17 @@ grep -q "kept_for_reference" "$CONFIG" \
   && no "the marker was left behind on the scratch course" \
   || ok "the scratch course is back to an ordinary one"
 
+# Asked again at the end: a running app that touches the folder mid-run
+# mirrors its own bundled copy back, and then some cases ran another recipe.
+hdr "The recipe this run used"
+RECIPE_AT_END=$(recipe_differences)
+[ "$RECIPE_AT_END" -eq 0 ] \
+  && ok "the folder still runs this checkout's recipe at the end of the run" \
+  || no "the folder's recipe differs from this checkout's in $RECIPE_AT_END place(s) at the end - something re-mirrored it during the run"
+
 hdr "Result"
 echo "  $PASS passed, $FAIL failed, $SKIP skipped"
+echo "  recipe: this checkout at $RECIPE_COMMIT$( [ "$RECIPE_DIRTY" -gt 0 ] && echo " with $RECIPE_DIRTY uncommitted change(s)" || echo ", clean"); $RECIPE_CHANGED difference(s) mirrored into the folder"
 if [ "${#MEASURED[@]}" -gt 0 ]; then
   echo
   echo "  Publishing a site that carries the Python engine (#455), and Cloudflare's switch to it (#665), measured:"
