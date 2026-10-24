@@ -76,11 +76,15 @@ class TheTurn(unittest.TestCase):
 
     def run_script(self, body: str, timeout: float = 20) -> subprocess.CompletedProcess:
         environment = dict(os.environ, HOME=str(self.home))
+        # The app hands every launcher its trail folder (#664); one inherited from
+        # the shell running these tests would send the line out of the scratch HOME.
+        environment.pop("PLANTOIR_TRAIL_DIR", None)
         return subprocess.run([BASH, "-c", self.script(body)], capture_output=True, text=True,
                               env=environment, timeout=timeout)
 
     def start_script(self, body: str) -> subprocess.Popen:
         environment = dict(os.environ, HOME=str(self.home))
+        environment.pop("PLANTOIR_TRAIL_DIR", None)
         return subprocess.Popen([BASH, "-c", self.script(body)], stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, env=environment)
 

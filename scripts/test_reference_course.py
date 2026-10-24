@@ -79,6 +79,9 @@ def _run_launcher(folder: Path, arguments: list):
     """
     environment = dict(os.environ)
     environment["HOME"] = str(folder / "home")
+    # The app hands every launcher its trail folder (#664); one inherited from
+    # the shell running these tests would send the line out of the scratch HOME.
+    environment.pop("PLANTOIR_TRAIL_DIR", None)
     (folder / "home").mkdir(exist_ok=True)
     return subprocess.run(
         ["bash", "./deploy.sh"] + arguments,

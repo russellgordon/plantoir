@@ -399,8 +399,20 @@ ensure_build_root() {
 # one. `lockf -k` on the folder takes the same lock the app's `flock` does and
 # creates no file. Where there is no lockf, or the volume refuses locks, the
 # line is appended unlocked rather than dropped.
+#
+# The folder is the app's trail folder, which the app hands over in
+# PLANTOIR_TRAIL_DIR (GitHub #664): an app started with --state-dir keeps its
+# trail in that state folder while every launcher it starts still has the real
+# HOME, so a line computed from HOME landed in the real trail. Only an ABSOLUTE
+# path is taken; an empty or relative value falls back to the folder under
+# HOME, so a stray value never writes a trail into the working folder. It moves
+# the trail and nothing else: the builds root and the tools still follow HOME.
+# contracts/app-rules.json -> launcherTrailFolder.
 note_on_the_trail() {
   local trail="${HOME%/}/Library/Logs/Plantoir"
+  case "${PLANTOIR_TRAIL_DIR:-}" in
+    /*) trail="${PLANTOIR_TRAIL_DIR%/}" ;;
+  esac
   mkdir -p "$trail" 2>/dev/null || return 0
   local trail_line
   trail_line="$(date '+%Y-%m-%d %H:%M:%S') · $1"

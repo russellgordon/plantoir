@@ -193,6 +193,9 @@ class PretendMac:
         environment["PATH"] = f"{self.bin}:{environment.get('PATH', '/usr/bin:/bin')}"
         environment["FAKE"] = str(self.fake)
         environment["HOME"] = str(self.home)
+        # The app hands every launcher its trail folder (#664); one inherited from
+        # the shell running these tests would send the line out of the scratch HOME.
+        environment.pop("PLANTOIR_TRAIL_DIR", None)
         environment["PREVIEWED"] = f"{course} {section}"
         return subprocess.run([BASH, "-c", script], cwd=self.here, env=environment,
                               capture_output=True, text=True, timeout=30)
@@ -267,6 +270,7 @@ class TheLabelCodeCases(unittest.TestCase):
         environment["PATH"] = f"{mac.bin}:{environment.get('PATH', '/usr/bin:/bin')}"
         environment["FAKE"] = str(mac.fake)
         environment["HOME"] = str(mac.home)
+        environment.pop("PLANTOIR_TRAIL_DIR", None)
         environment["PREVIEWED"] = f"{course} {section}"
         result = subprocess.run([BASH, "-c", script], cwd=mac.here, env=environment,
                                 capture_output=True, text=True, timeout=30)
@@ -328,7 +332,7 @@ class TheRealPreviewUpToItsGuard(unittest.TestCase):
     no website builder is touched. Its PATH has no docker and no colima, its
     HOME is a scratch folder, and `ps` and `lsof` are pretend."""
 
-    def run_the_real_prefix(self, deploying: bool) -> subprocess.CompletedProcess:
+    def run_the_real_prefix(self, deploying: bool, hand_over_a_trail: bool = False) -> subprocess.CompletedProcess:
         text = preview_text()
         call = 'if [[ -z "$BUILD_ONLY" && -z "${STOP_MODE:-}" ]]; then\n  refuse_a_preview_while_its_section_deploys\nfi\n'
         self.assertEqual(text.count(call), 1)
@@ -346,8 +350,16 @@ class TheRealPreviewUpToItsGuard(unittest.TestCase):
                 "FAKE": str(mac.fake),
                 "PATH": f"{mac.bin}:/usr/bin:/bin",
             }
+            # The folder an app started with --state-dir hands over (#664).
+            state_trail = mac.scratch / "state" / "Library" / "Logs" / "Plantoir"
+            if hand_over_a_trail:
+                environment["PLANTOIR_TRAIL_DIR"] = str(state_trail)
             result = subprocess.run([BASH, "./preview.sh", "ICS4U", "2", "--image", "x"], cwd=mac.here,
                                     env=environment, capture_output=True, text=True, timeout=60)
+            result.trail_in_home = mac.trail()
+            result.trail_in_state = []
+            if (state_trail / "activity.txt").exists():
+                result.trail_in_state = (state_trail / "activity.txt").read_text(encoding="utf-8").splitlines()
             calls_file = mac.fake / "calls"
             calls = calls_file.read_text(encoding="utf-8") if calls_file.exists() else ""
             self.assertIn("ps -Ao pid=,ppid=,args=", calls,
@@ -361,6 +373,23 @@ class TheRealPreviewUpToItsGuard(unittest.TestCase):
         for line in the_launcher_sentence("ICS4U", "2"):
             self.assertIn(line, result.stdout.splitlines())
         self.assertNotIn("command not found", result.stderr)
+
+    def test_the_real_refusal_lands_in_the_trail_folder_it_was_handed(self):
+        """GitHub #664: the refusal's line goes to the app's trail folder, and
+        the scratch HOME's trail (standing in for the real one) gets nothing."""
+        result = self.run_the_real_prefix(deploying=True, hand_over_a_trail=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        wanted = (the_trail_entry()["launcherLineWhenItsSectionIsBeingDeployed"]
+                  .replace("{course}", "ICS4U").replace("{section}", "2"))
+        self.assertEqual(len(result.trail_in_state), 1, result.trail_in_state)
+        self.assertTrue(result.trail_in_state[0].endswith(" · " + wanted), result.trail_in_state[0])
+        self.assertEqual(result.trail_in_home, [], "the line also went to the home folder's trail")
+
+    def test_without_a_handed_over_folder_the_refusal_stays_in_home(self):
+        result = self.run_the_real_prefix(deploying=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(len(result.trail_in_home), 1, result.trail_in_home)
+        self.assertEqual(result.trail_in_state, [])
 
     def test_with_nothing_deploying_the_real_preview_sh_goes_on(self):
         result = self.run_the_real_prefix(deploying=False)
