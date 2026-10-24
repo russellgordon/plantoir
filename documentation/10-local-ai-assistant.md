@@ -6809,6 +6809,21 @@ Three properties matter more than the mechanism:
   shows a fence as text. No tool, schema or prompt byte moved: none of the
   assistants — Plantoir's own or an outside one — can add an add-on, and the
   offer is never made through them (`obsidianAddOnsForFigures.rejected`).
+- **GeoGebra sketches are taught, not installed** (#578). The
+  `plantoir-math-graphs` skill's section 10 teaches the ` ```geogebra `
+  fence three ways (a `.ggb` beside the page, commands typed in the fence,
+  `material_id:` of a geogebra.org sketch), that a geogebra.org copy is kept
+  by the FENCE's text so `version: 2` is how a changed sketch is fetched
+  again, that `file:` is plain text a rename or Copy a Page does not follow,
+  and that Obsidian hides `.ggb` until "Detect all file extensions" is on.
+  `plantoir-page-authoring` no longer advises a geogebra.org `<iframe>`: it
+  steers to the fence and says an old iframe becomes `material_id:` of the
+  same id; `plantoir-quizzes` allows a sketch in a question or explanation,
+  never in a choice. The community Obsidian add-on (vanabel/obsidian-geogebra)
+  is named as optional and unreviewed, installing it the teacher's choice and
+  never the assistant's. No tool, schema or prompt byte moved: the tool
+  surface digest (`scripts/test_tool_surface_digest.py`) was checked
+  unchanged in every stage.
 - **The item is hidden when the tool is not installed**, and hidden
   independently per door. Not greyed out: a menu that teaches teachers to stop
   reading it is worse than a shorter menu.

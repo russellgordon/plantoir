@@ -390,8 +390,9 @@ JupyterLite or Custom Frames (a whole notebook per page).
 
 **What it is.** GeoGebra Math Apps **5.4.933.1**, the engine a page's
 ` ```geogebra ` sketches run on in the student's browser (the fence, its
-build pass and the site's loader land in #578's later stages; stage 1 is the
-engine and where it comes from). Gated like the engines above:
+build pass and the site's loader are in 05 → "GeoGebra sketches: what the
+build does" and 06 → Q; this section is the engine and where it comes
+from). Gated like the engines above:
 `page_features.GATED_ASSETS["geogebra"]`, so a section's site carries it
 (`static/geogebra/`) only while a page students can see has a sketch, and a
 site without one is byte for byte as before.
