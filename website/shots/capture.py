@@ -1899,7 +1899,11 @@ def provision_print_course(folder: Path, resources: Path | None = None) -> None:
         if said and time.time() - quiet_since > 0.8:
             plain = re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b"", said).decode("utf-8", "replace").rstrip(" ")
             last = (plain.splitlines() or [""])[-1]
-            if last.rstrip().endswith((":", "?", "]", ")")):
+            # The colour-scheme browser ends on its own instruction line
+            # rather than a question; Enter takes the scheme it shows, as
+            # the New Course panel's Return does (measured 2026-10-24: the
+            # print set's provisioning sat on it for ten minutes).
+            if last.rstrip().endswith((":", "?", "]", ")")) or "Enter to select" in last:
                 os.write(terminal, ((code if "Enter the course code" in last else "") + "\n").encode())
                 answered += 1
                 said = b""
@@ -2149,8 +2153,6 @@ def capture_geogebra_set(folder: Path) -> list[str]:
 
     Returns the pictures taken, as `<id>-light` / `<id>-dark`.
     """
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from preview_pages_windows import page_label
     shots = shots_of_kind("preview-page", scene="geogebra")
     if not shots:
         raise SystemExit("shots.json has no preview-page shot in the geogebra scene.")
@@ -2158,10 +2160,20 @@ def capture_geogebra_set(folder: Path) -> list[str]:
     recipe = committed_recipe()
     provision_print_course(folder, resources=recipe)
     for shot in shots:
-        page = folder / "courses" / page_label(shot["capture"])
-        if not page.is_file():
-            raise SystemExit(f"{page} is not in {folder}: it was made before the page was in the example "
-                             "content. Name another folder with --print-folder, or delete this one.")
+        # The address is the file's path with each space a dash; the file's
+        # own dashes stay (The-Slope-Angle-Conjecture is The Slope-Angle
+        # Conjecture.md), so the page is looked for by its address.
+        *folders, name = shot["capture"]["path"].strip("/").split("/")
+        place = folder / "courses" / shot["capture"]["course"] / Path(*folders) if folders else \
+            folder / "courses" / shot["capture"]["course"]
+        found = False
+        if place.is_dir():
+            for entry in place.iterdir():
+                if entry.suffix == ".md" and entry.stem.replace(" ", "-") == name:
+                    found = True
+        if not found:
+            raise SystemExit(f"{shot['capture']['path']} is not in {folder}: it was made before the page was in "
+                             "the example content. Name another folder with --print-folder, or delete this one.")
     return photograph_preview_shots(folder, shots)
 
 

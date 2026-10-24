@@ -60,6 +60,17 @@
     max-width: min(100%, var(--pl-geogebra-width, 800px));
     margin: 0 auto;
     background: #fff;
+    // The sketch's own shape, as the card has it. GeoGebra writes a width
+    // and height onto this box for the page width it measured when it
+    // opened, and then scales the sketch to the box's real width — so a
+    // 1430 x 759 sketch in a 630 px column drew 334 px tall inside a box
+    // left 482 px tall, a white band under it (measured 2026-10-24, the
+    // slope-angle page in WebKit). Its height is the sketch's ratio
+    // instead; overflow hidden, because the scaled sketch's layout box is
+    // still its full unscaled size.
+    aspect-ratio: var(--pl-geogebra-ratio, 8 / 5);
+    height: auto !important;
+    overflow: hidden;
 
     &[hidden] {
       display: none;
