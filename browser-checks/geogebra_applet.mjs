@@ -35,12 +35,21 @@
 //    lines that work (SetValue, SetColor, ZoomIn), which evalCommand's own
 //    answer would have reported; SetValue(a, 3) has set a to 3;
 // 8. the geogebra.org sketch on the second page (stage 4) opens from the
-//    site's own copy, with its author and licence linked.
+//    site's own copy, with its author and licence linked;
+// 9. on the quiz page, when one is given (stage 5, geogebraFences.quizzes):
+//    nothing of GeoGebra is fetched when it loads; the sketch in a
+//    question's EXPLANATION is not visible, and still nothing is fetched
+//    once the question is answered and the explanation shown - until its
+//    button is tapped, when it opens; the sketch in the QUESTION of a
+//    shuffled quiz opens, and after a print (beforeprint and afterprint,
+//    which put the choices in Markdown order and back) it is the same
+//    applet, in the same place, outside the choices, still running
+//    commands.
 //
 // It prints a line starting "OK:" with the time from tap to sketch and the
 // bytes fetched, or "FAIL:" with what went wrong.
 //
-//   node browser-checks/geogebra_applet.mjs <chrome> <site folder> <page A> <page B> <sketch .ggb>
+//   node browser-checks/geogebra_applet.mjs <chrome> <site folder> <page A> <page B> <sketch .ggb> [<quiz page>]
 //
 // Kept OUT of scripts/ like print_handout.mjs: it needs a browser on the Mac,
 // not the image. No packages: Node 22's own WebSocket.
@@ -53,7 +62,7 @@ import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
 import { gzipSync } from "node:zlib"
 
-const [chromePath, siteFolder, pageA, pageB, sketchFile] = process.argv.slice(2)
+const [chromePath, siteFolder, pageA, pageB, sketchFile, quizPage] = process.argv.slice(2)
 if (!chromePath || !siteFolder || !pageA || !pageB || !sketchFile) {
   console.error("usage: node geogebra_applet.mjs <chrome> <site folder> <page A> <page B> <sketch .ggb>")
   process.exit(2)
@@ -350,12 +359,48 @@ async function connect(chunk) {
         problems.push(`${phase}: GeoGebra's loader frame is not under <html> before and after each page change (${first.frame}, ${toB.frame}, ${backToA.frame})`)
       }
 
+      // 9 (stage 5): sketches in self-check questions.
+      let quizSaid = ""
+      if (quizPage) {
+        engineRequests = 0
+        // A fresh page load: the theme's own font requests come before any
+        // tap, as on the first page, and are Quartz's, not GeoGebra's.
+        tapped = false
+        await send("Page.navigate", { url: urlOf(quizPage) })
+        await waitFor(`document.readyState === "complete" && document.querySelectorAll(".plantoir-quiz figure.pl-geogebra").length >= 2 && document.querySelector(".plantoir-quiz-check") !== null`, 40)
+        await pause(500)
+        const atLoad = engineRequests
+        if (atLoad !== 0) problems.push(`${phase}: ${atLoad} requests for GeoGebra when the quiz page loaded`)
+        const where = await evaluate(`(() => { const all = Array.from(document.querySelectorAll("figure.pl-geogebra")); return all.map((f) => ({ quiz: !!f.closest(".plantoir-quiz"), explain: !!f.closest(".plantoir-quiz-explain"), choices: !!f.closest(".plantoir-quiz-choices"), visible: f.checkVisibility() })) })()`)
+        const stem = where?.[0]
+        const explained = where?.[1]
+        if (!stem || !stem.quiz || stem.explain || stem.choices || !stem.visible) problems.push(`${phase}: the quiz page's first sketch is not a visible sketch in a question: ${JSON.stringify(stem)}`)
+        if (!explained || !explained.explain || explained.visible) problems.push(`${phase}: the explanation's sketch is not hidden inside the explanation before the answer: ${JSON.stringify(explained)}`)
+        // Answer the explanation's question rightly, as a student would.
+        const answered = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; const quiz = f.closest(".plantoir-quiz"); const right = JSON.parse(quiz.dataset.quiz).correct[0]; quiz.querySelector('.plantoir-quiz-choice[data-choice="' + right + '"] input').click(); quiz.querySelector(".plantoir-quiz-check").click(); return true })()`)
+        const shown = answered === true && await waitFor(`document.querySelectorAll("figure.pl-geogebra")[1].checkVisibility()`, 20)
+        await pause(500)
+        const afterAnswer = engineRequests
+        if (!shown) problems.push(`${phase}: answering the question did not show its explanation's sketch`)
+        if (afterAnswer !== 0) problems.push(`${phase}: ${afterAnswer} requests for GeoGebra once the explanation was shown, before its button was tapped`)
+        const inExplanation = await tap(1)
+        if (!inExplanation.opened) problems.push(`${phase}: the sketch in the explanation did not open (${inExplanation.why})`)
+        const inQuestion = await tap(0)
+        if (!inQuestion.opened) problems.push(`${phase}: the sketch in the shuffled question did not open (${inQuestion.why})`)
+        await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[0]; window.__plantoirStem = { box: f.querySelector(".pl-geogebra-applet"), parent: f.parentElement }; window.dispatchEvent(new Event("beforeprint")); window.dispatchEvent(new Event("afterprint")); return true })()`)
+        const kept = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[0]; const box = f.querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; let ran = null; try { api.evalCommand("plantoirAfterPrint = 7"); ran = api.getValue("plantoirAfterPrint") } catch (error) { ran = String(error) } return { same: box === window.__plantoirStem.box, connected: box.isConnected, parent: f.parentElement === window.__plantoirStem.parent, outsideChoices: !f.closest(".plantoir-quiz-choices"), canvas: !!box.querySelector("canvas"), ran } })()`)
+        if (!kept || !kept.same || !kept.connected || !kept.parent || !kept.outsideChoices || !kept.canvas || kept.ran !== 7) {
+          problems.push(`${phase}: after a print, the sketch in the shuffled question is not the same working applet in its place: ${JSON.stringify(kept)}`)
+        }
+        quizSaid = `, on the quiz page ${atLoad} requests at load and ${afterAnswer} once the explanation was shown, its sketch ${inExplanation.ms} ms after the tap, the question's ${inQuestion.ms} ms and the same applet after a print`
+      }
+
       const violations = (await evaluate("window.__plantoirCheck.violations")) ?? []
       for (const url of blocked) problems.push(`${phase}: the policy blocked ${url}`)
       for (const line of refusedInLog) problems.push(`${phase}: the browser said: ${line}`)
       for (const violation of violations) problems.push(`${phase}: securitypolicyviolation ${violation}`)
       for (const url of offSite) problems.push(`${phase}: a request left the site: ${url}`)
-      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
+      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
     }
     clearTimeout(timer)
     if (problems.length > 0) return finish(1, "FAIL: " + problems.join("\n"))

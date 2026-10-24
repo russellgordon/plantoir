@@ -2293,7 +2293,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Investigations/GeoGebra Fixture.md" "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
         "$HIT_COURSE/Investigations/GeoGebra Missing.md" "$HIT_COURSE/Investigations/GeoGebra Hidden.md" \
         "$HIT_COURSE/Discussions/GeoGebra Second.md" "$HIT_COURSE/Discussions/GeoGebra Same Fence.md" \
-        "$HIT_COURSE/Discussions/GeoGebra Fixture Lines.ggb" \
+        "$HIT_COURSE/Discussions/GeoGebra Fixture Lines.ggb" "$HIT_COURSE/Investigations/Quiz GeoGebra.md" \
         ${GEOGEBRA_SEED_KEY:+"$GEOGEBRA_CACHE_DIR/$GEOGEBRA_SEED_KEY.ggb" "$GEOGEBRA_CACHE_DIR/$GEOGEBRA_SEED_KEY.json"} \
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
@@ -3166,6 +3166,41 @@ printf -- '---\ntitle: GeoGebra Missing\n---\nA sketch whose file is not there.\
   > "$HIT_COURSE/Investigations/GeoGebra Missing.md"
 printf -- '---\ntitle: GeoGebra Hidden\npublish: false\n---\nA hidden sketch (plantoir-geogebra-hidden-5e1c).\n\n```geogebra\nf(x) = x^3\n```\n' \
   > "$HIT_COURSE/Investigations/GeoGebra Hidden.md"
+# Stage 5 (geogebraFences.quizzes): a sketch in the QUESTION of a shuffled
+# self-check question and one in another's EXPLANATION, for the browser
+# check (nothing fetched until the explanation is shown and tapped; the
+# question's sketch the same working applet after a print) and for 6i-g
+# (the page's search text reads each sketch as its description alone).
+# Both questions work, so 6k's count of the folder's quiz problems is
+# unchanged; a sketch in a CHOICE is a recognise case on Quiz Fixture.
+cat > "$HIT_COURSE/Investigations/Quiz GeoGebra.md" <<'GEOGEBRAQUIZ'
+---
+title: Quiz GeoGebra
+---
+Questions with sketches (plantoir-quiz-geogebra-578).
+
+> [!quiz|shuffle] Drag A. Which is the slope of the segment?
+> ```geogebra
+> file: GeoGebra Fixture Lines.ggb
+> alt: Two points and a segment, in a question (plantoir-alt-quiz-stem).
+> ```
+> - [x] one half
+> - [ ] two
+> - [ ] minus one
+
+> [!quiz] Which line has a negative slope?
+> - [ ] y = 2x
+> - [x] y = -x + 3
+>
+> > [!explain]- Why
+> > Its slope is -1 (plantoir-quiz-explain-578).
+> > ```geogebra
+> > alt: The line y = -x + 3, in an explanation (plantoir-alt-quiz-explain).
+> > -x + y = 3
+> > L = {1, 2}
+> > zz = 5
+> > ```
+GEOGEBRAQUIZ
 # #502: a heading "Math" is id="math", which answered window.math, and a
 # heading "Exports" is id="exports", which answered window.exports - the two
 # names function-plot reads as its file runs (figureFences.pageIds). Drawn in
@@ -4149,12 +4184,26 @@ if re.search(r"Sketches from geogebra.org: [1-9][0-9]* copied now", said) or "pl
     problems.append("the build asked geogebra.org for a sketch it had a saved copy of")
 if (public / "Investigations" / "GeoGebra-Hidden.html").exists() or any("plantoir-geogebra-hidden-5e1c" in p.read_text(encoding="utf-8", errors="ignore") for p in public.rglob("*.html")):
     problems.append("the hidden page with a sketch reached the site")
+# Stage 5: the sketches in a question and in an explanation are cards inside
+# their quizzes, and the quiz page's search text reads each as its
+# description alone - never the button, the commands or the attribution,
+# which the quizzes' html stage would otherwise read after the card is in.
+quiz_page_path = public / "Investigations" / "Quiz-GeoGebra.html"
+quiz_page = quiz_page_path.read_text(encoding="utf-8") if quiz_page_path.is_file() else ""
+quiz_kinds = re.findall(r'<blockquote class="[^"]*\bplantoir-quiz\b[^"]*"[^>]*data-quiz-kind="([^"]*)"', quiz_page)
+if quiz_kinds != ["single", "single"] or quiz_page.count('<figure class="pl-figure pl-geogebra"') != 2 or "pl-geogebra-card" not in quiz_page:
+    problems.append(f"Investigations/Quiz-GeoGebra.html is not two working questions with a sketch each ({quiz_kinds})")
+index_path = public / "static" / "contentIndex.json"
+searched = json.loads(index_path.read_text(encoding="utf-8")).get("Investigations/Quiz-GeoGebra", {}).get("content", "") if index_path.is_file() else ""
+if "plantoir-alt-quiz-stem" not in searched or "Open the sketch" in searched or "Made with GeoGebra" in searched \
+        or "geogebra.org" in searched or "zz = 5" in searched or "plantoir-quiz-explain-578" in searched:
+    problems.append(f"the quiz page's search text does not read its sketches as their descriptions alone: {searched[:300]!r}")
 for problem in problems:
     print("   " + problem)
 sys.exit(1 if problems else 0)
 GGBCHECK
 then
-  pass "GeoGebra sketches: every fence a card with its button, size, description and attribution (on screen and for paper), the sketch's file published once at the address the cards name, the pinned adapted engine and the thumbnails carried, the description free of commands, a missing file left as code and reported by page and line, a hidden sketch nowhere, the same fence on another page showing the file beside it, the commands as written, and the geogebra.org sketch from its saved copy with nothing asked of geogebra.org, its author and licence on screen and for paper (#578)"
+  pass "GeoGebra sketches: every fence a card with its button, size, description and attribution (on screen and for paper), the sketch's file published once at the address the cards name, the pinned adapted engine and the thumbnails carried, the description free of commands, a missing file left as code and reported by page and line, a hidden sketch nowhere, the same fence on another page showing the file beside it, the commands as written, and the geogebra.org sketch from its saved copy with nothing asked of geogebra.org, its author and licence on screen and for paper, and the sketches in a quiz's question and explanation cards inside their working questions, read by the page's search as their descriptions alone (#578)"
 else
   fail "GeoGebra sketches: one of the checks above failed (#578)"
 fi
@@ -5357,8 +5406,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   rm -f "$GEOGEBRA_SITE/_headers"
   (cd scripts && python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$GEOGEBRA_SITE") >/tmp/verify_geogebra_applet.log 2>&1 || true
   if node browser-checks/geogebra_applet.mjs "$PRINT_CHROME" "$GEOGEBRA_SITE" /Investigations/GeoGebra-Fixture.html \
-       /Discussions/GeoGebra-Second.html "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" >>/tmp/verify_geogebra_applet.log 2>&1; then
-    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, the geogebra.org sketch opened from the site's copy with its author and licence linked, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, browser-checks/geogebra_applet.mjs)"
+       /Discussions/GeoGebra-Second.html "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
+       /Investigations/Quiz-GeoGebra.html >>/tmp/verify_geogebra_applet.log 2>&1; then
+    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, browser-checks/geogebra_applet.mjs)"
   else
     fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, or were published twice (browser-checks/geogebra_applet.mjs, #578)"
     cat /tmp/verify_geogebra_applet.log
