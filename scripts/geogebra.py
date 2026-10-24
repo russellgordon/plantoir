@@ -87,6 +87,9 @@ def words() -> dict:
 # ---- Reading a fence -----------------------------------------------------------
 
 _SETTING = re.compile(r"^([a-z_0-9]+)[ \t]*:[ \t]*(.*?)[ \t]*$")
+# A command that reads like a setting: a word, then a colon. GeoGebra's own
+# `a: x + y = 3` matches too, which is why only a KNOWN key is noted.
+_LOOKS_LIKE_SETTING = re.compile(r"^([A-Za-z_]+)[ \t]*:")
 _NUMBER = re.compile(r"^([0-9]{1,5})(?:[ \t]*px)?$")
 _TRUE = {"true", "yes", "on"}
 _FALSE = {"false", "no", "off"}
@@ -160,7 +163,17 @@ def read_fence(body: str) -> dict:
     while index < len(lines) and not figures.js_trim(lines[index]):
         index += 1
     if index < len(lines) and figures.js_trim(lines[index]) == "---":
-        # A block that opens with ---, read to the next ---.
+        # A block that opens with ---, read to the next ---. Never closed,
+        # it would swallow every command as a setting left out: said.
+        opened_at = index + 1
+        closed = False
+        for later in range(index + 1, len(lines)):
+            if figures.js_trim(lines[later]) == "---":
+                closed = True
+                break
+        if not closed:
+            return {"settings": {}, "commands": [], "notes": [], "lines": {},
+                    "problems": [{"reason": "settingsNotClosed", "blockLine": opened_at}]}
         index += 1
         while index < len(lines) and figures.js_trim(lines[index]) != "---":
             line = lines[index]
@@ -190,9 +203,18 @@ def read_fence(body: str) -> dict:
         text = figures.js_trim(lines[index])
         if text and not text.startswith("//"):
             commands.append({"line": index + 1, "text": text})
+            # A setting written among the commands (in capitals, or after a
+            # line that started the commands) is run as a command, which
+            # GeoGebra refuses: said at build time, where the teacher reads.
+            looks = _LOOKS_LIKE_SETTING.match(text)
+            if looks is not None and looks.group(1).lower() in known:
+                notes.append({"reason": "settingAmongCommands", "blockLine": index + 1,
+                              "name": looks.group(1)})
         index += 1
 
-    if "file" in settings and "material_id" in settings:
+    if settings.get("file") == "":
+        problems.append({"reason": "fileHasNoName", "blockLine": given_at["file"]})
+    elif "file" in settings and "material_id" in settings:
         problems.append({"reason": "fileAndMaterialBoth",
                          "blockLine": max(given_at["file"], given_at["material_id"])})
     elif "file" not in settings and "material_id" not in settings and not commands:
@@ -309,7 +331,24 @@ def find_file(value: str, page_path: str, content_root) -> str | None:
         media = _entry_in(root, "Media")
         if media is not None and parts[-1] not in ("", ".", ".."):
             found = _walk(root, root / media, [parts[-1]])
+    if found is not None and not is_published(found):
+        # Quartz leaves it out of the site, so a sketch made from it could
+        # never open: not found, said once (stage 2 review item 6).
+        return None
     return found
+
+
+def is_published(content_path: str) -> bool:
+    """Whether Quartz publishes the file at `content_path` (geogebraFences.
+    files.notPublished): not under a folder its ignorePatterns name, and no
+    part of the path starting with a dot (its file walk skips those)."""
+    parts = PurePosixPath(content_path).parts
+    if parts and parts[0] in rules("files", "notPublished", "folders"):
+        return False
+    for part in parts:
+        if part.startswith("."):
+            return False
+    return True
 
 
 def _sketch_size(xml: bytes):
@@ -503,6 +542,13 @@ def _write_site_files(output_dir, manifest, thumbnails: dict) -> None:
                 pass
 
 
+def page_key(content_path: str) -> str:
+    """A page's name in the manifest: its path in the site's content, in
+    NFC - what the transformer reads as file.data.relativePath, normalised
+    the same way (geogebraFences.manifest)."""
+    return unicodedata.normalize("NFC", content_path)
+
+
 def engine_present(vendor_dir=None) -> bool:
     vendor = Path(vendor_dir) if vendor_dir is not None else toolchain_paths.VENDOR_DIR
     return (vendor / ENGINE / "deployggb.js").is_file()
@@ -562,14 +608,16 @@ def prepare(pages: list, output_dir, content_root, vendor_dir=None, printer=prin
                 continue
             if "alt" not in settings:
                 outcome["notes"].append(_located(sketch, {"reason": "missingAlt", "blockLine": None}))
-            entries[sketch["key"]] = entry
+            # By page AND fence (stage 2 review item 1): the same fence on
+            # two pages can name two different files beside them.
+            entries.setdefault(page_key(page["path"]), {})[sketch["key"]] = entry
             pages_shown.add(page["path"])
             outcome["shown"] += 1
 
     manifest = None
     if entries:
-        manifest = {"version": 1, "words": said["site"], "attribution": rules("attribution"),
-                    "sketches": entries}
+        manifest = {"version": 2, "words": said["site"], "attribution": rules("attribution"),
+                    "pages": entries}
     _write_site_files(output_dir, manifest, thumbnails)
     outcome["counts"][ENGINE] = len(pages_shown)
     if outcome["sketches"]:

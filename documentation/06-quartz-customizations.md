@@ -3956,6 +3956,17 @@ the file is on the site once and the card names exactly that file
 SHA-256: one; must-fail with a second copy in `static/`: two). A fence the
 manifest does not know stays the code block it was.
 
+**The manifest is read by page, then by fence** (stage 2 review item 1): the
+transformer looks a sketch up under its page's `file.data.relativePath`,
+NFC-normalised as the build normalises it, and only then by the fence's key.
+Keyed by the fence alone, the same fence text on two pages (`file:
+Lines.ggb` beside each) would show ONE of the two files on both pages, and a
+page whose file is missing would show another page's sketch while its folder
+problem said it could not be shown. `geogebraFences.manifest.cases` pins it
+in Python; verify.sh plants a page whose fence is the first fixture's word
+for word, with a different `Lines.ggb` beside it, and reads the address its
+card names.
+
 ### Q3. Loading, on a tap
 
 `geogebra.inline.ts`: a tap loads `static/geogebra/deployggb.js` once
@@ -3990,6 +4001,21 @@ no sketch after a page change, plainly served and cross-origin isolated.
 `api.remove` runs (0 kept either way) and every sketch opened without it;
 and leaving applets in place so their libraries stay (each keeps its memory
 and listeners for the rest of the visit).
+
+**What `api.remove()` leaves behind** (stage 2 review, measured in Chromium
+over 45 applets opened and removed one page change at a time): about 9
+listeners, 18 detached nodes and 0.1 MB per applet — the heap went from 27.6
+to 32.0 MB — while `<head>` stays clean (46 children before, 35 after: what
+GeoGebra added is gone). A student would have to open hundreds of sketches in
+one visit for it to matter; a reload clears it. An iPad could not be measured
+here.
+
+**A tap that finishes after the page changed marks nothing** (stage 2 review
+item 3). The loader counts Quartz's page changes (`pageChanges`, raised in
+the page's cleanup); a sketch whose `appletOnLoad` or 60-second give-up
+arrives after the count moved is removed at once and touches no figure —
+`figure.isConnected` alone is not enough, because Quartz's page change can
+keep an element that looks the same on the new page.
 
 ### Q4. On paper, and the attribution
 

@@ -24867,7 +24867,12 @@
         {"name": "a switch that is not true or false", "body": "toolbar: sometimes\nf(x) = x", "settings": {}, "commands": [{"line": 2, "text": "f(x) = x"}], "problems": [{"reason": "trueOrFalseExpected", "blockLine": 1, "name": "toolbar", "value": "sometimes"}], "notes": []},
         {"name": "both a file and a geogebra.org sketch", "body": "file: Lines.ggb\nmaterial_id: ju3f2kbg", "settings": {"file": "Lines.ggb", "material_id": "ju3f2kbg"}, "commands": [], "problems": [{"reason": "fileAndMaterialBoth", "blockLine": 2}], "notes": []},
         {"name": "nothing to show", "body": "alt: An empty sketch.\n", "settings": {"alt": "An empty sketch."}, "commands": [], "problems": [{"reason": "nothingToShow", "blockLine": null}], "notes": []},
-        {"name": "an empty fence", "body": "", "settings": {}, "commands": [], "problems": [{"reason": "nothingToShow", "blockLine": null}], "notes": []}
+        {"name": "an empty fence", "body": "", "settings": {}, "commands": [], "problems": [{"reason": "nothingToShow", "blockLine": null}], "notes": []},
+        {"name": "a --- block that is never closed", "body": "---\nfile: Lines.ggb\nSetValue(a, 2)", "settings": {}, "commands": [], "problems": [{"reason": "settingsNotClosed", "blockLine": 1}], "notes": []},
+        {"name": "file: with no name", "body": "file:\nalt: Lines.", "settings": {"file": "", "alt": "Lines."}, "commands": [], "problems": [{"reason": "fileHasNoName", "blockLine": 1}], "notes": []},
+        {"name": "a setting in capitals is a command, and said", "body": "File: Lines.ggb\nf(x) = x", "settings": {}, "commands": [{"line": 1, "text": "File: Lines.ggb"}, {"line": 2, "text": "f(x) = x"}], "problems": [], "notes": [{"reason": "settingAmongCommands", "blockLine": 1, "name": "File"}]},
+        {"name": "a setting after the commands began is a command, and said", "body": "alt: A line.\nf(x) = 2x\nheight: 400", "settings": {"alt": "A line."}, "commands": [{"line": 2, "text": "f(x) = 2x"}, {"line": 3, "text": "height: 400"}], "problems": [], "notes": [{"reason": "settingAmongCommands", "blockLine": 3, "name": "height"}]},
+        {"name": "GeoGebra's own name with a colon is not said", "body": "a: x + y = 3\nslope: Slope(a)", "settings": {}, "commands": [{"line": 1, "text": "a: x + y = 3"}, {"line": 2, "text": "slope: Slope(a)"}], "problems": [], "notes": []}
       ]
     },
     "materialIds": {
@@ -24888,6 +24893,10 @@
     "files": {
       "rule": "`file:` names a .ggb by its name or a relative path, looked up by LISTING each folder (exact spelling first, then one that differs only in capitals or Unicode form, as page_features._find_in_media does - Netlify and Cloudflare are case-sensitive): beside the page first, then from the top of the course folder, then by its file name alone in the Media folder. It must be a zip holding geogebra.xml (read, never unpacked) and at most `largestFileMegabytes`. The site publishes the file ONCE: Quartz already publishes every file under content/ that is not a page (its Assets emitter), so the manifest records the file's path in content/ and the transformer makes its address with Quartz's own slugifyFilePath - the function that emitter uses - so the two cannot disagree. REJECTED: copying it into static/ as well (the example course's 1,594,544-byte sketch would be carried twice, 3,221,572 bytes instead of 1,627,028 with its thumbnail); taking the source out of content/ (a page that links the file for download would break, and Media there mirrors the teacher's own folder, which the build never edits).",
       "largestFileMegabytes": 20,
+      "notPublished": {
+        "rule": "Stage 2 review item 6. Quartz leaves some files out of the site, and a sketch made from one could never open, so such a file is NOT FOUND (fileNotFound, said once) rather than found and then missing: a file under a folder at the TOP of the course folder that Quartz's ignorePatterns name (exactly these spellings, measured with Quartz's own globby in the image 2026-10-24: `private/a.ggb` and `templates/c.ggb` were left out, `Private/f.ggb` and `U/private/b.ggb` were published), and a file with any part of its path starting with a dot (the file walk skips those: `.hid/d.ggb` and `U/.h/e.ggb` were left out).",
+        "folders": ["private", "templates", ".obsidian"]
+      },
       "cases": [
         {"name": "beside the page", "files": ["Unit 1/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/Lines.ggb", "reason": null},
         {"name": "a path from the course folder", "files": ["Sketches/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Sketches/Lines.ggb", "found": "Sketches/Lines.ggb", "reason": null},
@@ -24900,7 +24909,11 @@
         {"name": "no such file", "files": [], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "fileNotFound"},
         {"name": "not a zip", "files": ["Unit 1/Lines.ggb:notAZip"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "notAGeoGebraFile"},
         {"name": "a zip without geogebra.xml", "files": ["Unit 1/Lines.ggb:noXml"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "notAGeoGebraFile"},
-        {"name": "a path cannot leave the course folder", "files": ["Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "../../Lines.ggb", "found": null, "reason": "fileNotFound"}
+        {"name": "a path cannot leave the course folder", "files": ["Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "../../Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in the private folder Quartz leaves out", "files": ["private/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "private/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in the templates folder Quartz leaves out", "files": ["templates/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "templates/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in a folder whose name starts with a dot", "files": ["Unit 1/.drafts/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": ".drafts/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "a folder called private that is not at the top is published", "files": ["Unit 1/private/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "private/Lines.ggb", "found": "Unit 1/private/Lines.ggb", "reason": null}
       ]
     },
     "keys": {
@@ -24917,9 +24930,12 @@
       ]
     },
     "manifest": {
-      "rule": "quartz/plantoir-geogebra/manifest.json: {version, words (words.site), attribution, sketches: {key: entry}}. An entry is {ok: true, app, width, height (the sketch's own size, from geogebra.xml's first <euclidianView><size>, or the fence's width:/height:, which the applet is made at and then scaled down to fit the page), alt, caption, commands [{line, text}], toolbar, algebra, source {kind: file, contentPath} or null for commands alone, thumbnail {name, width, height} or null, attribution {kind}, size (openSketch's {size}, filled)}. Only sketches that can be shown are in it: anything else stays a code block. No sketch on the site, no folder. Thumbnails (the .ggb's own geogebra_thumbnail.png) go to quartz/static/geogebra-sketches/<the first 16 hex digits of the picture's own SHA-256>.png - so one sketch named by several fences is one picture - a folder removed when there are none.",
+      "rule": "quartz/plantoir-geogebra/manifest.json: {version, words (words.site), attribution, pages: {page: {key: entry}}} - by PAGE (its path in the site's content, in NFC: the transformer's file.data.relativePath, normalised the same way), then by the fence's key, because the same fence text on two pages can name two different files beside them, and each page must show its own (stage 2 review item 1; `cases`). An entry is {ok: true, app, width, height (the sketch's own size, from geogebra.xml's first <euclidianView><size>, or the fence's width:/height:, which the applet is made at and then scaled down to fit the page), alt, caption, commands [{line, text}], toolbar, algebra, source {kind: file, contentPath} or null for commands alone, thumbnail {name, width, height} or null, attribution {kind}, size (openSketch's {size}, filled)}. Only sketches that can be shown are in it: anything else stays a code block. No sketch on the site, no folder. Thumbnails (the .ggb's own geogebra_thumbnail.png) go to quartz/static/geogebra-sketches/<the first 16 hex digits of the picture's own SHA-256>.png - so one sketch named by several fences is one picture - a folder removed when there are none.",
       "workspace": "plantoir-geogebra",
-      "thumbnails": "geogebra-sketches"
+      "thumbnails": "geogebra-sketches",
+      "cases": [
+        {"name": "the same fence on two pages, each with its own file beside it, and on a third with none", "files": ["Unit 1/Lines.ggb:one", "Unit 2/Lines.ggb:two"], "pages": {"Unit 1/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "Unit 2/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "Unit 3/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n"}, "shown": {"Unit 1/Lesson.md": "Unit 1/Lines.ggb", "Unit 2/Lesson.md": "Unit 2/Lines.ggb"}, "problems": [{"page": "Unit 3/Lesson", "reason": "fileNotFound"}]}
+      ]
     },
     "siteCarriesEngine": {
       "rule": "The #454 gate: static/geogebra (the pruned, adapted engine - toolchain.json -> pins -> geogebra, 117 files, about 27 MB) only while a page students can see has a sketch that can be shown (page_features.GATED_ASSETS -> geogebra; the count is pages, from scripts/geogebra.py). None of it is fetched until a student taps; a site with no sketch carries none of it.",
@@ -24984,7 +25000,10 @@
         "nothingToShow": "there is nothing to show - add a file: line, a material_id: line, or GeoGebra commands",
         "engineMissing": "this copy of Plantoir can't show GeoGebra sketches",
         "missingAlt": "it has no alt: line, so a screen reader only says “A GeoGebra sketch.”",
-        "unknownSetting": "{name} isn't a GeoGebra setting, so it was left out"
+        "unknownSetting": "{name} isn't a GeoGebra setting, so it was left out",
+        "settingsNotClosed": "the --- line that opens the settings has no --- line to close it, so everything after it would be read as settings",
+        "fileHasNoName": "file: needs the name of a .ggb file",
+        "settingAmongCommands": "“{name}:” is read as a GeoGebra command, not a setting - settings go first, in small letters, before the commands"
       }
     },
     "knownLimits": [
