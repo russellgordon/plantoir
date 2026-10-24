@@ -28313,6 +28313,17 @@
           "untouched": false
         },
         {
+          "name": "aSketchInACalloutInAChoice",
+          "markdown": "> [!quiz] Which sketch shows a line?\n> - [x] This one\n>   > [!note] The sketch\n>   > ```geogebra\n>   > alt: A line, in a note in a choice.\n>   > y = x\n>   > ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "sketchInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
           "name": "aSketchInTheQuestionWithCommandsThatLookLikeChoices",
           "markdown": "> [!quiz] Drag A. Which is the slope of the line?\n> ```geogebra\n> alt: A line, in a question.\n> -x + y = 3\n> - [x] 2\n> [1, 2]\n> ```\n> - [x] -1\n> - [ ] 2\n",
           "quizzes": [

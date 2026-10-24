@@ -44,7 +44,9 @@
 //    shuffled quiz opens, and after a print (beforeprint and afterprint,
 //    which put the choices in Markdown order and back) it is the same
 //    applet, in the same place, outside the choices, still running
-//    commands.
+//    commands; and Start again hides the explanation's open sketch, and a
+//    second answer shows the same applet again, not zero-sized, still
+//    running commands.
 //
 // It prints a line starting "OK:" with the time from tap to sketch and the
 // bytes fetched, or "FAIL:" with what went wrong.
@@ -392,7 +394,20 @@ async function connect(chunk) {
         if (!kept || !kept.same || !kept.connected || !kept.parent || !kept.outsideChoices || !kept.canvas || kept.ran !== 7) {
           problems.push(`${phase}: after a print, the sketch in the shuffled question is not the same working applet in its place: ${JSON.stringify(kept)}`)
         }
-        quizSaid = `, on the quiz page ${atLoad} requests at load and ${afterAnswer} once the explanation was shown, its sketch ${inExplanation.ms} ms after the tap, the question's ${inQuestion.ms} ms and the same applet after a print`
+        // Start again hides the explanation (and its open sketch) again;
+        // answering again shows it: the same applet, still drawn at its
+        // size and still running commands (stage 5 review, item 2).
+        await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; window.__plantoirExplained = f.querySelector(".pl-geogebra-applet"); document.querySelector(".plantoir-quiz-start-again").click(); return true })()`)
+        const hiddenAgain = await waitFor(`!document.querySelectorAll("figure.pl-geogebra")[1].checkVisibility()`, 20)
+        if (!hiddenAgain) problems.push(`${phase}: Start again did not hide the explanation's sketch`)
+        await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; const quiz = f.closest(".plantoir-quiz"); const right = JSON.parse(quiz.dataset.quiz).correct[0]; quiz.querySelector('.plantoir-quiz-choice[data-choice="' + right + '"] input').click(); quiz.querySelector(".plantoir-quiz-check").click(); return true })()`)
+        const shownAgain = await waitFor(`document.querySelectorAll("figure.pl-geogebra")[1].checkVisibility()`, 20)
+        await pause(500)
+        const again = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; const box = f.querySelector(".pl-geogebra-applet"); const size = box ? box.getBoundingClientRect() : { width: 0, height: 0 }; const canvas = box ? box.querySelector("canvas") : null; const drawn = canvas ? canvas.getBoundingClientRect() : { width: 0, height: 0 }; let ran = null; try { const api = window[box.id.replace(/-box$/, "")]; api.evalCommand("plantoirShownAgain = 5"); ran = api.getValue("plantoirShownAgain") } catch (error) { ran = String(error) } return { same: box === window.__plantoirExplained, connected: !!box && box.isConnected, width: Math.round(size.width), height: Math.round(size.height), canvasWidth: Math.round(drawn.width), canvasHeight: Math.round(drawn.height), ran } })()`)
+        if (!shownAgain || !again || !again.same || !again.connected || again.width === 0 || again.height === 0 || again.canvasWidth === 0 || again.canvasHeight === 0 || again.ran !== 5) {
+          problems.push(`${phase}: hidden by Start again and shown again, the explanation's sketch is not the same working applet at its size: ${JSON.stringify(again)}`)
+        }
+        quizSaid = `, on the quiz page ${atLoad} requests at load and ${afterAnswer} once the explanation was shown, its sketch ${inExplanation.ms} ms after the tap, the question's ${inQuestion.ms} ms, the same applet after a print, and the explanation's the same applet at ${again?.width}×${again?.height} after Start again and a second answer`
       }
 
       const violations = (await evaluate("window.__plantoirCheck.violations")) ?? []

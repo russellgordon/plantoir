@@ -473,6 +473,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
         state["stem"] = []
 
     fence = None
+    quoted_fence = None
     previous_blank = True
     previous_paragraph = False
     index = 0
@@ -615,6 +616,20 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
 
         lazy_in_item = (state["listKind"] is not None and not previous_blank and previous_paragraph
                         and not _BLOCK_START.match(inner))
+        if in_item and depth >= 1:
+            # A blockquote or callout inside a choice: a GeoGebra sketch in it
+            # is still a sketch in that choice (#578 stage 6; the site finds
+            # it anywhere under the item). Its own fences are followed so a
+            # ```geogebra line quoted inside another fence is not one.
+            if quoted_fence is not None:
+                if _fence_closes(body, quoted_fence):
+                    quoted_fence = None
+            else:
+                quoted_fence = _fence_opens(body)
+                if quoted_fence is not None and _fence_language(body) == SKETCH_LANGUAGE:
+                    state["listHasSketch"] = True
+        else:
+            quoted_fence = None
         if in_item or lazy_in_item:
             # Inside a choice, or a lazy line continuing one.
             previous_blank = False
