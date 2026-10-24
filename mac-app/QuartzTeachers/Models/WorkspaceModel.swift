@@ -1597,9 +1597,13 @@ class WorkspaceModel {
         pass: ToolchainMirrorPass? = nil, relative: String? = nil
     ) -> MirrorOutcome {
         let fileManager: FileManager = FileManager.default
+        // One `stat` of each, used by every question below: this runs for
+        // twelve thousand files on the pass a teacher waits through.
+        let sourceStamp: ToolchainFingerprints.Stamp? = ToolchainFingerprints.stamp(of: sourceURL)
+        let copyStamp: ToolchainFingerprints.Stamp? = ToolchainFingerprints.stamp(of: destinationURL)
         var bundledHash: String? = nil
         if let pass, let relative {
-            bundledHash = pass.bundledHash(relative, of: sourceURL)
+            bundledHash = pass.bundledHash(relative, stamp: sourceStamp)
         }
 
         // The cheap question first: same size, same modification date.
@@ -1609,10 +1613,10 @@ class WorkspaceModel {
         // prove they match cost 3.8 seconds — every time the courses were
         // reloaded, which is after every rename, backup, restore and archive.
         // Two stat calls answer the same question for almost all of them.
-        if WorkspaceModel.filesLookIdentical(sourceURL, destinationURL) {
-            if let pass, let relative {
+        if ToolchainFingerprints.lookIdentical(sourceStamp, copyStamp) {
+            if let pass, let relative, let copyStamp {
                 if let bundledHash {
-                    pass.remember(relative, copy: destinationURL, sha256: bundledHash)
+                    pass.remember(relative, stamp: copyStamp, sha256: bundledHash)
                 } else {
                     // A Sparkle delta keeps the OLD install's time on every
                     // file it did not change, so the new build's manifest
@@ -1620,14 +1624,12 @@ class WorkspaceModel {
                     // are compared. What the index already knew about the
                     // copy is kept, so the next FULL install can still answer
                     // from fingerprints (documentation/09, M2).
-                    pass.keepWhatIsStillKnown(relative, copy: destinationURL)
+                    pass.keepWhatIsStillKnown(relative, stamp: copyStamp)
                 }
             }
             return MirrorOutcome(compared: 1)
         }
 
-        let copyStamp: ToolchainFingerprints.Stamp? = ToolchainFingerprints.stamp(of: destinationURL)
-        let sourceStamp: ToolchainFingerprints.Stamp? = ToolchainFingerprints.stamp(of: sourceURL)
         let compared: Int = copyStamp == nil ? 0 : 1
         var readInFull: Int = 0
         var sameLength: Bool = false
@@ -1639,7 +1641,7 @@ class WorkspaceModel {
         // rebuild or an install that restamped it (#663). The fingerprints
         // answer without reading the bundle's file.
         if sameLength, let pass, let relative, let bundledHash {
-            var copyHash: String? = pass.appliedHash(relative, of: destinationURL)
+            var copyHash: String? = pass.appliedHash(relative, stamp: copyStamp)
             if copyHash == nil {
                 readInFull = 1
                 copyHash = ToolchainFingerprints.sha256(of: destinationURL)
@@ -1709,24 +1711,13 @@ class WorkspaceModel {
     /// reading 122 MB to answer a question two stat calls almost always
     /// answer correctly. The dates only line up because `syncFile` stamps
     /// what it writes — see `copyModificationDate`.
+    ///
+    /// Since #663 this asks `stat` once per file (`ToolchainFingerprints.lookIdentical`),
+    /// the same question `syncFile` asks, so there is one definition of it.
     nonisolated static func filesLookIdentical(_ oneURL: URL, _ otherURL: URL) -> Bool {
-        let wanted: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey]
-        guard let one = try? oneURL.resourceValues(forKeys: wanted),
-              let other = try? otherURL.resourceValues(forKeys: wanted),
-              let oneSize = one.fileSize,
-              let otherSize = other.fileSize,
-              let oneDate = one.contentModificationDate,
-              let otherDate = other.contentModificationDate else {
-            return false
-        }
-        if oneSize != otherSize {
-            return false
-        }
-        // A tolerance rather than equality: a date makes a round trip through
-        // the file system as a floating-point number of seconds, and an exact
-        // comparison can fail on the last bit for two stamps that are the
-        // same moment. A millisecond is far tighter than any real edit.
-        return abs(oneDate.timeIntervalSince(otherDate)) < 0.001
+        return ToolchainFingerprints.lookIdentical(
+            ToolchainFingerprints.stamp(of: oneURL), ToolchainFingerprints.stamp(of: otherURL)
+        )
     }
 
     /// Gives the copy the original's modification date, so the cheap check
