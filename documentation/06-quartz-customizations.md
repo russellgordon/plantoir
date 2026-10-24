@@ -3976,7 +3976,14 @@ as `ggbBase64`, and makes the applet with the web3d codebase, offline, in
 English (the language files are left out of the engine), no menu bar, no
 input bar, no right-click menu, the reset icon, shift-drag zoom, the fence's
 `toolbar:`/`algebra:`, at the sketch's own size, scaled down to the page
-(`scaleContainerClass`). A tap that has not opened a sketch in 60 s says
+(`scaleContainerClass`). The box it is scaled into keeps the sketch's own
+shape (`aspect-ratio` from `--pl-geogebra-ratio`, `height: auto !important`,
+`overflow: hidden`, in `geogebra.scss`): GeoGebra writes a width and height
+onto that box for the page width it measured when it opened and never
+corrects them, so the 1430 × 759 slope-angle sketch, drawn 334 px tall in a
+630 px column, sat in a box left 482 px tall — a white band under it,
+found in the stage-7 screenshot (WebKit, 2026-10-24) and invisible to every
+check that only asked whether the box was zero-sized. A tap that has not opened a sketch in 60 s says
 `couldNotLoad` and the button works again. A geogebra.org sketch is fetched
 from the site's own copy in `static/geogebra-sketches/` (05 → item 9), never
 from geogebra.org.
