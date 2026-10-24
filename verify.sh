@@ -3622,6 +3622,20 @@ if not (course / "Media" / "Unit 2 Review.pdf").exists():
     plant("Media/Unit 2 Review.pdf",
           b"%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj "
           b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
+# #578: the skill's GeoGebra example names "Slope Angle Conjecture.ggb",
+# found in Media by its name. A copy of the planted fixture sketch with its
+# own id, so the fixture's file is still in the site once (6i-g).
+if not (course / "Media" / "Slope Angle Conjecture.ggb").exists():
+    import io, zipfile
+    fixture = course / "Investigations" / "GeoGebra Fixture Lines.ggb"
+    made = io.BytesIO()
+    with zipfile.ZipFile(fixture) as source, zipfile.ZipFile(made, "w", zipfile.ZIP_DEFLATED) as sketch:
+        for name in source.namelist():
+            data = source.read(name)
+            if name == "geogebra.xml":
+                data = data.replace(b"plantoir-verify-578", b"plantoir-verify-578-authoring")
+            sketch.writestr(name, data)
+    plant("Media/Slope Angle Conjecture.ggb", made.getvalue())
 record.write_text("\n".join(planted) + "\n", encoding="utf-8")
 print(f"   planted {len(examples)} examples from the page-authoring skill")
 AUTHORPLANTS
@@ -5009,6 +5023,10 @@ def tasks(html):
     return len(re.findall(r'<input type="checkbox"[^>]*class="plantoir-task"', html))
 def has_file(href):
     return (public / href.lstrip("./")).is_file()
+def geogebra_specs(html_text):
+    import html as html_module, json
+    return [json.loads(html_module.unescape(spec)) for spec in
+            re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"', html_text or "")]
 # (a text only that example holds, what it must build as, the check)
 claims = [
     ("title: Slope as a Rate of Change", "settings: the title, tags and maths",
@@ -5050,9 +5068,13 @@ claims = [
      lambda a, p: len(re.findall(r'<img src="\./Media/cell-diagram\.png"', a)) == 3 and 'width="300"' in a
      and 'alt="A plant cell with the nucleus labelled"' in a and '<iframe src="./Media/Unit-2-Review.pdf" class="pdf">' in a
      and 'href="./Media/Unit-2-Review.pdf"' in a and has_file("Media/cell-diagram.png") and has_file("Media/Unit-2-Review.pdf")),
-    ("![](https://www.youtube.com/watch?v=", "YouTube, Vimeo, GeoGebra and PhET players",
+    ("![](https://www.youtube.com/watch?v=", "YouTube, Vimeo and PhET players, and no GeoGebra iframe (#578)",
      lambda a, p: 'src="https://www.youtube.com/embed/' in a and '<iframe src="https://player.vimeo.com/video/' in a
-     and '<iframe src="https://www.geogebra.org/' in a and '<iframe src="https://phet.colorado.edu/' in a),
+     and 'geogebra.org' not in a and '<iframe src="https://phet.colorado.edu/' in a),
+    ("file: Slope Angle Conjecture.ggb", "two GeoGebra sketches: a file found in Media and one from commands (#578)",
+     lambda a, p: [spec.get("sketch") for spec in geogebra_specs(a)] == ["Media/Slope-Angle-Conjecture.ggb", None]
+     and [line["text"] for line in geogebra_specs(a)[1].get("commands", [])] == ["f(x) = 2x + 1", "A = Point(f)"]
+     and has_file("Media/Slope-Angle-Conjecture.ggb")),
     ("%% Tomorrow:", "a note only the teacher sees",
      lambda a, p: "Students see only this sentence." in a and "Tomorrow" not in p["full"]),
     ("title: Unit 3 Test Review", "publish: false keeps the page off the site",
@@ -5106,7 +5128,7 @@ print(f"   {len(examples)} examples, {len(claims)} claims")
 sys.exit(1 if problems else 0)
 AUTHORPY
 then
-  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, a text block that wraps (#653), checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/GeoGebra/PhET, comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
+  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, a text block that wraps (#653), checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/PhET, GeoGebra sketches from a file and from commands (#578), comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
 else
   fail "page-authoring skill: an example did not build as the feature it claims, or an example has no claim (#596)"
 fi
