@@ -92,7 +92,7 @@ function manifest(): Manifest | null {
 }
 
 // This page's sketches, by fence key, or null.
-function sketchesOf(known: Manifest, file: { data: Record<string, unknown> }): Record<string, Entry> | null {
+function sketchesOf(known: Manifest, file: { data: { relativePath?: unknown } }): Record<string, Entry> | null {
   const page = String(file.data.relativePath ?? "").normalize("NFC")
   return known.pages?.[page] ?? null
 }

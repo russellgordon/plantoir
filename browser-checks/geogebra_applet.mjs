@@ -298,10 +298,10 @@ async function connect(chunk) {
       // 7: which of its lines GeoGebra refused, and in what words.
       const ran = await waitFor(`document.querySelectorAll("figure.pl-geogebra")[1].dataset.geogebraCommands === "ran"`, 80)
       const lines = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; const spec = JSON.parse(f.dataset.geogebra); const box = f.querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; return { commands: spec.commands, shown: Array.from(f.querySelectorAll(":scope > .pl-geogebra-lines li")).map((li) => li.textContent), a: api && typeof api.getValue === "function" ? api.getValue("a") : null, dialogs: f.querySelectorAll(".dialogComponent").length } })()`)
-      const said = new Map(contract.commands.cases.map((item) => [item.text, item.said]))
+      const refusals = new Map(contract.commands.cases.map((item) => [item.text, item.said]))
       const wanted = []
       for (const command of lines?.commands ?? []) {
-        const words = said.get(command.text)
+        const words = refusals.get(command.text)
         if (words) wanted.push(contract.words.site.lineCouldNotRun.replace("{line}", String(command.line)).replace("{said}", words))
       }
       refusedLines = lines?.shown?.length ?? 0
