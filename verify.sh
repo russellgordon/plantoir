@@ -1952,6 +1952,88 @@ if [[ "$NODE_REPORT" == OK* ]]; then
 else
   fail "The image's Node does not match contracts/toolchain.json -> node and wrangler: ${NODE_REPORT#PROBLEMS }"
 fi
+
+# Known vulnerabilities in the image's npm packages (#667). Every JavaScript
+# tree the image carries is audited INSIDE the image, with the image's own npm,
+# and compared by scripts/npm_audit.py against contracts/toolchain.json ->
+# npmAudit: a high or critical advisory that is not accepted for its tree, or
+# that is accepted at a lower severity than it has now, FAILS. quartz and
+# tikz-engine have lockfiles; wrangler is a global install with none, so one is
+# built next to a copy of the installed tree (no network needed); pagedjs and
+# function-plot are prebuilt files, so a lockfile is built from their pins.
+# Only npm's STDOUT is read - offline npm prints its JSON there, an `npm error`
+# line on stderr, and exits 1 either way. The registry not answering is a SKIP
+# that says no tree counts as audited until every tree can be, never a pass; output that is not JSON, or a
+# tree whose lockfile is gone, is a FAIL. The record of each run is
+# research/npm-audit/<date>.md; RELEASING.md step 2 revisits it at every cut.
+NPM_AUDIT_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'NPMAUDITPY'
+import json, re, shutil, subprocess, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+sys.path.insert(0, "scripts")
+import npm_audit
+toolchain = json.load(open("contracts/toolchain.json"))
+pins = {p["pin"]: p for p in toolchain["pins"]}
+contract = toolchain["npmAudit"]
+inside = r"""
+audit_here() { npm audit --package-lock-only --json 2>/dev/null; echo; }
+synthesise() {
+  printf '{"name":"plantoir-audit","private":true,"dependencies":{"%s":"%s"}}' "$2" "$3" > "$1/package.json"
+  (cd "$1" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund >/dev/null 2>"$1/lock.err")
+}
+step_failed() {
+  printf '{"plantoir":"lockfile-step-failed","message":"%s"}\n' "$(grep -m1 -i 'error' "$1/lock.err" | tr -d '"\\' | cut -c1-200)"
+}
+for tree in quartz:/opt/quartz tikz-engine:/opt/vendor/tikz-engine; do
+  echo "=====TREE ${tree%%:*}"
+  if [ -f "${tree#*:}/package-lock.json" ]; then (cd "${tree#*:}" && audit_here); else echo '{"plantoir":"no-lockfile"}'; fi
+done
+echo "=====TREE wrangler"
+if [ -f /usr/lib/node_modules/wrangler/package.json ]; then
+  mkdir -p /tmp/a/w/node_modules && cp -a /usr/lib/node_modules/wrangler /tmp/a/w/node_modules/
+  if synthesise /tmp/a/w wrangler "$1"; then (cd /tmp/a/w && audit_here); else step_failed /tmp/a/w; fi
+else echo '{"plantoir":"no-lockfile"}'; fi
+echo "=====TREE pagedjs"
+mkdir -p /tmp/a/p
+if synthesise /tmp/a/p pagedjs "$2"; then (cd /tmp/a/p && audit_here); else step_failed /tmp/a/p; fi
+echo "=====TREE function-plot"
+mkdir -p /tmp/a/f
+if synthesise /tmp/a/f function-plot "$3"; then (cd /tmp/a/f && audit_here); else step_failed /tmp/a/f; fi
+"""
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "sh", "-c", inside, "sh",
+                      pins["wrangler"]["value"], pins["pagedjs"]["value"], pins["functionPlot"]["value"]],
+                     capture_output=True, text=True)
+out = Path("/tmp/verify_npm_audit")
+shutil.rmtree(out, ignore_errors=True)
+out.mkdir(parents=True)
+audits = {}
+sections = re.split(r"^=====TREE (\S+)\n", run.stdout, flags=re.M)
+for index in range(1, len(sections), 2):
+    (out / (sections[index] + ".json")).write_text(sections[index + 1])
+    audits[sections[index]] = npm_audit.read_audit(out / (sections[index] + ".json"))
+report = npm_audit.compare(audits, contract)
+code = npm_audit.exit_code(report)
+problems = []
+for line in npm_audit.describe(report):
+    if line.startswith(("BLOCKING", "FAILED")):
+        problems.append(line)
+if code == 1:
+    print("PROBLEMS " + "; ".join(problems or ["no tree was audited (docker exited " + str(run.returncode) + ")"]))
+elif code == 2:
+    print("SKIPPED " + report["unreachable_trees"][0][1][:200])
+else:
+    print(f"OK {report['advisories_seen']} advisories across {len(report['audited_trees'])} trees, "
+          f"{len(report['accepted_seen'])} accepted, {len(report['reported'])} low or moderate reported, "
+          f"{len(report['stale'])} stale")
+NPMAUDITPY
+)"
+if [[ "$NPM_AUDIT_REPORT" == OK* ]]; then
+  pass "The image's npm packages have no high or critical advisory that contracts/toolchain.json does not accept (#667): ${NPM_AUDIT_REPORT#OK }"
+elif [[ "$NPM_AUDIT_REPORT" == SKIPPED* ]]; then
+  skip "The image's npm packages were not checked for known vulnerabilities (#667): the advisory database could not be reached (${NPM_AUDIT_REPORT#SKIPPED }) - no tree counts as audited until every tree can be"
+else
+  fail "The image's npm packages have a new or raised high or critical advisory (#667): ${NPM_AUDIT_REPORT#PROBLEMS }. Decide it in contracts/toolchain.json -> npmAudit and research/npm-audit/"
+fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
 # -------------------- 4a. The live-reload client is still the one the rule names --------------------

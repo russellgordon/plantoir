@@ -42,6 +42,18 @@ drives real Safari through AppleScript and System Events, so it is run by
 hand, never by a suite. Cited from `documentation/06-quartz-customizations.md`
 F3.
 
+## `npm-audit/` — known vulnerabilities in the image's JavaScript
+
+One file per audit run, `<date>.md` (#667). Each one records the conditions:
+the image, Node and npm, when the advisory database was asked, and how each
+tree's lockfile was obtained. Then the full findings table, from
+`scripts/npm_audit.py findings`, with every advisory's exposure and the
+decision taken on it. Then the gate's proofs: green, an accepted id removed, a
+severity raised, output that is not JSON, and offline. A new file is added at
+a release cut when anything changed (RELEASING.md step 2). Older files stay.
+Cited from `contracts/toolchain.json` → `npmAudit` and
+`documentation/02-docker-image.md`.
+
 ## `ai-assist/` — the local assistant
 
 Why the assistant is built the way it is: which models were tried, which were
