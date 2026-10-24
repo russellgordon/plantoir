@@ -139,7 +139,6 @@
       "alt": "A Grade 10 mathematics exploration on a class website, The Slope-Angle Conjecture: under the heading The sketch, a GeoGebra sketch opened on the page, with three right triangles of different sizes that share one marked angle, the slider that sets it, and the ratio of each triangle's two shorter sides.",
       "caption": "A GeoGebra file saved beside the page, opened with a tap. Students drag the points and the slider; the sketch comes from your own class site.",
       "windows": false,
-      "awaiting_capture": true,
       "expectText": [
         "The sketch",
         "GeoGebra"

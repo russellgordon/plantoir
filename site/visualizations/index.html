@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Visualizations — Plantoir</title>
-<meta name="description" content="Diagrams and graphs for class notes — a drawn TikZ diagram, or a graph students can move — each written as a few lines in an ordinary note.">
+<meta name="description" content="Diagrams, graphs and GeoGebra sketches for class notes — a drawn TikZ diagram, a graph students can move, or a sketch they can drag — each written as a few lines in an ordinary note.">
 <link rel="canonical" href="https://plantoir.app/visualizations">
 
 <!-- Social preview. Update the URLs if the domain changes. -->
 <meta property="og:site_name" content="Plantoir">
 <meta property="og:title" content="Visualizations — Plantoir">
-<meta property="og:description" content="Diagrams and graphs for class notes — a drawn TikZ diagram, or a graph students can move — each written as a few lines in an ordinary note.">
+<meta property="og:description" content="Diagrams, graphs and GeoGebra sketches for class notes — a drawn TikZ diagram, a graph students can move, or a sketch they can drag — each written as a few lines in an ordinary note.">
 <meta property="og:url" content="https://plantoir.app/visualizations">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://plantoir.app/social-card.png">
@@ -20,7 +20,7 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Visualizations — Plantoir">
-<meta name="twitter:description" content="Diagrams and graphs for class notes — a drawn TikZ diagram, or a graph students can move — each written as a few lines in an ordinary note.">
+<meta name="twitter:description" content="Diagrams, graphs and GeoGebra sketches for class notes — a drawn TikZ diagram, a graph students can move, or a sketch they can drag — each written as a few lines in an ordinary note.">
 <meta name="twitter:image" content="https://plantoir.app/social-card.png">
 
 <!-- Mastodon verification. The profile's matching link back to plantoir.app
@@ -91,7 +91,7 @@
 
 <div class="page-head">
   <h1>Visualizations</h1>
-  <p class="standfirst">Diagrams and graphs, each written as a few lines in a note. Type them in Obsidian, preview the section, and students get a diagram drawn for them or a graph they can move. More kinds are on the way.</p>
+  <p class="standfirst">Diagrams, graphs and GeoGebra sketches, each written as a few lines in a note. Type them in Obsidian, preview the section, and students get a diagram drawn for them, a graph they can move, or a sketch with sliders and points they can drag.</p>
 </div>
 
 <hr class="rule">
@@ -164,8 +164,73 @@ y = -2(x - 1)^2 + 3
     <li>It can't mark a point or shade a region. For a marked point, draw the graph in TikZ with <code>pgfplots</code>.</li>
   </ul>
   <p>In Obsidian the block shows as its text; the graph is drawn when you preview.</p>
-  <p>Function graphs pan and zoom now; sliders and dynamic geometry arrive with GeoGebra in the next release.</p>
+  <p>Function graphs pan and zoom. For sliders and geometry students can drag, use a <a href="#geogebra">GeoGebra sketch</a>.</p>
   
+</section>
+
+<hr class="rule">
+
+<section id="geogebra">
+  <h2>GeoGebra sketches students can drag</h2>
+  <p>A <code>geogebra</code> block puts a working GeoGebra sketch on the page: points to drag, sliders to move, the algebra beside it if you want it. It waits as a picture of the sketch until a student taps <em>Open the sketch</em>, so a page with three sketches costs nothing until one is used. GeoGebra itself comes from your own class site, never from geogebra.org.</p>
+  <p>Say which sketch in one of three ways.</p>
+
+  <h3 id="geogebra-file">1. A sketch you saved from GeoGebra</h3>
+  <p>Make the sketch in GeoGebra, save it as a <code>.ggb</code> file, and put the file beside the page, or in the course's <code>Media</code> folder. Then name it:</p>
+  <h4 class="label">What you type</h4>
+  <pre class="fence"><code>```geogebra
+file: Slope Angle Conjecture.ggb
+alt: Three right triangles of different sizes that share one marked angle set by a slider. Points B, E and H resize them.
+```</code></pre>
+  <h4 class="label">What students get</h4>
+  <figure class="shot">
+    <picture>
+      <source srcset="../img/geogebra-sketch-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/geogebra-sketch-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/geogebra-sketch-light.webp" type="image/webp">
+      <img src="../img/geogebra-sketch-light.png" alt="A Grade 10 mathematics exploration on a class website, The Slope-Angle Conjecture: under the heading The sketch, a GeoGebra sketch opened on the page, with three right triangles of different sizes that share one marked angle, the slider that sets it, and the ratio of each triangle's two shorter sides."
+           width="1392" height="972" loading="lazy" decoding="async">
+    </picture>
+    <figcaption>A GeoGebra file saved beside the page, opened with a tap. Students drag the points and the slider; the sketch comes from your own class site.</figcaption>
+</figure>
+  <p>From <em>The Slope-Angle Conjecture</em> in the ready-made MPM2D course: students move the angle and resize the triangles until they can say what the slope belongs to.</p>
+  <p>Obsidian hides <code>.ggb</code> files in its file list until you turn on <strong>Settings ▸ Files and links ▸ Detect all file extensions</strong>; the file is there either way. The <code>file:</code> line is plain text, not a link: if you rename the file, change the line too. A page copied to another course with Copy a Page does not take the file with it, so a sketch you use on several pages is best kept in <code>Media</code>, where any page finds it by its name.</p>
+
+  <h3 id="geogebra-commands">2. Commands, typed in the block</h3>
+  <p>Type the commands one per line, exactly as you would in GeoGebra's Input Bar. A line starting <code>//</code> is a note to yourself.</p>
+  <h4 class="label">What you type</h4>
+  <pre class="fence"><code>```geogebra
+alt: The parabola y = a(x - 2)^2 beside y = x^2, with a slider for a.
+a = Slider(-3, 3, 0.5)
+f(x) = a(x - 2)^2
+g(x) = x^2
+SetColor(g, "gray")
+```</code></pre>
+  <p>GeoGebra reads the commands when a student opens the sketch, so open it once in your preview: a line it cannot run shows under the sketch as “Line 4 couldn't run”, with GeoGebra's own explanation. Commands can also follow <code>file:</code>, to change a sketch you saved.</p>
+
+  <h3 id="geogebra-material">3. A sketch on geogebra.org</h3>
+  <p>Name a public sketch by its address or its id:</p>
+  <pre class="fence"><code>```geogebra
+material_id: https://www.geogebra.org/m/ju3f2kbg
+alt: Three right triangles that share one marked angle set by a slider.
+```</code></pre>
+  <p>Plantoir saves a copy of the sketch the first time the site is built, and uses that copy from then on, so students never wait on geogebra.org. If the author changes the sketch there and you want the new one, change the block — add <code>version: 2</code>, and raise it next time — and the next preview fetches it again. If geogebra.org can't be reached and there is no saved copy yet, Plantoir says so and names the page. The sketch is shown with its author's name and its licence under it.</p>
+
+  <h4 class="label">What it accepts</h4>
+  <ul class="plain">
+    <li>Settings first, one <code>key: value</code> to a line, then any commands. <code>file:</code> or <code>material_id:</code>, never both.</li>
+    <li><code>alt</code> — one sentence a screen reader says instead of the sketch. Always give one.</li>
+    <li>Optional: <code>caption</code>, <code>app</code> (<code>classic</code>, <code>graphing</code>, <code>geometry</code> or <code>3d</code>), <code>width</code> and <code>height</code>, <code>toolbar</code> and <code>algebra</code> (<code>true</code> or <code>false</code>), and <code>version</code>.</li>
+    <li>A sketch can go in a page or in a quiz question — in its question or its explanation, not in one of its choices (see <a href="../quizzes/">Quizzes</a>).</li>
+    <li>On paper it prints as a picture of the sketch as the student left it, with the credit under it.</li>
+    <li>GeoGebra's own words in a sketch are in English.</li>
+    <li>A sketch that can't be shown stays as its text on the page, and Plantoir tells you the page, the block and the line.</li>
+  </ul>
+  <p>In Obsidian the block shows as its text; the sketch appears when you preview. A GeoGebra add-on for Obsidian that reads the same settings exists, made by somebody else; the website doesn't need it.</p>
+  <div class="note">
+    <p>Every sketch carries “Made with GeoGebra®”, linked to geogebra.org, as GeoGebra asks of anyone who shows its sketches.</p>
+  </div>
+  <p class="availability">On the Mac. The Windows version gets this in a later release.</p>
 </section>
 
 <hr class="rule">
@@ -190,7 +255,7 @@ y = 3(x - 2)^2 - 4
     <div class="plot" role="img" aria-label="The parent parabola y = x^2 and y = 3(x - 2)^2 - 4, which opens up, is narrower, and has its vertex at (2, -4)."></div>
     <p class="graph-fallback">The graph of y = x^2 and y = 3(x - 2)^2 - 4 is drawn here when the page has loaded.</p>
   </figure>
-  <p>Ask for a slider and it says sliders arrive with GeoGebra in the next release, and offers the nearest thing for now: two or three curves on one set of axes.</p>
+  <p>Ask for a slider and the guidance steers it to a GeoGebra sketch, with the slider written as one of its commands — or, for a sketch you already saved, to the <code>file:</code> line that names it.</p>
   <p>Open either from a course's menu with <a href="../features/#bring-your-own">Revise With ▸ Claude… or Codex…</a>, which starts it in your working folder.</p>
 </section>
 
