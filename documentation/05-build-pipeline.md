@@ -2409,7 +2409,14 @@ on geogebra.org (`material_id:`, fetched once and kept — item 9).
    — in capitals (`File: x.ggb`), or after the line that started the
    commands — is a `plantoir: note:` (`settingAmongCommands`), since it will
    run as a GeoGebra command that GeoGebra refuses. Only a known key is
-   noted, so GeoGebra's own `slope: Slope(a)` passes silently.
+   noted, so GeoGebra's own `slope: Slope(a)` passes silently. **A note is
+   not a folder problem** (stage 3+4 review item 3): it is a line in the
+   build's own output, which the app does not show the teacher, so the one
+   who sees the slip is usually the student, under the sketch: "Line {n}
+   couldn't run" (`lineCouldNotRun`, Q3 in 06). And not every such line is
+   refused: `height: 400` among the commands is a GeoGebra command that
+   makes a NUMBER called `height`, so the sketch opens, the box keeps its
+   own height, and nothing is said on the page at all.
 4. **The key.** A sketch is found by `figures.key_of` — figureFences'
    `cacheKey` rule, REUSED, so the build and the site (which hashes the mdast
    code value with `figureRules.keyOf`) agree by a rule both already run.
@@ -2497,7 +2504,21 @@ on geogebra.org (`material_id:`, fetched once and kept — item 9).
    and the fence stays code; 403/404/410 or `deleted` is `materialNotFound`;
    no applet is `materialHasNoSketch`, two or more `materialHasSeveralSketches`;
    a download that is not a GeoGebra file is `materialHasNoSketch` and is
-   never kept.
+   never kept. **A download cut off on the way** (stage 3+4 review items 1
+   and 2) is `materialCouldNotBeFetched` and is never kept: a body shorter
+   than its `Content-Length` (`read(n)` returns what came rather than
+   raising, so `MaterialFetcher._get` compares the two) and a chunked answer
+   that stops (`http.client.IncompleteRead`, an `HTTPException` and NOT an
+   `OSError`, which is why both fetch paths name it). Whatever else a fetch
+   raises is that ONE sketch's `materialCouldNotBeFetched` (`_material`'s
+   catch), so `_prepare_geogebra`'s catch-all — which drops the whole
+   manifest — is never reached by a fetch, and the `file:` sketches on the
+   same site are prepared as ever. Tests: `test_a_cut_off_download_…`
+   (three stub answers: the API cut short, the `.ggb` cut short, the `.ggb`
+   chunked and cut) and `test_a_failed_fetch_takes_no_other_sketch_down`;
+   must-fails, each red: the `HTTPException` catch removed, the length
+   check removed, the per-sketch catch removed. A failed fetch is not
+   remembered: 06 → Q3 says what that costs a build.
 
    **Measured** (2026-10-24, one request for ju3f2kbg by hand): HTTP 200,
    1,598 bytes of JSON — `title`, `visibility` "S", `deleted` false,
