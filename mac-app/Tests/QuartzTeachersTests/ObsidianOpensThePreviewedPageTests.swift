@@ -164,7 +164,8 @@ final class ObsidianOpensThePreviewedPageTests: XCTestCase {
     /// The fixture workspace's first course, its section 1's list written
     /// where the build writes it, and every door to Obsidian faked; the
     /// preview shows `address` (nil: none showing).
-    func drive(address: String?, answer: ObsidianFigureAddOnsAnswer = .no, figures: Bool = false) throws -> Driven {
+    func drive(address: String?, answer: ObsidianFigureAddOnsAnswer = .no, figures: Bool = false,
+               pages: [String: Any] = ["Unit-1/Lesson-3": ["source": "Unit 1/Lesson 3.md", "hidden": false]]) throws -> Driven {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
         addTeardownBlock {
             try? FileManager.default.removeItem(at: fixtureURL)
@@ -179,7 +180,6 @@ final class ObsidianOpensThePreviewedPageTests: XCTestCase {
         }
         let list: URL = PreviewedPageSource.listURL(courseFolder: course.directoryURL, sectionNumber: 1)
         try FileManager.default.createDirectory(at: list.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let pages: [String: Any] = ["Unit-1/Lesson-3": ["source": "Unit 1/Lesson 3.md", "hidden": false]]
         try JSONSerialization.data(withJSONObject: ["version": 1, "course": course.code, "section": 1, "pages": pages]).write(to: list)
 
         let previous: ProblemReportStore = ActivityTrail.store
@@ -273,6 +273,31 @@ final class ObsidianOpensThePreviewedPageTests: XCTestCase {
         made.workspace.openInObsidianAfterTheNote(request)
         XCTAssertEqual(made.log.openedPages, [page])
         XCTAssertEqual(made.log.openedFolders, [])
+    }
+
+    /// A visible front page that only embeds a HIDDEN class opens the class,
+    /// and the line says it is hidden — the flag of the file that opens.
+    func testAFrontPageShowingAHiddenClassSaysTheClassIsHidden() throws {
+        let made: Driven = try drive(address: "", pages: [
+            "index": ["source": "section1/index.md", "hidden": false,
+                      "shows": "Unit 1/Lesson 3.md", "showsHidden": true]
+        ])
+        made.workspace.openInObsidian(course: made.course, sectionNumber: 1, atThePreviewedPage: true)
+        XCTAssertEqual(made.log.openedPages, [made.course.directoryURL.appendingPathComponent("Unit 1/Lesson 3.md").path])
+        XCTAssertTrue(trail().contains("\(made.course.code)/1 · " + PreviewedPageSource.trailWords(
+            .page(URL(fileURLWithPath: "/"), place: "Unit 1/Lesson 3", hidden: true))), trail())
+    }
+
+    /// A second press while the add-ons scan of the first is still running
+    /// does nothing, so it writes nothing: one press, one line.
+    func testASecondPressDuringTheScanWritesNoSecondLine() async throws {
+        let made: Driven = try drive(address: "Unit-1/Lesson-3", answer: .notAsked, figures: true)
+        XCTAssertFalse(made.workspace.openInObsidian(course: made.course, sectionNumber: 1, atThePreviewedPage: true))
+        XCTAssertFalse(made.workspace.openInObsidian(course: made.course, sectionNumber: 1, atThePreviewedPage: true))
+        await made.workspace.obsidianAddOnsWork?.value
+        let line: String = PreviewedPageSource.trailWords(
+            .page(URL(fileURLWithPath: "/"), place: "Unit 1/Lesson 3", hidden: false))
+        XCTAssertEqual(SaveEnablesTests.occurrences(of: line, in: trail()), 1, trail())
     }
 
     /// The add-ons offer carries the page through its answer.

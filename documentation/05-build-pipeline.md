@@ -3377,7 +3377,11 @@ own `_is_draft`. The front page's entry gains `shows` when the teacher's
 `section<N>/index.md` — read from the teacher's file, not the build's copy,
 which gains a title and may gain the section marker — is nothing but a single
 `![[…]]` line below its settings, naming exactly one page (Russell's ruling
-1: open the class the front page shows).
+1: open the class the front page shows), and with it `showsHidden`, the
+build's `_is_draft` of THAT class page: the front page can be visible while
+the class it embeds is hidden, and the trail's "(hidden from students)" is
+said of the file that opens, so the front page's own `hidden` cannot stand
+in for it (#518 implementation review).
 
 **One correction, one trap left alone.** The per-section folder copy credits
 EVERY file under a folder it copied to the section, so when a folder name is

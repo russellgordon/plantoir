@@ -178,7 +178,20 @@ class PageSourcesTests(unittest.TestCase):
     def test_the_front_page_that_only_embeds_a_class_shows_it(self):
         index = self._the_list()["pages"]["index"]
         self.assertEqual(index, {"source": "section1/index.md", "hidden": False,
-                                 "shows": "section1/All Classes/Unit 1, Day 3.md"})
+                                 "shows": "section1/All Classes/Unit 1, Day 3.md",
+                                 "showsHidden": False})
+
+    def test_a_hidden_class_on_a_visible_front_page_is_flagged_as_hidden(self):
+        # The front page is visible; the class it embeds is not. The file
+        # that opens is the class, so its own flag is what the trail reads.
+        self._lay_out_the_course("---\ntitle: Section 1\n---\n\n![[Unit 1, Day 3]]\n\n")
+        _write(self.section / "All Classes" / "Unit 1, Day 3.md",
+               "---\ntitle: Unit 1, Day 3\npublish: false\n---\nToday.\n")
+        self._copy_like_the_build(["Unit 1"], ["Unit 1", "All Classes"])
+        index = self.build_site.page_sources(self.content, self.course, "ICS3U", 1, "b")["pages"]["index"]
+        self.assertEqual(index["hidden"], False)
+        self.assertEqual(index["shows"], "section1/All Classes/Unit 1, Day 3.md")
+        self.assertEqual(index["showsHidden"], True)
 
     def test_a_front_page_with_more_on_it_shows_nothing_else(self):
         index = self._the_list("---\ntitle: Section 1\n---\nWelcome.\n![[Unit 1, Day 3]]\n")["pages"]["index"]
