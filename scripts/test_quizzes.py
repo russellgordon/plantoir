@@ -283,6 +283,11 @@ class QuizFilesTests(unittest.TestCase):
         quizzes.write_quiz_files(self.output, checked)
         written = json.loads((self.output / "quartz" / quizzes.PAGES_FILE).read_text(encoding="utf-8"))
         self.assertEqual(written["examined"], checked["examined"])
+        # #644: every EXAMINED page's place, by its path in the site's
+        # content - what the site's emitter names a quiz page by - and never
+        # in the pages file the site reads.
+        self.assertEqual(checked["places"], {"Units/Practice.md": "Units/Practice", "Other.md": "Other"})
+        self.assertNotIn("places", written)
 
     def test_a_contract_that_cannot_be_read_writes_empty_words(self):
         original = toolchain_paths.CONTRACTS_DIR

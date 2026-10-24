@@ -1924,13 +1924,13 @@ def _wire_site_said_emitter(config_ts: Path) -> None:
         return
     anchor = "Plugin.Assets(),"
     if text.count(anchor) != 1:
-        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        print("⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): the site's settings have changed shape.")
         return
     at = text.index(anchor)
     line_start = text.rfind("\n", 0, at) + 1
     indent = text[line_start:at]
     if indent.strip():
-        print("⚠️ Could not let the website say which blocks of code show as plain code: the site's settings have changed shape.")
+        print("⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): the site's settings have changed shape.")
         return
     text = text[:line_start] + indent + "Plugin.PlantoirSiteSaid(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
@@ -2179,7 +2179,7 @@ def _vault_source_of(page):
     return source[0] if source is not None else None
 
 
-def _check_quizzes(content_root: Path, output_dir: Path) -> list:
+def _check_quizzes(content_root: Path, output_dir: Path) -> tuple:
     """
     Self-check quizzes (#563; scripts/quizzes.py), ALWAYS: every `> [!quiz]`
     on the pages students can see, by the gate's own visibility rule, read
@@ -2188,7 +2188,9 @@ def _check_quizzes(content_root: Path, output_dir: Path) -> list:
     file, and becomes the `quiz_problems` fact for the quizzesNotReady
     finding. Then quartz/plantoir_quiz.json (the words) and
     quartz/plantoir_quiz_pages.json (what was found where, for the site's
-    safety net) are written, on every build. Never stops a build: if this
+    safety net) are written, on every build. Answers the problems and (#644)
+    each examined page's place by its path in the site's content, which
+    _write_site_said hands the site's emitter. Never stops a build: if this
     cannot run, the site still renders every quiz by its own reading.
     """
     checked = None
@@ -2204,7 +2206,9 @@ def _check_quizzes(content_root: Path, output_dir: Path) -> list:
         quizzes.write_quiz_files(output_dir, checked)
     except OSError as error:
         print(f"⚠️ Could not set up the self-check questions: {error}")
-    return checked["problems"] if checked is not None else []
+    if checked is None:
+        return [], {}
+    return checked["problems"], checked.get("places") or {}
 
 
 def _prepare_figures(content_root: Path, output_dir: Path, course_dir: Path, full_rebuild: bool) -> dict:
@@ -2300,14 +2304,17 @@ def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Pa
 
 
 def _write_site_said(output_dir: Path, content_root: Path, course_code, section_number,
-                     swift_here: dict) -> None:
+                     swift_here: dict, quiz_places: dict = None) -> None:
     """
     quartz/plantoir_site_said.json (#567; scripts/site_said.py): which Python
     the site's emitter runs to say the runnable blocks it showed as plain code
     as ONE folder problem (siteHealth -> runnableCodeShownAsPlainCode), where
     each page that opts in came from in the course folder, and which Swift
     blocks swiftCouldNotBePrepared already names. The pages are the ones
-    students can see, by the gate's own rule, read from the build's copies.
+    students can see, by the gate's own rule, read from the build's copies;
+    each page the quiz check examined is added by its place too (#644,
+    quizzesReadDifferently, said in the same call), unless it is already
+    there, so a code page keeps its `source`.
     Never stops a build: if this cannot run, the site keeps its
     `plantoir: error:` lines and says no finding.
     """
@@ -2320,13 +2327,16 @@ def _write_site_said(output_dir: Path, content_root: Path, course_code, section_
             source = _vault_source_of(content_root / page["path"])
             places[page["path"]] = {"place": page["place"],
                                     "source": str(source) if source is not None else None}
+        for path, place in (quiz_places or {}).items():
+            if path not in places:
+                places[path] = {"place": place, "source": None}
         swift_named = []
         for problem in swift_here.get("problems") or []:
             swift_named.append([problem.get("page", ""), problem.get("block", 1)])
         site_said.write_side_file(output_dir, course_code, section_number, places, swift_named,
                                   content_root)
     except Exception as error:
-        print(f"⚠️ Could not let the website say which blocks of code show as plain code: {error}")
+        print(f"⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): {error}")
 
 
 LOCALES_SRC_CANDIDATES = [
@@ -9090,7 +9100,7 @@ def build_section_site(
     swift_here = _prepare_runnable_swift(content_root, output_dir, course_dir)
     # Self-check quizzes (#563), ALWAYS: the folder check, and the two files
     # the site reads.
-    quiz_problems_here = _check_quizzes(content_root, output_dir)
+    quiz_problems_here, quiz_places_here = _check_quizzes(content_root, output_dir)
 
     health_facts = {
         "coverage_wanted": coverage_wanted,
@@ -9313,7 +9323,8 @@ def build_section_site(
         print(f"⚠️ Could not set up the code students run: {error}")
     # What the site's emitter needs to say a block it shows as plain code as a
     # folder problem (#567), ALWAYS, beside the runner's words.
-    _write_site_said(output_dir, content_root, course_code, section_number, swift_here)
+    _write_site_said(output_dir, content_root, course_code, section_number, swift_here,
+                     quiz_places_here)
     # KaTeX from the site itself (#494), ALWAYS and on every site: the
     # stylesheet, copy-tex and the woff2 faces the maths is set in.
     install_katex_assets(output_dir)

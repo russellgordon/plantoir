@@ -283,7 +283,14 @@ plantoir: error: Units/Linear Relations.md: quiz 3, line 41: none of its choices
 ```
 
 `quiz 3` is the third quiz on that page, and the line is in the teacher's
-file. Fix the quiz and preview again. After adding or changing quizzes,
+file. Fix the quiz and preview again.
+
+Now and then the website reads a question differently from the way Plantoir
+checked it - most often a line of HTML straight after the question - so
+students may see the short note even though nothing above was reported. The
+next Preview names that question in the folder problems too, with its page
+and line. Write it more plainly, the way the patterns above show (the
+question, then its choices or its `[!answer]`), and preview again. After adding or changing quizzes,
 **preview the section and answer each one** - right and wrong - before
 publishing.
 

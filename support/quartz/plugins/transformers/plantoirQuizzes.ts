@@ -40,7 +40,11 @@
 // reads as fine, that the check read the other way says so on a
 // `plantoir: error:` line - quietly agreeing otherwise. Pages the check did
 // not examine (a page students cannot see is parsed here too and dropped
-// later) are never named.
+// later) are never named. Each line it prints is also recorded on the
+// page's file.data.plantoirQuizDisagreements (#644), which the site's
+// emitter (emitters/plantoirSiteSaid.ts) says as ONE quizzesReadDifferently
+// folder problem, in the same call as the code runner's - a teacher
+// previewing in the app never reads the console.
 
 import { Root as MdRoot, Html } from "mdast"
 import { Element, ElementContent, Root as HtmlRoot } from "hast"
@@ -73,6 +77,26 @@ type PageFindings = {
   nestedLines?: Array<number | null>
 }
 type QuizPages = { examined: string[]; pages: Record<string, PageFindings> }
+
+// One per `plantoir: error:` line the safety net prints (#644): the page's
+// path in the site's content, the quiz's place (only when the counts agree
+// and one quiz is read differently), the line the folder check found in the
+// teacher's file, the siteHealth -> quizzesReadDifferently -> reasons key,
+// and - for shownWithNote - the problem the SITE found, with its values.
+export type QuizDisagreement = {
+  page: string
+  n: number | null
+  line: number | null
+  reason: "shownWithNote" | "shownWorking" | "countedDifferently" | "nestedReadDifferently"
+  problem?: string
+  fill?: Record<string, string | number>
+}
+
+declare module "vfile" {
+  interface DataMap {
+    plantoirQuizDisagreements: QuizDisagreement[]
+  }
+}
 
 const WORDS_FILE = join("quartz", "plantoir_quiz.json")
 const PAGES_FILE = join("quartz", "plantoir_quiz_pages.json")
@@ -477,11 +501,28 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
   }
 }
 
-function sayDisagreement(page: string, where: string, said: Record<string, string>) {
+// Prints the line and records it (#644) - both or neither, so the folder
+// problem has exactly one piece per line (a site without its words prints
+// nothing and records nothing).
+function sayDisagreement(
+  file: { data: any },
+  page: string,
+  where: string,
+  said: Record<string, string>,
+  recorded: Omit<QuizDisagreement, "page">,
+) {
   const reason = said.readDifferently
   if (reason) {
     console.log(`plantoir: error: ${page}: ${where}: ${reason}`)
+    const all = (file.data.plantoirQuizDisagreements ?? []) as QuizDisagreement[]
+    all.push({ page, ...recorded })
+    file.data.plantoirQuizDisagreements = all
   }
+}
+
+function firstNumber(values: Array<number | null> | undefined): number | null {
+  const found = values?.find((value) => typeof value === "number")
+  return typeof found === "number" ? found : null
 }
 
 export const PlantoirQuizzes: QuartzTransformerPlugin = () => ({
@@ -505,7 +546,7 @@ export const PlantoirQuizzes: QuartzTransformerPlugin = () => ({
           const ready = known !== null && Object.keys(words).length > 0
           const source = value.split("\n")
           const slug = String(file.data.slug ?? "")
-          const results: Array<{ n: number; problem: string | null }> = []
+          const results: Array<{ n: number; problem: string | null; fill?: Record<string, string | number> }> = []
           let n = 0
           const roots = new Set<AnyNode>()
           for (const child of tree.children as unknown as AnyNode[]) {
@@ -524,7 +565,7 @@ export const PlantoirQuizzes: QuartzTransformerPlugin = () => ({
             properties.dataQuizHash = fnv1a(raw)
             const result = contentOf(child) === null ? verdict({ options: optionsOf(properties["data-callout-metadata"]), boxedLists: 0, choices: [], answers: [], blanks: 0 }) : verdict(modelOf(child, source))
             if ("problem" in result) {
-              results.push({ n, problem: result.problem })
+              results.push({ n, problem: result.problem, fill: result.fill })
               renderNotReady(child, result.problem, words)
             } else if (!ready) {
               results.push({ n, problem: null })
@@ -568,29 +609,48 @@ export const PlantoirQuizzes: QuartzTransformerPlugin = () => ({
           if (found.quizzes === n && found.nested !== nested) {
             // Only the quizzes inside a list or callout differ: name the
             // first of those the folder check found, by its own line.
-            const line = found.nestedLines?.find((value) => typeof value === "number")
+            const line = firstNumber(found.nestedLines)
             sayDisagreement(
+              file,
               page,
-              typeof line === "number" ? `a quiz inside a list or another callout at line ${line}` : "a quiz inside a list or another callout",
+              line !== null ? `a quiz inside a list or another callout at line ${line}` : "a quiz inside a list or another callout",
               said,
+              { n: null, line, reason: "nestedReadDifferently" },
             )
             return
           }
           if (found.quizzes !== n) {
             // No place can be trusted when the counts differ: name the first
             // quiz either side found.
-            const line = found.lines?.find((value) => typeof value === "number")
-            sayDisagreement(page, typeof line === "number" ? `the quiz at line ${line}` : "quiz 1", said)
+            const line = firstNumber(found.lines)
+            sayDisagreement(file, page, line !== null ? `the quiz at line ${line}` : "quiz 1", said, {
+              n: null,
+              line,
+              reason: "countedDifferently",
+            })
             return
           }
           for (const result of results) {
             const reported = found.problems.includes(result.n)
             if (reported !== (result.problem !== null)) {
-              sayDisagreement(page, named(result.n), said)
+              const line = found.lines?.[result.n - 1]
+              // The SITE's problem, never assumed: the folder check found
+              // nothing, so only the site knows why it shows the note.
+              const recorded: Omit<QuizDisagreement, "page"> =
+                result.problem !== null
+                  ? { n: result.n, line: typeof line === "number" ? line : null, reason: "shownWithNote", problem: result.problem, fill: result.fill ?? {} }
+                  : { n: result.n, line: typeof line === "number" ? line : null, reason: "shownWorking" }
+              sayDisagreement(file, page, named(result.n), said, recorded)
             }
           }
           if (found.nestedProblems.length !== nested) {
-            sayDisagreement(page, "a quiz inside a list or another callout", said)
+            // The printed line keeps no line; the record names the first
+            // quiz inside a list or callout the folder check found.
+            sayDisagreement(file, page, "a quiz inside a list or another callout", said, {
+              n: null,
+              line: firstNumber(found.nestedLines),
+              reason: "nestedReadDifferently",
+            })
           }
         }
       },

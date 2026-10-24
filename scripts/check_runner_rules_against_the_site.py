@@ -25,7 +25,9 @@ Three halves:
    code and one `plantoir: error:` line, and no line for a page students
    cannot see; and (#567) the emitter plantoirSiteSaid.ts after it, which
    says the blocks the transformer recorded as ONE runnableCodeShownAsPlainCode
-   marker through the build's Python (scripts/site_said.py), once per process.
+   marker through the build's Python (scripts/site_said.py), once per process
+   - and (#644) the quiz safety net's records beside them, ONE
+   quizzesReadDifferently marker from the same call, after the code's.
    Since #493 also every `swift.cacheKey` case (the site's
    normalising and key), and Swift blocks whose program the build has, could
    not make, or never saw.
@@ -306,9 +308,19 @@ const siteSaidRuns = []
     ["Units/Strings.md", page, undefined],
     ["Units/Hidden.md", page, false],
   ]
+  // #644: what the quiz transformer records, laid on the pages by hand
+  // (plantoirQuizzes.ts needs Quartz's callout parser; verify.sh runs it end
+  // to end).
+  const quizRecords = {
+    "Units/Loops.md": [{ page: "Units/Loops.md", n: null, line: null, reason: "countedDifferently" }],
+    "Units/Strings.md": [{ page: "Units/Strings.md", n: 1, line: 7, reason: "shownWithNote", problem: "choicesInHtml", fill: {} }],
+    "Units/Hidden.md": [{ page: "Units/Hidden.md", n: 1, line: 3, reason: "shownWorking" }],
+  }
   const runs = [
     { name: "three blocks on two pages, and a hidden page", carried: [], emits: 2 },
     { name: "nothing disagrees", carried: ["pyodide"], emits: 1 },
+    { name: "quizzes on two pages, and a hidden page", carried: ["pyodide"], emits: 2, quizzes: true },
+    { name: "blocks and quizzes together", carried: [], emits: 1, quizzes: true },
   ]
   for (const run of runs) {
     count += 1
@@ -328,6 +340,7 @@ const siteSaidRuns = []
       const tree = parse(text)
       const file = { value: text, data: { frontmatter: { codeRunner: true, publish }, slug: path.slice(0, -3), relativePath: path } }
       transform(tree, file)
+      if (run.quizzes) file.data.plantoirQuizDisagreements = quizRecords[path]
       content.push([tree, file])
     }
     console.log = log
@@ -506,6 +519,58 @@ def check_what_the_site_said(runs: list) -> list:
     if not failures:
         print(f"plantoirSiteSaid.ts: one finding for three blocks, said once, in {several['ms'][0]:.0f} ms "
               f"(a second emit {several['ms'][1]:.1f} ms; a site where nothing disagrees {quiet['ms'][0]:.1f} ms)")
+    failures += check_the_quizzes_the_site_said(by_name, prefix)
+    return failures
+
+
+def check_the_quizzes_the_site_said(by_name: dict, prefix: str) -> list:
+    """
+    #644: the quiz safety net's records alone are ONE quizzesReadDifferently
+    marker (pages in path order, the hidden page named nowhere, a second
+    emit silent); beside blocks of code they are a SECOND marker after the
+    code's, printed by the same single call.
+    """
+    failures = []
+    alone = by_name.get("quizzes on two pages, and a hidden page")
+    together = by_name.get("blocks and quizzes together")
+    if alone is None or together is None:
+        return ["plantoirSiteSaid: the Node half did not run the quiz cases"]
+    check = None
+    for entry in contracts.section("shared-rules", "siteHealth", "checks"):
+        if entry["name"] == "quizzesReadDifferently":
+            check = entry
+
+    def names(printed):
+        found = []
+        for line in printed.splitlines():
+            if prefix in line:
+                found.append(json.loads(line[line.index(prefix) + len(prefix):]))
+        return found
+
+    markers = names(alone["printed"][0])
+    if [marker.get("name") for marker in markers] != ["quizzesReadDifferently"]:
+        failures.append(f"plantoirSiteSaid: the quizzes alone printed {alone['printed'][0]!r}")
+    else:
+        finding = markers[0]
+        expected = (check["sentenceForSeveral"].replace("{count}", "2").replace("{course}", "ICS3U")
+                    .replace("{section}", "1"))
+        if finding.get("sentence") != expected:
+            failures.append(f"plantoirSiteSaid: the quizzes' finding is {finding}")
+        detail = finding.get("detail", "")
+        first = detail.find("“Unit 1/Loops”: ")
+        second = detail.find("“Unit 1/Strings”, question 1, line 7: ")
+        if first < 0 or second < first:
+            failures.append(f"plantoirSiteSaid: the quizzes' detail is not in page order: {detail}")
+        if "Hidden" in alone["printed"][0]:
+            failures.append("plantoirSiteSaid: the hidden page's quiz was named")
+    if len(alone["printed"]) != 2 or alone["printed"][1] != "":
+        failures.append(f"plantoirSiteSaid: a second emit said {alone['printed'][1:]!r}")
+    both = names(together["printed"][0])
+    if [marker.get("name") for marker in both] != ["runnableCodeShownAsPlainCode", "quizzesReadDifferently"]:
+        failures.append(f"plantoirSiteSaid: blocks and quizzes printed {together['printed'][0]!r}")
+    if not failures:
+        print(f"plantoirSiteSaid.ts: the quiz safety net's lines are one more finding, after the code's, "
+              f"from the same call ({together['ms'][0]:.0f} ms for both)")
     return failures
 
 
