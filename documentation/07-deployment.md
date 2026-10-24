@@ -1507,11 +1507,16 @@ would change every teacher's site and the shared Python for a harness's need.
 **Measured 2026-10-23** (M4 Pro, home network, `ada1o-s1-2026-testing.pages.dev`):
 the run's first Cloudflare leg (the one whose predecessor
 was the previous run's deployment) was served by production **6 s** after its
-upload returned — the fetch at 0 s still got the old deployment, so the race
-is real on the mac too, not only at Windows' cut; the leg paired with Netlify
-**1 s**, the leg paired with a folder **0 s** of waiting (2 s after its
-upload, the folder leg having run between). That run: **171 passed, 0
-failed, 0 skipped**. Windows measured 0–1 s typically and under two minutes at
+upload returned, to within one 5 s poll — the fetch at 0 s still got the old
+deployment, so the race is real on the mac too, not only at Windows' cut.
+The two later legs upload the SAME bytes as the first, so their matching at
+the first fetch (1 s and 2 s after their uploads) measures nothing about
+Cloudflare's switch; only a run's first leg does. That run: **171 passed, 0
+failed, 0 skipped**. The one protection for a teacher's own folder is the
+Class Websites name: any other real working folder passes the recipe guard
+(`preview.sh` and `.toolchain/Dockerfile` present) and is given this
+checkout's recipe and a full rebuild, as the script already rewrote
+destinations before #665. Windows measured 0–1 s typically and under two minutes at
 the 1.8.5 cut; a run that waits 0 s on every leg still justifies the wait,
 because the cut proved minutes are possible.
 

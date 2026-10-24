@@ -45,7 +45,7 @@
 #   ./verify-deploy.sh                     # uses the defaults below
 #   ./verify-deploy.sh <folder> <CODE> <N>
 #   ./verify-deploy.sh --self-test         # checks this script's own wait for
-#                                          # Cloudflare, offline, in ~40 s (#665)
+#                                          # Cloudflare, offline, in ~20 s (#665)
 #
 # It uses ONE course throughout, on purpose: a Netlify site and a Cloudflare
 # project are created once and reused, rather than littering the accounts with
@@ -142,7 +142,7 @@ wait_for_cloudflare_production() {  # wait_for_cloudflare_production <label> <pr
     if cmp -s "$dir/front.html" "$dir/fetched-front.html" && cmp -s "$dir/runner.html" "$dir/fetched-runner.html"; then
       since_upload=$(( $(date +%s) - uploaded ))
       ok "$label — production serves this deployment's front page and page of runnable code (after $waited s)"
-      MEASURED+=("$label: production served this deployment after $waited s of waiting, $since_upload s after its upload returned")
+      MEASURED+=("$label: production matched the upload after $waited s of waiting, $since_upload s after its upload returned (a wait of 0 s on a later leg means the same bytes were already live, not a fast switch)")
       return 0
     fi
     [ "$waited" -ge "$CF_WAIT" ] && break
@@ -329,18 +329,20 @@ restore_what_was_borrowed() {
   fi
   pkill -f "preview.sh $COURSE" 2>/dev/null
 }
-trap restore_what_was_borrowed EXIT INT TERM
-
-# ---------------------------------------------------------------- preflight
-hdr "Preflight — refuse clearly rather than half-running"
 # The teacher's own folder is never a test folder: this run rewrites its
-# recipe, its destinations and its sites.
+# recipe, its destinations and its sites. Refused BEFORE the trap below is
+# armed, so a refusal cannot run the trap's pkill against the teacher's
+# own preview (#665 implementation review).
 CANONICAL_FOLDER=$(cd "$WORKING_FOLDER" 2>/dev/null && /bin/pwd -P)
 CLASS_WEBSITES=$(cd "$HOME/Desktop/Class Websites" 2>/dev/null && /bin/pwd -P)
 if [ -n "$CANONICAL_FOLDER" ] && [ "$CANONICAL_FOLDER" = "$CLASS_WEBSITES" ]; then
   echo "  ❌ $WORKING_FOLDER is the teaching folder (Class Websites); run this against a test folder"
   exit 1
 fi
+trap restore_what_was_borrowed EXIT INT TERM
+
+# ---------------------------------------------------------------- preflight
+hdr "Preflight — refuse clearly rather than half-running"
 [ -f "$CONFIG" ] || { echo "  ❌ No course at $CONFIG"; exit 1; }
 ok "course found: $COURSE section $SECTION in $WORKING_FOLDER"
 cp "$CONFIG" "$ORIGINAL_CONFIG"
