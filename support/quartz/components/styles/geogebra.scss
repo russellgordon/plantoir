@@ -1,0 +1,190 @@
+// GeoGebra sketches (#578). EVERY rule here is under .pl-geogebra (the #454
+// B2 lesson): a page with no sketch is not touched by a single declaration,
+// on screen or on paper. The applet itself stays white in a dark theme -
+// GeoGebra has no dark applet - inside a card that follows the theme.
+
+.pl-figure.pl-geogebra {
+  text-align: left;
+
+  .pl-geogebra-card {
+    position: relative;
+    max-width: min(100%, var(--pl-geogebra-width, 800px));
+    aspect-ratio: var(--pl-geogebra-ratio, 8 / 5);
+    margin: 0 auto;
+    border: 1px solid var(--lightgray);
+    border-radius: 6px;
+    background: var(--light);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pl-geogebra-thumbnail {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #fff;
+    margin: 0;
+    border-radius: 0;
+    opacity: 0.85;
+  }
+
+  .pl-geogebra-open {
+    position: relative;
+    font: inherit;
+    font-weight: 600;
+    padding: 0.55rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--secondary);
+    background: var(--light);
+    color: var(--secondary);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+
+    &:hover:not(:disabled) {
+      background: var(--secondary);
+      color: var(--light);
+    }
+
+    &:disabled {
+      cursor: progress;
+      opacity: 0.8;
+    }
+  }
+
+  .pl-geogebra-applet {
+    width: 100%;
+    max-width: min(100%, var(--pl-geogebra-width, 800px));
+    margin: 0 auto;
+    background: #fff;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  &.pl-geogebra-loaded .pl-geogebra-card {
+    display: none;
+  }
+
+  .pl-geogebra-message {
+    margin: 0.5rem 0 0;
+    color: var(--gray);
+    font-style: italic;
+    text-align: center;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .pl-geogebra-caption {
+    margin-top: 0.4rem;
+    text-align: center;
+    color: var(--darkgray);
+  }
+
+  .pl-geogebra-commands {
+    margin: 0.5rem auto 0;
+    max-width: min(100%, var(--pl-geogebra-width, 800px));
+    font-size: 0.9em;
+
+    summary {
+      cursor: pointer;
+      color: var(--gray);
+    }
+  }
+
+  .pl-geogebra-attribution {
+    margin: 0.35rem auto 0;
+    max-width: min(100%, var(--pl-geogebra-width, 800px));
+    font-size: 0.8em;
+    color: var(--gray);
+    text-align: right;
+
+    a {
+      color: inherit;
+    }
+  }
+
+  // Paper only: the print attribution and the note.
+  .pl-geogebra-print-attribution,
+  .pl-geogebra-print-note,
+  .pl-geogebra-print {
+    display: none;
+  }
+}
+
+@media print {
+  .pl-figure.pl-geogebra {
+    .pl-geogebra-open,
+    .pl-geogebra-message,
+    .pl-geogebra-attribution,
+    .pl-geogebra-applet {
+      display: none !important;
+    }
+
+    // A sketch that was opened prints its picture as it stands; one that
+    // was not prints its thumbnail (geogebraFences.print).
+    .pl-geogebra-print {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    &.pl-geogebra-loaded:has(> .pl-geogebra-print) .pl-geogebra-card {
+      display: none !important;
+    }
+
+    &.pl-geogebra-loaded:not(:has(> .pl-geogebra-print)) .pl-geogebra-card {
+      display: flex !important;
+    }
+
+    .pl-geogebra-card {
+      border: none;
+      aspect-ratio: auto;
+    }
+
+    .pl-geogebra-thumbnail {
+      position: static;
+      opacity: 1;
+      height: auto;
+    }
+
+    .pl-geogebra-card:not(:has(.pl-geogebra-thumbnail)) {
+      display: none !important;
+    }
+
+    .pl-geogebra-print-note,
+    .pl-geogebra-print-attribution {
+      display: block;
+      margin: 0.25rem 0 0;
+      font-size: 8pt;
+      color: #000;
+      text-align: center;
+    }
+
+    .pl-geogebra-print-addresses {
+      display: block;
+      font-size: 7pt;
+    }
+  }
+}
+
+@media print {
+  // Neither a picture nor a thumbnail: the description is what prints.
+  .pl-figure.pl-geogebra:not(:has(.pl-geogebra-thumbnail)):not(:has(> .pl-geogebra-print)) > figcaption.pl-sr-only {
+    position: static !important;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
+    overflow: visible;
+    white-space: normal;
+    font-style: italic;
+  }
+}

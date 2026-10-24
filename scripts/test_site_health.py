@@ -78,6 +78,8 @@ class SiteHealthTests(unittest.TestCase):
             {"quiz_disagreements": [{"page": "Unit 2/Practice", "n": 1, "line": 7,
                                      "reason": "shownWithNote", "problem": "choicesInHtml",
                                      "fill": {}}]},
+            {"geogebra_problems": [{"page": "Unit 3/Slopes", "block": 1, "line": 22,
+                                    "reason": "fileNotFound", "file": "Slopes.ggb"}]},
         ):
             broken = dict(HEALTHY)
             broken.update(facts)
