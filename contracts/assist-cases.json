@@ -3269,6 +3269,29 @@
     ]
   },
   "note" : "Generated from the macOS app by `Plantoir --assist-contract`. Do not hand-edit; see contracts/README.md.",
+  "openInObsidian" : {
+    "accepted" : [
+      "Open this in Obsidian",
+      "Open this page in Obsidian",
+      "Edit this page in Obsidian",
+      "I want to edit this in Obsidian",
+      "Take me to this page in Obsidian",
+      "open in obsidian",
+      "Show me this in Obsidian"
+    ],
+    "nearMisses" : [
+      "Open the preview",
+      "Show me the preview",
+      "Open my website",
+      "Open Unit 2, Day 3",
+      "Edit Unit 2, Day 3 so the quiz is on Friday",
+      "What's on this page?"
+    ],
+    "note" : "#610: open_in_obsidian, the assistant's Open in Obsidian. `accepted` are sentences that ask for the page on screen in Obsidian; `nearMisses` must keep the tool they get without it. Both are READ by research/ai-assist/open-in-obsidian-610-probes.py, never retyped; the measurement and its pass rule are research/ai-assist/open-in-obsidian-610-preregistration.txt. `recordedOnly` sentences are measured and decide nothing.",
+    "recordedOnly" : [
+      "Open Unit 2, Day 3 in Obsidian"
+    ]
+  },
   "pagesNamingNoPage" : {
     "cases" : [
       {
