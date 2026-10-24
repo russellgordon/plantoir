@@ -44,12 +44,17 @@
 # USAGE
 #   ./verify-deploy.sh                     # uses the defaults below
 #   ./verify-deploy.sh <folder> <CODE> <N>
+#   ./verify-deploy.sh --self-test         # checks this script's own wait for
+#                                          # Cloudflare, offline, in ~40 s (#665)
 #
 # It uses ONE course throughout, on purpose: a Netlify site and a Cloudflare
 # project are created once and reused, rather than littering the accounts with
 # one per case. The names are printed at the end so they can be deleted.
 
 set -u
+
+SELF_TEST=false
+if [ "${1:-}" = "--self-test" ]; then SELF_TEST=true; shift; fi
 
 WORKING_FOLDER="${1:-$HOME/Desktop/plantoir-overnight}"
 COURSE="${2:-ADA1O}"
@@ -65,6 +70,236 @@ hdr()  { echo; echo "──────── $1"; }
 
 CONFIG="$WORKING_FOLDER/courses/$COURSE/course_config.json"
 PUBLIC_DIR="$WORKING_FOLDER/courses/$COURSE/.merged_output/section$SECTION/public"
+MEASURED=()
+
+# ------------------------------------- Cloudflare's production address (#665)
+# `wrangler pages deploy` returns when the upload is accepted, not when
+# <project>.pages.dev serves it. Every Cloudflare leg used to be judged the
+# moment the launcher returned, and at Windows' 1.8.5 cut one leg was judged
+# against the PREVIOUS deployment: eight checks failed, and two minutes later
+# all of them passed. So each leg now waits, for at most CF_WAIT seconds, for
+# production to serve what this leg uploaded - and not getting there is a
+# FAILURE that says so, after which the run judges what production does serve.
+# Never a skip, never an exit.
+#
+# What "what this leg uploaded" means is the subtle half. The built site holds
+# nothing unique per build, so a front page byte for byte equal to the upload
+# (Windows' test, kept as half of this one) cannot tell this deployment from
+# the last one whenever only the static files or headers moved - which is the
+# change this harness exists to catch, and the shape of the 1.8.5 failures.
+# So the borrowed page of runnable code carries a mark made fresh for every
+# run (RUN_MARK, written into it below), and production must serve BOTH the
+# front page and that page byte for byte as uploaded. The previous run's
+# deployment cannot carry this run's mark.
+#
+# The env overrides exist for --self-test, which runs the wait against a stub
+# on 127.0.0.1 in seconds; a real run leaves them alone.
+CF_POLL="${VERIFY_DEPLOY_CF_POLL:-5}"
+CF_WAIT="${VERIFY_DEPLOY_CF_WAIT:-120}"
+RUN_MARK="plantoir-verify-deploy-run-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+
+# Called the moment a Cloudflare leg returns, because in a pairing the next
+# leg can rebuild the section before production is judged. Keeps a copy of
+# what was uploaded, and when the upload returned.
+snapshot_cloudflare_upload() {  # snapshot_cloudflare_upload <label> <logfile> <snapshot dir>
+  local label="$1" log="$2" dir="$3" built
+  rm -rf "$dir"; mkdir -p "$dir"
+  date +%s >"$dir/uploaded-at"
+  # The log is a terminal transcript, so its lines end in \r\n (measured on
+  # a real run's log); without the tr the suffix below never matches.
+  built=$(tr -d '\r' <"$log" 2>/dev/null | sed -n 's/^.*Deploying from local build: //p' | tail -1)
+  case "$built" in
+    */courses/"$COURSE"/.merged_output/section"$SECTION"/public|courses/"$COURSE"/.merged_output/section"$SECTION"/public) ;;
+    *) no "$label — the leg did not say it uploaded this section's build, so what production should serve is unknown"
+       return 1 ;;
+  esac
+  if ! cp "$PUBLIC_DIR/index.html" "$dir/front.html" 2>/dev/null \
+     || ! cp "$PUBLIC_DIR/Runner-Deploy-Check.html" "$dir/runner.html" 2>/dev/null; then
+    no "$label — the uploaded build has no front page or no page of runnable code to compare production with"
+    return 1
+  fi
+  if ! grep -qF -- "$RUN_MARK" "$dir/runner.html"; then
+    no "$label — the uploaded page of runnable code does not carry this run's mark, so this deployment could not be told from the last"
+    return 1
+  fi
+  return 0
+}
+
+# Polls production's front page and page of runnable code until both are the
+# snapshot's bytes. A 404 or no answer is "not yet" (a brand-new project's
+# first publish). Fetching the deployment's own <hash>.<project>.pages.dev was
+# rejected: Windows measured it resolving LATER than production on a first
+# publish, and it is not the address a teacher hands out.
+wait_for_cloudflare_production() {  # wait_for_cloudflare_production <label> <production url> <snapshot dir>
+  local label="$1" base="${2%/}" dir="$3" start waited since_upload uploaded
+  start=$(date +%s)
+  uploaded=$(cat "$dir/uploaded-at" 2>/dev/null || echo "$start")
+  while :; do
+    rm -f "$dir/fetched-front.html" "$dir/fetched-runner.html"
+    curl -sL --max-time 20 -H 'Cache-Control: no-cache' -o "$dir/fetched-front.html" "$base/" 2>/dev/null
+    curl -sL --max-time 20 -H 'Cache-Control: no-cache' -o "$dir/fetched-runner.html" "$base/Runner-Deploy-Check" 2>/dev/null
+    waited=$(( $(date +%s) - start ))
+    if cmp -s "$dir/front.html" "$dir/fetched-front.html" && cmp -s "$dir/runner.html" "$dir/fetched-runner.html"; then
+      since_upload=$(( $(date +%s) - uploaded ))
+      ok "$label — production serves this deployment's front page and page of runnable code (after $waited s)"
+      MEASURED+=("$label: production served this deployment after $waited s of waiting, $since_upload s after its upload returned")
+      return 0
+    fi
+    [ "$waited" -ge "$CF_WAIT" ] && break
+    sleep "$CF_POLL"
+  done
+  no "$label — production did not serve this deployment within $CF_WAIT s; judging what it does serve"
+  MEASURED+=("$label: production had not switched to this deployment after $CF_WAIT s")
+  return 1
+}
+
+# ----------------------------------------------------------------- self-test
+# The wait above, proved against a stub server on 127.0.0.1 that serves the
+# OLD bytes for the first K requests to a path and the NEW after: no
+# credentials, no Docker, nothing borrowed from any folder. Runs before the
+# trap and the work folder exist, so it touches nothing a real run uses.
+run_self_test() {
+  local out rc started elapsed n
+  ST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/plantoir-deploy-selftest.XXXXXX") || exit 1
+  STUB_PID=""
+  trap '[ -n "$STUB_PID" ] && kill "$STUB_PID" 2>/dev/null; rm -rf "$ST_DIR"' EXIT
+  CF_POLL=1; CF_WAIT=8
+  COURSE=ADA1O; SECTION=1
+  RUN_MARK="plantoir-verify-deploy-run-selftest-$$"
+  PUBLIC_DIR="$ST_DIR/folder/courses/ADA1O/.merged_output/section1/public"
+  mkdir -p "$ST_DIR/site" "$PUBLIC_DIR"
+  printf '<html><body>front page</body></html>\n' >"$ST_DIR/site/old-front.html"
+  printf '<html><body>front page, rebuilt</body></html>\n' >"$ST_DIR/site/new-front.html"
+  printf '<html><body>runnable code, run plantoir-verify-deploy-run-before</body></html>\n' >"$ST_DIR/site/old-runner.html"
+  printf '<html><body>runnable code, run %s</body></html>\n' "$RUN_MARK" >"$ST_DIR/site/new-runner.html"
+  mkdir -p "$ST_DIR/snap"
+  cp "$ST_DIR/site/new-front.html" "$ST_DIR/snap/front.html"
+  cp "$ST_DIR/site/new-runner.html" "$ST_DIR/snap/runner.html"
+  cat >"$ST_DIR/stub.py" <<'STUB'
+import http.server, os, pathlib, sys
+portfile, folder, front_mode, runner_mode = sys.argv[1:5]
+folder = pathlib.Path(folder)
+routes = {"/": ("front", front_mode), "/Runner-Deploy-Check": ("runner", runner_mode)}
+counts = {}
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        path = self.path.split("?")[0]
+        if path not in routes:
+            self.send_error(404)
+            return
+        name, mode = routes[path]
+        seen = counts.get(path, 0)
+        counts[path] = seen + 1
+        kind, _, limit = mode.partition(":")
+        status, body = 200, (folder / f"new-{name}.html").read_bytes()
+        if kind != "new" and (limit == "inf" or seen < int(limit)):
+            if kind == "404":
+                status, body = 404, b"not here yet\n"
+            else:
+                body = (folder / f"old-{name}.html").read_bytes()
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+pathlib.Path(portfile + ".part").write_text(str(server.server_port))
+os.replace(portfile + ".part", portfile)
+server.serve_forever()
+STUB
+  st_start() {  # st_start <front mode> <runner mode>: old:K, old:inf, 404:K or new
+    rm -f "$ST_DIR/port"
+    python3 -I "$ST_DIR/stub.py" "$ST_DIR/port" "$ST_DIR/site" "$1" "$2" &
+    STUB_PID=$!
+    for _ in $(seq 1 100); do [ -s "$ST_DIR/port" ] && break; sleep 0.1; done
+    ST_URL="http://127.0.0.1:$(cat "$ST_DIR/port" 2>/dev/null)"
+  }
+  st_stop() { [ -n "$STUB_PID" ] && { kill "$STUB_PID" 2>/dev/null; wait "$STUB_PID" 2>/dev/null; }; STUB_PID=""; }
+  st_is() {  # st_is <path> <expected file>: does the stub serve that file now?
+    curl -s --max-time 5 -o "$ST_DIR/judged.html" "$ST_URL$1" 2>/dev/null
+    cmp -s "$ST_DIR/judged.html" "$2"
+  }
+  after_seconds() { printf '%s\n' "$1" | sed -n 's/.*(after \([0-9][0-9]*\) s).*/\1/p' | head -1; }
+
+  hdr "Self-test — the wait for Cloudflare's production address (#665)"
+
+  st_start old:3 old:3
+  st_is / "$ST_DIR/site/old-front.html" \
+    && ok "control: fetched at once, the stub serves the OLD front page (the race, reproduced)" \
+    || no "control: the stub did not serve the old front page first, so it proves nothing"
+  st_stop
+
+  st_start old:3 old:3
+  out=$(wait_for_cloudflare_production "case" "$ST_URL" "$ST_DIR/snap"); rc=$?
+  n=$(after_seconds "$out")
+  if [ "$rc" -eq 0 ] && [ -n "$n" ] && [ "$n" -ge 2 ] \
+     && st_is / "$ST_DIR/site/new-front.html" && st_is /Runner-Deploy-Check "$ST_DIR/site/new-runner.html"; then
+    ok "production switches after 3 requests: the wait passes (after ${n} s) and what is judged next is the NEW deployment"
+  else
+    no "production switches after 3 requests: rc $rc, said: ${out:-nothing}"
+  fi
+  st_stop
+
+  st_start old:inf old:inf
+  started=$(date +%s)
+  out=$(wait_for_cloudflare_production "case" "$ST_URL" "$ST_DIR/snap"); rc=$?
+  elapsed=$(( $(date +%s) - started ))
+  n=$(printf '%s\n' "$out" | grep -c '❌')
+  if [ "$rc" -ne 0 ] && [ "$n" -eq 1 ] && printf '%s' "$out" | grep -q "within 8 s; judging what it does serve" \
+     && [ "$elapsed" -ge 8 ] && [ "$elapsed" -le 15 ]; then
+    ok "production never switches: exactly one failure, at the cap (${elapsed} s), and the run goes on"
+  else
+    no "production never switches: rc $rc, $n failure(s), ${elapsed} s, said: ${out:-nothing}"
+  fi
+  st_stop
+
+  st_start 404:2 404:2
+  out=$(wait_for_cloudflare_production "case" "$ST_URL" "$ST_DIR/snap"); rc=$?
+  [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '✅' \
+    && ok "a brand-new project answers 404 at first: that is 'not yet', and the wait passes when it answers" \
+    || no "a brand-new project answers 404 at first: rc $rc, said: ${out:-nothing}"
+  st_stop
+
+  st_start new old:3
+  out=$(wait_for_cloudflare_production "case" "$ST_URL" "$ST_DIR/snap"); rc=$?
+  n=$(after_seconds "$out")
+  if [ "$rc" -eq 0 ] && [ -n "$n" ] && [ "$n" -ge 2 ] && st_is /Runner-Deploy-Check "$ST_DIR/site/new-runner.html"; then
+    ok "only the static files moved (same front page): the wait holds until the page of runnable code switches (after ${n} s)"
+  else
+    no "only the static files moved (same front page): rc $rc, said: ${out:-nothing}"
+  fi
+  st_stop
+
+  printf 'spawn ./deploy.sh ADA1O 1\r\n Deploying from local build: /teaching/courses/ADA1O/.merged_output/section1/public\r\n Live URL: https://example.pages.dev\r\n' >"$ST_DIR/crlf.log"
+  cp "$ST_DIR/site/new-front.html" "$PUBLIC_DIR/index.html"
+  cp "$ST_DIR/site/new-runner.html" "$PUBLIC_DIR/Runner-Deploy-Check.html"
+  out=$(snapshot_cloudflare_upload "case" "$ST_DIR/crlf.log" "$ST_DIR/snap-crlf"); rc=$?
+  [ "$rc" -eq 0 ] && [ -z "$out" ] && cmp -s "$ST_DIR/snap-crlf/runner.html" "$PUBLIC_DIR/Runner-Deploy-Check.html" \
+    && ok "a terminal transcript's \\r\\n line names this section's build: the upload is kept to compare with" \
+    || no "a terminal transcript's \\r\\n line: rc $rc, said: ${out:-nothing}"
+
+  printf ' Deploying from local build: /teaching/courses/ADA1O/.merged_output/section2/public\r\n' >"$ST_DIR/other.log"
+  out=$(snapshot_cloudflare_upload "case" "$ST_DIR/other.log" "$ST_DIR/snap-other"); rc=$?
+  [ "$rc" -ne 0 ] && [ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 1 ] \
+    && ok "a leg that uploaded another section's build is one failure, not a wait against the wrong bytes" \
+    || no "a leg that uploaded another section's build: rc $rc, said: ${out:-nothing}"
+
+  cp "$ST_DIR/site/old-runner.html" "$PUBLIC_DIR/Runner-Deploy-Check.html"
+  out=$(snapshot_cloudflare_upload "case" "$ST_DIR/crlf.log" "$ST_DIR/snap-unmarked"); rc=$?
+  [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "does not carry this run's mark" \
+    && ok "an upload whose page of runnable code lacks this run's mark is a failure, since the wait could not tell it from the last" \
+    || no "an upload without this run's mark: rc $rc, said: ${out:-nothing}"
+
+  hdr "Result"
+  echo "  $PASS passed, $FAIL failed, $SKIP skipped"
+  [ "$FAIL" -eq 0 ] || exit 1
+  exit 0
+}
+if [ "$SELF_TEST" = true ]; then
+  run_self_test
+fi
 
 mkdir -p "$WORK"
 
@@ -477,7 +712,6 @@ check_no_marker_folder() {  # check_no_marker_folder <label> <dir>
 # (read on a quiet machine, or it counts everything else too).
 NET_IFACE=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
 obytes() { netstat -ibn 2>/dev/null | awk -v i="$NET_IFACE" '$1==i && $3 ~ /Link/ {print $10; exit}'; }
-MEASURED=()
 measure_deploy() {  # measure_deploy <label> <logfile> <args...>
   local label="$1" log="$2"; shift 2
   local before after start finish rc files
@@ -509,6 +743,9 @@ let name = readLine() ?? ""
 print("Hello, \(name)!")
 ```
 RUNNERPAGE
+# This run's mark (#665): what tells this run's Cloudflare deployment from the
+# one before it, when nothing else in the built site differs.
+printf '\nThis run: %s.\n' "$RUN_MARK" >>"$RUNNER_PAGE"
 ok "a page of runnable code borrowed into section $SECTION (removed on any exit)"
 ( cd "$WORKING_FOLDER" && nohup ./preview.sh "$COURSE" "$SECTION" >"$WORK/preview.log" 2>&1 & )
 PREVIEW_PORT=""
@@ -613,7 +850,9 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   : >"$WORK/deploy-cloudflare.log"
   measure_deploy "Cloudflare, first publish with the engine" "$WORK/deploy-cloudflare.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "publish to Cloudflare exited 0" || no "publish to Cloudflare failed"
+  snapshot_cloudflare_upload "Cloudflare Pages" "$WORK/deploy-cloudflare.log" "$WORK/cf-alone"; CF_SNAPPED=$?
   CF_URL=$(url_from_log "$WORK/deploy-cloudflare.log")
+  [ -n "$CF_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare Pages" "$CF_URL" "$WORK/cf-alone"
   [ -n "$CF_URL" ] && check_url "Cloudflare Pages" "$CF_URL" || no "no Cloudflare address in the output"
   [ -n "$CF_URL" ] && check_engine "Cloudflare Pages" "$CF_URL/"
   [ -n "$CF_URL" ] && check_page_links "Cloudflare Pages" "$CF_URL/" cloudflare
@@ -634,7 +873,9 @@ if [ "$HAVE_NETLIFY" = true ] && [ "$HAVE_CLOUDFLARE" = true ]; then
   : >"$WORK/pair-nc2.log"
   measure_deploy "Cloudflare, second publish" "$WORK/pair-nc2.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "leg 2 (Cloudflare) exited 0" || no "leg 2 (Cloudflare) failed"
+  snapshot_cloudflare_upload "Cloudflare (paired with Netlify)" "$WORK/pair-nc2.log" "$WORK/cf-with-netlify"; CF_SNAPPED=$?
   C_URL=$(url_from_log "$WORK/pair-nc2.log")
+  [ -n "$C_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare (paired with Netlify)" "$C_URL" "$WORK/cf-with-netlify"
   [ -n "$N_URL" ] && check_url "Netlify (of the pair)" "$N_URL" || no "no Netlify address"
   [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" || no "no Cloudflare address"
   [ -n "$N_URL" ] && check_engine "Netlify (of the pair)" "$N_URL/"
@@ -671,10 +912,14 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   : >"$WORK/pair-cf.log"
   run_deploy "$WORK/pair-cf.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "leg 1 (Cloudflare) exited 0" || no "leg 1 (Cloudflare) failed"
+  # Kept NOW: the folder leg below can rebuild the section before production
+  # is judged.
+  snapshot_cloudflare_upload "Cloudflare (paired with a folder)" "$WORK/pair-cf.log" "$WORK/cf-with-folder"; CF_SNAPPED=$?
   C_URL=$(url_from_log "$WORK/pair-cf.log")
   : >"$WORK/pair-cf2.log"
   run_deploy "$WORK/pair-cf2.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_TARGET" \
     && ok "leg 2 (folder) exited 0" || no "leg 2 (folder) failed"
+  [ -n "$C_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare (paired with a folder)" "$C_URL" "$WORK/cf-with-folder"
   [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" || no "no Cloudflare address"
   [ -n "$C_URL" ] && check_page_links "Cloudflare (of the pair)" "$C_URL/" cloudflare
   check_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
@@ -760,7 +1005,7 @@ hdr "Result"
 echo "  $PASS passed, $FAIL failed, $SKIP skipped"
 if [ "${#MEASURED[@]}" -gt 0 ]; then
   echo
-  echo "  Publishing a site that carries the Python engine (#455), measured:"
+  echo "  Publishing a site that carries the Python engine (#455), and Cloudflare's switch to it (#665), measured:"
   for line in "${MEASURED[@]}"; do echo "    $line"; done
 fi
 echo
