@@ -645,8 +645,9 @@ whose section does not exist.
 `WINDOWS_PICTURE_OWED` until the Windows runtime carries GeoGebra) is MPM2D's
 *The Slope-Angle Conjecture* with its sketch opened. It is taken from a
 preview of MPM2D made from its example content, as the print set's is, in
-the folder `--print-folder` names — a NEW one when the kept `~/Plantoir
-Print` predates the page, since the run refuses a folder without it — and
+the folder `--print-folder` names — required here, with no default, and a
+NEW one when the kept `~/Plantoir Print` predates the page: the run refuses
+a folder whose MPM2D lacks it, before mirroring anything into it — and
 built by this tree's recipe as committed (`git archive HEAD`), as `--code`
 is. `shots/prepare/geogebra-sketch.js` taps *Open the sketch*, waits for the
 applet's drawing canvas, scrolls instantly (the site scrolls smoothly, which
