@@ -434,7 +434,7 @@ missing language falls back to English, measured with `lang=fr`), `html/`
 (sign-in callbacks), `sworker-locked.js` and `web3d.nocache.mjs`; it keeps all
 15 deferred fragments (CAS and 3D, 14 MB) and the fonts. Plus a `README.txt`
 (version, licence, attribution, what was removed, the six changes):
-**117 files, 27,092,921 bytes** (8.95 MB gzipped), `fileCount` and `bytes` in
+**117 files, 27,093,283 bytes** (8.95 MB gzipped), `fileCount` and `bytes` in
 the pin. A first sketch on a page downloads about 2.9 MB of it, gzipped (19
 requests, measured); the rest is fetched only by what a sketch uses.
 
@@ -471,14 +471,21 @@ image: the file count, bytes and three hashes, each replacement's text present
 once and GeoGebra's gone, no language file, no `web/` or `webSimple/`, and the
 README. Re-measure all six before the pin moves.
 
-**Licence.** GeoGebra's apps are free to use, copy, distribute, modify and
-transmit for **non-commercial** purposes, with the notice "Made with
-GeoGebra®" and a link to https://www.geogebra.org (licence page updated Nov
-2025); source EUPL 1.2, language files CC BY-NC-SA 4.0. We redistribute in
-three places — the mirror, the Windows installer, every class site with a
-sketch — and modify two files, all permitted non-commercially. **Free while
-Plantoir is free: if Plantoir is ever sold, contact office@geogebra.org
-first.** `THIRD_PARTY_LICENSES.md` has the row.
+**Licence.** GeoGebra's apps are free to use for **non-commercial**
+purposes, with the notice "Made with GeoGebra®" and a link to
+https://www.geogebra.org (licence page updated Nov 2025); language and
+interface files CC BY-NC-SA 4.0. **The six changes rest on the EUPL 1.2**,
+the licence of GeoGebra's source code, which the engine's two changed files
+are: the EUPL permits modifying and redistributing it with a notice of what
+changed and a pointer to the source, which `README.txt` carries
+(https://github.com/geogebra/geogebra). They do NOT rest on the
+non-commercial grant's "copy, distribute, modify", which is the clause for
+GeoGebra's Materials (installers, web services, graphics), not its code
+(stage-1 review, 2026-10-24). The engine used as GeoGebra's product, with
+its style and interface files, stays under the non-commercial licence. We
+redistribute in three places — the mirror, the Windows installer, every
+class site with a sketch — all permitted non-commercially. **Free while Plantoir is free: if Plantoir is ever sold, contact
+office@geogebra.org first.** `THIRD_PARTY_LICENSES.md` has the row.
 
 **Rejected:** widening the site's policy (`worker-src blob:` alone is not
 enough; replacements 1–3 would need `'unsafe-inline'`, which the hashes

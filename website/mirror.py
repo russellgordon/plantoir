@@ -155,14 +155,24 @@ def _cached_copy(entry: dict, cache: Path, fetch) -> Path:
     return cached
 
 
-def fill(site: dict, output: Path, cache: Path | None = None, fetch=download) -> list:
+def fill(site: dict, output: Path, cache: Path | None = None, fetch=None,
+         attempts: int = ATTEMPTS) -> list:
     """
     Put every listed file into output/mirror/, from the cache, and take out
     anything there that is not listed. Never raises: answers the lines to
     print, and a file it could not get is simply missing, which the deploy
     then refuses.
+
+    `attempts` is how often a missing cache entry is downloaded before giving
+    up. build.py passes ATTEMPTS only for --deploy, where the file must be
+    there, and 1 otherwise: six 60-second tries of a 33 MB download would
+    stall an offline `build.py` or `--serve` for minutes over a file nothing
+    but the deploy needs (stage-1 review, 2026-10-24).
     """
     cache = cache if cache is not None else cache_dir()
+    if fetch is None:
+        def fetch(url, destination):
+            download(url, destination, attempts=attempts)
     folder = Path(output) / MIRROR_FOLDER
     said = []
     wanted = set()

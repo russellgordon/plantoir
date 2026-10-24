@@ -169,11 +169,16 @@ def readme_text(removed_languages: int) -> str:
         "",
         "Made with GeoGebra(R) - https://www.geogebra.org",
         "",
-        "Licence: GeoGebra's apps are free to use, copy, distribute, modify and transmit for",
+        "Licence (https://www.geogebra.org/license): GeoGebra's apps are free to use for",
         "NON-COMMERCIAL purposes, with the notice \"Made with GeoGebra(R)\" and a link to",
-        "https://www.geogebra.org (https://www.geogebra.org/license). The source is under the",
-        "EUPL 1.2; the language and interface files are CC BY-NC-SA 4.0. Sketches uploaded to",
-        "geogebra.org are CC BY-NC-SA 4.0 and are credited to their author where they are shown.",
+        "https://www.geogebra.org. The engine's code is GeoGebra's source code, licensed under",
+        "the EUPL 1.2 (https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12);",
+        "the six changes listed below are modifications made, and redistributed, under the",
+        "EUPL 1.2, and GeoGebra's source is at https://github.com/geogebra/geogebra. The style and",
+        "interface files are CC BY-NC-SA 4.0, and the engine used with them as GeoGebra's product",
+        "stays under GeoGebra's non-commercial licence. Copyright (C) GeoGebra GmbH. Sketches",
+        "uploaded to geogebra.org are CC BY-NC-SA 4.0 and are credited to their author where",
+        "they are shown.",
         "",
         f"Source: https://download.geogebra.org/installers/5.4/{ZIP_NAME}",
         f"SHA-256 of that zip: {ZIP_SHA256}",
@@ -258,6 +263,10 @@ def adapt(zip_path, out_dir, expected_sha256: str = ZIP_SHA256) -> dict:
         files += 1
         total += len(readme)
 
+        # mkdtemp makes the folder 0700, and the rename keeps that: the site
+        # build (another user in the container, or a teacher's account on
+        # Windows) must be able to read it (stage-1 review, 2026-10-24).
+        os.chmod(staging, 0o755)
         previous = None
         if out_dir.exists():
             previous = out_dir.with_name(out_dir.name + ".previous")

@@ -234,6 +234,18 @@ class AdaptTests(EngineTestCase):
         self.assertIn(geogebra_engine.ZIP_SHA256, readme)
         for number in range(1, 7):
             self.assertIn(f"  {number}. ", readme)
+        # The changes rest on the EUPL (the source code's licence), with a
+        # pointer to GeoGebra's source - not on the Materials clause's
+        # "modify" (stage-1 review, 2026-10-24).
+        self.assertIn("EUPL 1.2", readme)
+        self.assertIn("modifications made, and redistributed, under the", readme)
+        self.assertIn("https://github.com/geogebra/geogebra", readme)
+
+    def test_the_folder_is_readable_by_everyone_not_only_its_maker(self):
+        # mkdtemp makes 0700, and a rename keeps it; the site build may run as
+        # another user (stage-1 review, 2026-10-24).
+        self.adapt(self.make_zip(bundle_members()))
+        self.assertEqual(self.out.stat().st_mode & 0o777, 0o755)
 
     def test_the_command_line_refuses_in_one_plain_line(self):
         bundle = self.make_zip(bundle_members())
