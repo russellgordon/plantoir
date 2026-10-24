@@ -55,14 +55,16 @@
     },
     {
       "pin": "node",
-      "value": "20",
-      "why": "**What Quartz v4.5.0 is known-good against.** Raising it means revalidating every teacher's site build, which is why the wrangler pin below bends around this rather than the reverse."
+      "value": "22.23.4",
+      "dockerfileContains": "nodejs=22.23.4-1nodesource1",
+      "why": "#640 (v1.9.0): Node 22.23.4 from NodeSource (`setup_22.x`), PINNED EXACTLY. Node 20 has been end-of-life since 2026-04-30, and the unpinned `setup_20.x` let the image and Windows' runtime drift to different patch releases (#636). 22.23.4 is the 2026-10-20 security release (npm 10.9.9, OpenSSL 3.5.9). An `=` pin is safe here, unlike caCertificates' floor: NodeSource keeps its history (measured 2026-10-23: every 22.x from 22.5.0 on arm64, 22.23.4 and back past 22.22.0 on amd64), so the pin does not break a first build the day 22.23.5 ships. Quartz v4.5.0 is still what decides this, and was revalidated on 22: an identical `npm ls --all` tree for Quartz and the tikz engine (665 lines, no EBADENGINE), byte-identical figure-cache SVG, the same 336 files for the EXC2O example with 0 differences once timestamps and Explorer ids are set aside, and verify.sh and verify-deploy.sh green. The one new behaviour, a `punycode` DEP0040 deprecation line on every Quartz build, is silenced by build_site.py (`--disable-warning=DEP0040`, that one warning only). Node's own built-in store (`tls.rootCertificates`) holds 116 roots and neither caCertificates subject; verify.sh checks the version, wrangler's engines and that store. Node 22 is end-of-life on 2027-04-30, so Quartz 5 (#512) or Node 24 must land before then. No windowsRuntimeContains yet: Windows' runtime stays on 20.18.1 until its own issue, which adds it with the bump. REJECTED: Node 24 (the ruling on #636 is 22, and 24 is a second, unmeasured jump); a floating `setup_22.x` (#636's drift again); a late `nodejs` layer over Node 20 (saves existing teachers about 90 MB, estimated, but every npm layer below must rebuild anyway, Node 20's files stay as dead weight, and no no-cache build reproduces the image)."
     },
     {
-      "mustStayBelow": "4.100",
+      "mustStayBelow": "4.87",
+      "nodeEngine": ">=20.3.0",
       "pin": "wrangler",
       "value": "4.80.0",
-      "why": "Cloudflare's own deploy CLI, used by `deploy.py` for the Pages destination. From 4.100 it requires Node 22. Staying on the newest Node-20 wrangler is a far smaller risk than raising Node. The exact pin also keeps the image reproducible and stops an upstream CLI change from breaking publishing for a teacher mid-semester."
+      "why": "Cloudflare's own deploy CLI, used by `deploy.py` for the Pages destination. `mustStayBelow` is 4.87 because 4.87.0 is the first wrangler whose `engines.node` is `>=22.0.0` (`npm view 'wrangler@>=4.80.0' engines.node`, 2026-10-23: 4.80.0 to 4.86.0 say `>=20.3.0`, 4.87.0 to 4.152.0 say `>=22.0.0`, none yet needs 24). It said 4.100 until #640, which was never a boundary. The image runs Node 22 since #640, so the ceiling now comes from WINDOWS: the pin is shared, and Windows' runtime stays on Node 20.18.1 until its own issue lands. Moving wrangler is its own piece once both platforms run 22, and that piece retires `mustStayBelow` on both. `nodeEngine` is wrangler's own `engines.node` at this pin: verify.sh reads it from the image's wrangler package.json, and the mac suite checks the `node` pin satisfies it - the invariant that matters from now on. The exact pin also keeps the image reproducible and stops an upstream CLI change from breaking publishing for a teacher mid-semester."
     },
     {
       "pin": "quartz",
@@ -170,7 +172,26 @@
         "AAA Certificate Services",
         "emSign ECC Root CA - G3"
       ],
-      "why": "#639 (v1.9.0): Debian's certificate store, at least this version - the one that stops trusting `mustNotTrust`, the Comodo and eMudhra roots above the intermediates compromised in October 2026. Python's urllib trusts this store (its default paths lead to /etc/ssl/certs/ca-certificates.crt), and urllib is every Netlify publish and deploy.py's own Cloudflare calls; OpenSSL checks no revocation, so distrusting the roots is the protection. A FLOOR (`dpkg --compare-versions ... ge`) in a late layer of its own, not an `=` pin: Debian's security archive serves only its newest version, so an exact pin breaks every first build the day deb13u2 ships, and a later version only distrusts more. verify.sh checks the version, that neither subject is in the bundle, in Python's default context or in the hashed certificate folder, and that the store still holds more than 100 certificates, so an empty store cannot pass. Debian removed exactly these two: emSign Root CA - G1, emSign Root CA - C1 and emSign ECC Root CA - C3 (also eMudhra) stay trusted, which is Debian's choice and not ours to curate. Measured 2026-10-23: 150 certificates at 20250419, 148 at this version. No windowsRuntimeContains: Windows' Python reads the Windows certificate stores, not this file. Node 20's own built-in store (wrangler) is not this file either - #640. REJECTED: an exact pin; a base-digest bump (a full rebuild for every teacher, and it moves Python's patch release); `apt-get upgrade` (unbounded); snapshot.debian.org (a new dependency on a first build); the main apt line (~330 MB again for every teacher who has built); trusting NodeSource's setup script, which happens to install ca-certificates, to keep doing so - and a cached layer never re-runs it."
+      "why": "#639 (v1.9.0): Debian's certificate store, at least this version - the one that stops trusting `mustNotTrust`, the Comodo and eMudhra roots above the intermediates compromised in October 2026. Python's urllib trusts this store (its default paths lead to /etc/ssl/certs/ca-certificates.crt), and urllib is every Netlify publish and deploy.py's own Cloudflare calls; OpenSSL checks no revocation, so distrusting the roots is the protection. A FLOOR (`dpkg --compare-versions ... ge`) in a late layer of its own, not an `=` pin: Debian's security archive serves only its newest version, so an exact pin breaks every first build the day deb13u2 ships, and a later version only distrusts more. verify.sh checks the version, that neither subject is in the bundle, in Python's default context or in the hashed certificate folder, and that the store still holds more than 100 certificates, so an empty store cannot pass. Debian removed exactly these two: emSign Root CA - G1, emSign Root CA - C1 and emSign ECC Root CA - C3 (also eMudhra) stay trusted, which is Debian's choice and not ours to curate. Measured 2026-10-23: 150 certificates at 20250419, 148 at this version. No windowsRuntimeContains: Windows' Python reads the Windows certificate stores, not this file. Node's own built-in store (`tls.rootCertificates`, which wrangler uses) is not this file either: measured by #640, Node 22.23.4's holds 116 roots and neither subject, and of the four emSign roots Node 20.20.2's held (144 roots) it keeps only emSign Root CA - G1, as Debian does; verify.sh checks it under the `node` pin. REJECTED: an exact pin; a base-digest bump (a full rebuild for every teacher, and it moves Python's patch release); `apt-get upgrade` (unbounded); snapshot.debian.org (a new dependency on a first build); the main apt line (~330 MB again for every teacher who has built); trusting NodeSource's setup script, which happens to install ca-certificates, to keep doing so - and a cached layer never re-runs it."
+    },
+    {
+      "pin": "geogebra",
+      "value": "5.4.933.1",
+      "dockerfileContains": "GEOGEBRA_VERSION=5.4.933.1",
+      "windowsRuntimeContains": "$GeogebraVersion = \"5.4.933.1\"",
+      "sha256": "409095947e065bce5bde20b8a6d56a60e2b3cb3cce6947e817a802513515ec0c",
+      "urls": [
+        "https://download.geogebra.org/installers/5.4/geogebra-math-apps-bundle-5-4-933-1.zip",
+        "https://plantoir.app/mirror/geogebra/geogebra-math-apps-bundle-5-4-933-1.zip"
+      ],
+      "files": {
+        "deployggb.js": "85f60b83bb8702f70443bd6462fdcbd855396b7c9ba23841a2fd28f94856e167",
+        "HTML5/5.0/web3d/web3d.nocache.js": "b4f3a5f0ee1fbe492893996ceea147a4d3601dc359b1a0bb25ed240693e427fe",
+        "HTML5/5.0/web3d/29EB0586CD5B749E221F6BB019F1B206.cache.js": "676326d5c2c33b30a7ede8103100020ed908e7f203f809ca9ad8ec2763731e68"
+      },
+      "fileCount": 117,
+      "bytes": 27093283,
+      "why": "#578: GeoGebra sketches students can drag on a class site (shared-rules.json -> geogebraFences, from stage 2). GeoGebra Math Apps 5.4.933.1 (the zip `sha256`, 33,461,640 bytes, Last-Modified 2026-10-19) is downloaded once into the image by the Dockerfile and checked; scripts/geogebra_engine.py `adapt` - the ONE recipe, which Windows' fetch-runtime.ps1 runs too, into runtime\\vendor\\geogebra - keeps deployggb.js, HTML5/5.0/css/ and the web3d codebase (it serves classic, graphing, geometry and 3d, measured in Chromium and WebKit), leaves out the 83 language files (web3d/js/properties_keys_*.js, 23 MB; English is built in, and a missing language falls back to it), web3d/html/, sworker-locked.js, web3d.nocache.mjs, and the web/, webSimple/ and GeoGebra.html copies, and writes a README.txt: `fileCount` files, `bytes` bytes (8.95 MB gzipped), at /opt/vendor/geogebra. A site carries them (static/geogebra) only while a page students can see has a sketch (page_features.GATED_ASSETS). SIX exact string replacements (geogebra_engine.REPLACEMENTS), each required to match exactly once or the step refuses and writes nothing: under the Netlify policy a published site is sent (script-src 'self' 'unsafe-eval' <hashes>, netlify_badge.py) the stock engine NEVER loads, in Chromium or WebKit, because GWT's loader injects its main file and deferred fragments as inline script text (on any host but 127.0.0.1, localhost and apps-builds.), nine resources go into <head> as inline scripts, and its zip library starts a blob: worker; the replacements make each a same-origin <script src> or an eval, and put the loader's hidden frame under <html>, because Quartz's page navigation replaces <body> and took the frame with it (Chromium then loaded no second sketch until a reload). `files` are the three files those replacements touch or a page loads first, hashed AFTER all six (only web3d.nocache.js carries the frame fix; the cache.js hash is the same with or without it), checked in the image by verify.sh. Licence (https://www.geogebra.org/license, updated Nov 2025): free to use for NON-COMMERCIAL purposes with the notice 'Made with GeoGebra(R)' linked to https://www.geogebra.org; language and interface files CC BY-NC-SA 4.0. The six replacements and their redistribution rest on the EUPL 1.2, the licence of GeoGebra's source code (which the two changed files are), with a notice of what changed and a pointer to https://github.com/geogebra/geogebra in README.txt - NOT on the non-commercial grant's 'copy, distribute, modify', which is the clause for GeoGebra's Materials (stage-1 review); the engine used with its style and interface files stays non-commercial. It is free while Plantoir is free: if Plantoir is ever sold, contact office@geogebra.org FIRST. Redistributed in three places, all permitted non-commercially: the plantoir.app mirror, the Windows installer, every class site. THE DOWNLOAD HOST IS FLAKY: 4 of 8 connections to download.geogebra.org timed out (2026-10-23, about 20:35 EDT), and guessed older version URLs 404, so a pinned version may vanish upstream. Hence `urls`: the Dockerfile retries the first (download.geogebra.org) six times, then fetches the SAME zip from plantoir.app's mirror, and checks the same SHA-256 whichever answered. The mirror is filled by website/build.py from a cache outside the repository and is never committed; website/build.py --deploy refuses while it is missing or its SHA-256 is not this one, and --verify-deploy fetches it back (RELEASING.md). REJECTED: widening the site's policy (worker-src blob: alone is not enough; the inline scripts need 'unsafe-inline', which the hashes disable and which would let Netlify's badge back in); pinning about ten inline hashes (fonts vary, and one missed hash is broken lettering, silently); a run-time patch of head.appendChild (it cannot reach the first two, which run in GWT's frame before any of our code); loading GeoGebra from geogebra.org (a third party on every page, and blocked by the same policy); `material_id` in deployggb (it calls geogebra.org); committing the zip or the mirror (33.5 MB in every clone, and every bump kept in history); the web or webSimple codebase (no 3D, or no toolbar and algebra view)."
     }
   ],
   "rules": [
@@ -185,7 +206,7 @@
     },
     {
       "rule": "If you raise Node, revalidate Quartz BEFORE chasing a newer CLI",
-      "why": "The order is the whole point of the wrangler pin."
+      "why": "The order is the whole point of the wrangler pin. #640 did the first half: the image's Node is 22 and Quartz v4.5.0 was revalidated on it; the CLI moves only once Windows' runtime is on 22 too."
     }
   ],
   "whyWranglerAtAll": "Cloudflare's upload protocol — BLAKE3 hashing, short-lived JWT, batched uploads — is undocumented enough that reimplementing it would break teachers' publishing whenever Cloudflare changed it. So the image carries their CLI instead.",
@@ -364,5 +385,244 @@
     "keptBytesWhy": "toolchain 533,231,069 + SDK 354,685,593 + wasm-opt 10,343,424, as the product's fetch keeps them (2026-10-22, READY.json). The measurement's hand trim was 3,268 B smaller: it also removed usr/bin/clang-deps-launcher.py, a Python script nothing here runs, which trim.remove does not name. Not part of the install digest, so a re-measured size never fetches again. Uninstalling Plantoir leaves it in %LOCALAPPDATA%\\Plantoir\\swift, as it leaves the assistant's models.",
     "measured": "2026-10-22, Lenovo 20QES70500 (Intel i5-8365U, 4 cores / 8 threads, 16 GB, Windows 11 Pro 26200, Ethernet), not elevated: the installer downloaded in 24.2 s in the measurement (about 87 MB/s) and the product's whole 2.3 GB in 21.5 s in its own first run (about 100 MB/s; a 50 Mbit/s school line would take about 6 min); everything after the download took about 142 s in that run (hashes and signature 40.1 s, expand 31.3 s, msiexec and trim 56.0 s, SDK 7.6 s, smoke 6.8 s), 104 s in the resumed one; the peak on disk was 4.82 GB (sampled every 2 s); all 15 swift-gate fragments compile to the mac's exact sizes and pass wasi_run.mjs; the compiled block runs in headless Edge 155 (swift_runner.mjs unmodified). The product path's own first-fetch timings are in documentation/12-windows-app.md.",
     "rejected": "Carrying Swift in the installer (0.9 GB for every teacher, most of whom never write Swift); `swift sdk install` (needs Visual Studio's link.exe); installer.exe /layout (copies only itself); HTTP Range for just the needed payloads (one solid LZX folder); the asserts toolchain (the bundle's default, larger, not measured); WiX's `wix burn extract` (a .NET tool to ship, where expand.exe is part of Windows); cabinet.dll FDI in-process to avoid carving the cabinet out (the next step if the 4.82 GB peak ever matters); a container or WSL2 (Windows has had neither since 2026-08-19)."
+  },
+  "npmAudit": {
+    "note": "#667 (v1.9.0): what `npm audit` reports against the image's JavaScript, and which findings are accepted and why. verify.sh audits every tree below inside the image, with the image's own npm, and FAILS on a high or critical advisory that is not accepted here for that tree, or that is accepted at a LOWER severity than the database gives it now (re-decide). Low and moderate advisories that are not accepted are reported, not failed; an accepted advisory no longer reported is stale, said and not failed. Offline it SKIPS, saying no tree counts as audited until every tree can be. A top-level key, deliberately NOT under `pins`: both apps' pin tests read every pin as a Dockerfile line. Every current advisory is listed, low and moderate included, with the severity it has today, so a later raise fails. `exposure` and `reason` are decided per tree, because one advisory can be harmless in one tree and not in another. Windows audits its runtime's copies of the same trees (`windowsRuntime`) against this same list. scripts/npm_audit.py is the comparator; research/npm-audit/<date>.md is the record of each run; RELEASING.md step 2 revisits it at every cut. REJECTED: upgrading now (the ruling on #667: no upgrades this release; Quartz's tree moves with Quartz 5, #512, and wrangler's with its own piece); `npm audit --audit-level=high` alone, which cannot say 'accepted', so every run would be red; auditing in the image build, which would need the network on every build and fail a teacher's first build the day an advisory is published.",
+    "failsOn": ["high", "critical"],
+    "reviewed": "2026-10-24",
+    "trees": [
+      {"tree": "quartz", "image": "/opt/quartz", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\quartz", "exposure": "Quartz v4.5.0 and every dependency its lockfile installs, dev dependencies included. Runs in the container on the teacher's Mac: the build, and the preview server while a preview runs. A built site carries Quartz's own client scripts and stylesheets."},
+      {"tree": "tikz-engine", "image": "/opt/vendor/tikz-engine", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\vendor\\tikz-engine", "exposure": "node-tikzjax and its locked dependencies (support/figures/package-lock.json, npm ci --omit=dev). Build only: a site carries the SVG it draws, never the engine."},
+      {"tree": "wrangler", "image": "/usr/lib/node_modules/wrangler", "lockfile": "synthesised from the installed tree", "pin": "wrangler", "windowsRuntime": "runtime\\wrangler", "exposure": "Cloudflare's deploy command line, a global install that keeps no lockfile: one is built from the installed tree (npm install --package-lock-only next to a copy of it). Runs only during a Cloudflare deploy."},
+      {"tree": "pagedjs", "image": "/opt/vendor/pagedjs/paged.min.js", "lockfile": "synthesised from the pin", "pin": "pagedjs", "windowsRuntime": "runtime\\vendor\\pagedjs", "exposure": "A prebuilt file a site carries for printing: it runs in the student's browser. Its lockfile is built from the pin's version, so an advisory against pagedjs itself is caught exactly, and its bundled dependencies only as they resolve today."},
+      {"tree": "function-plot", "image": "/opt/vendor/function-plot/function-plot.js", "lockfile": "synthesised from the pin", "pin": "functionPlot", "windowsRuntime": "runtime\\vendor\\function-plot", "exposure": "A prebuilt file a site carries for graphs: it runs in the student's browser. Its lockfile is built from the pin's version, with the same limit as pagedjs."}
+    ],
+    "accepted": [
+      {
+        "tree": "quartz",
+        "package": "@xmldom/xmldom",
+        "exposure": "not run",
+        "reason": "Installed with pixi.js for Quartz's Graph view, which build_site.py removes (the remove-Graph patch), so nothing calls it at build time and a built site carries neither pixi nor xmldom (measured 2026-10-24 on a built ICS4U site: no 'pixi' or 'xmldom' in prescript.js or postscript.js). Fixing it means moving Quartz's own lockfile, which waits for Quartz 5 (#512).",
+        "advisories": [
+          {"id": "GHSA-wh4c-j3r5-mjhp", "severity": "high"},
+          {"id": "GHSA-2v35-w6hq-6mfw", "severity": "high"},
+          {"id": "GHSA-f6ww-3ggp-fr8h", "severity": "high"},
+          {"id": "GHSA-x6wf-f3px-wcqx", "severity": "high"},
+          {"id": "GHSA-j759-j44w-7fr8", "severity": "high"},
+          {"id": "GHSA-6gmq-8vp8-gcm6", "severity": "moderate"},
+          {"id": "GHSA-w2rr-34g9-rvrj", "severity": "high"},
+          {"id": "GHSA-4w3w-2rp5-g8jm", "severity": "high"},
+          {"id": "GHSA-c7q8-3ch8-vqpv", "severity": "high"},
+          {"id": "GHSA-27p8-2357-5qqv", "severity": "high"},
+          {"id": "GHSA-6h8r-xr42-gp59", "severity": "moderate"},
+          {"id": "GHSA-8344-3jmq-59r6", "severity": "high"},
+          {"id": "GHSA-x4fp-j954-r2f4", "severity": "high"},
+          {"id": "GHSA-965w-775f-mr7g", "severity": "high"},
+          {"id": "GHSA-93r5-fhx6-vmg9", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "brace-expansion",
+        "exposure": "the teacher's build, and the preview server on the teacher's Mac",
+        "reason": "Denial of service on crafted brace patterns, under minimatch (Quartz's globs, rimraf, and serve-handler in the preview server). The patterns are Quartz's and serve-handler's own, never a teacher's notes or a student's request.",
+        "advisories": [
+          {"id": "GHSA-v6h2-p8h4-qcjw", "severity": "low"},
+          {"id": "GHSA-f886-m6hf-6m8v", "severity": "moderate"},
+          {"id": "GHSA-3jxr-9vmj-r5cp", "severity": "high"},
+          {"id": "GHSA-mh99-v99m-4gvg", "severity": "high"},
+          {"id": "GHSA-rgw5-rvv9-x895", "severity": "high"},
+          {"id": "GHSA-q2hr-2g5m-vwhr", "severity": "moderate"},
+          {"id": "GHSA-qhr7-859c-m2p7", "severity": "high"},
+          {"id": "GHSA-6j4f-fj2g-mc7p", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "fflate",
+        "exposure": "the teacher's build only",
+        "reason": "An infinite loop on a malformed ZIP64 archive. fflate is under satori and opentype.js, reading the fonts the image carries.",
+        "advisories": [
+          {"id": "GHSA-px8p-9vwx-vf98", "severity": "moderate"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "glob",
+        "exposure": "the teacher's build only",
+        "reason": "The advisory is the glob COMMAND LINE's -c/--cmd option. Quartz reaches glob as a library through rimraf and never runs its command line.",
+        "advisories": [
+          {"id": "GHSA-5j98-mcp5-4vw2", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "immutable",
+        "exposure": "the teacher's build only",
+        "reason": "Inside Sass (esbuild-sass-plugin). Sass compiles Quartz's and Plantoir's own stylesheets, never a teacher's or a student's input.",
+        "advisories": [
+          {"id": "GHSA-wf6x-7x77-mvgw", "severity": "high"},
+          {"id": "GHSA-xvcm-6775-5m9r", "severity": "high"},
+          {"id": "GHSA-v56q-mh7h-f735", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "js-yaml",
+        "exposure": "the teacher's build only",
+        "reason": "CPU denial of service or prototype pollution from crafted YAML (gray-matter, Quartz, rehype-citation). The YAML is the teacher's own front matter, in a build on their own Mac.",
+        "advisories": [
+          {"id": "GHSA-mh29-5h37-fv8m", "severity": "moderate"},
+          {"id": "GHSA-h67p-54hq-rp68", "severity": "moderate"},
+          {"id": "GHSA-52cp-r559-cp3m", "severity": "high"},
+          {"id": "GHSA-5p4m-2wfm-xmqj", "severity": "high"},
+          {"id": "GHSA-2883-xcg3-v3hh", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "katex",
+        "exposure": "the teacher's build only",
+        "reason": "Needs an existing prototype pollution to bypass KaTeX's trust settings. Quartz renders the maths at build time; a site carries KaTeX's stylesheet, fonts and copy-tex (#494), not the renderer.",
+        "advisories": [
+          {"id": "GHSA-238p-pmpm-9mq7", "severity": "low"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "mdast-util-to-hast",
+        "exposure": "its output reaches the student's browser, from the teacher's input",
+        "reason": "An unsanitised class attribute from Markdown. Only the teacher writes the Markdown a site is built from. Moderate, so not gated; recorded so a raise to high fails.",
+        "advisories": [
+          {"id": "GHSA-4fh9-h7wg-q85m", "severity": "moderate"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "minimatch",
+        "exposure": "the teacher's build, and the preview server on the teacher's Mac",
+        "reason": "ReDoS on crafted glob patterns. The patterns are Quartz's and serve-handler's own, never a teacher's notes or a student's request.",
+        "advisories": [
+          {"id": "GHSA-3ppc-4f35-3m26", "severity": "high"},
+          {"id": "GHSA-7r86-cg39-jmmj", "severity": "high"},
+          {"id": "GHSA-23c5-xmqv-rm74", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "picomatch",
+        "exposure": "the teacher's build only",
+        "reason": "ReDoS and wrong matches on crafted glob patterns (globby, fast-glob, micromatch). The patterns are Quartz's own.",
+        "advisories": [
+          {"id": "GHSA-3v7f-55p6-f55p", "severity": "moderate"},
+          {"id": "GHSA-c2c7-rcm5-vvqj", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "sharp",
+        "exposure": "the teacher's build only",
+        "reason": "libvips, libheif and librsvg issues with hostile images. sharp here renders Quartz's own generated social-preview images, not uploaded ones.",
+        "advisories": [
+          {"id": "GHSA-f88m-g3jw-g9cj", "severity": "high"},
+          {"id": "GHSA-rgj7-g3m4-5g8c", "severity": "high"},
+          {"id": "GHSA-wq5f-xc86-pv6w", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "source-map-js",
+        "exposure": "the teacher's build only",
+        "reason": "Inside Sass, over the source maps of Quartz's and Plantoir's own stylesheets.",
+        "advisories": [
+          {"id": "GHSA-68fv-2mgg-jv7q", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "toml",
+        "exposure": "the teacher's build only",
+        "reason": "Recursion, CPU denial of service or prototype pollution from crafted TOML (Quartz's +++ front matter). The TOML is the teacher's own, in a build on their own Mac.",
+        "advisories": [
+          {"id": "GHSA-82x6-q7mm-w9cf", "severity": "high"},
+          {"id": "GHSA-v5mp-jgw5-2x6j", "severity": "high"},
+          {"id": "GHSA-4qx8-w7c3-pj3p", "severity": "high"},
+          {"id": "GHSA-9j65-hcg3-gc64", "severity": "high"},
+          {"id": "GHSA-9qmh-m7c6-f92p", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "quartz",
+        "package": "ws",
+        "exposure": "the teacher's build, and the preview server on the teacher's Mac",
+        "reason": "Quartz's live-reload server while a preview runs (--serve --wsPort): a memory-exhaustion denial of service, and memory disclosure, of the preview's own websocket. A built site carries no ws. The preview ports listen beyond localhost today, which is its own finding.",
+        "advisories": [
+          {"id": "GHSA-58qx-3vcg-4xpx", "severity": "moderate"},
+          {"id": "GHSA-96hv-2xvq-fx4p", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "wrangler",
+        "package": "esbuild",
+        "exposure": "not run",
+        "reason": "The advisory is esbuild's development server on Windows. `wrangler pages deploy` uploads a folder and bundles nothing.",
+        "advisories": [
+          {"id": "GHSA-g7r4-m6w7-qqqr", "severity": "low"}
+        ]
+      },
+      {
+        "tree": "wrangler",
+        "package": "sharp",
+        "exposure": "not run",
+        "reason": "Under miniflare, wrangler's local development server (its images binding). `wrangler pages deploy` uploads a folder and never starts miniflare.",
+        "advisories": [
+          {"id": "GHSA-f88m-g3jw-g9cj", "severity": "high"},
+          {"id": "GHSA-rgj7-g3m4-5g8c", "severity": "high"},
+          {"id": "GHSA-wq5f-xc86-pv6w", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "wrangler",
+        "package": "undici",
+        "exposure": "Cloudflare deploy only",
+        "reason": "wrangler's HTTP client, used only while a Cloudflare deploy talks to Cloudflare's API from the teacher's Mac. The SOCKS5 and pool-proxy advisories need a proxy, and none is configured. The cache and cookie advisories need a shared cache, and wrangler makes fixed API calls with none. The WebSocket, EventSource and decompression ones are client-side denials of service from Cloudflare's own responses. Fixed in wrangler > 4.113.0, which needs Node 22 on Windows too: moving wrangler is its own piece (the wrangler pin).",
+        "advisories": [
+          {"id": "GHSA-vmh5-mc38-953g", "severity": "high"},
+          {"id": "GHSA-p88m-4jfj-68fv", "severity": "moderate"},
+          {"id": "GHSA-vxpw-j846-p89q", "severity": "high"},
+          {"id": "GHSA-hm92-r4w5-c3mj", "severity": "high"},
+          {"id": "GHSA-g8m3-5g58-fq7m", "severity": "low"},
+          {"id": "GHSA-pr7r-676h-xcf6", "severity": "moderate"},
+          {"id": "GHSA-8xcm-r25x-g524", "severity": "moderate"},
+          {"id": "GHSA-4cwx-7wf7-3272", "severity": "high"},
+          {"id": "GHSA-m8rv-5g2x-5cg5", "severity": "moderate"},
+          {"id": "GHSA-jr45-8vmc-qm54", "severity": "moderate"},
+          {"id": "GHSA-v3r7-h72x-cjcm", "severity": "moderate"},
+          {"id": "GHSA-35p6-xmwp-9g52", "severity": "low"},
+          {"id": "GHSA-pmjh-fq2x-6v4x", "severity": "moderate"},
+          {"id": "GHSA-r53p-7pc4-xj5r", "severity": "low"},
+          {"id": "GHSA-rfgv-xxqx-mfg5", "severity": "high"},
+          {"id": "GHSA-3xpg-4rpp-hhhm", "severity": "moderate"},
+          {"id": "GHSA-2jfj-6hjv-fm6j", "severity": "moderate"},
+          {"id": "GHSA-2gqq-gqf2-x968", "severity": "low"},
+          {"id": "GHSA-w293-vg96-wgc3", "severity": "high"},
+          {"id": "GHSA-8436-99hf-9mmv", "severity": "low"},
+          {"id": "GHSA-rx4f-c7p8-82vq", "severity": "moderate"},
+          {"id": "GHSA-4qv8-2p9j-2685", "severity": "moderate"},
+          {"id": "GHSA-f72v-6w45-q472", "severity": "moderate"},
+          {"id": "GHSA-xjj6-f33q-929c", "severity": "high"}
+        ]
+      },
+      {
+        "tree": "wrangler",
+        "package": "ws",
+        "exposure": "not run",
+        "reason": "Under miniflare, wrangler's local development server. `wrangler pages deploy` never starts it.",
+        "advisories": [
+          {"id": "GHSA-58qx-3vcg-4xpx", "severity": "moderate"},
+          {"id": "GHSA-96hv-2xvq-fx4p", "severity": "high"}
+        ]
+      }
+    ]
   }
 }

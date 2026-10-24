@@ -1228,3 +1228,19 @@ is the contract; what EXC2O needed:
   root (or a working folder).
 - The Docker image bakes `support/` — payload edits change the recipe hash
   and force a rebuild on next use; that is expected, not a bug.
+- A GeoGebra sketch in a payload (#578) is a ` ```geogebra ` fence with
+  `file:` naming a `.ggb` put BESIDE the page in the payload, shipped as
+  saved from GeoGebra (the installer copies anything that is not `.md`
+  as is). MPM2D's `Explorations/The Slope-Angle Conjecture.md` with
+  `Slope Angle Conjecture.ggb` is the example. Never `material_id:` in a
+  payload: a teacher's first preview would then need geogebra.org. Name
+  the file exactly - a misspelled `file:` is a folder problem
+  (`geogebraSketchesNotReady`) on the teacher's first preview. The
+  linter reads every fence's settings: it refuses `material_id:`, requires
+  `alt:`, and looks the `file:` up the way the build does. Its one limit:
+  it looks within the page's own tree (`shared/` or `per_section/`), not
+  the two merged as the installer merges them, so a `.ggb` kept in
+  `per_section/` for a `shared/` page (or the reverse) would be reported
+  missing although the installed course finds it - theoretical today,
+  since nothing ships that way; keep the file beside its page. Until the
+  Windows runtime carries GeoGebra, a sketch there raises `engineMissing`.

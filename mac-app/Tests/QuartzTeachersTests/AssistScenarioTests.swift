@@ -243,6 +243,7 @@ final class AssistScenarioTests: XCTestCase {
         let made = try AssistFixture.makeRunner(surface: surface)
         defer {
             FakePreview.shared.forget()
+            ReferenceLock.clearLock(at: made.root)
             try? FileManager.default.removeItem(at: made.root)
         }
 
@@ -260,6 +261,23 @@ final class AssistScenarioTests: XCTestCase {
             break
         }
 
+        // #610: what the section window's Open in Obsidian press comes to,
+        // and whether Obsidian is on this Mac (absent: it is, so a case does
+        // not depend on the Mac running the suite).
+        let obsidianPress: OpenInObsidianPress = AssistScenarioTests.obsidianPress(
+            named: scenario.given["obsidianPress"] as? String,
+            page: AssistScenarioTests.obsidianPage(of: scenario) ?? "Unit 1, Day 1",
+            in: made.course
+        )
+        let obsidianInstalled: Bool = scenario.given["obsidianInstalled"] as? Bool ?? true
+        made.runner.obsidianOpening.isInstalled = { return obsidianInstalled }
+
+        // #610: the fixture's course, kept for reference — written before
+        // the call, which reads the courses as they are saved now.
+        if scenario.given["keptForReference"] as? Bool == true {
+            try AssistScenarioTests.keepForReference(made.course)
+        }
+
         if windowOpen {
             FakePreview.shared.register(
                 folderPath: made.root.path,
@@ -269,7 +287,8 @@ final class AssistScenarioTests: XCTestCase {
                 refusingToDeploy: sectionBusy
                     ? AssistWording.sectionIsBusy(course: "ICS3U", section: "1")
                     : nil,
-                answeringLaterClasses: laterClassesAnswer
+                answeringLaterClasses: laterClassesAnswer,
+                pressingObsidian: obsidianPress
             )
         }
 
@@ -369,10 +388,60 @@ final class AssistScenarioTests: XCTestCase {
 
         if let reply = scenario.expectReply {
             XCTAssertEqual(
-                outcome.summary, try AssistScenarioTests.sentence(named: reply),
+                outcome.summary,
+                try AssistScenarioTests.sentence(named: reply, page: AssistScenarioTests.obsidianPage(of: scenario)),
                 "\(scenario.name): the reply is the sentence the contract names"
             )
         }
+    }
+
+    /// The page an Open in Obsidian case's press opened, as the sidebar
+    /// names it (#610) — nil for every other case, whose sentences keep
+    /// their `{page}` as written.
+    private static func obsidianPage(of scenario: Scenario) -> String? {
+        if let page = scenario.given["obsidianPage"] as? String {
+            return page
+        }
+        if scenario.given["obsidianPress"] != nil {
+            return "Unit 1, Day 1"
+        }
+        return nil
+    }
+
+    /// `given.obsidianPress`, as the section window's press would answer
+    /// (#610). Absent: the window has no press of its own to report.
+    private static func obsidianPress(named name: String?, page: String, in course: Course) -> OpenInObsidianPress {
+        switch name {
+        case "page":
+            let place: String = "section1/All Classes/" + page
+            return .opened(.page(
+                course.directoryURL.appendingPathComponent(place + ".md"), place: place, hidden: false
+            ))
+        case "noPageShowing":
+            return .opened(.fallback(.noPageShowing))
+        case "notInTheList":
+            return .opened(.fallback(.notInTheList))
+        case "waitingForAnAnswer":
+            return .waitingForAnAnswer
+        case "alreadyOpening":
+            return .alreadyOpening
+        default:
+            return .noWindow
+        }
+    }
+
+    /// Marks the fixture's course kept for reference, as `ReferenceRefusalTests`
+    /// writes one (#610's reference case).
+    private static func keepForReference(_ course: Course) throws {
+        let configURL: URL = course.directoryURL.appendingPathComponent("course_config.json")
+        var configuration: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(contentsOf: configURL)) as? [String: Any]
+        )
+        configuration["kept_for_reference"] = true
+        configuration["reference_school_year"] = 2025
+        configuration["deploy_target"] = "local_folder"
+        configuration["deploy_folder_path"] = ""
+        try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted]).write(to: configURL)
     }
 
     private func runApproval(_ scenario: Scenario, made: AssistFixture.Made) async throws {
@@ -455,7 +524,15 @@ final class AssistScenarioTests: XCTestCase {
         if scenario.expectModelRequests != nil || scriptedReply != nil {
             let started: StubEngine = try StubEngine()
             if let scriptedReply {
-                started.serve(try AssistScenarioTests.engineReply(scriptedBy: scriptedReply))
+                // The scripted reply answers the FIRST request; any lap after
+                // it gets plain text, so a turn that should have ended in code
+                // and handed back instead fails on the count below rather
+                // than looping on the same call for ever (found proving #610's
+                // must-fails: the agent has no lap cap of its own).
+                started.serve([
+                    try AssistScenarioTests.engineReply(scriptedBy: scriptedReply),
+                    #"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#,
+                ])
             } else {
                 started.serve(
                     #"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#
@@ -509,6 +586,16 @@ final class AssistScenarioTests: XCTestCase {
 
         try assertTranscript(of: agent, matches: scenario)
 
+        // What the window was asked to do, when the case says (#610: the
+        // model's open_in_obsidian presses the window's own button).
+        if let expected = scenario.expectEvents {
+            var wanted: [String] = []
+            for name in expected where name != "runLauncherDirectly" {
+                wanted.append(AssistScenarioTests.fakeEventName(for: name))
+            }
+            XCTAssertEqual(FakePreview.shared.events, wanted, "\(scenario.name): the window's events, in order")
+        }
+
         // A reply the engine STOPPED ran nothing, and the runner can see it
         // directly rather than only through the transcript: no launcher run,
         // no window action, no page written. That is what keeps the cut-off
@@ -546,7 +633,9 @@ final class AssistScenarioTests: XCTestCase {
                 // composed reply does not do: "tool(x): Re-dated 1 class.\n\n
                 // Should this be a new website…" contains the sentence, and
                 // does not contain "tool(x): Should this be a new website…".
-                let (speaker, wanted) = try AssistScenarioTests.speakerAndSentence(of: line)
+                let (speaker, wanted) = try AssistScenarioTests.speakerAndSentence(
+                    of: line, page: AssistScenarioTests.obsidianPage(of: scenario)
+                )
                 var found: Int? = nil
                 for index in searchedFrom..<actual.count
                 where actual[index].hasPrefix(speaker) && actual[index].contains(wanted) && found == nil {
@@ -620,28 +709,33 @@ final class AssistScenarioTests: XCTestCase {
 
     /// "wording.deployed" → the real sentence, with the placeholders filled in
     /// for the fixture's course and section.
-    private static func sentence(named reference: String) throws -> String {
+    private static func sentence(named reference: String, page: String? = nil) throws -> String {
         let key: String = reference.replacingOccurrences(of: "wording.", with: "")
         let wording: [String: String] = try XCTUnwrap(
             readContract(named: AssistContract.wordingFileName)["wording"] as? [String: String]
         )
         let template: String = try XCTUnwrap(wording[key], "No sentence called \(key)")
-        return template
+        var filled: String = template
             .replacingOccurrences(of: AssistContract.coursePlaceholder, with: "ICS3U")
             .replacingOccurrences(of: AssistContract.sectionPlaceholder, with: "1")
+        // #610: a page an Open in Obsidian case says was opened.
+        if let page {
+            filled = filled.replacingOccurrences(of: AssistContract.pagePlaceholder, with: page)
+        }
+        return filled
     }
 
     /// "assistant: wording.deployWasCancelled" → "assistant: Deploy cancelled."
     /// A contract transcript line split into who said it and what they said,
     /// with a `wording.` name resolved to the real sentence.
-    private static func speakerAndSentence(of line: String) throws -> (String, String) {
+    private static func speakerAndSentence(of line: String, page: String? = nil) throws -> (String, String) {
         guard let split = line.range(of: ": ") else {
             return ("", line)
         }
         let speaker: String = String(line[line.startIndex..<split.upperBound])
         let rest: String = String(line[split.upperBound...])
         if rest.hasPrefix("wording.") {
-            return (speaker, try sentence(named: rest))
+            return (speaker, try sentence(named: rest, page: page))
         }
         return (speaker, rest)
     }

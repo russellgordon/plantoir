@@ -92,8 +92,10 @@ keyboard has no Ctrl-D), ends the input, and `input()` then raises
 
 Some places cannot stop a program to ask: a site published to a folder
 (a school web space), a page opened in an older browser, and a page that
-ALSO shows a video, a PDF in a frame, a GeoGebra or Desmos applet, or a
-picture from another website. There the student types the answers in an
+ALSO shows a video, a PDF in a frame, a Desmos applet or a geogebra.org
+`<iframe>`, or a picture from another website (a ` ```geogebra ` sketch,
+served by the site itself, does not count). There the student types the
+answers in an
 **input box** under the code before pressing Run, **one line for each
 `input()` call**, in order; past the last line `input()` raises
 `EOFError`. When a page keeps the box because of something it shows, the

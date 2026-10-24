@@ -558,9 +558,9 @@ fi
 # says, and that the Swift image's recipe holds every pin and flag the
 # contract names. Stdlib only; the compiler itself is the Swift gate below.
 if (cd scripts && python3 test_swift_blocks.py) >/tmp/verify_swift_blocks_test.log 2>&1; then
-  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, and the trail's PLANTOIR_SWIFT: line from a real build log (scripts/test_swift_blocks.py, #493, #635)"
+  pass "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, the trail's PLANTOIR_SWIFT: line from a real build log, and what a failed build tells the teacher and leaves in state.json (scripts/test_swift_blocks.py, #493, #635, #642)"
 else
-  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, and the trail's PLANTOIR_SWIFT: line from a real build log (scripts/test_swift_blocks.py, #493, #635)"
+  fail "runnable Swift: the cache key, the toolchain id, the launcher's plan, the build's prepare and its words, the Swift image's pins and flags, the trail's PLANTOIR_SWIFT: line from a real build log, and what a failed build tells the teacher and leaves in state.json (scripts/test_swift_blocks.py, #493, #635, #642)"
   cat /tmp/verify_swift_blocks_test.log
 fi
 
@@ -568,9 +568,9 @@ fi
 # "already there" (#635): its block cut out and run with bash 3.2 against a
 # stand-in docker that runs the real swift_blocks.py got-ready.
 if (cd scripts && python3 test_swift_launcher_marker.py) >/tmp/verify_swift_launcher_marker_test.log 2>&1; then
-  pass "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence (scripts/test_swift_launcher_marker.py, #635)"
+  pass "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence, which for a failure is the one its reason calls for, and the state.json that reason writes (scripts/test_swift_launcher_marker.py, #635, #642)"
 else
-  fail "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence (scripts/test_swift_launcher_marker.py, #635)"
+  fail "preview.sh says how getting Swift ready ended - built, from cached layers, no room, waited, or failed and why - in one PLANTOIR_SWIFT: line after the teacher's sentence, which for a failure is the one its reason calls for, and the state.json that reason writes (scripts/test_swift_launcher_marker.py, #635, #642)"
   cat /tmp/verify_swift_launcher_marker_test.log
 fi
 
@@ -592,6 +592,16 @@ if (cd scripts && python3 test_font_variables.py) >/tmp/verify_font_variables_te
 else
   fail "font variables: each family in a stack quoted on its own, the system-font choice on the system stack, a single family byte for byte as before (scripts/test_font_variables.py, #629)"
   cat /tmp/verify_font_variables_test.log
+fi
+# Nothing the build starts in Node prints a deprecation into the teacher's
+# console (#640): NODE_OPTIONS carries --disable-warning=DEP0040 for Quartz
+# and the figure helper alike. Section 5 reads the real build log for it.
+# Stdlib only.
+if (cd scripts && python3 test_node_warnings.py) >/tmp/verify_node_warnings_test.log 2>&1; then
+  pass "Node's punycode deprecation silenced for Quartz and the figure helper, that one warning only, an existing NODE_OPTIONS kept (scripts/test_node_warnings.py, #640)"
+else
+  fail "Node's punycode deprecation is not silenced for every node the build starts, or more than it is silenced (scripts/test_node_warnings.py, #640)"
+  cat /tmp/verify_node_warnings_test.log
 fi
 if (cd scripts && python3 test_quartz_additions_wiring.py) >/tmp/verify_quartz_wiring_test.log 2>&1; then
   pass "Plantoir's additions are wired into a section's Quartz copy once, in the right places, and a second build changes nothing (scripts/test_quartz_additions_wiring.py, #455)"
@@ -644,11 +654,26 @@ fi
 # shares, the cache, the clock, the restart after a diagram that never
 # finishes, the gate and the words - against a stand-in engine, stdlib only.
 # The real engines are checked in the image below.
+if (cd scripts && python3 test_geogebra_engine.py) >/tmp/verify_geogebra_engine_test.log 2>&1; then
+  pass "GeoGebra's engine: the pinned zip, the web3d codebase kept, the language files left out, six replacements each made exactly once or nothing written, and the Dockerfile's two addresses and one hash (scripts/test_geogebra_engine.py, #578)"
+else
+  fail "GeoGebra's engine: the pinned zip, the six replacements and the Dockerfile layer (scripts/test_geogebra_engine.py, #578)"
+fi
 if (cd scripts && python3 test_figures.py) >/tmp/verify_figures_test.log 2>&1; then
   pass "diagrams and graphs: fences, tidying, the cache and its clock, what a site carries, and the words (scripts/test_figures.py, #485)"
 else
   fail "diagrams and graphs: fences, tidying, the cache and its clock, what a site carries, and the words (scripts/test_figures.py, #485)"
   cat /tmp/verify_figures_test.log
+fi
+# GeoGebra sketches (#578): every geogebraFences case - the fences, the
+# settings and commands, geogebra.org addresses, the file lookup, the keys,
+# the gate - the pass that writes the manifest and the thumbnails, the folder
+# problem, and where the transformer stands. Stdlib only.
+if (cd scripts && python3 test_geogebra.py) >/tmp/verify_geogebra_test.log 2>&1; then
+  pass "GeoGebra sketches: the fences, settings, commands, files (published once), keys, the gate, the manifest, the folder problem and the transformer's place (scripts/test_geogebra.py, #578)"
+else
+  fail "GeoGebra sketches: the fences, settings, commands, files, keys, gate or folder problem (scripts/test_geogebra.py, #578)"
+  cat /tmp/verify_geogebra_test.log
 fi
 
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
@@ -1176,6 +1201,23 @@ else
   cat /tmp/verify_links_checklist_test.log
 fi
 
+# ---- build_site.py: which file each page came from (#518) ----
+# Every obsidianOpensThePreviewedPage.slugCases case through the build's slug
+# rule, and the list a section's copy makes: a section's page over a shared
+# one, a folder's _index, a decomposed name spelled as it is on disk, two
+# files making one address, a hidden page, the front page's single embed,
+# and the list beside public/, never inside it.
+echo ""
+echo "🔎 Checking the list of which file each page came from…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_page_sources.py" /opt/scripts/test_page_sources.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_page_sources.py >/tmp/verify_page_sources_test.log 2>&1; then
+  pass "build_site.py: the list of which file each page came from says what the contract says (scripts/test_page_sources.py, #518)"
+else
+  fail "build_site.py: the list of which file each page came from does not say what the contract says (scripts/test_page_sources.py, #518)"
+  cat /tmp/verify_page_sources_test.log
+fi
+
 # ---- the published-pages record (#379) ----
 # The build's list of the pages it shows (beside public/, never inside it,
 # written only after the site was built), deploy.py's fragment after each
@@ -1236,7 +1278,9 @@ fi
 # pageShapes and ids case is run through it in Node; the transformer is run
 # over a page whose engine the site does and does not carry (siteDisagrees);
 # the build's fence reader reads every pageShapes case too; and every typed
-# codeRunner: line goes through the build's own reader.
+# codeRunner: line goes through the build's own reader. Since #653 the same
+# run puts every textFenceWrapping case through textWrapRule.ts and, as a
+# page, through Quartz's own parser and the transformer's second plugin.
 echo ""
 echo "🔎 Checking the runnable-code rules against what the site and the build run…"
 if docker run --rm \
@@ -1245,9 +1289,9 @@ if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/swift-gate" /opt/swift-gate),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/check_runner_rules_against_the_site.py \
   >/tmp/verify_runner_rules_site.log 2>&1; then
-  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, every codeRunner: line reads as the contract says, and the editor's colours agree with the image's own Shiki case for case, colour for colour and over the example content - $(grep '^codeRunnerColour.ts' /tmp/verify_runner_rules_site.log | sed 's/^codeRunnerColour.ts: //') (scripts/check_runner_rules_against_the_site.py, #455, #585)"
+  pass "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, every codeRunner: line reads as the contract says, and the editor's colours agree with the image's own Shiki case for case, colour for colour and over the example content - $(grep '^codeRunnerColour.ts' /tmp/verify_runner_rules_site.log | sed 's/^codeRunnerColour.ts: //'); and every textFenceWrapping case through the site's own textWrapRule.ts and, as a page, Quartz's own parser and the transformer - $(grep '^textWrapRule.ts' /tmp/verify_runner_rules_site.log | sed 's/^textWrapRule.ts: //') (scripts/check_runner_rules_against_the_site.py, #455, #585, #653)"
 else
-  fail "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, and every codeRunner: line reads as the contract says (scripts/check_runner_rules_against_the_site.py, #455)"
+  fail "every codeRunnerBlocks case holds in the site's own code and Quartz's own parser, the build reads every fence shape alike, every codeRunner: line reads as the contract says, and every textFenceWrapping case holds (scripts/check_runner_rules_against_the_site.py, #455, #653)"
   cat /tmp/verify_runner_rules_site.log
 fi
 
@@ -1323,6 +1367,18 @@ else
   fail "every figureFences case holds in the real engines (scripts/check_figure_rules_against_the_site.py, #485)"
   cat /tmp/verify_figure_rules_site.log
 fi
+# #578: the key every GeoGebra sketch is found by, through the SITE's own
+# Markdown reader in Node (a callout, a list item, tildes, Windows line
+# endings), hashed by the site's figureRules.js.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_geogebra_rules_against_the_site.py" /opt/scripts/check_geogebra_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_geogebra_rules_against_the_site.py \
+  >/tmp/verify_geogebra_rules_site.log 2>&1; then
+  pass "every geogebraFences key and fence case holds through the site's own Markdown reader: the site and the build find each sketch by the same key (scripts/check_geogebra_rules_against_the_site.py, #578)"
+else
+  fail "a geogebraFences key or fence case reads differently through the site's own Markdown reader (scripts/check_geogebra_rules_against_the_site.py, #578)"
+  cat /tmp/verify_geogebra_rules_site.log
+fi
 
 # ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
 # pictureSizes.js (the file the site's transformer imports) reads every
@@ -1371,6 +1427,46 @@ sys.exit(1 if outcome["problems"] or outcome["notes"] or outcome["figures"] == 0
 else
   fail "a diagram or graph in the example courses cannot be drawn, or has no description (#485)"
   cat /tmp/verify_payload_figures.log
+fi
+
+# Every GeoGebra sketch in the example courses is ready to open (#578): its
+# file found beside its page as a teacher's first preview finds it, read as a
+# sketch, with its description - and the payload's tree standing for the
+# course folder. Nothing is fetched: a payload names no geogebra.org sketch
+# (the linter refuses one), so a fetch here is a failure.
+if docker run --rm "$DEV_TEST_IMAGE" python3 -c '
+import sys, tempfile
+from pathlib import Path
+sys.path.insert(0, "/opt/scripts")
+import geogebra, toolchain_paths
+class NoFetching:
+    def __getattr__(self, name):
+        raise RuntimeError("a payload sketch asked geogebra.org for something")
+root = toolchain_paths.SUPPORT_DIR / "example_content"
+counted = {"sketches": 0, "shown": 0, "pages": 0, "problems": 0, "notes": 0}
+for tree in sorted(list(root.glob("*/shared")) + list(root.glob("*/per_section"))):
+    pages = []
+    for page in sorted(tree.rglob("*.md")):
+        text = page.read_text(encoding="utf-8")
+        if "```geogebra" in text or "~~~geogebra" in text:
+            path = page.relative_to(tree).as_posix()
+            pages.append({"place": path[:-3], "path": path, "text": text, "source": text})
+    if not pages:
+        continue
+    work = Path(tempfile.mkdtemp())
+    outcome = geogebra.prepare(pages, work, tree, cache_root=work / "cache", fetcher=NoFetching())
+    counted["pages"] += len(pages)
+    for name in ("sketches", "shown"):
+        counted[name] += outcome[name]
+    counted["problems"] += len(outcome["problems"])
+    counted["notes"] += len(outcome["notes"])
+print(str(counted["shown"]) + " of " + str(counted["sketches"]) + " sketch(es) on " + str(counted["pages"]) + " page(s)")
+sys.exit(1 if counted["problems"] or counted["notes"] or counted["shown"] == 0 or counted["shown"] != counted["sketches"] else 0)
+' >/tmp/verify_payload_geogebra.log 2>&1; then
+  pass "every GeoGebra sketch in the example courses is ready to open, its file found beside its page and with its description ($(tail -1 /tmp/verify_payload_geogebra.log), #578)"
+else
+  fail "a GeoGebra sketch in the example courses cannot be shown - a file not found or not a sketch, or no description (#578)"
+  cat /tmp/verify_payload_geogebra.log
 fi
 
 # ---- The date and title writers, against what the site reads ----
@@ -1670,6 +1766,7 @@ check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
 # Diagrams and graphs (#485 E1): the build's pass, and (in the loop) the
 # helper, its lockfile and the site's transformer, script and styles.
 check_baked scripts/figures.py            /opt/scripts/figures.py
+check_baked scripts/geogebra.py           /opt/scripts/geogebra.py
 # Runnable Swift (#493): plan and prepare; and (in the loop) the Swift image's
 # recipe, which the build hashes for its toolchain id, and the page's thread.
 check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
@@ -1785,6 +1882,84 @@ if [[ -z "$RUNNER_ENGINE_PROBLEMS" ]]; then
 else
   fail "The image's Pyodide or katex does not match contracts/toolchain.json: $RUNNER_ENGINE_PROBLEMS"
 fi
+# GeoGebra's engine (#578), by its pin: exactly `fileCount` files and `bytes`
+# bytes at /opt/vendor/geogebra, the three pinned files matching (hashed AFTER
+# the six replacements), each replacement's text present once and GeoGebra's
+# own text gone, none of the 83 language files, no web/ or webSimple/, and the
+# README naming the licence's attribution. The replacements are read from
+# scripts/geogebra_engine.py itself, so this cannot check a different six from
+# the ones the image made. The Dockerfile half - both addresses, the one
+# SHA-256 - is test_geogebra_engine.py's, run in the unit loop.
+GEOGEBRA_PROBLEMS="$(python3 - "$DEV_TEST_IMAGE" <<'GGPY'
+import json, subprocess, sys
+sys.path.insert(0, "scripts")
+import geogebra_engine
+pin = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "geogebra"][0]
+inside = r"""
+import hashlib, json, os, sys
+root = "/opt/vendor/geogebra"
+pinned, replacements = json.loads(sys.argv[1]), json.loads(sys.argv[2])
+files, total, languages, others = [], 0, 0, []
+for folder, _dirs, names in os.walk(root):
+    for name in names:
+        path = os.path.join(folder, name)
+        relative = os.path.relpath(path, root).replace(os.sep, "/")
+        files.append(relative)
+        total += os.path.getsize(path)
+        if "properties_keys_" in name:
+            languages += 1
+        if relative.startswith(("HTML5/5.0/web/", "HTML5/5.0/webSimple/")) or relative.endswith("GeoGebra.html"):
+            others.append(relative)
+hashes = {}
+for relative in pinned:
+    path = os.path.join(root, relative)
+    hashes[relative] = hashlib.sha256(open(path, "rb").read()).hexdigest() if os.path.isfile(path) else "missing"
+counts = []
+for file, old, new in replacements:
+    path = os.path.join(root, file)
+    text = open(path, encoding="utf-8").read() if os.path.isfile(path) else ""
+    counts.append([text.count(old), text.count(new)])
+readme = open(os.path.join(root, "README.txt"), encoding="utf-8").read() if os.path.isfile(os.path.join(root, "README.txt")) else ""
+print(json.dumps({"files": len(files), "bytes": total, "languages": languages, "others": others,
+                  "hashes": hashes, "counts": counts, "readme": readme}))
+"""
+replacements = [[file, old, new] for file, _purpose, old, new in geogebra_engine.REPLACEMENTS]
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "python3", "-c", inside,
+                      json.dumps(sorted(pin["files"])), json.dumps(replacements)],
+                     capture_output=True, text=True)
+problems = []
+try:
+    seen = json.loads(run.stdout)
+except ValueError:
+    print(f"/opt/vendor/geogebra could not be read: {run.stderr.strip()[-300:]}")
+    sys.exit(0)
+if seen["files"] != pin["fileCount"]:
+    problems.append(f"it holds {seen['files']} files, not the pinned {pin['fileCount']}")
+if seen["bytes"] != pin["bytes"]:
+    problems.append(f"it holds {seen['bytes']} bytes, not the pinned {pin['bytes']}")
+for relative, digest in sorted(pin["files"].items()):
+    if seen["hashes"].get(relative) != digest:
+        problems.append(f"{relative} is {seen['hashes'].get(relative)}, not the pinned {digest}")
+if seen["languages"]:
+    problems.append(f"{seen['languages']} language file(s) were not left out")
+if seen["others"]:
+    problems.append(f"it carries codebases a site does not use: {seen['others'][:3]}")
+if len(geogebra_engine.REPLACEMENTS) != 6:
+    problems.append(f"geogebra_engine.py names {len(geogebra_engine.REPLACEMENTS)} replacements, not six")
+for number, (old_count, new_count) in enumerate(seen["counts"], start=1):
+    if old_count != 0 or new_count != 1:
+        problems.append(f"replacement {number}: GeoGebra's text appears {old_count} time(s) and ours {new_count}")
+for needed in ("Made with GeoGebra", pin["value"], "https://www.geogebra.org", "NON-COMMERCIAL"):
+    if needed not in seen["readme"]:
+        problems.append(f"README.txt does not say {needed!r}")
+print("; ".join(problems))
+GGPY
+)"
+if [[ -z "$GEOGEBRA_PROBLEMS" ]]; then
+  pass "The image carries GeoGebra at /opt/vendor/geogebra, matching its pin: the pinned file count, bytes and hashes, the six replacements each made once, the 83 language files left out, and its README (#578)"
+else
+  fail "The image's GeoGebra does not match contracts/toolchain.json -> geogebra: $GEOGEBRA_PROBLEMS"
+fi
 # The certificate store (#639), by its pin: Debian's ca-certificates at
 # least the floor, neither root it distrusts left anywhere a TLS client here
 # looks - the bundle (curl, and Node with --use-openssl-ca), Python's default
@@ -1849,6 +2024,161 @@ if [[ "$CA_STORE_REPORT" == OK* ]]; then
   pass "The image's certificate store is ${CA_STORE_REPORT#OK } (#639)"
 else
   fail "The image's certificate store does not match contracts/toolchain.json -> caCertificates: ${CA_STORE_REPORT#PROBLEMS }"
+fi
+
+# Node, and the wrangler that runs on it (#640). The image's `node --version`
+# is exactly the contract's pin; wrangler is the pinned version and RUNS on it
+# (`--version` exits 0); its own package.json's engines.node is what the
+# contract records as wrangler -> nodeEngine, which the mac suite checks the
+# node pin satisfies; and Node's OWN built-in store (tls.rootCertificates,
+# which wrangler uses - not Debian's file above) trusts neither of
+# caCertificates' mustNotTrust subjects and still holds more than 100 roots,
+# so an empty store cannot pass.
+NODE_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'NODEPY'
+import json, subprocess, sys
+pins = {p["pin"]: p for p in json.load(open("contracts/toolchain.json"))["pins"]}
+node, wrangler, store = pins["node"], pins["wrangler"], pins["caCertificates"]
+inside = r"""
+const { execFileSync } = require("child_process");
+const { X509Certificate } = require("crypto");
+const names = JSON.parse(process.argv[1]);
+const subjects = [];
+for (const pem of require("tls").rootCertificates) {
+  subjects.push(new X509Certificate(pem).subject);
+}
+let wranglerSays = "";
+try {
+  wranglerSays = execFileSync("wrangler", ["--version"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+} catch (error) {
+  wranglerSays = "FAILED " + String(error.message).slice(0, 200);
+}
+const trusted = [];
+for (const name of names) {
+  for (const subject of subjects) {
+    if (subject.split("\n").includes("CN=" + name)) { trusted.push(name); break; }
+  }
+}
+console.log(JSON.stringify({
+  node: process.version,
+  npm: execFileSync("npm", ["--version"], { encoding: "utf8" }).trim(),
+  wrangler: wranglerSays.trim(),
+  engines: require("/usr/lib/node_modules/wrangler/package.json").engines.node,
+  count: subjects.length,
+  trusted: trusted,
+}));
+"""
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "node", "-e", inside, json.dumps(store["mustNotTrust"])],
+                     capture_output=True, text=True)
+try:
+    found = json.loads(run.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    print("PROBLEMS Node could not be asked: " + (run.stderr.strip()[-300:] or "no output"))
+    sys.exit(0)
+problems = []
+if found["node"] != "v" + node["value"]:
+    problems.append(f"node is {found['node']}, not v{node['value']}")
+if found["wrangler"].startswith("FAILED") or wrangler["value"] not in found["wrangler"]:
+    problems.append(f"wrangler {wrangler['value']} does not run on it: {found['wrangler'][:200]}")
+if found["engines"] != wrangler["nodeEngine"]:
+    problems.append(f"wrangler's engines say {found['engines']}, the contract's nodeEngine {wrangler['nodeEngine']}")
+if found["trusted"]:
+    problems.append("Node's own store trusts " + " and ".join(found["trusted"]))
+if found["count"] <= 100:
+    problems.append(f"Node's own store holds {found['count']} roots, not more than 100")
+if problems:
+    print("PROBLEMS " + "; ".join(problems))
+else:
+    print(f"OK Node {found['node']} (npm {found['npm']}), wrangler {wrangler['value']} runs on it with engines "
+          f"{found['engines']}, and Node's own store holds {found['count']} roots and trusts neither "
+          + " nor ".join(store["mustNotTrust"]))
+NODEPY
+)"
+if [[ "$NODE_REPORT" == OK* ]]; then
+  pass "The image runs ${NODE_REPORT#OK } (#640)"
+else
+  fail "The image's Node does not match contracts/toolchain.json -> node and wrangler: ${NODE_REPORT#PROBLEMS }"
+fi
+
+# Known vulnerabilities in the image's npm packages (#667). Every JavaScript
+# tree the image carries is audited INSIDE the image, with the image's own npm,
+# and compared by scripts/npm_audit.py against contracts/toolchain.json ->
+# npmAudit: a high or critical advisory that is not accepted for its tree, or
+# that is accepted at a lower severity than it has now, FAILS. quartz and
+# tikz-engine have lockfiles; wrangler is a global install with none, so one is
+# built next to a copy of the installed tree (no network needed); pagedjs and
+# function-plot are prebuilt files, so a lockfile is built from their pins.
+# Only npm's STDOUT is read - offline npm prints its JSON there, an `npm error`
+# line on stderr, and exits 1 either way. The registry not answering is a SKIP
+# that says no tree counts as audited until every tree can be, never a pass; output that is not JSON, or a
+# tree whose lockfile is gone, is a FAIL. The record of each run is
+# research/npm-audit/<date>.md; RELEASING.md step 2 revisits it at every cut.
+NPM_AUDIT_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'NPMAUDITPY'
+import json, re, shutil, subprocess, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+sys.path.insert(0, "scripts")
+import npm_audit
+toolchain = json.load(open("contracts/toolchain.json"))
+pins = {p["pin"]: p for p in toolchain["pins"]}
+contract = toolchain["npmAudit"]
+inside = r"""
+audit_here() { npm audit --package-lock-only --json 2>/dev/null; echo; }
+synthesise() {
+  printf '{"name":"plantoir-audit","private":true,"dependencies":{"%s":"%s"}}' "$2" "$3" > "$1/package.json"
+  (cd "$1" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund >/dev/null 2>"$1/lock.err")
+}
+step_failed() {
+  printf '{"plantoir":"lockfile-step-failed","message":"%s"}\n' "$(grep -m1 -i 'error' "$1/lock.err" | tr -d '"\\' | cut -c1-200)"
+}
+for tree in quartz:/opt/quartz tikz-engine:/opt/vendor/tikz-engine; do
+  echo "=====TREE ${tree%%:*}"
+  if [ -f "${tree#*:}/package-lock.json" ]; then (cd "${tree#*:}" && audit_here); else echo '{"plantoir":"no-lockfile"}'; fi
+done
+echo "=====TREE wrangler"
+if [ -f /usr/lib/node_modules/wrangler/package.json ]; then
+  mkdir -p /tmp/a/w/node_modules && cp -a /usr/lib/node_modules/wrangler /tmp/a/w/node_modules/
+  if synthesise /tmp/a/w wrangler "$1"; then (cd /tmp/a/w && audit_here); else step_failed /tmp/a/w; fi
+else echo '{"plantoir":"no-lockfile"}'; fi
+echo "=====TREE pagedjs"
+mkdir -p /tmp/a/p
+if synthesise /tmp/a/p pagedjs "$2"; then (cd /tmp/a/p && audit_here); else step_failed /tmp/a/p; fi
+echo "=====TREE function-plot"
+mkdir -p /tmp/a/f
+if synthesise /tmp/a/f function-plot "$3"; then (cd /tmp/a/f && audit_here); else step_failed /tmp/a/f; fi
+"""
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "sh", "-c", inside, "sh",
+                      pins["wrangler"]["value"], pins["pagedjs"]["value"], pins["functionPlot"]["value"]],
+                     capture_output=True, text=True)
+out = Path("/tmp/verify_npm_audit")
+shutil.rmtree(out, ignore_errors=True)
+out.mkdir(parents=True)
+audits = {}
+sections = re.split(r"^=====TREE (\S+)\n", run.stdout, flags=re.M)
+for index in range(1, len(sections), 2):
+    (out / (sections[index] + ".json")).write_text(sections[index + 1])
+    audits[sections[index]] = npm_audit.read_audit(out / (sections[index] + ".json"))
+report = npm_audit.compare(audits, contract)
+code = npm_audit.exit_code(report)
+problems = []
+for line in npm_audit.describe(report):
+    if line.startswith(("BLOCKING", "FAILED")):
+        problems.append(line)
+if code == 1:
+    print("PROBLEMS " + "; ".join(problems or ["no tree was audited (docker exited " + str(run.returncode) + ")"]))
+elif code == 2:
+    print("SKIPPED " + report["unreachable_trees"][0][1][:200])
+else:
+    print(f"OK {report['advisories_seen']} advisories across {len(report['audited_trees'])} trees, "
+          f"{len(report['accepted_seen'])} accepted, {len(report['reported'])} low or moderate reported, "
+          f"{len(report['stale'])} stale")
+NPMAUDITPY
+)"
+if [[ "$NPM_AUDIT_REPORT" == OK* ]]; then
+  pass "The image's npm packages have no high or critical advisory that contracts/toolchain.json does not accept (#667): ${NPM_AUDIT_REPORT#OK }"
+elif [[ "$NPM_AUDIT_REPORT" == SKIPPED* ]]; then
+  skip "The image's npm packages were not checked for known vulnerabilities (#667): the advisory database could not be reached (${NPM_AUDIT_REPORT#SKIPPED }) - no tree counts as audited until every tree can be"
+else
+  fail "The image's npm packages have a new or raised high or critical advisory (#667): ${NPM_AUDIT_REPORT#PROBLEMS }. Decide it in contracts/toolchain.json -> npmAudit and research/npm-audit/"
 fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
@@ -2082,6 +2412,11 @@ restore_hit_fixture() {
         "$HIT_COURSE/Printable Too Tall.md" \
         "$HIT_COURSE/Figures Fixture.md" "$HIT_COURSE/Figures Hidden.md" \
         "$HIT_COURSE/Figures Math Heading.md" "$HIT_COURSE/Figures Exports Heading.md" \
+        "$HIT_COURSE/Investigations/GeoGebra Fixture.md" "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
+        "$HIT_COURSE/Investigations/GeoGebra Missing.md" "$HIT_COURSE/Investigations/GeoGebra Hidden.md" \
+        "$HIT_COURSE/Discussions/GeoGebra Second.md" "$HIT_COURSE/Discussions/GeoGebra Same Fence.md" \
+        "$HIT_COURSE/Discussions/GeoGebra Fixture Lines.ggb" "$HIT_COURSE/Investigations/Quiz GeoGebra.md" \
+        ${GEOGEBRA_SEED_KEY:+"$GEOGEBRA_CACHE_DIR/$GEOGEBRA_SEED_KEY.ggb" "$GEOGEBRA_CACHE_DIR/$GEOGEBRA_SEED_KEY.json"} \
         "$HIT_COURSE/Runner Fixture.md" "$HIT_COURSE/Runner Not Opted.md" "$HIT_COURSE/Runner Plain Twin.md" \
         "$HIT_COURSE/Runner Playground.md" "$HIT_COURSE/Runner Hidden.md" "$HIT_COURSE/Runner Autorun.md" \
         "$HIT_COURSE/Anchor Fixture.md" "$HIT_COURSE/Picture Fixture.md" \
@@ -2094,10 +2429,11 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
         "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
-        "$HIT_COURSE/Quiz One Blank.md" \
+        "$HIT_COURSE/Quiz One Blank.md" "$HIT_COURSE/Quiz Read Differently.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
         "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Progress Fixture.md" \
+        "$HIT_COURSE/Wrap Fixture.md" "$HIT_COURSE/Wrap Plain Twin.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -2826,6 +3162,167 @@ y = ln(x)
 FIGURESFIXTURE
 printf -- '---\ntitle: Figures Hidden\npublish: false\n---\nA hidden graph (plantoir-figures-hidden-7f3a).\n\n```functionplot\ny = x^2\n```\n' \
   > "$HIT_COURSE/Figures Hidden.md"
+# #578: GeoGebra sketches. The planted sketch is made here, not committed (the
+# repository ships recipes, not binaries): a small construction GeoGebra
+# opens - two points, the segment between them and its slope - with a
+# thumbnail. In shared folders, because a file beside a page reaches the site
+# only from a folder the course shares (a page listed by name brings no file
+# with it). Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" "$HIT_COURSE/Discussions/GeoGebra Fixture Lines.ggb" <<'GGBPY'
+import struct, sys, zipfile, zlib
+def png(width, height):
+    rows = b"".join(b"\x00" + b"\xff\xff\xff" * width for _ in range(height))
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+xml = """<?xml version="1.0" encoding="utf-8"?>
+<geogebra format="5.0" version="5.4.933.1" app="classic" platform="w" id="plantoir-verify-578">
+<gui><font size="16"/></gui>
+<euclidianView>
+	<size  width="640" height="360"/>
+	<coordSystem xZero="320" yZero="180" scale="40" yscale="40"/>
+	<evSettings axes="true" grid="true" gridIsBold="false" pointCapturing="3" rightAngleStyle="1" checkboxSize="26" gridType="3"/>
+</euclidianView>
+<kernel><continuous val="false"/><decimals val="2"/><angleUnit val="degree"/><coordStyle val="0"/></kernel>
+<construction title="plantoir-verify-geogebra-sketch" author="" date="">
+<element type="point" label="A"><show object="true" label="true"/><coords x="-3" y="-1" z="1"/></element>
+<element type="point" label="B"><show object="true" label="true"/><coords x="3" y="2" z="1"/></element>
+<command name="Segment"><input a0="A" a1="B"/><output a0="f"/></command>
+<element type="segment" label="f"><show object="true" label="false"/></element>
+<expression label="m" exp="(y(B) - y(A)) / (x(B) - x(A))"/>
+<element type="numeric" label="m"><show object="true" label="true"/></element>
+</construction>
+</geogebra>
+"""
+with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as sketch:
+    sketch.writestr("geogebra.xml", xml)
+    sketch.writestr("geogebra_thumbnail.png", png(64, 36))
+# A DIFFERENT sketch with the same name in another folder, for the page whose
+# fence is word for word the first fixture's (stage 2 review item 1): each
+# page must show the file beside it. The same thumbnail, so the site still
+# carries one picture.
+with zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED) as sketch:
+    sketch.writestr("geogebra.xml", xml.replace("plantoir-verify-578", "plantoir-verify-578-discussions"))
+    sketch.writestr("geogebra_thumbnail.png", png(64, 36))
+GGBPY
+cat > "$HIT_COURSE/Investigations/GeoGebra Fixture.md" <<'GEOGEBRAFIXTURE'
+---
+title: GeoGebra Fixture
+---
+GeoGebra sketches planted by verify.sh (plantoir-geogebra-sentinel-5e1c).
+
+```geogebra
+file: GeoGebra Fixture Lines.ggb
+alt: Two points and the segment between them, with its slope (plantoir-alt-lines).
+caption: Drag A or B.
+```
+
+A sketch from commands:
+
+```geogebra
+alt: A parabola and a line (plantoir-alt-commands).
+f(x) = x^2
+g(x) = 2x + 1
+a = 2
+PLANTOIR-COMMANDS-FROM-THE-CONTRACT
+```
+
+> [!example]- In tildes, in a folded callout
+> ~~~geogebra
+> alt: A line in a callout (plantoir-alt-tilde).
+> h(x) = -x + 3
+> ~~~
+
+> [!note] A callout
+> > [!example] In a callout in a callout
+> > ```geogebra
+> > file: GeoGebra Fixture Lines.ggb
+> > alt: The same file again, in a callout in a callout (plantoir-alt-nested).
+> > ```
+GEOGEBRAFIXTURE
+# Stage 3: every geogebraFences.commands case, in order, after the lines
+# they need (f, a; A comes from a case) - the browser check opens this
+# sketch and reads which lines GeoGebra refused, in its own words.
+python3 - "$HIT_COURSE/Investigations/GeoGebra Fixture.md" <<'GGBCOMMANDS'
+import json, sys
+cases = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["geogebraFences"]["commands"]["cases"]
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+text = text.replace("PLANTOIR-COMMANDS-FROM-THE-CONTRACT\n", "".join(case["text"] + "\n" for case in cases))
+open(path, "w", encoding="utf-8").write(text)
+GGBCOMMANDS
+printf -- '---\ntitle: GeoGebra Second\n---\nThe same sketch, from another folder (plantoir-geogebra-second).\n\n```geogebra\nfile: Investigations/GeoGebra Fixture Lines.ggb\nalt: The planted sketch again (plantoir-alt-second).\n```\n\nA sketch from geogebra.org, kept from before:\n\n```geogebra\nmaterial_id: https://www.geogebra.org/m/plantoirvrfy578\nalt: A sketch from geogebra.org (plantoir-alt-material).\n```\n' \
+  > "$HIT_COURSE/Discussions/GeoGebra Second.md"
+# Stage 4: that geogebra.org sketch's SAVED COPY, beside the course's built
+# sites under the fence's key, as an earlier build would have left it - so
+# this build must ask geogebra.org nothing (geogebraFences.cache). The id is
+# one geogebra.org does not have: a build that asked anyway would be told
+# materialNotFound, and the checks below would fail rather than pass on a
+# real download. A different construction from the planted file, so the
+# site's copy is told apart from it by its SHA-256.
+# Written to the builds root by its own name (6a's rule), not through the
+# .merged_output link, which a fresh clone does not have yet.
+GEOGEBRA_CACHE_DIR="${HOME%/}/Library/Application Support/Plantoir/builds/$(/bin/pwd -P | shasum -a 256 | cut -c1-8)/EXC2O/.geogebra-cache"
+GEOGEBRA_SEED_KEY="$(python3 - "$HIT_COURSE/Discussions/GeoGebra Second.md" "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
+  "$GEOGEBRA_CACHE_DIR" <<'GGBSEED'
+import io, json, sys, zipfile
+from pathlib import Path
+sys.path.insert(0, "scripts")
+import geogebra
+page, planted, cache = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+sketches = geogebra.sketches_on_page(page.read_text(encoding="utf-8"))
+key = [sketch["key"] for sketch in sketches if "material_id:" in sketch["body"]][0]
+buffer = io.BytesIO()
+with zipfile.ZipFile(planted) as source, zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as copy:
+    copy.writestr("geogebra.xml", source.read("geogebra.xml").decode("utf-8").replace("plantoir-verify-578", "plantoir-verify-578-material"))
+    copy.writestr("geogebra_thumbnail.png", source.read("geogebra_thumbnail.png"))
+geogebra.SavedCopies(cache).put(key, {"id": "plantoirvrfy578", "title": "Verify Sketch", "author": "Verify Author (plantoir-author-578)", "ggb": buffer.getvalue()})
+print(key)
+GGBSEED
+)"
+
+printf -- '---\ntitle: GeoGebra Same Fence\n---\nThe first fixture fence word for word, with a different file of the same name beside it (plantoir-geogebra-same-fence).\n\n```geogebra\nfile: GeoGebra Fixture Lines.ggb\nalt: Two points and the segment between them, with its slope (plantoir-alt-lines).\ncaption: Drag A or B.\n```\n' \
+  > "$HIT_COURSE/Discussions/GeoGebra Same Fence.md"
+printf -- '---\ntitle: GeoGebra Missing\n---\nA sketch whose file is not there.\n\n```geogebra\nalt: Misspelled.\nfile: GeoGebra Fixture Lnies.ggb\n```\n' \
+  > "$HIT_COURSE/Investigations/GeoGebra Missing.md"
+printf -- '---\ntitle: GeoGebra Hidden\npublish: false\n---\nA hidden sketch (plantoir-geogebra-hidden-5e1c).\n\n```geogebra\nf(x) = x^3\n```\n' \
+  > "$HIT_COURSE/Investigations/GeoGebra Hidden.md"
+# Stage 5 (geogebraFences.quizzes): a sketch in the QUESTION of a shuffled
+# self-check question and one in another's EXPLANATION, for the browser
+# check (nothing fetched until the explanation is shown and tapped; the
+# question's sketch the same working applet after a print) and for 6i-g
+# (the page's search text reads each sketch as its description alone).
+# Both questions work, so 6k's count of the folder's quiz problems is
+# unchanged; a sketch in a CHOICE is a recognise case on Quiz Fixture.
+cat > "$HIT_COURSE/Investigations/Quiz GeoGebra.md" <<'GEOGEBRAQUIZ'
+---
+title: Quiz GeoGebra
+---
+Questions with sketches (plantoir-quiz-geogebra-578).
+
+> [!quiz|shuffle] Drag A. Which is the slope of the segment?
+> ```geogebra
+> file: GeoGebra Fixture Lines.ggb
+> alt: Two points and a segment, in a question (plantoir-alt-quiz-stem).
+> ```
+> - [x] one half
+> - [ ] two
+> - [ ] minus one
+
+> [!quiz] Which line has a negative slope?
+> - [ ] y = 2x
+> - [x] y = -x + 3
+>
+> > [!explain]- Why
+> > Its slope is -1 (plantoir-quiz-explain-578).
+> > ```geogebra
+> > alt: The line y = -x + 3, in an explanation (plantoir-alt-quiz-explain).
+> > -x + y = 3
+> > L = {1, 2}
+> > zz = 5
+> > ```
+GEOGEBRAQUIZ
 # #502: a heading "Math" is id="math", which answered window.math, and a
 # heading "Exports" is id="exports", which answered window.exports - the two
 # names function-plot reads as its file runs (figureFences.pageIds). Drawn in
@@ -2992,7 +3489,12 @@ printf -- '---\ntitle: Z1.1\n---\nA specific expectation planted by verify.sh un
 # see (reported nowhere); Quiz Source and Quiz Host: a quiz transcluded onto
 # a page with its own (review S5); Quiz Playground: every kind for the
 # browser check, with graphs, code to run and an image in choices and
-# explanations. Removed by restore_hit_fixture.
+# explanations; Quiz Read Differently (#644): a quiz the folder check reads
+# as fine and the site as not ready - a quoted `>` in an <img> straight
+# after the title, quizCallouts.knownLimits - which the site's safety net
+# says on its plantoir: error: line and as a quizzesReadDifferently folder
+# problem (named without "Quiz Fixture", which 6k counts lines for).
+# Removed by restore_hit_fixture.
 python3 - "$HIT_COURSE" <<'QUIZPLANTS'
 import json, struct, sys, zlib
 from pathlib import Path
@@ -3037,6 +3539,10 @@ crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]
 (course / "Quiz One Blank.md").write_text(
     "---\ntitle: Quiz One Blank\n---\nOne blank (plantoir-quiz-one-blank-7f3a).\n\n"
     "> [!quiz] The capital of France is `____`.\n> > [!answer]-\n> > Paris\n", encoding="utf-8")
+(course / "Quiz Read Differently.md").write_text(
+    "---\ntitle: Quiz Read Differently\n---\nRead differently by the site (plantoir-quiz-read-differently-644).\n\n"
+    "> [!quiz] Which is the right choice?\n> <img alt=\"x>y\" src=\"Media/plantoir-quiz-choice.png\">\n"
+    "> - [ ] wrong\n> - [x] right\n", encoding="utf-8")
 (course / "Quiz Hidden.md").write_text(
     "---\ntitle: Quiz Hidden\npublish: false\n---\nHidden (plantoir-quiz-hidden-7f3a).\n\n> [!quiz] Broken.\n> - [ ] a\n> - [ ] b\n",
     encoding="utf-8")
@@ -3118,6 +3624,52 @@ for twin in ("A", "B"):
     "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
     encoding="utf-8")
 TASKPLANTS
+# ---- #653: text blocks that wrap, planted for the same build ----
+# Wrap Fixture: a ```text wrap {2,101} block of 120 lines (a three-digit
+# gutter; long lines 2 and 100; line 101 one unbreakable run, a URL; line 102
+# led by four spaces and 103 by a tab; 2 and 101 highlighted), a ```text and a
+# ```python wrap block that must still scroll, and a flagged block in a folded
+# callout, in a list item and in a self-check quiz's explanation (plan review
+# finding 6). No codeRunner: a page with one would move 6j's count of pages
+# carrying Python. Wrap Plain Twin: the first three blocks with `wrap` taken
+# out of each info string, so 6o can compare them byte for byte.
+# Removed by restore_hit_fixture.
+python3 - "$HIT_COURSE" <<'WRAPPLANTS'
+import sys
+from pathlib import Path
+course = Path(sys.argv[1])
+F = "```"
+sentence = ("This long line of plain text is the kind a teacher pastes, an error message or a paragraph of sample "
+            "output, and it keeps going well past the width of any window so that it has to wrap several times over.")
+assert len(sentence) > 200
+lines = []
+for number in range(1, 121):
+    text = f"line {number}"
+    if number in (2, 100):
+        text = sentence
+    if number == 101:
+        text = "https://example.com/" + "a" * 400
+    if number == 102:
+        text = "    " + sentence
+    if number == 103:
+        text = "\t" + sentence
+    lines.append(text)
+long_block = "\n".join(lines)
+def blocks(flag):
+    return (F + "text" + flag + " {2,101}\n" + long_block + "\n" + F + "\n\n"
+            + "Plain text that scrolls:\n\n" + F + "text\n" + sentence + "\nshort\n" + F + "\n\n"
+            + "Code that scrolls:\n\n" + F + "python" + flag + "\nprint(\"" + sentence + "\")\n" + F + "\n")
+(course / "Wrap Fixture.md").write_text(
+    "---\ntitle: Wrap Fixture\n---\nText blocks that wrap (plantoir-text-wrap-653).\n\n" + blocks(" wrap") + "\n"
+    "> [!note]- Folded\n> " + F + "text wrap\n> " + sentence + "\n> " + F + "\n\n"
+    "- A step in a list:\n\n  " + F + "text wrap\n  " + sentence + "\n  " + F + "\n\n"
+    "> [!quiz] Which line wraps?\n> - [x] The long one\n> - [ ] The short one\n>\n"
+    "> > [!explain]- Why\n> > " + F + "text wrap\n> > " + sentence + "\n> > " + F + "\n",
+    encoding="utf-8")
+(course / "Wrap Plain Twin.md").write_text(
+    "---\ntitle: Wrap Plain Twin\n---\nThe same blocks without the word (plantoir-text-wrap-twin-653).\n\n" + blocks(""),
+    encoding="utf-8")
+WRAPPLANTS
 # ---- #596: every example in the page-authoring skill, planted for the same build ----
 # The skill's examples are read from the skill ITSELF, so an example edited
 # there is the example built here: every ```markdown / ````markdown fence and
@@ -3192,6 +3744,20 @@ if not (course / "Media" / "Unit 2 Review.pdf").exists():
     plant("Media/Unit 2 Review.pdf",
           b"%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj "
           b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
+# #578: the skill's GeoGebra example names "Slope Angle Conjecture.ggb",
+# found in Media by its name. A copy of the planted fixture sketch with its
+# own id, so the fixture's file is still in the site once (6i-g).
+if not (course / "Media" / "Slope Angle Conjecture.ggb").exists():
+    import io, zipfile
+    fixture = course / "Investigations" / "GeoGebra Fixture Lines.ggb"
+    made = io.BytesIO()
+    with zipfile.ZipFile(fixture) as source, zipfile.ZipFile(made, "w", zipfile.ZIP_DEFLATED) as sketch:
+        for name in source.namelist():
+            data = source.read(name)
+            if name == "geogebra.xml":
+                data = data.replace(b"plantoir-verify-578", b"plantoir-verify-578-authoring")
+            sketch.writestr(name, data)
+    plant("Media/Slope Angle Conjecture.ggb", made.getvalue())
 record.write_text("\n".join(planted) + "\n", encoding="utf-8")
 print(f"   planted {len(examples)} examples from the page-authoring skill")
 AUTHORPLANTS
@@ -3247,6 +3813,18 @@ if script -q /tmp/verify_main_build.log ./preview.sh EXC2O 1 --image "$DEV_TEST_
 else
   fail "preview.sh exited non-zero"
 fi
+# Nothing Node printed reached the console (#640). On Node 22 every Quartz
+# build printed "(node:N) [DEP0040] DeprecationWarning: The `punycode` module
+# is deprecated" until build_site.py's node_environment silenced it -
+# machinery in the teacher's console (CLAUDE.md rule 1). The match is Node's
+# own "[DEP" code prefix rather than the word "DeprecationWarning", which the
+# course's own pages or a future message could legitimately carry, and which
+# says nothing about which deprecation it was.
+if grep -q '\[DEP[0-9]' /tmp/verify_main_build.log; then
+  fail "The build printed a Node deprecation into the console: $(grep -o '\[DEP[0-9]*\][^(]*' /tmp/verify_main_build.log | sort -u | head -3 | tr '\n' ' ')(#640)"
+else
+  pass "The build printed no Node deprecation into the console (#640)"
+fi
 
 # -------------------- 6. Post-flight checks --------------------
 SITE_PUBLIC="courses/EXC2O/.merged_output/section1/public"
@@ -3269,6 +3847,18 @@ if [[ -L "courses/EXC2O/.merged_output" && "$LINK_TARGET" == "$EXPECTED_BUILD_RO
   pass "The built site is kept outside the working folder ($LINK_TARGET)"
 else
   fail "courses/EXC2O/.merged_output is not a link to $EXPECTED_BUILD_ROOT/EXC2O (it is: ${LINK_TARGET:-a real folder})"
+fi
+
+# -------------------- 6a2. Which file each page came from (#518) ------
+# The build's .page-sources.json, beside public/, read against what Quartz
+# actually wrote: every address a page students see is listed under must be a
+# page of this site, and every file named must be in the course folder. This
+# measures the build's slug rule against Quartz itself.
+if python3 scripts/test_page_sources.py --site "courses/EXC2O/.merged_output/section1" "courses/EXC2O" >/tmp/verify_page_sources_site.log 2>&1; then
+  pass "The build's list of which file each page came from matches the pages Quartz wrote ($(tail -1 /tmp/verify_page_sources_site.log), #518)"
+else
+  fail "The build's list of which file each page came from does not match the site (#518)"
+  cat /tmp/verify_page_sources_site.log
 fi
 
 # -------------------- 6b. The site wears Plantoir's icon, not Quartz's --------------------
@@ -3624,6 +4214,134 @@ then
   pass "diagrams and graphs: every fence drawn as an SVG in the page or reported by page and line, the faces and function-plot carried by the site itself, descriptions free of lettering, a hidden graph nowhere (#485)"
 else
   fail "diagrams and graphs: one of the checks above failed (#485)"
+fi
+
+# ---- 6i-g. GeoGebra sketches (#578), as the build left them ----
+# The planted GeoGebra Fixture: every geogebra fence (the file beside the
+# page, commands alone, tildes in a folded callout, a callout in a callout) is
+# a card with its button, its size, its attribution and its description; the
+# sketch's file is in the site exactly ONCE (Quartz publishes it; nothing
+# copies it - geogebraFences.files), at the address the card names; the
+# site carries the pinned, adapted engine and the thumbnail; the page's
+# description is its words, not the commands; the misspelled file stays a
+# code block and is reported by page and line; a hidden page's sketch is
+# nowhere.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
+     "$GEOGEBRA_CACHE_DIR" "$GEOGEBRA_SEED_KEY" <<'GGBCHECK'
+import hashlib, html, json, re, sys
+from pathlib import Path
+public, log, sketch = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+cache, seed_key = Path(sys.argv[4]), sys.argv[5]
+problems = []
+page_path = public / "Investigations" / "GeoGebra-Fixture.html"
+page = page_path.read_text(encoding="utf-8") if page_path.is_file() else ""
+if not page:
+    problems.append("Investigations/GeoGebra-Fixture.html was not built")
+figures = re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"[^>]*>(.*?)</figure>', page, re.S)
+if len(figures) != 4:
+    problems.append(f"{len(figures)} sketches on the page, not the 4 fences planted")
+specs = [json.loads(html.unescape(spec)) for spec, _ in figures]
+for alt in ("plantoir-alt-lines", "plantoir-alt-commands", "plantoir-alt-tilde", "plantoir-alt-nested"):
+    if not any(alt in body and 'class="pl-sr-only"' in body for _, body in figures):
+        problems.append(f"no sketch carries its description {alt} for a screen reader")
+for _, body in figures:
+    if "Open the sketch (about " not in body or '<a href="https://www.geogebra.org">Made with GeoGebra®</a>' not in body \
+            or "Made with GeoGebra · geogebra.org" not in body:
+        problems.append("a sketch lacks its button with its size, or its attribution on screen and in print form")
+        break
+digest = hashlib.sha256(sketch.read_bytes()).hexdigest() if sketch.is_file() else None
+copies = [path.relative_to(public).as_posix() for path in public.rglob("*") if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == digest]
+if copies != ["Investigations/GeoGebra-Fixture-Lines.ggb"]:
+    problems.append(f"the sketch's file is in the site as {copies}, not once at Investigations/GeoGebra-Fixture-Lines.ggb")
+same_path = public / "Discussions" / "GeoGebra-Same-Fence.html"
+same = same_path.read_text(encoding="utf-8") if same_path.is_file() else ""
+same_specs = [json.loads(html.unescape(spec)) for spec in re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"', same)]
+if [spec.get("sketch") for spec in same_specs] != ["Discussions/GeoGebra-Fixture-Lines.ggb"]:
+    problems.append(f"the page whose fence is the first fixture's word for word names {[spec.get('sketch') for spec in same_specs]}, not the file beside it (stage 2 review item 1)")
+named = sorted({spec["sketch"] for spec in specs if spec.get("sketch")})
+if named != ["Investigations/GeoGebra-Fixture-Lines.ggb"]:
+    problems.append(f"the cards name {named}, not the one published file")
+command_cases = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["geogebraFences"]["commands"]["cases"]
+wanted_commands = [{"line": 2, "text": "f(x) = x^2"}, {"line": 3, "text": "g(x) = 2x + 1"}, {"line": 4, "text": "a = 2"}]
+for number, case in enumerate(command_cases, start=5):
+    wanted_commands.append({"line": number, "text": case["text"]})
+if [spec["commands"] for spec in specs][1:3] != [wanted_commands, [{"line": 2, "text": "h(x) = -x + 3"}]]:
+    problems.append("the commands did not reach the cards as written, with their lines")
+pins = {pin["pin"]: pin for pin in json.load(open("contracts/toolchain.json"))["pins"]}
+engine = public / "static" / "geogebra"
+carried = [path for path in engine.rglob("*") if path.is_file()] if engine.is_dir() else []
+if len(carried) != pins["geogebra"]["fileCount"]:
+    problems.append(f"static/geogebra holds {len(carried)} files, not the pin's {pins['geogebra']['fileCount']}")
+for relative, wanted in pins["geogebra"]["files"].items():
+    path = engine / relative
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != wanted:
+        problems.append(f"static/geogebra/{relative} is not the pinned, adapted file")
+thumbnails = list((public / "static" / "geogebra-sketches").glob("*.png"))
+if len(thumbnails) != 1:
+    problems.append(f"{len(thumbnails)} thumbnails in static/geogebra-sketches, not 1 (one file, named by three fences on two pages)")
+description = re.search(r'<meta name="description" content="([^"]*)"', page)
+if not description or "f(x)" in description.group(1) or "plantoir-geogebra-sentinel-5e1c" not in description.group(1):
+    problems.append(f"the page's description is not its words: {description and description.group(1)!r}")
+missing = (public / "Investigations" / "GeoGebra-Missing.html").read_text(encoding="utf-8") if (public / "Investigations" / "GeoGebra-Missing.html").is_file() else ""
+if "pl-geogebra" in missing or "GeoGebra Fixture Lnies.ggb" not in missing:
+    problems.append("the sketch whose file is missing is not left as the code block it was")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+if "plantoir: error: Investigations/GeoGebra Missing.md: geogebra block 1, line 8: GeoGebra Fixture Lnies.ggb isn't beside the page" not in said:
+    problems.append("no plantoir: error line names Investigations/GeoGebra Missing.md, block 1, line 8")
+if not re.search(r'PLANTOIR_HEALTH: \{"name": "geogebraSketchesNotReady"[^\n]*GeoGebra Missing[^\n]*sketch 1, line 8', said):
+    problems.append("the build did not report the missing sketch as a folder problem naming page and line")
+# Stage 4: the geogebra.org sketch came from its saved copy - nothing asked
+# of geogebra.org - and its card names its author and its licence, linked on
+# screen and as text for paper, from the site's own copy in static/.
+second_path = public / "Discussions" / "GeoGebra-Second.html"
+second = second_path.read_text(encoding="utf-8") if second_path.is_file() else ""
+second_figures = re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"[^>]*>(.*?)</figure>', second, re.S)
+material = [(json.loads(html.unescape(spec)), body) for spec, body in second_figures if "plantoir-alt-material" in body]
+store = f"static/geogebra-sketches/{seed_key[:16]}.ggb"
+if not seed_key or len(material) != 1:
+    problems.append(f"the geogebra.org sketch is not a card on Discussions/GeoGebra-Second.html ({len(material)} found)")
+else:
+    spec, body = material[0]
+    if spec.get("sketch") != store:
+        problems.append(f"the geogebra.org sketch's card names {spec.get('sketch')}, not {store}")
+    for needed in ('<a href="https://www.geogebra.org/m/plantoirvrfy578">by Verify Author (plantoir-author-578)</a>',
+                   'href="https://creativecommons.org/licenses/by-nc-sa/4.0/"', ">CC BY-NC-SA 4.0</a>",
+                   "Made with GeoGebra · by Verify Author (plantoir-author-578) · CC BY-NC-SA 4.0",
+                   "https://www.geogebra.org/m/plantoirvrfy578  https://creativecommons.org/licenses/by-nc-sa/4.0/"):
+        if needed not in body:
+            problems.append(f"the geogebra.org sketch's attribution lacks {needed!r}")
+    saved = cache / f"{seed_key}.ggb"
+    copy = public / store
+    if not copy.is_file() or not saved.is_file() or copy.read_bytes() != saved.read_bytes():
+        problems.append(f"the site's {store} is not the saved copy")
+if "📐 Sketches from geogebra.org: 0 copied now, 1 kept from before." not in said:
+    problems.append("the build did not say the geogebra.org sketch was kept from before, with nothing copied now")
+if re.search(r"Sketches from geogebra.org: [1-9][0-9]* copied now", said) or "plantoirvrfy578 that anyone can open" in said:
+    problems.append("the build asked geogebra.org for a sketch it had a saved copy of")
+if (public / "Investigations" / "GeoGebra-Hidden.html").exists() or any("plantoir-geogebra-hidden-5e1c" in p.read_text(encoding="utf-8", errors="ignore") for p in public.rglob("*.html")):
+    problems.append("the hidden page with a sketch reached the site")
+# Stage 5: the sketches in a question and in an explanation are cards inside
+# their quizzes, and the quiz page's search text reads each as its
+# description alone - never the button, the commands or the attribution,
+# which the quizzes' html stage would otherwise read after the card is in.
+quiz_page_path = public / "Investigations" / "Quiz-GeoGebra.html"
+quiz_page = quiz_page_path.read_text(encoding="utf-8") if quiz_page_path.is_file() else ""
+quiz_kinds = re.findall(r'<blockquote class="[^"]*\bplantoir-quiz\b[^"]*"[^>]*data-quiz-kind="([^"]*)"', quiz_page)
+if quiz_kinds != ["single", "single"] or quiz_page.count('<figure class="pl-figure pl-geogebra"') != 2 or "pl-geogebra-card" not in quiz_page:
+    problems.append(f"Investigations/Quiz-GeoGebra.html is not two working questions with a sketch each ({quiz_kinds})")
+index_path = public / "static" / "contentIndex.json"
+searched = json.loads(index_path.read_text(encoding="utf-8")).get("Investigations/Quiz-GeoGebra", {}).get("content", "") if index_path.is_file() else ""
+if "plantoir-alt-quiz-stem" not in searched or "Open the sketch" in searched or "Made with GeoGebra" in searched \
+        or "geogebra.org" in searched or "zz = 5" in searched or "plantoir-quiz-explain-578" in searched:
+    problems.append(f"the quiz page's search text does not read its sketches as their descriptions alone: {searched[:300]!r}")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+GGBCHECK
+then
+  pass "GeoGebra sketches: every fence a card with its button, size, description and attribution (on screen and for paper), the sketch's file published once at the address the cards name, the pinned adapted engine and the thumbnails carried, the description free of commands, a missing file left as code and reported by page and line, a hidden sketch nowhere, the same fence on another page showing the file beside it, the commands as written, and the geogebra.org sketch from its saved copy with nothing asked of geogebra.org, its author and licence on screen and for paper, and the sketches in a quiz's question and explanation cards inside their working questions, read by the page's search as their descriptions alone (#578)"
+else
+  fail "GeoGebra sketches: one of the checks above failed (#578)"
 fi
 
 # ---- 6j. Runnable code (#455) and the site's own KaTeX (#494), as the build left them ----
@@ -4025,8 +4743,11 @@ for line in lines_said:
 counted = len(re.findall(r"plantoir: error: Quiz Fixture\.md: ", said))
 if counted != len(lines_said):
     problems.append(f"the build said {counted} plantoir: error: lines for Quiz Fixture, expected {len(lines_said)}")
-if rules["words"]["problems"]["readDifferently"] in said:
-    problems.append("the site and the folder check read a quiz differently: " + re.search(r"plantoir: error: [^\n]*" + re.escape(rules["words"]["problems"]["readDifferently"][:30]), said).group(0))
+# Quiz Read Differently is read differently on purpose (#644, checked in
+# 6k's next part); no other page may be.
+elsewhere = "\n".join(line for line in said.splitlines() if "Quiz Read Differently.md" not in line)
+if rules["words"]["problems"]["readDifferently"] in elsewhere:
+    problems.append("the site and the folder check read a quiz differently: " + re.search(r"plantoir: error: [^\n]*" + re.escape(rules["words"]["problems"]["readDifferently"][:30]), elsewhere).group(0))
 markers = [line for line in said.splitlines() if "PLANTOIR_HEALTH:" in line and '"quizzesNotReady"' in line]
 if len(markers) != 1 or f'"sentence": "{len(lines_said)} self-check questions' not in markers[0]:
     problems.append(f"expected one quizzesNotReady finding for {len(lines_said)} questions, got {markers}")
@@ -4104,6 +4825,82 @@ then
   pass "self-check quizzes: every quiz the contract names is read alike by the site and the folder check, each problem said with its line, the look-alikes and the hidden page left alone, no tick and no answer on the site but where a student asks for it (#563)"
 else
   fail "self-check quizzes: one of the checks above failed (#563)"
+fi
+
+# ---- 6k, continued: a quiz the site reads differently is a folder problem (#644) ----
+# Quiz Read Differently: the folder check reads its quiz as fine, the site as
+# not ready (the problem the site found, never assumed). The site prints its
+# safety net's plantoir: error: line while it parses the page, and then -
+# from the site's own build, in the SAME call to scripts/site_said.py as
+# Plain Code Fixture's block - ONE PLANTOIR_HEALTH: line naming it
+# (siteHealth.checks -> quizzesReadDifferently), right after the code's,
+# with the dialog's sentence on the console too; quizzesNotReady is not
+# moved by it.
+if python3 - "$SITE_PUBLIC" /tmp/verify_main_build.log "$HIT_COURSE" <<'QUIZSAIDPY'
+import html, json, re, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+public, log, course = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+problems = []
+rules = json.load(open("contracts/shared-rules.json", encoding="utf-8"))
+quiz_rules = rules["quizCallouts"]
+check = next(entry for entry in rules["siteHealth"]["checks"] if entry["name"] == "quizzesReadDifferently")
+prefix = rules["siteHealth"]["marker"]["prefix"]
+said = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
+built = public / "Quiz-Read-Differently.html"
+page = built.read_text(encoding="utf-8") if built.is_file() else ""
+kinds = []
+for attributes in re.findall(r'<blockquote class="[^"]*\bplantoir-quiz\b[^"]*"([^>]*)>', page):
+    get = lambda name: (re.search(name + r'="([^"]*)"', attributes) or [None, None])[1]
+    kinds.append((get("data-quiz-kind"), get("data-quiz-problem")))
+if not page:
+    problems.append("Quiz-Read-Differently.html was not built")
+elif kinds != [("notReady", "choicesInHtml")]:
+    problems.append(f"the site did not read Quiz Read Differently's quiz as not ready: {kinds}")
+source = (course / "Quiz Read Differently.md").read_text(encoding="utf-8")
+line = source.splitlines().index("> [!quiz] Which is the right choice?") + 1
+error = f"plantoir: error: Quiz Read Differently.md: quiz 1, line {line}: {quiz_rules['words']['problems']['readDifferently']}"
+if said.count(error) != 1:
+    problems.append(f"the site said {said.count(error)} times, not once: {error}")
+if len(re.findall(r"plantoir: error: Quiz Read Differently\.md: ", said)) != 1:
+    problems.append("the build said another plantoir: error: line for Quiz Read Differently (the folder check must find nothing)")
+markers = [text[text.index(prefix):].strip() for text in said.splitlines()
+           if prefix in text and '"quizzesReadDifferently"' in text]
+sentence = (check["sentence"].replace("{page}", "Quiz Read Differently").replace("{course}", "EXC2O")
+            .replace("{section}", "1"))
+reason = check["reasons"]["shownWithNote"].replace("{problem}", quiz_rules["words"]["problems"]["choicesInHtml"])
+piece = (check["quizLine"].replace("{page}", "Quiz Read Differently").replace("{n}", "1")
+         .replace("{line}", str(line)).replace("{reason}", reason))
+detail = check["detail"].replace("{quizzes}", piece)
+if len(markers) != 1:
+    problems.append(f"{len(markers)} quizzesReadDifferently markers, not one")
+else:
+    finding = json.loads(markers[0][len(prefix):])
+    want = {"name": "quizzesReadDifferently", "sentence": sentence, "detail": detail,
+            "fixable": False, "course": "EXC2O", "section": 1}
+    if finding != want:
+        problems.append(f"the finding is {finding}, not {want}")
+    if said.find(error) > said.find(markers[0]):
+        problems.append("the folder problem came before the site's own plantoir: error: line")
+    # One call: the code's marker and the quizzes' are adjacent, the code's first.
+    health = [text for text in said.splitlines() if prefix in text]
+    names = [json.loads(text[text.index(prefix) + len(prefix):]).get("name") for text in health]
+    at = names.index("quizzesReadDifferently")
+    if at == 0 or names[at - 1] != "runnableCodeShownAsPlainCode":
+        problems.append(f"the two site findings are not one call's, the code's first: {names}")
+if ("⚠️  " + sentence) not in said:
+    problems.append("the console does not show the dialog's sentence: " + sentence)
+not_ready = [text for text in said.splitlines() if prefix in text and '"quizzesNotReady"' in text]
+if len(not_ready) != 1 or "Quiz Read Differently" in not_ready[0]:
+    problems.append(f"the quizzesNotReady finding changed: {not_ready}")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+QUIZSAIDPY
+then
+  pass "a quiz the site reads differently: Quiz Read Differently's quiz is fine to the folder check and not ready on the site, named once on the safety net's plantoir: error: line and then as ONE quizzesReadDifferently folder problem from the site's own build, in the same call as the code's, with the site's own problem, the dialog's sentence and its line in the teacher's file (#644)"
+else
+  fail "a quiz the site reads differently: it is not said as a folder problem (#644)"
 fi
 
 # ---- 6l. Task boxes students tick (#519), as the build left them ----
@@ -4348,6 +5145,10 @@ def tasks(html):
     return len(re.findall(r'<input type="checkbox"[^>]*class="plantoir-task"', html))
 def has_file(href):
     return (public / href.lstrip("./")).is_file()
+def geogebra_specs(html_text):
+    import html as html_module, json
+    return [json.loads(html_module.unescape(spec)) for spec in
+            re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"', html_text or "")]
 # (a text only that example holds, what it must build as, the check)
 claims = [
     ("title: Slope as a Rate of Change", "settings: the title, tags and maths",
@@ -4369,6 +5170,8 @@ claims = [
     ("def slope(x1, y1, x2, y2):", "a coloured code block with line numbers, and code in a sentence",
      lambda a, p: 'data-language="python"' in a and a.count("data-line") >= 4 and "<code>print()</code>" in a
      and "font-variant-ligatures" in (public / "index.css").read_text(encoding="utf-8")),
+    ("text wrap", "a text block that wraps (#653)",
+     lambda a, p: 'class="plantoir-text-wrap"' in a and 'data-language="text"' in a and "FileNotFoundError" in a),
     ("- [ ] Estimate before calculating", "a checklist students tick, one box ticked to start",
      lambda a, p: tasks(a) == 3 and len(re.findall(r'<input type="checkbox" checked class="plantoir-task"', a)) == 1),
     ("## Success criteria", "a page with three success criteria (one ticked) and a checklist under another heading",
@@ -4387,9 +5190,13 @@ claims = [
      lambda a, p: len(re.findall(r'<img src="\./Media/cell-diagram\.png"', a)) == 3 and 'width="300"' in a
      and 'alt="A plant cell with the nucleus labelled"' in a and '<iframe src="./Media/Unit-2-Review.pdf" class="pdf">' in a
      and 'href="./Media/Unit-2-Review.pdf"' in a and has_file("Media/cell-diagram.png") and has_file("Media/Unit-2-Review.pdf")),
-    ("![](https://www.youtube.com/watch?v=", "YouTube, Vimeo, GeoGebra and PhET players",
+    ("![](https://www.youtube.com/watch?v=", "YouTube, Vimeo and PhET players, and no GeoGebra iframe (#578)",
      lambda a, p: 'src="https://www.youtube.com/embed/' in a and '<iframe src="https://player.vimeo.com/video/' in a
-     and '<iframe src="https://www.geogebra.org/' in a and '<iframe src="https://phet.colorado.edu/' in a),
+     and 'geogebra.org' not in a and '<iframe src="https://phet.colorado.edu/' in a),
+    ("file: Slope Angle Conjecture.ggb", "two GeoGebra sketches: a file found in Media and one from commands (#578)",
+     lambda a, p: [spec.get("sketch") for spec in geogebra_specs(a)] == ["Media/Slope-Angle-Conjecture.ggb", None]
+     and [line["text"] for line in geogebra_specs(a)[1].get("commands", [])] == ["f(x) = 2x + 1", "A = Point(f)"]
+     and has_file("Media/Slope-Angle-Conjecture.ggb")),
     ("%% Tomorrow:", "a note only the teacher sees",
      lambda a, p: "Students see only this sentence." in a and "Tomorrow" not in p["full"]),
     ("title: Unit 3 Test Review", "publish: false keeps the page off the site",
@@ -4443,9 +5250,89 @@ print(f"   {len(examples)} examples, {len(claims)} claims")
 sys.exit(1 if problems else 0)
 AUTHORPY
 then
-  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/GeoGebra/PhET, comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
+  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, a text block that wraps (#653), checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/PhET, GeoGebra sketches from a file and from commands (#578), comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
 else
   fail "page-authoring skill: an example did not build as the feature it claims, or an example has no claim (#596)"
+fi
+
+# ---- 6o. Text that wraps (#653), as the build left it ----
+# Wrap Fixture's flagged blocks - the top-level one, the folded callout's, the
+# list item's and the quiz explanation's - are each the ONLY content of a
+# div.plantoir-text-wrap, and its ```text and ```python wrap blocks are in
+# none; its first three figures are byte for byte Wrap Plain Twin's (the
+# word changes nothing but the wrapper); the class is on no other page but
+# the page-authoring skill's example; and index.css carries the rule with
+# both of its content declarations (the plain one, then the one with alt
+# text). How the blocks LOOK is browser-checks/text_wrap.mjs, below.
+if python3 - "$SITE_PUBLIC" <<'WRAPPY'
+import re, sys
+from pathlib import Path
+public = Path(sys.argv[1])
+problems = []
+def article(name):
+    path = public / name
+    if not path.is_file():
+        problems.append(f"{name} was not built")
+        return ""
+    found = re.search(r"<article[^>]*>(.*?)</article>", path.read_text(encoding="utf-8"), re.S)
+    return found.group(1) if found else ""
+FIGURE = re.compile(r'(<div class="plantoir-text-wrap">)?(<figure data-rehype-pretty-code-figure[^>]*>.*?</figure>)(</div>)?', re.S)
+fixture, twin = article("Wrap-Fixture.html"), article("Wrap-Plain-Twin.html")
+figures = [(bool(m.group(1)) and bool(m.group(3)), m.group(2)) for m in FIGURE.finditer(fixture)]
+twins = [m.group(2) for m in FIGURE.finditer(twin)]
+wrapped = [inside for inside, _ in figures]
+if wrapped != [True, False, False, True, True, True]:
+    problems.append(f"Wrap Fixture's figures wrapped {wrapped}, expected [True, False, False, True, True, True] "
+                    "(the long block, then text and python wrap unwrapped, then the callout's, the list item's and the quiz's)")
+wrappers = fixture.count('class="plantoir-text-wrap"')
+if wrappers != 4:
+    problems.append(f"Wrap Fixture holds {wrappers} wrappers, expected 4")
+for index, (inside, figure) in enumerate(figures):
+    if inside and 'data-language="text"' not in figure:
+        problems.append(f"Wrap Fixture's figure {index + 1} is wrapped and is not a text block")
+if len(figures) >= 3 and len(twins) == 3:
+    for index in range(3):
+        if figures[index][1] != twins[index]:
+            problems.append(f"Wrap Fixture's figure {index + 1} is not byte for byte Wrap Plain Twin's")
+else:
+    problems.append(f"found {len(figures)} figures on Wrap Fixture and {len(twins)} on Wrap Plain Twin")
+if len(figures) >= 3 and 'data-language="python"' not in figures[2][1]:
+    problems.append("Wrap Fixture's python wrap block is not a python block")
+lines = re.findall(r"<span data-line[ >]", figures[0][1]) if figures else []
+if len(lines) != 120 or figures[0][1].count("data-highlighted-line") != 2:
+    problems.append(f"the long block has {len(lines)} lines and {figures[0][1].count('data-highlighted-line') if figures else 0} highlighted, expected 120 and 2")
+elsewhere = []
+for page in public.rglob("*.html"):
+    name = str(page.relative_to(public))
+    if 'class="plantoir-text-wrap"' in page.read_text(encoding="utf-8", errors="replace"):
+        elsewhere.append(name)
+examples = [name for name in elsewhere if re.fullmatch(r"Authoring-Example-\d\d\.html", name)]
+others = sorted(set(elsewhere) - {"Wrap-Fixture.html"} - set(examples))
+if others or len(examples) != 1:
+    problems.append(f"the wrapper is on {others or 'no other page'} and on {len(examples)} skill examples (expected none, and one)")
+css = (public / "index.css").read_text(encoding="utf-8") if (public / "index.css").is_file() else ""
+# The :after rule of its own (the rule before it names :before and :after together).
+rule = re.search(r'\.plantoir-text-wrap pre:not\(\.plantoir-flowing\)>code>\[data-line\]:after\{[^}]*content:[^}]*\}', css)
+if rule is None:
+    problems.append("index.css lacks the wrapped line's :after rule")
+else:
+    body = rule.group(0)
+    plain = re.search(r'content:"((?:\\a …)+)";', body)
+    alt = re.search(r'content:"((?:\\a …)+)"/"";', body + ";")
+    if plain is None or alt is None or plain.group(1) != alt.group(1) or body.index(plain.group(0)) > body.index('/""'):
+        problems.append("index.css's :after rule lacks the plain content then the one with alt text, alike")
+    elif plain.group(1).count("…") != 80:
+        problems.append(f"index.css's ellipsis string has {plain.group(1).count('…')} rows, expected 80")
+if "@media screen{:root .plantoir-text-wrap pre:not(.plantoir-flowing)>code{white-space:pre-wrap;overflow-wrap:anywhere}" not in css:
+    problems.append("index.css lacks the screen-only pre-wrap rule")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+WRAPPY
+then
+  pass "text that wraps, as built: Wrap Fixture's four flagged text blocks (the page's own, a folded callout's, a list item's, a quiz explanation's) each in div.plantoir-text-wrap and its text and python wrap blocks in none, its first three blocks byte for byte the unflagged twin's, the class on no other page but the skill's example, and index.css's screen-only rule with 80 rows of ellipses and alt text (#653)"
+else
+  fail "text that wraps: a flagged text block was not wrapped, an unflagged block was, the word changed the block itself, or index.css lacks the rule (#653)"
 fi
 
 # ---- 6h, continued: the sidebar's page dot, by its text (#515) ----
@@ -4655,6 +5542,22 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_mermaid_draws.log
   fi
   rm -rf "$MERMAID_SITE"
+  # #578: GeoGebra sketches opened under the very policy a Netlify publish
+  # sends, on a clone with the publish's own _headers, served on [::1]
+  # (geogebraFences.policy) - and again cross-origin isolated.
+  GEOGEBRA_SITE="$(mktemp -d /tmp/plantoir-verify-geogebra.XXXXXX)"
+  cp -Rc "$SITE_PUBLIC/." "$GEOGEBRA_SITE/" 2>/dev/null || cp -R "$SITE_PUBLIC/." "$GEOGEBRA_SITE/"
+  rm -f "$GEOGEBRA_SITE/_headers"
+  (cd scripts && python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$GEOGEBRA_SITE") >/tmp/verify_geogebra_applet.log 2>&1 || true
+  if node browser-checks/geogebra_applet.mjs "$PRINT_CHROME" "$GEOGEBRA_SITE" /Investigations/GeoGebra-Fixture.html \
+       /Discussions/GeoGebra-Second.html "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
+       /Investigations/Quiz-GeoGebra.html >>/tmp/verify_geogebra_applet.log 2>&1; then
+    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, browser-checks/geogebra_applet.mjs)"
+  else
+    fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, or were published twice (browser-checks/geogebra_applet.mjs, #578)"
+    cat /tmp/verify_geogebra_applet.log
+  fi
+  rm -rf "$GEOGEBRA_SITE"
   # #515: the sidebar's page dot, on the rows the browser draws.
   if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
@@ -4663,6 +5566,14 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   else
     fail "the sidebar's page dot is missing from a page row, on a folder row, too faint, or the wrapped title does not hang, or the page or a closed folder's list scrolled by itself as the sidebar drew (browser-checks/sidebar_page_marker.mjs, #515, #611)"
     cat /tmp/verify_sidebar_page_marker.log
+  fi
+  # #653: a ```text wrap block as a reader sees it.
+  if node browser-checks/text_wrap.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Wrap-Fixture.html" \
+       >/tmp/verify_text_wrap.log 2>&1; then
+    pass "text that wraps, in a browser: Wrap Fixture's text wrap block does not scroll while its text and python wrap blocks do, every line's rows hold its text, every row starts at one x, the URL line's first row is full, each line's number sits on its first row and its ellipses run its full height on one hairline, highlighted lines keep their tint, the folded callout's, the list item's and the quiz explanation's blocks wrap too, in light, dark and at 390 px; on paper and in the handout it is laid out as a plain block, and the copy button copies it as written - $(head -1 /tmp/verify_text_wrap.log | sed 's/^OK: //') (#653, browser-checks/text_wrap.mjs)"
+  else
+    fail "a text wrap block did not wrap as the contract says, or an unflagged block did, or print, the handout or the copy button changed (browser-checks/text_wrap.mjs, #653)"
+    cat /tmp/verify_text_wrap.log
   fi
   # #494: maths offline from the site's own KaTeX, and (#455 review S1)
   # print after a change of page keeps the stylesheets.
@@ -4933,6 +5844,14 @@ for entry in os.listdir("/proc"):
     pass "and with no figure left, the site carries neither figure engine, nothing is drawn, and a page without figures is byte-identical (#485)"
   else
     fail "a site with no figures still carries static/function-plot or static/tikz, drew something, or changed a page without figures (#485)"
+  fi
+  # And no GeoGebra sketch (#578): no engine, no thumbnails, no sketch said.
+  if [[ -f "$SITE_INDEX" && ! -e "$SITE_PUBLIC/static/geogebra" && ! -e "$SITE_PUBLIC/static/geogebra-sketches" ]] \
+     && ! grep -q "GeoGebra sketch" /tmp/verify_old_container.log \
+     && ! grep -q "pl-geogebra" "$SITE_PUBLIC/Help-Sessions.html"; then
+    pass "and with no sketch left, the site carries no GeoGebra and no thumbnails, and says nothing of sketches (#578)"
+  else
+    fail "a site with no GeoGebra sketch still carries static/geogebra or static/geogebra-sketches, or spoke of sketches (#578)"
   fi
   # And no runnable code (#455): the engine is taken out again, while the
   # site's own KaTeX stays - every site carries it (#494).

@@ -669,6 +669,12 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             contentsOf: UserFacingLabelWordsTests.macAppRoot().appendingPathComponent("QuartzTeachers/Models/OpenInObsidianRoute.swift"),
             encoding: .utf8
         )
+        // Updated deliberately for #518: every open in the route — after the
+        // note, the offer, the reopen question or none — goes through ONE
+        // helper, which hands Obsidian the previewed page or the folder.
+        let code: String = TextFieldStyleScanTests.codeWithoutComments(route)
+        XCTAssertEqual(SaveEnablesTests.occurrences(of: "obsidianOpening.open(", in: code), 1)
+        XCTAssertEqual(SaveEnablesTests.occurrences(of: "obsidianOpening.openPage(", in: code), 1)
         XCTAssertTrue(route.contains("obsidianOpening.open(folder, course.directoryURL)"))
         let detail: String = try String(
             contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Section/SectionDetailView.swift"), encoding: .utf8

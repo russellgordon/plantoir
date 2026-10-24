@@ -1165,9 +1165,13 @@ nonisolated enum ActivityTrail {
         /// The app's tools were copied into the working folder — a folder
         /// set up from nothing, or a stale `.toolchain/` refreshed after an
         /// update (#473 on Windows, #476 here). Once per copy that changed
-        /// or failed something, never for the pass that finds nothing to
-        /// do. Carries the folder, the counts, the seconds, and for a copy
-        /// that could not finish the first file that failed and its error.
+        /// or failed something — and, since #663, once per copy that had to
+        /// READ a file to compare it — never for the pass that compares every
+        /// file by length and time and finds nothing to do. Carries the
+        /// folder, the counts (brought up to date; compared with a copy
+        /// already there, and how many of those were read in full, #663),
+        /// the seconds, and for a copy that could not finish the first file
+        /// that failed and its error.
         case workingFolderToolsCopied = "working folder tools copied"
         /// The teacher pressed Show on Front Page at Preview (#397): the
         /// section's front page now shows today's class — from and to, as
@@ -1236,6 +1240,13 @@ nonisolated enum ActivityTrail {
         case previewStartedAtLastViewed = "preview started at the page last viewed"
         /// Settings ▸ Preview changed where Preview opens (#504): which.
         case previewStartPageChosenInSettings = "preview start page chosen in Settings"
+        /// A section's Open in Obsidian (#518): the place in the course
+        /// folder of the file behind the page its preview showed, and whether
+        /// the page is hidden — or why the section opened as before instead,
+        /// "no preview page was showing" included. Written for every press of
+        /// a section's Open in Obsidian, never a course's; never a page's
+        /// words.
+        case pageOpenedInObsidian = "page opened in Obsidian"
         /// Open in Obsidian asked about Obsidian's add-ons for diagrams and
         /// graphs (#495): the course and the answer — Add Them, Not Now, or
         /// Not Now with "don't ask again" — or why nothing was asked

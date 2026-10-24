@@ -228,7 +228,15 @@ nonisolated enum RealHome {
             return forFiles.path
         }
         if path.hasPrefix("~/") {
-            return forFiles.appendingPathComponent(String(path.dropFirst(2))).path
+            let rest: String = String(path.dropFirst(2))
+            // `appendingPathComponent("")` asks the disk, and answers the home
+            // WITH a trailing slash once that folder exists — which the
+            // suite's throwaway home began to do in #663, when the mirror's
+            // index started being written under it.
+            if rest.isEmpty {
+                return forFiles.path
+            }
+            return forFiles.appendingPathComponent(rest).path
         }
         return path
     }

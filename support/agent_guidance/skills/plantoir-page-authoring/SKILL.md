@@ -1,6 +1,6 @@
 ---
 name: plantoir-page-authoring
-description: Use FIRST whenever writing, revising or reorganising any Plantoir course page - a lesson, a concept page, a class page, an exercise set, a task, a folder's front page, Key Links. Lists every way content can be written for a class website - page settings, callouts (every kind, foldable), diagrams, tables, maths, checklists students tick, success criteria that roll up to My Progress, links between pages, embedding one page in another, footnotes, tags, pictures and PDFs in the Media folder, YouTube and Vimeo videos, GeoGebra and PhET applets, hidden pages and publish, folders and the sidebar, class pages and the dates they give, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and says which of the four feature skills (printable pages, graphs and figures, quizzes, runnable code) to read next.
+description: Use FIRST whenever writing, revising or reorganising any Plantoir course page - a lesson, a concept page, a class page, an exercise set, a task, a folder's front page, Key Links. Lists every way content can be written for a class website - page settings, callouts (every kind, foldable), diagrams, tables, maths, checklists students tick, success criteria that roll up to My Progress, links between pages, embedding one page in another, footnotes, tags, pictures and PDFs in the Media folder, YouTube and Vimeo videos, GeoGebra sketches students drag, PhET applets, hidden pages and publish, folders and the sidebar, class pages and the dates they give, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and says which of the four feature skills (printable pages, graphs and figures, quizzes, runnable code) to read next.
 ---
 
 # Writing pages for a Plantoir class website
@@ -25,7 +25,7 @@ here:
 | The request mentions | Read |
 |---|---|
 | a worksheet, handout, practice set, answer key, "students will print", or handing out an existing PDF | `plantoir-printing` |
-| a graph of a function, a geometry figure, similar triangles, a number line, a probability tree, a circuit, anything "plotted" or "drawn" | `plantoir-math-graphs` |
+| a graph of a function, a geometry figure, similar triangles, a number line, a probability tree, a circuit, anything "plotted" or "drawn", a GeoGebra sketch or a slider | `plantoir-math-graphs` |
 | a quiz, a 5-question check, practice questions students check themselves, an exit ticket, multiple choice, fill in the blank | `plantoir-quizzes` |
 | "make this example runnable", a Python or Swift program students run in the browser, "try it yourself" | `plantoir-runnable-code` |
 
@@ -242,6 +242,21 @@ In a sentence, `print()` in single backticks is code too.
   yourself" - is the `plantoir-runnable-code` skill's ` ```python run `
   block, not this one.
 
+Plain text whose lines are long - an error message, sample output, a
+paragraph to copy - can wrap instead of scrolling sideways: write `text wrap`
+after the backticks.
+
+````markdown
+```text wrap
+FileNotFoundError: [Errno 2] No such file or directory: 'scores.csv' - the program looked in the folder it was started from, not the folder the file was saved in.
+```
+````
+
+- Each line keeps its number; a line that wraps shows … beside its later
+  rows. Copying the block copies the lines as written.
+- Only `text` wraps. Code never does, because code is read by column, and
+  `wrap` after any other language (` ```python wrap `) is ignored.
+
 ## 10. Checklists students tick
 
 ```markdown
@@ -445,18 +460,17 @@ and do not print:
 
 <iframe src="https://player.vimeo.com/video/22439234" width="640" height="360" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>
 
-<iframe src="https://www.geogebra.org/material/iframe/id/x8XV6rzq" width="800" height="500" allowfullscreen style="border: 1px solid #e4e4e4"></iframe>
-
 <iframe src="https://phet.colorado.edu/sims/html/projectile-motion/latest/projectile-motion_all.html" width="800" height="600" allowfullscreen></iframe>
 ```
 
 - **YouTube**: the picture form `![](address)` with the video's ordinary
   address (`youtube.com/watch?v=...` or `youtu.be/...`) becomes the player.
-- **Vimeo, GeoGebra and PhET**: paste the `<iframe ...></iframe>` the site's
-  own Share or Embed button gives, **on one line, with an empty line before
+- **Vimeo and PhET**: paste the `<iframe ...></iframe>` the site's own
+  Share or Embed button gives, **on one line, with an empty line before
   and after**. For Vimeo the address is `player.vimeo.com/video/<number>`,
-  for GeoGebra `www.geogebra.org/material/iframe/id/<id>`, for PhET the
-  simulation's `..._all.html` address.
+  for PhET the simulation's `..._all.html` address.
+- **GeoGebra is never an `<iframe>`**: write a ` ```geogebra ` block
+  (below).
 - A video file of the teacher's own goes in `Media` and is shown with
   `![[clip.mp4]]`.
 - For a graph students read rather than an applet they play with, prefer
@@ -464,6 +478,42 @@ and do not print:
 - A page that also has runnable code that reads input: read
   `plantoir-runnable-code` - a video, PDF frame or applet on the page
   changes how students type their input.
+
+**GeoGebra sketches** students drag and change are a ` ```geogebra `
+block. The class website serves GeoGebra itself: the sketch opens when a
+student taps it, needs nothing from geogebra.org, and prints as a picture
+of the sketch. Say which sketch in one of three ways - a file, GeoGebra
+commands, or a sketch on geogebra.org:
+
+````markdown
+```geogebra
+file: Slope Angle Conjecture.ggb
+alt: Three right triangles that share one marked angle, set by a slider.
+```
+
+```geogebra
+alt: The line y = 2x + 1 with a point A on it that students can drag.
+f(x) = 2x + 1
+A = Point(f)
+```
+````
+
+- `file:` names a `.ggb` file saved from GeoGebra, put beside the page
+  or in `Media`. It is plain text, not a link: renaming the file, or
+  copying the page with Copy a Page, does not follow it - keep the name
+  in step, or put the file in `Media`.
+- Commands, one per line, exactly as typed in GeoGebra's Input Bar, make
+  a sketch on their own - or change one a `file:` line opened.
+- `material_id:` with a geogebra.org address
+  (`material_id: https://www.geogebra.org/m/ju3f2kbg`) uses a sketch from
+  geogebra.org; Plantoir keeps a copy the first time the site is built.
+  A page that still has a geogebra.org `<iframe>`: replace it with a
+  block whose `material_id:` is the iframe's id.
+- **`alt:` always** - what a screen reader says instead of the sketch.
+- Every setting, fetching a changed geogebra.org sketch again, seeing a
+  `.ggb` in Obsidian, and what a problem looks like: the GeoGebra section
+  of `plantoir-math-graphs`. A sketch inside a self-check question:
+  `plantoir-quizzes`.
 
 ## 17. Notes only the teacher sees
 

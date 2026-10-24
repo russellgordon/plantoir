@@ -1,4 +1,4 @@
-Windows: no changes in this release — the Windows download is still 1.3.1.
+Plantoir 1.3.2 is for the Mac. **Windows: no changes** — the Windows download stays at 1.3.1 on plantoir.app until it catches up. Plantoir 1.4.0 or later on the Mac will offer this update by itself.
 
 **New**
 

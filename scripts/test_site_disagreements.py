@@ -2,7 +2,9 @@
 """
 A runnable block the SITE showed as plain code, said as one folder problem
 (#567: contracts/shared-rules.json -> siteHealth.checks ->
-runnableCodeShownAsPlainCode; scripts/site_said.py).
+runnableCodeShownAsPlainCode; scripts/site_said.py) - and (#644) the
+self-check questions the site read differently from the folder check, said
+in the same call as quizzesReadDifferently.
 
 Pure stdlib, no Docker and no network - so Windows' PythonToolchainTests runs
 it too. The site's half (the transformer recording and the emitter calling
@@ -25,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import build_site  # noqa: E402
 import contracts  # noqa: E402
 import page_features  # noqa: E402
 import site_health  # noqa: E402
@@ -34,6 +37,7 @@ import toolchain_paths  # noqa: E402
 SCRIPT = Path(__file__).resolve().parent / "site_said.py"
 REPO_CONTRACTS = Path(__file__).resolve().parent.parent / "contracts"
 NAME = "runnableCodeShownAsPlainCode"
+QUIZ_NAME = "quizzesReadDifferently"
 
 # The page from codeRunnerBlocks.fences.pageShapes' review N3 case: a fence
 # left open in a list item, then a runnable block. Its frontmatter makes the
@@ -42,11 +46,11 @@ UNCLOSED = ("---\ntitle: Loops\ncodeRunner: true\n---\n"
             "- step one\n  ```python\n  print(1)\n- step two\n\n```python run\nprint(2)\n```\n")
 
 
-def _check() -> dict:
+def _check(name: str = NAME) -> dict:
     for entry in contracts.section("shared-rules", "siteHealth", "checks"):
-        if entry["name"] == NAME:
+        if entry["name"] == name:
             return entry
-    raise AssertionError(f"{NAME} is not in the contract")
+    raise AssertionError(f"{name} is not in the contract")
 
 
 class SiteDisagreementTests(unittest.TestCase):
@@ -277,6 +281,155 @@ class SiteDisagreementTests(unittest.TestCase):
         words = json.dumps(page_features.runner_words())
         for key in ('"python"', '"script"', '"places"', '"course"', '"section"', '"swiftNamed"'):
             self.assertNotIn(key, words)
+
+
+class QuizDisagreementTests(unittest.TestCase):
+    """#644: the quiz safety net's lines, said as ONE quizzesReadDifferently
+    folder problem by the same emitter and in the same call."""
+
+    @classmethod
+    def setUpClass(cls):
+        if REPO_CONTRACTS.is_dir():
+            toolchain_paths.CONTRACTS_DIR = REPO_CONTRACTS
+        contracts.reset_cache()
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp(prefix="plantoir-quiz-said-"))
+
+    def tearDown(self):
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def test_every_contract_case_is_worded_as_the_contract_says(self):
+        cases = _check(QUIZ_NAME)["cases"]
+        self.assertGreaterEqual(len(cases), 5, "the contract lost cases")
+        table = site_health._checks_by_name()
+        for case in cases:
+            found = site_health.quizzes_read_differently_finding(
+                {"quiz_disagreements": case["quizzes"]}, case["course"], case["section"], table)
+            self.assertEqual(found.name, QUIZ_NAME, case["name"])
+            self.assertEqual(found.sentence, case["sentence"], case["name"])
+            if "detail" in case:
+                self.assertEqual(found.detail, case["detail"], case["name"])
+            else:
+                self.assertTrue(found.detail.endswith(case["detailEndsWith"]), case["name"] + ": " + found.detail)
+            self.assertFalse(found.fixable, case["name"])
+            self.assertEqual(found.course, case["course"])
+            self.assertEqual(found.section, case["section"])
+
+    def test_the_cases_use_every_piece_and_every_reason(self):
+        entry = _check(QUIZ_NAME)
+        details = " ".join(case.get("detail", case.get("detailEndsWith", "")) for case in entry["cases"])
+        reasons = set()
+        for case in entry["cases"]:
+            for quiz in case["quizzes"]:
+                reasons.add(quiz["reason"])
+        self.assertEqual(reasons, set(entry["reasons"]))
+        self.assertIn("“Unit 2/Practice”, question 2, line 12: ", details)
+        self.assertIn("“Unit 2/Practice”, question 3: ", details)
+        self.assertIn("“Unit 2/Practice”, line 30: ", details)
+        self.assertIn("“Unit 3/Review”: ", details)
+
+    def test_nothing_the_teacher_reads_names_the_machinery(self):
+        """Rule 1, through the nested `reasons` too, which the apps' sweeps
+        (top-level strings only) do not reach."""
+        forbidden = ["toolchain", "script", "docker", "container", "wsl", "python",
+                     "json", "stdout", "quartz", "repository", "config",
+                     "yaml", "frontmatter", "symlink", "vault"]
+        entry = _check(QUIZ_NAME)
+        shown = []
+        for key, value in entry.items():
+            if key in ("name", "why", "fill", "cases"):
+                continue
+            if isinstance(value, str):
+                shown.append((key, value))
+            elif isinstance(value, dict):
+                for inner, text in value.items():
+                    shown.append((f"{key}.{inner}", text))
+        self.assertIn("reasons.shownWithNote", [key for key, _ in shown])
+        for key, text in shown:
+            for word in forbidden:
+                self.assertNotIn(word, text.lower(), f"{QUIZ_NAME}.{key} says \"{word}\" to a teacher")
+
+    def test_it_is_never_offered_a_repair(self):
+        never = contracts.section("shared-rules", "siteHealth", "repair", "neverOffered", "checks")
+        self.assertIn(QUIZ_NAME, never)
+
+    def _said(self, places=None):
+        return {"course": "MPM2D", "section": 1, "content": str(self.folder / "content"),
+                "places": places or {}, "swiftNamed": []}
+
+    def test_a_quiz_page_is_named_by_its_place_and_keeps_the_sites_line(self):
+        said = self._said({"Practice.md": {"place": "Unit 2/Practice", "source": None}})
+        facts = site_said.quiz_facts_from_site(said, [
+            {"page": "Practice.md", "n": 1, "line": 7, "reason": "shownWithNote",
+             "problem": "choicesInHtml", "fill": {}},
+            {"page": "Other.md", "n": None, "line": None, "reason": "countedDifferently"}])
+        self.assertEqual(facts, [
+            {"page": "Other", "n": None, "line": None, "reason": "countedDifferently"},
+            {"page": "Unit 2/Practice", "n": 1, "line": 7, "reason": "shownWithNote",
+             "problem": "choicesInHtml", "fill": {}}])
+
+    def _run(self, payload: dict):
+        environment = dict(os.environ, PLANTOIR_CONTRACTS_DIR=str(toolchain_paths.CONTRACTS_DIR),
+                           PYTHONDONTWRITEBYTECODE="1")
+        done = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(payload).encode("utf-8"),
+                              capture_output=True, env=environment, timeout=60, cwd=str(self.folder))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        printed = done.stdout.decode("utf-8")
+        prefix = site_health.marker_prefix()
+        markers = []
+        for line in printed.splitlines():
+            if prefix in line:
+                markers.append(json.loads(line[line.index(prefix) + len(prefix):]))
+        return printed, markers
+
+    QUIZ = {"page": "Practice.md", "n": 1, "line": 7, "reason": "shownWithNote",
+            "problem": "choicesInHtml", "fill": {}}
+    BLOCK = {"page": "Units/Loops.md", "language": "python", "block": 1,
+             "reason": "blockNotPrepared", "code": ""}
+
+    def test_blocks_and_quizzes_are_two_markers_from_one_call_code_first(self):
+        printed, markers = self._run(dict(self._said(), blocks=[self.BLOCK], quizzes=[self.QUIZ]))
+        self.assertEqual([marker["name"] for marker in markers], [NAME, QUIZ_NAME], printed)
+        self.assertEqual(printed.count("⚠️"), 2, printed)
+        self.assertEqual(markers[1]["sentence"],
+                         _check(QUIZ_NAME)["sentence"].replace("{page}", "Practice")
+                         .replace("{course}", "MPM2D").replace("{section}", "1"))
+        self.assertNotIn("ℹ️", printed)
+
+    def test_quizzes_alone_are_one_marker(self):
+        printed, markers = self._run(dict(self._said(), quizzes=[self.QUIZ, self.QUIZ]))
+        self.assertEqual([marker["name"] for marker in markers], [QUIZ_NAME], printed)
+        self.assertEqual(printed.count("⚠️"), 1, printed)
+
+    def test_one_finding_that_fails_still_lets_the_other_be_said(self):
+        """Each finding is built in its own try: a quiz entry that cannot be
+        read costs the quizzes' finding and one plain line, never the code's."""
+        printed, markers = self._run(dict(self._said(), blocks=[self.BLOCK],
+                                          quizzes=[{"page": "Practice.md", "n": "seven"}]))
+        self.assertEqual([marker["name"] for marker in markers], [NAME], printed)
+        self.assertEqual(printed.count("ℹ️"), 1, printed)
+        printed, markers = self._run(dict(self._said(), blocks=[{"page": "a.md", "block": "x"}],
+                                          quizzes=[self.QUIZ]))
+        self.assertEqual([marker["name"] for marker in markers], [QUIZ_NAME], printed)
+        self.assertEqual(printed.count("ℹ️"), 1, printed)
+
+    def test_the_side_file_places_quiz_pages_and_keeps_a_code_pages_source(self):
+        content = self.folder / "content"
+        (content / "Units").mkdir(parents=True)
+        (content / "Units" / "Loops.md").write_text(
+            "---\ntitle: Loops\ncodeRunner: true\n---\n```python run\nprint(1)\n```\n", encoding="utf-8")
+        original = build_site._vault_source_of
+        build_site._vault_source_of = lambda page: Path("/c/Unit 1/Loops.md")
+        try:
+            build_site._write_site_said(self.folder / "site", content, "ICS3U", 1, {},
+                                        {"Units/Loops.md": "Units/Loops", "Practice.md": "Unit 2/Practice"})
+        finally:
+            build_site._vault_source_of = original
+        written = json.loads((self.folder / "site" / "quartz" / site_said.SIDE_FILE).read_text(encoding="utf-8"))
+        self.assertEqual(written["places"], {
+            "Practice.md": {"place": "Unit 2/Practice", "source": None},
+            "Units/Loops.md": {"place": "Units/Loops", "source": str(Path("/c/Unit 1/Loops.md"))}})
 
 
 if __name__ == "__main__":

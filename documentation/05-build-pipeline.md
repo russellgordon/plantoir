@@ -1935,8 +1935,10 @@ safety net's `plantoir: error:` line above told an assistant and nobody
 else. Since #567 the same blocks are one folder problem,
 `siteHealth.checks` → `runnableCodeShownAsPlainCode`, with the dialog, the
 assistant's answer and the trail line every other folder problem gets. It is
-the ONE check said from the site's build rather than before it
-(`siteHealth.whereItRuns`), and that is the whole design:
+one of the TWO checks said from the site's build rather than before it
+(`siteHealth.whereItRuns`; the other is the quiz safety net's, #644, in the
+next section, said by the same emitter in the same call), and that is the
+whole design:
 
 1. **The transformer records.** `codeRunner.ts`, in the branch that prints
    the line (and only for a page students can see), also pushes
@@ -2021,6 +2023,78 @@ section, #246); piping node's output through Python to catch the line (it
 would change the terminal the app's progress markers come through); and
 reusing `words.blockNotPrepared`'s words in the dialog ("if this line comes
 back" has no line there — the check has `reasons` of its own).
+
+### …and the quiz safety net (#644, v1.9.0)
+
+The self-check quizzes have a safety net of their own (below, "The safety
+net", `quizCallouts.safetyNet`): where the site and the folder check read a
+question differently, the site prints `plantoir: error: <page>: <where>:
+<readDifferently>`. Like the code runner's line, a teacher previewing in the
+app never saw it. Worse, in the direction that matters the teacher was told
+NOTHING: the site shows a short note in place of Check, and
+`quizzesNotReady`, worked out before the site exists, has nothing to say,
+because the folder check found nothing wrong. Since #644 those lines are a
+second site-said folder problem, `siteHealth.checks` →
+`quizzesReadDifferently`, on #567's path with no new reader:
+
+1. **The transformer records what it prints.** `plantoirQuizzes.ts`'s
+   `sayDisagreement` pushes `{page, n, line, reason, problem?, fill?}` onto
+   `file.data.plantoirQuizDisagreements` inside the branch that prints, so
+   there is exactly one record per line, and a site without its words
+   prints nothing and records nothing. The printed line is byte for byte
+   what it was. The four places it is called give the four `reasons` keys:
+   `shownWithNote` (a quiz the site shows as not ready that the check
+   passed, carrying the problem the SITE found and its values, never an
+   assumed `choicesInHtml`), `shownWorking` (the other way round),
+   `countedDifferently` (the top-level counts differ) and
+   `nestedReadDifferently` (only the quizzes inside a list or callout
+   differ, or their problems do). `line` is the one the folder check already
+   wrote into `plantoir_quiz_pages.json`: `lines[n-1]`, the first of
+   `lines`, or the first of `nestedLines`. Python never looks a line up
+   again, unlike #567's blocks.
+2. **One emitter, one call.** `plantoirSiteSaid.ts` gathers both lists
+   (`gathered` and `gatheredQuizzes`, the same rule: NFC, pages in path
+   order, hidden pages left out) and makes ONE `execFileSync` when either is
+   non-empty, with `{…, blocks, quizzes}` on stdin, the same once-mark and
+   the same 20 s timeout. Its `ℹ️` failure line no longer names blocks of
+   code ("Could not say what the website found: …").
+3. **Python says both.** `site_said.say` builds the code's finding, then the
+   quizzes' (`quiz_facts_from_site`, then
+   `site_health.quizzes_read_differently_finding`), each in its own `try`,
+   so one that fails costs only itself and one `ℹ️` line, and announces them
+   together, the code's first. It is still never `announce_or_stay_quiet`.
+4. **Places without a second scan.** `quizzes.check_pages` returns `places`,
+   each EXAMINED page's place by its path in the site's content (recorded
+   before the page's quizzes are read, so a page the site counts quizzes on
+   and the check does not still has one). `_check_quizzes` hands them on,
+   and `_write_site_said` adds `{"place", "source": None}` for each path not
+   already there, so a code page keeps its `source`.
+
+**Measured** (2026-10-23, Quartz's own ObsidianFlavoredMarkdown, GFM and
+the transformer, bundled in the scratchpad over a course folder's own Quartz 4.5.0, the plan review's harness; confirmed in the image by verify.sh): `<img
+alt="x>y" …>` on the line straight after the quiz's title reads as `single`
+and fine to the folder check, and as `notReady` / `choicesInHtml` to the
+site. That is direction `shownWithNote`, and verify.sh's end-to-end fixture
+(Quiz Read Differently) uses it. With an empty `>` line on either side of
+the `<img>` the two agree (`single`), which matches the advice
+`words.problems.choicesInHtml` gives. An open `<pre>` straight after the
+title fires the same way. The extra call costs one Python start
+only when nothing else had already caused one (quizzes alone disagreeing);
+when a block disagrees too, both findings ride the same start.
+
+**Rejected:** merging into `quizzesNotReady` (both apps key a finding on
+name, course and section, #246, so the two would replace each other, and
+that check is said before the site exists); a second emitter or a second
+call to `site_said.py` (a second Python start and a second once-mark); a
+second `pages_students_see` scan to place the quiz pages (the folder check
+already reads each page it examines); Python finding the lines again (the
+folder check already found them, and the printed line already uses them);
+assuming the site's problem is `choicesInHtml`. `shownWorking` is kept
+although it contradicts `quizzesNotReady`'s own words: in that direction the
+folder check over-reported, the contradiction is honest, and the finding
+stays one piece per console line (director's ruling). The nested `reasons`
+are swept for machinery words by `test_site_disagreements.py`, not by the
+apps' sweeps, which read top-level strings only.
 
 ### Live input: what the build adds (#583, v1.8.1)
 
@@ -2129,9 +2203,9 @@ block shares was said ten times and "and 7 more";
 | Reason | When |
 |---|---|
 | `compileError` | Swift found an error; the line is the first error's, in the teacher's file, and the words carry the compiler's own message. The block shows its code with Run off ("This program isn't ready to run yet."). |
-| `noRoom` | the launcher found less than 6 GB free for the Swift image (`state.json` beside the cache says so; plan removes it at the start of every run). |
-| `notDownloaded` | the launcher could not get Swift ready - on a Mac, build the Swift image (about 1.3 GB the first time); on Windows, fetch it (about 2.3 GB; offline, or a download that was not what was pinned) (`state.json`: `{state: notDownloaded}`); the sentence names the download, filled per platform from `swift.downloadGigabytes`, and the internet. |
-| `notCompiled` | nothing recorded, and the sentence says only "preview the course again" (implementation review N1: it used to blame the internet for causes that have nothing to do with it): a compile that did not finish (killed, too slow, wasm-opt failed - none is cached, so the next preview tries again), a wait for another launcher's download that gave up, or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
+| `noRoom` | the launcher found less than 6 GB free for the Swift image, or the disk filled part way through getting Swift ready (`state.json` beside the cache says so; plan removes it at the start of every run). |
+| `notDownloaded` | the launcher could not get Swift ready because it had no internet connection or its download was not what was pinned - on a Mac, building the Swift image (about 1.3 GB the first time; since #642 only these two causes, `mac.stateForReason`); on Windows, fetching it (about 2.3 GB) (`state.json`: `{state: notDownloaded}`); the sentence names the download, filled per platform from `swift.downloadGigabytes`, and the internet. |
+| `notCompiled` | nothing recorded, and the sentence says only "preview the course again" (implementation review N1: it used to blame the internet for causes that have nothing to do with it): a compile that did not finish (killed, too slow, wasm-opt failed - none is cached, so the next preview tries again), a wait for another launcher's download that gave up, a Mac image build that failed for any other cause (#642: `state.json` then holds only `{reason: unpack}`), or no launcher ran - deploy.py's own rebuild for a different web address (`rebuild_for_production`, review N1) runs `build_site.py --build-only` INSIDE the container and uses whatever a preview compiled. |
 
 Until v1.8.6 a fifth reason, `notOnWindows`, said Windows could not compile
 Swift (#493 option (b)); it went when Windows began compiling (#570), and the
@@ -2184,7 +2258,7 @@ app reads from the console and from a scheduled publish's log. On a Mac,
 | the build lock was held for longer than 1,200 s (`windows.waitSeconds`) | `waited` |
 | the build failed, and its failed step or BuildKit's summary says "no space left" (any case) or `curl: (23)` | `noRoom` |
 | ... says `computed checksum did NOT match` or `.tar.gz: FAILED` (sha256sum against the pin) | `damaged` |
-| ... names a curl network failure ((6), (7), (18), (28), (35), (52), (56)), a name that could not be resolved, `dial tcp`, or a timeout | `offline` |
+| ... names a curl network failure ((6), (7), (16), (18), (28), (35), (52), (55), (56), (92)), a name that could not be resolved, `dial tcp`, or a timeout | `offline` |
 | any other failure: a moved pin's HTTP 404 (`curl: (22)`), a certificate curl could not check (`curl: (60)`), a crashed SDK install, a daemon error | `unpack` |
 
 `busy` (another installation running) is Windows' alone. **The reason is read
@@ -2224,12 +2298,60 @@ second copy of the pins); a new script for it (it would need its own baked
 copy check and verify line for nothing `swift_blocks.py` cannot carry, and
 that file is not in the toolchain id).
 
-**Known gap:** the block-level reason is unchanged - a Mac build that failed
-for any cause still writes `{state: notDownloaded}`, whose sentence names the
-internet, so a `damaged`, `noRoom`-mid-build or `unpack` failure tells the
-teacher it could not be downloaded while the trail says why. Windows maps its
-reasons to states (`windows.ensureExit`); the mac adopting that is its own
-issue.
+**What the teacher is told when the build fails** (#642, v1.9.0). Until
+then `preview.sh` printed the sentence that is now `mac.printed.offline` and
+wrote `{state: notDownloaded}` for EVERY failed build, so a full disk or a
+damaged download was blamed on the internet in all three places a teacher
+reads it, while the trail line alone said why. Now the one reading of the log
+decides all of it: `swift_blocks.py got-ready --outcome=failed
+--state=<cache root>/state.json` writes the state, prints the sentence before
+the marker, and names the same reason in the marker.
+
+| The build's reason | `state.json` | each block, and the folder problem | the console (`mac.printed`) |
+|---|---|---|---|
+| `noRoom` (the disk filled part way) | `{reason: noRoom, state: noRoom}` | `reasons.noRoom` | `noRoom`: this Mac ran out of space part way, free some and preview again |
+| `offline` | `{reason: offline, state: notDownloaded}` | `reasons.notDownloaded` | `offline`: the sentence it always printed, byte for byte |
+| `damaged` | `{reason: damaged, state: notDownloaded}` | `reasons.notDownloaded` | `damaged`: Windows' own sentence, true here too |
+| `unpack` (anything else) | `{reason: unpack}` | `reasons.notCompiled` | `unpack`: it could not be got ready on this Mac, preview again |
+
+The mapping is Windows' `ensureExit` exactly (10, 11, 12), and
+`test_swift_blocks.py` holds the two equal by running `ensure` with a failing
+fetch for each reason. `reason` is a record for a helper reading the cache
+folder; nothing reads it. When the website builder prints nothing a teacher
+can read (it could not be asked, or an older copy printed only the marker),
+`preview.sh` prints `mac.printed.unpack` itself, from a literal the launcher
+test holds equal to the contract, and writes no state. The page students see
+does not change: `codeRunner.ts` shows `words.notReady` whatever the reason.
+The trail's event is unchanged (rule 5): its line already names the reason,
+and that reason is now what chooses the sentence.
+
+**Measured** with the dev tree's Python, before the change: `curl: (16)`,
+`(55)`, `(92)` and `(60)` all read as `unpack`. (16) is an HTTP/2 framing
+error, (55) a failure sending, (92) an HTTP/2 stream not closed cleanly -
+each a connection that dropped, which `offline`'s trail words already
+cover - so they are `offline` now, each with a
+`mac.reasonCases` case. **(60), a certificate curl could not check, stays
+`unpack` on purpose**, with a case pinning it: neither "go online" nor "try
+again" fixes it, and a network that intercepts encrypted connections is a
+real case at a school.
+
+**Known limit.** A content filter that answers 403 for download.swift.org is
+`curl: (22)`, so `unpack`, and the teacher is told to preview again - when the
+real fix is a network the filter does not block. A 404 from a moved pin is the
+same code, whose fix is a Plantoir update; neither is told apart from the log.
+
+**Rejected:** bash reading the reason out of the marker and choosing the
+sentence (JSON parsed by `case` patterns, and a second copy of four sentences
+that only a text test would keep in step); new block reasons `damaged` and
+`unpack` (new folder-problem words both platforms render, and Windows would
+have to write new states to reach them, when the three existing reasons
+already name the right fix for each cause); `damaged` → `notCompiled` (it
+would differ from Windows, and at a school the likeliest cause of a download
+that is not what was pinned is a portal or filter answering in place of the
+real server, for which "while it is connected to the internet" is the right
+advice); `(60)` as `offline` or a reason of its own (above); moving the
+free-space check's and the wait's sentences into the contract too (correct,
+and not needed: they already say the right thing).
 
 **Known limit.** The build's fence reader and Quartz's parser read a lazy line
 in a list item differently (`fences.pageShapes`): the build compiles the body
@@ -2247,6 +2369,191 @@ teacher would download 1.3 GB for a language most never use); failing the
 build on a compile error (ruling Q1); clearing the cache on `--full-rebuild`;
 a hand-bumped toolchain version in the key; caching a failure that was not
 the compiler's; one job folder per course.
+
+## GeoGebra sketches: what the build does (#578, v1.9.0)
+
+A teacher writes a ` ```geogebra ` fence — `file:` naming a `.ggb` saved
+from GeoGebra, or GeoGebra commands one per line, as in its Input Bar — and
+students get a sketch they can drag, opened with a tap and served by the
+class site itself. The same split as the figures above: **Python prepares
+and Quartz places.** `scripts/geogebra.py` does everything that can fail;
+the site's transformer and loader (06 → Q) only read what it left. The rules
+and cases: `contracts/shared-rules.json` → `geogebraFences`. Three kinds of
+sketch: a teacher's `.ggb` (`file:`), GeoGebra commands alone, and a sketch
+on geogebra.org (`material_id:`, fetched once and kept — item 9).
+
+1. **When.** ALWAYS section, straight after the figures pass and BEFORE the
+   folder checks (`_prepare_geogebra`), so a sketch that cannot be shown is
+   said where every folder problem is said. It never stops a build.
+2. **Which pages — TWO scans.** `geogebra.pages_students_see` runs
+   `figures.pages_students_see` once with `must_contain="```geogebra"` and
+   once with `"~~~geogebra"`, merged by path. `must_contain` is a plain
+   substring test, so one scan alone never reads a page whose only sketch is
+   in tildes (plan review finding 9; `test_geogebra.py`
+   `test_a_tilde_fence_is_found_by_the_page_scan` is its must-fail, measured
+   red with the second scan taken out).
+3. **Reading a fence** (`read_fence`, ruling Q1): leading `key: value` lines
+   whose key is one of the Obsidian GeoGebra plugin's (`file`,
+   `material_id`, `app`, `height`, `width`, `alt`, `caption`, `toolbar`,
+   `algebra`) or `version` are settings; the first line that is not starts
+   the commands, so GeoGebra's own `a: x + y = 3` is a command. A `---` line
+   ends the settings; a block that opens with `---` is read to the next one.
+   `version:` does nothing but change the fence — the documented way to make
+   a changed geogebra.org sketch be fetched again (stage 4). Every case is in
+   `geogebraFences.settings.cases`. Three slips are said at build time
+   (stage 2 review item 4), because otherwise a student would be the first
+   to see them: a `---` block that is never closed is a problem
+   (`settingsNotClosed` — it would have read every command as a setting and
+   left it out); `file:` with no name is `fileHasNoName`, not a
+   `fileNotFound` naming nothing; and a KNOWN key written among the commands
+   — in capitals (`File: x.ggb`), or after the line that started the
+   commands — is a `plantoir: note:` (`settingAmongCommands`), since it will
+   run as a GeoGebra command that GeoGebra refuses. Only a known key is
+   noted, so GeoGebra's own `slope: Slope(a)` passes silently. **A note is
+   not a folder problem** (stage 3+4 review item 3): it is a line in the
+   build's own output, which the app does not show the teacher, so the one
+   who sees the slip is usually the student, under the sketch: "Line {n}
+   couldn't run" (`lineCouldNotRun`, Q3 in 06). And not every such line is
+   refused: `height: 400` among the commands is a GeoGebra command that
+   makes a NUMBER called `height`, so the sketch opens, the box keeps its
+   own height, and nothing is said on the page at all.
+4. **The key.** A sketch is found by `figures.key_of` — figureFences'
+   `cacheKey` rule, REUSED, so the build and the site (which hashes the mdast
+   code value with `figureRules.keyOf`) agree by a rule both already run.
+   `check_geogebra_rules_against_the_site.py` runs every `keys` case through
+   the site's own Markdown reader in the image: a callout, a callout in a
+   callout, a list item, tildes, Windows line endings and trailing spaces
+   give the same key; `version: 2` gives a new one.
+5. **The file, and why it is published ONCE** (plan review finding 4).
+   `find_file` looks the name up by LISTING each folder — exact spelling
+   first, then one differing only in capitals or Unicode form (Netlify and
+   Cloudflare are case-sensitive) — beside the page, then from the top of the
+   course folder, then by its file name alone in `Media`. It must be a zip
+   holding `geogebra.xml` (read, never unpacked; size from its first
+   `<euclidianView><size>`, the app from `<geogebra app=…>`) and at most
+   20 MB. **A file Quartz leaves out of the site is not found** (stage 2
+   review item 6): one under `private/`, `templates/` or `.obsidian/` at the
+   top of the course folder (Quartz's `ignorePatterns`, root only and
+   case-sensitive — measured with Quartz's own globby in the image:
+   `private/a.ggb` left out, `Private/f.ggb` and `U/private/b.ggb`
+   published), or with any part of its path starting with a dot (the file
+   walk skips those). Said once as `fileNotFound`, never found here and then
+   missing on the site. **Nothing is copied:** Quartz's Assets emitter already publishes
+   every file under `content/` that is not a page, at `slugifyFilePath` of
+   its path, so the manifest records the path in `content/` and the
+   transformer makes the address with that same function. Measured on the
+   slope-angle sketch: 1,594,544 bytes on the site once, plus its 32,484-byte
+   thumbnail — against 3,221,572 had it been copied into `static/` as well.
+   **Rejected:** copying it (twice the bytes); taking the source out of
+   `content/` (a page linking the file for download would break, and
+   `content/Media` mirrors the teacher's own folder, which the build never
+   edits). A file beside a page reaches the site only from a folder the
+   course SHARES: a page listed by name in `shared_files` brings no file with
+   it, so the guidance says to keep a sketch beside a page in a folder, or in
+   `Media`.
+6. **What the site gets.** `quartz/plantoir-geogebra/manifest.json` — the
+   site's words and the attribution addresses from the contract, and, by
+   PAGE and then by fence key (06 → Q2: the same fence on two pages can name
+   two files), per sketch its app, size (the fence's `width:`/`height:` win), description,
+   caption, commands with their lines, toolbar/algebra, where its file is in
+   `content/`, its thumbnail, and the size the button names (the sketch's
+   bytes plus the engine's first load, 2,864,256 bytes gzipped: "about
+   4.5 MB" for the slope-angle sketch, measured 4,473,431 compressed). The
+   `.ggb`'s own `geogebra_thumbnail.png` goes to
+   `quartz/static/geogebra-sketches/`, named by its own SHA-256 so one file
+   on several fences is one picture. No sketch that can be shown: neither
+   folder, and every fence stays the code block it was.
+7. **The gate.** `counts["geogebra"]` — pages students can see with a sketch
+   that can be shown — goes to `page_features.install_gated_assets`, which
+   copies `/opt/vendor/geogebra` (02 → "/opt/vendor/geogebra": 117 files,
+   27,093,283 bytes) to `static/geogebra` only then, and takes it out when
+   none is left ("📐 This site carries GeoGebra for the sketches on 2
+   pages."). A build without the engine says `engineMissing` and shows none.
+8. **What the teacher and an assistant are told.** One folder problem per
+   section build, `geogebraSketchesNotReady` (page, sketch, line — the
+   setting's own line for a setting, the opening fence's otherwise; at most
+   ten), never offered a repair; one `plantoir: error:` line per sketch
+   (`Investigations/GeoGebra Missing.md: geogebra block 1, line 8: …`); a
+   sketch with no `alt:` is a `plantoir: note:` only. **No new trail event**:
+   problems reach the trail through the existing folder-problem line, as the
+   figures' do.
+9. **A sketch from geogebra.org: FETCHED ONCE, kept by the fence** (#578
+   stage 4; ruling Q2 and plan review finding 2; `geogebraFences.fetch` and
+   `.cache`). The first build that meets a `material_id:` fence asks
+   GeoGebra's public materials API
+   (`https://api.geogebra.org/v1.0/materials/{id}?scope=extended&embed=creator`)
+   what the sketch is, then downloads the `.ggb` of its ONE applet (the
+   element of type `G`), checks it as a teacher's file is checked, and only
+   then saves it in **`<builds>/<course>/.geogebra-cache/`** — beside the
+   course's built sites, outside the teacher's folder, shared by the sections
+   (08 names it) — as `<key>.ggb` plus `<key>.json` (id, title, author),
+   **keyed by the fence's own key**, not the sketch's id. A build whose fence
+   has a saved copy asks geogebra.org NOTHING. Changing the fence — the skill
+   says: add or change `version: 2` — gives a new key, so the next build
+   fetches again: that is how a teacher gets a sketch they edited on
+   geogebra.org, with no new button in either app (none exists, and none was
+   invented). `--full-rebuild` leaves the copies alone (`_prepare_geogebra`
+   passes `full_rebuild` and `geogebra.prepare` deliberately ignores it); a
+   copy unused for 90 days goes (`figures.PRUNE_DAYS`, the same rule). The
+   site's copy is written to `quartz/static/geogebra-sketches/<key[:16]>.ggb`
+   — a geogebra.org sketch has no file in `content/` for Quartz to publish —
+   and the card names the author and the licence (06 → Q4). Said: "📐
+   Sketches from geogebra.org: 1 copied now, 0 kept from before." Problems:
+   no copy and no network (or a timeout, a server error, a redirect off
+   geogebra.org's hosts) is `materialCouldNotBeFetched`, a folder problem,
+   and the fence stays code; 403/404/410 or `deleted` is `materialNotFound`;
+   no applet is `materialHasNoSketch`, two or more `materialHasSeveralSketches`;
+   a download that is not a GeoGebra file is `materialHasNoSketch` and is
+   never kept. **A download cut off on the way** (stage 3+4 review items 1
+   and 2) is `materialCouldNotBeFetched` and is never kept: a body shorter
+   than its `Content-Length` (`read(n)` returns what came rather than
+   raising, so `MaterialFetcher._get` compares the two) and a chunked answer
+   that stops (`http.client.IncompleteRead`, an `HTTPException` and NOT an
+   `OSError`, which is why both fetch paths name it). Whatever else a fetch
+   raises is that ONE sketch's `materialCouldNotBeFetched` (`_material`'s
+   catch), so `_prepare_geogebra`'s catch-all — which drops the whole
+   manifest — is never reached by a fetch, and the `file:` sketches on the
+   same site are prepared as ever. Tests: `test_a_cut_off_download_…`
+   (three stub answers: the API cut short, the `.ggb` cut short, the `.ggb`
+   chunked and cut) and `test_a_failed_fetch_takes_no_other_sketch_down`;
+   must-fails, each red: the `HTTPException` catch removed, the length
+   check removed, the per-sketch catch removed. A failed fetch is not
+   remembered: 06 → Q3 says what that costs a build.
+
+   **Measured** (2026-10-24, one request for ju3f2kbg by hand): HTTP 200,
+   1,598 bytes of JSON — `title`, `visibility` "S", `deleted` false,
+   `creator.displayname` "Russell Gordon", and one `elements` entry of type
+   `G` whose `url` is the 1,594,544-byte `.ggb`. That `.ggb` holds its own
+   `geogebra_thumbnail.png`, so the element's `previewUrl` picture is not
+   fetched (one request fewer, and the same thumbnail path as a teacher's
+   file). The image's Python trusts 148 certificate authorities by default,
+   so https to geogebra.org needs nothing added. **Tests never call the real
+   API**: `test_geogebra.py` `MaterialTests` serves both answers from a local
+   server of its own, through the same code, and counts the requests where
+   they arrive; verify.sh plants a saved copy for an id geogebra.org does not
+   have, so a build that asked anyway would fail rather than pass.
+   **Must-fails** (copy-and-restore, each red): keyed by the id → four
+   tests; a request despite a saved copy → three; `--full-rebuild` clearing
+   → the cache case. **Rejected:** asking every build (a class site would
+   change under the teacher, and every preview would need the network);
+   keying by the id (an edited sketch could never be fetched again); clearing
+   on a full rebuild (figures do, because a new engine draws differently — a
+   reason that does not apply here); fetching the preview picture as well.
+
+**`file:` is plain text, not a link.** Obsidian's rename does not rewrite
+it, and Copy a Page does not carry the file (it copies a page's links and
+embeds; below, "`Media` is mirrored WHOLE"). Both arrive as `fileNotFound`
+naming the line, and the lookup by file name in `Media` is what makes "put
+the .ggb in Media" the fix.
+
+**Measured** (2026-10-24, M4 Pro, macOS 26.6, Chrome for Testing 155, the
+verify fixture, a clone served on `[::1]` under the publish's own
+`_headers`): the planted sketch opened in 582–612 ms from the tap, 16
+requests, 8,917,110 bytes as served (2,835,223 compressed); a sketch from
+commands on the same page 40 ms; after Quartz's page change 253–259 ms;
+cross-origin isolated the same; 0 refusals, 0 requests off the site. The
+slope-angle sketch (1.6 MB, with its picture): 698–769 ms, 18 requests,
+10,644,945 bytes (4,473,431 compressed).
 
 ## Self-check quizzes: what the build does (#563, v1.8.0)
 
@@ -2274,7 +2581,10 @@ runnable-code count (`_check_quizzes`):
    line holding only one tag - swallows what follows it to the next empty
    line, as the site reads both: quiz syntax in one at the page's level is
    no quiz, and a list of choices in one makes the quiz `choicesInHtml`, on
-   both sides); a nested `> [!answer]` or
+   both sides; a ` ```geogebra ` or ` ~~~geogebra ` fence opened inside an
+   item of the choices makes it `sketchInAChoice` — #578 stage 5, 06 → Q7 —
+   whether or not the sketch itself can be shown, because the site refuses
+   it either way); a nested `> [!answer]` or
    `> [!explain]` at the
    quiz's own level is that callout; the rest is the question, whose
    paragraphs (and title) are where blanks are counted. `verdict` - the
@@ -2318,7 +2628,11 @@ where they differ (the line from the pages file's `lines`; when the
 top-level counts differ, "the quiz at line L" of the first quiz the check
 found; when only the quizzes in a list or callout differ, "a quiz inside a
 list or another callout at line L" from `nestedLines`) - quiet otherwise. It relies on `build --concurrency 1` (the line
-reaches the build's output from the one parsing thread, review N1).
+reaches the build's output from the one parsing thread, review N1). Since
+#644 each line is also recorded, and the site's emitter says them all as
+ONE `quizzesReadDifferently` folder problem, after any
+`runnableCodeShownAsPlainCode` and in the same call (above, "…and the quiz
+safety net").
 Measured: a `- [ ] ` choice with nothing after the box was read as a box
 here and as text by the site, and the net said so on its first build; the
 rule was then corrected on both sides and pinned (`aBoxNeedsWordsAfterIt`).
@@ -2464,7 +2778,11 @@ wrong section on one platform.
 - The environment sets `TZ=UTC` and a fixed `SOURCE_DATE_EPOCH`
   (2024-01-01), nudging build tooling toward reproducible output —
   part of the [determinism strategy](07-deployment.md#why-determinism-matters)
-  that keeps Netlify uploads small.
+  that keeps Netlify uploads small. It is built by
+  `toolchain_paths.node_environment`, which also adds
+  `--disable-warning=DEP0040` to `NODE_OPTIONS` (#640): on Node 22 Quartz
+  v4.5.0 prints a `punycode` deprecation on every build, and only that one
+  warning is silenced ([02](02-docker-image.md) → "Node 22 (#640)").
 - **Preview mode (default):** kills any process holding the requested
   port (`lsof`, that port only — several previews can run at once). This is
   the one place a port is still the right handle, because here the port is
@@ -3342,6 +3660,67 @@ worth checking on any platform that moves build output.
 
 [◀ Previous: Course Setup](04-course-setup.md) · [Back to index](README.md) · [Next: Quartz Customizations ▶](06-quartz-customizations.md)
 
+## Which file each page came from (#518)
+
+Every build of a section — a preview AND a publish — writes
+`.page-sources.json` into the section's built output, beside `public/` and
+`.visible-pages.json`, never inside `public/`, so no deploy uploads it. It
+maps each address Quartz serves (the page's slug below the site's root) to the
+file in the course folder it was made from, as a POSIX path with its `.md`,
+and whether students see it. Open in Obsidian reads it to open the page a
+section's preview shows (`09-mac-app.md` → "Open in Obsidian opens the page
+the preview shows (#518)"). Format: `contracts/file-formats.json` →
+`pageSourcesList`.
+
+**Where and when.** `_write_page_sources` runs immediately before the
+`if build_only:` branch that either builds for publishing or serves the
+preview — after My Progress, the How I Teach sweep, the #246 hiding and every
+other pass that adds or removes a page — so the list matches what Quartz
+reads. It has to be before the branch: the serve branch never reaches the
+publish-only `_write_visible_places`, and a preview is exactly when the list
+is wanted. Atomic (`_write_json_atomically`), and a failure to write it
+prints a warning and never fails the build: without it the app opens the
+section as before. In the ALWAYS part of the build, so every existing folder
+gets it on its next build.
+
+**What it is made from.** `_vault_sources`, which the content copy already
+fills for the date pass (#275). Per entry: `page_slug_as_quartz_serves`
+(`_quartz_page_slug`, plus Quartz 4.5.0's two departures measured 2026-10-21
+on 38 names — only an exact `.md` is a page, and a last segment `_index` is
+`index`; `obsidianOpensThePreviewedPage.slugCases`); two files making one
+address are written `{collided: true}` with no file; a page the build made
+(My Progress, a coverage map), a file no longer there and one outside the
+course folder after links are followed are left out; `hidden` is the build's
+own `_is_draft`. The front page's entry gains `shows` when the teacher's
+`section<N>/index.md` — read from the teacher's file, not the build's copy,
+which gains a title and may gain the section marker — is nothing but a single
+`![[…]]` line below its settings, naming exactly one page (Russell's ruling
+1: open the class the front page shows), and with it `showsHidden`, the
+build's `_is_draft` of THAT class page: the front page can be visible while
+the class it embeds is hidden, and the trail's "(hidden from students)" is
+said of the file that opens, so the front page's own `hidden` cannot stand
+in for it (#518 implementation review).
+
+**One correction, one trap left alone.** The per-section folder copy credits
+EVERY file under a folder it copied to the section, so when a folder name is
+both shared and per-section, a shared page copied there first is credited to
+a section file that does not exist. The list names the shared file at the
+same place instead. The record itself (`_vault_sources`, which the date pass
+also writes back through) is unchanged; that trap is a toolchain issue of its
+own (#518's plan, recommended for v2.0.0).
+
+**Measured against Quartz itself.** `scripts/test_page_sources.py` runs the
+slug cases and a course copied the way the build copies it, in the image
+under `verify.sh`; then `verify.sh` reads the real EXC2O build's list back
+(`--site`) and requires a `public/<slug>.html` for every listed page students
+see, and every listed file in the course folder.
+
+**Rejected:** writing it only in a publish (a preview is the case it is for);
+comparing its `buildId` with the preview's (the app never learns which build
+a preview shows, and `.build-id` moves on Rebuild Preview before the list
+does — diagnosis only); keeping it inside `public/` (every deploy route ships
+`public/`).
+
 ## `Media` is mirrored WHOLE, so a picture is uploaded before its page is
 
 Every build copies the course's `Media` folder into the build tree entire —
@@ -3363,3 +3742,9 @@ by reading the site: nothing links to those files until the page is published.
 It is written down because "why is last year's PDF on my site already?" is a
 question somebody will ask, and the answer is a rule about `Media` rather than
 anything the copy did.
+
+A GeoGebra sketch named by `file:` (#578) is the one file Copy a Page leaves
+behind: the fence's `file:` line is plain text, not a link or an embed, so
+the copy does not see it and the copied page's sketch is `fileNotFound`
+until the `.ggb` is put in the destination's `Media` (where the build's
+lookup finds it by its name alone) or the line is changed.

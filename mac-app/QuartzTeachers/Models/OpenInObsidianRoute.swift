@@ -2,13 +2,16 @@ import Foundation
 
 /// The note about a reference course's locked pages, asked for before
 /// Obsidian opens: the course, and the folder Obsidian reveals once the note
-/// is answered (the section's own when asked from a section).
+/// is answered (the section's own when asked from a section) — or the page
+/// the section's preview was showing at the press (#518), which opens
+/// instead.
 struct LockedPagesNoteRequest: Identifiable {
 
     // MARK: - Stored properties
 
     let course: Course
     let folder: URL
+    var page: URL? = nil
 
     // MARK: - Computed properties
 
@@ -20,7 +23,8 @@ struct LockedPagesNoteRequest: Identifiable {
 /// Obsidian's add-ons question (#495), or the reopen question, waiting to
 /// be shown before Obsidian opens: the course, the folder Obsidian reveals
 /// afterwards, the add-ons the course needs, and whether the course is open
-/// in Obsidian right now.
+/// in Obsidian right now — and the page the section's preview was showing
+/// at the press (#518), which opens instead of the folder once answered.
 struct ObsidianAddOnsRequest: Identifiable {
 
     // MARK: - Stored properties
@@ -29,12 +33,59 @@ struct ObsidianAddOnsRequest: Identifiable {
     let folder: URL
     let needed: [ObsidianFigureAddOn]
     let courseIsOpen: Bool
+    var page: URL? = nil
 
     // MARK: - Computed properties
 
     var id: String {
         return course.code + "|" + folder.path
     }
+}
+
+/// What one press of a section window's Open in Obsidian came to, for the
+/// assistant's `open_in_obsidian` (#610), which has to SAY what happened.
+///
+/// The page in `.opened` is the answer read ONCE, at the press — the same
+/// answer that chose what Obsidian was handed — so the reply can never name a
+/// page other than the one that opened (a second read of the web view could).
+enum OpenInObsidianPress: Equatable {
+
+    /// Obsidian was handed the page the preview showed, or the section as
+    /// before, and why.
+    case opened(PreviewedPageSource.Answer)
+
+    /// A question is up in the section window (the locked-pages note, the
+    /// add-ons offer or the reopen question); Obsidian opens once it is
+    /// answered.
+    case waitingForAnAnswer
+
+    /// An earlier press is still looking the course over; this one did
+    /// nothing, as a second click on the button does.
+    case alreadyOpening
+
+    /// No window answered the press — the default for a window that does
+    /// not register one.
+    case noWindow
+}
+
+/// What the route did with one press, for its two callers (#610).
+struct OpenInObsidianPressed {
+
+    // MARK: - Stored properties
+
+    /// Obsidian was handed something now.
+    let opened: Bool
+
+    /// The press went ahead (and left its trail line); false only for a
+    /// second press while the add-ons scan of the first is running.
+    let wentAhead: Bool
+
+    /// The add-ons scan started, and decides once it is back.
+    let scanStarted: Bool
+
+    /// The page on screen at the press, or why the section opens; nil for a
+    /// course press.
+    let answer: PreviewedPageSource.Answer?
 }
 
 /// Everything Open in Obsidian asks of the world outside the app — Obsidian
@@ -67,6 +118,25 @@ struct ObsidianOpening {
         FolderActions.openInObsidian(revealing: folder, vaultURL: vault)
     }
 
+    /// Opens one page in Obsidian (#518) — the page's own door, since the
+    /// folder door looks for `<page>/index.md` and opens the vault instead.
+    var openPage: @MainActor (_ page: URL, _ vault: URL) -> Void = { page, vault in
+        FolderActions.openPageInObsidian(page, vaultURL: vault)
+    }
+
+    /// The address below its root of the page a section's preview is
+    /// showing right now, or nil when none is (#518) — asked of the section
+    /// window itself, which owns the web view.
+    var previewedAddress: @MainActor (_ workingFolderPath: String?, _ courseCode: String, _ sectionNumber: Int) -> String? = { workingFolderPath, courseCode, sectionNumber in
+        guard let workingFolderPath else {
+            return nil
+        }
+        let controller: SectionWindowControllers.Controller? = SectionWindowControllers.shared.controller(
+            folderPath: workingFolderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
+        return controller?.previewedPage()
+    }
+
     /// Quits Obsidian and waits for it to be gone.
     var quitAndWait: @MainActor () async -> Void = {
         await FolderActions.quitObsidianAndWait()
@@ -97,7 +167,17 @@ extension WorkspaceModel {
 
     /// Open in Obsidian — the ONE function every route calls: the section
     /// window's toolbar button, Course Settings' toolbar button, a row's
-    /// context menu, and Course ▸ / Section ▸ Open in Obsidian (#457).
+    /// context menu, Course ▸ / Section ▸ Open in Obsidian (#457), and the
+    /// in-app assistant's `open_in_obsidian` (#610), which presses the section
+    /// window's own through `openInObsidianAndWait` below.
+    ///
+    /// `atThePreviewedPage` is true for a SECTION's press — the section
+    /// window's button, Section ▸ Open in Obsidian and a section row's menu
+    /// (#518, ruling 3): while that section's preview shows a page, the file
+    /// behind it opens instead of the section's front page
+    /// (`PreviewedPageSource`), and the press leaves a trail line either way
+    /// (ruling 5). Course presses leave it false and open what they always
+    /// did.
     ///
     /// On a course kept for reference it locks the pages again first (a
     /// folder back from another Mac or a backup is not locked until somebody
@@ -125,17 +205,76 @@ extension WorkspaceModel {
     func openInObsidian(
         course: Course,
         sectionNumber: Int?,
+        atThePreviewedPage: Bool = false,
         lockAgain: @MainActor (Course) -> Void = ReferenceLock.ensureLockedInBackground
     ) -> Bool {
+        let pressed: OpenInObsidianPressed = pressOpenInObsidian(
+            course: course, sectionNumber: sectionNumber,
+            atThePreviewedPage: atThePreviewedPage, lockAgain: lockAgain
+        )
+        return pressed.opened
+    }
+
+    /// A SECTION's press of Open in Obsidian, for the assistant (#610): the
+    /// same route the button takes (`openInObsidian` above, with
+    /// `atThePreviewedPage`), and then — because the assistant has to say
+    /// what happened — waits for the add-ons scan when one started, and
+    /// reports what the press came to.
+    ///
+    /// Called by the section window's controller on the WINDOW's own model:
+    /// the questions this route can ask are presented only by the window
+    /// that owns the model, so a press on any other model would set a
+    /// request nobody shows.
+    func openInObsidianAndWait(
+        course: Course,
+        sectionNumber: Int,
+        lockAgain: @MainActor (Course) -> Void = ReferenceLock.ensureLockedInBackground
+    ) async -> OpenInObsidianPress {
+        let pressed: OpenInObsidianPressed = pressOpenInObsidian(
+            course: course, sectionNumber: sectionNumber,
+            atThePreviewedPage: true, lockAgain: lockAgain
+        )
+        guard pressed.wentAhead, let answer = pressed.answer else {
+            return .alreadyOpening
+        }
+        if pressed.opened {
+            return .opened(answer)
+        }
+        if pressed.scanStarted, let work = obsidianAddOnsWork {
+            await work.value
+        }
+        if lockedPagesNoteRequest != nil || obsidianAddOnsOfferRequest != nil || obsidianReopenRequest != nil {
+            return .waitingForAnAnswer
+        }
+        return .opened(answer)
+    }
+
+    /// The route itself, shared by both callers above: what it did, and the
+    /// answer read at the press.
+    private func pressOpenInObsidian(
+        course: Course,
+        sectionNumber: Int?,
+        atThePreviewedPage: Bool,
+        lockAgain: @MainActor (Course) -> Void
+    ) -> OpenInObsidianPressed {
         let folder: URL = FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)
+        // Read at the press (the page on screen now), but written to the
+        // trail only once the press goes ahead: a second press while the
+        // add-ons scan runs does nothing, so it says nothing.
+        var answer: PreviewedPageSource.Answer? = nil
+        if atThePreviewedPage, let sectionNumber {
+            answer = previewedPageAnswer(course: course, sectionNumber: sectionNumber)
+        }
+        let page: URL? = WorkspaceModel.pageToOpen(answer)
         if course.isKeptForReference {
+            notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
             lockAgain(course)
             if !LockedPagesNote.hasBeenShown(courseCode: course.code) {
-                lockedPagesNoteRequest = LockedPagesNoteRequest(course: course, folder: folder)
-                return false
+                lockedPagesNoteRequest = LockedPagesNoteRequest(course: course, folder: folder, page: page)
+                return OpenInObsidianPressed(opened: false, wentAhead: true, scanStarted: false, answer: answer)
             }
-            obsidianOpening.open(folder, course.directoryURL)
-            return true
+            openObsidian(folder, page: page, course: course)
+            return OpenInObsidianPressed(opened: true, wentAhead: true, scanStarted: false, answer: answer)
         }
         let settings: AppSettings = obsidianOpening.settings ?? AppSettings.shared
         if !ObsidianFigureAddOnsOffer.scans(
@@ -144,21 +283,23 @@ extension WorkspaceModel {
             answer: settings.obsidianFigureAddOns,
             suppressedThisRun: ObsidianFigureAddOnsThisRun.suppressed
         ) {
-            obsidianOpening.open(folder, course.directoryURL)
-            return true
+            notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
+            openObsidian(folder, page: page, course: course)
+            return OpenInObsidianPressed(opened: true, wentAhead: true, scanStarted: false, answer: answer)
         }
         let coursePath: String = course.directoryURL.path
         if ObsidianFigureAddOnsThisRun.beingOpened.contains(coursePath) {
-            return false
+            return OpenInObsidianPressed(opened: false, wentAhead: false, scanStarted: false, answer: answer)
         }
+        notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
         ObsidianFigureAddOnsThisRun.beingOpened.insert(coursePath)
         let scan = obsidianOpening.scan
         obsidianAddOnsWork = Task { @MainActor in
             let scanned: (needed: [ObsidianFigureAddOn], wouldAdd: [ObsidianFigureAddOn]) = await scan(coursePath)
-            await self.openInObsidian(course: course, folder: folder, needed: scanned.needed, wouldAdd: scanned.wouldAdd)
+            await self.openInObsidian(course: course, folder: folder, page: page, needed: scanned.needed, wouldAdd: scanned.wouldAdd)
             ObsidianFigureAddOnsThisRun.beingOpened.remove(coursePath)
         }
-        return false
+        return OpenInObsidianPressed(opened: false, wentAhead: true, scanStarted: true, answer: answer)
     }
 
     /// The note was answered "Open in Obsidian": remember it was shown, and
@@ -166,7 +307,7 @@ extension WorkspaceModel {
     func openInObsidianAfterTheNote(_ request: LockedPagesNoteRequest) {
         LockedPagesNote.remember(courseCode: request.course.code)
         lockedPagesNoteRequest = nil
-        obsidianOpening.open(request.folder, request.course.directoryURL)
+        openObsidian(request.folder, page: request.page, course: request.course)
     }
 
     /// The offer was answered (#495). Obsidian opens after every answer.
@@ -189,7 +330,7 @@ extension WorkspaceModel {
         case .notNowDontAskAgain:
             settings.obsidianFigureAddOns = .no
         }
-        obsidianOpening.open(request.folder, request.course.directoryURL)
+        openObsidian(request.folder, page: request.page, course: request.course)
     }
 
     /// The reopen question was answered (#495): Reopen closes Obsidian, adds
@@ -203,7 +344,7 @@ extension WorkspaceModel {
         }
         ObsidianFigureAddOnsThisRun.reopenDeclined.insert(request.course.directoryURL.path)
         ActivityTrail.note(.obsidianReopenedForAddOns, ObsidianFigureAddOnsTrail.reopenDeclined(course: request.course.code))
-        obsidianOpening.open(request.folder, request.course.directoryURL)
+        openObsidian(request.folder, page: request.page, course: request.course)
     }
 
     /// A section's preview has just shown a fresh build (#495's second
@@ -244,11 +385,67 @@ extension WorkspaceModel {
 
     // MARK: - Private helpers
 
+    /// The one place Open in Obsidian hands Obsidian something: the page the
+    /// section's preview was showing when there is one (#518), the folder
+    /// (its front page, or the course) otherwise.
+    private func openObsidian(_ folder: URL, page: URL?, course: Course) {
+        if let page {
+            obsidianOpening.openPage(page, course.directoryURL)
+            return
+        }
+        obsidianOpening.open(folder, course.directoryURL)
+    }
+
+    /// A section's press (#518): the file behind the page its preview is
+    /// showing, or why the section opens as before. Writes nothing; the
+    /// trail line is `notePreviewedPress`'s, once the press goes ahead.
+    private func previewedPageAnswer(course: Course, sectionNumber: Int) -> PreviewedPageSource.Answer {
+        let address: String? = obsidianOpening.previewedAddress(workspaceURL?.path, course.code, sectionNumber)
+        var listData: Data? = nil
+        if address != nil {
+            listData = try? Data(contentsOf: PreviewedPageSource.listURL(
+                courseFolder: course.directoryURL, sectionNumber: sectionNumber
+            ))
+        }
+        return PreviewedPageSource.resolve(
+            address: address, listData: listData, courseFolder: course.directoryURL
+        )
+    }
+
+    /// The file a section's press opens, or nil for the section as before
+    /// (and for every course press, which has no answer).
+    private static func pageToOpen(_ answer: PreviewedPageSource.Answer?) -> URL? {
+        guard let answer else {
+            return nil
+        }
+        if case .page(let file, _, _) = answer {
+            return file
+        }
+        return nil
+    }
+
+    /// The trail line for a section's press that goes ahead — the page, or
+    /// why the section opened instead (ruling 5). A course press has no
+    /// answer and writes nothing.
+    private func notePreviewedPress(_ answer: PreviewedPageSource.Answer?, course: Course, sectionNumber: Int?) {
+        guard let answer, let sectionNumber else {
+            return
+        }
+        ActivityTrail.note(
+            .pageOpenedInObsidian, PreviewedPageSource.trailWords(answer),
+            course: course.code, section: sectionNumber
+        )
+    }
+
     /// What Open in Obsidian does once the scan is back.
-    private func openInObsidian(course: Course, folder: URL, needed: [ObsidianFigureAddOn], wouldAdd: [ObsidianFigureAddOn]) async {
+    private func openInObsidian(course: Course, folder: URL, page: URL?, needed: [ObsidianFigureAddOn], wouldAdd: [ObsidianFigureAddOn]) async {
         let settings: AppSettings = obsidianOpening.settings ?? AppSettings.shared
         let coursePath: String = course.directoryURL.path
-        let target: URL = FolderActions.obsidianTarget(forFolder: folder, vaultURL: course.directoryURL)
+        // The file Obsidian is handed, which decides which vault opens it.
+        var target: URL = FolderActions.obsidianTarget(forFolder: folder, vaultURL: course.directoryURL)
+        if let page {
+            target = FolderActions.pageTarget(page, vaultURL: course.directoryURL)
+        }
         let situation: ObsidianFigureAddOnsOffer.Situation = ObsidianFigureAddOnsOffer.Situation(
             reference: course.isKeptForReference,
             obsidianInstalled: true,
@@ -263,23 +460,23 @@ extension WorkspaceModel {
         )
         switch ObsidianFigureAddOnsOffer.decision(situation) {
         case .justOpen:
-            obsidianOpening.open(folder, course.directoryURL)
+            openObsidian(folder, page: page, course: course)
         case .notTheVault:
             let line: String = ObsidianFigureAddOnsTrail.notTheVault(course: course.code)
             if !ObsidianFigureAddOnsThisRun.linesWritten.contains(line) {
                 ObsidianFigureAddOnsThisRun.linesWritten.insert(line)
                 ActivityTrail.note(.obsidianAddOnsOffered, line)
             }
-            obsidianOpening.open(folder, course.directoryURL)
+            openObsidian(folder, page: page, course: course)
         case .offer:
-            obsidianAddOnsOfferRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: false)
+            obsidianAddOnsOfferRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: false, page: page)
         case .offerWhileOpen:
-            obsidianAddOnsOfferRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: true)
+            obsidianAddOnsOfferRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: true, page: page)
         case .installThenOpen:
             await addObsidianAddOns(toCourse: course, needed, trigger: .openInObsidian)
-            obsidianOpening.open(folder, course.directoryURL)
+            openObsidian(folder, page: page, course: course)
         case .askReopen:
-            obsidianReopenRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: true)
+            obsidianReopenRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: true, page: page)
         }
     }
 
@@ -294,13 +491,13 @@ extension WorkspaceModel {
         // screen (#495 implementation review B1).
         if obsidianOpening.isRunning() {
             ActivityTrail.note(.obsidianReopenedForAddOns, ObsidianFigureAddOnsTrail.didNotClose(course: request.course.code))
-            obsidianOpening.open(request.folder, request.course.directoryURL)
+            openObsidian(request.folder, page: request.page, course: request.course)
             return
         }
         await addObsidianAddOns(toCourse: request.course, request.needed, trigger: .afterReopening)
         ActivityTrail.note(.obsidianReopenedForAddOns, ObsidianFigureAddOnsTrail.reopened(course: request.course.code))
         obsidianOpening.reopen(wereOpen)
-        obsidianOpening.open(request.folder, request.course.directoryURL)
+        openObsidian(request.folder, page: request.page, course: request.course)
     }
 
     /// The vaults #495 treats as open: Obsidian is running and its registry

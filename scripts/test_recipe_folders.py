@@ -5,7 +5,9 @@ The toolchain recipe's folder list has FOUR copies. This pins them together.
 The list lives in `contracts/toolchain.json` -> recipeFolders. The carriers are:
 
 * the Dockerfile's `COPY` lines — checked in BOTH directions,
-* the mac app's `WorkspaceModel.refreshToolchain`,
+* the mac app's `WorkspaceModel.mirroredFolders` (since #663; until then an
+  inline list in `copyToolchainFiles`),
+* the mac build phase that fingerprints them, `mac-app/BuildScripts/write_toolchain_hashes.py` (#663),
 * Windows' `ToolchainMirror.RecipeFolders`,
 * the marketing screenshot harness, `website/shots/capture.py`,
 * `mac-app/project.yml`, which bundles them,
@@ -92,9 +94,18 @@ class RecipeFolderListsAgree(unittest.TestCase):
 
     def test_the_mac_app_mirrors_every_recipe_folder(self):
         text = (REPO / "mac-app" / "QuartzTeachers" / "Models" / "WorkspaceModel.swift").read_text(encoding="utf-8")
-        found = _bracketed_list(text, "for folderName in")
+        found = _bracketed_list(text, "static let mirroredFolders")
         self.assertEqual(found, expected_folders(),
-                         "WorkspaceModel.refreshToolchain's folder list has drifted "
+                         "WorkspaceModel.mirroredFolders has drifted "
+                         "from contracts/toolchain.json -> recipeFolders")
+
+    def test_the_mac_manifest_fingerprints_every_recipe_folder(self):
+        # A folder the manifest leaves out is compared the old way, by reading
+        # both copies, on every restamped pass (#663).
+        text = (REPO / "mac-app" / "BuildScripts" / "write_toolchain_hashes.py").read_text(encoding="utf-8")
+        found = _bracketed_list(text, "FOLDERS =")
+        self.assertEqual(found, expected_folders(),
+                         "write_toolchain_hashes.py's FOLDERS has drifted "
                          "from contracts/toolchain.json -> recipeFolders")
 
     def test_the_windows_app_mirrors_every_recipe_folder(self):

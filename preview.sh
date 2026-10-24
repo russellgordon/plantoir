@@ -399,8 +399,20 @@ ensure_build_root() {
 # one. `lockf -k` on the folder takes the same lock the app's `flock` does and
 # creates no file. Where there is no lockf, or the volume refuses locks, the
 # line is appended unlocked rather than dropped.
+#
+# The folder is the app's trail folder, which the app hands over in
+# PLANTOIR_TRAIL_DIR (GitHub #664): an app started with --state-dir keeps its
+# trail in that state folder while every launcher it starts still has the real
+# HOME, so a line computed from HOME landed in the real trail. Only an ABSOLUTE
+# path is taken; an empty or relative value falls back to the folder under
+# HOME, so a stray value never writes a trail into the working folder. It moves
+# the trail and nothing else: the builds root and the tools still follow HOME.
+# contracts/app-rules.json -> launcherTrailFolder.
 note_on_the_trail() {
   local trail="${HOME%/}/Library/Logs/Plantoir"
+  case "${PLANTOIR_TRAIL_DIR:-}" in
+    /*) trail="${PLANTOIR_TRAIL_DIR%/}" ;;
+  esac
   mkdir -p "$trail" 2>/dev/null || return 0
   local trail_line
   trail_line="$(date '+%Y-%m-%d %H:%M:%S') · $1"
@@ -3614,9 +3626,10 @@ give_back_the_swift_build_lock() {
 # shape Windows prints (codeRunnerBlocks.swift.mac in
 # contracts/shared-rules.json). Written by swift_blocks.py in the website
 # builder, which reads this run's build log at its own path, so the bytes and
-# the reason are worked out in the shared Python both test suites run. Prints
-# nothing when the builder cannot be asked: the trail line is lost, the
-# preview is not.
+# the reason are worked out in the shared Python both test suites run. After a
+# failed build it also prints the teacher's sentence and writes state.json
+# (--state, #642). Prints nothing when the builder cannot be asked: the trail
+# line is lost, the preview is not.
 say_how_swift_got_ready() {
   docker exec "$CONTAINER_NAME" python3 /opt/scripts/swift_blocks.py got-ready \
     --course="$COURSE" --section="$SECTION" "$@" 2>/dev/null || true
@@ -3685,9 +3698,28 @@ prepare_runnable_swift() {
         prune_superseded_swift_images "$swift_image"
       else
         give_back_the_swift_build_lock
-        printf '{"state": "notDownloaded"}\n' > "$root/state.json" 2>/dev/null || true
-        echo "⚠️  Could not get Swift ready — the first time needs an internet connection. The rest of the site builds as usual; preview again once online to make its Swift programs runnable."
-        say_how_swift_got_ready --outcome=failed --log="$logs/swift-build-$$.log"
+        # Why it failed decides what the teacher reads, what state.json says
+        # (so each block's reason and the folder problem) and the trail's
+        # reason - all from one reading of the log, in the website builder
+        # (#642, codeRunnerBlocks.swift.mac.printed and stateForReason).
+        # Until #642 every failure said "needs an internet connection".
+        local said line told=""
+        said="$(say_how_swift_got_ready --outcome=failed --log="$logs/swift-build-$$.log" --state="$root/state.json")"
+        while IFS= read -r line; do
+          case "$line" in
+            ""|PLANTOIR_SWIFT:*) ;;
+            *) told="yes" ;;
+          esac
+        done <<< "$said"
+        if [[ -z "$told" ]]; then
+          # The builder said nothing a teacher can read (it could not be
+          # asked, or its copy predates --state): mac.printed.unpack, and no
+          # state.json, so the blocks say "preview the course again".
+          echo "⚠️  Swift could not be got ready on this Mac. The rest of the site builds as usual; preview again to try once more."
+        fi
+        if [[ -n "$said" ]]; then
+          printf '%s\n' "$said"
+        fi
         rm -rf "$jobs"
         return 0
       fi

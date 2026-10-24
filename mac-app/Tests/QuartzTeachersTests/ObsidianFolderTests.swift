@@ -48,7 +48,9 @@ final class ObsidianFolderTests: XCTestCase {
         let detail: String = try String(
             contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Section/SectionDetailView.swift"), encoding: .utf8
         )
-        XCTAssertTrue(detail.contains("workspace.openInObsidian(course: course, sectionNumber: sectionNumber)"),
+        // #518: the toolbar asks for the page the preview shows; it is still
+        // the one function.
+        XCTAssertTrue(detail.contains("workspace.openInObsidian(course: course, sectionNumber: sectionNumber, atThePreviewedPage: true)"),
                       "the section window's toolbar button")
     }
 

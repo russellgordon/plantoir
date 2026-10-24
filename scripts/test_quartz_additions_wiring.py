@@ -135,7 +135,11 @@ class WiringTests(unittest.TestCase):
                       "the runner's transformer goes straight before SyntaxHighlighting, at its indent")
         self.assertEqual(self.text("transformers").count('export { PlantoirQuizzes } from "./plantoirQuizzes"'), 1)
         self.assertEqual(config.count("Plugin.PlantoirQuizzes(),"), 1)
-        self.assertIn("      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n", config,
+        # #578: the GeoGebra sketches' transformer stands between the two.
+        self.assertEqual(config.count("Plugin.PlantoirGeoGebra(),"), 1)
+        self.assertEqual(self.text("transformers").count('export { PlantoirGeoGebra } from "./plantoirGeoGebra"'), 1)
+        self.assertIn("      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirGeoGebra(),\n"
+                      "      Plugin.PlantoirQuizzes(),\n", config,
                       "the quizzes' transformer goes straight after the figures', so after Description, at its indent")
         self.assertEqual(self.text("transformers").count('export { PlantoirTasks } from "./plantoirTasks"'), 1)
         self.assertEqual(config.count("Plugin.PlantoirTasks(),"), 1)
@@ -209,7 +213,7 @@ class WiringTests(unittest.TestCase):
         build_site.wire_quartz_additions(self.output)
         config = self.text("config")
         self.assertEqual(config.count("Plugin.PlantoirFigures("), 1)
-        self.assertIn("Plugin.PlantoirFigures(),\n      Plugin.PlantoirQuizzes(),\n", config)
+        self.assertIn("Plugin.PlantoirFigures(),\n      Plugin.PlantoirGeoGebra(),\n      Plugin.PlantoirQuizzes(),\n", config)
 
     def test_a_section_wired_before_519_gets_the_task_boxes_after_its_quizzes(self):
         self.files["config"].write_text(CONFIG.replace(

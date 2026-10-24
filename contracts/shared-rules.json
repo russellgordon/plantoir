@@ -772,7 +772,7 @@
       {
         "carries": "the course, and that Course Settings made an EMPTY page (so no counts); or that it could not, and why.",
         "event": "How I Teach page started",
-        "why": "#329: Course Settings' 'Create and Open' puts a page the teacher did not write into the course folder, and the assistant then calls it 'not written yet' (howITeachPage.emptyPageIsNotWritten) - so 'where did this page come from?' is answerable by this line and nothing else. The #209 lines cover reads and ASSISTANT writes, not this door. Opening a page that is there writes nothing, as the toolbar's Open in Obsidian writes nothing. No appliesOn: Windows gets the same row and owes the same line.",
+        "why": "#329: Course Settings' 'Create and Open' puts a page the teacher did not write into the course folder, and the assistant then calls it 'not written yet' (howITeachPage.emptyPageIsNotWritten) - so 'where did this page come from?' is answerable by this line and nothing else. The #209 lines cover reads and ASSISTANT writes, not this door. Opening a page that is there writes nothing, as Course Settings' Open in Obsidian writes nothing (a SECTION's Open in Obsidian writes 'page opened in Obsidian' since #518). No appliesOn: Windows gets the same row and owes the same line.",
         "line": "started an empty How I Teach page from Course Settings / could not start the How I Teach page from Course Settings: {reason}"
       },
       {
@@ -874,8 +874,8 @@
       },
       {
         "event": "working folder tools copied",
-        "carries": "the working folder's path (redacted), how many files were brought up to date, how many could not be copied or removed, how many seconds it took, and the outcome in the sentence: got ready, or could not finish - with the first file that could not be copied or removed (from the working folder down) and its error, or the error that stopped the copy. On Windows since #559 (the mac: GitHub #663) it also carries how many files were compared with an existing copy and, in brackets, how many of those had to be read in full to compare them, each said only when it is above 0 ('14 files brought up to date, 12889 compared (12745 read in full) in 131.6 s'). The sentence never says 'update': the same copy fills a folder set up from nothing and refreshes any stale one",
-        "why": "GitHub #473 (Windows v1.4.5). The first launch after an update copies the app's tools into the working folder, and that copy measured 119.7 s and 93.7 s on 2026-10-07 (Intel Core i5-8365U, Windows 11 Pro 26200), during which the teacher saw no window at all. It now runs after the window appears, with a banner and with Preview, Deploy and New Course disabled until it is done, so a teacher can now SEE it happen - and 'Plantoir sat there saying it was getting the folder ready' and 'Preview was greyed out for ages after the update' are reports this line answers: when, how long, how many files, and whether it failed. Written ONCE per copy that changed or failed something - and, on Windows since #559, per copy that had to READ any file to compare it - never for the ordinary launch that compares every file by length and time and finds nothing to do, which would bury the one line that matters. The reads are why: on 2026-10-16 the 1.7.1 -> 1.7.2 copy took 131.6 s for 14 changed files, because about 12,700 same-length files had a different time and were read twice (the bundle had been built from a freshly checked-out tree), and the line said only '14 files'; a pass that re-read every file and changed none (11.2 s warm, measured 2026-10-22) left no line at all. Since #559 Windows compares such files by the bundle's manifest (.hashes, beside the bundled recipe) and the folder's index instead of reading them, so a line with reads in it now means a fingerprint could not vouch for a file - a copy whose own time moved, a bundle built without its manifest - which is exactly what a slow launch is diagnosed from (documentation/12-windows-app.md, 'Comparing without reading (#559)'). One event for both outcomes, the outcome in the sentence, following the scheduled-run precedent above: somebody reading the trail wants to know the folder was or was not got ready, not which of two keys was chosen. On the mac since #476 (2026-10-08): the same copy runs off the main actor (ToolchainReadiness.ensure), with Preview, Deploy and New Course greyed and a banner once a file is written, the mac's half of the same design (documentation/09-mac-app.md, 'Getting a folder ready after an update'); ToolchainReadiness writes this line with the same counts, seconds and first failure; a copy that failed is remembered and skipped by the routine reloads until File > Reload Courses or a newly pointed window retries it, which is Windows' rule too. Until #476 this entry was appliesOn windows, written as permanent because the mac had no visible moment for it; it has one now. On Windows since #477 the scheduled run makes the same copy before it builds, and its line names the course and section and says 'for a scheduled deploy'; a failure there ends '; the scheduled deploy stood down' instead of pointing at File > Reload Courses, which nobody is there to choose at half six. Since #484, a copy a closing window waited for ends ', and Plantoir waited for it before closing'."
+        "carries": "the working folder's path (redacted), how many files were brought up to date, how many could not be copied or removed, how many seconds it took, and the outcome in the sentence: got ready, or could not finish - with the first file that could not be copied or removed (from the working folder down) and its error, or the error that stopped the copy. On both platforms (Windows since #559, the mac since #663) it also carries how many files were compared with an existing copy and, in brackets, how many of those had to be read in full to compare them, each said only when it is above 0 ('14 files brought up to date, 12889 compared (12745 read in full) in 131.6 s' on Windows; the mac keeps its own 'file(s)' and colon). The sentence never says 'update': the same copy fills a folder set up from nothing and refreshes any stale one",
+        "why": "GitHub #473 (Windows v1.4.5). The first launch after an update copies the app's tools into the working folder, and that copy measured 119.7 s and 93.7 s on 2026-10-07 (Intel Core i5-8365U, Windows 11 Pro 26200), during which the teacher saw no window at all. It now runs after the window appears, with a banner and with Preview, Deploy and New Course disabled until it is done, so a teacher can now SEE it happen - and 'Plantoir sat there saying it was getting the folder ready' and 'Preview was greyed out for ages after the update' are reports this line answers: when, how long, how many files, and whether it failed. Written ONCE per copy that changed or failed something - and, since #559 on Windows and #663 on the mac, per copy that had to READ any file to compare it - never for the ordinary launch that compares every file by length and time and finds nothing to do, which would bury the one line that matters. The reads are why: on 2026-10-16 the 1.7.1 -> 1.7.2 copy took 131.6 s for 14 changed files, because about 12,700 same-length files had a different time and were read twice (the bundle had been built from a freshly checked-out tree), and the line said only '14 files'; a pass that re-read every file and changed none (11.2 s warm, measured 2026-10-22) left no line at all. Since #559 Windows compares such files by the bundle's manifest (.hashes, beside the bundled recipe) and the folder's index instead of reading them, so a line with reads in it now means a fingerprint could not vouch for a file - a copy whose own time moved, a bundle built without its manifest - which is exactly what a slow launch is diagnosed from (documentation/12-windows-app.md, 'Comparing without reading (#559)'). The mac matches since #663: its manifest (toolchain.hashes, at the root of the app's Resources) is written from the bundle by a build phase after Xcode's copy, as Windows' .hashes is written from the built output after MSBuild's copy, so it carries the bundle's own exact times; the one difference is the installer: a DMG copy and a Sparkle full install were measured keeping them to the tick, and a Sparkle delta keeps the OLD install's time on every file it did not change, which the match by length and time answers - so the mac trusts a fingerprint within 1 ms on both sides and has no installer rounding to allow for (documentation/09-mac-app.md, 'Comparing without reading (#663)'). One event for both outcomes, the outcome in the sentence, following the scheduled-run precedent above: somebody reading the trail wants to know the folder was or was not got ready, not which of two keys was chosen. On the mac since #476 (2026-10-08): the same copy runs off the main actor (ToolchainReadiness.ensure), with Preview, Deploy and New Course greyed and a banner once a file is written, the mac's half of the same design (documentation/09-mac-app.md, 'Getting a folder ready after an update'); ToolchainReadiness writes this line with the same counts, seconds and first failure; a copy that failed is remembered and skipped by the routine reloads until File > Reload Courses or a newly pointed window retries it, which is Windows' rule too. Until #476 this entry was appliesOn windows, written as permanent because the mac had no visible moment for it; it has one now. On Windows since #477 the scheduled run makes the same copy before it builds, and its line names the course and section and says 'for a scheduled deploy'; a failure there ends '; the scheduled deploy stood down' instead of pointing at File > Reload Courses, which nobody is there to choose at half six. Since #484, a copy a closing window waited for ends ', and Plantoir waited for it before closing'."
       },
       {
         "event": "ran from a menu",
@@ -936,6 +936,12 @@
         "carries": "the choice made: the front page or the page last viewed (previewStartPage.setting.values). One line per change, written when the teacher changes it.",
         "line": "Settings ▸ Preview — Preview now opens at the page last viewed",
         "why": "#504. The setting changes what the plain Preview press does in every course, so 'Preview stopped opening the front page' is answered by when it was changed - on the 'assistant model chosen' precedent."
+      },
+      {
+        "event": "page opened in Obsidian",
+        "carries": "the course and section, and EITHER the place in the course folder of the file Open in Obsidian opened for the page the preview showed (without .md), with '(hidden from students)' when the page is hidden, OR why it opened the section as before instead: no preview page was showing, the list of pages could not be read, the page is not one of the course's own files, two files make that address, the file is outside the course folder, or it is gone. The exact words are obsidianOpensThePreviewedPage.trail and .fallbacks. Written for every SECTION press (the section window's button, Section > Open in Obsidian, a section row's menu, and since #610 the in-app assistant's open_in_obsidian, which presses that window's button through the same route, so its press writes this one line and no other) that goes ahead - a press turned away while the add-ons scan is still running writes nothing - the fallback included (ruling 5) - and never for a course press. NEVER anything written on the page.",
+        "line": "ICS3U/1 · opened Unit 1/Lesson 3 in Obsidian, the page the preview shows",
+        "why": "#518. Which file opened is decided out of sight - the build's list, the address on screen, the front page's embed - so 'I pressed Open in Obsidian and got the wrong page' (or the front page) has its answer only here, and which of the reasons it was says whether anything is wrong at all."
       },
       {
         "event": "obsidian add-ons offered",
@@ -4793,7 +4799,7 @@
   },
   "siteHealth": {
     "note": "What the toolchain checks about a course's folders before it builds, and the WORDS a teacher reads when one of them is wrong. Certain folder and file names carry behaviour — the curriculum folder, the folder holding class pages, Media, a section's index — and nothing stopped a teacher deleting or renaming one in Obsidian. The features then failed SILENTLY: the Curriculum Coverage map in particular still rendered, still looked healthy, and was wrong.",
-    "whereItRuns": "Inside build_site.py, after the shared and per-section folders have been merged into content/ and BEFORE Quartz builds or anything is uploaded. It has to run there rather than in the apps: every check is defined over the MERGED tree, which does not exist until the build makes it, and a check that only guarded the GUI button would be bypassed by the assistant, by `Plantoir --mcp-stdio`, by the launchers, and by the scheduled deploy — which runs from launchd or Task Scheduler with the app CLOSED, and is the case that matters most. ONE check is the exception, said from the SITE's build instead: runnableCodeShownAsPlainCode (#567), because the disagreement it names exists only once Quartz has parsed the page - its own `why` says how, and why not after the build.",
+    "whereItRuns": "Inside build_site.py, after the shared and per-section folders have been merged into content/ and BEFORE Quartz builds or anything is uploaded. It has to run there rather than in the apps: every check is defined over the MERGED tree, which does not exist until the build makes it, and a check that only guarded the GUI button would be bypassed by the assistant, by `Plantoir --mcp-stdio`, by the launchers, and by the scheduled deploy — which runs from launchd or Task Scheduler with the app CLOSED, and is the case that matters most. TWO checks are the exception, said from the SITE's build instead: runnableCodeShownAsPlainCode (#567) and quizzesReadDifferently (#644), because the disagreement each names exists only once Quartz has parsed the page - runnableCodeShownAsPlainCode's `why` says how, and why not after the build; both are said by the same emitter, in one call.",
     "checksTheFeatureNotTheFolder": "Every check asks whether the FEATURE produced anything, never whether a folder exists. Recreating an empty `Ontario Curriculum` folder does not restore a teacher's expectation pages, and `_find_curriculum_folder` requires a page named for an expectation code — so an existence check plus a Fix button would have silenced the warning AND left the map missing. A check that can be satisfied without fixing the problem is worse than no check.",
     "scheduledDeployPublishesAnyway": "A scheduled deploy NEVER refuses on a health finding. A slightly inaccurate curriculum map is a paper cut; a site update a teacher was counting on that silently did not happen is not. The finding is recorded and surfaced afterwards instead.",
     "marker": {
@@ -4835,7 +4841,7 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently", "geogebraSketchesNotReady"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
         "reversed": {
           "check": "linksIntoHiddenPages",
@@ -5209,7 +5215,7 @@
         "andMore": "and {count} more",
         "fixable": false,
         "fill": "{page} is the page's place in the course folder without .md (the page's path in the site without .md, for a page the build did not see); {language} is the language table row's displayName (codeRunnerBlocks.languages, by its fence); {block} counts the page's runnable blocks OF THAT LANGUAGE from 1, as the site counts them (the n on the `plantoir: error:` line and in the block's id); {line} is the opening fence's line in the teacher's own file, found by the code the site read: the ONE opening line of that language with `run` whose following lines hold that code (each line compared with quote markers and the spaces at either end taken off) - when none or several match, the block is named through blockLineNoLine; {reason} is reasons[the site's reason] filled with {language}: blockAfterUnclosedFence when the site sees a fence above the block that is never closed, blockNotCompiled for a `prebuilt` language whose engine is carried but whose key is not in the build's list, blockNotPrepared otherwise - the same choice the `plantoir: error:` line makes (siteDisagrees). `sentence` when ONE block and `sentenceForSeveral` otherwise ({count} blocks). `detail` names at most ten blocks, pages in the order of their paths in the site and each page's blocks in the order the site found them, joined with \"; \" (a reason holds commas), then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per site build, said only on the FIRST build a site-building process makes: a preview's later rebuilds keep their `plantoir: error:` lines only. A Swift block swiftCouldNotBePrepared already names (the same page and block) is left out, so one block is one finding; when every block is left out there is no finding. `cases` pin the wording: each case's blocks go through site_health.site_disagreements_finding (scripts/test_site_disagreements.py). The nested `reasons` reach a teacher but are NOT reached by the apps' machinery sweeps (testNoCheckNamesTheMachinery and NoCheckNamesTheMachinery read a check's top-level strings only); test_site_disagreements.py sweeps them, and it runs on both platforms (verify.sh, and Windows' PythonToolchainTests).",
-        "why": "#567, from #455's implementation review N3: a runnable block the site's parser reads differently from the build's reader (an unclosed fence above it, a shape in codeRunnerBlocks.fences.pageShapes) shows students plain code with no Run button, and was said only on a `plantoir: error:` line in the build's console, which a teacher previewing in the app never reads. The ONE check said from the site's build rather than before it (whereItRuns): the disagreement exists only once Quartz has parsed the page, and in a preview Quartz is one `quartz build --serve` process that never returns to build_site.py, so a Python pass after it would never run. So the transformer (codeRunner.ts) records each block it prints a line for on the page's file.data.plantoirSiteDisagreements; an emitter (plantoirSiteSaid.ts) gathers them on its first emit and hands them, on stdin, to scripts/site_said.py run by the build's own Python (written into quartz/plantoir_site_said.json), which words this one finding through site_health and prints it with site_health.announce - so the marker every reader already knows reaches both apps, the assistant, the MCP server and a scheduled deploy's record with no new reader and no new trail event (measured 24-31 ms per call in the image, only when a block disagrees). REJECTED: the site wording the finding itself from words Python prepared (a second implementation of a finding's assembly, testable only on the mac); Python predicting the shapes with a reader of its own (it guesses at the site's parse and misses the shapes nobody has measured, which are why the safety net exists); a Python pass after Quartz (never runs in a preview); one marker per page or per block (both apps key a finding on name, course and section, #246); announcing again on each live rebuild (the mac and Windows deduplicate a changed finding differently, and the dialog would interrupt a teacher who is editing). Words of its own rather than words.blockNotPrepared's, whose 'if this line comes back' has no line to come back to in a dialog (plan review amendment 4). Never stops a build: if the call fails, the `plantoir: error:` lines remain. Not repairable: only the teacher can mend the page. The trail line is the family's existing 'found a problem with this course's folders' (folderProblemFound).",
+        "why": "#567, from #455's implementation review N3: a runnable block the site's parser reads differently from the build's reader (an unclosed fence above it, a shape in codeRunnerBlocks.fences.pageShapes) shows students plain code with no Run button, and was said only on a `plantoir: error:` line in the build's console, which a teacher previewing in the app never reads. One of the two checks said from the site's build rather than before it (whereItRuns; quizzesReadDifferently, #644, is the other, said in the same call): the disagreement exists only once Quartz has parsed the page, and in a preview Quartz is one `quartz build --serve` process that never returns to build_site.py, so a Python pass after it would never run. So the transformer (codeRunner.ts) records each block it prints a line for on the page's file.data.plantoirSiteDisagreements; an emitter (plantoirSiteSaid.ts) gathers them on its first emit and hands them, on stdin, to scripts/site_said.py run by the build's own Python (written into quartz/plantoir_site_said.json), which words this one finding through site_health and prints it with site_health.announce - so the marker every reader already knows reaches both apps, the assistant, the MCP server and a scheduled deploy's record with no new reader and no new trail event (measured 24-31 ms per call in the image, only when a block disagrees - or, since #644, a quiz). REJECTED: the site wording the finding itself from words Python prepared (a second implementation of a finding's assembly, testable only on the mac); Python predicting the shapes with a reader of its own (it guesses at the site's parse and misses the shapes nobody has measured, which are why the safety net exists); a Python pass after Quartz (never runs in a preview); one marker per page or per block (both apps key a finding on name, course and section, #246); announcing again on each live rebuild (the mac and Windows deduplicate a changed finding differently, and the dialog would interrupt a teacher who is editing). Words of its own rather than words.blockNotPrepared's, whose 'if this line comes back' has no line to come back to in a dialog (plan review amendment 4). Never stops a build: if the call fails, the `plantoir: error:` lines remain. Not repairable: only the teacher can mend the page. The trail line is the family's existing 'found a problem with this course's folders' (folderProblemFound).",
         "cases": [
           {
             "name": "one block after a fence left open",
@@ -5263,6 +5269,125 @@
             ],
             "sentence": "11 blocks of code in ICS3U Section 1 show as plain code, with no Run button.",
             "detailEndsWith": "; “Lists”, Python block 10, line 41: the website was made without Python - preview the course again, and if the block is still plain code, put its opening ``` on a line of its own; and 1 more."
+          }
+        ]
+      },
+      {
+        "name": "quizzesReadDifferently",
+        "sentence": "Plantoir and the website read a self-check question on “{page}” in {course} Section {section} differently.",
+        "sentenceForSeveral": "Plantoir and the website read {count} self-check questions in {course} Section {section} differently.",
+        "detail": "The website shows students something different from what Plantoir checked, until it is written more plainly in your notes: {quizzes}.",
+        "quizLine": "“{page}”, question {n}, line {line}: {reason}",
+        "quizLineNoLine": "“{page}”, question {n}: {reason}",
+        "quizLineNotNumbered": "“{page}”, line {line}: {reason}",
+        "quizPageOnly": "“{page}”: {reason}",
+        "reasons": {
+          "shownWithNote": "students see a short note in place of Check and Show answer, though Plantoir found nothing wrong with it - the website says {problem}, then preview the course again",
+          "shownWorking": "students can check it, though Plantoir said it can’t be checked yet - write it as plainly as you can, the question then its choices or its [!answer], then preview the course again",
+          "countedDifferently": "the website found a different number of questions on this page - start each question on its own, at the left edge of the page, then preview the course again",
+          "nestedReadDifferently": "a question inside a list or another callout was read differently - put it after the list or callout, at the left edge of the page, then preview the course again"
+        },
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "One piece per `plantoir: error:` line the site's quiz safety net prints (quizCallouts.safetyNet), recorded by the transformer (plantoirQuizzes.ts) on the page's file.data.plantoirQuizDisagreements at the place it prints the line, and only when it prints one. {page} is the page's place in the course folder without .md (the page's path in the site without .md, for a page the build did not place); {n} the question's place among the page's top-level quizzes, given only when the two sides counted the same number and one quiz is read differently (quizLine, or quizLineNoLine when its line is not known), absent otherwise (quizLineNotNumbered, or quizPageOnly when there is no line either); {line} the line in the teacher's own file the folder check already found and wrote into quartz/plantoir_quiz_pages.json - `lines` for a numbered question, the first of `lines` when the top-level counts differ, the first of `nestedLines` when the quizzes inside a list or callout differ - never looked up again. {reason} is reasons[the site's key]: shownWithNote when the site shows the note and the folder check found nothing wrong, with {problem} filled by quizCallouts.words.problems[the problem the SITE found] and the site's own values (the folder check's nothingToCheck when the key has no words, as quizzesNotReady does); shownWorking when the site shows Check and quizzesNotReady named the question; countedDifferently when the top-level counts differ; nestedReadDifferently when the quizzes inside a list or callout differ. `sentence` when ONE piece and `sentenceForSeveral` otherwise ({count} pieces). `detail` names at most ten, pages in the order of their paths in the site and each page's pieces in the order the site printed them, joined with \"; \" (a reason holds commas), then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per site build, said only on the FIRST build a site-building process makes, by the same emitter and in the SAME call to scripts/site_said.py as runnableCodeShownAsPlainCode, after it. `cases` pin the wording: each case's quizzes go through site_health.quizzes_read_differently_finding (scripts/test_site_disagreements.py). The nested `reasons` reach a teacher but are NOT reached by the apps' machinery sweeps (top-level strings only); test_site_disagreements.py sweeps them, on both platforms.",
+        "why": "#644, from #567's plan Q4: the quiz safety net (quizCallouts.safetyNet) said a question the site and the folder check read differently only on a `plantoir: error:` line in the build's console, which a teacher previewing in the app never reads. The direction that matters is the site showing the note where the folder check found nothing (measured on origin/dev: a `<img alt=\"x>y\">` straight after the question's title, with no empty `>` line, reads as fine to the folder check and as choicesInHtml to the site): quizzesNotReady says nothing, so the teacher was told NOTHING while students saw a note in place of Check. Said from the site's build for the same reason as runnableCodeShownAsPlainCode (whereItRuns), through the same emitter and the same call, so it costs no second Python start and the marker every reader already knows reaches both apps, the assistant, the MCP server and a scheduled deploy's record with no new reader and no new trail event. A name of its own rather than more pieces in quizzesNotReady: both apps key a finding on name, course and section (#246), so the two would replace each other, and quizzesNotReady is worked out before the site exists. REJECTED: a second emitter or a second call to site_said.py (a second Python start and a second once-mark); a second scan of every page students see to place the quiz pages (the folder check already reads each page it examines, and hands its place on); Python finding the lines again (the folder check already found them in the teacher's file, and the printed line already uses them); assuming the site's problem is choicesInHtml (the site's own problem is recorded and worded). shownWorking is kept although it contradicts quizzesNotReady's own words: in that direction the folder check over-reported, the contradiction is honest, and the finding stays one piece per console line (director's ruling). Never stops a build: if the call fails, the `plantoir: error:` lines remain. Not repairable: only the teacher can mend the page. The trail line is the family's existing 'found a problem with this course's folders' (folderProblemFound).",
+        "cases": [
+          {
+            "name": "one question the website shows with a note",
+            "course": "MPM2D",
+            "section": 1,
+            "quizzes": [
+              { "page": "Unit 2/Practice", "n": 1, "line": 7, "reason": "shownWithNote", "problem": "choicesInHtml", "fill": {} }
+            ],
+            "sentence": "Plantoir and the website read a self-check question on “Unit 2/Practice” in MPM2D Section 1 differently.",
+            "detail": "The website shows students something different from what Plantoir checked, until it is written more plainly in your notes: “Unit 2/Practice”, question 1, line 7: students see a short note in place of Check and Show answer, though Plantoir found nothing wrong with it - the website says a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out, then preview the course again."
+          },
+          {
+            "name": "four on two pages, one of each piece",
+            "course": "MPM2D",
+            "section": 2,
+            "quizzes": [
+              { "page": "Unit 2/Practice", "n": 2, "line": 12, "reason": "shownWorking" },
+              { "page": "Unit 2/Practice", "n": 3, "line": null, "reason": "shownWithNote", "problem": "noCorrectChoice", "fill": {} },
+              { "page": "Unit 2/Practice", "n": null, "line": 30, "reason": "nestedReadDifferently" },
+              { "page": "Unit 3/Review", "n": null, "line": null, "reason": "countedDifferently" }
+            ],
+            "sentence": "Plantoir and the website read 4 self-check questions in MPM2D Section 2 differently.",
+            "detail": "The website shows students something different from what Plantoir checked, until it is written more plainly in your notes: “Unit 2/Practice”, question 2, line 12: students can check it, though Plantoir said it can’t be checked yet - write it as plainly as you can, the question then its choices or its [!answer], then preview the course again; “Unit 2/Practice”, question 3: students see a short note in place of Check and Show answer, though Plantoir found nothing wrong with it - the website says none of its choices is ticked - mark the right one with [x], then preview the course again; “Unit 2/Practice”, line 30: a question inside a list or another callout was read differently - put it after the list or callout, at the left edge of the page, then preview the course again; “Unit 3/Review”: the website found a different number of questions on this page - start each question on its own, at the left edge of the page, then preview the course again."
+          },
+          {
+            "name": "the site's own values fill its problem",
+            "course": "MPM2D",
+            "section": 1,
+            "quizzes": [
+              { "page": "Unit 5/Blanks", "n": 2, "line": 14, "reason": "shownWithNote", "problem": "blanksAndLines", "fill": { "blanks": 2, "lines": 3 } }
+            ],
+            "sentence": "Plantoir and the website read a self-check question on “Unit 5/Blanks” in MPM2D Section 1 differently.",
+            "detail": "The website shows students something different from what Plantoir checked, until it is written more plainly in your notes: “Unit 5/Blanks”, question 2, line 14: students see a short note in place of Check and Show answer, though Plantoir found nothing wrong with it - the website says it has 2 blanks but 3 answer lines - give one answer line for each blank, in order, then preview the course again."
+          },
+          {
+            "name": "a question inside a callout whose line is not known",
+            "course": "MPM2D",
+            "section": 1,
+            "quizzes": [
+              { "page": "Unit 4/{course} review", "n": null, "line": null, "reason": "nestedReadDifferently" }
+            ],
+            "sentence": "Plantoir and the website read a self-check question on “Unit 4/{course} review” in MPM2D Section 1 differently.",
+            "detail": "The website shows students something different from what Plantoir checked, until it is written more plainly in your notes: “Unit 4/{course} review”: a question inside a list or another callout was read differently - put it after the list or callout, at the left edge of the page, then preview the course again.",
+            "why": "quizPageOnly; and a page a teacher named with braces is named as it is (one pass)."
+          },
+          {
+            "name": "eleven name ten and the number left over",
+            "course": "MPM2D",
+            "section": 1,
+            "quizzes": [
+              { "page": "Lists", "n": 1, "line": 5, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 2, "line": 9, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 3, "line": 13, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 4, "line": 17, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 5, "line": 21, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 6, "line": 25, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 7, "line": 29, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 8, "line": 33, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 9, "line": 37, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 10, "line": 41, "reason": "shownWithNote", "problem": "choicesInHtml" },
+              { "page": "Lists", "n": 11, "line": 45, "reason": "shownWithNote", "problem": "choicesInHtml" }
+            ],
+            "sentence": "Plantoir and the website read 11 self-check questions in MPM2D Section 1 differently.",
+            "detailEndsWith": "; “Lists”, question 10, line 41: students see a short note in place of Check and Show answer, though Plantoir found nothing wrong with it - the website says a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out, then preview the course again; and 1 more."
+          }
+        ]
+      },
+      {
+        "name": "geogebraSketchesNotReady",
+        "sentence": "A GeoGebra sketch on “{page}” in {course} Section {section} can’t be shown.",
+        "sentenceForSeveral": "{count} GeoGebra sketches in {course} Section {section} can’t be shown.",
+        "detail": "Students see the sketch’s lines as you wrote them, instead of a sketch they can move, until it is fixed in your notes: {sketches}.",
+        "sketchLine": "“{page}”, sketch {block}, line {line}: {reason}",
+        "sketchLineNoLine": "“{page}”, sketch {block}: {reason}",
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's geogebra fences from 1; {line} is the line in the teacher's own file - the setting's line when the problem is a setting, the opening fence's line otherwise - and sketchLineNoLine is used when it cannot be found (a page the build wrote itself); {reason} is geogebraFences.words.reasons[reason] filled with the sketch's {file}, {name}, {value}, {id}, {megabytes} and {limit}. `sentence` when ONE sketch cannot be shown and `sentenceForSeveral` otherwise ({count} sketches). `detail` names at most ten, joined with \"; \" (a reason can hold a comma), then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per section build.",
+        "why": "#578: a sketch that cannot be shown stays the plain code block it was (its settings and commands, as written), and the teacher, who previews in the app and never reads the build's console, has to be told where - page, sketch and line - or students see the lines for good. An assistant reads the same facts on `plantoir: error:` lines. It never stops a build: one sketch must not keep a whole site from being built or deployed. Not repairable: only the teacher knows which file was meant. A sketch with no description (alt:) is NOT a finding, only a `plantoir: note:` line, as figuresCouldNotBeDrawn treats a diagram without one.",
+        "cases": [
+          {
+            "name": "one sketch whose file is not there",
+            "course": "MPM2D",
+            "section": 1,
+            "sketches": [{"page": "Unit 3/The Slope-Angle Conjecture", "block": 1, "line": 22, "reason": "fileNotFound", "file": "Slope Angle.ggb"}],
+            "sentence": "A GeoGebra sketch on “Unit 3/The Slope-Angle Conjecture” in MPM2D Section 1 can’t be shown.",
+            "detail": "Students see the sketch’s lines as you wrote them, instead of a sketch they can move, until it is fixed in your notes: “Unit 3/The Slope-Angle Conjecture”, sketch 1, line 22: Slope Angle.ggb isn't beside the page, in the course folder or in Media (a renamed file or a copied page keeps the old name here - put the .ggb in Media, or change the file: line)."
+          },
+          {
+            "name": "two sketches, one with no line",
+            "course": "MPM2D",
+            "section": 2,
+            "sketches": [
+              {"page": "Lines", "block": 1, "line": 4, "reason": "appNotKnown", "value": "cas"},
+              {"page": "Lines", "block": 2, "line": null, "reason": "nothingToShow"}
+            ],
+            "sentence": "2 GeoGebra sketches in MPM2D Section 2 can’t be shown.",
+            "detail": "Students see the sketch’s lines as you wrote them, instead of a sketch they can move, until it is fixed in your notes: “Lines”, sketch 1, line 4: app: can be classic, graphing, geometry or 3d, not “cas”; “Lines”, sketch 2: there is nothing to show - add a file: line, a material_id: line, or GeoGebra commands."
           }
         ]
       }
@@ -23885,7 +24010,7 @@
       "sectionEnd": "<!-- END PLANTOIR -->",
       "source": "support/agent_guidance",
       "pageAuthoringSkill": {
-        "rule": "The skill `plantoir-page-authoring` (#596) sits beside the four feature skills in support/agent_guidance/skills and reaches a working folder the same way: the one an assistant reads FIRST for any page, listing every way content is written for a site - settings, text, callouts and folding, Mermaid, tables, maths, checklists, success-criteria headings and My Progress (from 1.8.2), links, embedding, footnotes, tags, Media pictures and PDFs, YouTube, Vimeo, GeoGebra and PhET, %% notes, publish:, folders and index pages, class pages and their dates, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and a routing table naming each skill in routesTo rather than repeating it. The root AGENTS.md and CLAUDE.md sections name it in their FIRST bullet. Every example in it is built and read back as the feature it claims by verify.sh 6n (the skill's fences are read from the skill itself).",
+        "rule": "The skill `plantoir-page-authoring` (#596) sits beside the four feature skills in support/agent_guidance/skills and reaches a working folder the same way: the one an assistant reads FIRST for any page, listing every way content is written for a site - settings, text, callouts and folding, Mermaid, tables, maths, checklists, success-criteria headings and My Progress (from 1.8.2), links, embedding, footnotes, tags, Media pictures and PDFs, YouTube, Vimeo and PhET, GeoGebra sketches as a ```geogebra block (#578: the geogebra.org iframe advice is retired), %% notes, publish:, folders and index pages, class pages and their dates, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and a routing table naming each skill in routesTo rather than repeating it. The root AGENTS.md and CLAUDE.md sections name it in their FIRST bullet. Every example in it is built and read back as the feature it claims by verify.sh 6n (the skill's fences are read from the skill itself).",
         "skill": "plantoir-page-authoring",
         "routesTo": [
           "plantoir-printing",
@@ -24696,7 +24821,7 @@
       }
     },
     "agentGuidance": {
-      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): when to use which fence, the syntax, four complete patterns, the measured list of packages, the limits, what to avoid, what cannot be done, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Measured (doc 09): Codex reads the root AGENTS.md only when started at the working folder or below a `.git`; started inside a course of a folder that is not a git repository it reads none.",
+      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): when to use which fence, the syntax, four complete patterns, a GeoGebra sketch three ways with `version:`, Obsidian's hidden .ggb and what Copy a Page and a rename do not follow (#578, section 10), the measured list of packages, the limits, what to avoid, what cannot be done, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Measured (doc 09): Codex reads the root AGENTS.md only when started at the working folder or below a `.git`; started inside a course of a folder that is not a git repository it reads none.",
       "skill": "plantoir-math-graphs"
     },
     "knownLimits": [
@@ -24705,6 +24830,236 @@
       "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so it cannot be installed from Obsidian's own Browse list; without it Obsidian shows a functionplot fence as plain text, while the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site once it is installed and switched on in the course. obsidianAddOnsForFigures (#495) says which app adds them, and where.",
       "A site opened as files on a computer, rather than served, shows a diagram's lettering in the browser's own font: browsers do not load fonts beside a page opened that way.",
       "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5)."
+    ]
+  },
+  "geogebraFences": {
+    "rule": "#578 (v1.9.0). A ```geogebra fence (or ~~~geogebra) on a page students can see becomes a GeoGebra sketch they can drag, opened with a tap and served by the class site itself - never by geogebra.org. Python prepares and Quartz places, as for figureFences: scripts/geogebra.py reads every fence on the pages students can see (by the gate's own visibility rule), finds the sketch's file, takes its size and its thumbnail, and hands the site's transformer (support/quartz/plugins/transformers/plantoirGeoGebra.ts) a manifest in quartz/plantoir-geogebra/; the loader (support/quartz/components/scripts/geogebra.inline.ts) loads GeoGebra's engine from static/geogebra only when a student taps. A fence that cannot be shown stays the plain code block it always was, and the teacher is told where (siteHealth -> geogebraSketchesNotReady, and a `plantoir: error:` line). A site with no sketch carries no static/geogebra, no manifest, and its pages are byte for byte as before.",
+    "fences": {
+      "rule": "The info string's FIRST WORD, exactly `geogebra` (the name the Obsidian GeoGebra plugin registers); backticks or tildes; at any quote depth, in a list item, %% comments removed - figureFences.fences' reader (markdown_code.fenced_blocks), a fence opened after a second container on a list marker's line excluded, as figures exclude it. Pages students can see are found with TWO page scans, one for ```geogebra and one for ~~~geogebra, merged by path: the scan's must_contain is a plain substring test, so one scan alone misses every ~~~ fence (plan review finding 9).",
+      "cases": [
+        {"name": "a geogebra fence", "page": "Intro.\n\n```geogebra\nf(x) = x^2\n```\n", "found": [{"block": 1, "line": 3}]},
+        {"name": "tildes", "page": "~~~geogebra\nf(x) = x^2\n~~~\n", "found": [{"block": 1, "line": 1}]},
+        {"name": "GeoGebra in capitals is not a sketch", "page": "```GeoGebra\nf(x) = x^2\n```\n", "found": []},
+        {"name": "the first word of the info string", "page": "```geogebra title=\"x\"\nf(x) = x^2\n```\n", "found": [{"block": 1, "line": 1}]},
+        {"name": "inside a folded callout", "page": "> [!example]- A sketch\n> ```geogebra\n> f(x) = x^2\n> ```\n", "found": [{"block": 1, "line": 2}]},
+        {"name": "two on a page", "page": "```geogebra\nf(x) = x\n```\n\n~~~geogebra\ng(x) = 2x\n~~~\n", "found": [{"block": 1, "line": 1}, {"block": 2, "line": 5}]}
+      ]
+    },
+    "settings": {
+      "rule": "Ruling Q1: `key: value` lines, the Obsidian GeoGebra plugin's keys. Leading lines whose key is one of `known` are settings; the FIRST line that is not a known `key: value` starts the commands - so GeoGebra's own `a: x + y = 3` (a line named a) is a command, never a setting. A `---` line straight after the settings ends them; a block that OPENS with `---` is read up to the next `---`, and there an unknown key is a setting that is left out with a note (unknownSetting). Blank lines before and among the settings are skipped. A value may be wrapped in one pair of quotes, which are taken off; `file:` may be written as an Obsidian link ([[name]]), whose brackets are taken off too - it is still plain text to Obsidian (knownLimits). Keys are lowercase, exactly. `version:` does nothing but change the fence: it is the documented way to make a changed geogebra.org sketch be fetched again (cache). Exactly one of `file` and `material_id`, or neither with at least one command.",
+      "known": ["file", "material_id", "app", "height", "width", "alt", "caption", "toolbar", "algebra", "version"],
+      "apps": ["classic", "graphing", "geometry", "3d"],
+      "numbers": ["height", "width"],
+      "switches": ["toolbar", "algebra"],
+      "cases": [
+        {"name": "a file with its description and height", "body": "file: Slope Angle Conjecture.ggb\nalt: Three right triangles sharing one angle.\nheight: 480", "settings": {"file": "Slope Angle Conjecture.ggb", "alt": "Three right triangles sharing one angle.", "height": 480}, "commands": [], "problems": [], "notes": []},
+        {"name": "commands alone", "body": "f(x) = x^2\nA = (1, 2)", "settings": {}, "commands": [{"line": 1, "text": "f(x) = x^2"}, {"line": 2, "text": "A = (1, 2)"}], "problems": [], "notes": []},
+        {"name": "settings, then commands", "body": "alt: A parabola and a point on it.\nf(x) = x^2\nA = Point(f)", "settings": {"alt": "A parabola and a point on it."}, "commands": [{"line": 2, "text": "f(x) = x^2"}, {"line": 3, "text": "A = Point(f)"}], "problems": [], "notes": []},
+        {"name": "GeoGebra's own colon is a command", "body": "a: x + y = 3\nb: x - y = 1", "settings": {}, "commands": [{"line": 1, "text": "a: x + y = 3"}, {"line": 2, "text": "b: x - y = 1"}], "problems": [], "notes": []},
+        {"name": "a --- line ends the settings", "body": "file: Lines.ggb\n---\nSetValue(a, 2)", "settings": {"file": "Lines.ggb"}, "commands": [{"line": 3, "text": "SetValue(a, 2)"}], "problems": [], "notes": []},
+        {"name": "a --- block at the top, with a key that is not a setting", "body": "---\nfile: Lines.ggb\nzoom: 2\n---\nSetValue(a, 2)", "settings": {"file": "Lines.ggb"}, "commands": [{"line": 5, "text": "SetValue(a, 2)"}], "problems": [], "notes": [{"reason": "unknownSetting", "blockLine": 3, "name": "zoom"}]},
+        {"name": "blank lines and // lines are skipped, line numbers kept", "body": "alt: A line.\n\n// the line itself\nf(x) = 2x + 1\n", "settings": {"alt": "A line."}, "commands": [{"line": 4, "text": "f(x) = 2x + 1"}], "problems": [], "notes": []},
+        {"name": "quotes and link brackets come off", "body": "file: [[Lines.ggb]]\ncaption: \"Drag B: what stays the same?\"", "settings": {"file": "Lines.ggb", "caption": "Drag B: what stays the same?"}, "commands": [], "problems": [], "notes": []},
+        {"name": "version is a setting", "body": "file: Lines.ggb\nversion: 2", "settings": {"file": "Lines.ggb", "version": "2"}, "commands": [], "problems": [], "notes": []},
+        {"name": "a size in pixels", "body": "width: 600px\nheight: 400\ntoolbar: true\nalgebra: no\nf(x) = x", "settings": {"width": 600, "height": 400, "toolbar": true, "algebra": false}, "commands": [{"line": 5, "text": "f(x) = x"}], "problems": [], "notes": []},
+        {"name": "an app GeoGebra does not have", "body": "app: cas\nf(x) = x", "settings": {}, "commands": [{"line": 2, "text": "f(x) = x"}], "problems": [{"reason": "appNotKnown", "blockLine": 1, "value": "cas"}], "notes": []},
+        {"name": "a height that is not a number", "body": "height: tall\nf(x) = x", "settings": {}, "commands": [{"line": 2, "text": "f(x) = x"}], "problems": [{"reason": "numberExpected", "blockLine": 1, "name": "height", "value": "tall"}], "notes": []},
+        {"name": "a switch that is not true or false", "body": "toolbar: sometimes\nf(x) = x", "settings": {}, "commands": [{"line": 2, "text": "f(x) = x"}], "problems": [{"reason": "trueOrFalseExpected", "blockLine": 1, "name": "toolbar", "value": "sometimes"}], "notes": []},
+        {"name": "both a file and a geogebra.org sketch", "body": "file: Lines.ggb\nmaterial_id: ju3f2kbg", "settings": {"file": "Lines.ggb", "material_id": "ju3f2kbg"}, "commands": [], "problems": [{"reason": "fileAndMaterialBoth", "blockLine": 2}], "notes": []},
+        {"name": "nothing to show", "body": "alt: An empty sketch.\n", "settings": {"alt": "An empty sketch."}, "commands": [], "problems": [{"reason": "nothingToShow", "blockLine": null}], "notes": []},
+        {"name": "an empty fence", "body": "", "settings": {}, "commands": [], "problems": [{"reason": "nothingToShow", "blockLine": null}], "notes": []},
+        {"name": "a --- block that is never closed", "body": "---\nfile: Lines.ggb\nSetValue(a, 2)", "settings": {}, "commands": [], "problems": [{"reason": "settingsNotClosed", "blockLine": 1}], "notes": []},
+        {"name": "file: with no name", "body": "file:\nalt: Lines.", "settings": {"file": "", "alt": "Lines."}, "commands": [], "problems": [{"reason": "fileHasNoName", "blockLine": 1}], "notes": []},
+        {"name": "a setting in capitals is a command, and said", "body": "File: Lines.ggb\nf(x) = x", "settings": {}, "commands": [{"line": 1, "text": "File: Lines.ggb"}, {"line": 2, "text": "f(x) = x"}], "problems": [], "notes": [{"reason": "settingAmongCommands", "blockLine": 1, "name": "File"}]},
+        {"name": "a setting after the commands began is a command, and said", "body": "alt: A line.\nf(x) = 2x\nheight: 400", "settings": {"alt": "A line."}, "commands": [{"line": 2, "text": "f(x) = 2x"}, {"line": 3, "text": "height: 400"}], "problems": [], "notes": [{"reason": "settingAmongCommands", "blockLine": 3, "name": "height"}]},
+        {"name": "GeoGebra's own name with a colon is not said", "body": "a: x + y = 3\nslope: Slope(a)", "settings": {}, "commands": [{"line": 1, "text": "a: x + y = 3"}, {"line": 2, "text": "slope: Slope(a)"}], "problems": [], "notes": []}
+      ]
+    },
+    "commands": {
+      "rule": "#578 stage 3. The fence's commands run once the sketch has opened (after a file: or material_id: sketch loads, or alone), one line at a time, in order, as typed in GeoGebra's Input Bar. A line GeoGebra refuses is shown under the sketch as words.site.lineCouldNotRun, {line} the line in the fence (from 1, the settings counted) and {said} GeoGebra's OWN words - the message lines of its error dialog, joined with spaces, without its title or buttons. How a refusal is known, measured 2026-10-24 in Chromium 1243 and WebKit 2359 on the adapted engine: evalCommand's answer CANNOT be used - it is false for scripting commands that work (SetValue, SetColor, ZoomIn) and for real errors alike, and asyncEvalCommand resolves \"\" for both, before any dialog; GeoGebra's error dialog tells them apart, but it is added 1 to 10 ms AFTER the line returns, a few tasks later. So after each line the loader also runs `endOfLine`, a command GeoGebra does not know: its dialog ALWAYS comes and always after the line's own (every case below, in order, both engines), so a dialog that arrives before it is the line's. Each dialog is read and removed as it is added (a MutationObserver), before it is drawn, and the wait ends when the marker's dialog arrives - no clock, only a last-resort `giveUpSeconds` for all the lines together. Dialogs are on while the lines run and turned off after (setErrorDialogsActive), so nothing a student does opens one. A line that does nothing and is not an error (SetValue of a name that does not exist) raises nothing and is not said: knownLimits. REJECTED: evalCommand's answer (would report every SetValue); asyncEvalCommand (resolves before the dialog); waiting a fixed time after each line for a dialog that may not come (a guess that flickers on a slower machine); checking the commands at build time (would need GeoGebra's parser in the build).",
+      "endOfLine": "PlantoirEndOfLine()",
+      "giveUpSeconds": 10,
+      "cases": [
+        {"text": "SetValue(a, 3)", "said": null},
+        {"text": "SetColor(f, \"red\")", "said": null},
+        {"text": "ZoomIn(-5, -5, 5, 5)", "said": null},
+        {"text": "A = (1, 2)", "said": null},
+        {"text": "Circle((0,0), 2)", "said": null},
+        {"text": "SetValue(zz, 3)", "said": null},
+        {"text": "Foo(1)", "said": "Unknown command : Foo"},
+        {"text": "k(x) = sin(x", "said": "Unbalanced brackets k(x) = sin(x"},
+        {"text": "f(x) = x^2 +* 3", "said": "Please check your input"},
+        {"text": "Segment(A)", "said": "Command Segment: Illegal number of arguments: 1 Syntax: Segment( <Point>, <Point> ) Segment( <Point>, <Length> )"}
+      ]
+    },
+    "materialIds": {
+      "rule": "`material_id:` takes a sketch's id or any geogebra.org address that names one: /m/ID, /classic/ID, /graphing/ID, /geometry/ID, /3d/ID, /calculator/ID, /material/show/id/ID, /material/iframe/id/ID, with or without anything after it. An id is 4 to 16 letters and digits. Anything else is materialNotUnderstood.",
+      "cases": [
+        {"value": "ju3f2kbg", "id": "ju3f2kbg"},
+        {"value": "https://www.geogebra.org/m/ju3f2kbg", "id": "ju3f2kbg"},
+        {"value": "https://www.geogebra.org/m/ju3f2kbg#material/abc", "id": "ju3f2kbg"},
+        {"value": "geogebra.org/classic/ju3f2kbg?embed", "id": "ju3f2kbg"},
+        {"value": "https://www.geogebra.org/material/iframe/id/ju3f2kbg/width/700/height/400/border/888888", "id": "ju3f2kbg"},
+        {"value": "https://www.geogebra.org/material/show/id/1234567", "id": "1234567"},
+        {"value": "https://www.geogebra.org/3d/abcd1234", "id": "abcd1234"},
+        {"value": "https://example.org/m/ju3f2kbg", "id": null},
+        {"value": "a sketch about slopes", "id": null},
+        {"value": "https://www.geogebra.org/u/rwhg", "id": null}
+      ]
+    },
+    "fetch": {
+      "rule": "#578 stage 4. A `material_id:` sketch is copied from geogebra.org ONCE (cache), by two requests: GeoGebra's public materials API for what the sketch is (`api`, {id} the sketch's id) and then the .ggb of its ONE applet. Measured 2026-10-24 by one request for ju3f2kbg by hand (HTTP 200, 1,598 bytes of application/json): `title` (\"Slope Angle Conjecture\"), `visibility` (\"S\"), `deleted` (false), `creator.displayname` (\"Russell Gordon\" - the author the attribution names), and `elements`, one per part of the page, each with a `type`; the applet is the element of type \"G\", whose `url` is the .ggb (https://www.geogebra.org/resource/ju3f2kbg/…/material-ju3f2kbg.ggb, 1,594,544 bytes, holding its own geogebra_thumbnail.png - so the element's `previewUrl` picture is NOT fetched: one request fewer, and the thumbnail is made exactly as for a teacher's file). No element of type G is materialHasNoSketch; more than one is materialHasSeveralSketches; an answer of 403, 404 or 410, or `deleted: true`, is materialNotFound; anything else - no network, more than `requestSeconds`, another answer, a redirect to a host not in `hosts`, more than files.largestFileMegabytes - is materialCouldNotBeFetched. https only, and a redirect is followed only to one of `hosts`. A .ggb that is not a GeoGebra file is materialHasNoSketch and is NOT kept. Tests never call the real API: scripts/test_geogebra.py serves both answers from a local server of its own, through the same code.",
+      "api": "https://api.geogebra.org/v1.0/materials/{id}?scope=extended&embed=creator",
+      "hosts": ["api.geogebra.org", "www.geogebra.org", "geogebra.org", "cdn.geogebra.org"],
+      "requestSeconds": 15
+    },
+    "cache": {
+      "rule": "Ruling Q2 and plan review finding 2: FETCH ONCE, kept by the FENCE. A geogebra.org sketch is saved in `folder` beside the course's built sites (`<builds>/<course>/.geogebra-cache`, outside the teacher's folder and shared by the course's sections) as `<key>.ggb` and `<key>.json` (its id, title and author), where key is the fence's own key (keys: figureRules.keyOf of the fence body) - NOT the sketch's id. A build whose fence has a saved copy asks geogebra.org NOTHING; change anything in the fence (the documented way: add or change `version: 2`) and the next build fetches it again, which is how a teacher gets a sketch they changed on geogebra.org. Spaces at the ends of lines and Windows line endings keep the key (keys). `--full-rebuild` leaves the saved copies alone: there is one way to fetch again, the fence, and a full rebuild while geogebra.org cannot be reached must not turn a working sketch into a folder problem. Every build that uses a copy touches it, and a copy unused for `pruneDays` goes (figures.PRUNE_DAYS, the same rule). No saved copy and geogebra.org out of reach: materialCouldNotBeFetched, a folder problem, and the fence stays code. The site's copy is written to quartz/static/geogebra-sketches/<the key's first 16 hex digits>.ggb - a geogebra.org sketch has no file in content/ for Quartz to publish - and its thumbnail as a teacher's file's is. REJECTED: asking geogebra.org on every build (a class site would change under the teacher, and every preview would need the network); keying by the id (an edited sketch could never be fetched again without a command neither app has); clearing on --full-rebuild (figures do, for a different reason: a new drawing engine draws differently).",
+      "folder": ".geogebra-cache",
+      "pruneDays": 90,
+      "cases": [
+        {"name": "no saved copy: fetched once, then kept", "saved": false, "online": true, "fullRebuild": false, "builds": 2, "requests": 2, "shown": true, "reason": null},
+        {"name": "a saved copy: geogebra.org is asked nothing", "saved": true, "online": true, "fullRebuild": false, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "a saved copy and no network: shown", "saved": true, "online": false, "fullRebuild": false, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "a full rebuild keeps the saved copy", "saved": true, "online": false, "fullRebuild": true, "builds": 1, "requests": 0, "shown": true, "reason": null},
+        {"name": "no saved copy and no network: a folder problem", "saved": false, "online": false, "fullRebuild": false, "builds": 1, "requests": 1, "shown": false, "reason": "materialCouldNotBeFetched"},
+        {"name": "the fence changed (version: 2): fetched again", "saved": true, "online": true, "fullRebuild": false, "builds": 1, "requests": 2, "shown": true, "reason": null, "fenceChanged": true}
+      ]
+    },
+    "files": {
+      "rule": "`file:` names a .ggb by its name or a relative path, looked up by LISTING each folder (exact spelling first, then one that differs only in capitals or Unicode form, as page_features._find_in_media does - Netlify and Cloudflare are case-sensitive): beside the page first, then from the top of the course folder, then by its file name alone in the Media folder. It must be a zip holding geogebra.xml (read, never unpacked) and at most `largestFileMegabytes`. The site publishes the file ONCE: Quartz already publishes every file under content/ that is not a page (its Assets emitter), so the manifest records the file's path in content/ and the transformer makes its address with Quartz's own slugifyFilePath - the function that emitter uses - so the two cannot disagree. REJECTED: copying it into static/ as well (the example course's 1,594,544-byte sketch would be carried twice, 3,221,572 bytes instead of 1,627,028 with its thumbnail); taking the source out of content/ (a page that links the file for download would break, and Media there mirrors the teacher's own folder, which the build never edits).",
+      "largestFileMegabytes": 20,
+      "notPublished": {
+        "rule": "Stage 2 review item 6. Quartz leaves some files out of the site, and a sketch made from one could never open, so such a file is NOT FOUND (fileNotFound, said once) rather than found and then missing: a file under a folder at the TOP of the course folder that Quartz's ignorePatterns name (exactly these spellings, measured with Quartz's own globby in the image 2026-10-24: `private/a.ggb` and `templates/c.ggb` were left out, `Private/f.ggb` and `U/private/b.ggb` were published), and a file with any part of its path starting with a dot (the file walk skips those: `.hid/d.ggb` and `U/.h/e.ggb` were left out).",
+        "folders": ["private", "templates", ".obsidian"]
+      },
+      "cases": [
+        {"name": "beside the page", "files": ["Unit 1/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/Lines.ggb", "reason": null},
+        {"name": "a path from the course folder", "files": ["Sketches/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Sketches/Lines.ggb", "found": "Sketches/Lines.ggb", "reason": null},
+        {"name": "in Media by its name alone", "files": ["Media/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Media/Lines.ggb", "reason": null},
+        {"name": "a page copied without its sketch finds it in Media", "files": ["Media/Lines.ggb"], "page": "Unit 2/Copied.md", "value": "Old Unit/Lines.ggb", "found": "Media/Lines.ggb", "reason": null},
+        {"name": "capitals that differ", "files": ["Unit 1/lines.GGB"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/lines.GGB", "reason": null},
+        {"name": "the exact spelling wins", "files": ["Unit 1/lines.ggb", "Unit 1/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/Lines.ggb", "reason": null},
+        {"name": "beside the page wins over Media", "files": ["Unit 1/Lines.ggb", "Media/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": "Unit 1/Lines.ggb", "reason": null},
+        {"name": "renamed in Obsidian, so not found", "files": ["Unit 1/Lines (final).ggb"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "no such file", "files": [], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "not a zip", "files": ["Unit 1/Lines.ggb:notAZip"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "notAGeoGebraFile"},
+        {"name": "a zip without geogebra.xml", "files": ["Unit 1/Lines.ggb:noXml"], "page": "Unit 1/Lesson.md", "value": "Lines.ggb", "found": null, "reason": "notAGeoGebraFile"},
+        {"name": "a path cannot leave the course folder", "files": ["Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "../../Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in the private folder Quartz leaves out", "files": ["private/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "private/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in the templates folder Quartz leaves out", "files": ["templates/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "templates/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "in a folder whose name starts with a dot", "files": ["Unit 1/.drafts/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": ".drafts/Lines.ggb", "found": null, "reason": "fileNotFound"},
+        {"name": "a folder called private that is not at the top is published", "files": ["Unit 1/private/Lines.ggb"], "page": "Unit 1/Lesson.md", "value": "private/Lines.ggb", "found": "Unit 1/private/Lines.ggb", "reason": null}
+      ]
+    },
+    "keys": {
+      "rule": "A sketch is looked up by figureFences.cacheKey's rule - SHA-256 of the tidied fence body (figureRules.keyOf, figures.key_of) - REUSED, so Python and the site agree by a rule both already run. The body is the text inside the fence AFTER the quote markers of its depth are taken off (the site's mdast code value; markdown_code's body), so a sketch in a callout has the same key as the same fence at the top level. Each case is run by scripts/test_geogebra.py and, through the site's own Markdown reader in Node, by scripts/check_geogebra_rules_against_the_site.py (verify.sh).",
+      "cases": [
+        {"name": "at the top of the page", "page": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a callout: the same key", "page": "> [!example] Lines\n> ```geogebra\n> file: Lines.ggb\n> alt: Two lines.\n> ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a callout in a callout: the same key", "page": "> [!note] Look\n> > [!example]- Lines\n> > ```geogebra\n> > file: Lines.ggb\n> > alt: Two lines.\n> > ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a list item: the same key", "page": "- Look at this:\n\n  ```geogebra\n  file: Lines.ggb\n  alt: Two lines.\n  ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in tildes: the same key", "page": "~~~geogebra\nfile: Lines.ggb\nalt: Two lines.\n~~~\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "with Windows line endings: the same key", "page": "```geogebra\r\nfile: Lines.ggb\r\nalt: Two lines.\r\n```\r\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "with spaces at the ends of lines: the same key", "page": "```geogebra\nfile: Lines.ggb   \nalt: Two lines.  \n```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "version: changed: a NEW key, so a geogebra.org sketch is fetched again", "page": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\nversion: 2\n```\n", "key": "b2860a5dc41e377506fe67fb1e0953dd666b405e254519081eb8ef703c6c13b6"},
+        {"name": "in a quiz's question: the same key (stage 5)", "page": "> [!quiz] Drag A.\n> ```geogebra\n> file: Lines.ggb\n> alt: Two lines.\n> ```\n> - [x] a\n> - [ ] b\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a quiz's explanation: the same key (stage 5)", "page": "> [!quiz] Pick one.\n> - [x] a\n> - [ ] b\n>\n> > [!explain]- Why\n> > ```geogebra\n> > file: Lines.ggb\n> > alt: Two lines.\n> > ```\n", "key": "3e37cdb37230fc882886d34c2ad67b7a93de0fe097783a2e1e6025b10fda24ba"},
+        {"name": "in a quiz's explanation, with commands that look like a choice and a list (stage 5)", "page": "> [!quiz] Which line falls?\n> - [ ] y = 2x\n> - [x] y = -x + 3\n>\n> > [!explain]- Why\n> > ```geogebra\n> > alt: The line.\n> > -x + y = 3\n> > - [x] 2\n> > [1, 2]\n> > ```\n", "key": "2b39f61c95053033293f63a38649345c3d91b0d1e691289ebd32d941b870df23"}
+      ]
+    },
+    "manifest": {
+      "rule": "quartz/plantoir-geogebra/manifest.json: {version, words (words.site), attribution, pages: {page: {key: entry}}} - by PAGE (its path in the site's content, in NFC: the transformer's file.data.relativePath, normalised the same way), then by the fence's key, because the same fence text on two pages can name two different files beside them, and each page must show its own (stage 2 review item 1; `cases`). An entry is {ok: true, app, width, height (the sketch's own size, from geogebra.xml's first <euclidianView><size>, or the fence's width:/height:, which the applet is made at and then scaled down to fit the page), alt, caption, commands [{line, text}], toolbar, algebra, source {kind: file, contentPath} or null for commands alone, thumbnail {name, width, height} or null, attribution {kind}, size (openSketch's {size}, filled)}. Only sketches that can be shown are in it: anything else stays a code block. No sketch on the site, no folder. Thumbnails (the .ggb's own geogebra_thumbnail.png) go to quartz/static/geogebra-sketches/<the first 16 hex digits of the picture's own SHA-256>.png - so one sketch named by several fences is one picture - a folder removed when there are none.",
+      "workspace": "plantoir-geogebra",
+      "thumbnails": "geogebra-sketches",
+      "cases": [
+        {"name": "the same fence on two pages, each with its own file beside it, and on a third with none", "files": ["Unit 1/Lines.ggb:one", "Unit 2/Lines.ggb:two"], "pages": {"Unit 1/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "Unit 2/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n", "Unit 3/Lesson.md": "```geogebra\nfile: Lines.ggb\nalt: Two lines.\n```\n"}, "shown": {"Unit 1/Lesson.md": "Unit 1/Lines.ggb", "Unit 2/Lesson.md": "Unit 2/Lines.ggb"}, "problems": [{"page": "Unit 3/Lesson", "reason": "fileNotFound"}]}
+      ]
+    },
+    "quizzes": {
+      "rule": "#578 stage 5. A sketch works in a self-check question's QUESTION (before the choices) and in its EXPLANATION ([!explain]), and is REFUSED in a CHOICE: quizCallouts.words.problems.sketchInAChoice, in quizCallouts.recognise.order after choicesAndAnswer, found by quizzes.py (a ```geogebra or ~~~geogebra fence opened inside an item of the quiz's boxed list) and by the site (quizRules.QuizModel.sketchInAChoice: a plantoirGeoGebra node - or a geogebra code block the build could not show - inside an item of the first boxed list), whether or not the sketch itself can be shown, so the two agree. A sketch in a plain list in the question, or anywhere outside the boxed list, is fine. Every shape is a quizCallouts.recognise case, run by test_quizzes.py and planted on verify.sh's Quiz Fixture (6k), so the safety net (quizCallouts.safetyNet) stays silent; the keys of a fence in a question and in an explanation are keys cases.",
+      "whyNotInAChoice": "A choice is a click target: its label wraps the box, so a drag on a point would toggle the answer; and the shuffle moves the choices (quiz.inline.ts fieldset.appendChild, on load and again after every print, reapplyOrder). REJECTED: allowing it and putting the applet back after each move.",
+      "order": "Wired Figures, GeoGebra, Quizzes, Tasks (build_site._wire_geogebra_transformer; test_geogebra.py WiringTests). MEASURED (2026-10-24, the dev-test image, one quiz page with a sketch in a question, an explanation and a choice): GeoGebra wired after Quizzes built the same HTML byte for byte; the one difference was the quiz page's search text, which the quizzes' html stage makes again from the tree AFTER the sketch's card is in. Fixed by withoutAnswers reading a sketch as its figcaption alone - what Description, which runs before the card, reads on every other page - so the order is pinned by the wiring test, not by anything a student sees.",
+      "node": "The markdown stage's figure is a node of type plantoirGeoGebra with data.hName, never a raw html node. MEASURED: an html node renders the same page (Quartz parses raw HTML into elements), but the quiz reader recognises a sketch by the node's type, so with an html node a sketch in a choice was read as a working question while the folder check refused it - the must-fail.",
+      "explanation": "The card sits inside the hidden explanation, so nothing of the engine is fetched until the explanation is shown AND its button tapped (browser-checks/geogebra_applet.mjs: zero engine requests after the page loads and after the answer is checked, then the sketch opens). Start again hides it with the explanation.",
+      "print": "Print moves choices only (restoreOrder / reapplyOrder), never a question or an explanation, so a sketch open in a question of a shuffled quiz is the same applet, still working, after a print (the browser check). On paper a quiz prints as its question, its sketch as geogebraFences.print says.",
+      "searchText": "A quiz page's search text and summary read a sketch as its description alone, never its button, commands or attribution (plantoirQuizzes.ts withoutAnswers; verify.sh 6i-g reads the quiz page's search text)."
+    },
+    "siteCarriesEngine": {
+      "rule": "The #454 gate: static/geogebra (the pruned, adapted engine - toolchain.json -> pins -> geogebra, 117 files, about 27 MB) only while a page students can see has a sketch that can be shown (page_features.GATED_ASSETS -> geogebra; the count is pages, from scripts/geogebra.py). None of it is fetched until a student taps; a site with no sketch carries none of it.",
+      "cases": [
+        {"name": "no sketches", "pages": [{"text": "Just words.", "visible": true}], "geogebra": 0},
+        {"name": "a sketch students can see", "pages": [{"text": "```geogebra\nf(x) = x^2\n```\n", "visible": true}], "geogebra": 1},
+        {"name": "a sketch in tildes", "pages": [{"text": "~~~geogebra\nf(x) = x^2\n~~~\n", "visible": true}], "geogebra": 1},
+        {"name": "only on a page students cannot see", "pages": [{"text": "---\npublish: false\n---\n```geogebra\nf(x) = x^2\n```\n", "visible": false}], "geogebra": 0},
+        {"name": "a sketch that cannot be shown", "pages": [{"text": "```geogebra\nfile: Nowhere.ggb\n```\n", "visible": true}], "geogebra": 0}
+      ]
+    },
+    "engine": {
+      "rule": "What a tap loads, measured 2026-10-23 on the slope-angle sketch: deployggb.js, then GeoGebra's web3d codebase from static/geogebra/HTML5/5.0/web3d/ (setHTML5Codebase, offline), then the sketch, handed over as ggbBase64 after a same-origin fetch. The applet is made with language en (English is built in; the language files are left out), no menu bar, no input bar, no right-click menu, the reset icon, shift-drag zoom, the fence's toolbar:/algebra:, and scaleContainerClass so a wide sketch is scaled down to the page (700 px on a laptop, 374 px on a phone, measured). A second sketch on a later page loads in 0.14 to 0.6 s: the engine stays.",
+      "firstLoadBytes": {"raw": 9034254, "gzipped": 2864256, "requests": 19},
+      "sizeBytes": "openSketch's {size} is the sketch's own bytes plus firstLoadBytes.gzipped (class sites are sent compressed), in megabytes to one decimal place, through words.site.sketchSize."
+    },
+    "spa": {
+      "rule": "Quartz's page change replaces <body> and drops every <head> child without spa-preserve. What keeps a second sketch working is GeoGebra's hidden loader frame going under <html>, which the page change keeps (geogebra_engine.py replacement 3): measured with it reverted, Chromium 155 opened no sketch after a page change until a reload, under the policy and cross-origin isolated alike. deployggb.js is loaded once and marked spa-preserve. Each applet is removed (api.remove) when the page changes, and that takes GeoGebra's own styles and libraries out of <head> (measured: 8 libraries, then 0), which the next tap puts back - so a second sketch opens in about 255 ms, not 0.6 s. REJECTED: the plan's MutationObserver marking what GeoGebra adds to <head> spa-preserve - measured in stage 2, it changes nothing while api.remove runs (0 libraries kept either way, and every sketch opened without it); and leaving applets in place so their libraries stay (each keeps its memory and its listeners for the rest of the visit)."
+    },
+    "print": {
+      "rule": "A loaded applet prints its canvas cropped (measured), so the handout's prepare step and the browser's beforeprint put a picture of the sketch as it stands now (api.getPNGBase64, synchronous) beside it, and the print styles show that picture instead of the applet. Nothing on the page is moved or replaced, so there is nothing to put back after the print (#576's rule holds without a restore). A sketch that was never opened prints its thumbnail; one with neither prints its description. The button never prints; the attribution always does, in its print form with the addresses as plain text (attribution)."
+    },
+    "attribution": {
+      "rule": "GeoGebra's licence asks for the notice \"Made with GeoGebra®\" and a link to https://www.geogebra.org on every applet (toolchain.json -> pins -> geogebra). On screen: words.site.madeWith, linked to engineUrl, under every sketch. A sketch from geogebra.org (CC BY-NC-SA 4.0) also names its author, linked to the sketch on geogebra.org (materialUrl), and the licence (licenceName, linked to licenceUrl): the author is the materials API's creator.displayname, else the user name, else the sketch's own address (fetch), so a card never says \"by\" and nothing. A sketch from the teacher's own file names no author or licence: the file is theirs, and nothing in it says either. On paper a link cannot be followed, so the print form is one short line (printAttributionFile, or printAttributionMaterial) with the addresses printed under it as plain text, in small type.",
+      "engineUrl": "https://www.geogebra.org",
+      "materialUrl": "https://www.geogebra.org/m/{id}",
+      "licenceUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+    },
+    "policy": {
+      "rule": "Under the policy a Netlify publish sends (scripts/netlify_badge.py: script-src 'self' 'unsafe-eval' <hashes>) the stock engine never loads; the six replacements of geogebra_engine.py make it load with that policy unchanged. Every browser check serves on [::1], never 127.0.0.1 or localhost: GeoGebra's loader runs its main file as inline text on those two hosts (and apps-builds.), which would test a path no class site takes. browser-checks/geogebra_applet.mjs proves it on a clone of a built site with the publish's own _headers: zero refusals by the policy, zero requests off the site."
+    },
+    "words": {
+      "note": "English, as data: the site's words appear on a page students read, the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {file} is the name as the fence gives it, {name} a setting's name, {value} what it was given, {line} a line of the fence, {said} GeoGebra's own words, {author} a geogebra.org author, {id} a sketch's id, {megabytes} and {limit} sizes.",
+      "site": {
+        "openSketch": "Open the sketch ({size})",
+        "sketchSize": "about {megabytes} MB",
+        "loading": "Opening the sketch…",
+        "couldNotLoad": "This sketch couldn't be opened. Check the connection, then try again.",
+        "lineCouldNotRun": "Line {line} couldn't run: {said}",
+        "commandsSummary": "What this sketch is made from",
+        "madeWith": "Made with GeoGebra®",
+        "createdBy": "by {author}",
+        "licenceName": "CC BY-NC-SA 4.0",
+        "printAttributionMaterial": "Made with GeoGebra · by {author} · CC BY-NC-SA 4.0",
+        "printAttributionFile": "Made with GeoGebra · geogebra.org",
+        "untitledSketch": "A GeoGebra sketch.",
+        "printNote": "On the class website, this sketch can be moved."
+      },
+      "reasons": {
+        "fileNotFound": "{file} isn't beside the page, in the course folder or in Media (a renamed file or a copied page keeps the old name here - put the .ggb in Media, or change the file: line)",
+        "notAGeoGebraFile": "{file} isn't a GeoGebra file - save the sketch from GeoGebra as a .ggb file",
+        "fileTooLarge": "{file} is {megabytes} MB, and a sketch can be at most {limit} MB",
+        "fileAndMaterialBoth": "use file: or material_id:, not both",
+        "materialNotUnderstood": "“{value}” isn't a geogebra.org sketch or its address",
+        "materialNotFound": "geogebra.org has no sketch {id} that anyone can open",
+        "materialCouldNotBeFetched": "geogebra.org could not be reached to keep a copy of sketch {id} - preview again while this computer is online",
+        "materialHasSeveralSketches": "sketch {id} on geogebra.org holds several sketches - name one of them instead",
+        "materialHasNoSketch": "{id} on geogebra.org is not a sketch",
+        "appNotKnown": "app: can be classic, graphing, geometry or 3d, not “{value}”",
+        "numberExpected": "{name}: needs a number of pixels, such as 480, not “{value}”",
+        "trueOrFalseExpected": "{name}: needs true or false, not “{value}”",
+        "nothingToShow": "there is nothing to show - add a file: line, a material_id: line, or GeoGebra commands",
+        "engineMissing": "this copy of Plantoir can't show GeoGebra sketches",
+        "missingAlt": "it has no alt: line, so a screen reader only says “A GeoGebra sketch.”",
+        "unknownSetting": "{name} isn't a GeoGebra setting, so it was left out",
+        "settingsNotClosed": "the --- line that opens the settings has no --- line to close it, so everything after it would be read as settings",
+        "fileHasNoName": "file: needs the name of a .ggb file",
+        "settingAmongCommands": "“{name}:” is read as a GeoGebra command, not a setting - settings go first, in small letters, before the commands"
+      }
+    },
+    "knownLimits": [
+      "`file:` is plain text, not a link: Obsidian's rename does not rewrite it, and Copy a Page does not carry the file (it copies a page's links and embeds). Both are said as fileNotFound naming the line, and the Media lookup by file name is what makes \"put the .ggb in Media\" the fix.",
+      "English only: the language files are left out of the engine (23 MB), and every applet is made with language en.",
+      "A command that does nothing without being an error - SetValue of a name that does not exist - raises no dialog and is not said (commands). Commands are not checked at build time: GeoGebra's parser runs only in the browser, so a refused line is first seen on the page, by whoever opens the sketch.",
+      "Obsidian hides .ggb files unless Settings -> Files and links -> Detect all file extensions is on.",
+      "The open sketch's box keeps the sketch's own shape and hides what spills out of it (geogebra.scss: height auto, overflow hidden - documentation/06 Q3), so the keyboard GeoGebra may open INSIDE its applet on a touchscreen, for a fence with `algebra: true`, could be cut off at the box's bottom edge. Unmeasured: no touchscreen was tried (an iPad and Edge on a touch laptop are to be checked later); on a desktop browser no keyboard opens."
     ]
   },
   "previewStartPage": {
@@ -25072,6 +25427,15 @@
           "meta": "run",
           "optedIn": false,
           "runner": false
+        },
+        {
+          "name": "wrap is not a flag (#653)",
+          "lang": "python",
+          "meta": "run wrap",
+          "optedIn": true,
+          "runner": true,
+          "flags": [],
+          "why": "`wrap` belongs to ```text fences only (textFenceWrapping); after `run` it is a word the row does not list, ignored like any other, so the block runs and nothing wraps."
         }
       ],
       "pageShapes": {
@@ -26665,7 +27029,7 @@
         "notDownloaded": "Swift could not be downloaded to this computer - preview the course again while it is connected to the internet (the first time downloads about {downloadGigabytes} GB)",
         "noRoom": "this computer needs about {gigabytes} GB of free space before it can make Swift programs ready to run"
       },
-      "reasonsRule": "Why a block has no program, said on its `plantoir: error:` line and in siteHealth -> swiftCouldNotBePrepared (each reason filled in ONE pass): compileError - the cache holds the compiler's diagnostics, and {said} is the message of its first `error:` (the line it names is mapped to the teacher's file); notCompiled - no program and no reason recorded (a compile that did not finish - killed, too slow, wasm-opt failed - which the next preview tries again, a wait for another launcher's download that gave up, or no launcher ran, as in deploy.py's own rebuild); notDownloaded - the launcher could not get Swift ready: on a Mac it could not build the Swift image, on Windows (since v1.8.6, #570) the fetch was offline or its download was not what was pinned (`state.json` says so: {state: notDownloaded}); {downloadGigabytes} is downloadGigabytes for the platform the build runs on (1.3 on a Mac, 2.3 on Windows), so the Mac's sentence is unchanged; noRoom - the launcher found less than room.needGigabytes free ({gigabytes}). Until v1.8.6 a fifth reason, notOnWindows, said Windows could not compile Swift (#493 option (b)); it is gone with that limit. `reasonCases` pin which one applies, on each platform.",
+      "reasonsRule": "Why a block has no program, said on its `plantoir: error:` line and in siteHealth -> swiftCouldNotBePrepared (each reason filled in ONE pass): compileError - the cache holds the compiler's diagnostics, and {said} is the message of its first `error:` (the line it names is mapped to the teacher's file); notCompiled - no program and no reason recorded (a compile that did not finish - killed, too slow, wasm-opt failed - which the next preview tries again, a wait for another launcher's download that gave up, a Mac's Swift image build that failed for any reason other than the three below (mac.stateForReason, #642), or no launcher ran, as in deploy.py's own rebuild); notDownloaded - the launcher could not get Swift ready: on a Mac its Swift image build had no internet connection or a download that was not what was pinned (mac.stateForReason, #642: offline and damaged, the same two as Windows' exit 11; until v1.9.0 every failed build said this), on Windows (since v1.8.6, #570) the fetch was offline or its download was not what was pinned (`state.json` says so: {state: notDownloaded}); {downloadGigabytes} is downloadGigabytes for the platform the build runs on (1.3 on a Mac, 2.3 on Windows), so the Mac's sentence is unchanged; noRoom - the launcher found less than room.needGigabytes free ({gigabytes}), or the disk filled part way through getting Swift ready (on a Mac, mac.stateForReason; on Windows, exit 10). Until v1.8.6 a fifth reason, notOnWindows, said Windows could not compile Swift (#493 option (b)); it is gone with that limit. `reasonCases` pin which one applies, on each platform.",
       "reasonCases": [
         {
           "name": "no program and nothing recorded, on a Mac",
@@ -26688,6 +27052,23 @@
           },
           "appliesOn": "mac",
           "reason": "notDownloaded"
+        },
+        {
+          "name": "a Mac build whose download was not what was pinned (#642)",
+          "state": {
+            "reason": "damaged",
+            "state": "notDownloaded"
+          },
+          "appliesOn": "mac",
+          "reason": "notDownloaded"
+        },
+        {
+          "name": "a Mac build that failed for any other reason records only why (#642)",
+          "state": {
+            "reason": "unpack"
+          },
+          "appliesOn": "mac",
+          "reason": "notCompiled"
         },
         {
           "name": "no program and nothing recorded, on Windows",
@@ -26759,7 +27140,21 @@
         }
       },
       "mac": {
-        "rule": "#635, v1.9.0: preview.sh prints the same PLANTOIR_SWIFT: line as Windows (windows.marker) after building the Swift image, on every ending but 'already there': the build succeeded (ready true); the free-space check refused it (noRoom, before anything was downloaded); the wait for another launcher's build gave up after the build lock's 1200 s, which is windows.waitSeconds (waited); or the build failed (the reason read from its log, reasonsFromTheBuildLog). Not printed when the image was already there, when another launcher built it while this one waited, nor when this copy of Plantoir carries no support/swift (nothing was attempted). busy is never printed on a Mac: it is Windows' other installation. The line is written by `swift_blocks.py got-ready` in the website builder, which reads this run's build log at its own path (the builds folder is mounted there), after the sentence a teacher reads. seconds is the image build alone, in whole seconds, not the wait for the lock.",
+        "rule": "#635, v1.9.0: preview.sh prints the same PLANTOIR_SWIFT: line as Windows (windows.marker) after building the Swift image, on every ending but 'already there': the build succeeded (ready true); the free-space check refused it (noRoom, before anything was downloaded); the wait for another launcher's build gave up after the build lock's 1200 s, which is windows.waitSeconds (waited); or the build failed (the reason read from its log, reasonsFromTheBuildLog). Not printed when the image was already there, when another launcher built it while this one waited, nor when this copy of Plantoir carries no support/swift (nothing was attempted). busy is never printed on a Mac: it is Windows' other installation. The line is written by `swift_blocks.py got-ready` in the website builder, which reads this run's build log at its own path (the builds folder is mounted there), after the sentence a teacher reads. seconds is the image build alone, in whole seconds, not the wait for the lock. Since #642 the failed ending's reading of the log also decides what follows from it: `got-ready --outcome=failed --state=<cache root>/state.json` writes state.json by stateForReason and prints printed[reason] on the line before the marker, so the teacher's sentence, the blocks' reason and the trail's reason come from one reading.",
+        "printed": {
+          "offline": "⚠️  Could not get Swift ready — the first time needs an internet connection. The rest of the site builds as usual; preview again once online to make its Swift programs runnable.",
+          "noRoom": "⚠️  This Mac ran out of free space while getting Swift ready, so the Swift programs on this site will not run yet. The rest of the site builds as usual; free up some space and preview again.",
+          "damaged": "⚠️  Swift's download was not what was expected, so it was thrown away. The rest of the site builds as usual; preview again to download it once more.",
+          "unpack": "⚠️  Swift could not be got ready on this Mac. The rest of the site builds as usual; preview again to try once more."
+        },
+        "printedRule": "#642: what a teacher reads on the console when the Swift image's build FAILED, chosen by the reason read from its log (reasonsFromTheBuildLog) and printed by `swift_blocks.py got-ready --outcome=failed` in the website builder, before the marker. Until v1.9.0 preview.sh printed `offline` for every failure, so a full disk or a damaged download was blamed on the internet. offline is that sentence, byte for byte; damaged is windows.printed.damaged (true on a Mac too: a failed step leaves no layer, so the download is thrown away); noRoom is the disk filling PART WAY, after the free-space check passed, so it names no numbers (the check's own sentence, with them, stays preview.sh's); unpack is anything else, and is also preview.sh's fallback, written there as a literal, when the website builder printed nothing but the marker (an older swift_blocks.py) or nothing at all (it could not be asked) - that fallback writes no state.json. Pinned by key, never quoted, in scripts/test_swift_blocks.py and scripts/test_swift_launcher_marker.py (which also holds preview.sh's literal equal to unpack). The other Swift sentences - the free-space check, the wait, getting ready, ready, compiling - stay preview.sh's own.",
+        "stateForReason": {
+          "noRoom": "noRoom",
+          "offline": "notDownloaded",
+          "damaged": "notDownloaded",
+          "unpack": null
+        },
+        "stateRule": "#642: what a failed build writes into <cache root>/state.json, which prepare reads for every block that has no program (reasons, reasonCases): {\"reason\": <the build's reason>} plus {\"state\": stateForReason[reason]} when that is not null. The mapping is windows.ensureExit's exactly (10 noRoom; 11 offline and damaged; 12 no state, so notCompiled), and scripts/test_swift_blocks.py holds the two equal. damaged stays notDownloaded rather than notCompiled because at a school the likeliest cause of a download that is not what was pinned is a portal or a filter answering in place of the real server, and 'while it is connected to the internet' is the right advice for that. `reason` is a record for a helper reading the cache folder and is read by nothing (missing_reason reads `state` only). An unknown reason is unpack: no state, printed.unpack.",
         "downloadedBytesRule": "The image build prints nothing about bytes (every download is curl -fsSL inside a RUN), so downloadedBytes is the sum of toolchain.json -> swiftImage.pins `bytes` for the download steps that RAN, for the architecture the build used. A step is found by a pin's URL in its BuildKit header (`#N [i/n] RUN ...`, the whole command with every ARG already expanded, so the URL is there and `$WASM_SDK_URL` is not); the architecture is the word in the header's `case \"<arch>\" in`; a step that ran is one with no `#N CACHED` line, matched by its number N (BuildKit numbers steps in the order it reaches them, not the Dockerfile's). 0 when Docker reused both download layers: measured 2026-10-22 on this Mac's four teaching-quartz-swift:src-* images, whose first seven layers are identical, so an update that changes only compile.py rebuilds in seconds downloading nothing, and the pins' 1.3 GB there would be false. apt's packages and the base image (the website builder's own) are not counted, the scope of swiftImage.measured.",
         "downloadedBytesRejected": "Making the Dockerfile print what curl downloaded (curl -w '%{size_download}'): support/swift/Dockerfile is in compile.toolchainIdFrom, so the edit would compile every cached Swift program on every Mac again and download 1.3 GB once more, for a number on the trail. `docker image inspect` .Size (2.24 GB on disk, 504 MB compressed): neither is what was downloaded. A fixed 1.3 GB: false on the cached rebuild above, and a second copy of the pins.",
         "downloadSteps": [
@@ -26832,11 +27227,11 @@
           }
         ],
         "reasonsFromTheBuildLog": {
-          "rule": "Read only when the build failed, and only from the lines of every step that ended `#N ERROR` (each line starting `#N `) and the lines that belong to no step (BuildKit's closing summary, from `------` to `ERROR: failed to solve:`, and anything docker itself printed) - never a step that succeeded, whose output can say anything. The first entry of `order` with a needle in those lines wins, so a full disk (which makes curl and tar fail too) is noRoom, and a checksum that failed after a whole download is damaged rather than offline; anything else is unpack, the contract's 'or anything else went wrong' (a moved pin's HTTP 404, curl (22); a certificate curl could not check, curl (60); a crashed `swift sdk install`; a daemon error). The Swift Dockerfile carries none of the needles, so its excerpt in the summary decides nothing (scripts/test_swift_blocks.py checks it).",
+          "rule": "Read only when the build failed, and only from the lines of every step that ended `#N ERROR` (each line starting `#N `) and the lines that belong to no step (BuildKit's closing summary, from `------` to `ERROR: failed to solve:`, and anything docker itself printed) - never a step that succeeded, whose output can say anything. The first entry of `order` with a needle in those lines wins, so a full disk (which makes curl and tar fail too) is noRoom, and a checksum that failed after a whole download is damaged rather than offline; anything else is unpack, the contract's 'or anything else went wrong' (a moved pin's HTTP 404, curl (22); a certificate curl could not check, curl (60); a crashed `swift sdk install`; a daemon error). Since #642, curl (16) (an HTTP/2 framing error), (55) (failed sending) and (92) (an HTTP/2 stream not closed cleanly) are offline: each is a connection that dropped, which offline's words already say ('or the download stopped'). curl (60) stays unpack on purpose: neither 'go online' nor 'try again' fixes a certificate that cannot be checked, and a network that intercepts encrypted connections is a real case at a school; a filter answering 403 is curl (22) and also unpack. The Swift Dockerfile carries none of the needles, so its excerpt in the summary decides nothing (scripts/test_swift_blocks.py checks it).",
           "order": [
             {"reason": "noRoom", "ignoreCase": true, "anyOf": ["no space left", "curl: (23)"]},
             {"reason": "damaged", "ignoreCase": false, "anyOf": ["computed checksum did NOT match", ".tar.gz: FAILED"]},
-            {"reason": "offline", "ignoreCase": false, "anyOf": ["curl: (6)", "curl: (7)", "curl: (18)", "curl: (28)", "curl: (35)", "curl: (52)", "curl: (56)", "Could not resolve host", "Temporary failure resolving", "dial tcp", "i/o timeout", "TLS handshake timeout", "no such host"]}
+            {"reason": "offline", "ignoreCase": false, "anyOf": ["curl: (6)", "curl: (7)", "curl: (18)", "curl: (28)", "curl: (35)", "curl: (16)", "curl: (52)", "curl: (55)", "curl: (56)", "curl: (92)", "Could not resolve host", "Temporary failure resolving", "dial tcp", "i/o timeout", "TLS handshake timeout", "no such host"]}
           ],
           "otherwise": "unpack"
         },
@@ -26897,6 +27292,38 @@
               "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 56"
             ],
             "reason": "offline"
+          },
+          {
+            "name": "an HTTP/2 framing error part way: (16) (#642)",
+            "log": [
+              "#6 95.12 curl: (16) Error in the HTTP2 framing layer",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 16"
+            ],
+            "reason": "offline"
+          },
+          {
+            "name": "the connection dropped while sending: (55) (#642)",
+            "log": [
+              "#6 3.40 curl: (55) Failed sending data to the peer",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 55"
+            ],
+            "reason": "offline"
+          },
+          {
+            "name": "an HTTP/2 stream that was not closed cleanly: (92) (#642)",
+            "log": [
+              "#6 180.77 curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 92"
+            ],
+            "reason": "offline"
+          },
+          {
+            "name": "a certificate curl could not check stays unpack: (60) (#642)",
+            "log": [
+              "#6 0.52 curl: (60) SSL certificate problem: unable to get local issuer certificate",
+              "#6 ERROR: process \"/bin/sh -c set -e; ...\" did not complete successfully: exit code: 60"
+            ],
+            "reason": "unpack"
           },
           {
             "name": "no internet for apt",
@@ -27078,6 +27505,179 @@
       "The Swift tokenizer ships with no caller yet: every Swift block is read-only and shows Shiki's own highlighted copy, so codeRunnerColour.ts colours Swift only in the contract's cases and the check's agreement score until an editable Swift block exists (#579). Its row's `colour` is already \"swift\", so that block needs no further wiring."
     ]
   },
+  "textFenceWrapping": {
+    "note": "#653 (v1.9.0). A plain text block can wrap its long lines instead of scrolling sideways: ```text wrap. Implemented once, in support/quartz (plugins/transformers/textWrapRule.ts, the second markdown plugin of codeRunner.ts, components/styles/codeLines.scss), so Windows inherits it with the build; run by scripts/check_runner_rules_against_the_site.py, verify.sh's Wrap Fixture checks and browser-checks/text_wrap.mjs. documentation/06-quartz-customizations.md -> P. No trail event: the app does nothing new a teacher sees.",
+    "rule": "#653 (Russell, 2026-10-23). A ```text fence may opt in to wrapping with the word `wrap` in its info string (```text wrap): its lines wrap at the width of the window instead of scrolling sideways. Without the word nothing changes - every block scrolls, as before, and its HTML is byte for byte what it was. Code never wraps, because code is read by column: `wrap` after any other language (```python wrap) is ignored silently - no folder problem, no build line - and the runnable-code reader never treats it as a flag (codeRunnerBlocks.fences.cases, 'wrap is not a flag (#653)'). On paper nothing changes either: print.scss wraps every block, flagged or not, as it always has.",
+    "fence": {
+      "rule": "The info string (mdast's `lang`, then `meta`) joined and split on codeRunnerRule's INFO_SPACE, as codeRunnerBlocks.fences splits it; the first word is exactly `text` (lowercase, as Q1), and `wrap` is any later word, exactly. Read by support/quartz/plugins/transformers/textWrapRule.ts (wrapsText) on every page, opted in to anything or not; the block is wrapped at the markdown stage in <div class=\"plantoir-text-wrap\">, because rehype-pretty-code 0.14 drops every property on <pre> and <code> and keeps no trace of the meta (measured 2026-10-09 for #455, again for #653). A title holding the word ` wrap ` counts: chosen, not discovered, as codeRunnerBlocks S5.",
+      "casesRule": "`fence` is the info string exactly as typed after the three backticks; `lang` and `meta` are what Quartz's own parser (remark-parse + remark-gfm, the image's) makes of it, MEASURED, not reasoned; `wraps` is the verdict. scripts/check_runner_rules_against_the_site.py runs every case twice: wrapsText(lang, meta) must equal `wraps`; and the page \"```\" + fence + \"\\nx\\n```\\n\" is parsed by that parser, whose code node must carry exactly this `lang` and `meta` (so a case that is not what the parser makes of its fence fails rather than passing on data no page can produce), and then run through codeRunner.ts's second markdown plugin, which must wrap it exactly when `wraps`. A leading space in `meta` is therefore not a case: micromark never writes one.",
+      "cases": [
+          {
+            "name": "the plain case",
+            "fence": "text wrap",
+            "lang": "text",
+            "meta": "wrap",
+            "wraps": true
+          },
+          {
+            "name": "a text block without the word scrolls, as before",
+            "fence": "text",
+            "lang": "text",
+            "meta": null,
+            "wraps": false
+          },
+          {
+            "name": "two spaces",
+            "fence": "text  wrap",
+            "lang": "text",
+            "meta": "wrap",
+            "wraps": true
+          },
+          {
+            "name": "a tab",
+            "fence": "text\twrap",
+            "lang": "text",
+            "meta": "wrap",
+            "wraps": true
+          },
+          {
+            "name": "a trailing space",
+            "fence": "text wrap ",
+            "lang": "text",
+            "meta": "wrap ",
+            "wraps": true
+          },
+          {
+            "name": "a no-break space (Option-Space): micromark leaves it all in lang",
+            "fence": "text\u00a0wrap",
+            "lang": "text\u00a0wrap",
+            "meta": null,
+            "wraps": true,
+            "why": "Split on INFO_SPACE, as codeRunnerBlocks.fences splits it (#455 review N2). What it does NOT do is make the block read as plain `text` further on: rehype-pretty-code 0.14 renders it with data-language=\"text\u00a0wrap\", the no-break space kept, not \"text\" (measured 2026-10-23 in the image, for #653's review). The wrapper still wraps it, and its lines are intact."
+          },
+          {
+            "name": "no-break spaces, then highlighted lines",
+            "fence": "text\u00a0\u00a0wrap {3}",
+            "lang": "text\u00a0\u00a0wrap",
+            "meta": "{3}",
+            "wraps": true,
+            "why": "As the case above: wrapped, and line 3 still highlighted, but rehype-pretty-code 0.14 renders it with data-language=\"text\u00a0\u00a0wrap\", both no-break spaces kept, not \"text\" (measured 2026-10-23 in the image)."
+          },
+          {
+            "name": "with highlighted lines after it",
+            "fence": "text wrap {2}",
+            "lang": "text",
+            "meta": "wrap {2}",
+            "wraps": true
+          },
+          {
+            "name": "with highlighted lines before it",
+            "fence": "text {2} wrap",
+            "lang": "text",
+            "meta": "{2} wrap",
+            "wraps": true
+          },
+          {
+            "name": "a code fence: code never wraps",
+            "fence": "python wrap",
+            "lang": "python",
+            "meta": "wrap",
+            "wraps": false,
+            "why": "Ignored silently: no folder problem and no build line, and the block scrolls as every code block does."
+          },
+          {
+            "name": "a runnable block: neither wraps nor loses its Run button",
+            "fence": "python run wrap",
+            "lang": "python",
+            "meta": "run wrap",
+            "wraps": false
+          },
+          {
+            "name": "text run wrap: text is not a runner language, so it wraps and gets no Run button",
+            "fence": "text run wrap",
+            "lang": "text",
+            "meta": "run wrap",
+            "wraps": true,
+            "why": "`run` is just another word after `text` (codeRunnerBlocks reads runners for its LANGUAGES only), so the block wraps; the check script also runs it on a `codeRunner: true` page through the runner transformer and requires no runner."
+          },
+          {
+            "name": "TEXT in capitals is not text (Q1)",
+            "fence": "TEXT wrap",
+            "lang": "TEXT",
+            "meta": "wrap",
+            "wraps": false
+          },
+          {
+            "name": "txt is not text",
+            "fence": "txt wrap",
+            "lang": "txt",
+            "meta": "wrap",
+            "wraps": false
+          },
+          {
+            "name": "plaintext is not text",
+            "fence": "plaintext wrap",
+            "lang": "plaintext",
+            "meta": "wrap",
+            "wraps": false
+          },
+          {
+            "name": "no language: Quartz reads wrap AS the language",
+            "fence": "wrap",
+            "lang": "wrap",
+            "meta": null,
+            "wraps": false
+          },
+          {
+            "name": "a space before the word changes nothing: it is still the language",
+            "fence": " wrap",
+            "lang": "wrap",
+            "meta": null,
+            "wraps": false
+          },
+          {
+            "name": "wrapped is not wrap",
+            "fence": "text wrapped",
+            "lang": "text",
+            "meta": "wrapped",
+            "wraps": false
+          },
+          {
+            "name": "a title that is the word, quoted, is not the word",
+            "fence": "text title=\"wrap\"",
+            "lang": "text",
+            "meta": "title=\"wrap\"",
+            "wraps": false
+          },
+          {
+            "name": "a title holding the word on its own counts (chosen, not discovered, as codeRunnerBlocks S5)",
+            "fence": "text title=\"Sample wrap output\"",
+            "lang": "text",
+            "meta": "title=\"Sample wrap output\"",
+            "wraps": true
+          }
+      ]
+    },
+    "look": "On screen only (@media screen, and never in the handout's pre.plantoir-flowing): white-space pre-wrap with overflow-wrap anywhere, so indentation is kept and a URL breaks anywhere. Each source line keeps its number on its FIRST visual row; every later row shows `…` in the gutter, in the number's colour and font, right-aligned (codeLines.scss's plantoir-gutter mixin), and the hairline runs the line's full height. Every row's text starts at one x - the number box's width - whatever the line holds. Both pseudo-elements are absolute in the gutter, so a line that is one unbreakable run fills its first row (an inline number made that row empty, measured). The ellipses are one string of 80 rows the line clips, so they share the code's own line-height and cannot drift. Highlighted lines keep their tint and bar across every row; the 100- and 1000-line widths hold. Hidden from screen readers (content alt \"\"). The copy button copies the block as written: no ellipsis and no line break where a line wrapped. No JavaScript.",
+    "knownLimits": [
+      "A source line that wraps onto more than 81 rows shows ellipses on its first 80 continuation rows only (about 7,800 characters at 1512 px, where a row holds 97 on the built page, and about 2,800 at a phone's 390 px). 80 rather than 200 because WebKit lays the whole string out for every line: a 1,002-line wrapped block at 390 px relays out in 63.5 ms with 80 rows against 132.3 ms with 200, 17.7 ms with one and 0.9 ms unwrapped (Playwright WebKit 26.6, median of five loads, M4 Pro; a 120-line block 7.6 ms). Chromium 153 is 3.4 to 3.6 ms whatever the count.",
+      "Safari before 17.4 does not know the `content: ... / \"\"` form and keeps the plain declaration before it, so it shows the ellipses AND a screen reader there reads each one aloud. Accepted rather than dropped: the other way round, an older Safari would lose the ellipses altogether.",
+      "Obsidian ignores the extra word, so the editor shows the block unwrapped (not measured in Obsidian; the info string's first word is the language there too).",
+      "The page's copy button sits over the first row's right end on hover, as it does over a scrolling block."
+    ],
+    "rejected": [
+      "The number inline with a text-indent hang (the issue's sketch, and print.scss's handout approach): an unbreakable line (a URL) moves whole to its second row and leaves the first holding only its number (measured at 390 px).",
+      "An SVG data-URI ellipsis repeated as a background: no web font, a colour of its own per theme, and a repeat period that is a guess at the line-height.",
+      "JavaScript counting rows: breaks under live reload, print and isolated pages, and is not needed.",
+      "`wrap` for code fences: Russell's ruling - code is read by column.",
+      "A folder problem for `python wrap`: noise for a harmless word; the page-authoring skill says where the flag belongs.",
+      "Attributes on <pre> or <code>: rehype-pretty-code 0.14 drops them.",
+      "A separate wired plugin: a fourth config anchor edit in build_site.py for ten lines.",
+      "A Python mirror of the rule: nothing in the build reads it.",
+      "Continuation rows indented to the line's own leading white space (VS Code's \"same\" indent): not possible in CSS alone.",
+      "200 rows of ellipses (the plan's first number): WebKit's relayout cost doubles for rows no real text block reaches (knownLimits)."
+    ]
+  },
   "netlifyPageAddresses": {
     "note": "GitHub issue #628, v1.9.0. Netlify answers a PAGE asked for with any capital letter with a 301 to its lower-case path, and serves every other file (pictures, styles, scripts, data) in any case with a 200 - measured 2026-10-23 on ics3u-s2-2026-27.russellgordon.ca. Quartz writes every page link with the page's own capitals, so every click on a Netlify site paid a redirect. A Netlify publish therefore lower-cases the PATH of each same-site link in memory as it uploads (scripts/netlify_paths.py, called by deploy.py's _build_files_manifest), marks the page, and the site's router and link previews do the same for the links they make themselves when the mark is there (scripts/build_site.py -> PLANTOIR-SERVED-CASE). Shared Python and shared Quartz edits, so both apps inherit it: run by scripts/test_netlify_paths.py (verify.sh, and Windows' PythonToolchainTests). Neither app carries an implementation of its own. The live check is verify-deploy.sh -> check_page_links (and its verify-deploy.ps1 counterpart). documentation/07-deployment.md -> 'Page addresses on Netlify: lower case at upload (#628)'.",
     "rule": "On a Netlify publish only, the RAW text of each same-site link's path has its ASCII capitals A-Z made small, in place: never a character reference (`&...;`, which may stand for a capital), never the two hex digits of a %-escape, never the query or the fragment (a reference that stands for `?` or `#` ends the path as the character would). Same site means relative, root-relative, or absolute on the section's own host; a fragment-only link, any other scheme, a protocol-relative `//` link and every other host are left exactly as written, and so is every link in a page that has a <base>. Rewritten: `href` on <a> and <area>, `href` on <link rel=canonical> and the url of <meta http-equiv=refresh> (Quartz's alias pages - the edit moves only the URL's own characters, so the site's fetchCanonical regex still finds it), every <loc> in the root sitemap.xml and every <link> in the root index.xml. Never <guid>, <description>, `data-slug`, `src`, any script or style. The page's <html> tag gains the marker attribute (none is added to a file with no <html> tag; its links are still rewritten). public/ is never written: a Cloudflare destination, a folder publish and the preview get the build's bytes, with the capitals and without the marker. Deterministic and idempotent. Failure direction: a link this misses or lower-cases needlessly costs at most the one redirect Netlify already sends - never a broken link.",
@@ -27130,6 +27730,7 @@
         "choiceWithoutBox",
         "twoAnswers",
         "choicesAndAnswer",
+        "sketchInAChoice",
         "oneChoice",
         "noCorrectChoice",
         "noAnswerLine",
@@ -27700,6 +28301,73 @@
           "markdown": "<div>\n> [!quiz] Shown in HTML.\n> > [!answer]-\n> > 4\n</div>\n",
           "quizzes": [],
           "untouched": true
+        },
+        {
+          "name": "aSketchInAChoice",
+          "markdown": "> [!quiz] Which sketch shows a line?\n> - [x] This one\n>   ```geogebra\n>   alt: A line, in a choice.\n>   y = x\n>   ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "sketchInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInACalloutInAChoice",
+          "markdown": "> [!quiz] Which sketch shows a line?\n> - [x] This one\n>   > [!note] The sketch\n>   > ```geogebra\n>   > alt: A line, in a note in a choice.\n>   > y = x\n>   > ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "sketchInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInTheQuestionWithCommandsThatLookLikeChoices",
+          "markdown": "> [!quiz] Drag A. Which is the slope of the line?\n> ```geogebra\n> alt: A line, in a question.\n> -x + y = 3\n> - [x] 2\n> [1, 2]\n> ```\n> - [x] -1\n> - [ ] 2\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInTheExplanation",
+          "markdown": "> [!quiz] Which line falls?\n> - [ ] y = 2x\n> - [x] y = -x + 3\n>\n> > [!explain]- Why\n> > Its slope is -1.\n> > ```geogebra\n> > alt: A line, in an explanation.\n> > -x + y = 3\n> > ```\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                1
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSketchInAListThatIsNotTheChoices",
+          "markdown": "> [!quiz] Look first:\n> - the line\n>   ```geogebra\n>   alt: A line, in a list that is not the choices.\n>   y = x\n>   ```\n>\n> Which is its slope?\n>\n> - [x] 1\n> - [ ] 2\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
+              "line": 1
+            }
+          ],
+          "untouched": false
         }
       ]
     },
@@ -28352,7 +29020,7 @@
       "why": "Self-check, never a grade book (#511): nothing leaves the browser and nothing is collected; what is kept is a convenience for the one student at that browser."
     },
     "print": "On paper a quiz prints as its question only (ruling Q8; the answer key is #511's): the buttons, feedback, score, answer block, explanation, correctness marks and the not-ready line are hidden; native boxes are hidden and an empty ○ (one answer) or □ (select all) is drawn instead, so a student's selection never prints; a blank prints as an empty line. Choices print in Markdown order. In a printable page's handout the answers of a quiz are in NEITHER the questions part nor the key, and its explanations never print: print.inline.ts gives callouts inside a quiz no role, and the handout's copy removes what a quiz holds back.",
-    "safetyNet": "The folder check writes quartz/plantoir_quiz_pages.json on every build: `examined` (each page it read, by its path in the site's content) and, for each page with a quiz, {quizzes, problems (the n of each it reported), nested, nestedProblems, lines (each top-level quiz's first line in the teacher's file, or null), nestedLines (the same for each quiz that is not at the top level)}. The site compares, page by page, only for pages examined and published: a different count, or a quiz one side reports and the other does not, prints `plantoir: error: <page>: quiz <n>, line <L>: <words.problems.readDifferently>` (the line in the teacher's file when the folder check knows it, from `lines`; when the top-level counts differ, `the quiz at line <L>` of the first quiz the folder check found, or `quiz 1`; when only the quizzes inside a list or callout differ, `a quiz inside a list or another callout at line <L>` from `nestedLines`; never a count). A quiz is matched by its place among the page's top-level quizzes, guarded by the count (a count that differs is one line for the page, since no place can then be trusted); one that is not at the top level by its place among those. The site renders what IT read; the line says the two disagree. It works because the site builds with --concurrency 1 (build_site.py), so the line reaches the build's output (review N1).",
+    "safetyNet": "The folder check writes quartz/plantoir_quiz_pages.json on every build: `examined` (each page it read, by its path in the site's content) and, for each page with a quiz, {quizzes, problems (the n of each it reported), nested, nestedProblems, lines (each top-level quiz's first line in the teacher's file, or null), nestedLines (the same for each quiz that is not at the top level)}. The site compares, page by page, only for pages examined and published: a different count, or a quiz one side reports and the other does not, prints `plantoir: error: <page>: quiz <n>, line <L>: <words.problems.readDifferently>` (the line in the teacher's file when the folder check knows it, from `lines`; when the top-level counts differ, `the quiz at line <L>` of the first quiz the folder check found, or `quiz 1`; when only the quizzes inside a list or callout differ, `a quiz inside a list or another callout at line <L>` from `nestedLines`; never a count). A quiz is matched by its place among the page's top-level quizzes, guarded by the count (a count that differs is one line for the page, since no place can then be trusted); one that is not at the top level by its place among those. The site renders what IT read; the line says the two disagree. Each line is also recorded (file.data.plantoirQuizDisagreements) and the site's emitter says them all as ONE quizzesReadDifferently folder problem (#644, siteHealth.checks), so a teacher previewing in the app is told too. It works because the site builds with --concurrency 1 (build_site.py), so the line reaches the build's output (review N1).",
     "words": {
       "site": {
         "note": "English, as data, on a page students read. No word names the machinery (CLAUDE.md rule 1). {n} and {count} are numbers; {answer} and {answers} stand for the answer as shown (a formula stays a formula); {value} and {tolerance} are as the teacher wrote them; {right} and {total} count quizzes on the page.",
@@ -28381,7 +29049,7 @@
         "notReady": "This question can’t be checked on this site yet."
       },
       "problems": {
-        "note": "Why a quiz cannot be checked, as the folder check and the site's safety net say it - on a `plantoir: error:` line, which an assistant and a teacher read, and in the quizzesNotReady finding. {n} is the answer line's place in the [!answer] (from 1), {lines} and {blanks} counts, {option} the setting as typed.",
+        "note": "Why a quiz cannot be checked, as the folder check and the site's safety net say it - on a `plantoir: error:` line, which an assistant and a teacher read, and in the quizzesNotReady finding (and, for the problem the SITE found, in quizzesReadDifferently's shownWithNote, #644). {n} is the answer line's place in the [!answer] (from 1), {lines} and {blanks} counts, {option} the setting as typed.",
         "nothingToCheck": "it has no ticked choices and no [!answer], so there is nothing to check - tick the right choice with [x], or add an [!answer] inside the quiz",
         "noCorrectChoice": "none of its choices is ticked - mark the right one with [x]",
         "oneChoice": "it has only one choice - give it at least two",
@@ -28395,6 +29063,7 @@
         "emptyAlternative": "answer line {n} has an empty answer between its | marks",
         "badTolerance": "answer line {n} has a ± that is not a number ± a number, like 3.14 ± 0.01",
         "unknownOption": "“{option}” is not a quiz setting - the only one is shuffle",
+        "sketchInAChoice": "a GeoGebra sketch sits inside one of its choices, where dragging the sketch would pick that choice - put the sketch in the question, above the choices, or in its explanation",
         "choicesInHtml": "a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out",
       "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
         "readDifferently": "the site and the folder check read this question differently - preview the site again, and if this line comes back, rewrite it from one of the patterns in the plantoir-quizzes skill"
@@ -28414,8 +29083,8 @@
       "A self-check, never a grade: the page's source shows the answers to anyone who looks.",
       "A quiz shown by transclusion (![[Other page#Quiz]]) is checked and scored as its own page's quiz, under the host page's score.",
       "A popover preview of a page shows its quizzes without Check (the page's script runs on the page itself, not in a popover); their answers stay hidden.",
-      "The folder check reads a page line by line, not with the site's parser (documentation/05): pages written the way the skill shows agree, and where an unusual nesting is read differently the site's safety net says so on a `plantoir: error:` line.",
-        "Two HTML shapes are still read differently by the site and the folder check (#563 final review, 2026-10-17): a tag whose quoted attribute holds a `>` (`<img alt=\"x>y\">`) and an open `<pre>`, `<script>`, `<style>` or `<textarea>` before the choices. The safety net catches both and the page says so on its `plantoir: error:` line; neither is a shape the skill shows."
+      "The folder check reads a page line by line, not with the site's parser (documentation/05): pages written the way the skill shows agree, and where an unusual nesting is read differently the site's safety net says so on a `plantoir: error:` line and as a folder problem (quizzesReadDifferently, #644).",
+        "Two HTML shapes are still read differently by the site and the folder check (#563 final review, 2026-10-17): a tag whose quoted attribute holds a `>` (`<img alt=\"x>y\">`) and an open `<pre>`, `<script>`, `<style>` or `<textarea>` before the choices. The safety net catches both and the page says so on its `plantoir: error:` line and as a folder problem (quizzesReadDifferently, #644); neither is a shape the skill shows."
     ]
   },
   "obsidianAddOnsForFigures": {
@@ -31367,5 +32036,111 @@
       },
       "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_MAPS:)."
     }
+  },
+  "obsidianOpensThePreviewedPage": {
+    "note": "GitHub #518 (v1.9.0, mac first; Russell's rulings of 2026-10-23 on the issue are binding). Open in Obsidian, pressed for a SECTION while that section's preview is showing a page, opens the Markdown file behind the page on screen instead of the section's front page. The build writes which file each page came from (file-formats.json -> pageSourcesList); the app reads the preview's address at the press and looks it up there. documentation/09-mac-app.md -> 'Open in Obsidian opens the page the preview shows (#518)' says what was measured and rejected; documentation/05-build-pipeline.md says when the build writes the list.",
+    "rule": "THE PAGE ON SCREEN, READ AT THE PRESS. The address is the preview's own web view's (the mac's WKWebView, Windows' WebView2) at the moment of the press, through previewStartPage's normaliser (the path below the preview's root, query and fragment stripped, percent-encoded as it arrived; '' for the front page) - NOT the page last viewed (#504), which deliberately ignores the app's own loads and so lags what is shown after Rebuild Preview or a press of the front page. A section press is the section window's toolbar button, Section > Open in Obsidian, a section row's context menu and the in-app assistant's open_in_obsidian (#610), which presses that window's own button on that window's model and reads the address once, at the press, so its reply names the page that opened; Course > Open in Obsidian, Course Settings' button, a course row's menu and the How I Teach row open exactly what they opened before (ruling 3: the page belongs to a section, the course press names the course). The address is decoded once (percent-encoding), compared in Unicode NFC on both sides (APFS keeps the form a name was typed in), and looked up in the section's list: '' is 'index'; an address ending '/' is looked up as <address>index first and then without the '/'; any other address as itself and then as <address>/index. An entry marked collided, no entry, a file that is not '.md', a file outside the course folder once links are followed, and a file that is gone all FALL BACK to what the press opened before (the section's front page, or the course when it has none) - a dead menu item is the worse fault. The front page's entry may carry 'shows': the class page the front page is only an embed of (ruling 1), which is opened instead while that file is there, with 'showsHidden': whether students are kept from THAT page. The hidden flag the trail reads is the flag of the file that opens - the class's showsHidden when the class opens, the front page's hidden when it does not - so a visible front page that shows a hidden class says '(hidden from students)', and a hidden front page whose class is visible does not. A hidden page opens anyway - the teacher is its author (ruling 4). Every section press that goes ahead writes one trail line (activityTrail -> 'page opened in Obsidian'); a press turned away while the add-ons scan is still running writes nothing. The line is written including the fallback when no page was showing (ruling 5); a course press writes none. Opening keeps obsidian://open?path=<absolute path> (the vault's name is ambiguous across working folders) with '+' written %2B. The query encoder leaves '+' raw; Obsidian 1.13.7 and 1.14.4 decode the query with decodeURIComponent and so read a raw '+' as '+' (measured 2026-10-23, an isolated Obsidian on a scratch vault: both spellings opened 'C++ Basics.md'), but '+' is a space to every form-style parser (URLSearchParams), so the link no longer depends on which one reads it. A reference course's locked-pages note, the add-ons offer and the reopen question all carry the page through, so it is the page that opens once they are answered.",
+    "rejected": [
+      "Asking Safari for its front tab with AppleScript: the preview is not in Safari (it is the app's own web view), and asking would need the Automation permission ('Plantoir wants access to control Safari'), denied once and never asked again.",
+      "The live-reload websocket: it carries messages from the server to the page only; the app is not one of its clients.",
+      "A file written by script injected into the page: a second channel to keep in step with the address the app already sees.",
+      "The page last viewed (previewStartPage.remembering): it ignores the app's own loads on purpose, so it can name a page that is no longer on screen.",
+      "Working the file out from the address in the app: a per-section page replacing a shared one, a folder's _index and the names Quartz slugs (spaces, &, %, ?, #) can only be undone by the build that made the site.",
+      "The vault name in the link (obsidian://open?vault=): two working folders can hold courses with the same name."
+    ],
+    "fallbacks": {
+      "noPageShowing": "no preview page was showing",
+      "noList": "the preview's list of pages could not be read",
+      "notInTheList": "the page on screen is not one of the course's own files",
+      "collided": "two of the course's files make a page at that address",
+      "outsideTheCourse": "the page's file is not inside the course folder",
+      "fileGone": "the page's file is no longer there"
+    },
+    "trail": {
+      "opened": "opened {place} in Obsidian, the page the preview shows",
+      "openedHidden": "opened {place} in Obsidian, the page the preview shows (hidden from students)",
+      "fellBack": "opened the section in Obsidian, not a page of the preview: {why}",
+      "place": "the file's place in the course folder without .md, as every trail line names a page - never anything written on it"
+    },
+    "link": {
+      "note": "What the app hands macOS (or Windows) to open a page; the percent-encoding of everything but '+' is the platform encoder's own (URLComponents, Uri.EscapeDataString). Every link of this shape - spaces, '+' either way, '&', a comma, a hidden page, a decomposed name with a decomposed or a composed link - opened its file in an isolated Obsidian 1.13.7 and 1.14.4 (2026-10-23), and none created a file.",
+      "cases": [
+        {"path": "/Users/teacher/Class Websites/courses/ICS3U/Unit 1/Lesson 3.md", "link": "obsidian://open?path=/Users/teacher/Class%20Websites/courses/ICS3U/Unit%201/Lesson%203.md"},
+        {"path": "/Users/teacher/Class Websites/courses/ICS3U/Unit 1/C++ Basics.md", "link": "obsidian://open?path=/Users/teacher/Class%20Websites/courses/ICS3U/Unit%201/C%2B%2B%20Basics.md"},
+        {"path": "/Users/teacher/Class Websites/courses/ICS3U/Unit 1/Q&A.md", "link": "obsidian://open?path=/Users/teacher/Class%20Websites/courses/ICS3U/Unit%201/Q%26A.md"}
+      ]
+    },
+    "slugCases": {
+      "note": "build_site.page_slug_as_quartz_serves against Quartz 4.5.0's slugifyFilePath (measured 2026-10-21 on 38 names; scripts/test_page_sources.py runs these, and verify.sh checks every address of a real build against the page Quartz wrote). null: Quartz makes no page of the file.",
+      "cases": [
+        {"file": "index.md", "slug": "index"},
+        {"file": "Unit 1/Lesson 3.md", "slug": "Unit-1/Lesson-3"},
+        {"file": "Unit 1/_index.md", "slug": "Unit-1/index"},
+        {"file": "_index.md", "slug": "index"},
+        {"file": "Unit 1/Q&A.md", "slug": "Unit-1/Q-and-A"},
+        {"file": "Unit 1/100% Done.md", "slug": "Unit-1/100-percent-Done"},
+        {"file": "Unit 1/Lesson?.md", "slug": "Unit-1/Lesson"},
+        {"file": "Unit 1/C# Basics.md", "slug": "Unit-1/C-Basics"},
+        {"file": "Unit 1/C++ Basics.md", "slug": "Unit-1/C++-Basics"},
+        {"file": "Unit 1/Café Notes.md", "slug": "Unit-1/Café-Notes"},
+        {"file": "Gr. 9 Curriculum/B1.md", "slug": "Gr.-9-Curriculum/B1"},
+        {"file": "Unit 1/Notes.MD", "slug": null},
+        {"file": "Unit 1/Picture.png", "slug": null}
+      ]
+    },
+    "fixture": {
+      "note": "The course folder every case below is read against: these files exist (paths below the course folder; 'Café Notes.md' is written in NFD, decomposed, as a Mac may keep it), and Escape.md exists BESIDE the course folder, outside it.",
+      "files": [
+        "section1/index.md",
+        "section1/All Classes/Unit 1, Day 3.md",
+        "Unit 1/Lesson 3.md",
+        "Unit 1/_index.md",
+        "Unit 1/Café Notes.md",
+        "Unit 1/C++ Basics.md",
+        "Unit 1/Homework.md",
+        "Unit 1/Picture.png",
+        "section1/Unit 1/Quiz.md",
+        "section1/Unit 1/Homework.md"
+      ],
+      "outside": "../Elsewhere/Escape.md",
+      "pages": {
+        "index": {"source": "section1/index.md", "hidden": false, "shows": "section1/All Classes/Unit 1, Day 3.md", "showsHidden": false},
+        "Unit-1/Lesson-3": {"source": "Unit 1/Lesson 3.md", "hidden": false},
+        "Unit-1/index": {"source": "Unit 1/_index.md", "hidden": false},
+        "Unit-1/Café-Notes": {"source": "Unit 1/Café Notes.md", "hidden": false},
+        "Unit-1/C++-Basics": {"source": "Unit 1/C++ Basics.md", "hidden": false},
+        "Unit-1/Homework": {"source": "section1/Unit 1/Homework.md", "hidden": false},
+        "Unit-1/Quiz": {"source": "section1/Unit 1/Quiz.md", "hidden": true},
+        "Unit-1/A-B": {"collided": true},
+        "Unit-1/Gone": {"source": "Unit 1/Gone.md", "hidden": false},
+        "Unit-1/Escape": {"source": "../Elsewhere/Escape.md", "hidden": false},
+        "Unit-1/Picture": {"source": "Unit 1/Picture.png", "hidden": false}
+      }
+    },
+    "cases": [
+      {"name": "the front page that only embeds today's class opens the class", "address": "", "expect": {"opens": "section1/All Classes/Unit 1, Day 3.md", "hidden": false}},
+      {"name": "a front page with more on it opens the front page", "address": "", "pages": {"index": {"source": "section1/index.md", "hidden": false}}, "expect": {"opens": "section1/index.md", "hidden": false}},
+      {"name": "the class a front page embeds is gone: the front page opens", "address": "", "pages": {"index": {"source": "section1/index.md", "hidden": false, "shows": "section1/All Classes/Gone.md"}}, "expect": {"opens": "section1/index.md", "hidden": false}},
+      {"name": "a visible front page that embeds a hidden class opens the class, and says it is hidden", "address": "", "pages": {"index": {"source": "section1/index.md", "hidden": false, "shows": "section1/All Classes/Unit 1, Day 3.md", "showsHidden": true}}, "expect": {"opens": "section1/All Classes/Unit 1, Day 3.md", "hidden": true}},
+      {"name": "a hidden front page that embeds a visible class says the class's flag", "address": "", "pages": {"index": {"source": "section1/index.md", "hidden": true, "shows": "section1/All Classes/Unit 1, Day 3.md", "showsHidden": false}}, "expect": {"opens": "section1/All Classes/Unit 1, Day 3.md", "hidden": false}},
+      {"name": "a shared page", "address": "Unit-1/Lesson-3", "expect": {"opens": "Unit 1/Lesson 3.md", "hidden": false}},
+      {"name": "a section's page that replaced a shared one opens the section's file", "address": "Unit-1/Homework", "expect": {"opens": "section1/Unit 1/Homework.md", "hidden": false}},
+      {"name": "an address ending in a slash that names a page", "address": "Unit-1/Lesson-3/", "expect": {"opens": "Unit 1/Lesson 3.md", "hidden": false}},
+      {"name": "a folder's page, with the slash", "address": "Unit-1/", "expect": {"opens": "Unit 1/_index.md", "hidden": false}},
+      {"name": "a folder's page, without it", "address": "Unit-1", "expect": {"opens": "Unit 1/_index.md", "hidden": false}},
+      {"name": "percent-encoding is decoded", "address": "Unit-1/Lesson%2D3", "expect": {"opens": "Unit 1/Lesson 3.md", "hidden": false}},
+      {"name": "a composed accent in the address finds a decomposed name", "address": "Unit-1/Caf%C3%A9-Notes", "expect": {"opens": "Unit 1/Café Notes.md", "hidden": false}},
+      {"name": "a decomposed accent in the address finds it too", "address": "Unit-1/Cafe%CC%81-Notes", "expect": {"opens": "Unit 1/Café Notes.md", "hidden": false}},
+      {"name": "a plus in the name", "address": "Unit-1/C++-Basics", "expect": {"opens": "Unit 1/C++ Basics.md", "hidden": false}},
+      {"name": "a hidden page opens anyway, and says so", "address": "Unit-1/Quiz", "expect": {"opens": "section1/Unit 1/Quiz.md", "hidden": true}},
+      {"name": "two files make the same address", "address": "Unit-1/A-B", "expect": {"fallback": "collided"}},
+      {"name": "the file has gone since the build", "address": "Unit-1/Gone", "expect": {"fallback": "fileGone"}},
+      {"name": "a file outside the course folder is never opened", "address": "Unit-1/Escape", "expect": {"fallback": "outsideTheCourse"}},
+      {"name": "a file that is not a page", "address": "Unit-1/Picture", "expect": {"fallback": "notInTheList"}},
+      {"name": "a page the build made (My Progress, a coverage map)", "address": "My-Progress", "expect": {"fallback": "notInTheList"}},
+      {"name": "no page is showing", "address": null, "expect": {"fallback": "noPageShowing"}},
+      {"name": "no list (a build from before #518)", "address": "Unit-1/Lesson-3", "list": null, "expect": {"fallback": "noList"}},
+      {"name": "a list of another version", "address": "Unit-1/Lesson-3", "list": {"version": 2, "pages": {}}, "expect": {"fallback": "noList"}}
+    ]
   }
 }

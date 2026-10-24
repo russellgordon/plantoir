@@ -8,6 +8,18 @@
   "version": "1.8.7",
   "released": "October 2026",
   "netlify_site_id": "67a69720-5e21-49ed-a354-adce4a75b279",
+  "mirror": {
+    "note": "Files plantoir.app serves at /mirror/ for the website builder to fall back to when their own host does not answer (#578): GeoGebra's bundle, whose host download.geogebra.org timed out on 4 of 8 connections (2026-10-23) and keeps no old versions. List every version a RELEASED app still names - a released Dockerfile names its own mirror address - and remove one only when no supported release names it. Never committed: build.py fills site/mirror/ (git-ignored) from $PLANTOIR_MIRROR_CACHE or ~/Library/Caches/Plantoir-dev/mirror, downloading each from its source the first time; --deploy refuses while one is missing or not its SHA-256, and --verify-deploy fetches each back (website/mirror.py, RELEASING.md).",
+    "files": [
+      {
+        "file": "geogebra/geogebra-math-apps-bundle-5-4-933-1.zip",
+        "bytes": 33461640,
+        "sha256": "409095947e065bce5bde20b8a6d56a60e2b3cb3cce6947e817a802513515ec0c",
+        "source": "https://download.geogebra.org/installers/5.4/geogebra-math-apps-bundle-5-4-933-1.zip",
+        "namedBy": "contracts/toolchain.json -> pins -> geogebra 5.4.933.1 (first released in the version that ships #578)"
+      }
+    ]
+  },
   "downloads_note": "The download cards on the home page. A card with no 'pinned' version links GitHub's evergreen releases/latest/download/<asset>, which 404s for a platform whose installer is missing from the newest release; such a card is pinned to the last release that has it, and says so. Windows was pinned to 1.1.0 from v1.2.0, which carried the macOS DMG only, until its installer joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3 cut until PlantoirSetup.exe joined v1.4.3 (2026-10-07), and to 1.4.3 for the mac-first v1.4.4 cut until PlantoirSetup.exe joined v1.4.4 (2026-10-08): pin it again in any release that lacks PlantoirSetup.exe, and unpin it in the release that ships the Windows installer again. The Mac card was pinned to 1.4.4 from the Windows-only v1.4.5 cut until Plantoir-macOS.dmg joined v1.4.5 (2026-10-08). Windows is pinned to 1.4.5 for the mac-only v1.5.0 cut (2026-10-09), and stays pinned there for the mac-only v1.6.0 and v1.7.0 cuts (2026-10-09) and the mac-only v1.7.1 cut (2026-10-11), until PlantoirSetup.exe joined v1.7.1 (2026-10-16, the Windows catch-up, #481), and to 1.7.1 for the mac-only v1.7.2 cut (2026-10-16) until PlantoirSetup.exe joined v1.7.2 later that day, and to 1.7.2 for the mac-only v1.8.0 cut (2026-10-17), the mac-only v1.8.1 cut (2026-10-18), the mac-only v1.8.2 cut (2026-10-19) the mac-only v1.8.3 cut (2026-10-19), the mac-only v1.8.4 and v1.8.5 cuts, until PlantoirSetup.exe joined v1.8.5 (2026-10-22, the Windows catch-up), and to 1.8.5 for the mac-only v1.8.6 cut (2026-10-22) until PlantoirSetup.exe joined v1.8.6 (2026-10-23, the Windows catch-up), and to 1.8.6 for the mac-only v1.8.7 cut (2026-10-23) until PlantoirSetup.exe joined v1.8.7 later that day (the Windows catch-up): pin it again in any release that lacks PlantoirSetup.exe, and unpin it in the release that ships the Windows installer again. Asset names are frozen (RELEASING.md).",
   "downloads": [
     {
@@ -62,6 +74,9 @@
       },
       "quizzes": {
         "windows": true
+      },
+      "geogebra": {
+        "windows": false
       }
     }
   },

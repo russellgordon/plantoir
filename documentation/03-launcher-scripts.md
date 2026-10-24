@@ -1797,8 +1797,20 @@ round passed it).
   minutes…") after asking the website builder for its free space (`df` of its
   root; under 6 GB it builds nothing, writes `{state: noRoom}` into the
   cache's `state.json` and says so - review S9; the check runs before ANY
-  missing-image build, even one that would reuse cached layers; a build that
-  fails writes `{state: notDownloaded}`), under a lock in
+  missing-image build, even one that would reuse cached layers, and it is
+  the only thing that writes `freeGigabytes`, which nothing reads; a build
+  that fails asks `swift_blocks.py got-ready --outcome=failed
+  --state=<cache root>/state.json`, which reads the build log once and from
+  that reading writes `state.json`, prints the teacher's sentence and then
+  the marker - `{state: noRoom}` for a disk that filled part way,
+  `{state: notDownloaded}` for no internet or a damaged download, no state
+  for anything else, each beside `{reason: …}` (`codeRunnerBlocks.swift.mac`
+  → `printed`, `stateForReason`, #642; until v1.9.0 every failure wrote
+  notDownloaded and blamed the internet); when the website builder prints
+  nothing a teacher can read - it could not be asked, or its copy predates
+  `--state` and prints only the marker - preview.sh prints `mac.printed.unpack`
+  itself, a literal the launcher test holds equal to the contract, and writes
+  no state, so the blocks say "preview the course again"), under a lock in
   `/tmp/plantoir-swift-build-<uid>.lock` so two launchers never download it
   side by side (review S3; a lock whose holder has gone is taken over, and a
   wait longer than 20 minutes gives up with a line) - then compiles with one
@@ -2549,6 +2561,74 @@ and what was measured.
   NOT measured: a second interactive account's listener (this PC has one account
   and one was not created for the test) and a `wslrelay.exe` one (none running).
   Rejected: trusting either probe alone.
+
+## Where a launcher's own trail lines go (GitHub #664)
+
+Most trail lines are written by the app, but a few are written by the
+launcher itself, through `note_on_the_trail` — a refusal (a preview while its
+section deploys, a deploy while that section is busy, a folder spelled two
+ways), and the launcher's own lines from a publish it runs (on the Mac a
+scheduled publish is started by the app itself, so those lines are the app's;
+on Windows, Task Scheduler runs `deploy.ps1` and they are the launcher's).
+The function is the same in `setup.sh`, `preview.sh` and `deploy.sh`
+(`scripts/test_trail_lock.py` pins that), appends one
+`YYYY-MM-DD HH:MM:SS · sentence` line and waits for the folder lock the app
+holds while it trims the file (#238, doc 09 → "Two writers at once").
+
+**Which folder.** It used to be `$HOME/Library/Logs/Plantoir`, always. That
+was wrong under `--state-dir` (#154): the flag moves the app's trail into the
+state folder, but every launcher the app starts still has the real `HOME` —
+on purpose, see below — so a refusal from a launcher started by a
+`--state-dir` app was written into the teacher's real trail. Since #664 the
+app hands its trail folder over in **`PLANTOIR_TRAIL_DIR`**, and the
+function takes it when it is an absolute path:
+
+```bash
+local trail="${HOME%/}/Library/Logs/Plantoir"
+case "${PLANTOIR_TRAIL_DIR:-}" in
+  /*) trail="${PLANTOIR_TRAIL_DIR%/}" ;;
+esac
+```
+
+- **Absolute only.** Unset, empty or relative falls back to the folder under
+  `HOME`, so a stray value can never start a trail inside the working folder
+  the launcher runs in. A trailing `/` is dropped.
+- **The trail only.** `BUILD_ROOT`, `TOOLS_DIR` and everything else still
+  read `HOME`. The UI suites build into the REAL builds root and clean it up
+  (#641, doc 09), and the helper programs are shared by every copy of the
+  app, so moving `HOME` would have moved the wrong things.
+- **The lock still works.** The app trims holding `flock` on
+  `ActivityTrail.store.folderURL`, which is the folder it hands over, so
+  `lockf -k` on the redirected folder takes the same lock
+  (`TheTrailFolderCanBeHandedToTheLauncher.test_the_lock_is_taken_on_a_handed_over_folder_too`).
+- **The app sets it ALWAYS** (`HelperPrograms.environment`, every launcher
+  the app starts, including the publishes launchd runs through Plantoir),
+  overriding an inherited value. In the plain app the value is the folder
+  the launcher would have computed anyway, so nothing changes there. Under the
+  unit suite it is the test host's throwaway trail, so the integration tests'
+  real launchers stay out of the teacher's trail too. A launcher typed at the
+  command line has no such variable and writes where it always has.
+
+**Rejected:** setting it only under `--state-dir`, which was the issue's own
+wording (it leaves the unit suite's real launchers on the real trail, and it
+needs a second branch to remove an inherited value); handing the launcher a
+redirected `HOME` (it moves the builds root and the helper programs, which
+`--state-dir` keeps real on purpose); accepting a relative path (nothing that
+sets it on purpose hands over anything but a full path).
+
+The rule and its five cases are `contracts/app-rules.json` →
+`launcherTrailFolder`. `scripts/test_trail_lock.py` runs every case through
+each launcher's real function with a scratch `HOME`.
+`scripts/test_preview_while_deploying.py` runs the real `preview.sh` up to its
+deploying refusal with the variable set, and checks the line is in the
+handed-over folder and not in the scratch `HOME`'s trail. Neither test reads
+the real trail. Python tests that start a launcher with `os.environ` and a
+scratch `HOME` remove the variable first, because an inherited one would send
+their lines out of the scratch folder.
+
+**Windows still owes its half:** `Write-TrailLine` in `preview.ps1` and
+`deploy.ps1` builds its path from `%LOCALAPPDATA%` (doc 12 → the `--state-dir`
+section), and the contract's cases are written for both.
 
 ## A note on line endings
 

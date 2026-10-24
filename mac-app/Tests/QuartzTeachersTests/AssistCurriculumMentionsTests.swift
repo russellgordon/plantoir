@@ -35,7 +35,11 @@ final class AssistCurriculumMentionsTests: XCTestCase {
     /// right four times in five.
     @MainActor
     func testTheLocalModelSurfaceIsNarrowAndTheMcpSurfaceIsLarger() {
-        XCTAssertEqual(AssistToolRunner.tools.count, 22)
+        // 23 since #610 added `open_in_obsidian`; still 13 shown, because
+        // shown to the local model it cost routing it had always had
+        // (research/ai-assist/open-in-obsidian-610-results.txt), so it is
+        // hidden and reached through fixed phrasings.
+        XCTAssertEqual(AssistToolRunner.tools.count, 23)
         XCTAssertEqual(AssistToolRunner.localTools.count, 13,
                        "What the model is shown must not grow when the surface does")
 

@@ -265,6 +265,7 @@ if command -v create-dmg >/dev/null 2>&1; then
     --icon "Plantoir.app" 150 175 \
     --app-drop-link 450 175 \
     --no-internet-enable \
+    --filesystem APFS \
     "${DMG_PATH}" \
     "${DMG_STAGE}" || {
       echo "   create-dmg exited non-zero, falling back to native hdiutil (APFS)..."

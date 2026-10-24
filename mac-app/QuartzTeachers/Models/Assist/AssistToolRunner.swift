@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import Observation
 
-/// The twenty-two tools that exist — thirteen of them shown to the local
+/// The twenty-three tools that exist — thirteen of them shown to the local
 /// model — and what running one does.
 ///
 /// Four rules shape this surface. They are inherited from the Windows work
@@ -256,17 +256,29 @@ final class AssistToolRunner {
 
     /// The tools, as the LOCAL model sees them.
     ///
-    /// Thirteen of the twenty-two that exist. A small local model routes worse
+    /// Thirteen of the twenty-three that exist. A small local model routes worse
     /// the more it is shown, so anything it never has to NAME is kept off the
-    /// list: the seven `plan_` twins, which plan mode calls in code, and two
+    /// list: the seven `plan_` twins, which plan mode calls in code, and three
     /// more — `remember_timetable`, whose dates must come from a teacher rather
-    /// than from a model, and `re_date_classes`, whose phrasings are matched in
-    /// code. All of them still run when they are called by CODE — plan mode,
+    /// than from a model, and `re_date_classes` and `open_in_obsidian` (#610,
+    /// measured), whose phrasings are matched in code. All of them still run when they are called by CODE — plan mode,
     /// a matched phrasing, or Claude Code over MCP. A model in a section
     /// window that names one of them is refused (#327,
     /// `AssistAgent.sayTheModelNamedAToolItWasNotOffered`).
     var definitions: [AssistToolDefinition] {
         return AssistToolRunner.localTools
+    }
+
+    /// What Open in Obsidian asks of the world outside the app (#610): this
+    /// runner's own model's, so `open_in_obsidian` asks whether Obsidian is
+    /// on this Mac the way the route does, and a test can answer instead.
+    var obsidianOpening: ObsidianOpening {
+        get {
+            return workspace.obsidianOpening
+        }
+        set {
+            workspace.obsidianOpening = newValue
+        }
     }
 
     /// The tools the MCP client sees: everything that exists, plus the ones
@@ -615,6 +627,8 @@ final class AssistToolRunner {
             return planPrepareForStartOfYear(arguments)
         case "prepare_for_start_of_year":
             return await prepareForStartOfYear(arguments)
+        case "open_in_obsidian":
+            return await openInObsidian(arguments)
         default:
             return AssistToolOutcome.couldNotRead(
                 "There is no tool called “\(call.function.name)”."
@@ -2159,6 +2173,87 @@ final class AssistToolRunner {
             message = AssistWording.courseIsBeingCopiedFromTheMenu(course: located.course.code)
         }
         return AssistToolOutcome.wrote(message, detail: message)
+    }
+
+    /// Open in Obsidian, asked of the assistant (#610): the section window's
+    /// own button, pressed — so the page on screen, the locked-pages note and
+    /// the add-ons offer are exactly the button's, and its trail line is the
+    /// route's, written once.
+    ///
+    /// The order is the rulings': the course and section first (the reply
+    /// names them); then an assistant working from another app is refused,
+    /// because that process has no preview to read and no window to ask in;
+    /// then a Mac with no Obsidian; then the window, brought up as a rebuild
+    /// or a deploy brings it. REJECTED: opening the section's front page from
+    /// another app's process with `FolderActions` directly — that skips the
+    /// add-ons offer and the reference note, the "one command, two
+    /// behaviours" fault the HIG sweep removed.
+    ///
+    /// The turn ends here (`answered`/`refused`): a second lap would only
+    /// invent a follow-up.
+    private func openInObsidian(_ arguments: [String: Any]) async -> AssistToolOutcome {
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return AssistToolOutcome.refused(refusal(from: found).message)
+        }
+        let course: Course = located.course
+        let section: String = String(located.sectionNumber)
+        if surface == .mcp {
+            return AssistToolOutcome.refused(
+                AssistWording.openInObsidianIsInTheSectionWindow(course: course.displayCode, section: section)
+            )
+        }
+        if !obsidianOpening.isInstalled() {
+            return AssistToolOutcome.refused(AssistWording.obsidianIsNotOnThisMac)
+        }
+        if sectionWindow(for: course, sectionNumber: located.sectionNumber) == nil {
+            _ = await revealSectionOnScreen(course: course, sectionNumber: located.sectionNumber)
+        }
+        guard let window = sectionWindow(for: course, sectionNumber: located.sectionNumber) else {
+            return AssistToolOutcome.refused(
+                AssistWording.openInObsidianFoundNoWindow(course: course.displayCode, section: section)
+            )
+        }
+        let press: OpenInObsidianPress = await window.openInObsidian()
+        let said: String = AssistToolRunner.sentence(for: press, course: course.displayCode, section: section)
+        if press == .noWindow {
+            return AssistToolOutcome.refused(said)
+        }
+        return AssistToolOutcome.answered(said, detail: said)
+    }
+
+    /// What a press of Open in Obsidian came to, in the teacher's words
+    /// (#610). The page is named from the answer read at the press — the
+    /// one that opened — never from a second look at the window.
+    static func sentence(for press: OpenInObsidianPress, course: String, section: String) -> String {
+        switch press {
+        case .opened(let answer):
+            switch answer {
+            case .page(_, let place, _):
+                return AssistWording.openedThePageInObsidian(page: AssistToolRunner.lastPart(of: place))
+            case .fallback(let reason):
+                if reason == .noPageShowing {
+                    return AssistWording.openedTheSectionNoPageShowing(course: course, section: section)
+                }
+                return AssistWording.openedTheSectionPageNotFound(course: course, section: section)
+            }
+        case .waitingForAnAnswer:
+            return AssistWording.obsidianOpensAfterTheQuestion(course: course, section: section)
+        case .alreadyOpening:
+            return AssistWording.obsidianIsAlreadyOpening(course: course)
+        case .noWindow:
+            return AssistWording.openInObsidianFoundNoWindow(course: course, section: section)
+        }
+    }
+
+    /// "section1/All Classes/Unit 2, Day 3" → "Unit 2, Day 3": a page's
+    /// place in the course, as the sidebar names it.
+    private static func lastPart(of place: String) -> String {
+        var parts: [Substring] = place.split(separator: "/")
+        guard let last = parts.popLast() else {
+            return place
+        }
+        return String(last)
     }
 
     /// What is said when a publish or a hide stopped part way (#412): one
