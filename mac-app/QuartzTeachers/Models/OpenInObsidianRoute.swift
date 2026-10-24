@@ -42,6 +42,52 @@ struct ObsidianAddOnsRequest: Identifiable {
     }
 }
 
+/// What one press of a section window's Open in Obsidian came to, for the
+/// assistant's `open_in_obsidian` (#610), which has to SAY what happened.
+///
+/// The page in `.opened` is the answer read ONCE, at the press — the same
+/// answer that chose what Obsidian was handed — so the reply can never name a
+/// page other than the one that opened (a second read of the web view could).
+enum OpenInObsidianPress: Equatable {
+
+    /// Obsidian was handed the page the preview showed, or the section as
+    /// before, and why.
+    case opened(PreviewedPageSource.Answer)
+
+    /// A question is up in the section window (the locked-pages note, the
+    /// add-ons offer or the reopen question); Obsidian opens once it is
+    /// answered.
+    case waitingForAnAnswer
+
+    /// An earlier press is still looking the course over; this one did
+    /// nothing, as a second click on the button does.
+    case alreadyOpening
+
+    /// No window answered the press — the default for a window that does
+    /// not register one.
+    case noWindow
+}
+
+/// What the route did with one press, for its two callers (#610).
+struct OpenInObsidianPressed {
+
+    // MARK: - Stored properties
+
+    /// Obsidian was handed something now.
+    let opened: Bool
+
+    /// The press went ahead (and left its trail line); false only for a
+    /// second press while the add-ons scan of the first is running.
+    let wentAhead: Bool
+
+    /// The add-ons scan started, and decides once it is back.
+    let scanStarted: Bool
+
+    /// The page on screen at the press, or why the section opens; nil for a
+    /// course press.
+    let answer: PreviewedPageSource.Answer?
+}
+
 /// Everything Open in Obsidian asks of the world outside the app — Obsidian
 /// itself, its registry, the disk — in one replaceable place, so a test can
 /// drive the route without ever reaching the teacher's Obsidian (#495).
@@ -121,7 +167,9 @@ extension WorkspaceModel {
 
     /// Open in Obsidian — the ONE function every route calls: the section
     /// window's toolbar button, Course Settings' toolbar button, a row's
-    /// context menu, and Course ▸ / Section ▸ Open in Obsidian (#457).
+    /// context menu, Course ▸ / Section ▸ Open in Obsidian (#457), and the
+    /// in-app assistant's `open_in_obsidian` (#610), which presses the section
+    /// window's own through `openInObsidianAndWait` below.
     ///
     /// `atThePreviewedPage` is true for a SECTION's press — the section
     /// window's button, Section ▸ Open in Obsidian and a section row's menu
@@ -160,6 +208,55 @@ extension WorkspaceModel {
         atThePreviewedPage: Bool = false,
         lockAgain: @MainActor (Course) -> Void = ReferenceLock.ensureLockedInBackground
     ) -> Bool {
+        let pressed: OpenInObsidianPressed = pressOpenInObsidian(
+            course: course, sectionNumber: sectionNumber,
+            atThePreviewedPage: atThePreviewedPage, lockAgain: lockAgain
+        )
+        return pressed.opened
+    }
+
+    /// A SECTION's press of Open in Obsidian, for the assistant (#610): the
+    /// same route the button takes (`openInObsidian` above, with
+    /// `atThePreviewedPage`), and then — because the assistant has to say
+    /// what happened — waits for the add-ons scan when one started, and
+    /// reports what the press came to.
+    ///
+    /// Called by the section window's controller on the WINDOW's own model:
+    /// the questions this route can ask are presented only by the window
+    /// that owns the model, so a press on any other model would set a
+    /// request nobody shows.
+    func openInObsidianAndWait(
+        course: Course,
+        sectionNumber: Int,
+        lockAgain: @MainActor (Course) -> Void = ReferenceLock.ensureLockedInBackground
+    ) async -> OpenInObsidianPress {
+        let pressed: OpenInObsidianPressed = pressOpenInObsidian(
+            course: course, sectionNumber: sectionNumber,
+            atThePreviewedPage: true, lockAgain: lockAgain
+        )
+        guard pressed.wentAhead, let answer = pressed.answer else {
+            return .alreadyOpening
+        }
+        if pressed.opened {
+            return .opened(answer)
+        }
+        if pressed.scanStarted, let work = obsidianAddOnsWork {
+            await work.value
+        }
+        if lockedPagesNoteRequest != nil || obsidianAddOnsOfferRequest != nil || obsidianReopenRequest != nil {
+            return .waitingForAnAnswer
+        }
+        return .opened(answer)
+    }
+
+    /// The route itself, shared by both callers above: what it did, and the
+    /// answer read at the press.
+    private func pressOpenInObsidian(
+        course: Course,
+        sectionNumber: Int?,
+        atThePreviewedPage: Bool,
+        lockAgain: @MainActor (Course) -> Void
+    ) -> OpenInObsidianPressed {
         let folder: URL = FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)
         // Read at the press (the page on screen now), but written to the
         // trail only once the press goes ahead: a second press while the
@@ -174,10 +271,10 @@ extension WorkspaceModel {
             lockAgain(course)
             if !LockedPagesNote.hasBeenShown(courseCode: course.code) {
                 lockedPagesNoteRequest = LockedPagesNoteRequest(course: course, folder: folder, page: page)
-                return false
+                return OpenInObsidianPressed(opened: false, wentAhead: true, scanStarted: false, answer: answer)
             }
             openObsidian(folder, page: page, course: course)
-            return true
+            return OpenInObsidianPressed(opened: true, wentAhead: true, scanStarted: false, answer: answer)
         }
         let settings: AppSettings = obsidianOpening.settings ?? AppSettings.shared
         if !ObsidianFigureAddOnsOffer.scans(
@@ -188,11 +285,11 @@ extension WorkspaceModel {
         ) {
             notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
             openObsidian(folder, page: page, course: course)
-            return true
+            return OpenInObsidianPressed(opened: true, wentAhead: true, scanStarted: false, answer: answer)
         }
         let coursePath: String = course.directoryURL.path
         if ObsidianFigureAddOnsThisRun.beingOpened.contains(coursePath) {
-            return false
+            return OpenInObsidianPressed(opened: false, wentAhead: false, scanStarted: false, answer: answer)
         }
         notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
         ObsidianFigureAddOnsThisRun.beingOpened.insert(coursePath)
@@ -202,7 +299,7 @@ extension WorkspaceModel {
             await self.openInObsidian(course: course, folder: folder, page: page, needed: scanned.needed, wouldAdd: scanned.wouldAdd)
             ObsidianFigureAddOnsThisRun.beingOpened.remove(coursePath)
         }
-        return false
+        return OpenInObsidianPressed(opened: false, wentAhead: true, scanStarted: true, answer: answer)
     }
 
     /// The note was answered "Open in Obsidian": remember it was shown, and

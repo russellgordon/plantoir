@@ -2363,6 +2363,31 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         ("back up this course",
          AssistCardCommand(toolName: "back_up_course", arguments: [:])),
 
+        // Open in Obsidian (#610), the section window's own button pressed.
+        // Matched here because the local MODEL is not shown
+        // `open_in_obsidian`: shown it, the smaller assistant lost probes it
+        // had always got right and sent "Open Unit 2, Day 3" to it
+        // (research/ai-assist/open-in-obsidian-610-results.txt). No
+        // arguments: the page is the one on screen in this window. Exact
+        // sentences only — "open Unit 2, Day 3 in Obsidian" names a page the
+        // button cannot take, and is a near miss.
+        ("open this in obsidian",
+         AssistCardCommand(toolName: "open_in_obsidian", arguments: [:])),
+        ("open this page in obsidian",
+         AssistCardCommand(toolName: "open_in_obsidian", arguments: [:])),
+        ("open in obsidian",
+         AssistCardCommand(toolName: "open_in_obsidian", arguments: [:])),
+        ("edit this in obsidian",
+         AssistCardCommand(toolName: "open_in_obsidian", arguments: [:])),
+        ("edit this page in obsidian",
+         AssistCardCommand(toolName: "open_in_obsidian", arguments: [:])),
+        ("i want to edit this in obsidian",
+         AssistCardCommand(toolName: "open_in_obsidian", arguments: [:])),
+        ("take me to this page in obsidian",
+         AssistCardCommand(toolName: "open_in_obsidian", arguments: [:])),
+        ("show me this in obsidian",
+         AssistCardCommand(toolName: "open_in_obsidian", arguments: [:])),
+
         ("what courses do i have?",
          AssistCardCommand(toolName: "list_courses", arguments: [:])),
         ("list my courses",
