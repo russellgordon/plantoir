@@ -196,7 +196,8 @@ final class ToolchainFingerprintTests: XCTestCase {
     }
 
     /// A bundle with no manifest is compared exactly as before #663: both
-    /// files read, and no index written, since there is nothing to vouch for.
+    /// files read. The index still learns the copies from the bytes the pass
+    /// had in hand, so a later bundle that does carry a manifest reads nothing.
     func testABundleWithNoManifestIsComparedAsBefore() throws {
         _ = mirror()
         try restampTheBundle(bySeconds: 60)
@@ -206,7 +207,53 @@ final class ToolchainFingerprintTests: XCTestCase {
         XCTAssertEqual(outcome.changed, 0)
         XCTAssertEqual(outcome.compared, bundledFiles.count)
         XCTAssertEqual(outcome.readInFull, bundledFiles.count)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: indexURL.path))
+
+        try restampTheBundle(bySeconds: 60)
+        try writeManifest()
+        let withAManifest: WorkspaceModel.MirrorOutcome = mirror()
+        XCTAssertEqual(withAManifest.readInFull, 0)
+        XCTAssertEqual(withAManifest.compared, bundledFiles.count)
+    }
+
+    /// MUST-FAIL without `keepWhatIsStillKnown`. A Sparkle delta keeps the
+    /// old install's time on every file it does not change (measured: 12,865
+    /// of 12,891 on 1.8.6 → 1.8.7), so the new build's manifest describes
+    /// none of them and the cheap match by length and time compares them.
+    /// The index must survive that pass, or the next FULL install — a DMG,
+    /// or Sparkle without a delta, which restamps everything — hashes every
+    /// copy again.
+    func testAFullInstallAfterADeltaReadsNothing() throws {
+        try writeManifest()
+        _ = mirror()
+
+        // The delta: one file changed (new bytes, new time); the others keep
+        // their times; the manifest is the NEW build's, whose times are its
+        // own build's and describe none of the files on disk.
+        let changedFile: URL = bundle.appendingPathComponent("support/quartz/page.tsx")
+        try write("second version, a different length\n", to: changedFile)
+        var shifted: [String: ToolchainFingerprint] = [:]
+        for relative in bundledFiles {
+            let url: URL = bundle.appendingPathComponent(relative)
+            let stamp: ToolchainFingerprints.Stamp = try XCTUnwrap(ToolchainFingerprints.stamp(of: url))
+            let hash: String = try XCTUnwrap(ToolchainFingerprints.sha256(of: url))
+            shifted[relative] = ToolchainFingerprint(
+                length: stamp.length, ticks: stamp.ticks + 3_600 * ToolchainFingerprints.ticksPerSecond, sha256: hash
+            )
+        }
+        try ToolchainFingerprints.write(shifted, to: bundle.appendingPathComponent(ToolchainFingerprints.manifestName))
+        let afterTheDelta: WorkspaceModel.MirrorOutcome = mirror()
+        XCTAssertEqual(afterTheDelta.failed, 0)
+        XCTAssertEqual(afterTheDelta.changed, 1)
+        XCTAssertEqual(afterTheDelta.readInFull, 0)
+
+        // The full install: every file restamped, a manifest that describes them.
+        try restampTheBundle(bySeconds: 600)
+        try writeManifest()
+        let afterTheFullInstall: WorkspaceModel.MirrorOutcome = mirror()
+        XCTAssertEqual(afterTheFullInstall.failed, 0)
+        XCTAssertEqual(afterTheFullInstall.changed, 0)
+        XCTAssertEqual(afterTheFullInstall.compared, bundledFiles.count)
+        XCTAssertEqual(afterTheFullInstall.readInFull, 0, "Every copy is still known to the index")
     }
 
     /// A copy edited in place — its own time moved, so the index no longer

@@ -1610,8 +1610,18 @@ class WorkspaceModel {
         // reloaded, which is after every rename, backup, restore and archive.
         // Two stat calls answer the same question for almost all of them.
         if WorkspaceModel.filesLookIdentical(sourceURL, destinationURL) {
-            if let pass, let relative, let bundledHash {
-                pass.remember(relative, copy: destinationURL, sha256: bundledHash)
+            if let pass, let relative {
+                if let bundledHash {
+                    pass.remember(relative, copy: destinationURL, sha256: bundledHash)
+                } else {
+                    // A Sparkle delta keeps the OLD install's time on every
+                    // file it did not change, so the new build's manifest
+                    // describes none of them and this cheap match is how they
+                    // are compared. What the index already knew about the
+                    // copy is kept, so the next FULL install can still answer
+                    // from fingerprints (documentation/09, M2).
+                    pass.keepWhatIsStillKnown(relative, copy: destinationURL)
+                }
             }
             return MirrorOutcome(compared: 1)
         }
@@ -1658,6 +1668,9 @@ class WorkspaceModel {
                 // across so the cheap check can answer next time instead of
                 // re-reading 61 MB for the rest of the session.
                 WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
+                if let pass, let relative {
+                    pass.remember(relative, copy: destinationURL, sha256: ToolchainFingerprints.sha256(of: sourceData))
+                }
                 return MirrorOutcome(compared: compared, readInFull: readInFull)
             }
         }
@@ -1668,8 +1681,13 @@ class WorkspaceModel {
                 try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destinationURL.path)
             }
             WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
-            if let pass, let relative, let bundledHash {
-                pass.remember(relative, copy: destinationURL, sha256: bundledHash)
+            if let pass, let relative {
+                // The bytes just written are in hand, so the index learns the
+                // copy even when no manifest vouched for the bundle's file.
+                pass.remember(
+                    relative, copy: destinationURL,
+                    sha256: bundledHash ?? ToolchainFingerprints.sha256(of: sourceData)
+                )
             }
             return MirrorOutcome(changed: 1, failed: 0, compared: compared, readInFull: readInFull)
         } catch {
