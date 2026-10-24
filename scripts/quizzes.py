@@ -237,6 +237,8 @@ def verdict(model: dict) -> dict:
     has_answer = len(model["answers"]) == 1
     if has_choices and has_answer:
         return problem("choicesAndAnswer")
+    if has_choices and model.get("sketchInAChoice"):
+        return problem("sketchInAChoice")
     if has_choices:
         if len(model["choices"]) == 1:
             return problem("oneChoice")
@@ -394,6 +396,23 @@ def _fence_opens(body: str, base: int = 0):
     return (run[0], len(run))
 
 
+def _fence_language(body: str) -> str:
+    """The first word of a fence opener's info string (what the site's
+    parser calls the code's `lang`), or "" - for a sketch in a choice
+    (#578 stage 5: geogebra.LANGUAGE)."""
+    _columns, index = _leading(body, 0)
+    match = _FENCE_OPEN.match(body[index:])
+    if match is None:
+        return ""
+    words = match.group(2).split()
+    return words[0] if words else ""
+
+
+# A ```geogebra fence's language (geogebra.LANGUAGE; not imported, so this
+# file stays free of the sketches' own module).
+SKETCH_LANGUAGE = "geogebra"
+
+
 def _code_spans(text: str) -> list:
     """The contents of every code span in one paragraph's text."""
     ranges = []
@@ -431,6 +450,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
     state = {
         "boxedLists": 0, "choices": [], "listKind": None, "listContent": 0,
         "listHasBox": False, "listItems": [], "stem": [], "blanks": _blanks_in(title),
+        "listHasSketch": False, "sketchInAChoice": False,
     }
     answers = []
     answer_lines_at = []
@@ -441,9 +461,11 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             state["boxedLists"] += 1
             if state["boxedLists"] == 1:
                 state["choices"] = list(state["listItems"])
+                state["sketchInAChoice"] = state["listHasSketch"]
         state["listKind"] = None
         state["listHasBox"] = False
         state["listItems"] = []
+        state["listHasSketch"] = False
 
     def close_stem():
         if state["stem"]:
@@ -569,6 +591,8 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             opened = _fence_opens(text)
             if opened is not None:
                 fence = (opened, 0)
+                if _fence_language(text) == SKETCH_LANGUAGE:
+                    state["listHasSketch"] = True
             previous_blank = False
             previous_paragraph = opened is None
             index += 1
@@ -579,6 +603,10 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             close_stem()
             if not in_item:
                 close_list()
+            elif _fence_language(body) == SKETCH_LANGUAGE:
+                # A GeoGebra sketch inside a choice (#578 stage 5): refused
+                # if this list turns out to be the quiz's choices.
+                state["listHasSketch"] = True
             fence = (opened, 0)
             previous_blank = False
             previous_paragraph = False
@@ -613,6 +641,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             "answers": answers,
             "blanks": state["blanks"],
             "htmlChoices": state.get("htmlChoices", False),
+            "sketchInAChoice": state["sketchInAChoice"],
         },
         "answerLinesAt": answer_lines_at,
         "nestedQuizzes": nested_quizzes,
