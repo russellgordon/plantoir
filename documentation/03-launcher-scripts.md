@@ -2562,6 +2562,72 @@ and what was measured.
   and one was not created for the test) and a `wslrelay.exe` one (none running).
   Rejected: trusting either probe alone.
 
+## Where a launcher's own trail lines go (GitHub #664)
+
+Most trail lines are written by the app, but a few are written by the
+launcher itself, through `note_on_the_trail` — a refusal (a preview while its
+section deploys, a deploy while that section is busy, a folder spelled two
+ways), and every line from a publish launchd started at six in the morning.
+The function is the same in `setup.sh`, `preview.sh` and `deploy.sh`
+(`scripts/test_trail_lock.py` pins that), appends one
+`YYYY-MM-DD HH:MM:SS · sentence` line and waits for the folder lock the app
+holds while it trims the file (#238, doc 09 → "Two writers at once").
+
+**Which folder.** It used to be `$HOME/Library/Logs/Plantoir`, always. That
+was wrong under `--state-dir` (#154): the flag moves the app's trail into the
+state folder, but every launcher the app starts still has the real `HOME` —
+on purpose, see below — so a refusal from a launcher started by a
+`--state-dir` app was written into the teacher's real trail. Since #664 the
+app hands its trail folder over in **`PLANTOIR_TRAIL_DIR`**, and the
+function takes it when it is an absolute path:
+
+```bash
+local trail="${HOME%/}/Library/Logs/Plantoir"
+case "${PLANTOIR_TRAIL_DIR:-}" in
+  /*) trail="${PLANTOIR_TRAIL_DIR%/}" ;;
+esac
+```
+
+- **Absolute only.** Unset, empty or relative falls back to the folder under
+  `HOME`, so a stray value can never start a trail inside the working folder
+  the launcher runs in. A trailing `/` is dropped.
+- **The trail only.** `BUILD_ROOT`, `TOOLS_DIR` and everything else still
+  read `HOME`. The UI suites build into the REAL builds root and clean it up
+  (#641, doc 09), and the helper programs are shared by every copy of the
+  app, so moving `HOME` would have moved the wrong things.
+- **The lock still works.** The app trims holding `flock` on
+  `ActivityTrail.store.folderURL`, which is the folder it hands over, so
+  `lockf -k` on the redirected folder takes the same lock
+  (`TheTrailFolderCanBeHandedToTheLauncher.test_the_lock_is_taken_on_a_handed_over_folder_too`).
+- **The app sets it ALWAYS** (`HelperPrograms.environment`, every launcher
+  the app starts, including the publishes launchd runs through Plantoir),
+  overriding an inherited value. In the plain app the value is the folder
+  the launcher would have computed anyway, so nothing changes there. Under the
+  unit suite it is the test host's throwaway trail, so the integration tests'
+  real launchers stay out of the teacher's trail too. A launcher typed at the
+  command line has no such variable and writes where it always has.
+
+**Rejected:** setting it only under `--state-dir`, which was the issue's own
+wording (it leaves the unit suite's real launchers on the real trail, and it
+needs a second branch to remove an inherited value); handing the launcher a
+redirected `HOME` (it moves the builds root and the helper programs, which
+`--state-dir` keeps real on purpose); accepting a relative path (nothing that
+sets it on purpose hands over anything but a full path).
+
+The rule and its five cases are `contracts/app-rules.json` →
+`launcherTrailFolder`. `scripts/test_trail_lock.py` runs every case through
+each launcher's real function with a scratch `HOME`.
+`scripts/test_preview_while_deploying.py` runs the real `preview.sh` up to its
+deploying refusal with the variable set, and checks the line is in the
+handed-over folder and not in the scratch `HOME`'s trail. Neither test reads
+the real trail. Python tests that start a launcher with `os.environ` and a
+scratch `HOME` remove the variable first, because an inherited one would send
+their lines out of the scratch folder.
+
+**Windows still owes its half:** `Write-TrailLine` in `preview.ps1` and
+`deploy.ps1` builds its path from `%LOCALAPPDATA%` (doc 12 → the `--state-dir`
+section), and the contract's cases are written for both.
+
 ## A note on line endings
 
 The repository stores every file with LF endings. At image-build time,

@@ -136,6 +136,12 @@ class TheTrailFolderCanBeHandedToTheLauncher(unittest.TestCase):
         self.assertEqual(sorted(rule["appliesOn"]), ["mac", "windows"])
 
     def test_every_case_lands_where_the_contract_says(self):
+        # The .sh launchers run on a Mac only, where an absolute path starts
+        # with "/". Under Git Bash on Windows a scratch folder is "C:\...",
+        # which the function rightly does not take; Windows' own half is
+        # preview.ps1's and deploy.ps1's, run by test_launcher_rules.ps1.
+        if os.name != "posix":
+            self.skipTest("the .sh launchers' absolute paths are POSIX paths")
         cases = the_trail_folder_rule()["cases"]
         self.assertEqual(len(cases), 5)
         for launcher in LAUNCHERS:
