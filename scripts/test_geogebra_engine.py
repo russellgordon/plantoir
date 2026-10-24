@@ -241,6 +241,7 @@ class AdaptTests(EngineTestCase):
         self.assertIn("modifications made, and redistributed, under the", readme)
         self.assertIn("https://github.com/geogebra/geogebra", readme)
 
+    @unittest.skipUnless(os.name == "posix", "a Windows directory reports 0o777 to CPython, so the mode means nothing there")
     def test_the_folder_is_readable_by_everyone_not_only_its_maker(self):
         # mkdtemp makes 0700, and a rename keeps it; the site build may run as
         # another user (stage-1 review, 2026-10-24).
