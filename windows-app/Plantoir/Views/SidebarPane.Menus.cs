@@ -85,15 +85,50 @@ public sealed partial class SidebarPane
     /// the toolbar used to skip (the plan's finding 0.9). Every other course
     /// goes through <see cref="ObsidianOpenRoute"/> (#581): sequence steps 2–8
     /// of <c>obsidianAddOnsForFigures</c>.
+    ///
+    /// <para>A SECTION press (every caller that names a section: the section
+    /// window's toolbar, Section &gt; Open in Obsidian, a section row's menu, and
+    /// the assistant through <c>MainWindow.PressOpenInObsidianFor</c>) opens the
+    /// file behind the page that section's preview shows (#681): the address is
+    /// read ONCE, here, and resolved against the build's list; every fallback
+    /// opens what the press opened before. A course press (section null) opens
+    /// exactly what it opened before and writes no trail line.</para>
+    ///
+    /// <para>Returns what the press came to as soon as it is known - the
+    /// assistant's reply is made from it (#690); every other caller drops it.</para>
     /// </summary>
-    public Task OpenInObsidian(Course course, int? section)
+    public Task<OpenInObsidianPress> OpenInObsidian(Course course, int? section)
     {
         string reveal = section is int number ? course.SectionDirectory(number) : course.DirectoryPath;
-        if (ReferenceCourse.IsKeptForReference(course)) return OpenReferenceInObsidian(course, reveal);
+        PreviewedPageSource.Answer? answer = null;
+        if (section is int pressed)
+        {
+            string? address = _window.PreviewedAddressFor(course.Code, pressed);
+            var list = address is null || Workspace.WorkspacePath is not { } folder
+                ? null
+                : PreviewedPageSource.ReadList(PreviewedPageSource.ListPathFor(folder, course.Code, pressed));
+            answer = PreviewedPageSource.Resolve(address, list, course.DirectoryPath);
+        }
+        if (ReferenceCourse.IsKeptForReference(course))
+        {
+            var reported = new TaskCompletionSource<OpenInObsidianPress>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ = Finishing(OpenReferenceInObsidian(course, reveal, answer, section, reported), reported, answer);
+            return reported.Task;
+        }
         // Obsidian's add-ons for diagrams and graphs (#581): scanned, offered,
-        // added or asked to reopen BEFORE Obsidian opens — all decided in
+        // added or asked to reopen BEFORE Obsidian opens - all decided in
         // Plantoir.Core's route; this window only shows its two questions.
-        return new ObsidianOpenRoute(new ObsidianWorld(ShowDialogSafelyAsync)).OpenAsync(course, reveal);
+        var (report, finished) = new ObsidianOpenRoute(new ObsidianWorld(ShowDialogSafelyAsync)).Press(course, reveal, answer, section);
+        _ = Finishing(finished, null, answer);
+        return report;
+    }
+
+    /// <summary>Waits for a press's route so a fault is logged rather than lost, and makes sure its report completes.</summary>
+    private static async Task Finishing(Task route, TaskCompletionSource<OpenInObsidianPress>? reported, PreviewedPageSource.Answer? answer)
+    {
+        try { await route; }
+        catch (Exception ex) { App.LogDiagnostic($"Open in Obsidian failed: {ex.Message}"); }
+        finally { reported?.TrySetResult(new OpenInObsidianPress.Opened(answer)); }
     }
 
     // ---- What the menu bar reads -------------------------------------------

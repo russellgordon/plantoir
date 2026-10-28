@@ -77,4 +77,42 @@ public class ObsidianRouteSourceTests
     [InlineData("CourseSettingsView.xaml.cs", "_window.SidebarPane.OpenInObsidian(_course, null)")]
     public void TheToolbars_TakeTheOneRoute(string file, string call) =>
         Assert.Contains(call, File.ReadAllText(Path.Combine(AppFolder, "Views", file)));
+
+    /// <summary>
+    /// #681: a section's press reads the preview's address ONCE, in the one
+    /// route, and resolves it against the build's list - so the page that
+    /// opens and the page the assistant's reply names are the same answer.
+    /// </summary>
+    [Fact]
+    public void TheSectionPressReadsTheAddressOnce()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs"));
+        int start = source.IndexOf("public Task<OpenInObsidianPress> OpenInObsidian(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("
+    }
+", start, StringComparison.Ordinal);
+        string press = source[start..end];
+        Assert.Equal(1, press.Split("PreviewedAddressFor(").Length - 1);
+        Assert.Contains("PreviewedPageSource.Resolve(", press);
+        Assert.Contains(".Press(course, reveal, answer, section)", press);
+    }
+
+    /// <summary>
+    /// #681: the address is WebView2's own, through the normaliser - never the
+    /// page last viewed, which ignores the app's own loads (the contract's
+    /// <c>obsidianOpensThePreviewedPage.rejected</c>).
+    /// </summary>
+    [Fact]
+    public void ThePressReadsWebView2sSourceThroughTheNormaliser()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SectionDetailView.xaml.cs"));
+        int start = source.IndexOf("internal string? PreviewedAddress()", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf(";", start, StringComparison.Ordinal);
+        string reader = source[start..end];
+        Assert.Contains("CoreWebView2?.Source", reader);
+        Assert.Contains("PreviewStartPage.Remember(", reader);
+        Assert.DoesNotContain("LastViewedPages", reader);
+    }
 }

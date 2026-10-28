@@ -33,6 +33,20 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
             // one.
             ["back up this course"] = ("back_up_course", new()),
 
+            // #690 (the mac's #610): Open in Obsidian, the page on screen. The
+            // tool was MEASURED against the mac's local model and FAILED on
+            // both tiers (research/ai-assist/open-in-obsidian-610-results.txt),
+            // so no local model is shown it: these shapes are matched in code.
+            // No arguments - the page is the window's.
+            ["open this in obsidian"] = ("open_in_obsidian", new()),
+            ["open this page in obsidian"] = ("open_in_obsidian", new()),
+            ["open in obsidian"] = ("open_in_obsidian", new()),
+            ["edit this in obsidian"] = ("open_in_obsidian", new()),
+            ["edit this page in obsidian"] = ("open_in_obsidian", new()),
+            ["i want to edit this in obsidian"] = ("open_in_obsidian", new()),
+            ["take me to this page in obsidian"] = ("open_in_obsidian", new()),
+            ["show me this in obsidian"] = ("open_in_obsidian", new()),
+
             // Answered for a teacher who is looking at one section and wants
             // to know what else is in the folder.
             ["what courses do i have?"] = ("list_courses", new()),

@@ -714,6 +714,18 @@ public static class ActivityTrail
         /// <summary>File ▸ Settings ▸ Obsidian turned the add-ons on or off — the only way back from "Don't ask again".</summary>
         ObsidianAddOnsSettingChanged,
 
+        // ---- Open in Obsidian opens the page the preview shows (#681; the mac's #518) ----
+        /// <summary>
+        /// A SECTION's Open in Obsidian went ahead: the place of the file it
+        /// opened for the page the preview showed (with "(hidden from
+        /// students)" when that file is hidden), or why it opened the section
+        /// as before. Written once per press by
+        /// <see cref="Plantoir.Core.Models.PreviewedPageSource.NoteThePress"/>;
+        /// never for a course press, never for a press turned away while the
+        /// add-ons scan runs. Never anything written on the page.
+        /// </summary>
+        PageOpenedInObsidian,
+
         // ---- Runnable Swift on Windows (#570; the mac's #493) ----
         /// <summary>
         /// The first preview with a Swift block got Swift ready on this PC:
@@ -861,6 +873,7 @@ public static class ActivityTrail
         Event.ObsidianAddOnsAdded => "obsidian add-ons added",
         Event.ObsidianReopenedForAddOns => "obsidian reopened for add-ons",
         Event.ObsidianAddOnsSettingChanged => "obsidian add-ons setting changed",
+        Event.PageOpenedInObsidian => "page opened in Obsidian",
         Event.SwiftGotReady => "Swift got ready on this computer",
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),

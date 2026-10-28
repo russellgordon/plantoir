@@ -132,6 +132,7 @@ internal static class NamedGapLedger
     private const string V150 = "v1.5.0";
     private const string V171 = "v1.7.1";
     private const string V180 = "v1.8.0";
+    private const string V191 = "v1.9.1";
 
     /// <summary>
     /// One thing the contract names and this app does not have yet.
@@ -159,6 +160,10 @@ internal static class NamedGapLedger
     // Not empty from 2026-10-22 until #581 landed the same day: its four
     // Obsidian add-on events.
 
+    private const string ObsidianNotOnThisMachine =
+        "the contract's sentence says \"this Mac\" without {machine}; Windows cannot say it as written and " +
+        "cannot regenerate assist-wording.json (the mac does), so it says \"this PC\" until mac #698 lands";
+
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
         // ---- activityTrail.mustRecord. #514's two events ("preview started
@@ -182,7 +187,16 @@ internal static class NamedGapLedger
 
         // ---- app-rules.json → modelTiers.requirements
 
-        // ---- assist-wording.json → wording: none held open. The Section
+        // ---- assist-wording.json → wording, and assist-cases.json →
+        // scenarios.cases: #690's one sentence that names the computer
+        // "this Mac" without {machine} (specialNames.platformWording.machine.rule),
+        // and the scenario that expects it. Windows says "this PC"
+        // (AssistWording.ObsidianIsNotOnThisPc) until the mac writes the
+        // sentence with {machine}: mac issue #698.
+        Owed(AssistWordingKeys, 698, V191, ObsidianNotOnThisMachine, "obsidianIsNotOnThisMac"),
+        Owed(AssistScenarios, 698, V191, ObsidianNotOnThisMachine, "open in Obsidian on a Mac without Obsidian presses nothing (#610)"),
+
+        // ---- assist-wording.json → wording: before #690, none held open. The Section
         // menu's sentences landed with #489's 2B, the Deploy question's
         // seventeen (mac #475) with 2C, and mac #524's sixteen plan-table
         // sentences (plan*, menuPlan*) with #548's plan table.

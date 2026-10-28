@@ -188,8 +188,17 @@ public sealed partial class SidebarPane
     /// what Obsidian for Windows shows on a page it cannot save has not been
     /// measured here (bundle-6 plan §6.7; a question for Russell).
     /// </summary>
-    private async Task OpenReferenceInObsidian(Course course, string revealFolder)
+    /// <remarks>#681: a SECTION press carries <paramref name="answer"/>, the page
+    /// its preview shows, and opens that file once the note is answered; its
+    /// trail line is written first, as the mac's route notes before lockAgain.
+    /// <paramref name="report"/> says what the press came to as soon as it is
+    /// known (#690): waiting while the note is up, opened once Obsidian is handed
+    /// something.</remarks>
+    private async Task OpenReferenceInObsidian(Course course, string revealFolder, PreviewedPageSource.Answer? answer = null,
+                                               int? section = null, TaskCompletionSource<OpenInObsidianPress>? report = null)
     {
+        if (answer is not null && section is int number) PreviewedPageSource.NoteThePress(answer, course.Code, number);
+
         // Lock the pages again FIRST, on every route (#491 item 4; the mac's
         // OpenInObsidianRoute does lockAgain before anything): a page unlocked
         // since the folder was last read — by hand, by a sync client, by a
@@ -219,11 +228,13 @@ public sealed partial class SidebarPane
                 DefaultButton = ContentDialogButton.Primary,
             };
             note.SetValue(Microsoft.UI.Xaml.Automation.AutomationProperties.AutomationIdProperty, "referenceCalmNote");
+            report?.TrySetResult(new OpenInObsidianPress.WaitingForAnAnswer());
             if (await ShowDialogSafelyAsync(note) != ContentDialogResult.Primary) return;
             RememberNoteShown(course);
         }
         await FolderActions.OpenInObsidian(revealFolder, course.DirectoryPath,
-            BundledToolchain.SupportPath("obsidian_defaults/.obsidian"));
+            BundledToolchain.SupportPath("obsidian_defaults/.obsidian"), (answer as PreviewedPageSource.Page)?.File);
+        report?.TrySetResult(new OpenInObsidianPress.Opened(answer));
     }
 
     // ---- Picking a school year -------------------------------------------------

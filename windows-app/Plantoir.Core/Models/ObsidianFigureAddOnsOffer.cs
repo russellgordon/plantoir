@@ -287,6 +287,13 @@ public static class ObsidianFigureAddOnsThisRun
     /// <summary>Courses Open in Obsidian is working on — a second click while the first scans does nothing.</summary>
     public static HashSet<string> BeingOpened { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Courses whose Open in Obsidian has a question up (the offer or the
+    /// reopen question). A second press then is told it is waiting for an
+    /// answer rather than that the course is still being opened (#690).
+    /// </summary>
+    public static HashSet<string> Asking { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Forgets everything — for a test.</summary>
     public static void Forget()
     {
@@ -294,6 +301,7 @@ public static class ObsidianFigureAddOnsThisRun
         ReopenDeclined.Clear();
         LinesWritten.Clear();
         BeingOpened.Clear();
+        Asking.Clear();
     }
 
     /// <summary>Writes a pass's line if it is worth one: always when something was added, otherwise once per course per run.</summary>

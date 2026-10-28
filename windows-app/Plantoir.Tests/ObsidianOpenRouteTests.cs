@@ -43,7 +43,11 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         public ObsidianFigureAddOnsTrail.Answered OfferAnswer = ObsidianFigureAddOnsTrail.Answered.AddThem;
         public bool ReopenAnswer = true;
         public Func<Task>? DuringScan;
+        public bool ScanThrows;
         public Action? WhileOfferIsUp;
+        /// <summary>When set, the offer waits for this before answering (a question left up).</summary>
+        public Task? OfferAnsweredWhen;
+        public readonly List<string?> PagesAskedAbout = new();
         public readonly List<string> Asked = new();
         public string? Carried;
         public string? Defaults;
@@ -52,26 +56,38 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         public bool IsRunning() => Running;
         public string? RegistryText() => Registry;
         public string TargetFor(string folder, string vault) => folder;
-        public Task OpenAsync(string folder, string vault) { Asked.Add("open " + Path.GetFileName(folder)); return Task.CompletedTask; }
+        public Task OpenAsync(string folder, string vault, string? page = null)
+        {
+            Asked.Add(page is null ? "open " + Path.GetFileName(folder) : "open page " + Path.GetFileName(page));
+            return Task.CompletedTask;
+        }
         public Task QuitAndWaitAsync() { Asked.Add("quit"); if (!StaysRunningAfterQuit) Running = false; return Task.CompletedTask; }
         public Task ReopenAsync(IReadOnlyList<string> vaultPaths) { Asked.Add("reopen " + string.Join(",", vaultPaths.Select(Path.GetFileName))); return Task.CompletedTask; }
         public async Task<(List<ObsidianFigureAddOn> Needed, List<ObsidianFigureAddOn> WouldAdd)> ScanAsync(string coursePath)
         {
             Asked.Add("scan");
             if (DuringScan is not null) await DuringScan();
+            if (ScanThrows) throw new IOException("the course could not be read");
             return await Task.Run(() => ObsidianFigureAddOns.Scan(coursePath)) is var scanned
                 ? (Remap(scanned.Needed), Remap(scanned.WouldAdd)) : default;
         }
         public string? CarriedFolder => Carried;
         public string? DefaultsFolder => Defaults;
         public ObsidianFigureAddOnsAnswer Answer { get => Stored; set { Asked.Add("answer " + value); Stored = value; } }
-        public Task<ObsidianFigureAddOnsTrail.Answered> AskOfferAsync(ObsidianAddOnsRequest request)
+        public async Task<ObsidianFigureAddOnsTrail.Answered> AskOfferAsync(ObsidianAddOnsRequest request)
         {
             Asked.Add(request.CourseIsOpen ? "offer while open" : "offer");
+            PagesAskedAbout.Add(request.Page);
             WhileOfferIsUp?.Invoke();
-            return Task.FromResult(OfferAnswer);
+            if (OfferAnsweredWhen is not null) await OfferAnsweredWhen;
+            return OfferAnswer;
         }
-        public Task<bool> AskReopenAsync(ObsidianAddOnsRequest request) { Asked.Add("ask reopen"); return Task.FromResult(ReopenAnswer); }
+        public Task<bool> AskReopenAsync(ObsidianAddOnsRequest request)
+        {
+            Asked.Add("ask reopen");
+            PagesAskedAbout.Add(request.Page);
+            return Task.FromResult(ReopenAnswer);
+        }
 
         /// <summary>The scan finds the pinned add-ons; the pass writes the test's small stand-ins with the same ids.</summary>
         public List<ObsidianFigureAddOn> FakeAddOns = new();
@@ -300,6 +316,147 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         Assert.True(Added(course));
         Assert.Contains("(after a preview): Functionplot 1.2.1 added", TrailText);
         Assert.DoesNotContain("offer", string.Join(" ", world.Asked));
+    }
+
+    // ---- #681 / #690: a SECTION's press carries the page and reports early ----
+
+    /// <summary>A page answer for the course's section 1, on disk.</summary>
+    private static PreviewedPageSource.Page APage(Course course, string name = "Unit 1, Day 3")
+    {
+        string folder = Path.Combine(course.DirectoryPath, "section1", "All Classes");
+        Directory.CreateDirectory(folder);
+        string file = Path.Combine(folder, name + ".md");
+        File.WriteAllText(file, "# " + name + "\n");
+        return new PreviewedPageSource.Page(file, "section1/All Classes/" + name, Hidden: false);
+    }
+
+    private int PressLines => TrailText.Split('\n').Count(line => line.Contains("in Obsidian, ") && line.Contains("MPM2D/1"));
+
+    [Fact]
+    public async Task ASectionPressOpensThePageThroughThePageDoor()
+    {
+        var (world, course, route) = Make(figures: false);
+        var page = APage(course);
+        var (reported, finished) = route.Press(course, Path.Combine(course.DirectoryPath, "section1"), page, 1);
+        Assert.True(await finished);
+        Assert.Equal(new OpenInObsidianPress.Opened(page), await reported);
+        Assert.Equal(new[] { "scan", "open page Unit 1, Day 3.md" }, world.Asked);
+    }
+
+    [Fact]
+    public async Task AFallbackOpensTheSectionAsBefore()
+    {
+        var (world, course, route) = Make(figures: false);
+        var fell = new PreviewedPageSource.FellBack(PreviewedPageSource.Fallback.NoPageShowing);
+        var (reported, finished) = route.Press(course, Path.Combine(course.DirectoryPath, "section1"), fell, 1);
+        await finished;
+        Assert.Equal(new OpenInObsidianPress.Opened(fell), await reported);
+        Assert.Equal(new[] { "scan", "open section1" }, world.Asked);
+        Assert.Contains(PreviewedPageSource.TrailWords(fell), TrailText);
+    }
+
+    [Fact]
+    public async Task ThePageIsCarriedThroughTheOffer()
+    {
+        var (world, course, route) = Make();
+        var page = APage(course);
+        await route.Press(course, course.DirectoryPath, page, 1).Finished;
+        Assert.Equal(new[] { "scan", "offer", "answer Yes", "open page Unit 1, Day 3.md" }, world.Asked);
+        Assert.Equal(new string?[] { page.File }, world.PagesAskedAbout);
+    }
+
+    [Fact]
+    public async Task ThePageIsCarriedThroughTheReopenQuestion()
+    {
+        var (world2, course2, route2) = Make();
+        var page = APage(course2);
+        world2.Stored = ObsidianFigureAddOnsAnswer.Yes;
+        world2.Running = true;
+        world2.Registry = OpenRegistry(course2);
+        world2.ReopenAnswer = false;
+        await route2.Press(course2, course2.DirectoryPath, page, 1).Finished;
+        Assert.Equal(new[] { "scan", "ask reopen", "open page Unit 1, Day 3.md" }, world2.Asked);
+        Assert.Equal(new string?[] { page.File }, world2.PagesAskedAbout);
+    }
+
+    [Fact]
+    public async Task APressWhoseQuestionIsUpReportsWaitingAndASecondPressIsToldTheSame()
+    {
+        var (world, course, route) = Make();
+        var page = APage(course);
+        var answer = new TaskCompletionSource();
+        world.OfferAnsweredWhen = answer.Task;
+        Task<bool>? finished = null;
+        try
+        {
+            (var reported, finished) = route.Press(course, course.DirectoryPath, page, 1);
+            Assert.IsType<OpenInObsidianPress.WaitingForAnAnswer>(await reported.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.False(finished.IsCompleted);
+
+            var (second, secondFinished) = route.Press(course, course.DirectoryPath, page, 1);
+            Assert.IsType<OpenInObsidianPress.WaitingForAnAnswer>(await second);
+            Assert.False(await secondFinished);
+            Assert.Equal(1, PressLines);
+        }
+        finally
+        {
+            // Releases the static BeingOpened and Asking through a real answer.
+            answer.TrySetResult();
+            if (finished is not null) await finished;
+        }
+        Assert.Empty(ObsidianFigureAddOnsThisRun.Asking);
+        Assert.Empty(ObsidianFigureAddOnsThisRun.BeingOpened);
+    }
+
+    [Fact]
+    public async Task ASecondPressDuringTheScanIsAlreadyOpeningAndWritesNoLine()
+    {
+        var (world, course, route) = Make(figures: false);
+        var page = APage(course);
+        var release = new TaskCompletionSource();
+        world.DuringScan = () => release.Task;
+        var (_, first) = route.Press(course, course.DirectoryPath, page, 1);
+        var (second, secondFinished) = route.Press(course, course.DirectoryPath, page, 1);
+        Assert.IsType<OpenInObsidianPress.AlreadyOpening>(await second);
+        Assert.False(await secondFinished);
+        release.SetResult();
+        Assert.True(await first);
+        Assert.Equal(1, PressLines);
+    }
+
+    [Fact]
+    public async Task OnePressOneTrailLine()
+    {
+        var (world, course, route) = Make();
+        var page = APage(course);
+        await route.Press(course, course.DirectoryPath, page, 1).Finished;
+        Assert.Equal(1, PressLines);
+        Assert.Contains("MPM2D/1 · " + PreviewedPageSource.TrailWords(page), TrailText);
+
+        // Without a scan (no Obsidian) too: still one line per press.
+        world.Installed = false;
+        await route.Press(course, course.DirectoryPath, page, 1).Finished;
+        Assert.Equal(2, PressLines);
+    }
+
+    [Fact]
+    public async Task ACoursePressWritesNoLine()
+    {
+        var (world, course, route) = Make();
+        Assert.True(await route.OpenAsync(course, course.DirectoryPath));
+        Assert.DoesNotContain("in Obsidian, the page the preview shows", TrailText);
+        Assert.DoesNotContain("not a page of the preview", TrailText);
+    }
+
+    [Fact]
+    public async Task TheReportAlwaysCompletesWhenTheScanFails()
+    {
+        var (world, course, route) = Make();
+        world.ScanThrows = true;
+        var (reported, finished) = route.Press(course, course.DirectoryPath, APage(course), 1);
+        await Assert.ThrowsAsync<IOException>(() => finished);
+        await Assert.ThrowsAsync<IOException>(() => reported.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Empty(ObsidianFigureAddOnsThisRun.BeingOpened);
     }
 
     /// <summary>Every Open in Obsidian route in the app goes through the one function, which goes through this route.</summary>
