@@ -228,11 +228,12 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // When the app carries the native runtime (node, python, Quartz,
         // wrangler in its own folder), tell the launcher where it is: the
         // launcher then builds directly on this PC — no WSL2, no container,
-        // no administrator rights. Every launcher child must get this —
-        // see NativeRuntime for the sweep that once did not.
-        IReadOnlyDictionary<string, string>? extraEnvironment = null;
-        if (NativeRuntime.Directory is { } runtimeDir)
-            extraEnvironment = new Dictionary<string, string> { ["PLANTOIR_RUNTIME"] = runtimeDir };
+        // no administrator rights. And always hand it the app's own trail
+        // folder (#682), so a --state-dir run keeps the launcher's refusal
+        // lines. Every launcher child must get both: see LauncherEnvironment
+        // for the sweep that once did not. ConPTY merges these over the
+        // inherited environment, the extra value winning.
+        IReadOnlyDictionary<string, string> extraEnvironment = LauncherEnvironment.Current;
 
         try
         {

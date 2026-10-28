@@ -2059,7 +2059,7 @@
       "mac",
       "windows"
     ],
-    "appliesOnWhy" : "Both apps can be started with --state-dir, which moves the app's own trail into the state folder while every launcher it starts keeps the real home folder. The mac's launchers read the variable since GitHub #664; Windows' preview.ps1 and deploy.ps1 owe the same reading (the windows issue opened from #664).",
+    "appliesOnWhy" : "Both apps can be started with --state-dir, which moves the app's own trail into the state folder while every launcher it starts keeps the real home folder. The mac's launchers read the variable since GitHub #664, and Windows' preview.ps1 and deploy.ps1 since #682 (Write-TrailLine, run against every case by windows-app/test_launcher_rules.ps1 section 6). On Windows an absolute folder means a drive letter and a separator, or a UNC \\\\server\\share: [IO.Path]::IsPathRooted is true on PowerShell 5.1 for \\state\\Logs and C:state, which are relative to the current drive or folder.",
     "cases" : [
       {
         "expect" : "{scratch}/state/Logs/Plantoir",

@@ -50,8 +50,11 @@ public sealed class LauncherRunner : ILauncherRunner
         };
         // The MCP server ships beside the app, so the same bundled runtime
         // sits beside this executable too - point the launcher at it, or it
-        // takes the container branch (see NativeRuntime).
-        Plantoir.Core.Scripting.NativeRuntime.Apply(info);
+        // takes the container branch (see NativeRuntime) - and hand it this
+        // server's own trail folder (#682): the window's server, started
+        // with --state-dir, keeps the launcher's lines in the redirected
+        // trail; one Claude Code or Codex started hands over the real one.
+        Plantoir.Core.Scripting.LauncherEnvironment.Apply(info);
 
         if (OperatingSystem.IsWindows())
         {
@@ -131,7 +134,7 @@ public sealed class LauncherRunner : ILauncherRunner
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                 };
-                Plantoir.Core.Scripting.NativeRuntime.Apply(info);
+                Plantoir.Core.Scripting.LauncherEnvironment.Apply(info);
                 foreach (string argument in new[] { "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
                                                     run.Arguments[0], run.Arguments[1], "--stop" })
                     info.ArgumentList.Add(argument);

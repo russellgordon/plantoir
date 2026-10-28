@@ -550,7 +550,16 @@ public static class ScheduledRun
     }
 
     /// <summary>Run the wrapper with PowerShell, non-interactively, and answer its exit code.</summary>
-    private static int RunWrapperForReal(string script)
+    /// <summary>
+    /// How the wrapper is started. It is handed this run's trail folder
+    /// (#682), and its own children - <c>preview.ps1 --build-only</c> and each
+    /// <c>deploy.ps1</c> leg, started with <c>Start-Process</c> - inherit it,
+    /// so the launchers' lines land in the same trail as this run's. ONLY the
+    /// trail: handing <c>PLANTOIR_RUNTIME</c> here too would change which
+    /// runtime a task uses (the wrapper falls back to the installed one),
+    /// which is its own question (#702).
+    /// </summary>
+    internal static ProcessStartInfo WrapperStartInfo(string script)
     {
         var info = new ProcessStartInfo
         {
@@ -559,7 +568,14 @@ public static class ScheduledRun
             UseShellExecute = false,
             WorkingDirectory = Path.GetDirectoryName(script) ?? Environment.CurrentDirectory,
         };
+        info.EnvironmentVariables[LauncherEnvironment.TrailVariable] = ActivityTrail.CurrentLogDirectory;
         foreach (string argument in TaskScheduling.WrapperRunArguments(script)) info.ArgumentList.Add(argument);
+        return info;
+    }
+
+    private static int RunWrapperForReal(string script)
+    {
+        var info = WrapperStartInfo(script);
         try
         {
             using var process = Process.Start(info);

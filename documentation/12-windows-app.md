@@ -650,12 +650,15 @@ the evening before by UI-suite runs that had all been started with
   server as well. A server started by an outside door (Claude Code, Codex) is
   never handed it.
 - **The launchers' own refusal lines** (`Write-TrailLine` in `preview.ps1`
-  and `deploy.ps1`) still use the real path here. The mac's
-  `note_on_the_trail` follows `PLANTOIR_TRAIL_DIR` since #664, and the mac
-  app sets it always (doc 03 → "Where a launcher's own trail lines go");
-  the Windows half is still owed, by the `windows` issue opened from #664,
-  against `contracts/app-rules.json` → `launcherTrailFolder` (trail only,
-  never the builds root). No current UI test triggers a refusal.
+  and `deploy.ps1`) follow the redirect since #682, the Windows half of the
+  mac's #664. Every launcher child is handed `PLANTOIR_TRAIL_DIR` = the
+  app's own trail folder by `LauncherEnvironment` (ALWAYS, overriding an
+  inherited value, as the contract says), and `Write-TrailLine` takes it when
+  it is absolute (doc 03 → "Where a launcher's own trail lines go"). That
+  covers the window's launchers, the window's own `plantoir-mcp` (which has
+  `--state-dir`, so it hands over the redirected folder) and a scheduled
+  publish's wrapper and legs. It moves the trail ONLY: the launchers still
+  build into the real builds root. No current UI test triggers a refusal.
 
 **What a driven run must not touch**, and what now checks it: the real trail,
 settings, startup log, scheduled-deploy wrappers and pending sentinels, and

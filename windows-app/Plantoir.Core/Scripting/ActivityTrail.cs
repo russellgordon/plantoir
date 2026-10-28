@@ -884,6 +884,13 @@ public static class ActivityTrail
 
     public static string CurrentLogPath => _customLogPath ?? DefaultLogPath;
 
+    /// <summary>The folder <see cref="CurrentLogPath"/> is in: what every
+    /// launcher is handed as PLANTOIR_TRAIL_DIR (#682,
+    /// <see cref="LauncherEnvironment"/>). A launcher always writes
+    /// <c>activity.txt</c> there, which is why a test that wants a launcher's
+    /// lines in its scratch trail names that file.</summary>
+    public static string CurrentLogDirectory => Path.GetDirectoryName(CurrentLogPath)!;
+
     public const string PromptPrefix = "  asked: ";
 
     public static void Note(Event @event, string what, DateTime? moment = null)
