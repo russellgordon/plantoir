@@ -9851,11 +9851,76 @@ the bundle through `support\**`. Its source is 1,594,544 bytes, a zip, and
 proves inclusion, not the installer's output bytes: the test project does not
 reference the app.
 
-**Not measured here, owed by hand** (#687 §4): one real geogebra.org
-material fetch through the Windows certificate store, a sketch on a Netlify
-site in Edge, a sketch in a quiz, and Narrator. No new trail line: an engine
-that is missing already surfaces as the `geogebraSketchesNotReady` folder
-problem.
+**Measured by hand, 2026-10-28** (#687 §4, with #676 and #677 in the same
+sitting). Lenovo 20QES70500, i5-8365U, UHD 620, Windows 11 26200, Edge
+156.0.4314.50 headless, the x64 Debug build's runtime (Node 22.23.4, Python
+3.11.9). A temp working folder with MPM2D made by `setup.ps1` (through
+`website/shots/print_set_windows.py`'s `provision`), plus verify.sh's
+GeoGebra Fixture, GeoGebra Second (its geogebra.org fence changed to the
+real `material_id: ju3f2kbg`), Quiz GeoGebra, Wrap Fixture and Quiz Read
+Differently plants, built through `plantoir-mcp.exe --state-dir …`
+`rebuild_preview` (so the trail went to the state folder).
+
+- **The geogebra.org fetch through Windows' certificate store worked as
+  is.** The runtime's Python default context loads 37 CA certificates from
+  the Windows ROOT store (39 x509 in all; OpenSSL 3.0.13). The first build
+  (136 s, cold) kept `ju3f2kbg` in `builds\<id>\MPM2D\.geogebra-cache\`:
+  1,594,544 bytes, "Slope Angle Conjecture" by Russell Gordon.
+- **Offline.** No admin rights, so no hosts-file edit: the network was
+  blocked for the build instead with `HTTPS_PROXY`/`HTTP_PROXY` pointed at
+  a dead port (`127.0.0.1:9`). With the saved copy in place the build
+  passed in 62 s, with no `geogebraSketchesNotReady` and the copy only
+  touched (`SavedCopies.get`'s `utime`). The negative control, the same
+  block with the saved copy moved away, raised `geogebraSketchesNotReady`
+  ("geogebra.org could not be reached to keep a copy of sketch
+  ju3f2kbg"), so the block was real.
+- **`browser-checks/geogebra_applet.mjs`** on a clone with the publish's own
+  `_headers`, served on `[::1]` (the check unchanged except
+  `plantoirvrfy578` read as `ju3f2kbg` for the credit links, in a temporary
+  copy): OK. Under the Netlify policy, the first sketch opened in 1,483 ms:
+  8,917,131 bytes in 16 requests, 2,835,242 gzipped. The commands sketch
+  opened in 230 ms with 4 lines refused as the contract says. After a page
+  change it took 298 ms, the geogebra.org sketch's saved copy 1,517 ms, and
+  back again 260 ms. On the quiz page: 0 requests at load and 0 once the
+  explanation was shown, the explanation's sketch 805 ms after its tap, the
+  question's 261 ms and the same applet after a print. 0 refusals, 0
+  requests off the site. Cross-origin isolated: 3,487, 164, 262, 1,256 and
+  270 ms, quiz 876 and 273 ms, otherwise the same. The sketch is on the
+  site once.
+- **The slope-angle page on the preview** (`http://127.0.0.1:8081`,
+  uncompressed, cache off): opened 5,269, 2,351 and 1,798 ms after the tap
+  on three runs, 18 requests, 10,639,807 bytes, nothing requested from any
+  other host. The mac's 698–769 ms was on `[::1]` with Chrome for Testing,
+  so it is not the same measurement. Printed with `Page.printToPDF` (4
+  pages, 164,272 bytes): the sketch is a picture (a 64,983-byte image),
+  then "On the class website, this sketch can be moved.", "Made with
+  GeoGebra · geogebra.org" and `https://www.geogebra.org`.
+- **What a screen reader is given** (Edge's accessibility tree, not
+  Narrator itself). Closed: the button "Open the sketch (about 4.5 MB)",
+  and the fence's `alt:` sentence as the text of a visually hidden
+  `figcaption`. The thumbnail is `alt=""` and is skipped. The figure itself
+  computes an EMPTY name, so the sentence is read as text beside the button,
+  not announced as the figure's name. Open: GeoGebra's own "GeoGebra
+  Classic" application, its Algebra tree, and status lines such as "α =
+  Angle(B, A, C)" and "45°", a slider's Play button. Narrator by ear is
+  still not done.
+- **#677.** The build said `plantoir: error: Quiz Read Differently.md: quiz
+  1, line 7: …`. Each rebuild left the trail line `MPM2D/1 · found a
+  problem with this course's folders (quizzesReadDifferently)`, and
+  `rebuild_preview`'s answer named the question, line 7 and the site's own
+  problem (the choices read as HTML). The window's dialog was not driven.
+  `git grep` finds neither "Could not say what the website found" nor the
+  old "Could not name the blocks of code" anywhere in `windows-app`.
+- **#676.** `browser-checks/text_wrap.mjs` against the preview's Wrap
+  Fixture: OK. 120 lines, 132 rows at 1,512 px (light and dark) and 152 at
+  390 px; digits 3; every row at x 372.75 px (63.75 at 390); line 101's
+  first row full, 5 rows at 1,512 px and 12 at 390; about 95 characters a
+  row; the copy button gave 120 lines and 2,174 characters.
+
+Still owed: a tap in Edge on a site published to Netlify, Narrator by ear,
+and the dialog's order behind a runnable-code finding. No new trail line:
+an engine that is missing already surfaces as the `geogebraSketchesNotReady`
+folder problem.
 
 **The npm audit: `windows-app\audit-runtime.ps1`** (#685). It is opt-in and
 named in RELEASING.md step 2 beside verify.sh's line. It is not a `dotnet
