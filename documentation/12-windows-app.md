@@ -5461,6 +5461,23 @@ the whole table).
 - **`AgentGuidance`'s skills** go through `SyncDirectory` with no manifest,
   so they take exactly the pre-#559 path.
 
+**A test of the mirror must never depend on two writes landing in different
+clock ticks (#673).** Equal length plus times within 2 ms is the fast path,
+and it is reached twice: first in `SyncDirectory`'s own `FilesLookIdentical`
+check, then again at the top of `SyncFile`. NTFS takes a file's time from the
+system clock tick, so two files written in one tick get the same stamp. A
+fixture that writes a copy and its bundled file at the SAME length, one
+straight after the other, is therefore "identical" whenever the writes share
+a tick, and the mirror correctly copies nothing.
+`ScheduledRunTests.TheRunBringsTheFoldersToolsUpToDateBeforeItWritesTheWrapper`
+did exactly that ("OLD fingerprint" against "NEW fingerprint", 15 characters
+each) and failed once in a full run at the 1.8.7 cut, green 5 of 5 alone. The
+suspicion that #559's read-back of each copy's time contributed was wrong for
+that test: its bundle has no `.hashes`, so `MirrorPass.BundledHash` is null and
+the manifest and index paths are never reached. Give the copy a different
+LENGTH (that alone guarantees the copy is read and replaced), and set its time
+explicitly when the test is about times. The fixture now does both.
+
 **Measured** (same PC, 2026-10-23, warm cache, a scratch working folder
 filled from the x64 Debug build's `Toolchain\`, 12,909 files). The harness
 called `ToolchainMirror.RefreshToolchain` directly. "Before" is the same
