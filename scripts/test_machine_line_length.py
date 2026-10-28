@@ -90,7 +90,12 @@ class TheCapHolds(unittest.TestCase):
                     self.assertEqual(named, expect["named"])
                     self.assertIn(str(total), payload["sentence"], "the sentence keeps the true count")
                     if expect["named"] < total:
-                        self.assertIn(str(total - expect["named"]), payload["detail"])
+                        # The filled andMore, not just its number: a bare digit
+                        # is in a page name ("Unit 1/...") as often as not.
+                        table = site_health._checks_by_name()
+                        and_more = site_health.filled(table["linksIntoHiddenPages"]["andMore"],
+                                                      {"count": total - expect["named"]})
+                        self.assertIn(and_more, payload["detail"])
                     continue
                 key = rule("lists")[case["marker"]]
                 kept = len(payload[key])
