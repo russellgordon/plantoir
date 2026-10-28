@@ -4994,8 +4994,9 @@ they have a pass of their own (`website/shots/print_set_windows.py`): a
 working folder made by the branch's own `setup.ps1`, a preview built by its
 own `preview.ps1` with the bundled runtime, the page taken in an Edge `--app`
 window like every class-site shot, and the handout printed by the page itself
-in headless Edge (`handout_pdf.mjs` under the runtime's Node 20, which needs
-`--experimental-websocket`). Three things met doing it, each measured on
+in headless Edge (`handout_pdf.mjs` under the runtime's Node, which on the
+20.18.1 runtime of 2026-10-15 needed `--experimental-websocket`; not needed
+since #675, whose Node 22.23.4 has a global `WebSocket`). Three things met doing it, each measured on
 2026-10-15: `setup_course.py`'s colour-scheme picker reads keys through
 `msvcrt`, so answering `setup.ps1` through a PIPE hangs there for ever — it
 is driven through `PtyDriver` instead, with `q` keeping the scheme the
