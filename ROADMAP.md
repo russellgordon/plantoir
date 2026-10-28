@@ -50,7 +50,7 @@ download joins the release, with what 1.9.0 brought the Mac:
   shown when the disk fills while Swift is being set up
   ([#672](https://github.com/russellgordon/plantoir/issues/672)); the Quizzes
   page pictures on plantoir.app
-  ([#590](https://github.com/russellgordon/plantoir/issues/590)); and what a
+  ([#590](https://github.com/russellgordon/plantoir/issues/590)); what a
   scheduled publish does when the computer is asleep
   ([#554](https://github.com/russellgordon/plantoir/issues/554)); and
   messages in the window no longer run two lines together, and a question is

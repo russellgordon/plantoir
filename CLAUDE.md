@@ -969,7 +969,8 @@ changes made there have "no automated gate" at all, which is no longer true:
   for any release that changes it. It needs `windows-app\Vendor\fetch-runtime.ps1`
   to have been run, and refuses a runtime without `vendor\pyodide`. A release
   needs a `-FirstPublish` run as well as a plain one (`RELEASING.md` step 2,
-  #630 and #623).
+  #630 and #623). `-SelfTest` proves its Cloudflare wait offline in about
+  20 s (#680); run it before a credentialed run.
 
 **The mac suite runs its test classes one at a time, and that is load-bearing.**
 The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`,
