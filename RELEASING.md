@@ -112,6 +112,9 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-28 | GeoGebra sketches (a ```` ```geogebra ```` fence, or a `.ggb` file beside a page) open on a site built on Windows, from the site's own copy of the engine | Windows (the mac had it in 1.9.0) | #687 |
+| 2026-10-28 | Nothing: the Windows website builder runs on Node 22.23.4, the version the mac's image uses | Windows | #675 |
+| 2026-10-28 | Nothing: the Windows runtime's npm advisories were audited and the six left are accepted on evidence; `windows-app\audit-runtime.ps1` re-runs the audit by hand | Windows | #685 |
 | 2026-10-28 | Open in Obsidian on a section opens the page its preview is showing, not the section's front page; and "Open this in Obsidian" typed to the assistant presses that button | Windows (the mac since 1.9.0) | [#681](https://github.com/russellgordon/plantoir/issues/681), [#690](https://github.com/russellgordon/plantoir/issues/690) |
 
 
@@ -127,6 +130,7 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-10-28 | Windows: stop any preview, and let a scheduled deploy finish, before installing this version by hand. | Since #675 the installer empties `runtime\node` on an upgrade so an old Node cannot linger inside the new one, and it does not close `node.exe` (its close list names only Plantoir, plantoir-mcp and llama-server). A preview server or scheduled deploy still running leaves that folder half deleted and the teacher facing a file-in-use prompt. Tracked as #700. |
 
 ## Trim the roadmap
 
@@ -151,7 +155,8 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
    gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional. And
-   **revisit the npm audit** (#667): read verify.sh's npm-audit line (step 2).
+   **revisit the npm audit** (#667): read verify.sh's npm-audit line, and on
+   Windows run `windows-app\audit-runtime.ps1` (#685) (step 2).
 1a. **Minor releases (x.y.0) only: is Cloudflare Pages still safe?** Check
    Cloudflare's changelog for a Pages end-of-life date and whether Workers now
    takes custom domains with outside nameservers. Checklist step 1a says what
@@ -171,9 +176,15 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 3. **Build the signed Windows bundle**: first **re-run
    `windows-app\Vendor\fetch-runtime.ps1`** — it returns at once when the
    runtime is current, and fetches only `runtime\vendor` (Paged.js, Latin
-   Modern, function-plot, Pyodide, the TikZ engine; about 56 MB, under a
-   minute — 49 s measured on the build PC on 2026-10-22) when the runtime
-   predates any of them; `publish.ps1` never runs it, and the build now
+   Modern, function-plot, Pyodide, the TikZ engine, GeoGebra's engine; about
+   56 MB before GeoGebra joined, under a minute — 49 s measured on the build
+   PC on 2026-10-22, 31 s for a vendor-only run on 2026-10-28) when the
+   runtime predates any of them. **A BASE pin change is different: the fetch
+   REFUSES** when the manifest's Node, Python, Quartz, wrangler or emoji
+   differs from its pin (#675's Node 22.23.4 is one), because that phase
+   cannot be redone in place — delete `windows-app\Vendor\runtime` and
+   re-run it, a full fetch of about 600 MB (218 s on the build PC, Lenovo
+   20QES70500, 2026-10-28). `publish.ps1` never runs it, and the build now
    REFUSES a runtime whose manifest lacks those keys rather than ship one
    without them (#503; `pyodide` joined the keys with #568, so every runtime
    made before 2026-10-22 is refused until the fetch is re-run), and **run
@@ -324,6 +335,21 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `documentation/02-docker-image.md` → "Known vulnerabilities in the image's
    npm packages" says what each outcome means.
 
+   **On Windows, the same audit over the runtime** (#685): run
+   `.\windows-app\audit-runtime.ps1` from the repository root, against the
+   runtime the installer will carry (`-Runtime <folder>` for another one).
+   It audits the same five trees with the runtime's own npm and compares
+   them through the same `scripts/npm_audit.py` and the same accepted list:
+   exit 0 clean, 1 a blocking advisory or a tree not audited, 2 SKIPPED
+   (offline — run it again with the network). It is opt-in and in no
+   `dotnet test`, for the reason the image keeps it out of its build: the
+   advisory database changes daily. It prints where it kept each tree's
+   audit, for `npm_audit.py findings`. Only the wrangler tree can carry an
+   advisory the image does not (its lockfile is the one npm wrote beside
+   the installed copy); one that appears there only is decided like any
+   other, added to the shared list under `wrangler` with its reason, and
+   told to the mac in a `mac` issue, because the list moved under it.
+
    **If the release changes anything under `scripts/`, the Dockerfile or a
    launcher, run the publishing verifier rather than smoking it by hand** —
    `verify-deploy.ps1` on Windows, `./verify-deploy.sh` on the mac. It is the
@@ -362,7 +388,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > on each run.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
-   before its `vendor` folder — #503):
+   before its `vendor` folder — #503; when a BASE pin changed — Node, Python,
+   Quartz, wrangler, emoji, as #675's Node 22 did — the fetch refuses: delete
+   `Vendor\runtime` first and let it fetch everything, about 600 MB, 218 s
+   on the build PC):
 
        powershell -File Vendor\fetch-runtime.ps1
        powershell -File Vendor\fetch-obsidian-addons.ps1

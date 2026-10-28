@@ -350,7 +350,8 @@ and the bundled runtime (`windows-app/Vendor/runtime`, or `PLANTOIR_RUNTIME`),
 photographs *Similar Triangles Practice* from its top in an Edge `--app`
 window in light and dark (`print-page-windows-light/-dark.png`), prints the
 Questions only handout through `handout_pdf.mjs` with the runtime's Node
-(`--experimental-websocket`, since it carries Node 20) and headless Edge, and
+(with `--experimental-websocket` only on a runtime older than Node 22: the
+runtime has carried 22.23.4 since #675) and headless Edge, and
 shows that PDF in an Edge `--app` window with the viewer's toolbar off
 (`print-handout-windows.png`, light: it is paper). Each picture is read back
 with Windows' own text recognition (`windowshot --ocr`) and must show
