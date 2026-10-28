@@ -8080,7 +8080,7 @@ mirrors the checkout's working tree into the folder before it judges
 anything (the three `.sh` launchers, the `.toolchain/` root files and
 `recipeFolders`, `__pycache__` skipped on both sides), rebuilds from scratch
 when anything differed, and diffs the folder again at the end. Its
-Cloudflare wait went one step further than this side's did: production must
+Cloudflare wait goes one step further than this side's did until #680: production must
 serve the front page AND the borrowed page of runnable code byte for byte,
 and that page carries a mark made fresh for every run, because the front
 page alone cannot tell two deployments apart when only static files or
