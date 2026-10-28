@@ -9882,14 +9882,40 @@ today's newest versions, and audit a tree nobody installed.
 the five trees, 81 accepted, 3 blocking, 3 reported, 0 stale. Per tree (npm's
 own counts): quartz 19 vulnerable packages (12 high), wrangler 6 (5 high),
 tikz-engine, pagedjs and function-plot 0. The 3 blocking advisories are high
-ones in `undici` 7.24.4 under wrangler, which `miniflare` 4.20260401.0 pins
-exactly: GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx and GHSA-qrxm-fqhp-jwvm.
-GitHub published all three on 2026-10-27, after the list's `reviewed`
-2026-10-24, with 7.30.1 fixing them. The 3 reported moderates are
-GHSA-9fm3-97px-rjf6 and GHSA-55wc-3pg8-jfw6 (undici, same day) and
-GHSA-wx4j-mvgx-mqwp (satori, under Quartz, 2026-10-27). **None of them is
-Windows-only**: the same exact pins put the same undici in the image, so
-verify.sh's next online run should report the same three. Deciding them
-(accept with exposure, or move wrangler) is a shared decision for the list,
-not this piece's. Offline (the registry pointed at a closed port) the
-script said SKIPPED and exited 2, with all five trees unreachable.
+ones in `undici` 7.24.4: GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx and
+GHSA-qrxm-fqhp-jwvm. The 3 reported moderates are GHSA-9fm3-97px-rjf6 and
+GHSA-55wc-3pg8-jfw6 (undici) and GHSA-wx4j-mvgx-mqwp (satori, under Quartz).
+GitHub published all six on 2026-10-27, after the list's `reviewed`
+2026-10-24. **None of them is Windows-only**: the same exact pins put the same
+undici and satori in the image, so verify.sh's next online run should see the
+same six.
+
+**All six were then accepted, on evidence** (`research/npm-audit/2026-10-28.md`
+has what was read and measured; `npmAudit.accepted` carries each reason, and
+`reviewed` is 2026-10-28). The fact that decides the undici five:
+**wrangler BUNDLES undici 7.24.4 into its own `wrangler-dist/cli.js`**, so
+"miniflare is never started" does not cover them, and wrangler's own code
+was read instead. It composes no undici interceptor (the cache and
+decompress advisories), passes no `tls` option to any dispatcher (only the
+default Agent, or `EnvHttpProxyAgent({ noProxy })` when a proxy variable is
+set), and opens no WebSocket. The TLS 1.2 renegotiation crash needs TLS 1.2,
+and api.cloudflare.com, where every `pages deploy` request goes, negotiated
+TLS 1.3 from the runtime's Node 22.23.4. registry.npmjs.org negotiated 1.2,
+but wrangler's update check reaches it through Node's `https`, not undici.
+satori is only CustomOgImages', which `build_site.py` comments out unless
+`--include-social-media-previews` is passed, and neither app passes it. The
+second run: `COUNTS audited=5 advisories=87 accepted=87 blocking=0 reported=0
+stale=0 failed=0 unreachable=0`, exit 0. Offline (the registry pointed at a
+closed port) the script said SKIPPED and exited 2, with all five trees
+unreachable.
+
+**The installer does not close a running Node.** `CloseApplicationsFilter`
+names `*Plantoir*`, `*plantoir-mcp*` and `*llama-server*`, not `node.exe`,
+and `[InstallDelete]` now empties `{app}\runtime\node`. So a preview, or a
+scheduled deploy, still running from the old version at install time holds
+`{app}\runtime\node\node.exe` open, Restart Manager is not asked to close it,
+and the install can leave `runtime\node` half deleted. The filter is left as
+it is in this piece (the implementation review raised it; widening what a
+hand-run install closes is its own change, not a side effect of a Node bump).
+Until then: stop any preview and let a scheduled deploy finish before
+installing by hand.

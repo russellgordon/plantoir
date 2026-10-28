@@ -864,6 +864,13 @@ pixi.js's, for the Graph view build_site.py removes. A built site has no
 `pixi` or `xmldom` string. The undici advisories touch only a Cloudflare
 deploy, and are fixed in wrangler > 4.113.0, which waited on Windows' Node 22
 (landed in #675; the move itself is its own piece).
+**Re-run 2026-10-28 on Windows' runtime** (`research/npm-audit/2026-10-28.md`,
+`windows-app\audit-runtime.ps1`, the same pins): 87 pairs, six new since the
+24th (five undici, one satori, published 2026-10-27), all accepted on
+evidence after reading wrangler's code. wrangler bundles undici 7.24.4 into
+its own `cli.js`, so the undici reasons are about wrangler's requests, not
+only miniflare's. The image's next online verify.sh run should see the same
+87.
 The audit takes about 22 s online. Offline it takes about 2.5 min (npm's
 retries), and only then. One more exposure fact, not this piece's to fix: the
 preview ports are published on every interface (`lsof` shows `TCP *:8133` and
