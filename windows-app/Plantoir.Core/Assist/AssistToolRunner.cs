@@ -346,8 +346,10 @@ public sealed class AssistToolRunner
         string course = ShownCourseCode?.Invoke() ?? _courseCode;
         if (!ObsidianIsInstalled()) return AssistWording.ObsidianIsNotOnThisPc;
         OpenInObsidianPress press;
+        // A fault is a press that opened nothing - never "no window", which
+        // would send the teacher looking for a window that is right there.
         try { press = await OpenInObsidianInApp!.Invoke(); }
-        catch { press = new OpenInObsidianPress.NoWindow(); }
+        catch { press = new OpenInObsidianPress.DidNotOpen(); }
         return press switch
         {
             OpenInObsidianPress.Opened { Answer: PreviewedPageSource.Page page } =>
@@ -357,6 +359,11 @@ public sealed class AssistToolRunner
             OpenInObsidianPress.Opened => AssistWording.OpenedTheSectionPageNotFound(course, section),
             OpenInObsidianPress.WaitingForAnAnswer => AssistWording.ObsidianOpensAfterTheQuestion(course, section),
             OpenInObsidianPress.AlreadyOpening => AssistWording.ObsidianIsAlreadyOpening(course),
+            // The contract has no sentence for a press that failed (a gap the
+            // mac is told of). This one is the least wrong: every clause of it
+            // is true - the button is in Plantoir, pressing it is the way, and
+            // nothing was opened - where "no window" and "opened" are not.
+            OpenInObsidianPress.DidNotOpen => AssistWording.OpenInObsidianIsInTheSectionWindow(course, section),
             _ => AssistWording.OpenInObsidianFoundNoWindow(course, section),
         };
     }

@@ -193,7 +193,8 @@ public sealed partial class SidebarPane
     /// trail line is written first, as the mac's route notes before lockAgain.
     /// <paramref name="report"/> says what the press came to as soon as it is
     /// known (#690): waiting while the note is up, opened once Obsidian is handed
-    /// something.</remarks>
+    /// something; a throw before that is reported by the caller's
+    /// <c>Finishing</c> as <c>DidNotOpen</c>, never as opened.</remarks>
     private async Task OpenReferenceInObsidian(Course course, string revealFolder, PreviewedPageSource.Answer? answer = null,
                                                int? section = null, TaskCompletionSource<OpenInObsidianPress>? report = null)
     {
@@ -229,7 +230,14 @@ public sealed partial class SidebarPane
             };
             note.SetValue(Microsoft.UI.Xaml.Automation.AutomationProperties.AutomationIdProperty, "referenceCalmNote");
             report?.TrySetResult(new OpenInObsidianPress.WaitingForAnAnswer());
-            if (await ShowDialogSafelyAsync(note) != ContentDialogResult.Primary) return;
+            // While the note is up the course is "asking" (#690), so the
+            // assistant's press waiting for this dialog to close is not run
+            // again after it: this press opens Obsidian once it is answered.
+            ObsidianFigureAddOnsThisRun.Asking.Add(course.DirectoryPath);
+            ContentDialogResult? chosen;
+            try { chosen = await ShowDialogSafelyAsync(note); }
+            finally { ObsidianFigureAddOnsThisRun.Asking.Remove(course.DirectoryPath); }
+            if (chosen != ContentDialogResult.Primary) return;
             RememberNoteShown(course);
         }
         await FolderActions.OpenInObsidian(revealFolder, course.DirectoryPath,

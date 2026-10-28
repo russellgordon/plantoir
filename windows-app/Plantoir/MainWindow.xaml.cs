@@ -864,15 +864,17 @@ public sealed partial class MainWindow : Window
     /// The in-app assistant's Open in Obsidian (#690; the mac's #610): presses
     /// THIS window's own Open in Obsidian for the section - the sidebar's one
     /// route, #681's page and all - and says what the press came to as soon as
-    /// that is known. The section is shown first (a freshly shown section has
-    /// no page on screen yet, so it opens the section and says why), and the
-    /// window comes forward only when it was hidden or minimised, never taking
-    /// focus from the assistant's window (the recorded choice of
-    /// <see cref="ShowPreviewFor"/>). NoWindow when this window is on another
-    /// folder or the section is not here. When a dialog is already up in this
-    /// window the answer is <c>WaitingForAnAnswer</c> and the press runs only
-    /// once that dialog has closed, so the sentence the assistant says is true;
-    /// a second ContentDialog cannot be shown over the first.
+    /// that is known. The order is <see cref="AssistantsObsidianPress"/>'s: a
+    /// question of an earlier press for the course, or any other dialog up in
+    /// this window, is answered first (WaitingForAnAnswer), and the section is
+    /// shown only once no dialog is up, so nothing on screen changes under an
+    /// open dialog; the press runs after that dialog closes, within
+    /// <see cref="AssistantsObsidianPress.LongestWait"/>. The window comes
+    /// forward only when it was hidden or minimised, never taking focus from
+    /// the assistant's window (the recorded choice of <see cref="ShowPreviewFor"/>);
+    /// a freshly shown section has no page on screen yet, so it opens the
+    /// section and says why. NoWindow when this window is on another folder
+    /// or the section is not here; DidNotOpen when the press failed.
     /// </summary>
     public async Task<OpenInObsidianPress> PressOpenInObsidianFor(string folder, string courseCode, int section)
     {
@@ -886,39 +888,34 @@ public sealed partial class MainWindow : Window
                 : Workspace.Courses.FirstOrDefault(c => string.Equals(c.Code, courseCode, StringComparison.OrdinalIgnoreCase)
                                                         && c.SectionNumbers.Contains(section));
 
+        void ShowTheSection()
+        {
+            if (DetailHost.Content is not SectionDetailView existing ||
+                !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                existing.SectionNumber != section)
+            {
+                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+            }
+            ComeForwardIfHidden();
+        }
+
         async Task PressOnTheInterfaceThread()
         {
             try
             {
-                if (TheCourse() is null)
-                {
-                    pressed.TrySetResult(new OpenInObsidianPress.NoWindow());
-                    return;
-                }
-                if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
-                    existing.SectionNumber != section)
-                {
-                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
-                }
-                ComeForwardIfHidden();
-                if (DialogGate.IsOpen(Content?.XamlRoot))
-                {
-                    pressed.TrySetResult(new OpenInObsidianPress.WaitingForAnAnswer());
-                    while (!IsClosed && DialogGate.IsOpen(Content?.XamlRoot)) await Task.Delay(300);
-                }
-                // Read again after any wait: the folder or the course may have changed under the dialog.
-                if (TheCourse() is not { } course)
-                {
-                    pressed.TrySetResult(new OpenInObsidianPress.NoWindow());
-                    return;
-                }
-                pressed.TrySetResult(await SidebarPane.OpenInObsidian(course, section));
+                await AssistantsObsidianPress.RunAsync(new AssistantsObsidianPress.Window(
+                    CoursePath: () => TheCourse()?.DirectoryPath,
+                    DialogIsOpen: () => DialogGate.IsOpen(Content?.XamlRoot),
+                    IsClosed: () => IsClosed,
+                    BringUp: ShowTheSection,
+                    Press: () => TheCourse() is { } course
+                        ? SidebarPane.OpenInObsidian(course, section)
+                        : Task.FromResult<OpenInObsidianPress>(new OpenInObsidianPress.NoWindow())), pressed);
             }
             catch (Exception ex)
             {
                 App.LogDiagnostic($"PressOpenInObsidianFor exception: {ex}");
-                pressed.TrySetResult(new OpenInObsidianPress.NoWindow());
+                pressed.TrySetResult(new OpenInObsidianPress.DidNotOpen());
             }
         }
     }

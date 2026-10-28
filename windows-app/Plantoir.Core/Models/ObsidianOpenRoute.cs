@@ -25,6 +25,15 @@ public abstract record OpenInObsidianPress
 
     /// <summary>There was no window of that working folder to press it in.</summary>
     public sealed record NoWindow : OpenInObsidianPress;
+
+    /// <summary>
+    /// The press failed before Obsidian was handed anything - the add-ons scan,
+    /// the pass or the open itself threw - so nothing was opened. Windows'
+    /// own: the mac's press has no such outcome and the contract no sentence
+    /// for it (<c>12-windows-app.md</c> → "The assistant's Open in Obsidian
+    /// on Windows (#690, the mac's #610)" says which sentence is said, and why).
+    /// </summary>
+    public sealed record DidNotOpen : OpenInObsidianPress;
 }
 
 /// <summary>
@@ -155,9 +164,12 @@ public sealed class ObsidianOpenRoute
             finally { ObsidianFigureAddOnsThisRun.BeingOpened.Remove(coursePath); }
             return true;
         }
-        catch (Exception problem)
+        catch
         {
-            report.TrySetException(problem);
+            // A RESULT, never an exception: the assistant's reply is made from
+            // it, and "nothing was opened" is the one thing known to be true.
+            // A report already made (a question was up) stands.
+            report.TrySetResult(new OpenInObsidianPress.DidNotOpen());
             throw;
         }
         finally

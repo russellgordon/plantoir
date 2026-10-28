@@ -4609,8 +4609,9 @@ in Obsidian route's page door and writes the trail event. The assistant's door
 (#610) is #690 there: the call is answered by the APP, pressing the section
 window's own Open in Obsidian. Where Windows differs — a press that reports
 early because its questions are awaited dialogs, a name kept decomposed on
-NTFS, the link's `/` written `%2F` — is in `12-windows-app.md` → "Open in
-Obsidian opens the page the preview shows on Windows (#681)".
+NTFS, the link's `\` written `%5C` and `:` written `%3A` — is in
+`12-windows-app.md` → "Open in Obsidian opens the page the preview shows
+on Windows (#681, the mac's #518)".
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 

@@ -7785,7 +7785,7 @@ nine of the ten scenarios run; the tenth, "on a Mac without Obsidian", is held
 in `NamedGapLedger` because `wording.obsidianIsNotOnThisMac` names "this Mac"
 without `{machine}` (mac #698), so Windows says "this PC". How the press
 reports early on Windows, where a question is an awaited dialog, is in
-`12-windows-app.md` → "The assistant's Open in Obsidian (#690)".
+`12-windows-app.md` → "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".
 
 ## Telling an outside assistant how the course is taught (#209)
 

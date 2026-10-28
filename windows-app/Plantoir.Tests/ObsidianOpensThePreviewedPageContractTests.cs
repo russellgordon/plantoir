@@ -73,6 +73,9 @@ public sealed class ObsidianOpensThePreviewedPageContractTests : IDisposable
     {
         string course = LayOutTheFixture();
         var cases = Block["cases"]!.AsArray();
+        // A TRIPWIRE, deliberately: the mac adding a case should be noticed
+        // here and read, as the named-gap rule intends, not pass by unseen
+        // because a loop happened to run one more time. Raise it on purpose.
         Assert.Equal(23, cases.Count);
         var wrong = new List<string>();
         foreach (var node in cases)
@@ -114,6 +117,42 @@ public sealed class ObsidianOpensThePreviewedPageContractTests : IDisposable
         Assert.Equal("Café Notes.md".Normalize(NormalizationForm.FormD), Path.GetFileName(page.File));
     }
 
+    /// <summary>
+    /// NTFS finds a name in any case, Obsidian's vault lookup does not: a list
+    /// naming the file in another case opens the file as it is spelled on disk.
+    /// </summary>
+    [Fact]
+    public void ACaseChangedNameIsOpenedAsItIsOnDisk()
+    {
+        string course = LayOutTheFixture();
+        var list = ListFor(new JsonObject { ["pages"] = new JsonObject
+        {
+            ["Unit-1/Lesson-3"] = new JsonObject { ["source"] = "unit 1/LESSON 3.md", ["hidden"] = false },
+        } });
+        var page = Assert.IsType<PreviewedPageSource.Page>(PreviewedPageSource.Resolve("Unit-1/Lesson-3", list, course));
+        Assert.Equal(Path.Combine("Unit 1", "Lesson 3.md"), Path.GetRelativePath(course, page.File));
+    }
+
+    /// <summary>
+    /// A '..' is refused before anything is walked, even one that would come
+    /// back inside the course: after a link the spelled path and the real one
+    /// part ways, and the spelled one is what Obsidian is handed.
+    /// </summary>
+    [Theory]
+    [InlineData("Unit 1/../Unit 1/Lesson 3.md")]
+    [InlineData("section1/../../ICS3U/Unit 1/Lesson 3.md")]
+    [InlineData("C:/Windows/win.md")]
+    public void ADotDotSegmentIsRefusedBeforeAnythingIsWalked(string source)
+    {
+        string course = LayOutTheFixture();
+        var list = ListFor(new JsonObject { ["pages"] = new JsonObject
+        {
+            ["Unit-1/Lesson-3"] = new JsonObject { ["source"] = source, ["hidden"] = false },
+        } });
+        Assert.Equal(new PreviewedPageSource.FellBack(PreviewedPageSource.Fallback.OutsideTheCourse),
+            PreviewedPageSource.Resolve("Unit-1/Lesson-3", list, course));
+    }
+
     [Fact]
     public void TheTrailWordsAreTheContracts()
     {
@@ -147,14 +186,16 @@ public sealed class ObsidianOpensThePreviewedPageContractTests : IDisposable
     /// <summary>
     /// The contract's <c>link.cases</c> are POSIX paths, and the note says the
     /// percent-encoding of everything but '+' is the platform encoder's own:
-    /// Windows' <c>Uri.EscapeDataString</c> also writes '/' as %2F, so the
-    /// strings are not compared. What IS the contract's: '+' is %2B, '&amp;' is
+    /// Windows' <c>Uri.EscapeDataString</c> escapes every separator - a Windows
+    /// path's '' as %5C and ':' as %3A (and these POSIX paths' '/' as %2F) -
+    /// so the strings are not compared. What IS the contract's: '+' is %2B, '&amp;' is
     /// %26, a space is %20, and the path comes back whole.
     /// </summary>
     [Fact]
     public void TheLinkEncodesWhatTheContractEncodes()
     {
         var cases = Block["link"]!["cases"]!.AsArray();
+        // A tripwire, as in EveryCaseResolvesAsTheContractSays: raise it on purpose.
         Assert.Equal(3, cases.Count);
         foreach (var node in cases)
         {

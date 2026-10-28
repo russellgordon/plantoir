@@ -448,15 +448,201 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         Assert.DoesNotContain("not a page of the preview", TrailText);
     }
 
+    /// <summary>
+    /// A fault before Obsidian is handed anything is reported as a RESULT,
+    /// DidNotOpen - never Opened, never an exception - and the route itself
+    /// still faults, so the fault is logged.
+    /// </summary>
     [Fact]
-    public async Task TheReportAlwaysCompletesWhenTheScanFails()
+    public async Task TheReportSaysDidNotOpenWhenTheScanFails()
     {
         var (world, course, route) = Make();
         world.ScanThrows = true;
         var (reported, finished) = route.Press(course, course.DirectoryPath, APage(course), 1);
         await Assert.ThrowsAsync<IOException>(() => finished);
-        await Assert.ThrowsAsync<IOException>(() => reported.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.IsType<OpenInObsidianPress.DidNotOpen>(await reported.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.DoesNotContain(world.Asked, asked => asked.StartsWith("open", StringComparison.Ordinal));
         Assert.Empty(ObsidianFigureAddOnsThisRun.BeingOpened);
+    }
+
+    // ---- #690: the assistant's press, in the order AssistantsObsidianPress keeps ----
+
+    /// <summary>A window for <see cref="AssistantsObsidianPress"/>, as data: what it says, and what was asked of it.</summary>
+    private sealed class FakeWindow
+    {
+        public string? CoursePath;
+        public bool DialogOpen;
+        public bool Closed;
+        public Func<Task<OpenInObsidianPress>> Pressing = () => Task.FromResult<OpenInObsidianPress>(new OpenInObsidianPress.Opened(null));
+        public readonly List<string> Asked = new();
+
+        public AssistantsObsidianPress.Window AsWindow() => new(
+            CoursePath: () => CoursePath,
+            DialogIsOpen: () => DialogOpen,
+            IsClosed: () => Closed,
+            BringUp: () => Asked.Add(DialogOpen ? "bring up UNDER A DIALOG" : "bring up"),
+            Press: () => { Asked.Add("press"); return Pressing(); });
+    }
+
+    private static async Task<(OpenInObsidianPress Reported, Task Run)> RunTheAssistantsPress(
+        FakeWindow window, Func<TimeSpan, Task>? delay = null, TimeSpan? longestWait = null)
+    {
+        var report = new TaskCompletionSource<OpenInObsidianPress>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var run = AssistantsObsidianPress.RunAsync(window.AsWindow(), report, delay ?? (_ => Task.CompletedTask), longestWait);
+        return (await report.Task.WaitAsync(TimeSpan.FromSeconds(10)), run);
+    }
+
+    [Fact]
+    public async Task TheAssistantsPress_WithNoWindowIsNoWindow()
+    {
+        var window = new FakeWindow();
+        var (reported, run) = await RunTheAssistantsPress(window);
+        await run;
+        Assert.IsType<OpenInObsidianPress.NoWindow>(reported);
+        Assert.Empty(window.Asked);
+    }
+
+    [Fact]
+    public async Task TheAssistantsPress_ShowsTheSectionThenPresses()
+    {
+        var window = new FakeWindow { CoursePath = @"C:\courses\MPM2D" };
+        var (reported, run) = await RunTheAssistantsPress(window);
+        await run;
+        Assert.IsType<OpenInObsidianPress.Opened>(reported);
+        Assert.Equal(new[] { "bring up", "press" }, window.Asked);
+    }
+
+    /// <summary>
+    /// Another dialog up: waiting is said at once, nothing on screen changes
+    /// while it is up, and the press runs once it has closed.
+    /// </summary>
+    [Fact]
+    public async Task TheAssistantsPress_WaitsForADialogWithoutChangingTheSectionUnderIt()
+    {
+        var window = new FakeWindow { CoursePath = @"C:\courses\MPM2D", DialogOpen = true };
+        int looks = 0;
+        var (reported, run) = await RunTheAssistantsPress(window, _ =>
+        {
+            Assert.Empty(window.Asked);
+            if (++looks == 3) window.DialogOpen = false;
+            return Task.CompletedTask;
+        });
+        Assert.IsType<OpenInObsidianPress.WaitingForAnAnswer>(reported);
+        await run;
+        Assert.Equal(new[] { "bring up", "press" }, window.Asked);
+    }
+
+    /// <summary>A dialog left up longer than the ceiling: nothing is ever pressed.</summary>
+    [Fact]
+    public async Task TheAssistantsPress_GivesUpAtTheCeiling()
+    {
+        var window = new FakeWindow { CoursePath = @"C:\courses\MPM2D", DialogOpen = true };
+        var (reported, run) = await RunTheAssistantsPress(window, longestWait: TimeSpan.FromSeconds(3));
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.IsType<OpenInObsidianPress.WaitingForAnAnswer>(reported);
+        Assert.Empty(window.Asked);
+        Assert.Equal(TimeSpan.FromMinutes(10), AssistantsObsidianPress.LongestWait);
+    }
+
+    [Fact]
+    public async Task TheAssistantsPress_IsNotRunWhenTheWindowClosesDuringTheWait()
+    {
+        var window = new FakeWindow { CoursePath = @"C:\courses\MPM2D", DialogOpen = true };
+        var (_, run) = await RunTheAssistantsPress(window, _ => { window.Closed = true; return Task.CompletedTask; });
+        await run;
+        Assert.Empty(window.Asked);
+    }
+
+    [Fact]
+    public async Task TheAssistantsPress_ThatFailsIsDidNotOpen()
+    {
+        var window = new FakeWindow { CoursePath = @"C:\courses\MPM2D", Pressing = () => throw new IOException("no") };
+        var (reported, run) = await RunTheAssistantsPress(window);
+        await Assert.ThrowsAsync<IOException>(() => run);
+        Assert.IsType<OpenInObsidianPress.DidNotOpen>(reported);
+    }
+
+    /// <summary>
+    /// The route's question guard wins over the wait for a dialog: while an
+    /// earlier press's add-ons offer is up (a dialog, and Asking), the
+    /// assistant's press says it is waiting and is NEVER run - not even once
+    /// the offer has closed - so Obsidian opens once and one trail line is
+    /// written, by the first press.
+    /// </summary>
+    [Fact]
+    public async Task TheAssistantsPress_DuringAnotherPresssQuestionNeverPressesAgain()
+    {
+        var (world, course, route) = Make();
+        var page = APage(course);
+        var answer = new TaskCompletionSource();
+        world.OfferAnsweredWhen = answer.Task;
+        Task<bool>? first = null;
+        try
+        {
+            (var firstReport, first) = route.Press(course, course.DirectoryPath, page, 1);
+            Assert.IsType<OpenInObsidianPress.WaitingForAnAnswer>(await firstReport.WaitAsync(TimeSpan.FromSeconds(10)));
+
+            var window = new FakeWindow
+            {
+                CoursePath = course.DirectoryPath,
+                DialogOpen = true,
+                Pressing = () => route.Press(course, course.DirectoryPath, page, 1).Reported,
+            };
+            var (reported, run) = await RunTheAssistantsPress(window, _ =>
+            {
+                window.DialogOpen = false;
+                answer.TrySetResult();
+                return Task.CompletedTask;
+            });
+            await run;
+            Assert.IsType<OpenInObsidianPress.WaitingForAnAnswer>(reported);
+            Assert.Empty(window.Asked);
+        }
+        finally
+        {
+            answer.TrySetResult();
+            if (first is not null) await first;
+        }
+        Assert.Single(world.Asked, asked => asked.StartsWith("open", StringComparison.Ordinal));
+        Assert.Equal(1, PressLines);
+    }
+
+    /// <summary>
+    /// The runner's reply to a press that failed says nothing false: not "no
+    /// window", not "opened" - openInObsidianIsInTheSectionWindow, whose every
+    /// clause is true (the contract has no sentence for a failed press).
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AFailedPressIsAnsweredWithoutAFalseSentence(bool throws)
+    {
+        var runner = new Plantoir.Core.Assist.AssistToolRunner(new NoServer(), "MPM2D", 1, Plantoir.Core.Assist.AssistSurface.LocalWindow)
+        {
+            OpenInObsidianInApp = throws
+                ? () => throw new IOException("no")
+                : () => Task.FromResult<OpenInObsidianPress>(new OpenInObsidianPress.DidNotOpen()),
+        };
+        var call = new System.Text.Json.Nodes.JsonObject
+        {
+            ["id"] = "call-1",
+            ["function"] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["name"] = "open_in_obsidian",
+                ["arguments"] = new System.Text.Json.Nodes.JsonObject { ["course"] = "MPM2D", ["section"] = 1 }.ToJsonString(),
+            },
+        };
+        var (answer, handed) = await runner.Run(call, default);
+        Assert.True(handed);
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.OpenInObsidianIsInTheSectionWindow("MPM2D", "1"), answer.Summary);
+    }
+
+    /// <summary>A server that is never to be called: the app answers open_in_obsidian.</summary>
+    private sealed class NoServer : Plantoir.Core.Assist.IToolServer
+    {
+        public Task<Plantoir.Core.Assist.AssistToolAnswer> CallTool(string name, System.Text.Json.Nodes.JsonObject arguments,
+            Action<string>? progress = null, CancellationToken cancellation = default) =>
+            throw new InvalidOperationException("open_in_obsidian reached the server: " + name);
     }
 
     /// <summary>Every Open in Obsidian route in the app goes through the one function, which goes through this route.</summary>

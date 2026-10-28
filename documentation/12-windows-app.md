@@ -3170,7 +3170,7 @@ real `PlantoirTools` against a course in a temp folder, which is the shape
 `AssistFixture.makeRunner` has had on the mac since the scenario suite shipped.
 (Since #690 a scripted `given.modelReply` answers the first request only, as
 the mac's runner does since #610, and the ten Open in Obsidian cases' keys are
-read — "The assistant's Open in Obsidian on Windows (#690)".)
+read — "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".)
 
 Five things about it are decisions rather than details.
 
@@ -3874,7 +3874,7 @@ Windows led on. Each hand-back knew a course code and a section number, and
 found the window to use as `_main`, the window the conversation was opened
 beside. (Open in Obsidian joined them with #690, through
 `MainWindowForBuilds` and a folder check of its own — "The assistant's Open in
-Obsidian on Windows (#690)" below.)
+Obsidian on Windows (#690, the mac's #610)" below.)
 
 **That window can move.** Nothing closes an assistant window when the main
 window is pointed at a different working folder, so `_main` outlives the folder
@@ -5857,7 +5857,7 @@ section window's toolbar used to skip, going straight to
 that names a section opens the page that section's preview shows, and the
 route returns what the press came to (`Task<OpenInObsidianPress>`, which every
 caller but the assistant drops) — "Open in Obsidian opens the page the preview
-shows on Windows (#681)" below.
+shows on Windows (#681, the mac's #518)" below.
 
 **The course row lost its local-assistant item** (then "Revise with local AI
 assistant…"; since #491 the rows' Revise items sit in Revise With ▸ as Claude…,
@@ -9593,8 +9593,8 @@ rejected; this section says only what Windows does differently and what it
 measured. Since #681 a section's press carries the page its preview shows
 through the offer and the reopen question (`ObsidianAddOnsRequest.Page`), and
 since #690 the route reports what a press came to before it has finished —
-both in "Open in Obsidian opens the page the preview shows on Windows (#681)"
-and "The assistant's Open in Obsidian on Windows (#690)" below.
+both in "Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)"
+and "The assistant's Open in Obsidian on Windows (#690, the mac's #610)" below.
 
 **The files.** `windows-app/Vendor/fetch-obsidian-addons.ps1` reads every id,
 version, size, SHA-256 and address from `obsidianAddOnsForFigures.addOns` (it
@@ -9820,10 +9820,10 @@ as the mac's notes it before `lockAgain`.
 **Things the mac must merely KNOW** (no contract case changes, so no mac suite
 goes red):
 
-- **The link's `/` is `%2F` here.** `link.cases` are POSIX paths, and
-  `Uri.EscapeDataString` writes the whole path — `C:\` as `C%3A%5C`, every
-  separator escaped — so the contract's link strings cannot be compared
-  verbatim. The contract's note says the encoding of everything but `+` is the
+- **The link's `\` is `%5C` and `:` is `%3A` here.** `link.cases` are POSIX
+  paths, and `Uri.EscapeDataString` writes the whole Windows path — `C:\` as
+  `C%3A%5C`, every separator escaped — so the contract's link strings cannot
+  be compared verbatim. The contract's note says the encoding of everything but `+` is the
   platform encoder's own, so `TheLinkEncodesWhatTheContractEncodes` asserts
   what IS shared: `+` is `%2B`, `&` is `%26`, a space is `%20`, and the path
   round-trips through `Uri.UnescapeDataString`. `PreviewedPageSource.ObsidianLink`
@@ -9831,13 +9831,29 @@ goes red):
 - **A decomposed name on NTFS.** The fixture keeps `Café Notes.md` decomposed
   (NFD) while the list names it composed. APFS finds either spelling; NTFS
   treats them as two names. So a name the list gives that is not on disk as
-  spelled is looked for among its folder's entries by NFC (case-insensitively,
-  as NTFS compares), segment by segment, and the name FOUND is the one opened.
+  spelled is looked for among its folder's entries by NFC, compared exactly
+  (`Ordinal`: only the composed/decomposed difference is forgiven), segment by
+  segment, and the name FOUND is the one opened.
   `ADecomposedNameIsOpenedAsItIsOnDisk` pins it.
+- **The name opened is the one on disk, case included.** NTFS finds a name in
+  any case, so the list's `unit 1/lesson 3.md` passes `File.Exists` for a file
+  called `Unit 1/Lesson 3.md`; but Obsidian looks the path it is handed up in
+  its vault case-sensitively, so handing it the list's spelling could open
+  nothing, or a new empty note. When a name IS there, its own spelling is read
+  back with `Directory.EnumerateFileSystemEntries(folder, name)` and that is
+  what is opened. `ACaseChangedNameIsOpenedAsItIsOnDisk` pins it.
 - **Links followed, the vault's spelling kept.** The outside-the-course check
   follows every link on the way (`FileSystemInfo.ResolveLinkTarget`, the
   course folder resolved the same way); the path handed to Obsidian keeps the
   links unfollowed, because that is the spelling Obsidian knows the vault by.
+  Both must be inside the course. And a source with a `..` segment (or a
+  rooted one, `C:`) is refused as `outsideTheCourse` before anything is
+  walked, rather than walked and checked: links are followed in the real path
+  and not in the spelled one, so a `..` after a link moves the two apart, and
+  the spelled one — the one Obsidian is handed — could leave the course while
+  the real one stays in it. The build never writes a `..` (the contract's
+  `Escape` case is one, and is refused either way), so no real page is lost.
+  `ADotDotSegmentIsRefusedBeforeAnythingIsWalked` pins it.
 - **Under `--state-dir` there is no list.** The app's builds root moves with the
   state folder and the launchers' does not (#664), so a UI test's press reads
   `noList` and opens the section. Not a fault of the press.
@@ -9887,11 +9903,31 @@ reopen question and the reference note are AWAITED ContentDialogs, so finishing
 the route can take minutes. `ObsidianOpenRoute.Press` therefore returns two
 tasks: `Reported`, completed by the FIRST of Obsidian handed something
 (`Opened`), a question about to be shown (`WaitingForAnAnswer`) or the guard
-refusing (`AlreadyOpening`), and ALWAYS completed (a `finally` around the
-route; a fault is passed on); and `Finished`, the route itself.
+refusing (`AlreadyOpening`), and ALWAYS completed with a RESULT — a fault
+before any of those is `DidNotOpen` (below), never an exception; and
+`Finished`, the route itself, which still faults so the fault is logged.
 `OpenAsync(course, folder)` keeps its `Task<bool>` and awaits the whole route,
-so every #581 test reads the same sequence. `TheReportAlwaysCompletesWhenTheScanFails`
-pins the `finally`.
+so every #581 test reads the same sequence. `TheReportSaysDidNotOpenWhenTheScanFails`
+pins it.
+
+**A failed press says nothing false.** When the scan, the add-ons pass or the
+open itself throws before Obsidian is handed anything, nothing was opened, and
+every outcome the contract names would say something untrue: `opened…` that it
+opened, `openInObsidianFoundNoWindow` that no window shows the section (the
+window is right there), `obsidianOpensAfterTheQuestion` that a question is up.
+So Windows has a fifth outcome, `OpenInObsidianPress.DidNotOpen` — from the
+route, from `SidebarPane`'s `Finishing` for a course kept for reference (which
+used to report `Opened` from a `finally` even when the route threw before
+opening), from `AssistantsObsidianPress`, and from the runner's own `catch` —
+and the reply is `wording.openInObsidianIsInTheSectionWindow`: the least wrong
+sentence there is, because each of its clauses is true (opening a page in
+Obsidian happens in Plantoir; open the section there and press Open in
+Obsidian; nothing was opened). It reads a little oddly from the in-app
+assistant, which is IN Plantoir. The contract has no sentence for a press that
+failed, and that gap is the mac's to fill (a `wording` key and a scenario),
+since Windows cannot regenerate `assist-wording.json`.
+`AFailedPressIsAnsweredWithoutAFalseSentence` and
+`TheReferenceRouteReportsDidNotOpenWhenItThrows` pin it.
 
 **Two divergences from the mac, chosen here (the mac should KNOW):**
 
@@ -9904,16 +9940,52 @@ pins the `finally`.
 - **Another dialog already up in the main window** (any ContentDialog,
   `DialogGate.IsOpen`): WinUI shows one ContentDialog at a time, and a second
   `ShowAsync` throws — which `ShowDialogSafelyAsync` turns into a silent Not
-  Now. So `PressOpenInObsidianFor` answers `WaitingForAnAnswer` at once and
-  runs the press only once that dialog has closed (polled every 300 ms on the
-  interface thread), so `wording.obsidianOpensAfterTheQuestion` is true. No
-  trail line until the press actually runs. Director's ruling, 2026-10-28.
+  Now. So the press answers `WaitingForAnAnswer` at once and runs only once
+  that dialog has closed (looked at every 300 ms on the interface thread), so
+  `wording.obsidianOpensAfterTheQuestion` is true. No trail line until the
+  press actually runs. Director's ruling, 2026-10-28. The order is
+  `AssistantsObsidianPress.RunAsync` (Plantoir.Core, so it is tested without a
+  window; `MainWindow.PressOpenInObsidianFor` only supplies the window):
+  1. no window of the folder with the course → `NoWindow`;
+  2. a question of an EARLIER Open in Obsidian press for the course is up
+     (`Asking`, which since this piece covers a reference course's note too)
+     → `WaitingForAnAnswer` and NO press, ever: that press opens Obsidian once
+     it is answered, and pressing again after it closed would open Obsidian
+     twice and write two trail lines — so this guard wins over the wait below;
+  3. any other dialog up → `WaitingForAnAnswer`, then wait for it to close.
+     The section is NOT selected first: swapping `DetailHost.Content` under an
+     open dialog changes the window the dialog is about;
+  4. the folder, the course and `Asking` checked again — then the section is
+     shown and the window comes forward if hidden, and only then pressed.
+
+  **The wait has a ceiling of ten minutes** (`AssistantsObsidianPress.LongestWait`),
+  and ends early if the window closes; when it runs out, nothing is pressed.
+  Ten minutes is long enough to read and answer any question Plantoir asks,
+  and short enough that Obsidian does not open by itself long after the
+  conversation has moved on — an unbounded wait would open it whenever a
+  dialog left up over lunch was finally dismissed. The cost is that the reply
+  already said Obsidian opens after the question, and after ten minutes it
+  does not; the teacher presses Open in Obsidian themselves.
+  The `TheAssistantsPress_…` tests in `ObsidianOpenRouteTests` pin every step,
+  `TheAssistantsPress_DuringAnotherPresssQuestionNeverPressesAgain` the guard
+  against a second open, and `ObsidianRouteSourceTests.TheAssistantsPressTakesTheTestedOrder`
+  that the window goes through it.
 
 **The server.** `plantoir-mcp.exe` serves `open_in_obsidian` (`ReadOnly`, the
 contract's description and schema) and REFUSES with
 `wording.openInObsidianIsInTheSectionWindow` after resolving the course and
 section, so an unknown course is refused as every tool refuses it. The process
 has no WebView2 and no window to ask the questions in. 42 → 43 tools.
+
+**REJECTED: the server, or the assistant, opening Obsidian directly.**
+`plantoir-mcp.exe` could resolve the section's folder and hand Obsidian an
+`obsidian://` link itself, and the in-app runner could call
+`FolderActions.OpenInObsidian` without the window. Both skip what the button
+does before Obsidian opens — the add-ons offer and the reopen question (#581),
+and a course kept for reference's pages locked again and its note (#491) —
+and neither has the preview's address to read, so neither could open the page
+on screen, which is the point of #681. Pressing the window's own button keeps
+every route one route.
 
 **Not on the local list.** The mac measured the tool on its local model and it
 failed on both tiers, so `AssistAgent.ForTheLocalModel` (13) is unchanged and

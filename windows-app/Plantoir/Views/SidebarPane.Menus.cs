@@ -123,12 +123,25 @@ public sealed partial class SidebarPane
         return report;
     }
 
-    /// <summary>Waits for a press's route so a fault is logged rather than lost, and makes sure its report completes.</summary>
+    /// <summary>
+    /// Waits for a press's route so a fault is logged rather than lost, and
+    /// makes sure its report completes - with what is TRUE: a route that threw
+    /// before reporting (before Obsidian was handed anything, since the open
+    /// reports Opened the moment it returns) did not open it, so it is
+    /// <c>DidNotOpen</c>, never Opened.
+    /// </summary>
     private static async Task Finishing(Task route, TaskCompletionSource<OpenInObsidianPress>? reported, PreviewedPageSource.Answer? answer)
     {
-        try { await route; }
-        catch (Exception ex) { App.LogDiagnostic($"Open in Obsidian failed: {ex.Message}"); }
-        finally { reported?.TrySetResult(new OpenInObsidianPress.Opened(answer)); }
+        try
+        {
+            await route;
+            reported?.TrySetResult(new OpenInObsidianPress.Opened(answer));
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"Open in Obsidian failed: {ex.Message}");
+            reported?.TrySetResult(new OpenInObsidianPress.DidNotOpen());
+        }
     }
 
     // ---- What the menu bar reads -------------------------------------------

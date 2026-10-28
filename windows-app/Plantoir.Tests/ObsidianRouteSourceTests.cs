@@ -97,6 +97,46 @@ public class ObsidianRouteSourceTests
     }
 
     /// <summary>
+    /// #690: a course kept for reference's route that throws before opening is
+    /// reported DidNotOpen by <c>Finishing</c>, never Opened from a finally.
+    /// </summary>
+    [Fact]
+    public void TheReferenceRouteReportsDidNotOpenWhenItThrows()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs")).Replace("\r\n", "\n");
+        int start = source.IndexOf("private static async Task Finishing(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string finishing = source[start..end];
+        int caught = finishing.IndexOf("catch", StringComparison.Ordinal);
+        Assert.True(caught > 0);
+        Assert.Contains("new OpenInObsidianPress.DidNotOpen()", finishing[caught..]);
+        Assert.DoesNotContain("finally", finishing);
+    }
+
+    /// <summary>
+    /// #690: the assistant's press goes through <c>AssistantsObsidianPress</c>,
+    /// whose order is tested in Core - the window only supplies itself, and
+    /// selects the section in <c>BringUp</c>, never before the wait.
+    /// </summary>
+    [Fact]
+    public void TheAssistantsPressTakesTheTestedOrder()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "MainWindow.xaml.cs")).Replace("\r\n", "\n");
+        int start = source.IndexOf("public async Task<OpenInObsidianPress> PressOpenInObsidianFor(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string press = source[start..end];
+        Assert.Contains("AssistantsObsidianPress.RunAsync(", press);
+        Assert.Contains("BringUp: ShowTheSection", press);
+        Assert.DoesNotContain("Task.Delay", press);
+        int run = press.IndexOf("AssistantsObsidianPress.RunAsync(", StringComparison.Ordinal);
+        int selected = press.IndexOf("Workspace.Selection =", StringComparison.Ordinal);
+        int shown = press.IndexOf("void ShowTheSection()", StringComparison.Ordinal);
+        Assert.True(shown >= 0 && selected > shown && selected < run, "the section is selected only inside ShowTheSection");
+    }
+
+    /// <summary>
     /// #681: the address is WebView2's own, through the normaliser - never the
     /// page last viewed, which ignores the app's own loads (the contract's
     /// <c>obsidianOpensThePreviewedPage.rejected</c>).

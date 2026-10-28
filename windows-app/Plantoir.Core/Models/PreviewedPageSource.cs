@@ -15,7 +15,8 @@ namespace Plantoir.Core.Models;
 /// <c>obsidianOpensThePreviewedPage</c>, run by
 /// <c>ObsidianOpensThePreviewedPageContractTests</c> against the contract's own
 /// fixture. <c>documentation/12-windows-app.md</c> → "Open in Obsidian opens the
-/// page the preview shows on Windows (#681)" says what differs from the mac.</para>
+/// page the preview shows on Windows (#681, the mac's #518)" says what differs
+/// from the mac.</para>
 ///
 /// <para>One difference is NTFS's and not a choice: a Mac may keep a name
 /// decomposed (NFD) while the list, written by Python from the same name, may
@@ -34,8 +35,11 @@ public static class PreviewedPageSource
 
     /// <summary>
     /// The file behind the page on screen: <paramref name="File"/> is absolute,
-    /// spelled as it is on disk; <paramref name="Place"/> its place in the course
-    /// folder without <c>.md</c>, with <c>/</c>, for the trail and the reply.
+    /// every name in it spelled as the folder holding it lists it - case and
+    /// composed or decomposed accents both, read back from disk, since Obsidian
+    /// looks the path up in its vault case-sensitively; <paramref name="Place"/>
+    /// its place in the course folder without <c>.md</c>, with <c>/</c>, as the
+    /// list spells it, for the trail and the reply.
     /// </summary>
     public sealed record Page(string File, string Place, bool Hidden) : Answer;
 
@@ -159,18 +163,36 @@ public static class PreviewedPageSource
     {
         if (!source.EndsWith(".md", StringComparison.Ordinal)) return new FellBack(Fallback.NotInTheList);
 
-        string course = WorkingFolder.Resolved(courseFolder);
-        Located(course, [], out string realCourse, out _);
         string[] segments = source.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        // A '..' anywhere, or a segment that is itself rooted ("C:") or holds
+        // a '\', is refused before anything is walked: the walk follows links
+        // in its REAL path and not in its spelled one, so a '..' after a link
+        // moves the two apart, and the spelled one - what Obsidian is handed -
+        // could land outside the course while the real one is inside. The
+        // build writes paths below the course and never a '..' (the contract's
+        // Escape case is exactly one), so refusing it costs no real page.
+        foreach (string segment in segments)
+        {
+            if (segment == ".." || segment.Contains('\\') || Path.IsPathRooted(segment))
+                return new FellBack(Fallback.OutsideTheCourse);
+        }
+
+        string course = WorkingFolder.Resolved(courseFolder);
+        string spelledCourse = Located(course, [], out string realCourse, out _) ?? course;
         string? onDisk = Located(course, segments, out string real, out bool missing);
 
-        if (!real.StartsWith(realCourse.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))
+        // Both inside the course: the real path (links followed), so a link
+        // cannot reach out of it, and the spelled one, which is what opens.
+        if (!IsInside(real, realCourse) || (onDisk is not null && !IsInside(onDisk, spelledCourse)))
             return new FellBack(Fallback.OutsideTheCourse);
         if (missing || onDisk is null || !System.IO.File.Exists(onDisk)) return new FellBack(Fallback.FileGone);
 
         string place = source[..^".md".Length].Normalize(NormalizationForm.FormC);
         return new Page(onDisk, place, hidden);
     }
+
+    private static bool IsInside(string path, string folder) =>
+        path.StartsWith(folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Walks <paramref name="segments"/> down from <paramref name="start"/>:
@@ -188,12 +210,6 @@ public static class PreviewedPageSource
         foreach (string segment in segments)
         {
             if (segment == ".") continue;
-            if (segment == "..")
-            {
-                spelled = Path.GetDirectoryName(spelled) ?? spelled;
-                real = Path.GetDirectoryName(real) ?? real;
-                continue;
-            }
             if (missing)
             {
                 spelled = Path.Combine(spelled, segment);
@@ -239,19 +255,38 @@ public static class PreviewedPageSource
         return path;
     }
 
-    /// <summary>The entry of <paramref name="folder"/> called <paramref name="name"/>, as spelled, or by NFC; null when there is none.</summary>
+    /// <summary>
+    /// The entry of <paramref name="folder"/> called <paramref name="name"/>,
+    /// AS IT IS SPELLED ON DISK, or null when there is none. NTFS finds a name
+    /// in any case, but Obsidian matches the path it is handed against its
+    /// vault's files case-sensitively, so when the name is there the entry's
+    /// own spelling is read back from the folder and that is what is opened.
+    /// A name not there as written is looked for by NFC, comparing exactly
+    /// (<see cref="StringComparison.Ordinal"/>): only the composed/decomposed
+    /// difference is forgiven there, as on APFS.
+    /// </summary>
     private static string? NameOnDisk(string folder, string name)
     {
-        string exact = Path.Combine(folder, name);
-        if (System.IO.File.Exists(exact) || Directory.Exists(exact)) return name;
         try
         {
+            string exact = Path.Combine(folder, name);
+            if (System.IO.File.Exists(exact) || Directory.Exists(exact))
+            {
+                string? sameButForCase = null;
+                foreach (string entry in Directory.EnumerateFileSystemEntries(folder, name))
+                {
+                    string entryName = Path.GetFileName(entry);
+                    if (string.Equals(entryName, name, StringComparison.Ordinal)) return entryName;
+                    if (string.Equals(entryName, name, StringComparison.OrdinalIgnoreCase)) sameButForCase ??= entryName;
+                }
+                return sameButForCase ?? name;
+            }
             if (!Directory.Exists(folder)) return null;
             string wanted = name.Normalize(NormalizationForm.FormC);
             foreach (string entry in Directory.EnumerateFileSystemEntries(folder))
             {
                 string entryName = Path.GetFileName(entry);
-                if (string.Equals(entryName.Normalize(NormalizationForm.FormC), wanted, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(entryName.Normalize(NormalizationForm.FormC), wanted, StringComparison.Ordinal))
                     return entryName;
             }
         }
@@ -267,7 +302,7 @@ public static class PreviewedPageSource
     /// too (<c>\</c> as %5C, ':' as %3A), which Obsidian decodes
     /// (<c>decodeURIComponent</c>; measured on Obsidian for Windows 1.14.5,
     /// <c>12-windows-app.md</c> → "Open in Obsidian opens the page the preview
-    /// shows on Windows (#681)").
+    /// shows on Windows (#681, the mac's #518)").
     /// </summary>
     public static string ObsidianLink(string path) => "obsidian://open?path=" + Uri.EscapeDataString(path);
 

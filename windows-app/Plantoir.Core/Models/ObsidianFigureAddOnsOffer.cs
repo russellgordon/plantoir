@@ -288,9 +288,11 @@ public static class ObsidianFigureAddOnsThisRun
     public static HashSet<string> BeingOpened { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Courses whose Open in Obsidian has a question up (the offer or the
-    /// reopen question). A second press then is told it is waiting for an
-    /// answer rather than that the course is still being opened (#690).
+    /// Courses whose Open in Obsidian has a question up (the offer, the
+    /// reopen question, or a course kept for reference's calm note). A second
+    /// press then is told it is waiting for an answer rather than that the
+    /// course is still being opened, and the assistant's press is not run
+    /// again once that question closes (#690).
     /// </summary>
     public static HashSet<string> Asking { get; } = new(StringComparer.OrdinalIgnoreCase);
 
