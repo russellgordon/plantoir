@@ -361,13 +361,18 @@ at four times 400's repaint time.
 
 **The lengths it has to hold.** A one-block plain-code finding is 531-611
 characters, and the most it names (ten blocks, then "and N more") about
-2,300; `site_said.py` packs every block into ONE finding. But no width is a
-cure: `PLANTOIR_DATED:` names every page the build rewrote and
-`PLANTOIR_MAPS:` every map, with no cap, so a line longer than 8,192 MAY split
-the same way. That is not measured: Python prints those lines before Quartz
-starts its spinner, and whether the split needs the spinner or only a full
-screen and a wrap on the bottom row is not known. The follow-up issue (#666)
-proposes a cap in the shared Python.
+2,300; `site_said.py` packs every block into ONE finding. No width is a
+cure on its own, so since #666 the width is no longer the only defence: the
+shared Python keeps every machine line to `machineLineLength.maxCharacters`
+(4,000, half the console's width and the carry guard's 8,000, because a wide
+character is two cells or two UTF-16 units). A `PLANTOIR_DATED:`,
+`PLANTOIR_KEPT_OFF:` or `PLANTOIR_MAPS:` line that would be longer keeps its
+first entries and carries `count` and `more`; a health finding names fewer
+than ten. The readers here (`PagesDatedByTheBuild`, `HowITeachKeptOffReport`,
+`CoverageMapsBuilt`) say the line's `count` on the trail. Doc 05 → "How long a
+machine line may be (#666)" has the rule, the numbers and what was rejected.
+(Whether a long line printed before Quartz's spinner starts would have split
+at all was never measured; the cap makes the question moot.)
 (`PLANTOIR_LINKS_CHECKLIST:` carries counts only, not links.)
 
 **Rejected: joining a split line back together before the readers.** The

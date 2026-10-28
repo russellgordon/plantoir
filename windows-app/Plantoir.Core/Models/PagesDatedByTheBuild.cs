@@ -20,7 +20,7 @@ namespace Plantoir.Core.Models;
 /// a launcher can glue the marker to the tail of its own half line. The line
 /// itself is kept out of the console by <c>TranscriptBuilder</c> (rule 1).</para>
 /// </summary>
-public sealed record PagesDatedByTheBuild(string Course, int Section, IReadOnlyList<string> Pages)
+public sealed record PagesDatedByTheBuild(string Course, int Section, IReadOnlyList<string> Pages, int? Count = null)
 {
     /// <summary>The marker prefix, as the contract spells it.</summary>
     public const string Marker = "PLANTOIR_DATED:";
@@ -37,11 +37,15 @@ public sealed record PagesDatedByTheBuild(string Course, int Section, IReadOnlyL
     {
         get
         {
-            string names = string.Join(", ", Pages.Take(NamesShownOnTheTrail));
-            int notShown = Pages.Count - Math.Min(Pages.Count, NamesShownOnTheTrail);
-            if (notShown > 0) names += $" and {notShown} more";
-            string noun = Pages.Count == 1 ? "page" : "pages";
-            return $"the build gave {Pages.Count} {noun} the date of their class: {names}";
+            // The count is the build's own when it shortened its line (#666),
+            // so "and N more" counts the pages the line left out as well.
+            int total = Math.Max(Count ?? 0, Pages.Count);
+            int shown = Math.Min(Pages.Count, NamesShownOnTheTrail);
+            string names = string.Join(", ", Pages.Take(shown));
+            int notShown = total - shown;
+            if (notShown > 0) names = shown == 0 ? $"{notShown} not named" : names + $" and {notShown} more";
+            string noun = total == 1 ? "page" : "pages";
+            return $"the build gave {total} {noun} the date of their class: {names}";
         }
     }
 
@@ -65,8 +69,9 @@ public sealed record PagesDatedByTheBuild(string Course, int Section, IReadOnlyL
                 .Where(page => !string.IsNullOrEmpty(page))
                 .Select(page => page!)
                 .ToList() ?? new List<string>();
-            if (course.Length == 0 || section <= 0 || pages.Count == 0) return null;
-            return new PagesDatedByTheBuild(course, section, pages);
+            int? count = obj["count"] is JsonValue counted && counted.TryGetValue(out int total) ? total : null;
+            if (course.Length == 0 || section <= 0 || (pages.Count == 0 && (count ?? 0) == 0)) return null;
+            return new PagesDatedByTheBuild(course, section, pages, count);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException)
         {

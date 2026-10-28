@@ -4708,7 +4708,7 @@
     "note": "How the build tells the app which of the teacher's pages it rewrote with their class's date (#275, #276), so the app can put their names on the activity trail. The rewriting rule itself is class-planning.json's; this is only the line that reports it.",
     "marker": {
       "prefix": "PLANTOIR_DATED:",
-      "rule": "One line on stdout, printed only when at least one page was rewritten: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and pages (each rewritten page's place in the course folder, without .md, e.g. \"section1/index\" or \"Exercises/Using Aggregate Functions\"). A plain sentence for a person reading the console is printed just before it. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_HEALTH: lines - a line carrying it anywhere, hidden whole, including while it is still arriving, and read from the prefix onward (siteHealth.marker.rule).",
+      "rule": "One line on stdout, printed only when at least one page was rewritten: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and pages (each rewritten page's place in the course folder, without .md, e.g. \"section1/index\" or \"Exercises/Using Aggregate Functions\"). A plain sentence for a person reading the console is printed just before it. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_HEALTH: lines - a line carrying it anywhere, hidden whole, including while it is still arriving, and read from the prefix onward (siteHealth.marker.rule). A line longer than machineLineLength.maxCharacters keeps its first entries and adds count (how many there were) and more (how many it left out) after the list (#666); a reader parses it as it parses a whole line.",
       "examples": [
         "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\", \"Exercises/Using Aggregate Functions\"]}"
       ],
@@ -4716,8 +4716,8 @@
     },
     "trailLine": {
       "event": "pages dated by the build",
-      "shape": "the build gave N page(s) the date of their class: <names, comma-separated>",
-      "why": "Names only, and the count first, so a long list can be shortened without losing how many there were.",
+      "shape": "the build gave N page(s) the date of their class: <names, comma-separated> - N is the line's count when it carries one (#666), the first 40 names are shown, then 'and M more' for the rest, M counting the pages the line itself left out too; a line that names none ends 'M not named'",
+      "why": "Names only, and the count first, so a long list can be shortened without losing how many there were - by the trail, and since #666 by the build's own line, which is why a shortened line carries count.",
       "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, which reads that log for PLANTOIR_HEALTH: lines already); on Windows also a run plantoir-mcp started (#660, BuildMachineLines; the mac's MCP door is its ScriptRunner). Both, or the scheduled build — the one likeliest to rewrite files — leaves no trace."
     }
   },
@@ -4783,7 +4783,7 @@
     "note": "How the build tells the app which curriculum coverage maps it wrote (#128), so the app can put one line on the activity trail per build. Which maps there are is curriculumRules.coveragePageTitles and specialNames.curriculumFoldersResolution; this is only the line that reports them.",
     "marker": {
       "prefix": "PLANTOIR_MAPS:",
-      "rule": "One line on stdout on EVERY build whose section wants the map, including a build that wrote none: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and maps - one {title, folder, expectations} per map written, primary first; an empty list when none was. Nothing is printed when the map is switched off for the section: the console already says so, and the trail would only repeat the setting. Plain sentences for a person reading the console are printed before it (one per map). The apps keep the marker line out of the console a teacher reads, as they do every PLANTOIR_ line (transcriptStripping.machineLines).",
+      "rule": "One line on stdout on EVERY build whose section wants the map, including a build that wrote none: the prefix followed by a single-line JSON object carrying course (the course code), section (a number) and maps - one {title, folder, expectations} per map written, primary first; an empty list when none was. Nothing is printed when the map is switched off for the section: the console already says so, and the trail would only repeat the setting. Plain sentences for a person reading the console are printed before it (one per map). The apps keep the marker line out of the console a teacher reads, as they do every PLANTOIR_ line (transcriptStripping.machineLines). A line longer than machineLineLength.maxCharacters keeps its first entries and adds count (how many there were) and more (how many it left out) after the list (#666); a reader parses it as it parses a whole line.",
       "examples": [
         "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 1, \"maps\": [{\"title\": \"Curriculum Coverage\", \"folder\": \"Ontario Curriculum\", \"expectations\": 42}, {\"title\": \"College Board Curriculum Coverage\", \"folder\": \"College Board Curriculum\", \"expectations\": 18}]}",
         "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 2, \"maps\": []}"
@@ -4792,7 +4792,7 @@
     },
     "trailLine": {
       "event": "curriculum maps built",
-      "shape": "the build made N curriculum map(s): <title> from <folder> (<E> expectations), ... — or, with none: the build made no curriculum map: no curriculum folder holds an expectation page",
+      "shape": "the build made N curriculum map(s): <title> from <folder> (<E> expectations), ... — or, with none: the build made no curriculum map: no curriculum folder holds an expectation page. N is the line's count when it carries one (#666), and a shortened line's maps end ' and M more' ('M not named' when it names none).",
       "why": "The count first, then each map as a teacher would say it; the folder is named because two maps' titles alone do not say which folder a missing one should have come from.",
       "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_DATED:)."
     }
@@ -19983,13 +19983,14 @@
     "lookAlikeLineWhen": "Once per page, for a .md file at the top of the course or the section whose name, folded as `matching` folds it, STARTS with 'how i teach' and is not the page. The failure it catches is SILENT PUBLICATION: 'How I Teach 1.md' or 'How I teach ICS4U.md' is published with no frontmatter, and the teacher who meant it to be private is told nothing otherwise.",
     "keptOffMarker": {
       "prefix": "PLANTOIR_KEPT_OFF:",
-      "rule": "One line on stdout, printed only when the build DROPPED the page from a copy list the course's settings had named it in - the course's page predates this rule, or somebody added it by hand - so a page the earlier builds published is now kept off. The prefix, then a single-line JSON object carrying course (the course folder's name), section (a number) and pages (each dropped page's place in the course folder without .md, e.g. \"How I Teach\" or \"section1/How I Teach\"). Not printed for a page that was never listed: that one was never on the site, and a line on every build would bury the one that matters. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_DATED: (pagesDatedByTheBuild.marker).",
+      "rule": "One line on stdout, printed only when the build DROPPED the page from a copy list the course's settings had named it in - the course's page predates this rule, or somebody added it by hand - so a page the earlier builds published is now kept off. The prefix, then a single-line JSON object carrying course (the course folder's name), section (a number) and pages (each dropped page's place in the course folder without .md, e.g. \"How I Teach\" or \"section1/How I Teach\"). Not printed for a page that was never listed: that one was never on the site, and a line on every build would bury the one that matters. The apps keep the marker line itself out of the console a teacher reads, as they do PLANTOIR_DATED: (pagesDatedByTheBuild.marker). A line longer than machineLineLength.maxCharacters keeps its first entries and adds count (how many there were) and more (how many it left out) after the list (#666); a reader parses it as it parses a whole line.",
       "examples": [
         "PLANTOIR_KEPT_OFF: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"How I Teach\"]}"
       ],
       "why": "The report this answers is real and arrives late: a teacher who already had a page called How I Teach, meant for students, finds it gone from the site after an update, and the console that said why is long gone - the same argument pagesDatedByTheBuild makes for itself. Read by the app the way PLANTOIR_DATED: is: from the console of a run it started, and from a scheduled publish's own log."
     },
     "keptOffTrailLine": "the build kept {count} page(s) named How I Teach off the website that the course's settings had listed for it: {names}",
+    "keptOffTrailLineWhenShortened": "{count} is the line's count when it carries one (#666, machineLineLength), and {names} then ends ' and M more', M = count minus the pages named ('M not named' when it names none).",
     "notListedAsAPage": {
       "rule": "The assistant's own page listings leave the page out wherever the assistant LISTS pages for a teacher or a model: list_pages, the pages publish_pages / unpublish_pages (and their plans) can find by title, and the pages add_curriculum_mentions can write into. Asked to publish or hide it by title, the answer is wording.howITeachIsNeverPublished rather than 'no page is called that'.",
       "notNarrowed": "The walk link rewriting uses when classes are renamed (make room, re-date, insert) is NOT narrowed: a How I Teach page that links to [[Unit 2, Day 3]] must follow that class when it is renamed, and Obsidian only rewrites links when Obsidian does the rename. So the skip is applied at each listing, never inside the shared page walk.",
@@ -32142,6 +32143,164 @@
       {"name": "no page is showing", "address": null, "expect": {"fallback": "noPageShowing"}},
       {"name": "no list (a build from before #518)", "address": "Unit-1/Lesson-3", "list": null, "expect": {"fallback": "noList"}},
       {"name": "a list of another version", "address": "Unit-1/Lesson-3", "list": {"version": 2, "pages": {}}, "expect": {"fallback": "noList"}}
+    ]
+  },
+  "machineLineLength": {
+    "appliesOn": [
+      "mac",
+      "windows"
+    ],
+    "note": "How long one PLANTOIR_ machine line the shared Python prints may be (#666). Printed by scripts/machine_line.py for every line that carries an unbounded list; read by both apps exactly as a whole line is.",
+    "maxCharacters": 4000,
+    "rule": "Every PLANTOIR_ JSON line the shared Python prints is at most maxCharacters characters long, prefix included. A line that would be longer keeps the FIRST k entries of its one unbounded list (lists names it), k as large as fits, and carries \"count\" (how many there were) and \"more\" (how many it left out) after the list; a line that fits is printed exactly as before, with neither key. JSON is never cut mid-text. A PLANTOIR_HEALTH: finding is shortened differently, because its sentence already carries the count: its detail names fewer than ten blocks or pages, its andMore saying how many it left out, while the console's own two lines above it keep all ten. Each reader parses a shortened line exactly as it parses a whole one, and a reader that words a count (pagesDatedByTheBuild.trailLine, howITeachPage.keptOffTrailLine, coverageMapsBuilt.trailLine) uses count when it is there, so its \"and N more\" also counts what the line left out. The bounded markers are printed as they always were: their payloads have no list and stay far under the cap.",
+    "lists": {
+      "PLANTOIR_DATED:": "pages",
+      "PLANTOIR_KEPT_OFF:": "pages",
+      "PLANTOIR_MAPS:": "maps"
+    },
+    "shortenedByNamingFewer": [
+      "PLANTOIR_HEALTH:"
+    ],
+    "bounded": [
+      "PLANTOIR_MY_PROGRESS:",
+      "PLANTOIR_REPAIRED:",
+      "PLANTOIR_LINKS_CHECKLIST:",
+      "PLANTOIR_SWIFT:",
+      "PLANTOIR_CLOUDFLARE_REMADE:"
+    ],
+    "boundedNote": "PLANTOIR_CLOUDFLARE_REMADE: is space-separated rather than JSON (deploy.py) and names one project and one address. The others carry counts, one page or one reason. scripts/test_machine_line_length.py holds each under the cap at its worst plausible size, so a list added to one of them later is caught there.",
+    "why": "The mac's kernel pseudo terminal never splits a line, but Windows' pseudo console has a width: a line longer than the console that wraps on the bottom row while Quartz's spinner redraws comes back as two lines (CR LF, a cursor move, then the rest), and its reader gets a cut-off JSON head and records nothing (#662, measured 2026-10-23 on a Lenovo 20QES70500, i5-8365U, Windows 11 Pro 26200: a 611-character finding split at 400 columns). #662 widened the app's console to 8,192 columns, the widest Windows PowerShell 5.1 can afford (documentation/12 -> How wide the console is, and why), but nothing bounded the lines: PLANTOIR_DATED: names every re-dated page, about 40 characters each, so roughly 200 pages pass 8,192; PLANTOIR_MAPS: every map; a ten-block health finding is about 2,300. 4,000 is half the narrowest of the limits a line meets on the way, because 'characters' are counted three ways: Python counts code points, the app's carry guard (ScriptRunner, 8,000) counts UTF-16 units, and the console counts cells, and a CJK character or an emoji is two of either; so 2 x maxCharacters must fit both 8,000 and ConPtyProcess.LauncherColumns, which the Windows suite pins. A cap protects any future reader with a width, not only Windows'.",
+    "rejected": [
+      {
+        "option": "(b) Move an unbounded payload to a file in the build folder and print its path, as PLANTOIR_LINKS_CHECKLIST: does.",
+        "why": "Both apps' readers change, a scheduled record no longer carries what it needs to (the wrapper keeps lines, not files), and a fourth kind of file needs cleaning up. Russell chose (a) on #666."
+      },
+      {
+        "option": "A 32,767-column console, the most a short allows.",
+        "why": "Windows PowerShell 5.1 pads every progress frame to the full width: a 2 MB Invoke-WebRequest took over 280 s at 32,767 against 86 s at 400 (documentation/12 -> How wide the console is). And a wider console only moves the limit."
+      },
+      {
+        "option": "Cut the text at maxCharacters.",
+        "why": "The JSON no longer parses and the reader records nothing - exactly today's failure, made certain instead of occasional."
+      },
+      {
+        "option": "A cap in each reader.",
+        "why": "The Python prints the line; one cap in one place reaches every reader on both platforms, the scheduled record included, and a reader cannot repair a line that already split."
+      },
+      {
+        "option": "Shorten a long list without saying how many there were.",
+        "why": "The trail lines say the count first so that a long list can be shortened without losing it (pagesDatedByTheBuild.trailLine.why); a shortened line that only carried k entries would make the trail say k."
+      }
+    ],
+    "casesNote": "Each case runs through the REAL emitter for its marker (build_site.announce_dated_pages, how_i_teach.announce, build_site.announce_coverage_maps, site_health.announce) with items made from template, {n} filled 1..count. expect.kept is how many entries the line keeps (count and more appear only when kept < count, more = count - kept, and the kept entries are the FIRST ones); for a health finding expect.named is how many of the list its detail names, and its sentence still says count. The test checks the length and the parse independently of these numbers, and that one more entry would not have fitted.",
+    "cases": [
+      {
+        "name": "a few dated pages fit whole",
+        "marker": "PLANTOIR_DATED:",
+        "items": {
+          "template": "Unit {n}/Day {n}",
+          "count": 10
+        },
+        "expect": {
+          "kept": 10
+        }
+      },
+      {
+        "name": "dated pages just over the cap",
+        "marker": "PLANTOIR_DATED:",
+        "items": {
+          "template": "Unit 1 Kinematics/Day {n} - Displacement, velocity and a longer lesson name",
+          "count": 51
+        },
+        "expect": {
+          "kept": 50
+        }
+      },
+      {
+        "name": "three hundred dated pages",
+        "marker": "PLANTOIR_DATED:",
+        "items": {
+          "template": "Unit {n}/Day {n}",
+          "count": 300
+        },
+        "expect": {
+          "kept": 206
+        }
+      },
+      {
+        "name": "two hundred How I Teach pages kept off",
+        "marker": "PLANTOIR_KEPT_OFF:",
+        "items": {
+          "template": "section{n}/How I Teach",
+          "count": 200
+        },
+        "expect": {
+          "kept": 154
+        }
+      },
+      {
+        "name": "a hundred coverage maps",
+        "marker": "PLANTOIR_MAPS:",
+        "items": {
+          "template": {
+            "title": "Curriculum Coverage {n}",
+            "folder": "Ontario Curriculum {n}",
+            "expectations": 42
+          },
+          "count": 100
+        },
+        "expect": {
+          "kept": 42
+        }
+      },
+      {
+        "name": "a finding naming ten long links",
+        "marker": "PLANTOIR_HEALTH:",
+        "facts": "links_into_hidden_pages",
+        "items": {
+          "template": {
+            "from": "Unit {n}/A visible page whose name goes on for a long while, as a teacher's lesson titles sometimes do when they say everything the lesson covers, its readings, its homework and the week it falls in",
+            "to": "Unit {n}/A hidden page whose name goes on for a long while, as a teacher's lesson titles sometimes do when they say everything the lesson covers, its readings, its homework and the week it falls in too"
+          },
+          "count": 10
+        },
+        "expect": {
+          "named": 9
+        }
+      }
+    ],
+    "readerExamplesNote": "Shortened lines as a reader meets them, and what it must make of them: the course, the section, how many entries the line carries (shown), the count, and the trail line, whose \"and N more\" is count minus shown. Run by the Windows suite (MachineLineLengthContractTests, through each reader and through BuildMachineLines); owed by the mac's readers.",
+    "readerExamples": [
+      {
+        "line": "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"Unit 1/Day 1\", \"Unit 1/Day 2\"], \"count\": 300, \"more\": 298}",
+        "expect": {
+          "course": "ICS4U",
+          "section": 1,
+          "shown": 2,
+          "count": 300,
+          "trailLine": "the build gave 300 pages the date of their class: Unit 1/Day 1, Unit 1/Day 2 and 298 more"
+        }
+      },
+      {
+        "line": "PLANTOIR_KEPT_OFF: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/How I Teach\"], \"count\": 200, \"more\": 199}",
+        "expect": {
+          "course": "ICS4U",
+          "section": 1,
+          "shown": 1,
+          "count": 200,
+          "trailLine": "the build kept 200 pages named How I Teach off the website that the course's settings had listed for it: section1/How I Teach and 199 more"
+        }
+      },
+      {
+        "line": "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 1, \"maps\": [{\"title\": \"Curriculum Coverage 1\", \"folder\": \"Ontario Curriculum 1\", \"expectations\": 42}], \"count\": 100, \"more\": 99}",
+        "expect": {
+          "course": "ICS3U",
+          "section": 1,
+          "shown": 1,
+          "count": 100,
+          "trailLine": "the build made 100 curriculum maps: Curriculum Coverage 1 from Ontario Curriculum 1 (42 expectations) and 99 more"
+        }
+      }
     ]
   }
 }
