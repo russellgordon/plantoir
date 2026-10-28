@@ -523,6 +523,17 @@ eats text up to the next letter; none of the runs measured carried one.
 **For the mac, to know only.** Its pseudo terminal never draws a blank line
 as a cursor jump, so it has nothing to do here.
 
+### A running preview does not follow edits (#671)
+
+On either platform an edit reaches the preview on the next Preview: nothing
+re-merges `courses/` while a preview serves. Windows ALSO carries a Quartz
+v4.5.0 fault the mac cannot meet — its watcher reports backslash paths, so
+an edit to the merged copy is seen but no page is re-emitted, and a file
+that vanishes before Quartz copies it kills the serve. Not reachable by a
+teacher today, not patched in 1.9.0 (#703 is the follow-up); the
+measurements and the exact patch are in [05 → A running preview does not
+follow edits](05-build-pipeline.md#a-running-preview-does-not-follow-edits-671).
+
 ---
 
 ## Scheduled deploys
