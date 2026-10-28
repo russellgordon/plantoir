@@ -1,6 +1,6 @@
 #440 (Windows half) - add_next_class's `unit` and `days` leave the local model's view
 RESULTS, against next-class-unit-440-windows-preregistration.txt (committed
-1e34dfd5a at 00:16:44 EDT, before the first request at 00:18:30).
+d07c01340 at 00:16:44 EDT, before the first request at 00:18:30).
 
 Run 2026-10-08 00:18-03:50 EDT on the conditions registered: Intel Core
 i5-8365U (4C/8T), 16 GB, Intel UHD 620, Windows 11 Pro 26200; llama-server

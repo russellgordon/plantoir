@@ -48,9 +48,9 @@ namespace Plantoir.Tests;
 /// and the comment beside them disclaims itself as precedent in as many words
 /// ("a note that they are owed a caller, not a precedent"). It was rejected for
 /// #158 for a stronger reason than tidiness, and the difference is MEASURED
-/// rather than remembered: all three were declared in <c>a3144010</c> at 08:17
+/// rather than remembered: all three were declared in <c>ef844171</c> at 08:17
 /// on 2026-08-25 and all three got their first <c>ActivityTrail.Note</c> call
-/// in <c>a3c581fb</c> at 08:45 the same morning — <b>28 minutes</b>, inside one
+/// in <c>18b02264</c> at 08:45 the same morning — <b>28 minutes</b>, inside one
 /// piece of work. The unit-word rename is a whole feature a MILESTONE away, so
 /// the declaration would sit there with nothing to write it until v1.3.0. And
 /// an event that is named but never recorded

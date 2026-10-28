@@ -370,7 +370,7 @@ class TheAccountQuestionSaysWhatItMeansTo(unittest.TestCase):
         """The failure this closes: the caller got the instructions AND the
         id — 519 characters (521 bytes) where 32 were meant, measured by
         lifting the pre-fix
-        function out of 07952399^ and calling it the way the call site does —
+        function out of 6ca40f6a^ and calling it the way the call site does —
         which was then remembered in the Keychain and handed to wrangler as
         CLOUDFLARE_ACCOUNT_ID."""
         identifier = "0123456789abcdef0123456789abcdef"
@@ -410,7 +410,7 @@ class ATeacherAlreadyBittenGetsOutOfIt(unittest.TestCase):
     def poisoned_value(self) -> str:
         """What the old bug actually wrote: the instructions, then the id."""
         old = subprocess.run(
-            ["git", "show", "07952399^:deploy.sh"],
+            ["git", "show", "6ca40f6a^:deploy.sh"],
             capture_output=True, text=True, cwd=str(REPOSITORY_ROOT), timeout=60,
         )
         if old.returncode != 0:

@@ -86,8 +86,8 @@ Surface:     13 tools, the local surface, from
 Contract:    contracts/assist-cases.json unchanged between the BEFORE tree and
              the implementation branch (sha256
              047e49e954ccd4b72574c05da0f7d893227f3b991738757c366b7bda02462cb2
-             in both). Contract 68de49ad (2026-09-09 23:33) is newer than
-             AssistToolSurface.swift 3c080a54 (2026-09-09 23:20).
+             in both). Contract 3964aafb (2026-09-09 23:33) is newer than
+             AssistToolSurface.swift a1146fe6 (2026-09-09 23:20).
 Prompt:      the shipped literal, READ out of AssistAgent.swift. That file
              changed on the branch (96 lines), so the literal was extracted
              from both trees and compared rather than assumed: identical,
@@ -106,8 +106,8 @@ Interception: 5 of 29 in the default set, 15 of 19 in the shelf set - the same
              ran against the 15/19 surface; the probe it moved
              ("shelf: deploy at 6:30") chose the same tool in every arm of
              this run, capped and not.
-Sources:     BEFORE arms: a worktree of origin/dev at 0a6c2247.
-             AFTER arms:  a worktree of origin/issue/166-token-cap at 0f5f48f8,
+Sources:     BEFORE arms: a worktree of origin/dev at f061645e.
+             AFTER arms:  a worktree of origin/issue/166-token-cap at 82cc54d8,
                           the pushed implementation.
 Suite:       research/ai-assist/trimmed-surface-suite.py on the branch,
              sha256 c95232e29ba1f411750db8ddd6347644bafe62309facf64201c6fe4f27e37365.

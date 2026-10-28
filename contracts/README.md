@@ -23,7 +23,7 @@ mechanics, a measurement taken on one machine: not.
 | [`toolchain.json`](toolchain.json) | The image both platforms build from the same recipe: the fifteen pins (Paged.js the eighth, #454; Latin Modern the ninth, #499; function-plot and node-tikzjax the tenth and eleventh, #485 E1; Pyodide and KaTeX the twelfth and thirteenth, #455 and #494 — count them rather than trusting the word) with the REASON each sits where it does, and what each of the seven Quartz patches changes and why it cannot be dropped; and, since #493, `swiftImage` — the SECOND image's pins (the Swift toolchain for each architecture, the wasm SDK, binaryen, the base), a top-level key deliberately not under `pins`, because both apps' pin tests read every pin as a line of the ROOT Dockerfile; and, since #667, `npmAudit` — another top-level key beside it: the five npm trees the image carries, and every `npm audit` advisory accepted for each, with its severity, exposure and reason. verify.sh fails on a high or critical advisory not in it (`scripts/npm_audit.py`, `scripts/test_npm_audit.py`). |
 | [`example-content.json`](example-content.json) | The ready-made courses: how a payload is discovered, the manifest's keys, and the allow-list rule that decides what actually installs. |
 | [`file-formats.json`](file-formats.json) | **The two files both apps WRITE and the Python then reads**: every `course_config.json` key with its type and default, and the frontmatter that decides whether students see a page — including the legacy `draft:` spelling, which means the opposite. Since #245 also the WORK LEASE file (`workLease`): the file under `courses/.internal/activity/` that says which process is doing what, in Windows' shape plus the mac's start-time line. |
-| [`shared-rules.json`](shared-rules.json) | Sixty-eight rule sets (counted 2026-10-24 on `issue/578-geogebra` off `dev` 821ebb58a: sixty-seven plus `geogebraFences` (#578) — the base already had sixty-seven, one more than the sixty-six this row said; sixty-six counted 2026-10-23 on `issue/653-text-fence-wrap` off `dev` 84911d0c0: sixty-five plus `textFenceWrapping` (#653); sixty-five counted 2026-10-23 on `issue/628-netlify-link-case` after merging `main` 93da093e4: sixty-four plus `netlifyPageAddresses` (#628); sixty-four counted 2026-10-23 on `dev` after the merges of #635, #613, #584, #616, #611, #614, #567, #639, #631, #629 and #576 onto `dev` df6980785: sixty-three plus `buildRepairs` (#584); sixty-three counted 2026-10-19 on `issue/545-my-progress` off `dev` a70c5e7e8: sixty-one plus `myProgress` and `myProgressBuilt` (#545); sixty-one counted 2026-10-18 on `issue/519-588` off `dev` 0fe0d1cba: sixty plus `taskBoxes` (#519); sixty counted 2026-10-17 on `issue/495-obsidian-addons` off `dev` 4fc623bfe: fifty-nine plus `obsidianAddOnsForFigures` (#495); fifty-nine counted 2026-10-17 on `issue/563-quizzes` off `dev` 62d81b1a4: fifty-eight plus `quizCallouts` (#563); fifty-eight counted 2026-10-17 on `issue/455-runnable-python` off `dev` 1f29ff04a: fifty-seven plus `codeRunnerBlocks` (#455); fifty-seven counted 2026-10-11 on `issue/504-preview-at-last-viewed` off `dev` 69cb00dc9: fifty-six plus `previewStartPage` (#504); fifty-six counted 2026-10-09 on `issue/485-E1-tikz-functionplot` off `dev` 13d05574c: fifty-five plus `figureFences` (#485 E1); fifty-five counted 2026-10-09 on `issue/454-printable-pages` off `dev` 8178eeaac: fifty-four plus `printablePages` (#454); fifty-four counted 2026-10-08 on `issue/457-hig-sweep` merged with `dev` 178cb511b: fifty-three plus `sidebarDeleteKey` (#457 batch C); fifty-three counted 2026-10-08 on `issue/457-475-assistant-routes` off `dev` 01f384090: fifty-two plus `classesDatedLater` (#475); fifty-two counted 2026-10-08 on `issue/457-482-menus-hig` off `dev` a04e4815a: fifty plus `subjectMenus` and `openRecent` (#457); fifty counted 2026-10-07 on `issue/458-door-course-lease` merged with `dev` 71b133764, as the file's top-level keys other than `note`: forty-eight at `dev` 4b177c68 plus `deployWhileItsSectionDeploys` (#439) and `doorCourseHold` (#458); forty-eight counted 2026-10-03 on `issue/433-outside-assistant-busy`: forty-seven at `dev` b50084d5 plus `publishPlanNaming` (#425); forty-seven counted 2026-09-30 on `issue/379-links-checklist` merged with `dev` 365fbede: forty-four at dev 373b94d5, plus `courseSettingsWording` and `userFacingLabelWords` (bundle C) and `linksChecklist` (#379); it was forty-three at `dev` d467ede6 on 2026-09-27. Three rows each claiming this count had survived successive merges, saying forty-two, forty-three and thirty-eight; they were folded into this one for the v1.4.0 release, and the word's history is in git. Count the keys rather than trusting the word) on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks, and which a teacher is OFFERED when they are asked**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**, and **what the New Course wizard's affirmative button says, what it tells a teacher whose course will start empty, and what its skeleton toggle does to the structure editor in BOTH directions**, and **what a window lets go of when it is pointed at a different working folder**, and **which act turns a scheduled deploy off without being asked, which acts deliberately turn none off, and how late is too late for one to still run**, and **which working folder a window opens on at launch, and what it is told when the one from last time cannot be reopened** (#311), and **which working folders the website builder on a Mac can reach, and what a teacher is told when they choose one it cannot** (#290), and **what happens when a teacher copies one page of one course into another — what is never copied, what the copy's settings must say for it to arrive hidden from students, what is done when a picture of that name is already there with different bytes, and the two shapes where this app and the website builder would read a page differently**, and **how the breadcrumb trail is read back into a problem report when some of its characters cannot be read — every line kept, and a note saying how many**, and **what getting a section ready for the start of the year puts into draft, what it never touches, and what check_section's three groups report** (#96), and **when Plantoir may install a new version of itself, and what a quit does to one that is ready (#204)**, and **the teacher's How I Teach page: its one name and place, that the build never puts it on a website, what the assistant's page lists leave out, and what the three tools that read and write it refuse** (#209), and **how an excluded folder or file is matched, and when a removal or an add-back is written on the trail** (#152), and **how the build tells the app which coverage maps it wrote** (#128), and **that the assistant reads the course list and each course's settings at the moment of every call** (#322), and **that every act which sends a site somewhere or sets a deploy reads the settings as SAVED at that moment** (#335). |
+| [`shared-rules.json`](shared-rules.json) | Sixty-eight rule sets (counted 2026-10-24 on `issue/578-geogebra` off `dev` ff6766570: sixty-seven plus `geogebraFences` (#578) — the base already had sixty-seven, one more than the sixty-six this row said; sixty-six counted 2026-10-23 on `issue/653-text-fence-wrap` off `dev` 2bce43328: sixty-five plus `textFenceWrapping` (#653); sixty-five counted 2026-10-23 on `issue/628-netlify-link-case` after merging `main` 2b7f65348: sixty-four plus `netlifyPageAddresses` (#628); sixty-four counted 2026-10-23 on `dev` after the merges of #635, #613, #584, #616, #611, #614, #567, #639, #631, #629 and #576 onto `dev` cdea887b5: sixty-three plus `buildRepairs` (#584); sixty-three counted 2026-10-19 on `issue/545-my-progress` off `dev` 8e068c210: sixty-one plus `myProgress` and `myProgressBuilt` (#545); sixty-one counted 2026-10-18 on `issue/519-588` off `dev` 20e19be58: sixty plus `taskBoxes` (#519); sixty counted 2026-10-17 on `issue/495-obsidian-addons` off `dev` 4344c7f43: fifty-nine plus `obsidianAddOnsForFigures` (#495); fifty-nine counted 2026-10-17 on `issue/563-quizzes` off `dev` d2b8591c9: fifty-eight plus `quizCallouts` (#563); fifty-eight counted 2026-10-17 on `issue/455-runnable-python` off `dev` 570ea5359: fifty-seven plus `codeRunnerBlocks` (#455); fifty-seven counted 2026-10-11 on `issue/504-preview-at-last-viewed` off `dev` 1e53c914b: fifty-six plus `previewStartPage` (#504); fifty-six counted 2026-10-09 on `issue/485-E1-tikz-functionplot` off `dev` 24558cba5: fifty-five plus `figureFences` (#485 E1); fifty-five counted 2026-10-09 on `issue/454-printable-pages` off `dev` f7afcb83f: fifty-four plus `printablePages` (#454); fifty-four counted 2026-10-08 on `issue/457-hig-sweep` merged with `dev` 7ee189a9a: fifty-three plus `sidebarDeleteKey` (#457 batch C); fifty-three counted 2026-10-08 on `issue/457-475-assistant-routes` off `dev` 13979b91d: fifty-two plus `classesDatedLater` (#475); fifty-two counted 2026-10-08 on `issue/457-482-menus-hig` off `dev` 152a9d51c: fifty plus `subjectMenus` and `openRecent` (#457); fifty counted 2026-10-07 on `issue/458-door-course-lease` merged with `dev` 6600df4c5, as the file's top-level keys other than `note`: forty-eight at `dev` 5c3ccaf2 plus `deployWhileItsSectionDeploys` (#439) and `doorCourseHold` (#458); forty-eight counted 2026-10-03 on `issue/433-outside-assistant-busy`: forty-seven at `dev` 69360971 plus `publishPlanNaming` (#425); forty-seven counted 2026-09-30 on `issue/379-links-checklist` merged with `dev` c8aa04c3: forty-four at dev 8728a6e5, plus `courseSettingsWording` and `userFacingLabelWords` (bundle C) and `linksChecklist` (#379); it was forty-three at `dev` 7b4b85ba on 2026-09-27. Three rows each claiming this count had survived successive merges, saying forty-two, forty-three and thirty-eight; they were folded into this one for the v1.4.0 release, and the word's history is in git. Count the keys rather than trusting the word) on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks, and which a teacher is OFFERED when they are asked**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**, and **what the New Course wizard's affirmative button says, what it tells a teacher whose course will start empty, and what its skeleton toggle does to the structure editor in BOTH directions**, and **what a window lets go of when it is pointed at a different working folder**, and **which act turns a scheduled deploy off without being asked, which acts deliberately turn none off, and how late is too late for one to still run**, and **which working folder a window opens on at launch, and what it is told when the one from last time cannot be reopened** (#311), and **which working folders the website builder on a Mac can reach, and what a teacher is told when they choose one it cannot** (#290), and **what happens when a teacher copies one page of one course into another — what is never copied, what the copy's settings must say for it to arrive hidden from students, what is done when a picture of that name is already there with different bytes, and the two shapes where this app and the website builder would read a page differently**, and **how the breadcrumb trail is read back into a problem report when some of its characters cannot be read — every line kept, and a note saying how many**, and **what getting a section ready for the start of the year puts into draft, what it never touches, and what check_section's three groups report** (#96), and **when Plantoir may install a new version of itself, and what a quit does to one that is ready (#204)**, and **the teacher's How I Teach page: its one name and place, that the build never puts it on a website, what the assistant's page lists leave out, and what the three tools that read and write it refuse** (#209), and **how an excluded folder or file is matched, and when a removal or an add-back is written on the trail** (#152), and **how the build tells the app which coverage maps it wrote** (#128), and **that the assistant reads the course list and each course's settings at the moment of every call** (#322), and **that every act which sends a site somewhere or sets a deploy reads the settings as SAVED at that moment** (#335). |
 
 | [`course-management.json`](course-management.json) | The names the three kinds of zip carry and how they are told apart, what section number is offered next and which entries are refused in whose words, the grade a course code names, what a folder added later starts with (#506), and what happens to backups over time — which are pruned, how the space they take is counted, and what a delete of several removes and keeps, and what a course code may be, at the app and at the command line (#402). |
 | [`class-planning.json`](class-planning.json) | Which page titles carry numbers, what "the next class" would be called, and — the highest-stakes data here — the ORDER renames must run in when room is made for a class, whether Preview offers today's class for the front page (#397), and which published classes are dated after the next class day (#475). |
@@ -165,8 +165,8 @@ looks like:
 
 | When (local) | What |
 |---|---|
-| 18:54 | `0f34c54d` builds `back_up_course` on the mac, requiring `[course]` — the same shape Windows had had since 2026-08-13. Nothing diverges. |
-| 19:14 | `b0913344` fixes a real defect in it: the copy was filed as the TEACHER's, so the Backups list credited them with a copy they never made and `pruneBackups` — which skips anything not the assistant's — would have kept every one for ever. The fix takes a `section` and attributes the copy. The schema moves. |
+| 18:54 | `29d7112a` builds `back_up_course` on the mac, requiring `[course]` — the same shape Windows had had since 2026-08-13. Nothing diverges. |
+| 19:14 | `65be722e` fixes a real defect in it: the copy was filed as the TEACHER's, so the Backups list credited them with a copy they never made and `pruneBackups` — which skips anything not the assistant's — would have kept every one for ever. The fix takes a `section` and attributes the copy. The schema moves. |
 | 19:52 | #70 is opened. It names `back_up_course`, its plan twin and its briefing persistence. It does not mention the argument. |
 
 So the thing that travelled unannounced was **a defect fix**, which is the
@@ -221,8 +221,8 @@ Four ways out, and only the last is honest:
   site-health work for exactly this reason, and the comment beside them
   disclaims itself as precedent in as many words. Rejected here, and the
   difference is not tidiness — it was measured rather than remembered. All
-  three were declared in `a3144010` at 08:17 on 2026-08-25 and all three got
-  their first `ActivityTrail.Note` call in `a3c581fb` at 08:45 the same
+  three were declared in `ef844171` at 08:17 on 2026-08-25 and all three got
+  their first `ActivityTrail.Note` call in `18b02264` at 08:45 the same
   morning: **28 minutes**, inside one piece of work. This is a whole feature a
   milestone away. And an event
   that is named but never recorded tells the contract a line exists that no
@@ -758,7 +758,7 @@ ledger), and the wording block gained `scheduleReplaces` with a new
 
 **Re-taken 2026-09-25 with [#275](https://github.com/russellgordon/plantoir/issues/275) and [#276](https://github.com/russellgordon/plantoir/issues/276)**
 (pages take their class's date). The walker read **171** at `origin/dev`
-(c02f5d3b — the 163 above was not re-taken by the pieces between) and reads
+(2843ab7c — the 163 above was not re-taken by the pieces between) and reads
 **174** after: `sectionIndexPointer.dateCases.cases` (9),
 `datingPagesAClassBrings.atBuildTime.cases` (14 — 12 when first written; the
 fix round the same day added the hub case and a plain YAML date) and
@@ -771,7 +771,7 @@ which is not a new list. The two `atBuildTime` lists DO have a Windows reader
 seven `dateCases` with a `pointAt` are owed by Windows' own pointer.
 **Re-taken 2026-09-25 with [#194](https://github.com/russellgordon/plantoir/issues/194)**
 (asking "morning or evening?" in code). The walker read **171** at `origin/dev`
-(9d4bf2a6) and **172** after on its own branch — **175** on the merged tree,
+(d4d4a510) and **172** after on its own branch — **175** on the merged tree,
 re-taken with the walker after #275 (above) had made it 174: `deployAtATime.asked` (9) is new, and has
 no Windows reader, so it joins the `deployAtATime` row in the table below.
 The review's fix round took `asked` to 11 (`deploy at 6.30` moved there from
@@ -784,7 +784,7 @@ wording block gained `morningOrEvening`, rendered with literal values rather
 than placeholders — see the `asked` rows for every other input.
 **Re-taken 2026-09-25 with [#175](https://github.com/russellgordon/plantoir/issues/175)**
 (adding a section finds frontmatter the build's way). The walker reads **171**
-at `origin/dev` (9d4bf2a6) and **172** after on its own branch — **176** on the
+at `origin/dev` (d4d4a510) and **172** after on its own branch — **176** on the
 merged tree, re-taken with the walker after #275 and #194 (above) had made it
 175. The one new list is
 `course-management.json` → `sectionNumbers.addingKeysToAPage.cases` (7), with
@@ -801,7 +801,7 @@ an event Windows has to record or ledger.
 
 **Re-taken 2026-09-25 with [#242](https://github.com/russellgordon/plantoir/issues/242)**
 (what backups take, and deleting several), counted ON THIS BRANCH — which
-carries `origin/dev` 634182d7 (#235, #275 and #276), not whatever `dev` holds
+carries `origin/dev` d2f60814 (#235, #275 and #276), not whatever `dev` holds
 when it merges. Re-taken at the merge: **179** on the merged tree (176 after #175, above, plus these three), and `activityTrail.mustRecord` **73**. On this branch the walker read **174** before
 #242's lists and **177** after: `course-management.json` → `backups.pruneCases` (3),
 `.sizeCases` (2) and `.deleteCases` (3), none with a Windows reader, all in the
@@ -816,7 +816,7 @@ the same base; the merge that lands second re-counts. Re-taken at the merge, the
 last of the batch: **180** on the merged tree, and `activityTrail.mustRecord` **73**.
 **Re-taken 2026-09-25 with [#277](https://github.com/russellgordon/plantoir/issues/277)**
 (a deploy time the family can read but does not set is answered with the
-spelling to use). The walker read **180** at `origin/dev` (43d8e853) and
+spelling to use). The walker read **180** at `origin/dev` (5c70aac0) and
 **181** after (and still 181 after the fix round) on its branch — **186** on the merged tree, re-taken at the merge after #280 and #245 (above): `deployAtATime.sayItAs` (45) is new, with no Windows reader, so
 it joins the `deployAtATime` row in the table below. `deployAtATime.asked`
 went from 11 to 25, `.refused` from 28 to 51 (`deploy at 6.30 pm` moved to
@@ -829,7 +829,7 @@ renderings of one function, see the
 
 **Re-taken 2026-09-25 with [#245](https://github.com/russellgordon/plantoir/issues/245)**
 (the import's lease edges), counted ON THIS BRANCH, which carries
-`origin/dev` 43d8e853. The walker read **180** before it and **183** after on its branch — **185** on the merged tree (re-taken at the merge: #280's `previewPorts` case lists had taken dev to 182 without a re-take, which is the drift this paragraph exists to catch):
+`origin/dev` 5c70aac0. The walker read **180** before it and **183** after on its branch — **185** on the merged tree (re-taken at the merge: #280's `previewPorts` case lists had taken dev to 182 without a re-take, which is the drift this paragraph exists to catch):
 `shared-rules.json` → `workLeases.liveness.cases` (19 — 18 when first written; review L2 added a one-line import lease),
 `referenceCourses.importing.oneImportPerCourseAtATime.cases` (9) and
 `file-formats.json` → `workLease.bodyCases` (7). None has a Windows reader; all
@@ -858,7 +858,7 @@ of `course could not be imported for reference` now says it is written for
 every course the summary lists as not imported.
 **Re-taken 2026-09-25 with [#192](https://github.com/russellgordon/plantoir/issues/192)**
 (a command-line re-run of setup keeps the marks pool), counted ON THIS BRANCH
-from `origin/dev` 68214a6c. The walker read **187** before it and **188** after:
+from `origin/dev` f0512ae8. The walker read **187** before it and **188** after:
 one new list, `shared-rules.json` → `gradedFolders.rerunningSetup.cases` (11),
 read on Windows by `PythonToolchainTests` through the discovered
 `scripts/test_graded_folders_rerun.py`, so it adds nothing to the hand-checked
@@ -870,7 +870,7 @@ Re-taken at the merge into `dev`: **188** lists on the merged tree, `activityTra
 Re-taken at the merge into `dev`: **188** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#136](https://github.com/russellgordon/plantoir/issues/136)**
 (the preview-build check reads every page), counted ON THIS BRANCH, which
-carries `origin/dev` 68214a6c. The walker read **187** before it and **188**
+carries `origin/dev` f0512ae8. The walker read **187** before it and **188**
 after: one new list, `app-rules.json` → `buildFreshness.previewBuild.cases`
 (9). It HAS a Windows reader — `scripts/test_preview_build_detection.py`,
 discovered by `PythonToolchainTests`, runs `deploy.py`'s check against it — so
@@ -882,7 +882,7 @@ and not a list. No trail event, so `activityTrail.mustRecord` is unchanged.
 Re-taken at the merge into `dev`: **189** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#234](https://github.com/russellgordon/plantoir/issues/234)**
 (preview.sh makes sure this Mac can reach the builder before it builds),
-counted ON THIS BRANCH, which carries `origin/dev` 68214a6c. The walker read
+counted ON THIS BRANCH, which carries `origin/dev` f0512ae8. The walker read
 **187** before it and **188** after on this branch: one new list,
 `app-rules.json` → `previewPorts.whenThisMacCannotReachTheBuilder.cases` (10),
 with no Windows reader that runs it — its row is below.
@@ -892,7 +892,7 @@ existing "preview did not appear" event, whose `carries` grew and which gained
 Re-taken at the merge into `dev`: **190** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#137](https://github.com/russellgordon/plantoir/issues/137)**
 (a scheduled publish whose build failed outright names no destination), counted
-ON THIS BRANCH, which carries `origin/dev` 68214a6c. The walker read **187**
+ON THIS BRANCH, which carries `origin/dev` f0512ae8. The walker read **187**
 before it and **188** after: one new list, `shared-rules.json` →
 `scheduledPublishStopped.whichKind.cases` (6), with no Windows reader — its row
 is below. `activityTrail.mustRecord` is unchanged at **75**: the line for a
@@ -902,7 +902,7 @@ sentence `buildDidNotFinish` (objects, not lists).
 Re-taken at the merge into `dev`: **191** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#255](https://github.com/russellgordon/plantoir/issues/255)**
 (Obsidian add-ons stay behind on every route to a reference course), counted
-ON THIS BRANCH, which carries `origin/dev` 68214a6c. The walker read **187**
+ON THIS BRANCH, which carries `origin/dev` f0512ae8. The walker read **187**
 before it and **192** after: `shared-rules.json` →
 `referenceCourses.obsidianAddOns` adds five lists —
 `leftBehindInsideObsidian` (3), `kept` (5), `cases` (9 — 8 when first written; the review split the linked-settings case in two), `knownLimits` (3)
@@ -915,7 +915,7 @@ grew instead. The two wording blocks gained `addOnsAreLeftBehind` and
 Re-taken at the merge into `dev`: **196** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#153](https://github.com/russellgordon/plantoir/issues/153)**
 (folder problems: the overnight trail line and two console leaks), counted ON
-THIS BRANCH, which carries `origin/dev` 68214a6c. The walker read **187**
+THIS BRANCH, which carries `origin/dev` f0512ae8. The walker read **187**
 before it and **188** after: one new list, `shared-rules.json` →
 `siteHealth.marker.consoleCases.cases` (4), with no Windows reader — its row
 is below. No trail event was added — the scheduled run now WRITES the existing
@@ -925,7 +925,7 @@ Re-taken at the merge into `dev`: **197** lists on the merged tree, `activityTra
 
 **Re-taken 2026-09-25 with [#246](https://github.com/russellgordon/plantoir/issues/246)**
 (a page whose settings the build cannot read is hidden and named), counted ON
-THIS BRANCH, which is built on #153's (05bc5216). The walker read **188**
+THIS BRANCH, which is built on #153's (467c9c40). The walker read **188**
 before it and **189** after: one new list, `shared-rules.json` →
 `unreadablePageSettings.cases` (18). It HAS a Windows reader —
 `scripts/test_unreadable_page_settings.py`, which `PythonToolchainTests`
@@ -943,7 +943,7 @@ Re-taken at the merge into `dev`: **198** lists on the merged tree, `activityTra
 Re-taken at the merge into `dev`: **198** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#227](https://github.com/russellgordon/plantoir/issues/227)**
 (a folder publish never misreads the path), counted ON THIS BRANCH, which
-carries `origin/dev` 68214a6c. The walker read **187** before it and **188**
+carries `origin/dev` f0512ae8. The walker read **187** before it and **188**
 after: one new list, `shared-rules.json` → `folderPublishTarget.cases` (6),
 read by `scripts/test_deploy_folder_target.py` — which Windows' PythonToolchainTests
 discovers and SKIPS there (no bash that can reach a scratch folder), so it is
@@ -955,7 +955,7 @@ No trail event was added, so `activityTrail.mustRecord` is unchanged at 75, and
 Re-taken at the merge into `dev`: **199** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#167](https://github.com/russellgordon/plantoir/issues/167)**
 ("what does this page link to?" answered in code), counted ON THIS BRANCH,
-which carries `origin/dev` 68214a6c. The walker read **187** before it and
+which carries `origin/dev` f0512ae8. The walker read **187** before it and
 **194** after: `assist-cases.json` → `linksQuestion.accepted` (33),
 `.anotherCourse` (10), `.onlyIfAPageIsCalled` (5), `.refused` (34),
 `.answering.section` (9), `.answering.cases` (13) and `.answering.lookup` (9)
@@ -971,7 +971,7 @@ Re-taken at the merge into `dev`: **206** lists on the merged tree, `activityTra
 
 **Re-taken 2026-09-25 with [#212](https://github.com/russellgordon/plantoir/issues/212)**
 (a scheduled publish tells the teacher with a notification), counted ON THIS
-BRANCH, which is built on #137's (6e966265). The walker read **188** before it
+BRANCH, which is built on #137's (1ab0cdd2). The walker read **188** before it
 and **191** after: three new lists under `shared-rules.json` →
 `scheduledPublishStopped.notification` — `announcing.cases` (5, each `everyKind`
 row played once per kind), `onShow.cases` (4) and `asking.cases` (7) — none
@@ -983,7 +983,7 @@ Re-taken at the merge into `dev`: **209** lists on the merged tree, `activityTra
 
 **Re-taken 2026-09-25 with [#182](https://github.com/russellgordon/plantoir/issues/182)**
 (a restore carries a key with its lines, and says what it could not put
-back), counted ON THIS BRANCH, which is built on #246's (402c8e3a). The walker
+back), counted ON THIS BRANCH, which is built on #246's (2175a5be). The walker
 read **189** before it and **190** after: one new list,
 `course-management.json` → `backups.restoringOneSectionsKeys.cases` (6), with
 no Windows reader — its row is below. `activityTrail.mustRecord` grew from 75
@@ -995,22 +995,22 @@ Re-taken at the merge into `dev`: **210** lists on the merged tree, `activityTra
 
 **Re-taken 2026-09-25 with [#94](https://github.com/russellgordon/plantoir/issues/94)**
 (a workspace is remade only once nothing is running in it), counted ON THIS
-BRANCH, which is built on #189's (7f01653e, itself off `origin/dev`
-68214a6c). The walker read **187** before it and **189** after: two new
+BRANCH, which is built on #189's (83b7f853, itself off `origin/dev`
+f0512ae8). The walker read **187** before it and **189** after: two new
 lists, `app-rules.json` → `previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning.cases`
 (14) and `.sequences.cases` (6), both mac-only by `appliesOn` and in the table
 below. `activityTrail.mustRecord` grew from 75 to **76** (`workspace was in
-use`, `appliesOn: ["mac"]`), which is not a new list. Re-taken at the merge of `origin/dev` (366e7f11+) into this branch: **211** lists on the merged tree (209 on dev plus these two), `activityTrail.mustRecord` **78**.
+use`, `appliesOn: ["mac"]`), which is not a new list. Re-taken at the merge of `origin/dev` (c90f35c4+) into this branch: **211** lists on the merged tree (209 on dev plus these two), `activityTrail.mustRecord` **78**.
 Re-taken at the merge into `dev`: **212** lists on the merged tree, `activityTrail.mustRecord` **79**.
 
 **Re-taken 2026-09-25 with [#237](https://github.com/russellgordon/plantoir/issues/237)**
 (one scheduled deploy per section per working folder), counted ON THIS BRANCH
-(on `dev` 56f0d7c5): still **209**. `scheduledDeployCancellation.cases` grew
+(on `dev` 3af11121): still **209**. `scheduledDeployCancellation.cases` grew
 from 10 to 15, which is not a new list, and the new
 `scheduledDeployCancellation.oneAlarmPerWorkingFolder` holds prose and a
 `rejected` list of STRINGS, which the walker rightly does not count.
 `activityTrail.mustRecord` is unchanged at **77** on this branch (no new event; measured — an earlier draft of this note said 78). The director re-takes both numbers at the merge.
-Re-taken at the merge of `origin/dev` (f0a1550c+) into this branch: **212** lists on the merged tree, `activityTrail.mustRecord` **79** — both unchanged by #237.
+Re-taken at the merge of `origin/dev` (4860be32+) into this branch: **212** lists on the merged tree, `activityTrail.mustRecord` **79** — both unchanged by #237.
 Re-taken at the merge into `dev`: **212** lists on the merged tree, `activityTrail.mustRecord` **79**.
 Re-taken at the merge into `dev`: **213** lists on the merged tree, `activityTrail.mustRecord` **79**.
 Re-taken at the merge into `dev`: **215** lists on the merged tree, `activityTrail.mustRecord` **79**.
@@ -1047,7 +1047,7 @@ Re-taken at the merge into `dev`: **285** lists on the merged tree, `activityTra
 Re-taken at the merge into `dev`: **289** lists on the merged tree, `activityTrail.mustRecord` **123**.
 
 **Re-taken 2026-09-26 with [#301](https://github.com/russellgordon/plantoir/issues/301)**
-(the trail read back leniently), counted ON THIS BRANCH (on `dev` cf80225a): **212**
+(the trail read back leniently), counted ON THIS BRANCH (on `dev` 8efb581a): **212**
 before and **213** after — one new list, `shared-rules.json` →
 `problemReportTrail.cases` (12), in the table below and owed by the `windows`
 issue drafted for #301. `problemReportTrail.noteOrder` is a list of STRINGS, which
@@ -1058,7 +1058,7 @@ read" says why a trail line was rejected).
 
 **Re-taken 2026-09-26 with [#292](https://github.com/russellgordon/plantoir/issues/292)**
 (a new course is written its payload's marks pool), counted ON THIS BRANCH off
-`dev` cf80225a. The walker read **212** before it and **214** after: two new
+`dev` 8efb581a. The walker read **212** before it and **214** after: two new
 lists, `shared-rules.json` → `gradedFolders.newCourse.cases` (6) and
 `.manifestCases` (8). Both HAVE a Windows reader for their command-line half —
 `scripts/test_graded_folders_new_course.py`, discovered by
@@ -1070,7 +1070,7 @@ still has thirty-two top-level keys — `newCourse` sits inside `gradedFolders`.
 
 **Re-taken 2026-09-26 with [#294](https://github.com/russellgordon/plantoir/issues/294)**
 (an escaped pipe `[[X\|alias]]` names X for every reader), counted ON THIS
-BRANCH (off `dev` cf80225a). The walker read **212** before it and **215**
+BRANCH (off `dev` 8efb581a). The walker read **212** before it and **215**
 after: three new lists, `shared-rules.json` → `readingALink.cases` (10),
 `readingALink.rejected` (4, prose) and `followingLinks.publishing.cases` (1),
 all in the table above. Three existing lists grew by one case each and are not
@@ -1082,7 +1082,7 @@ already passes) and `copyingAPageBetweenCourses.cases` (27 → 28).
 **Re-taken 2026-09-26 with [#310](https://github.com/russellgordon/plantoir/issues/310)**
 (the preview port walk sees every account; a preview looks before starting a
 stopped workspace and before announcing its address), counted ON THIS BRANCH,
-off `origin/dev` cf80225a. The walker read **212** before it and **213**
+off `origin/dev` 8efb581a. The walker read **212** before it and **213**
 after: one new list, `app-rules.json` →
 `previewPorts.whenAnotherAccountHasTheAddress.cases` (12), mac-only by
 `appliesOn` and in the table below. `previewPorts.hostBlockCases` grew from 12
@@ -1094,7 +1094,7 @@ first.
 
 **Re-taken 2026-09-26 with [#311](https://github.com/russellgordon/plantoir/issues/311) and [#290](https://github.com/russellgordon/plantoir/issues/290)**
 (one piece: reopening the last working folder, and refusing one the builder
-cannot reach), counted ON THIS BRANCH (on `dev` cf80225a). The walker read
+cannot reach), counted ON THIS BRANCH (on `dev` 8efb581a). The walker read
 **212** before it and **219** after: seven new lists, all in `shared-rules.json` —
 `reopeningTheLastWorkingFolder.launchCases` (7), `.folderCases` (11),
 `.memoryCases` (3) and `.rejected` (10), owed by the `windows` issue from #311;
@@ -1105,14 +1105,14 @@ exempt permanently (`appliesOn: ["mac"]`). All seven are in the table below.
 which is not a new list; the first two are events Windows has to record or
 ledger. Review round (same day): `folderCases` grew from 11 to 13 and
 `diskCases` from 7 to 8, and `rejected` from 10 to 11 — rows, not lists.
-Re-taken at the merge of `origin/dev` (46149ac1) into this branch, with the
+Re-taken at the merge of `origin/dev` (4d9dbf95) into this branch, with the
 walker: **226** lists on the merged tree (219 on dev plus these seven),
 `activityTrail.mustRecord` **83** (80 on dev plus these three), and
 `shared-rules.json` holds **thirty-five** rule sets.
 
 **Re-taken 2026-09-26 with [#306](https://github.com/russellgordon/plantoir/issues/306)**
 (a click on a scheduled publish's notification opens that section), counted ON
-THIS BRANCH (off `dev` de4a79e1, which read **226**). The walker reads **228**:
+THIS BRANCH (off `dev` 924eb65b, which read **226**). The walker reads **228**:
 two new lists, both in `shared-rules.json` —
 `scheduledPublishStopped.notification.onClick.cases` (16, three of them
 `appliesOn: ["mac"]`) and `.rejected` (10), owed by the `windows` issue from
@@ -1125,20 +1125,20 @@ to 17 (a mac-only case, a folder out of the builder's reach) — a row, not a li
 
 **Re-taken 2026-09-26 with [#312](https://github.com/russellgordon/plantoir/issues/312)**
 (the Mac app carries its website builder's helper programs and starting disk),
-counted ON THIS BRANCH after merging `dev` 9eb779ac (#204), which read
+counted ON THIS BRANCH after merging `dev` 9eaf0594 (#204), which read
 **230**. The walker read **232**: two new lists, both in `app-rules.json` →
 `helperBootstrap` — `installCases` (18; 21 after the review round, rows) and
 `firstStartCases` (6; 7 after it) — exempt permanently (`appliesOn: ["mac"]`)
 and in the table below. `activityTrail.mustRecord` grew by two ("helper
 programs installed" and "website builder created", both `appliesOn: ["mac"]`),
 which is not a new list and asks nothing of Windows; `app-rules.json` gains
-one top-level key. Re-taken with the walker at the merge of `dev` 163095eb
+one top-level key. Re-taken with the walker at the merge of `dev` a393592d
 into this branch: **244** lists on the merged tree (242 on dev plus these
 two), `activityTrail.mustRecord` **98** (96 on dev plus two), and
 `shared-rules.json` holds **thirty-nine** rule sets (unchanged by #312).
 **Re-taken 2026-09-26 with [#323](https://github.com/russellgordon/plantoir/issues/323)**
 (a scheduled deploy reads the course's settings when it runs), counted ON THIS
-BRANCH, off #322's tip (8375353a), which read **229**. The walker reads **231**:
+BRANCH, off #322's tip (f1b720be), which read **229**. The walker reads **231**:
 two new lists, both in `shared-rules.json` —
 `scheduledDeployCancellation.theDestination.cases` (12, one `appliesOn: ["mac"]`)
 and `savingSettings.scheduledDeploys.cases` (4; 5 after the review round, a row, not a list), owed by the `windows` issue
@@ -1150,18 +1150,18 @@ three at the merge if anything else landed first.
 
 **Re-taken 2026-09-25 with [#204](https://github.com/russellgordon/plantoir/issues/204)**
 (Plantoir finds and installs its own updates, slice 1), counted ON THIS BRANCH
-(on `dev` cf80225a): the walker read **212** before it and **214** after — two
+(on `dev` 8efb581a): the walker read **212** before it and **214** after — two
 new lists, `shared-rules.json` → `appUpdates.cases` (14) and
 `appUpdates.atQuit.cases` (6), both run on the mac and with no Windows reader;
 their row is in the table below. `activityTrail.mustRecord` grew from 79 to
 **87** (eight events, none with `appliesOn`), which is not a new list but eight
 events Windows has to record or ledger. Re-taken 2026-09-26 at the merge of
-`dev` ff1213ed into this branch: **230** lists on the merged tree (228 on dev plus
+`dev` 92a7099a into this branch: **230** lists on the merged tree (228 on dev plus
 these two), `activityTrail.mustRecord` **91** (83 on dev plus eight). The director
 re-takes both numbers at the merge into `dev`.
 **Re-taken 2026-09-26 with [#197](https://github.com/russellgordon/plantoir/issues/197) and [#114](https://github.com/russellgordon/plantoir/issues/114)**
 (a page list that names no page; one description per tool), counted ON THIS
-BRANCH, off `dev` ff1213ed, which read **228**. The walker reads **231**: three
+BRANCH, off `dev` 92a7099a, which read **228**. The walker reads **231**: three
 new lists, all in `assist-cases.json` → `pagesNamingNoPage` — `cases` (12),
 `everythingInAUnit.accepted` (4) and `.refused` (7) — owed by the `windows`
 issue from #197/#114 and in the table below. `cardPhrasings.parsed` grew from 9
@@ -1171,14 +1171,14 @@ find`) — rows, not lists. `toolDescriptions` adds no list: `descriptions` is a
 object keyed by tool, and `measuredDepartures` is empty. `assist-cases.json`
 gains two AUTHORED top-level keys, and the generator's `generated.note` names
 them.
-Re-taken at the merge of `origin/dev` (9eb779ac, which carries #204) into this
+Re-taken at the merge of `origin/dev` (9eaf0594, which carries #204) into this
 branch: **233** lists on the merged tree (230 on dev plus these three),
 `activityTrail.mustRecord` **92** (91 on dev plus this one).
-Re-taken again at the merge of `origin/dev` fe9cb3e5 (#201, #209, #313 and others): **236** lists, `activityTrail.mustRecord` **95**; `toolDescriptions` now pins all **35** tools the mac serves over MCP (#209's three How I Teach tools added).
+Re-taken again at the merge of `origin/dev` dec29da4 (#201, #209, #313 and others): **236** lists, `activityTrail.mustRecord` **95**; `toolDescriptions` now pins all **35** tools the mac serves over MCP (#209's three How I Teach tools added).
 
 **Re-taken 2026-09-26 with [#313](https://github.com/russellgordon/plantoir/issues/313)**
 (a link written inside code is not a link), counted ON THIS BRANCH (off #314's
-tip f7d1a608, on `dev` ff1213ed). The walker reads **228** before and after: no
+tip 3e9bf705, on `dev` 92a7099a). The walker reads **228** before and after: no
 new list. `readingALink.whatIsCode` and `.whatIsCodeLimits` are lists of
 STRINGS, which the walker rightly does not count. Six existing lists grew, and
 none is a new list: `readingALink.cases` (10 → 40), `readingALink.rejected`
@@ -1194,7 +1194,7 @@ on the merged tree (unchanged by #313), `activityTrail.mustRecord` **91**.
 
 **Re-taken 2026-09-26 with [#97](https://github.com/russellgordon/plantoir/issues/97)**
 (a folder rename follows an angle-bracket Markdown link, `[q](<Tasks/Quiz 1.md>)`),
-counted ON THIS BRANCH (off `dev` ff1213ed): **228** before and after — no new
+counted ON THIS BRANCH (off `dev` 92a7099a): **228** before and after — no new
 list. `specialNames.renameFolder.linkRewriting.cases` grew from 13 to **25**,
 rows in a list both suites already deserialise, and the new
 `linkRewriting.insideAngleBrackets` holds prose plus two lists of STRINGS
@@ -1208,7 +1208,7 @@ land in its milestone. `activityTrail.mustRecord` is unchanged at **83** (no
 new event: `folder renamed` records no link counts, so its line stays true).
 **Re-taken 2026-09-26 with [#291](https://github.com/russellgordon/plantoir/issues/291)**
 (the preview check looks for the live-reload client's tag and first
-statement, not the bare address), counted ON THIS BRANCH (off `dev` ff1213ed,
+statement, not the bare address), counted ON THIS BRANCH (off `dev` 92a7099a,
 which read **228**). The walker still reads **228**: `previewBuild.cases` grew
 from 9 to 15 — rows, not a list — and `signature` became an object whose
 `between` is an array of strings, a field rather than a case list. The six new
@@ -1217,7 +1217,7 @@ nine were; its own two readers stay owed on #272. `activityTrail.mustRecord` is
 unchanged at **83** (no new event: the piece narrows when an existing behaviour
 fires). `shared-rules.json` is untouched.
 **Re-taken 2026-09-26 with [#209](https://github.com/russellgordon/plantoir/issues/209)**
-(the teacher's How I Teach page), counted ON THIS BRANCH (off `dev` ff1213ed,
+(the teacher's How I Teach page), counted ON THIS BRANCH (off `dev` 92a7099a,
 which read **228**). The walker reads **229**: one new list,
 `shared-rules.json` → `howITeachPage.nameCases` (13), run by
 `scripts/test_how_i_teach.py` on both platforms (the build's half) and owed by
@@ -1226,15 +1226,15 @@ is a list of strings and is not counted. `activityTrail.mustRecord` grew from 83
 to **86** (`How I Teach page read`, `How I Teach page written`, `How I Teach
 page kept off the website`), which is not a new list. `shared-rules.json` holds
 **thirty-six** rule sets.
-Re-taken at the merge of `origin/dev` 9eb779ac (#204) into this branch, with the
+Re-taken at the merge of `origin/dev` 9eaf0594 (#204) into this branch, with the
 walker: **231** lists on the merged tree (230 on dev plus `howITeachPage.nameCases`),
 `activityTrail.mustRecord` **94** (91 on dev plus these three), and
 `shared-rules.json` holds **thirty-seven** rule sets. Re-taken again at the merge of `origin/dev`
-524485e9 (#314, #315): **232** lists (231 on dev plus `nameCases`),
+57fc8348 (#314, #315): **232** lists (231 on dev plus `nameCases`),
 `activityTrail.mustRecord` **94**, thirty-seven rule sets.
 **Re-taken 2026-09-26 with [#201](https://github.com/russellgordon/plantoir/issues/201)**
 (an unpublish stops at a class page), counted ON THIS BRANCH off `origin/dev`
-ff1213ed, which read **228**. The walker reads **229**: one new list,
+92a7099a, which read **228**. The walker reads **229**: one new list,
 `shared-rules.json` → `followingLinks.unpublishing.cases` (4), owed by the
 `windows` issue from #201 and in the table below. `activityTrail.mustRecord`
 is unchanged at **83** (nothing on the trail records what an unpublish
@@ -1243,7 +1243,7 @@ top-level keys, one of them `note`): the cases sit inside `followingLinks`.
 `neverTakenDownByFollowingLinks` is still three objects, deliberately.
 **Re-taken 2026-09-26 with [#322](https://github.com/russellgordon/plantoir/issues/322)**
 (the assistant reads a course's settings at the call), counted ON THIS BRANCH
-after merging `origin/dev` ff1213ed (#306), which read **228**. The walker
+after merging `origin/dev` 92a7099a (#306), which read **228**. The walker
 reads **229**: one new list, `shared-rules.json` →
 `assistantReadsSettingsAtTheCall.cases` (7), owed by the `windows` issue from
 #322 and in the table below. Its `rejected` is a list of STRINGS, so it is not
@@ -1256,7 +1256,7 @@ three at the merge if anything else landed first.
 
 **Re-taken 2026-09-26 with [#128](https://github.com/russellgordon/plantoir/issues/128)**
 (one coverage map per curriculum folder), counted ON THIS BRANCH (off `dev`
-ff1213ed, which read **228**). The walker reads **234**: seven new lists and
+92a7099a, which read **228**). The walker reads **234**: seven new lists and
 one gone, all in `shared-rules.json` — `curriculumRules.coveragePageTitles.cases`,
 `curriculumRules.coverageMapOrder.cases` (read by the build's test only: the
 map is drawn by the shared Python), `specialNames.curriculumFoldersResolution.cases`
@@ -1266,18 +1266,18 @@ and `transcriptStripping.machineLines.cases`. `activityTrail.mustRecord` grew
 from 83 to **84** (`curriculum maps built`), and `shared-rules.json` holds
 **thirty-six** rule sets (`coverageMapsBuilt`). All but `coverageMapOrder` are
 owed by Windows, in the `windows` issue from #128 and the rows below. Re-taken at the merge of
-`dev` 9eb779ac (#204) into this branch: **236** lists on the merged tree (230 on dev
+`dev` 9eaf0594 (#204) into this branch: **236** lists on the merged tree (230 on dev
 plus these six net), `activityTrail.mustRecord` **92** (91 on dev plus one), **thirty-seven**
 rule sets.
-Re-taken at the merge of `origin/dev` b917b501 (#313, #209 and others) into this branch:
+Re-taken at the merge of `origin/dev` 2a1a31bc (#313, #209 and others) into this branch:
 **238** lists on the merged tree (232 on dev plus #128's six net), `activityTrail.mustRecord`
 **95** (94 on dev plus `curriculum maps built`), **thirty-eight** rule sets.
 
-Re-taken at the merge of the director's stack 5de019ba (dev + #322 + #128 + hygiene) into #323's branch: **242** lists on the merged tree (240 on the stack, plus #323's two), `activityTrail.mustRecord` **96** (95 on the stack, plus #323's one), and `shared-rules.json` holds **thirty-nine** rule sets (#323 adds none; the stack already held thirty-nine, whatever the rule-set line above still says).
+Re-taken at the merge of the director's stack d19fd5b1 (dev + #322 + #128 + hygiene) into #323's branch: **242** lists on the merged tree (240 on the stack, plus #323's two), `activityTrail.mustRecord` **96** (95 on the stack, plus #323's one), and `shared-rules.json` holds **thirty-nine** rule sets (#323 adds none; the stack already held thirty-nine, whatever the rule-set line above still says).
 
 **Re-taken 2026-09-26 with [#152](https://github.com/russellgordon/plantoir/issues/152)**
 (the marks floor, exact exclusions, a chosen pool's spelling, and a revert
-line beside the exclusion lines written on the click), counted ON THIS BRANCH (off `dev` ff1213ed, which
+line beside the exclusion lines written on the click), counted ON THIS BRANCH (off `dev` 92a7099a, which
 read **228**). The walker reads **232**: four new lists, all in
 `shared-rules.json` — `gradedFolders.floor.cases` (17) and
 `excludedItems.recordedOnClick.cases` (9; first landed as `recordedOnSave`, 8, and replaced the same day by Russell's recorded decision), owed by the `windows` issue from #152
@@ -1291,15 +1291,15 @@ not count; `removingAFolder.cases` grew from 7 to 8, a row, not a list.
 `activityTrail.mustRecord` grew from 83 to **84**: `exclusions reverted` is new, and `item
 excluded` / `item re-included` gained the kind in `carries` and the decision in `why`. `shared-rules.json` holds **thirty-six** rule sets
 (37 top-level keys, one of them `note`): `excludedItems` is new.
-Re-taken at the merge of `origin/dev` (9eb779ac, which carries #204) into this branch, with the
+Re-taken at the merge of `origin/dev` (9eaf0594, which carries #204) into this branch, with the
 walker: **234** lists on the merged tree (230 on dev plus these four),
 `activityTrail.mustRecord` **92** (dev's 91 plus `exclusions reverted`), and
 `shared-rules.json` holds **thirty-seven** rule sets.
-Re-taken again at the merge of `origin/dev` (fe9cb3e5) into this branch: **237** lists on the merged tree (233 on dev plus these four), `activityTrail.mustRecord` **95** (dev's 94 plus `exclusions reverted`), and **thirty-eight** rule sets.
-Re-taken at the merge of the director's stack 8d3a5844 (dev plus #322, #128, the hygiene piece and #323) into this branch: **246** lists on the merged tree (242 on the stack plus these four), `activityTrail.mustRecord` **97** (the stack's 96 plus `exclusions reverted`), and **forty** rule sets.
+Re-taken again at the merge of `origin/dev` (dec29da4) into this branch: **237** lists on the merged tree (233 on dev plus these four), `activityTrail.mustRecord` **95** (dev's 94 plus `exclusions reverted`), and **thirty-eight** rule sets.
+Re-taken at the merge of the director's stack 37e1162d (dev plus #322, #128, the hygiene piece and #323) into this branch: **246** lists on the merged tree (242 on the stack plus these four), `activityTrail.mustRecord` **97** (the stack's 96 plus `exclusions reverted`), and **forty** rule sets.
 **Re-taken 2026-09-26 with [#336](https://github.com/russellgordon/plantoir/issues/336)**
 (the wizard's skeleton toggle reads "an English skeleton", not "a english
-skeleton"), counted ON THIS BRANCH (off `dev` ff1213ed, which read **228**).
+skeleton"), counted ON THIS BRANCH (off `dev` 92a7099a, which read **228**).
 The walker reads **229**: one new list, `shared-rules.json` →
 `wizard.skeletonToggleLabelSubject.cases` (16 — the twelve families the old
 rule got wrong and four it got right, `general` among them), owed by the
@@ -1307,12 +1307,12 @@ rule got wrong and four it got right, `general` among them), owed by the
 `article` arrays are string lists, not case lists. `wizard.skeletonToggleLabel`
 changed to `Start from {article} {subject} skeleton`, which reddens any Windows
 test pinning the old template — deliberately. `activityTrail.mustRecord` is
-unchanged: a label is not an event. Re-taken at the merge of `origin/dev` fe9cb3e5
+unchanged: a label is not an event. Re-taken at the merge of `origin/dev` dec29da4
 (#204, #313, #97, #291, #209, #201) into this branch, with the walker: **234**
 lists on the merged tree (233 on dev plus `skeletonToggleLabelSubject.cases`).
 **Re-taken 2026-09-26 with [#150](https://github.com/russellgordon/plantoir/issues/150)
 and [#327](https://github.com/russellgordon/plantoir/issues/327)**, counted ON
-THIS BRANCH (off `dev` ff1213ed, which read **228**): still **228**. #150 adds
+THIS BRANCH (off `dev` 92a7099a, which read **228**): still **228**. #150 adds
 one member to `assist-cases.json` → `cardPhrasings.parsed` (make-room's article
 form) and #327 one pair to `tools.planTwins` — both GENERATED, and neither a new
 list. `activityTrail.mustRecord` grows from 83 to **84** (#327's `assistant
@@ -1320,7 +1320,7 @@ named a tool it was not offered`, owed by Windows — see the `windows` issue fr
 #327).
 **Re-taken 2026-09-26 with bundle C ([#329](https://github.com/russellgordon/plantoir/issues/329),
 [#351](https://github.com/russellgordon/plantoir/issues/351))**, counted ON THIS
-BRANCH (off #154's tip b879cfad, which read **250**): **252**. Two new lists,
+BRANCH (off #154's tip d2e50f63, which read **250**): **252**. Two new lists,
 `shared-rules.json` → `howITeachPage.settingsButton.cases` (6) and
 `howITeachPage.emptyPageIsNotWritten.cases` (5), both owed by the `windows`
 issue drafted from bundle C and in the table below. `activityTrail.mustRecord`
@@ -1328,7 +1328,7 @@ grows from 99 to **101** (`assistant backed up a course`, `How I Teach page
 started`, both owed by Windows), and the `How I Teach page read` line gains its
 empty variant. Still **forty-one** rule sets — both new keys sit inside
 `howITeachPage`.
-Re-taken at the merge of `origin/dev` bd1f571d (bundle B, row 604) into this
+Re-taken at the merge of `origin/dev` 2963aa85 (bundle B, row 604) into this
 branch, with the walker: **265** lists on the merged tree (263 on dev plus
 bundle C's two), `activityTrail.mustRecord` **111** (dev's 109 plus bundle C's
 two), **forty-four** rule sets. The review round added no list:
@@ -1340,7 +1340,7 @@ Windows asks this question at all.
 
 **Re-taken 2026-09-26 with [#96](https://github.com/russellgordon/plantoir/issues/96)**
 (Get Ready for the Start of the Year, and check_section's third group), counted
-ON THIS BRANCH (off `dev` ff1213ed, which read **228**). The walker reads
+ON THIS BRANCH (off `dev` 92a7099a, which read **228**). The walker reads
 **231**: three new lists, all in `shared-rules.json` — `startOfYear.cases`
 (14), `startOfYear.rejected` (12, prose) and `sectionCheck.cases` (7), in the
 table below and owed by the `windows` issue from #96. `assist-cases.json` →
@@ -1350,13 +1350,13 @@ of the year change undone`, `start of the year not done`), none `appliesOn`, so
 all three are red on Windows until recorded or ledgered. `shared-rules.json`
 holds **thirty-seven** rule sets (38 top-level keys, one of them `note`).
 #209 is adding tools in parallel; re-take at the merge.
-Re-taken at the merge of `origin/dev` (9eb779ac, with #204) into this branch: **233** lists on the merged tree (230 on dev plus these three), `activityTrail.mustRecord` **94** (91 on dev plus three), and **thirty-eight** rule sets.
-Re-taken at the merge of `origin/dev` (b917b501, with #209, #313, #97, #291/#253, #314/#326; then fe9cb3e5, with #201) into this branch: **236** lists on the merged tree (233 on dev plus these three), `activityTrail.mustRecord` **97** (94 on dev plus three), and **thirty-nine** rule sets (40 top-level keys, one of them `note`).
-Re-taken at the merge of `origin/dev` 8c5ff37c into this branch: **253** lists (250 on dev plus these three), `activityTrail.mustRecord` **102** (99 on dev plus three), **forty-two** rule sets; `toolDescriptions` gains the two start-of-year tools (37).
+Re-taken at the merge of `origin/dev` (9eaf0594, with #204) into this branch: **233** lists on the merged tree (230 on dev plus these three), `activityTrail.mustRecord` **94** (91 on dev plus three), and **thirty-eight** rule sets.
+Re-taken at the merge of `origin/dev` (2a1a31bc, with #209, #313, #97, #291/#253, #314/#326; then dec29da4, with #201) into this branch: **236** lists on the merged tree (233 on dev plus these three), `activityTrail.mustRecord` **97** (94 on dev plus three), and **thirty-nine** rule sets (40 top-level keys, one of them `note`).
+Re-taken at the merge of `origin/dev` d8df8622 into this branch: **253** lists (250 on dev plus these three), `activityTrail.mustRecord` **102** (99 on dev plus three), **forty-two** rule sets; `toolDescriptions` gains the two start-of-year tools (37).
 **Re-taken 2026-09-26 with [#343](https://github.com/russellgordon/plantoir/issues/343),
 [#341](https://github.com/russellgordon/plantoir/issues/341) and
 [#335](https://github.com/russellgordon/plantoir/issues/335)** (bundle A), counted
-ON THIS BRANCH off `dev` 8c5ff37c, which read **250**: the walker reads **252** —
+ON THIS BRANCH off `dev` d8df8622, which read **250**: the walker reads **252** —
 `class-planning.json` → `reDatingASection.reportedCounts.cases` (5) and
 `shared-rules.json` → `actsUseTheSavedSettings.cases` (7), both in the table
 below (`actsUseTheSavedSettings.rejected` and `.sentences` are string lists).
@@ -1364,11 +1364,11 @@ below (`actsUseTheSavedSettings.rejected` and `.sentences` are string lists).
 settings`). The generated files gain three wording keys
 (`reDatedOnlyPagesTheyUse`, `…ForAMeeting`, `everyPageIsAlreadyOnItsDay`) and a changed `tools.planTwinsNote`
 ("Five writes have none"), none of them a list.
-Re-taken at the merge of the director's stack d3693d06 (dev 8c5ff37c plus #154 and the small fixes, #96 among what it carries) into this branch: **257** lists on the merged tree (255 on the stack plus these two), `activityTrail.mustRecord` **105** (104 on the stack plus `deploy used the saved settings`), and **forty-three** rule sets.
+Re-taken at the merge of the director's stack 6c982ada (dev d8df8622 plus #154 and the small fixes, #96 among what it carries) into this branch: **257** lists on the merged tree (255 on the stack plus these two), `activityTrail.mustRecord` **105** (104 on the stack plus `deploy used the saved settings`), and **forty-three** rule sets.
 
 **Re-taken 2026-09-27 with bundle B** (#331, #325, #333, #330, #334 and the
 background warm-up), counted ON THIS BRANCH after merging `origin/dev`
-1746960d, which read **255**. The walker reads **261**: six new lists —
+7468565b, which read **255**. The walker reads **261**: six new lists —
 `shared-rules.json` → `siteHealth.linksIntoHiddenPages.cases` (11, #333);
 `app-rules.json` → `publishedFreshness.filesCountedUnderRule2.cases` (8) and
 `.stampRuleCases.cases` (6, #330); `builderWarmUp.startsWhen.cases` (8),
@@ -1383,14 +1383,14 @@ Windows on pull**, `FolderPathRewriterTests`), `renamingTheUnitWord.linkCases.ca
 ready in the background: …` events), all four `appliesOn: ["mac"]`,
 permanently: Windows builds natively and has no builder to get ready. **Forty-two** rule sets, unchanged: the
 warm-up's rules are in `app-rules.json`.
-Re-taken at the merge of `origin/dev` c32d9db3 (bundle A and #154) into this
+Re-taken at the merge of `origin/dev` ed239ecd (bundle A and #154) into this
 branch: **263** lists on the merged tree (257 on dev plus these six),
 `activityTrail.mustRecord` **109** (105 on dev plus four), **forty-three** rule
 sets (dev's count; bundle B adds none).
 
 **Re-taken 2026-09-29 with [#381](https://github.com/russellgordon/plantoir/issues/381)**
 (a preview cannot start while its section is being deployed), counted ON
-THIS BRANCH off `dev` 23bde395, which read **265**: the walker reads **268** —
+THIS BRANCH off `dev` 99a47640, which read **265**: the walker reads **268** —
 three new lists, all in `shared-rules.json` → `previewWhileItsSectionDeploys`:
 `cases` (10 after the fix round; 9 first), `launcherCases` (24; 21 first) and `failureExplanationCases` (1), in the
 table below. `activityTrail.mustRecord` is unchanged at **111** (the two new
@@ -1398,11 +1398,11 @@ lines are fields of the existing `build declined, course busy elsewhere`),
 and `shared-rules.json` holds **forty-four** rule sets (dev's forty-three plus
 this one).
 
-**Re-taken 2026-09-29 with bundle C** ([#364](https://github.com/russellgordon/plantoir/issues/364), #373, #374, #376, #369), counted at its merge into `dev` (365fbede): **273** lists (268 on dev plus five): `shared-rules.json` → `savingSettings.whatEnablesSave.freshOpenCases` (8), `.perSectionEditCases` (7), `.heldBackCases` (7), `userFacingLabelWords.exceptions` (1) and `wizard.clubToggle.settingsRows.shownWhenCases` (8). `activityTrail.mustRecord` **112** (`settings save held back`); **forty-seven** rule sets (`courseSettingsWording`, `userFacingLabelWords` and, later, #379's `linksChecklist`).
+**Re-taken 2026-09-29 with bundle C** ([#364](https://github.com/russellgordon/plantoir/issues/364), #373, #374, #376, #369), counted at its merge into `dev` (c8aa04c3): **273** lists (268 on dev plus five): `shared-rules.json` → `savingSettings.whatEnablesSave.freshOpenCases` (8), `.perSectionEditCases` (7), `.heldBackCases` (7), `userFacingLabelWords.exceptions` (1) and `wizard.clubToggle.settingsRows.shownWhenCases` (8). `activityTrail.mustRecord` **112** (`settings save held back`); **forty-seven** rule sets (`courseSettingsWording`, `userFacingLabelWords` and, later, #379's `linksChecklist`).
 
 **Re-taken 2026-09-29 with [#378](https://github.com/russellgordon/plantoir/issues/378)**
 (piece A: work left behind is stopped, the wait is named), counted on this
-branch after merging `origin/dev` 365fbede (#381 and bundle C), which read
+branch after merging `origin/dev` c8aa04c3 (#381 and bundle C), which read
 **273**: **273** lists, unchanged — no new list.
 Lists that grew (rows, not lists): `app-rules.json` →
 `previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning.cases` 14 → 41 (34, then 7 more in the review fix rounds) and
@@ -1419,7 +1419,7 @@ four generated keys (`deployNeedsAnAnswer`, `deployNeedsAnAnswerAt`,
 `deployWentOutTo`, `previewBuildNeedsAnAnswer`).
 
 **Re-taken 2026-09-30 with #379** (the links checklist), on `issue/379-links-checklist`
-cut from `origin/dev` 23bde395, which read **265**. The walker reads **269**: four
+cut from `origin/dev` 99a47640, which read **265**. The walker reads **269**: four
 new lists — `class-planning.json` → `datingPagesAClassBrings.fromTheLinksChecklist.cases`
 (13) and `.publishedBeforeIsRecorded.cases` (2); `shared-rules.json` →
 `linksChecklist.buildCases` (3) and `.publishCases` (4) — all in the table below.
@@ -1427,27 +1427,27 @@ new lists — `class-planning.json` → `datingPagesAClassBrings.fromTheLinksChe
 events, on both platforms). **Forty-four** rule sets (`linksChecklist`).
 `class-planning.json` → `datingPagesAClassBrings.neverPublishedIsInferred` is GONE,
 replaced by `publishedBeforeIsRecorded` (it held no list).
-Re-taken at the merge of `origin/dev` 373b94d5 (#381, which read **268**) into this
+Re-taken at the merge of `origin/dev` 8728a6e5 (#381, which read **268**) into this
 branch: **272** lists on the merged tree, `activityTrail.mustRecord` **114**, forty-four
 rule sets.
-Re-taken at the merge of `origin/dev` 365fbede (bundle C, which read **273** and
+Re-taken at the merge of `origin/dev` c8aa04c3 (bundle C, which read **273** and
 `mustRecord` **112**) into this branch: **277** lists, `activityTrail.mustRecord` **115**,
 forty-seven rule sets.
 The #379 fix round (2026-09-30) grew rows, not lists: `fromTheLinksChecklist.cases` 13 → 15,
 `linksChecklist.publishCases` 4 → 5.
 
 **Re-taken 2026-09-30 with #385** (rows that come under another row), on
-`issue/385-checklist-rows-follow` cut from `origin/dev` 21fcec70, which read **277**. The
+`issue/385-checklist-rows-follow` cut from `origin/dev` c1f07514, which read **277**. The
 walker reads **279**: two new lists — `shared-rules.json` → `linksChecklist.followingARow.cases`
 (10) and `linksChecklist.naming.cases` (2) — both in the table below. Rows grew too:
 `fromTheLinksChecklist.cases` 15 → 21, `linksChecklist.publishCases` 5 → 10.
 `activityTrail.mustRecord` stays **117** (three lines changed, no event added); rule sets
 stay forty-seven.
-Re-taken at the merge of `origin/dev` 2259257b (#378 piece A, **273** lists, `mustRecord`
+Re-taken at the merge of `origin/dev` f447ccbd (#378 piece A, **273** lists, `mustRecord`
 **113**) into this branch: **277** lists, `activityTrail.mustRecord` **116**, forty-seven
 rule sets.
 Re-taken 2026-09-30 with [#396](https://github.com/russellgordon/plantoir/issues/396) (v1.4.2 bundle C),
-ON THIS BRANCH off `dev` 21fcec70, which read **277**: **278** lists —
+ON THIS BRANCH off `dev` c1f07514, which read **277**: **278** lists —
 `shared-rules.json` → `scheduledDeployRefusals.planOpening.cases` (3), in the table below
 (`alsoSaid.rejected` is a list of strings). `actsUseTheSavedSettings.cases` grew 7 → 8.
 `activityTrail.mustRecord` stays at **117** (the "116" above is what that branch read
@@ -1456,7 +1456,7 @@ Forty-seven rule sets, unchanged: `planOpening` is a sibling inside an existing 
 
 **Re-taken 2026-09-30 with [#383](https://github.com/russellgordon/plantoir/issues/383) and
 [#388](https://github.com/russellgordon/plantoir/issues/388)** (bundle A of v1.4.2), on
-`issue/383-388-scheme-name-and-one-reader` off `dev` 21fcec70, which read **277**: the
+`issue/383-388-scheme-name-and-one-reader` off `dev` c1f07514, which read **277**: the
 walker reads **278** — one new list, `shared-rules.json` →
 `previewWhileItsSectionDeploys.labelCodeCases` (8). Rows, not lists:
 `previewWhileItsSectionDeploys.launcherCases` 27 → 29 and `app-rules.json` →
@@ -1465,7 +1465,7 @@ rule sets unchanged (`userFacingLabelWords` gained a `data` key, not a list).
 
 **Re-taken 2026-09-30 with [#402](https://github.com/russellgordon/plantoir/issues/402) and
 [#403](https://github.com/russellgordon/plantoir/issues/403)** (bundle F of v1.4.2), on
-`issue/402-403-codes-and-destinations` off `dev` 558ba11a6, which read **281**: the walker
+`issue/402-403-codes-and-destinations` off `dev` ea717a331, which read **281**: the walker
 reads **283** — two new lists, both in the table below: `course-management.json` →
 `courseCode.commandLine.cases` (8) and `shared-rules.json` →
 `scheduledDeployRefusals.planOpening.listCoursesLine.cases` (1). Rows grew:
@@ -1475,30 +1475,30 @@ blocks).
 
 **Re-taken 2026-09-30 with [#398](https://github.com/russellgordon/plantoir/issues/398)**
 (rows a ticked class brings, bundle E of v1.4.2), on
-`issue/398-a-row-its-class-brings` off `dev` 558ba11a6, which read **281**: the
+`issue/398-a-row-its-class-brings` off `dev` ea717a331, which read **281**: the
 walker reads **282** — one new list, `shared-rules.json` →
 `linksChecklist.comingWithAClass.cases` (12), in the table below. Rows, not lists:
 `linksChecklist.publishCases` 10 → 15 (13, then iv-m and iv-n in the fix round). `activityTrail.mustRecord` unchanged at
 **117** (the published line gained a count; no event added); forty-seven rule sets.
-Re-taken at the merge of `origin/dev` c87eb5c2a (bundle F, **283** lists) into this branch: **284** lists, `activityTrail.mustRecord` **117**, forty-seven rule sets.
+Re-taken at the merge of `origin/dev` a2a5312b7 (bundle F, **283** lists) into this branch: **284** lists, `activityTrail.mustRecord` **117**, forty-seven rule sets.
 
 **Re-taken 2026-09-30 with [#397](https://github.com/russellgordon/plantoir/issues/397)**
 (today's class on the front page, v1.4.2 bundle D), on
-`issue/397-todays-class-on-the-front-page` off `dev` 21fcec70, which read **277**: **278** —
+`issue/397-todays-class-on-the-front-page` off `dev` c1f07514, which read **277**: **278** —
 one new list, `class-planning.json` → `todaysClassOnTheFrontPage.cases` (40; 42 after the fix round), in the table
 below. Rows, not lists: `sectionIndexPointer.cases` 9 → 20 (27 after the fix round) and
 `sectionIndexPointer.dateCases.cases` 9 → 13. `activityTrail.mustRecord` 117 → **119**
 ("put today's class on the front page", "left the front page as it was" — both platforms).
 `shared-rules.json` rule sets unchanged at forty-seven (the new rule is a top-level key of
-`class-planning.json`); `file-formats.json` gained `frontPageNotToday`, which holds no list. Re-taken at its merge of `origin/dev` 558ba11a6
+`class-planning.json`); `file-formats.json` gained `frontPageNotToday`, which holds no list. Re-taken at its merge of `origin/dev` ea717a331
 (**281** lists, `mustRecord` **117**): **282** lists, `activityTrail.mustRecord` **119**.
-Re-taken at its merge of `origin/dev` c87eb5c2a (bundle F, **283** lists, `mustRecord` **117**):
+Re-taken at its merge of `origin/dev` a2a5312b7 (bundle F, **283** lists, `mustRecord` **117**):
 **284** lists, `activityTrail.mustRecord` **119**.
-Re-taken at its merge of `origin/dev` 10ecadf0b (bundle E, **284** lists, `mustRecord` **117**):
+Re-taken at its merge of `origin/dev` 2cbde45a0 (bundle E, **284** lists, `mustRecord` **117**):
 **285** lists, `activityTrail.mustRecord` **119**.
 
 **Re-taken 2026-10-01 with Windows parity bundle 10** (#421, #422, Q8), on
-`issue/bundle10-parity` off `dev` e313e770: **287** lists, unchanged by the bundle.
+`issue/bundle10-parity` off `dev` 646e78a3: **287** lists, unchanged by the bundle.
 Rows, not lists: `course-management.json` → `backups.restoringOneSectionsKeys.cases`
 6 → **7** (a blank line before the opening fence is dropped — the mac's behaviour,
 Windows matched it). `activityTrail.mustRecord` 120 → **121** ("making room did not
@@ -1507,7 +1507,7 @@ finish every page", `appliesOn: ["windows"]` until the mac records it; #422).
 **Re-taken 2026-10-03 once for v1.4.3 bundles A, C and D together** (A:
 #433, #412, #425 DO 3 and same-named pages; C: #408, #377, #425 DO 1; D: #418,
 #410, #413, #415, #416), on `issue/433-outside-assistant-busy` with C
-(26d5f70f) and D (b60747f3) merged in, off `dev` b50084d5, which read
+(9cd374bc) and D (65497642) merged in, off `dev` 69360971, which read
 **287**: **289**. The two new lists are A's —
 `workLeases.declining.outsideChanges.cases` (10) and `publishPlanNaming.cases`
 (4). C and D add rows and objects, not lists (the separate paragraphs each
@@ -1526,7 +1526,7 @@ while a preview was open" and "preview closed for a deploy"; C's "remembered tim
 (A's `publishPlanNaming`).
 
 **Re-taken 2026-10-04 for v1.4.3 Windows bundle A** (#424), on
-`issue/v143-a-assistant` off `dev` 52cbd4bd: `assist-cases.json` gains one
+`issue/v143-a-assistant` off `dev` 33c99772: `assist-cases.json` gains one
 AUTHORED top-level key, `scheduleAndCancel`, holding THREE new lists —
 `accepted` (7), `asksForTheTime` (3) and `refused` (11) — so the count grows
 by three wherever it is next re-taken (not re-counted here, the census being
@@ -1534,7 +1534,7 @@ the mac's). Nothing else in A adds a list: #436 wires `outsideChanges` and
 `publishPlanNaming` into Windows' tests, which were already counted.
 
 **Re-taken 2026-10-04 for v1.4.3 bundle B** (#411), on
-`issue/411-tool-surface-and-shortcuts` off `dev` 89b7e4b6: **289, unchanged** —
+`issue/411-tool-surface-and-shortcuts` off `dev` bde940af: **289, unchanged** —
 B adds rows, not lists. `assist-cases.json` → `hideIsUnpublish.accepted` 13 →
 **16** and `.refused` 20 → **35** (one row moved from refused to accepted,
 then two accepted and sixteen refused rows added — eighteen new rows);
@@ -1543,7 +1543,7 @@ key `modelReply`); `deployAtATime.resolving` 11 → **13** (the two
 daylight-saving rows). `cardPhrasings.parsed` gains one entry (generated).
 
 **Re-taken 2026-10-07 for #449** (the mac's half of `scheduleAndCancel`), on
-`issue/449-schedule-and-cancel-frames` off `dev` 4b177c684: **292, unchanged**
+`issue/449-schedule-and-cancel-frames` off `dev` 5c3ccaf24: **292, unchanged**
 — rows, not lists. `scheduleAndCancel.accepted` 9 → **10** (the prompt shelf's
 own "Cancel scheduled deploy", added from the mac); `asksForTheTime` 7 and
 `refused` 11 as Windows left them. The three lists now have a reader on BOTH
@@ -1554,7 +1554,7 @@ at **123** — two entries' `carries` and `why` grew, no event was added.
 are frames over sentences, specified by the authored key, not card phrasings.
 
 **Re-taken 2026-10-07 for #440**, on `issue/440-add-next-class-unit-days` (piece
-S merged in) off `dev` 4b177c684: 292 → **297**. `assist-cases.json` gains one
+S merged in) off `dev` 5c3ccaf24: 292 → **297**. `assist-cases.json` gains one
 AUTHORED top-level key, `nextClassUnits`, holding FIVE lists — `accepted` (11),
 `notThis` (12), `pointed` (22), `runs` (17) and `pointerSentences` (3).
 `scenarios.cases` 25 → **32** (seven #440 scenarios). Generated:
@@ -1568,7 +1568,7 @@ AUTHORED top-level key, `nextClassUnits`, holding FIVE lists — `accepted` (11)
 AUTHORED `pointed` rows (22 → **25**: decided false refusals, not measured);
 the census stays **297**, since it counts lists, not rows.
 **Re-taken 2026-10-07 for #458** (the mac's door course hold), on
-`issue/458-door-course-lease` off `dev` 4b177c684, which read **292**; re-counted at the merge with `dev` 71b133764, which read **297** after #440: **301**.
+`issue/458-door-course-lease` off `dev` 5c3ccaf24, which read **292**; re-counted at the merge with `dev` 6600df4c5, which read **297** after #440: **301**.
 The four new lists are `shared-rules.json` → `doorCourseHold.courseToHold.cases`
 (8) and `doorCourseHold.reviseCases` (9), and `file-formats.json` →
 `heldBackupRecord.cases` (3) and `heldBackupRecord.nameCases` (4); none had a
@@ -1576,7 +1576,7 @@ Windows reader until #468 (2026-10-08, `DoorCourseHoldTests`). `activityTrail.mu
 held a course"). Rule sets 49 → **50** (`doorCourseHold`).
 
 **Re-taken 2026-10-08 for #453 and #465** (Windows' updater), on
-`issue/463-464-465-453-app` off `dev` 5f8e18f7b, which read **303**: **304** — one
+`issue/463-464-465-453-app` off `dev` 40c755a51, which read **303**: **304** — one
 new list, `shared-rules.json` → `appUpdates.offerCases.cases` (8, AUTHORED from
 Windows, appliesOn windows; read by `AppUpdatesContractTests`). The prose rule
 `appUpdates.anOfferNobodySawIsNotAnAnswer` holds a list of strings, which the walker
@@ -1585,7 +1585,7 @@ grew (`update found`, the Windows spelling of the version); no event was added.
 Rule sets unchanged at fifty (both new keys sit inside `appUpdates`).
 
 **Re-taken 2026-10-08 for #457 and #482** (the mac's menus, Open Recent, and
-the rate-limit match), on `issue/457-482-menus-hig` off `dev` a04e4815a, which
+the rate-limit match), on `issue/457-482-menus-hig` off `dev` 152a9d51c, which
 read **305**: **308** — three new lists, all AUTHORED on the mac and none with a
 Windows reader yet (UNRUN there, not red): `shared-rules.json` →
 `subjectMenus.cases` (17, which File, Course, Section and View items can be
@@ -1603,7 +1603,7 @@ opened", "working folder not reopened"), and `class-planning.json` →
 button. Rule sets 50 → **52** (`subjectMenus`, `openRecent`).
 
 **Re-taken 2026-10-08 for #457 batch B and #475** on `issue/457-475-assistant-routes`
-off `dev` 01f384090, which read **308**: **309** — one new list,
+off `dev` 13979b91d, which read **308**: **309** — one new list,
 `class-planning.json` → `futureDatedClasses.cases` (24, AUTHORED on the mac, no
 Windows reader yet: UNRUN there). Five lists grew, and these turn Windows red
 where it reads them: `assist-cases.json` → `scenarios.cases` 32 → **35** (the
@@ -1622,7 +1622,7 @@ fixes round added one scenario (35 → **36**, Keep All) and three
 Rule sets re-counted on the branch after the fixes round: **53**.
 
 **Re-taken 2026-10-08 for #457 batch C (the HIG sweep)** on `issue/457-hig-sweep`
-merged with `dev` 178cb511b (batch B in), which read **309**: **310** — one new
+merged with `dev` 7ee189a9a (batch B in), which read **309**: **310** — one new
 list, `shared-rules.json` → `sidebarDeleteKey.cases` (6, AUTHORED on the mac,
 no Windows reader yet: UNRUN there). One list grew, and it turns Windows red:
 `shared-rules.json` → `activityTrail.mustRecord` 133 → **135** ("opened Plantoir
@@ -1643,13 +1643,13 @@ too, and `outsideAgents.agents[].menuItem` is read by
 `ContractTests.TheOutsideAgentsMenuTitles_AreTheContracts`.
 
 **Re-taken 2026-10-17 for #555** (partial undo), on `issue/555-partial-undo` off
-`dev` 1a52f3a45, which read **347** with the walker below: **349**. `assist-cases.json`
+`dev` 05142a403, which read **347** with the walker below: **349**. `assist-cases.json`
 gains one AUTHORED top-level key, `undoFiles`, holding two lists — `files` (14)
 and `presses` (3); `steps` inside a press is a field of that case. No Windows
 reader yet (owed, the #555 `windows` issue). The generated halves move only in
 `generated.note`, which now names `undoFiles` (`Plantoir --write-contracts
 contracts`, twice; the second run changed nothing).
-**#560 (2026-10-17)**, on `issue/560-trail-open-close` off `dev` 1a52f3a45: no
+**#560 (2026-10-17)**, on `issue/560-trail-open-close` off `dev` 05142a403: no
 list added, so the census is unchanged by this piece (349 after #555). `shared-rules.json` →
 `activityTrail.mustRecord` 140 → **141** ("app closed", for both platforms —
 it turns Windows red until it records it), and "app opened" has a new

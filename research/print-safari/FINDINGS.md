@@ -58,11 +58,11 @@ record the result on its issue.
 Measured 2026-10-23 (morning) by a Claude Opus 5.5 measurer, with Russell's
 go-ahead to drive Safari, on the same Mac and **Safari 26.6**, with
 `safari_print.sh`, `serve.mjs`, `instrument.js` and `cancel.applescript` as
-committed at 6faa4cf77. The page is the same copy of ICS3U section 2,
+committed at be3bd67a3. The page is the same copy of ICS3U section 2,
 `Concepts/Variables-and-Data-Types` (18 code blocks, 2 pictures), with the
-branch's print script (`print.inline.ts` at 6faa4cf77, bundled with esbuild,
+branch's print script (`print.inline.ts` at be3bd67a3, bundled with esbuild,
 minified) spliced into `postscript.js` in place of the built one. The "old"
-row splices origin/dev's `print.inline.ts` (df6980785) the same way. Every
+row splices origin/dev's `print.inline.ts` (cdea887b5) the same way. Every
 sheet was cancelled through System Events; nothing was printed or saved.
 Times are milliseconds from the press, read from the page's own event log.
 The shell's "sheet seen" time is not used: it polls System Events every
@@ -76,7 +76,7 @@ The shell's "sheet seen" time is not used: it polls System Events every
 | #576 | fallback, from home | print faces (.otf) 1.5 s | +3,100, fonts loaded | **yes**, "Page 3 of 5" | +3,132 | on Cancel (+11,767) | +11,768 | +11,776 |
 | #576 | Paged.js, direct | nothing | +275 | yes, "Page 3 of 6" | +291 | on Cancel (+8,610) | +8,611 | +8,627 |
 | #576 | Paged.js, from home | nothing | +266 | yes, "Page 3 of 6" | +281 | on Cancel (+8,769) | +8,770 | +8,784 |
-| old (df6980785) | fallback, from home | nothing | +88, **fonts loading** | **no** | never | at once (+88) | +89 | never |
+| old (cdea887b5) | fallback, from home | nothing | +88, **fonts loading** | **no** | never | at once (+88) | +89 | never |
 | old, `KEEP=1` | fallback, from home | nothing | +74, fonts loading | yes, 32 ms after print() returned | +106 | at once (+74) | (suppressed) | +8,662, on Cancel |
 | old, `KEEP=1` | fallback, from home | nothing | +77, fonts loading | yes, 36 ms after print() returned | +113 | at once (+77) | (suppressed) | +8,756, on Cancel |
 

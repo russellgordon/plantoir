@@ -82,7 +82,7 @@ half-finished entry left its unbuilt half behind as #100.
 
   **Measured, because "it feels flaky" is not usable.** Running
   `-only-testing:QuartzTeachersTests/CourseRenameInterfaceTests` alone:
-  **3 crashes in 7 runs on an unmodified `dev` worktree** (commit `3ca5f0a4`,
+  **3 crashes in 7 runs on an unmodified `dev` worktree** (commit `70722b2e`,
   built fresh in `/tmp`), and 2 in 3 on a branch that touched only
   `SpecialFoldersHelpView`. So it PRE-DATES any current work and reproduces
   from a clean checkout. The full suite is likewise green on some runs
@@ -316,7 +316,7 @@ half-finished entry left its unbuilt half behind as #100.
 
   - **It is pre-existing.** Clean `dev` aborts too, so no branch since has
     caused it. (Every `dev` run also carried one FAILED case — the stale
-    milestone marker, fixed on the branch in `13da5319`.)
+    milestone marker, fixed on the branch in `26e46d73`.)
   - **It is NOT purely a bystander.** The class alone aborts 1 in 10, which the
     "bystander" reading does not predict: something in that class is enough on
     its own. The full suite raises the rate to roughly 1 in 2, so earlier tests
@@ -458,7 +458,7 @@ half-finished entry left its unbuilt half behind as #100.
 
   **This entry survived only because of its own closing instruction**, which
   said to leave it until a mac had regenerated `app-rules.json`. A mac did, on
-  2026-09-01 (`13da5319`), and the contract has carried the right marker ever
+  2026-09-01 (`26e46d73`), and the contract has carried the right marker ever
   since — so the sentence telling a reader the contract is stale had itself
   gone stale, and acting on it would have meant redoing done work or
   hand-editing a generated file. **Two things ARE still un-refreshed** and are

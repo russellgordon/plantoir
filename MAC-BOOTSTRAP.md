@@ -97,8 +97,8 @@ of it is worth knowing because it is not carelessness:
 
 | When | What |
 |---|---|
-| 18:54 | `0f34c54d` builds `back_up_course`, requiring `[course]` — the same shape Windows had had since August. Nothing diverges. |
-| 19:14 | `b0913344` fixes a real defect in it: the copy was filed as the TEACHER's, so `pruneBackups` would have kept every one for ever. The fix takes a `section`. The schema moves. |
+| 18:54 | `29d7112a` builds `back_up_course`, requiring `[course]` — the same shape Windows had had since August. Nothing diverges. |
+| 19:14 | `65be722e` fixes a real defect in it: the copy was filed as the TEACHER's, so `pruneBackups` would have kept every one for ever. The fix takes a `section`. The schema moves. |
 | 19:52 | #70 is opened. It names the tool, its plan twin and its briefing persistence — everything except the argument. |
 
 The issue describes the FEATURE, because that is what you set out to build; the

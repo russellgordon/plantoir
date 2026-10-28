@@ -34,7 +34,7 @@ AssistAgent does (Say appends the date; NarrowToLocal rewrites examples).
                        hyphen     the constant below (ASCII hyphens)
                        shipped    AssistAgent.swift's literal, read out of the
                                   Swift at run time — em-dashes and all
-                       pre-tweak  the same literal as it stood at b77b91bd^,
+                       pre-tweak  the same literal as it stood at 0a9aae83^,
                                   read with `git show`: before the two
                                   "undo_last_change reverses only..." sentences
                      `hyphen` and `shipped` are asserted equal modulo six
@@ -119,7 +119,7 @@ MAC_SHELF_ONLY = "--mac-shelf" in args
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 AGENT_SWIFT = "mac-app/QuartzTeachers/Models/Assist/AssistAgent.swift"
 CLIENT_SWIFT = "mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift"
-PRE_TWEAK_COMMIT = "b77b91bd^"
+PRE_TWEAK_COMMIT = "0a9aae83^"
 
 ENDPOINT = "http://127.0.0.1:%s/v1/chat/completions" % PORT
 

@@ -1,6 +1,6 @@
 #610 - open_in_obsidian shown to the local model, on the mac. Measured
 2026-10-24 (05:47-07:24 EDT), BOTH tiers, three arms, against the rule in
-open-in-obsidian-610-preregistration.txt (committed 82811c5e4 and pushed
+open-in-obsidian-610-preregistration.txt (committed 53d20e215 and pushed
 before the first request). RESULT: FAILS on BOTH tiers. Zero polarity
 inversions anywhere, but rule (b) (no regression) and rule (c) (no theft)
 fail on each tier. So, as pre-registered: open_in_obsidian is hidden from the
@@ -26,7 +26,7 @@ CONDITIONS (as pre-registered, with one deviation)
           deleted after the run.
   10 greedy trials, the app's body. Dateline "(Today is 2026-10-24, a
   Saturday.)".
-  BEFORE / BEFORE' = git archive of origin/dev 31c71d748 (whole tree), tools
+  BEFORE / BEFORE' = git archive of origin/dev 113f66f0e (whole tree), tools
   = its tools-from-contract.py local (13, 46b96562...2cd96cb6); two server
   sessions. AFTER = the branch at the implementation, contract regenerated
   by `Plantoir --write-contracts` from its Debug build: 14 tools, the 13

@@ -2654,7 +2654,7 @@ and nothing holds it back. Revert is enabled exactly when the copy differs.
 **Measured, not assumed.** #364 (Save apparently enabled on a freshly opened
 course, dark picture only) and #373 (Russell, 2026-09-27: a change made only on
 a section's page did not enable Save) were filed as one comparison wrong in both
-directions. On dev 2e11471d, with the course in #364's picture, in the real
+directions. On dev fb191f7c, with the course in #364's picture, in the real
 window, light and dark, Debug and Release, pressing the real per-section
 toggle through accessibility: the comparison is right both ways. #364's own
 frame proves it — Revert is disabled there, (38,38,38), and Save cannot be
@@ -3341,7 +3341,7 @@ review's finding 3; `SectionVerbsTests.testPagesAreNamedByTheirFolder`).
 `.headline`, leading, 52 points, sentence case — and its default button takes
 Return and the accent only while it can be pressed (#364's shape), through
 batch C's `.sheetTitle(_:)` and `.defaultButton(isEnabled:)` since the two
-batches met on one branch (ddf2fb321). A request from a row's
+batches met on one branch (bf0678729). A request from a row's
 context menu is DROPPED once that row is no longer selected, never run the
 next time the section is shown (the review's note 7).
 
@@ -5529,7 +5529,7 @@ because the obvious home is wrong twice over:
   set. `SuiteStaysOutOfRealFoldersTests` pins every redirect and that refusal;
   a probe that logs a stack whenever any of these resolvers answers a path in
   the real `~/Library` under XCTest counted, over the full suite, **482 stacks on `origin/dev`**
-  (8bcb01f1; LaunchAgents 347 — 317 of them the too-late sweep — the agent's
+  (2f44ceae; LaunchAgents 347 — 317 of them the too-late sweep — the agent's
   log 77, `.succeeded` 24, `assist/` 23, `.findings` 11; 92 of those only
   built a path into generated text) and **38 with the fix — every one
   `oneShotCommand` writing script TEXT with its real-home default, which
@@ -10191,7 +10191,7 @@ definition of "under test". "Under a UI test" has one definition too since
 and `BuildOutputLocation.isRunningTests` all read.
 
 What went through it — every product lookup of the home folder that existed on
-`dev` at 43d8e853:
+`dev` at 5c70aac0:
 
 | File | What it resolved |
 |---|---|
@@ -10672,7 +10672,7 @@ with a tree that held the menu bar and nothing else.
 blamed another app being frontmost. That was measured and is wrong: in every
 normal run the test host is never the active app (`NSApp.isActive` false at
 launch, iTerm in front), and the walk finds everything. A probe walked the
-tree in each window state (origin/dev 68214a6c):
+tree in each window state (origin/dev f0512ae8):
 
 | Window state | `isActive` | window `isOnActiveSpace` | windows in the tree | walk finds the sidebar row, the − button, the path bar |
 |---|---|---|---|---|
@@ -11612,7 +11612,7 @@ for Debug and `EXCLUDED_SOURCE_FILE_NAMES: Plantoir-Beta.icon` for Release.
 The exclusion matters: with it, a Release build's `actool` call is the same
 command it always was — one input, `--app-icon Plantoir` — so what
 `publish.sh -Sign` ships cannot have picked the Beta icon up by accident.
-Measured on 2026-09-27 against a Release build of `dev` at 2e11471d: the
+Measured on 2026-09-27 against a Release build of `dev` at fb191f7c: the
 compiled `Plantoir.icns` is byte-identical (SHA-1 `fcb0be92…`), the Info.plist
 identical, the signing identity unchanged. `Assets.car` differs byte-wise, but
 so do two `actool` runs on the SAME unchanged `Plantoir.icon` minutes apart —
@@ -11678,7 +11678,7 @@ products.
 
 ### What failed under 27, measured
 
-`origin/dev` at badb062ab, `build-for-testing` Debug under 27, failed twice
+`origin/dev` at 4bae50aab, `build-for-testing` Debug under 27, failed twice
 over — the second failure hidden until the first was fixed:
 
 1. **The two chat-bubble shapes** (`AssistChatBubbleShape`,

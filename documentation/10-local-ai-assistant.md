@@ -1182,7 +1182,7 @@ measurement repeated ten times, so the question was re-asked across dates.
 
 **Conditions for every number below** (they belong to these numbers and to
 nothing else): Mac16,8 M4 Pro, 48 GiB; llama.cpp b10435 on Metal, the
-`llama-server` bundled in the dev 68214a6c Debug build; `AssistServerHost.
+`llama-server` bundled in the dev f0512ae8 Debug build; `AssistServerHost.
 serverArguments` per tier; the app's request body (temperature 0,
 `tool_choice` auto, `max_tokens` read out of the Swift); the shipped system
 prompt; the 13-tool local surface from the contract. Raw output, the grid's
@@ -2188,7 +2188,7 @@ STOP in the walk, the same one publishing and date-moving make. (Windows'
 `ContractTests` also pins that count at three, so a fourth entry would have
 turned it red on pull for a rule already written in the right place.)
 
-**Measured**, on a scratch build of `dev` at ff1213ed with the four cases:
+**Measured**, on a scratch build of `dev` at 92a7099a with the four cases:
 without the clause **3 of 4 cases red, 7 assertions** (cases 1, 2 and 4 —
 case 3, both classes named, is green either way); with it, all four green.
 The whole-unit shape ("unpublish Unit 4" where Day 2 links to Unit 5, Day 1)
@@ -2260,7 +2260,7 @@ scroll, about pages nothing in the publish touches.
 
 **The issue's premise was wrong, and the fix is shaped by the correction.**
 It said curriculum pages are "always published" by a rule in
-`build_site.py`. Measured at `origin/dev` 80dddf4db: there is no such rule.
+`build_site.py`. Measured at `origin/dev` 638d9d340: there is no such rule.
 `_is_in_curriculum_folder` is defined and has no caller (the build pipeline's
 [dates section](05-build-pipeline.md#dates-drive-everything) already said so
 for dates), and `patches/publish.ts` publishes any page that does not say
@@ -3015,7 +3015,7 @@ one was removed for exactly that reason.
 
 ### Re-measured on Metal after the system prompt changed
 
-The system prompt gained two sentences on 2026-08-24 (`b77b91bd`) on the
+The system prompt gained two sentences on 2026-08-24 (`0a9aae83`) on the
 strength of numbers taken on **Windows, in a container** — the folder's index
 classifies that run so, and its 1-192 s per-call latencies are a CPU profile,
 so the "Vulkan" in issue #117's title belongs to the tweak's own before/after
@@ -3733,7 +3733,7 @@ want a human to look.
 **This example is now WRONG and is kept only as a warning: an earlier version
 of this section said "the mac watches for 'Setting up this Mac' where
 `setup.ps1` prints 'Setting up this PC'."** `setup.ps1` printed that once, but
-stopped the day Windows moved to a fully native toolchain (`b356a1f`,
+stopped the day Windows moved to a fully native toolchain (`4adcd5b`,
 2026-08-19, "Native toolchain (no container)" in `setup.ps1`) — no WSL2, no
 Docker, no one-time machine setup, no container to start at all. Nobody
 updated `TaskMilestones.cs`'s launcher markers to match, and nothing caught
@@ -3823,7 +3823,7 @@ naming every phrasing.
   including the ones your REVIEW FIXES moved.** Learned from the same failure,
   and the timing is the whole lesson. `back_up_course` was built at 18:54 on
   2026-09-08 requiring `[course]`, exactly matching the tool Windows had had
-  since August. Twenty minutes later a review fix (`b0913344`) gave it a
+  since August. Twenty minutes later a review fix (`65be722e`) gave it a
   `section`, because it had been filing the copy as the TEACHER's and
   `pruneBackups` would have kept every one for ever. #70 was opened at 19:52
   and described the FEATURE — the tool, its plan twin, its briefing
@@ -5083,7 +5083,7 @@ bare `string`, which cannot carry the mark at all), but the CONSTRUCTOR can:
 `isPlan` defaults to false, so a twin whose happy path is built with `.read`,
 `.wrote` or a bare `AssistToolOutcome(...)` compiles, reads correctly in every
 text assertion, and makes its write unrunnable from the window. Measured on
-`ff1213ed`: all ten `plan_` tools marked their happy path, so this is a pin,
+`92a7099a`: all ten `plan_` tools marked their happy path, so this is a pin,
 not a fix. Two tests hold it:
 
 - `AssistPlanModeTests.testEveryPlanToolOnTheSurfaceCanSayItIsAPlan` runs every
@@ -5197,7 +5197,7 @@ skipped too. Once one press had taken a change back in part (one page put
 back, an edited one left alone), the change could never come off the list:
 the teacher set the edited page back, pressed Undo again, and was told the
 page they had already got back "has been edited since". Measured on
-`origin/dev` 1a52f3a45: the second press of `SectionVerbsEndingTests`' partial
+`origin/dev` 05142a403: the second press of `SectionVerbsEndingTests`' partial
 undo ended "took part of the last change back" with the entry still there.
 
 Every file now gets ONE verdict, `AssistUndoVerdict.of` in
@@ -7096,7 +7096,7 @@ the offer for S3's probe.
 
 The parked branch `issue/411-add-next-class-unit-days` is KEPT as the
 record of what #411 measured (Russell, on #440, 2026-10-04); its tip is
-`7bfab8fc314cb0427c7e630caa10e29a59861fd9`, named here so the pointer survives
+`8aeda78f35e3204a733fb84f249f9440e6d5a88f`, named here so the pointer survives
 a rename. It is not merged and is not to be merged.
 
 ### #424: schedule, cancel, and a reply that runs to the cap
@@ -7850,7 +7850,7 @@ routing re-measurement. The surface is 22 / 13 local / 35 MCP (was 32).
 docstring) gives, after regeneration:
 
 - `local 13 tools 46b965622213567d49aae523c70f9bcd2c9fd3d1c21279e167d0da2b2cd96cb6` — unchanged, and now PINNED in full by `scripts/test_tool_surface_digest.py`;
-- `mcp 35 tools 777bf545185efd47333e13877c263884c9a3e3d19d6deb82388f6eb5c2fdcc54` — moved, as it must with three new tools; recorded here, not pinned. Re-hashed after merging `dev` 9eb779ac (#204, which touched no tool): both digests unchanged.
+- `mcp 35 tools 777bf545185efd47333e13877c263884c9a3e3d19d6deb82388f6eb5c2fdcc54` — moved, as it must with three new tools; recorded here, not pinned. Re-hashed after merging `dev` 9eaf0594 (#204, which touched no tool): both digests unchanged.
 
 What the write keeps, and why:
 

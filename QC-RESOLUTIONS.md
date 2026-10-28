@@ -1655,11 +1655,11 @@ Updated all academic course timeline references across the 23 courses from June/
 In `QC-FINDINGS.md` (§2.2), 11 course landing pages (`per_section/index.md`) transcluded the correct newest published class page, but contained stale `%%` comments referencing obsolete unit/day numbers from earlier short arcs:
 - `ADA1O`: Transcluded `Unit 4, Day 23`; comment referenced `Unit 4, Day 5` (held-back `Unit 4, Day 6`).
 - `ICS3U`: Transcluded `Unit 4, Day 22`; comment referenced `Unit 4, Day 6` (held-back `Unit 4, Day 7`).
-- `ICS4U`: Transcluded `Unit 4, Day 24`; comment referenced `Unit 4, Day 6` (held-back `Unit 4, Day 7`). *(Resolved in prior commit `b884fa50`)*
+- `ICS4U`: Transcluded `Unit 4, Day 24`; comment referenced `Unit 4, Day 6` (held-back `Unit 4, Day 7`). *(Resolved in prior commit `e2cade76`)*
 - `MCR3U`: Transcluded `Unit 4, Day 25`; comment referenced `Unit 4, Day 5` (held-back `Unit 4, Day 6`).
 - `MDM4U`: Transcluded `Unit 4, Day 21`; comment referenced `Unit 4, Day 6` (held-back `Unit 4, Day 7`).
 - `MHF4U`: Transcluded `Unit 4, Day 23`; comment referenced `Unit 4, Day 5` (held-back `Unit 4, Day 6`).
-- `MPM2D`: Transcluded `Unit 4, Day 20`; comment referenced `Unit 4, Day 5` (held-back `Unit 4, Day 6`). *(Resolved in prior commit `771bb61d`)*
+- `MPM2D`: Transcluded `Unit 4, Day 20`; comment referenced `Unit 4, Day 5` (held-back `Unit 4, Day 6`). *(Resolved in prior commit `1b4e762c`)*
 - `MTH1W`: Transcluded `Unit 4, Day 21`; comment referenced `Unit 4, Day 5` (held-back `Unit 4, Day 6`).
 - `SCH3U`: Transcluded `Unit 5, Day 17`; comment referenced `Unit 5, Day 4` (held-back `Unit 5, Day 5`).
 - `SCH4U`: Transcluded `Unit 5, Day 16`; comment referenced `Unit 5, Day 3` (held-back `Unit 5, Day 4`).

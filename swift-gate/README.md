@@ -49,7 +49,7 @@ four that trap, `.expected` is what it prints before the trap. Every
 ## Measured (2026-10-17, the Swift image on Colima, Apple M4 Pro)
 
 Compiled by `support/swift/compile.py` in `teaching-quartz-swift`, all
-fifteen in parallel in 13 s (verify.sh at 50bbb079e), then run by
+fifteen in parallel in 13 s (verify.sh at d9bd64330), then run by
 `wasi_run.mjs` in Node 22:
 
 | # | Library | Bytes | Imports | Result |

@@ -1349,7 +1349,7 @@ guard uses it.
 
 **Why its own block, and why there.** The issue asked for the helper inside
 the PREVIEW PORT BLOCK. Measured: that block starts at `preview.sh:1742` (dev
-21fcec70), and the guard runs at `:794`, before anything is changed
+c1f07514), and the guard runs at `:794`, before anything is changed
 (`test_the_guard_asks_before_anything_is_changed` pins it before the PREVIEW
 PORT BLOCK marker). Bash defines a function only when it reaches it, so a
 helper there would not exist when the guard called it: "command not found",

@@ -5,11 +5,11 @@
 Read this first; the dated entries below are history, newest first, and an earlier batch's "the ledger holds…" or "comes with #514" was true on its own day only.
 
 - **Windows has caught up to the mac's 1.7.1.** Sixteen issues' Windows halves are on this branch: the menu bar and Open Recent (#488, #483), the Section menu's functions (#489) and classes dated after the next class at Deploy (#475), the one Settings window — Assistant, Preview, Deploying — with the Account ID edited only there and Help ▸ Plantoir Help (#491 part A, #490), the HIG sweep (#491 part B), hiding rebuilds and the rebuild-question sentences (#479, #478, #481, #482), the scheduled run's Queue policy, its own tools refresh and the close that waits for a copy (#470, #477, #484), printable pages (#496), the runtime's diagram and graph engines (#503), and Preview at Last Viewed (#514). `RELEASING.md` → "Landed since v1.7.1" lists them with their platforms.
-- **1.7.2's catch-up wording and endings are on `dev` since 4e133c1fa** (2026-10-16): scheduled deploys no longer ask for a cable and say a PC on battery sleeps sooner (#547); `plan_write_how_i_teach` refuses a course kept for reference (#540); the assistant's Make Room card says Undo will not take it back, with a scenario proposed to the mac (#530); and the Section menu's trail endings, "took part of the last change back" among them, with Re-date Classes… that stops part way saying so (#550). Details: documentation/07 ("Plugged in…" removed), 10 and 12 ("Writes with no new undo entry, and Undo's three endings").
+- **1.7.2's catch-up wording and endings are on `dev` since 1bc61e09d** (2026-10-16): scheduled deploys no longer ask for a cable and say a PC on battery sleeps sooner (#547); `plan_write_how_i_teach` refuses a course kept for reference (#540); the assistant's Make Room card says Undo will not take it back, with a scenario proposed to the mac (#530); and the Section menu's trail endings, "took part of the last change back" among them, with Re-date Classes… that stops part way saying so (#550). Details: documentation/07 ("Plugged in…" removed), 10 and 12 ("Writes with no new undo entry, and Undo's three endings").
 - **`NamedGapLedger` is empty again since #581** (2026-10-22, branch `issue/581-obsidian-addons`): its four Obsidian add-on events (`obsidian add-ons offered`, `added`, `reopened for add-ons`, `setting changed`) are recorded. (It held them from `issue/565-trail-wording-red` the same day; before that it was empty from 2026-10-16.)
 - **Every clone and worktree must run `windows-app\Vendor\fetch-obsidian-addons.ps1` once** (since #581, 2026-10-22): the app's build REFUSES without the seven pinned add-on files (`CheckObsidianAddOns`), as it refuses a stale runtime.
 - **The version is 1.8.7** (`<Version>` in `Plantoir.csproj`; bumped 2026-10-23 when Windows joined v1.8.7 the same day as the mac; it had been 1.8.6 since Windows joined v1.8.6 earlier that day). Windows 1.7.1 joined the v1.7.1 release on 2026-10-16 (#481), and the bump to 1.7.2 followed with its catch-up wording. (This line said 1.7.1 until 2026-10-22, after the csproj had moved.)
-- **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 8d2f1145f — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
+- **Gates** (since #542's piece, 2026-10-16: the last FULL unit run was at `issue/542-polish-172` 76364b50b — Failed 0, Passed 2779, Total 2779, 6 m 12 s; the commits after it had targeted and UI re-runs only, and the merged dev gets its own full run at the version bump). **At the earlier branch's last commit** (Intel i5-8365U, 16 GB, Windows 11 Pro 26200, one 1920 × 1080 screen at 150%, 2026-10-15/16): `dotnet test` Failed 0, Passed 2725, Skipped 0, Total 2725 (6 m 21 s); the FULL UI suite, unlocked, once: Failed 2, Passed 80, Skipped 0, Total 82 (40 m 8 s) — `GettingReadyUiTests.ClosingDuringTheCopyWaitsForItThenQuits` passed alone straight after (2 of 2, a load flake), and `NewCourseWizardUiTests.EscapeClosesTheCodeListThenTheWizard` failed alone too ("TextBox is off screen" — the harness window is short at 150%) and passes (8 of 8) since the test brings the app forward instead of clicking a box below the window's edge.
 - **What was owed on an unlocked desktop is done** (2026-10-15, on the console): the eleven `[UiFact]`s pass (four test fixes and one app fix — the corner sketch's ids; see the entry below), the two print pictures are taken (`print-page`, `print-handout` now `windows: true`), and WebView2's own printing, the hand-over through ShellExecute and the toolbar's width are measured (`documentation/12-windows-app.md` → "Printable pages" and "Toolbar width"). Two decisions they raise are the director's: the hand-over could be dropped (WebView2 prints the handout itself), and the window's minimum. **Corrected 2026-10-16 (#542):** the minimum was already 900 epx (1350 px at 150%; measured, nothing drags below it); what was wrong is that the window OPENED below it, at 793 epx on a first run at 150%, because its size was set before the minimum. It now opens at the minimum or wider — `documentation/12-windows-app.md` → "Toolbar width".
 
 ## 2026-10-23 — a driven run leaves the real trail alone, and every key sent down is sent up (#641, #638, v1.8.7)
@@ -225,7 +225,7 @@ What landed on `dev` since 1.4.2, one line each (GUI rows 712–721 have the det
 
 **Moved to v1.4.4 by Russell on 2026-10-07:** the dark title bar fix and the dark pictures.
 
-Gates on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200), at `dev` `581c2f634`:
+Gates on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200), at `dev` `ac6d5f576`:
 
 - `dotnet test`: Failed 0, Passed 2338, Skipped 0, Total 2338 (6 m 19 s).
 - UI suite (`run-ui-tests.ps1`): first run Failed 2, Passed 51, Total 53 (23 m 18 s); both failures reproduced alone and were real — a `ToggleSwitch` and the icon-plus-text Preview and Deploy buttons had no accessible name (app fix, GUI row below), and the two-backups test sent its Ctrl-click too fast for the app (test fix). Second run Failed 0, Passed 53, Skipped 0, Total 53 (22 m 35 s). The installer was re-signed after that fix, so the shipped bytes carry it.
@@ -246,20 +246,20 @@ Branch `issue/bundle9-finish`. Done: #419 (the robocopy scan reads tracked files
 
 ## 2026-10-01 — overnight parity run
 
-Windows parity run, 2026-09-30 to 2026-10-01: eight bundles landed on `dev` in ten merges (every merge `--no-ff`), 106 issues worked. The suite went from **61 red to 0**: baseline `Failed: 61, Passed: 1486, Total: 1547` at `0d040a81`; now `Failed: 0, Passed: 2209, Skipped: 1, Total: 2210` at `0d36bd84` (the skip is the native-build test, which needs a runtime).
+Windows parity run, 2026-09-30 to 2026-10-01: eight bundles landed on `dev` in ten merges (every merge `--no-ff`), 106 issues worked. The suite went from **61 red to 0**: baseline `Failed: 61, Passed: 1486, Total: 1547` at `30c78344`; now `Failed: 0, Passed: 2209, Skipped: 1, Total: 2210` at `7a3890a1` (the skip is the native-build test, which needs a runtime).
 
 | Bundle | dev | Totals after |
 |---|---|---|
-| 1 plumbing | `cce2ca9e` | 53 / 1509 / 1562 |
-| 2 writers | `8f35af79` | 34 / 1576 / 1610 |
-| 3 trail, leases, scheduled deploys, quit | `53d22566` | 32 / 1636 / 1668 |
-| 4 preview and publish | `84c23dac` | 27 / 1697 / 1724 |
-| 5a assistant chain | `9ddf2a7b` | 19 / 1774 / 1793 |
-| 5b assistant, the rest | `8752e296` | 17 / 1940 / 1957 |
-| 6a course creation | `3d946d0d` | 9 / 2016 / 2025 |
-| 6b reference, import, Copy a Page | `ed2da05e` | 7 / 2118 / 2126 |
-| 7 clubs and settings | `905a20c3` | 0 / 2159 / 2160 |
-| 8 Windows-only UI, runner, updates | `0d36bd84` | 0 / 2209 / 2210 |
+| 1 plumbing | `1ecc107c` | 53 / 1509 / 1562 |
+| 2 writers | `ba73616f` | 34 / 1576 / 1610 |
+| 3 trail, leases, scheduled deploys, quit | `e8bca385` | 32 / 1636 / 1668 |
+| 4 preview and publish | `14600c03` | 27 / 1697 / 1724 |
+| 5a assistant chain | `04d56db9` | 19 / 1774 / 1793 |
+| 5b assistant, the rest | `77557c49` | 17 / 1940 / 1957 |
+| 6a course creation | `87f65e7d` | 9 / 2016 / 2025 |
+| 6b reference, import, Copy a Page | `4d1d1057` | 7 / 2118 / 2126 |
+| 7 clubs and settings | `89fda2e4` | 0 / 2159 / 2160 |
+| 8 Windows-only UI, runner, updates | `7a3890a1` | 0 / 2209 / 2210 |
 
 - **Handed to the mac** (issues labelled `mac`): #407, #408, #409, #410, #411, #412, #413, #415, #416, #418.
 - **`verify-deploy.ps1`** was run three times, after bundles 4, 5b and 6b: 37 passed, 0 failed, 0 skipped each time.
@@ -649,7 +649,7 @@ Contract lists run here for the first time: `datesAndTitles.writingCases` (16),
 
 ## Parity run, bundle 1: red means something again (2026-09-30)
 
-The suite pulled on 2026-09-30 (dev `0d040a81`) was **61 failed, 1486 passed**,
+The suite pulled on 2026-09-30 (dev `30c78344`) was **61 failed, 1486 passed**,
 every red mapped to an open issue (`plantoir-windows-run\logs\baseline-red-list.md`
 on Russell's machine). Bundle 1 (branch `issue/bundle1-plumbing`) was plumbing,
 so that "did I break something?" has an answer again:
@@ -828,8 +828,8 @@ kind of session can do, measured on the day and written for the next one:
 
 - **The native (containerless) toolchain shipped in v1.1.0 — this is no
   longer a branch, and the container path is gone, not merely deprecated.**
-  `windows-native-toolchain` merged (`b356a1fc` onward) and the WSL2/Docker
-  fallback was deleted outright in `5925e102` — a copy of the app with no
+  `windows-native-toolchain` merged (`4adcd5b7` onward) and the WSL2/Docker
+  fallback was deleted outright in `df317f52` — a copy of the app with no
   bundled runtime now fails fast with "This copy of Plantoir is missing its
   website builder. Reinstall Plantoir, then try again." (`setup.ps1`,
   `preview.ps1`, `deploy.ps1`); there is no fallback path left to take. Run
@@ -841,7 +841,7 @@ kind of session can do, measured on the day and written for the next one:
   or the installed app's own runtime folder exists — that is now the only
   code path. Builds land in `%LOCALAPPDATA%\Plantoir\builds\<folder-id>`
   (OneDrive-safe). Verified by hand, both before and after an adversarial
-  pass (`abb28380`) that found and fixed six real defects (a stop sweep that
+  pass (`2b968c70`) that found and fixed six real defects (a stop sweep that
   silently did nothing, a preview-port announce race, a course-creation
   failure mode, and stale WSL2/container wording leaking into the trail and
   the UI): native build (57 s cold), serve (HTTP 200), stop (kills the tree,

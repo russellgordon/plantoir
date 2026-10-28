@@ -492,7 +492,7 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     branch at all), but it is one `if` away from not being, so the tree
     itself is pinned here.
 
-    The two hashes were captured from `origin/dev` at e9000169 on
+    The two hashes were captured from `origin/dev` at 0b4edb5b on
     2026-09-22, BEFORE any of issue #251 was written, by running this
     same install against that script: 295 files, identical name list,
     identical bytes. Deterministic because the install is given a fixed
@@ -501,19 +501,19 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     Moved ON PURPOSE once since: #331 (2026-09-26) corrected three
     sentences of the template note in ADA1O's `Tasks/_DUPLICATE ME.md`,
     which said a link inside a %% comment "still counts as a link". Checked
-    by installing against origin/dev 8c5ff37c and diffing: that one file,
+    by installing against origin/dev d8df8622 and diffing: that one file,
     those lines, nothing else.
 
     And once more: #443 (2026-10-04) stopped the course pages calling the
     class website "the published page / website / site" — DEPLOY puts a
     site online, PUBLISH only marks a page. Checked by installing against
-    origin/dev b2726e6b and diffing: eight files (seven `_DUPLICATE ME.md`
+    origin/dev 189d4084 and diffing: eight files (seven `_DUPLICATE ME.md`
     and `Tutorials/Scavenger Hunt.md`), those four sentences, nothing else.
 
     Moved ON PURPOSE again: #444 (2026-10-07) put the heading marks back in
     the template sentence "Every `##` (level 2) and `###` (level 3) heading",
     which had said "Every  (level 2) and  (level 3) heading" since the
-    template was added. Checked by installing against origin/dev 4b177c68
+    template was added. Checked by installing against origin/dev 5c3ccaf2
     and diffing: the seven `_DUPLICATE ME.md` files, that one line in each,
     nothing else. The value here is the one taken after #443's wording was
     merged in (2026-10-07): the two changes touch the same line, so the
@@ -522,7 +522,7 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     Moved ON PURPOSE again: #519 (2026-10-18) made the task boxes on a
     class site tickable, so `Style/What This Site Can Do.md` no longer says
     they are read-only and clicking one does nothing. Checked by installing
-    against origin/dev 0fe0d1cba and diffing: that one file, that one
+    against origin/dev 20e19be58 and diffing: that one file, that one
     paragraph (three lines become four), nothing else.
     """
 
