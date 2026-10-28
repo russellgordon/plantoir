@@ -8328,10 +8328,11 @@ anything unexpected, such as a signature check that hangs past 300 s:
 traceback without its marker) or waited (another preview held the fetch for
 longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
 "already ready" prints the marker. They are read from the `PLANTOIR_SWIFT:` line by
-`SwiftGotReady.cs`, in both readers (the console's
-`ScriptRunner.RecordHealthFinding`, and the scheduled publish's
-`ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
-(`TaskScheduling.cs`). A deploy already scheduled picks the line up from its
+`SwiftGotReady.cs`, through `BuildMachineLines.Record` in all three readers
+(the console's `ScriptRunner`, the scheduled publish's
+`ScheduledHealthFindings`, and since #660 a run `plantoir-mcp` started), and
+kept by the scheduled wrapper's marker scan (`TaskScheduling.cs`, generated
+from `BuildMachineLines.ScheduledRecordMarkers`). A deploy already scheduled picks the line up from its
 next run, because `ScheduledRun` writes the wrapper afresh each time (see
 `PLANTOIR_MAPS:` above). Neither event carries `appliesOn`: the mac has
 recorded both since v1.9.0 (#635), from the same `PLANTOIR_SWIFT:` line, which
@@ -8434,10 +8435,11 @@ What Windows owed:
 
 - **`my progress page built`** (`ActivityTrail.Event.MyProgressPageBuilt`),
   read from the build's `PLANTOIR_MY_PROGRESS:` line by `MyProgressBuilt` —
-  the `CoverageMapsBuilt` pattern — in the console reader
-  (`ScriptRunner.RecordHealthFinding`, and the 8000-character carry guard),
-  the scheduled publish's record reader (`ScheduledHealthFindings`) and the
-  wrapper's marker scan (`TaskScheduling.cs`). A deploy already scheduled
+  the `CoverageMapsBuilt` pattern — through `BuildMachineLines.Record` in the
+  console reader (`ScriptRunner`, whose 8000-character carry guard keeps any
+  `PLANTOIR_` line since #660), the scheduled publish's record reader
+  (`ScheduledHealthFindings`) and a run `plantoir-mcp` started (#660), and
+  kept by the wrapper's marker scan (`TaskScheduling.cs`). A deploy already scheduled
   scans for it from its next run, since `ScheduledRun` writes the wrapper
   afresh each time; only a task set before bundle 3 misses it, once. The sentences are
   `myProgressBuilt.trailLine.shapes`, "N page(s)" spelled 1 page / N pages.
