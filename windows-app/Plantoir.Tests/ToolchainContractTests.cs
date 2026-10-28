@@ -366,9 +366,17 @@ public class ToolchainContractTests
         foreach (string name in names)
             Assert.Matches(new System.Text.RegularExpressions.Regex(@"(?m)^\s*" + name + @"\s*=\s*\$\w+"), pins.Groups[1].Value);
 
-        Assert.Matches(new System.Text.RegularExpressions.Regex(
-            @"foreach \(\$key in \$BasePins\.Keys\)\s*\{\s*if \(\[string\]\$existing\.\$key -ne \$BasePins\[\$key\]\)\s*\{\s*throw"),
-            recipe);
+        // The loop over $BasePins must compare each value with its pin and
+        // refuse: held loosely (the block names $BasePins[$key], a -ne and a
+        // throw) so a harmless rewrite - a different cast, a Write-Host before
+        // the throw - does not fail it, while deleting the comparison does.
+        var loop = System.Text.RegularExpressions.Regex.Match(
+            recipe, @"(?s)foreach \(\$key in \$BasePins\.Keys\)\s*\{(.*?)
+    \}");
+        Assert.True(loop.Success, "fetch-runtime.ps1 no longer loops over $BasePins.");
+        Assert.Contains("$BasePins[$key]", loop.Groups[1].Value);
+        Assert.Contains("-ne", loop.Groups[1].Value);
+        Assert.Contains("throw", loop.Groups[1].Value);
     }
 
     /// <summary>

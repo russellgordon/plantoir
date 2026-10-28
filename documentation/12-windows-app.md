@@ -9916,6 +9916,6 @@ scheduled deploy, still running from the old version at install time holds
 `{app}\runtime\node\node.exe` open, Restart Manager is not asked to close it,
 and the install can leave `runtime\node` half deleted. The filter is left as
 it is in this piece (the implementation review raised it; widening what a
-hand-run install closes is its own change, not a side effect of a Node bump).
+hand-run install closes is its own change, #700, not a side effect of a Node bump).
 Until then: stop any preview and let a scheduled deploy finish before
 installing by hand.
