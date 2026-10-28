@@ -848,6 +848,79 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
+    /// The page a section's preview shows now (#681), or null when that
+    /// section is not the one on screen: Windows shows one section per main
+    /// window, and a section not shown has no preview page to name, so null
+    /// (<c>noPageShowing</c>) is the honest answer for it.
+    /// </summary>
+    internal string? PreviewedAddressFor(string courseCode, int section) =>
+        DetailHost.Content is SectionDetailView detail &&
+        string.Equals(detail.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) &&
+        detail.SectionNumber == section
+            ? detail.PreviewedAddress()
+            : null;
+
+    /// <summary>
+    /// The in-app assistant's Open in Obsidian (#690; the mac's #610): presses
+    /// THIS window's own Open in Obsidian for the section - the sidebar's one
+    /// route, #681's page and all - and says what the press came to as soon as
+    /// that is known. The order is <see cref="AssistantsObsidianPress"/>'s: a
+    /// question of an earlier press for the course, or any other dialog up in
+    /// this window, is answered first (WaitingForAnAnswer), and the section is
+    /// shown only once no dialog is up, so nothing on screen changes under an
+    /// open dialog; the press runs after that dialog closes, within
+    /// <see cref="AssistantsObsidianPress.LongestWait"/>. The window comes
+    /// forward only when it was hidden or minimised, never taking focus from
+    /// the assistant's window (the recorded choice of <see cref="ShowPreviewFor"/>);
+    /// a freshly shown section has no page on screen yet, so it opens the
+    /// section and says why. NoWindow when this window is on another folder
+    /// or the section is not here; DidNotOpen when the press failed.
+    /// </summary>
+    public async Task<OpenInObsidianPress> PressOpenInObsidianFor(string folder, string courseCode, int section)
+    {
+        var pressed = new TaskCompletionSource<OpenInObsidianPress>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!DispatcherQueue.TryEnqueue(() => _ = PressOnTheInterfaceThread())) return new OpenInObsidianPress.NoWindow();
+        return await pressed.Task;
+
+        Course? TheCourse() =>
+            IsClosed || !WorkingFolder.IsTheSame(Workspace.WorkspacePath, folder)
+                ? null
+                : Workspace.Courses.FirstOrDefault(c => string.Equals(c.Code, courseCode, StringComparison.OrdinalIgnoreCase)
+                                                        && c.SectionNumbers.Contains(section));
+
+        void ShowTheSection()
+        {
+            if (DetailHost.Content is not SectionDetailView existing ||
+                !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                existing.SectionNumber != section)
+            {
+                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+            }
+            ComeForwardIfHidden();
+        }
+
+        async Task PressOnTheInterfaceThread()
+        {
+            try
+            {
+                await AssistantsObsidianPress.RunAsync(new AssistantsObsidianPress.Window(
+                    CoursePath: () => TheCourse()?.DirectoryPath,
+                    DialogIsOpen: () => DialogGate.IsOpen(Content?.XamlRoot),
+                    IsClosed: () => IsClosed,
+                    BringUp: ShowTheSection,
+                    Press: () => TheCourse() is { } course
+                        ? SidebarPane.OpenInObsidian(course, section)
+                        : Task.FromResult<OpenInObsidianPress>(new OpenInObsidianPress.NoWindow())), pressed);
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"PressOpenInObsidianFor exception: {ex}");
+                pressed.TrySetResult(new OpenInObsidianPress.DidNotOpen());
+            }
+        }
+    }
+
+    /// <summary>
     /// Deploy through the section's own flow and AWAIT the real outcome —
     /// success, failure, or a multi-destination partial — rather than only
     /// the moment the click was dispatched. Returns null if no section view

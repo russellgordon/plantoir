@@ -101,8 +101,7 @@ public static class FolderActions
         return File.Exists(index) ? index : vaultPath;
     }
 
-    public static string ObsidianUri(string path) =>
-        "obsidian://open?path=" + Uri.EscapeDataString(path);
+    public static string ObsidianUri(string path) => Plantoir.Core.Models.PreviewedPageSource.ObsidianLink(path);
 
     public static bool FolderIsInRegisteredVault(string folderPath, string? registryJson)
     {

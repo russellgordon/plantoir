@@ -336,6 +336,19 @@ public class ContractTests
         Assert.Equal(wording["menuPlanShowAlreadyOnePage"]!.ToString(), AssistWording.MenuPlanShowAlready(1, publishing: true));
         Assert.Equal(wording["menuPlanShowAlreadyOnePageHiding"]!.ToString(), AssistWording.MenuPlanShowAlready(1, publishing: false));
 
+        // #690 (the mac's #610): the assistant's Open in Obsidian. The
+        // eighth, obsidianIsNotOnThisMac, is held in NamedGapLedger (#698):
+        // it says "this Mac" without {machine}, and Windows says "this PC".
+        Assert.Equal(wording["openedThePageInObsidian"]!.ToString(), AssistWording.OpenedThePageInObsidian("{page}"));
+        Assert.Equal(wording["openedTheSectionNoPageShowing"]!.ToString(), AssistWording.OpenedTheSectionNoPageShowing("{course}", "{section}"));
+        Assert.Equal(wording["openedTheSectionPageNotFound"]!.ToString(), AssistWording.OpenedTheSectionPageNotFound("{course}", "{section}"));
+        Assert.Equal(wording["obsidianOpensAfterTheQuestion"]!.ToString(), AssistWording.ObsidianOpensAfterTheQuestion("{course}", "{section}"));
+        Assert.Equal(wording["obsidianIsAlreadyOpening"]!.ToString(), AssistWording.ObsidianIsAlreadyOpening("{course}"));
+        Assert.Equal(wording["openInObsidianIsInTheSectionWindow"]!.ToString(), AssistWording.OpenInObsidianIsInTheSectionWindow("{course}", "{section}"));
+        Assert.Equal(wording["openInObsidianFoundNoWindow"]!.ToString(), AssistWording.OpenInObsidianFoundNoWindow("{course}", "{section}"));
+        // Windows' own sentence is the contract's with the computer named for this platform.
+        Assert.Equal(wording["obsidianIsNotOnThisMac"]!.ToString().Replace("this Mac", "this PC"), AssistWording.ObsidianIsNotOnThisPc);
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
@@ -404,6 +417,10 @@ public class ContractTests
             "the mac's planWillBecome(visible:withTheDatesOf:) — the dispatcher over planWillBecomeVisible, " +
             "planWillBecomeHidden and planWillBecomeVisibleWithTheDateOf, which the contract samples under those " +
             "keys; neither app gives the dispatcher a key of its own (#548, mac #524)",
+        ["ObsidianIsNotOnThisPc"] =
+            "Windows' wording of obsidianIsNotOnThisMac (#690): the contract's sentence names \"this Mac\" " +
+            "without {machine}, against specialNames.platformWording.machine.rule, so it cannot be said here as " +
+            "written; the key is held in NamedGapLedger until the mac writes it with {machine} (#698)",
         // ScheduleADeployNeedsATime left this list with #466: the mac
         // implemented #424's frames (#449) and the key is generated now.
     };

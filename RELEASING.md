@@ -115,6 +115,7 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-28 | GeoGebra sketches (a ```` ```geogebra ```` fence, or a `.ggb` file beside a page) open on a site built on Windows, from the site's own copy of the engine | Windows (the mac had it in 1.9.0) | #687 |
 | 2026-10-28 | Nothing: the Windows website builder runs on Node 22.23.4, the version the mac's image uses | Windows | #675 |
 | 2026-10-28 | Nothing: the Windows runtime's npm advisories were audited and the six left are accepted on evidence; `windows-app\audit-runtime.ps1` re-runs the audit by hand | Windows | #685 |
+| 2026-10-28 | Open in Obsidian on a section opens the page its preview is showing, not the section's front page; and "Open this in Obsidian" typed to the assistant presses that button | Windows (the mac since 1.9.0) | [#681](https://github.com/russellgordon/plantoir/issues/681), [#690](https://github.com/russellgordon/plantoir/issues/690) |
 
 
 ## Warnings the release notes MUST carry
@@ -301,7 +302,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > second half is still yours: open the file and check each entry's issue is
    > open. An entry whose milestone IS this release means the work is owed
    > NOW — build it, or move the issue (and the entry) to a later milestone as
-   > a deliberate decision. Never cut over one. The boundary and the reasoning
+   > a deliberate decision. Never cut over one. **For this cut the ledger is
+   > deliberately NOT empty**: it holds two entries against mac #698 (v1.9.1,
+   > #690's `obsidianIsNotOnThisMac` and its scenario), and since v1.9.1 is
+   > later than 1.8.7 `EveryEntryIsOwedByAMilestoneLaterThanThisBuild` passes
+   > with them in it. The boundary and the reasoning
    > are in `contracts/README.md` → "Named gaps".
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries

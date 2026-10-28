@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Threading;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
@@ -158,6 +159,19 @@ public class AssistScenarioTests : IDisposable
         if (given?["theDeployMeetsAQuestion"]?.GetValue<bool>() == true) _launcher.QuestionOn = "deploy";
 
         SetUpWhatThisCaseNeeds(when, pending);
+        // #690: `given.obsidianPage` names the page a press opened (default
+        // "Unit 1, Day 1"), and fills {page} in the expected sentences.
+        string obsidianPage = given?["obsidianPage"]?.ToString() ?? "Unit 1, Day 1";
+        PageInTheSentence.Value = obsidianPage;
+        // `given.keptForReference`: the fixture's course is marked kept for
+        // reference before the call, as ReferenceFixtures marks one.
+        if (given?["keptForReference"]?.GetValue<bool>() == true)
+        {
+            string config = Path.Combine(_folder, "courses", Course, "course_config.json");
+            var marked = File.Exists(config) ? CourseConfiguration.Load(config) : CourseConfiguration.FromDictionary(new Newtonsoft.Json.Linq.JObject());
+            marked.MarkKeptForReference(null);
+            marked.Write(config);
+        }
         // #355: `given.visibleClasses` lays out those class pages, published,
         // in section 1 before the call (the first is the first class).
         if (given?["visibleClasses"] is JsonArray visibleClasses)
@@ -234,6 +248,32 @@ public class AssistScenarioTests : IDisposable
                     "cancelled" => LaterClassesAnswer.Cancelled,
                     var other => throw new InvalidOperationException($"{scenarioName}: laterClassesAnswer {other}"),
                 });
+            };
+        }
+
+        // #690: `given.obsidianInstalled` (absent = installed). The press is
+        // the APP's: with `surface: "mcp"` there is no window to press, the
+        // seam is left unset and the server's own refusal answers (an outside
+        // assistant). Otherwise a window that is open notes `openInObsidian`
+        // and reports `given.obsidianPress`; none open is NoWindow, no event.
+        agent.ObsidianIsInstalled = () => given?["obsidianInstalled"]?.GetValue<bool>() ?? true;
+        if (given?["surface"]?.ToString() != "mcp")
+        {
+            agent.OpenInObsidianInApp = () =>
+            {
+                if (!sectionWindowOpen) return Task.FromResult<OpenInObsidianPress>(new OpenInObsidianPress.NoWindow());
+                _window.Note("openInObsidian");
+                string place = $"section{SectionNumber}/All Classes/{obsidianPage}";
+                OpenInObsidianPress press = given?["obsidianPress"]?.ToString() switch
+                {
+                    "page" => new OpenInObsidianPress.Opened(new PreviewedPageSource.Page(PagePath(obsidianPage), place, false)),
+                    "noPageShowing" => new OpenInObsidianPress.Opened(new PreviewedPageSource.FellBack(PreviewedPageSource.Fallback.NoPageShowing)),
+                    "notInTheList" => new OpenInObsidianPress.Opened(new PreviewedPageSource.FellBack(PreviewedPageSource.Fallback.NotInTheList)),
+                    "waitingForAnAnswer" => new OpenInObsidianPress.WaitingForAnAnswer(),
+                    "alreadyOpening" => new OpenInObsidianPress.AlreadyOpening(),
+                    var other => throw new InvalidOperationException($"{scenarioName}: obsidianPress {other}"),
+                };
+                return Task.FromResult(press);
             };
         }
 
@@ -679,8 +719,17 @@ public class AssistScenarioTests : IDisposable
             ?? throw new InvalidOperationException($"No sentence called {key} in assist-wording.json");
         return found.GetValue<string>()
             .Replace("{course}", Course, StringComparison.Ordinal)
-            .Replace("{section}", SectionNumber.ToString(), StringComparison.Ordinal);
+            .Replace("{section}", SectionNumber.ToString(), StringComparison.Ordinal)
+            .Replace("{page}", PageInTheSentence.Value ?? "Unit 1, Day 1", StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// The page this case's Open in Obsidian names (<c>given.obsidianPage</c>,
+    /// #690), for <see cref="Sentence"/>, which every expectation resolves
+    /// through and which is static. Async-local, so it follows the one case
+    /// that set it through its awaits and no other.
+    /// </summary>
+    private static readonly AsyncLocal<string?> PageInTheSentence = new();
 
     /// <summary>
     /// "assistant: wording.deployWasCancelled" split into who said it and what
@@ -767,10 +816,12 @@ public class AssistScenarioTests : IDisposable
 
     /// <summary>
     /// Never answers, unless the case scripts <c>given.modelReply</c> (#411):
-    /// then that WHOLE reply answers every request — <c>finishReason</c> plus
+    /// then that WHOLE reply answers the FIRST request — <c>finishReason</c> plus
     /// either a <c>toolCall</c> (its <c>arguments</c> as the model's own TEXT,
     /// so a half-written call can be scripted; "{course}" is the fixture's
-    /// course) or <c>content</c>.
+    /// course) or <c>content</c>. Every later request is answered with plain
+    /// text, as the mac's runner does since #610 (#690): a hand-back that
+    /// stopped ending the turn would otherwise ask again for ever.
     /// </summary>
     private sealed class ScriptedModel : IChatModel
     {
@@ -789,6 +840,13 @@ public class AssistScenarioTests : IDisposable
         {
             Requests++;
             if (_reply is null) return Task.FromResult<ModelReply?>(null);
+            // The scripted reply answers the FIRST request only; every later
+            // one is plain text, as the mac's runner does since #610: a
+            // hand-back regression would otherwise loop for ever, since the
+            // agent has no lap cap.
+            if (Requests > 1)
+                return Task.FromResult<ModelReply?>(new ModelReply(
+                    new JsonObject { ["role"] = "assistant", ["content"] = "Here it is." }, "stop"));
 
             var message = new JsonObject { ["role"] = "assistant" };
             if (_reply["toolCall"] is JsonObject call)
