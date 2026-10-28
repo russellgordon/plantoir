@@ -901,7 +901,15 @@ public static class ActivityTrail
     /// launcher is handed as PLANTOIR_TRAIL_DIR (#682,
     /// <see cref="LauncherEnvironment"/>). A launcher always writes
     /// <c>activity.txt</c> there, which is why a test that wants a launcher's
-    /// lines in its scratch trail names that file.</summary>
+    /// lines in its scratch trail names that file.
+    ///
+    /// <para>A test that sets its trail at <c>%TEMP%\plantoir-trail-&lt;guid&gt;.txt</c>
+    /// (BuildMachineLinesTests, ConPtyLongLineTests, MachineLineLengthContractTests
+    /// and others) makes <c>%TEMP%</c> itself the log directory for its run.
+    /// Harmless: those tests run no launcher that writes a trail line, and
+    /// nothing reads <c>%TEMP%\activity.txt</c>. A test that DOES want a
+    /// launcher's lines gives its trail a folder of its own, ending in
+    /// <c>activity.txt</c>.</para></summary>
     public static string CurrentLogDirectory => Path.GetDirectoryName(CurrentLogPath)!;
 
     public const string PromptPrefix = "  asked: ";
