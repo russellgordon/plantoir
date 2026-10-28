@@ -61,15 +61,26 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File verify-deploy.ps1 `
         -WorkingFolder "C:\Users\me\Desktop\plantoir-test" -Course ICS3U -Section 1
 
+.PARAMETER SelfTest
+    Prove the wait for Cloudflare's production address (#680, the mac's
+    #665) against a stub server on 127.0.0.1, in about 20 seconds: no
+    credentials, no network, no working folder. The same eight cases as
+    `./verify-deploy.sh --self-test`, by the same names. Run it before a
+    real run whenever the wait changes.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File verify-deploy.ps1 -FirstPublish
+
+.EXAMPLE
+    powershell -NoProfile -ExecutionPolicy Bypass -File verify-deploy.ps1 -SelfTest
 #>
 [CmdletBinding()]
 param(
     [string]$WorkingFolder = "$env:USERPROFILE\Desktop\plantoir-deploy-verify",
     [string]$Course = "ICS3U",
     [int]$Section = 1,
-    [switch]$FirstPublish
+    [switch]$FirstPublish,
+    [switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Continue'
@@ -83,9 +94,304 @@ function Hdr([string]$text) {
     Write-Host ""
     Write-Host "== $text" -ForegroundColor Cyan
 }
-function Ok([string]$text) { $script:Pass++; Write-Host "  [ok]   $text" -ForegroundColor DarkGray }
-function No([string]$text) { $script:Fail++; $script:Failures += $text; Write-Host "  [FAIL] $text" -ForegroundColor Red }
+# $script:Quiet is set only by -SelfTest, around the calls it judges: their
+# own lines would read as the run's (the mac's self-test captures them in a
+# subshell for the same reason).
+$script:Quiet = $false
+function Ok([string]$text) { $script:Pass++; if (-not $script:Quiet) { Write-Host "  [ok]   $text" -ForegroundColor DarkGray } }
+function No([string]$text) { $script:Fail++; $script:Failures += $text; if (-not $script:Quiet) { Write-Host "  [FAIL] $text" -ForegroundColor Red } }
 function Skipped([string]$text) { $script:Skip++; Write-Host "  [skip] $text" -ForegroundColor Yellow }
+
+# ------------------------------------- Cloudflare's production address (#680)
+# `wrangler pages deploy` returns when the upload is accepted, not when
+# <project>.pages.dev serves it. At the 1.8.5 cut a single Cloudflare leg
+# was judged while production still served the deployment before it: eight
+# checks failed, and two minutes later all of them passed (#630). So each
+# leg waits, for at most $CfWait seconds, for production to serve what this
+# leg uploaded. Not getting there is a FAILURE that says so, after which the
+# run judges what production does serve. Never a skip, never an exit.
+#
+# "What this leg uploaded" is the subtle half, and the reason this is not
+# the front-page-only wait it was until #680. The built site holds nothing
+# unique per build, so when only static files or headers moved
+# (static/pyodide/*, _headers, KaTeX) the old and new deployments have the
+# same index.html, and a front-page wait passed while production still
+# served the old one - the shape of the 1.8.5 failures. The borrowed page of
+# runnable code therefore carries a mark made fresh for every run
+# ($script:RunMark, appended where the page is written), and production must
+# serve BOTH the front page and that page byte for byte as uploaded. The
+# previous run's deployment cannot carry this run's mark. The twin of
+# verify-deploy.sh's snapshot_cloudflare_upload / wait_for_cloudflare_production
+# (#665), wording included, with " - " for its " (em dash) ".
+#
+# The environment overrides exist for -SelfTest, which runs the wait against
+# a stub in seconds; a real run leaves them alone. `if`, not `??`: this is
+# Windows PowerShell 5.1.
+$script:CfPoll = 5
+if ($env:VERIFY_DEPLOY_CF_POLL) { $script:CfPoll = [int]$env:VERIFY_DEPLOY_CF_POLL }
+$script:CfWait = 120
+if ($env:VERIFY_DEPLOY_CF_WAIT) { $script:CfWait = [int]$env:VERIFY_DEPLOY_CF_WAIT }
+$script:RunMark = "plantoir-verify-deploy-run-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ'))-$PID"
+$script:CfWaited = -1
+# curl.exe by full path, as the mac uses curl. Set here rather than with the
+# other checks' helpers below because -SelfTest needs it before the preflight.
+$script:Curl = Join-Path $env:SystemRoot "System32\curl.exe"
+$script:Measured = @()
+
+# Called the moment a Cloudflare leg returns, because in a pairing the next
+# leg can rebuild the section before production is judged. Keeps a copy of
+# what was uploaded, and when the upload returned. Returns $true when the
+# copy can be judged against.
+#
+# The upload is found from deploy.py's LAST "Deploying from local build:"
+# line, which on Windows names %LOCALAPPDATA%\Plantoir\builds\<id>\<COURSE>\
+# section<N>\public (there is no fixed $PUBLIC_DIR as on the mac, so the
+# files are copied from the folder the line names). The `\s*` before `$`
+# swallows the transcript's `\r`. The suffix check alone would accept
+# ANOTHER working folder's build of the same course and section (same
+# suffix, different <id>); the MARK check below is what rules that out,
+# since no other folder's page carries this run's mark.
+function Save-CloudflareUpload([string]$What, [string]$Log, [string]$Snapshot) {
+    Remove-Item -LiteralPath $Snapshot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path $Snapshot | Out-Null
+    [IO.File]::WriteAllText((Join-Path $Snapshot 'uploaded-at'), [string][DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+    $built = [regex]::Matches([string]$Log, '(?m)Deploying from local build: (.+?)\s*$') | Select-Object -Last 1
+    $suffix = "\$Course\section$Section\public"
+    if (-not $built -or -not $built.Groups[1].Value.EndsWith($suffix, [StringComparison]::OrdinalIgnoreCase)) {
+        No "$What - the leg did not say it uploaded this section's build, so what production should serve is unknown"
+        return $false
+    }
+    $public = $built.Groups[1].Value
+    try {
+        Copy-Item -LiteralPath (Join-Path $public 'index.html') -Destination (Join-Path $Snapshot 'front.html') -ErrorAction Stop
+        Copy-Item -LiteralPath (Join-Path $public 'Runner-Deploy-Check.html') -Destination (Join-Path $Snapshot 'runner.html') -ErrorAction Stop
+    } catch {
+        No "$What - the uploaded build has no front page or no page of runnable code to compare production with"
+        return $false
+    }
+    $runner = [IO.File]::ReadAllText((Join-Path $Snapshot 'runner.html'))
+    if ($runner.IndexOf($script:RunMark, [StringComparison]::Ordinal) -lt 0) {
+        No "$What - the uploaded page of runnable code does not carry this run's mark, so this deployment could not be told from the last"
+        return $false
+    }
+    return $true
+}
+
+# Polls production's front page and page of runnable code until both are the
+# snapshot's bytes. A 404 or no answer is "not yet" (a brand-new project's
+# first publish). Comparing against the deployment's own
+# <hash>.<project>.pages.dev was rejected: on a project's first publish that
+# subdomain resolves LATER than production (Url-FromLog's comment), and it is
+# not the address a teacher hands out.
+function Wait-CloudflareProduction([string]$What, [string]$Url, [string]$Snapshot) {
+    $base = $Url.TrimEnd('/')
+    $wantFront = (Get-FileHash -LiteralPath (Join-Path $Snapshot 'front.html')).Hash
+    $wantRunner = (Get-FileHash -LiteralPath (Join-Path $Snapshot 'runner.html')).Hash
+    $uploaded = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    try { $uploaded = [int64]([IO.File]::ReadAllText((Join-Path $Snapshot 'uploaded-at')).Trim()) } catch { }
+    $fetchedFront = Join-Path $Snapshot 'fetched-front.html'
+    $fetchedRunner = Join-Path $Snapshot 'fetched-runner.html'
+    $script:CfWaited = -1
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        Remove-Item -LiteralPath $fetchedFront, $fetchedRunner -ErrorAction SilentlyContinue
+        & $script:Curl -s -L --max-time 20 -H "Cache-Control: no-cache" -o $fetchedFront "$base/" 2>$null
+        & $script:Curl -s -L --max-time 20 -H "Cache-Control: no-cache" -o $fetchedRunner "$base/Runner-Deploy-Check" 2>$null
+        $waited = [int][Math]::Floor($clock.Elapsed.TotalSeconds)
+        if ((Test-Path -LiteralPath $fetchedFront) -and (Test-Path -LiteralPath $fetchedRunner) -and
+            (Get-FileHash -LiteralPath $fetchedFront).Hash -eq $wantFront -and
+            (Get-FileHash -LiteralPath $fetchedRunner).Hash -eq $wantRunner) {
+            $sinceUpload = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - $uploaded
+            $script:CfWaited = $waited
+            Ok "$What - production serves this deployment's front page and page of runnable code (after $waited s)"
+            $script:Measured += "${What}: production matched the upload after $waited s of waiting, $sinceUpload s after its upload returned (a wait of 0 s on a later leg means the same bytes were already live, not a fast switch)"
+            return $true
+        }
+        if ($waited -ge $script:CfWait) { break }
+        Start-Sleep -Seconds $script:CfPoll
+    }
+    No "$What - production did not serve this deployment within $($script:CfWait) s; judging what it does serve"
+    $script:Measured += "${What}: production had not switched to this deployment after $($script:CfWait) s"
+    return $false
+}
+
+# ----------------------------------------------------------------- self-test
+# The wait above, proved against a stub server on 127.0.0.1 that serves the
+# OLD bytes for the first K requests to a path and the NEW after: no
+# credentials, no network, nothing borrowed from any folder. Runs before the
+# preflight, so it touches nothing a real run uses. The stub is a COPY of
+# verify-deploy.sh's (its run_self_test, lines 178-211 on 2026-10-28), kept
+# byte for byte so the two harnesses are proved by the same server; change
+# both or neither. The eight cases are the mac's, by the same names.
+function Invoke-SelfTest {
+    $st = Join-Path ([IO.Path]::GetTempPath()) ("plantoir-deploy-selftest-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    $script:CfPoll = 1
+    $script:CfWait = 8
+    $script:RunMark = "plantoir-verify-deploy-run-selftest-$PID"
+    # The course and section a snapshot must name, as the mac's self-test
+    # sets COURSE and SECTION; nothing else reads them in a self-test run.
+    $script:Course = 'ADA1O'; $script:Section = 1
+    $site = Join-Path $st 'site'
+    $public = Join-Path $st 'Plantoir\builds\5f3a9c1e\ADA1O\section1\public'
+    $snap = Join-Path $st 'snap'
+    foreach ($d in $site, $public, $snap) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+    $noBom = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText((Join-Path $site 'old-front.html'), "<html><body>front page</body></html>`n", $noBom)
+    [IO.File]::WriteAllText((Join-Path $site 'new-front.html'), "<html><body>front page, rebuilt</body></html>`n", $noBom)
+    [IO.File]::WriteAllText((Join-Path $site 'old-runner.html'), "<html><body>runnable code, run plantoir-verify-deploy-run-before</body></html>`n", $noBom)
+    [IO.File]::WriteAllText((Join-Path $site 'new-runner.html'), "<html><body>runnable code, run $($script:RunMark)</body></html>`n", $noBom)
+    Copy-Item (Join-Path $site 'new-front.html') (Join-Path $snap 'front.html')
+    Copy-Item (Join-Path $site 'new-runner.html') (Join-Path $snap 'runner.html')
+    $stub = @'
+import http.server, os, pathlib, sys
+portfile, folder, front_mode, runner_mode = sys.argv[1:5]
+folder = pathlib.Path(folder)
+routes = {"/": ("front", front_mode), "/Runner-Deploy-Check": ("runner", runner_mode)}
+counts = {}
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        path = self.path.split("?")[0]
+        if path not in routes:
+            self.send_error(404)
+            return
+        name, mode = routes[path]
+        seen = counts.get(path, 0)
+        counts[path] = seen + 1
+        kind, _, limit = mode.partition(":")
+        status, body = 200, (folder / f"new-{name}.html").read_bytes()
+        if kind != "new" and (limit == "inf" or seen < int(limit)):
+            if kind == "404":
+                status, body = 404, b"not here yet\n"
+            else:
+                body = (folder / f"old-{name}.html").read_bytes()
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+pathlib.Path(portfile + ".part").write_text(str(server.server_port))
+os.replace(portfile + ".part", portfile)
+server.serve_forever()
+'@
+    $stubFile = Join-Path $st 'stub.py'
+    [IO.File]::WriteAllText($stubFile, ($stub -replace "`r`n", "`n"), $noBom)
+    # The bundled runtime's Python when there is one, as the real run uses;
+    # any `python` otherwise. -I, so nothing beside the stub is imported.
+    $runtime = if ($env:PLANTOIR_RUNTIME) { $env:PLANTOIR_RUNTIME } else { Join-Path $PSScriptRoot 'windows-app\Vendor\runtime' }
+    $python = Join-Path $runtime 'python\python.exe'
+    if (-not (Test-Path -LiteralPath $python)) { $python = 'python' }
+    $script:StubProcess = $null
+    $script:StubUrl = ''
+    $portFile = Join-Path $st 'port'
+    function Start-Stub([string]$FrontMode, [string]$RunnerMode) {
+        Remove-Item -LiteralPath $portFile -ErrorAction SilentlyContinue
+        $script:StubProcess = Start-Process -FilePath $python -PassThru -WindowStyle Hidden `
+            -ArgumentList ('-I "' + $stubFile + '" "' + $portFile + '" "' + $site + '" ' + $FrontMode + ' ' + $RunnerMode)
+        foreach ($i in 1..100) { if ((Test-Path -LiteralPath $portFile) -and (Get-Item -LiteralPath $portFile).Length -gt 0) { break }; Start-Sleep -Milliseconds 100 }
+        $port = if (Test-Path -LiteralPath $portFile) { ([IO.File]::ReadAllText($portFile)).Trim() } else { '' }
+        $script:StubUrl = "http://127.0.0.1:$port"
+    }
+    function Stop-Stub {
+        if ($script:StubProcess -and -not $script:StubProcess.HasExited) {
+            Stop-Process -Id $script:StubProcess.Id -Force -ErrorAction SilentlyContinue
+            try { $script:StubProcess.WaitForExit(5000) | Out-Null } catch { }
+        }
+        $script:StubProcess = $null
+    }
+    # Does the stub serve that file now?
+    function Test-Serves([string]$Path, [string]$Expected) {
+        $judged = Join-Path $st 'judged.html'
+        Remove-Item -LiteralPath $judged -ErrorAction SilentlyContinue
+        & $script:Curl -s --max-time 5 -o $judged "$($script:StubUrl)$Path" 2>$null
+        return (Test-Path -LiteralPath $judged) -and (Get-FileHash -LiteralPath $judged).Hash -eq (Get-FileHash -LiteralPath $Expected).Hash
+    }
+    # Runs one call with its own Ok/No lines hidden and its counts taken back
+    # out, and says what it did: the result, and the failures it recorded.
+    function Measure-Case([scriptblock]$Call) {
+        $pass = $script:Pass; $fail = $script:Fail; $failures = $script:Failures
+        $script:Quiet = $true
+        try { $result = & $Call } finally { $script:Quiet = $false }
+        $said = @($script:Failures | Select-Object -Skip $failures.Count)
+        $script:Pass = $pass; $script:Fail = $fail; $script:Failures = $failures
+        return @{ Result = $result; Failures = $said }
+    }
+
+    Hdr "Self-test - the wait for Cloudflare's production address (#680, the mac's #665)"
+    try {
+        Start-Stub 'old:3' 'old:3'
+        if (Test-Serves '/' (Join-Path $site 'old-front.html')) { Ok "control: fetched at once, the stub serves the OLD front page (the race, reproduced)" }
+        else { No "control: the stub did not serve the old front page first, so it proves nothing" }
+        Stop-Stub
+
+        Start-Stub 'old:3' 'old:3'
+        $case = Measure-Case { Wait-CloudflareProduction "case" $script:StubUrl $snap }
+        $n = $script:CfWaited
+        if ($case.Result -eq $true -and $n -ge 2 -and (Test-Serves '/' (Join-Path $site 'new-front.html')) -and (Test-Serves '/Runner-Deploy-Check' (Join-Path $site 'new-runner.html'))) {
+            Ok "production switches after 3 requests: the wait passes (after $n s) and what is judged next is the NEW deployment"
+        } else { No "production switches after 3 requests: result $($case.Result), after $n s, said: $($case.Failures -join ' | ')" }
+        Stop-Stub
+
+        Start-Stub 'old:inf' 'old:inf'
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        $case = Measure-Case { Wait-CloudflareProduction "case" $script:StubUrl $snap }
+        $elapsed = [int]$clock.Elapsed.TotalSeconds
+        if ($case.Result -eq $false -and $case.Failures.Count -eq 1 -and $case.Failures[0] -like "*within 8 s; judging what it does serve" -and $elapsed -ge 8 -and $elapsed -le 15) {
+            Ok "production never switches: exactly one failure, at the cap ($elapsed s), and the run goes on"
+        } else { No "production never switches: result $($case.Result), $($case.Failures.Count) failure(s), $elapsed s, said: $($case.Failures -join ' | ')" }
+        Stop-Stub
+
+        Start-Stub '404:2' '404:2'
+        $case = Measure-Case { Wait-CloudflareProduction "case" $script:StubUrl $snap }
+        if ($case.Result -eq $true -and $case.Failures.Count -eq 0) { Ok "a brand-new project answers 404 at first: that is 'not yet', and the wait passes when it answers" }
+        else { No "a brand-new project answers 404 at first: result $($case.Result), said: $($case.Failures -join ' | ')" }
+        Stop-Stub
+
+        Start-Stub 'new' 'old:3'
+        $case = Measure-Case { Wait-CloudflareProduction "case" $script:StubUrl $snap }
+        $n = $script:CfWaited
+        if ($case.Result -eq $true -and $n -ge 2 -and (Test-Serves '/Runner-Deploy-Check' (Join-Path $site 'new-runner.html'))) {
+            Ok "only the static files moved (same front page): the wait holds until the page of runnable code switches (after $n s)"
+        } else { No "only the static files moved (same front page): result $($case.Result), after $n s, said: $($case.Failures -join ' | ')" }
+        Stop-Stub
+
+        # A real run's log is PtyDriver's raw transcript, so its lines end in
+        # \r\n, and the path is the Windows builds folder's.
+        $crlf = "Deploying ADA1O S1 from this PC ...`r`n Deploying from local build: $public`r`n Live URL: https://example.pages.dev`r`n"
+        Copy-Item (Join-Path $site 'new-front.html') (Join-Path $public 'index.html') -Force
+        Copy-Item (Join-Path $site 'new-runner.html') (Join-Path $public 'Runner-Deploy-Check.html') -Force
+        $case = Measure-Case { Save-CloudflareUpload "case" $crlf (Join-Path $st 'snap-crlf') }
+        if ($case.Result -eq $true -and $case.Failures.Count -eq 0 -and
+            (Get-FileHash -LiteralPath (Join-Path $st 'snap-crlf\runner.html')).Hash -eq (Get-FileHash -LiteralPath (Join-Path $public 'Runner-Deploy-Check.html')).Hash) {
+            Ok "a terminal transcript's \r\n line names this section's build: the upload is kept to compare with"
+        } else { No "a terminal transcript's \r\n line: result $($case.Result), said: $($case.Failures -join ' | ')" }
+
+        $other = " Deploying from local build: $($public -replace '\\section1\\public$', '\section2\public')`r`n"
+        $case = Measure-Case { Save-CloudflareUpload "case" $other (Join-Path $st 'snap-other') }
+        if ($case.Result -eq $false -and $case.Failures.Count -eq 1) { Ok "a leg that uploaded another section's build is one failure, not a wait against the wrong bytes" }
+        else { No "a leg that uploaded another section's build: result $($case.Result), said: $($case.Failures -join ' | ')" }
+
+        Copy-Item (Join-Path $site 'old-runner.html') (Join-Path $public 'Runner-Deploy-Check.html') -Force
+        $case = Measure-Case { Save-CloudflareUpload "case" $crlf (Join-Path $st 'snap-unmarked') }
+        if ($case.Result -eq $false -and ($case.Failures -join ' ') -like "*does not carry this run's mark*") { Ok "an upload whose page of runnable code lacks this run's mark is a failure, since the wait could not tell it from the last" }
+        else { No "an upload without this run's mark: result $($case.Result), said: $($case.Failures -join ' | ')" }
+    } finally {
+        Stop-Stub
+        Remove-Item -LiteralPath $st -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    Hdr "Result"
+    Write-Host "  $($script:Pass) passed, $($script:Fail) failed, $($script:Skip) skipped"
+    if ($script:Fail -gt 0) {
+        Write-Host "  Failures:" -ForegroundColor Red
+        foreach ($f in $script:Failures) { Write-Host "    - $f" -ForegroundColor Red }
+        exit 1
+    }
+    exit 0
+}
+if ($SelfTest) { Invoke-SelfTest }
 
 # ------------------------------------------------------------------ preflight
 Hdr "Preflight - refuse clearly rather than half-running"
@@ -719,33 +1025,10 @@ function Check-ServedCase([string]$What, [string]$Site) {
     else { No "$What's postscript.js names plantoirPaths $count time(s), not 3 - an anchor in _wire_served_case moved" }
 }
 
-# Cloudflare's production address serves the NEW deployment only after it
-# has propagated (#630's second comment): at the 1.8.5 cut a single
-# Cloudflare leg was judged while production still served the deployment
-# before it, eight checks failed, and two minutes later all of them passed.
-# Wait for production's front page to be byte for byte the index.html this
-# leg uploaded (the folder deploy.py names in "Deploying from local build:"),
-# for at most 120 s. Not reaching it is a FAILURE - the run then judges what
-# production is serving, and says so - never a skip.
-function Wait-CloudflareProduction([string]$What, [string]$Log, [string]$Url) {
-    $built = [regex]::Match($Log, '(?m)Deploying from local build: (.+?)\s*$')
-    if (-not $built.Success) { No "$What - no 'Deploying from local build:' line, so what was uploaded is unknown"; return }
-    $index = Join-Path $built.Groups[1].Value "index.html"
-    if (-not (Test-Path -LiteralPath $index)) { No "$What - the uploaded build has no index.html at $index"; return }
-    $want = (Get-FileHash -LiteralPath $index).Hash
-    $fetched = Join-Path $work "cf-front-page.html"
-    $clock = [Diagnostics.Stopwatch]::StartNew()
-    while ($clock.Elapsed.TotalSeconds -lt 120) {
-        Remove-Item -LiteralPath $fetched -ErrorAction SilentlyContinue
-        & $script:Curl -s -L --max-time 20 -H "Cache-Control: no-cache" -o $fetched "$($Url.TrimEnd('/'))/" 2>$null
-        if ((Test-Path -LiteralPath $fetched) -and (Get-FileHash -LiteralPath $fetched).Hash -eq $want) {
-            Ok "$What - production serves this deployment's front page (after $([int]$clock.Elapsed.TotalSeconds) s)"
-            return
-        }
-        Start-Sleep -Seconds 5
-    }
-    No "$What - production did not serve this deployment's front page within 120 s; judging what it does serve"
-}
+# The wait for Cloudflare's production address, and the snapshot it judges
+# against, are defined near the top (Save-CloudflareUpload and
+# Wait-CloudflareProduction, #680), because -SelfTest runs them before the
+# preflight.
 
 # Every address a publish answered at, for the Result block: a FIRST-publish
 # run creates them, and nothing deletes them.
@@ -827,8 +1110,7 @@ function Url-FromLog([string]$log) {
 # codeRunnerBlocks.loading, .isolation). curl.exe by full path, as the mac
 # uses curl: Invoke-WebRequest under 5.1 follows redirects without saying
 # which headers were the last response's.
-$script:Curl = Join-Path $env:SystemRoot "System32\curl.exe"
-$script:Measured = @()
+# ($script:Curl and $script:Measured are set near the top, for -SelfTest.)
 $script:ContractsDir = Join-Path $PSScriptRoot "contracts"
 
 # The LAST response's status and headers (after any redirects when -Follow),
@@ -1002,8 +1284,11 @@ Hdr "Preview - serve mode, which is what a teacher actually uses"
 # by the folder's previous recipe keeps them until it is rebuilt from scratch
 # (#630; the 1.8.5 cut's remedy was deleting the builds folder by hand).
 if ($script:MirrorChanged.Count -gt 0) { Ok "the recipe changed, so the preview rebuilds the section from scratch (--full-rebuild)" }
-[IO.File]::WriteAllText($runnerPage, ($runnerPageText -replace "`r`n", "`n"), $script:NoBom)
-Ok "a page of runnable code borrowed into section $Section (removed on any exit)"
+# This run's mark on the page (#680): the one thing in the built site that
+# tells this run's deployment from the last, which the Cloudflare wait needs.
+# LF, no BOM - the mac's `printf '\nThis run: %s.\n' >>`.
+[IO.File]::WriteAllText($runnerPage, ($runnerPageText -replace "`r`n", "`n") + "`n`nThis run: $($script:RunMark).`n", $script:NoBom)
+Ok "a page of runnable code borrowed into section $Section, marked for this run (removed on any exit)"
 $previewLog = Join-Path $work "preview.log"
 $previewProcess = Start-Process -FilePath "cmd.exe" `
     -ArgumentList "/c", ".\preview.bat $Course $Section$(if ($script:MirrorChanged.Count -gt 0) { ' --full-rebuild' }) > `"$previewLog`" 2>&1" `
@@ -1120,6 +1405,7 @@ if ($haveCloudflare) {
     # reads deploy_target from the configuration. Setting the config key alone
     # published to Netlify while this script reported a Cloudflare pass.
     $cloudflareRun = Measure-Deploy "Cloudflare, first publish with the engine" "deploy.bat" @($Course, "$Section", "--target", "cloudflare") (Join-Path $work "deploy-cloudflare.log")
+    $cfSnapped = Save-CloudflareUpload "Cloudflare Pages" $cloudflareRun.Log (Join-Path $work "cf-alone")
     if ($cloudflareRun.ExitCode -eq 0) { Ok "publish to Cloudflare exited 0" } else { No "publish to Cloudflare exited $($cloudflareRun.ExitCode)" }
     if ($cloudflareRun.Log -match '(?i)cloudflare|wrangler|pages\.dev') { Ok "the launcher really went to Cloudflare" }
     else { No "the Cloudflare leg's output never mentions Cloudflare - it published somewhere else" }
@@ -1127,7 +1413,7 @@ if ($haveCloudflare) {
     if ($cloudflareUrl) {
         Note-Site $cloudflareUrl
         Check-Url "Cloudflare Pages" $cloudflareUrl -MustEndWith "pages.dev"
-        Wait-CloudflareProduction "Cloudflare Pages" $cloudflareRun.Log $cloudflareUrl
+        if ($cfSnapped) { [void](Wait-CloudflareProduction "Cloudflare Pages" $cloudflareUrl (Join-Path $work "cf-alone")) }
         Check-Engine "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/"
         Check-PageLinks "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/" cloudflare
     } else { No "no Cloudflare address in the output" }
@@ -1166,6 +1452,9 @@ if ($haveCloudflare) {
     New-Item -ItemType Directory -Force -Path $folderTarget | Out-Null
     Set-Destination -Primary "cloudflare_pages" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget.Replace('\','\\'))`"}]"
     $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--target", "cloudflare") -LogFile (Join-Path $work "pair2-cf.log")
+    # Kept NOW: the folder leg below rebuilds the section before production
+    # is judged, and the wait used to read the index.html it had rewritten.
+    $cfSnapped = Save-CloudflareUpload "Cloudflare (paired with a folder)" $legOne.Log (Join-Path $work "cf-with-folder")
     $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "pair2-folder.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (cloudflare $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
@@ -1173,7 +1462,7 @@ if ($haveCloudflare) {
     if ($cfPaired) {
         Note-Site $cfPaired
         Check-Url "Cloudflare (paired with a folder)" $cfPaired -MustEndWith "pages.dev"
-        Wait-CloudflareProduction "Cloudflare (paired with a folder)" $legOne.Log $cfPaired
+        if ($cfSnapped) { [void](Wait-CloudflareProduction "Cloudflare (paired with a folder)" $cfPaired (Join-Path $work "cf-with-folder")) }
         Check-PageLinks "Cloudflare (paired with a folder)" "$($cfPaired.TrimEnd('/'))/" cloudflare
     }
     else { No "no Cloudflare address in the paired output" }
@@ -1189,6 +1478,7 @@ if ($haveNetlify -and $haveCloudflare) {
     $legOne = Measure-Deploy "Netlify, second publish" "deploy.bat" @($Course, "$Section") (Join-Path $work "pair3-netlify.log")
     Set-Destination -Primary "cloudflare_pages"
     $legTwo = Measure-Deploy "Cloudflare, second publish" "deploy.bat" @($Course, "$Section", "--target", "cloudflare") (Join-Path $work "pair3-cf.log")
+    $cfSnapped = Save-CloudflareUpload "Cloudflare (paired with Netlify)" $legTwo.Log (Join-Path $work "cf-with-netlify")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), cloudflare $($legTwo.ExitCode))" }
     $u1 = Url-FromLog $legOne.Log
@@ -1202,7 +1492,7 @@ if ($haveNetlify -and $haveCloudflare) {
     if ($u2) {
         Note-Site $u2
         Check-Url "Cloudflare (paired with Netlify)" $u2 -MustEndWith "pages.dev"
-        Wait-CloudflareProduction "Cloudflare (paired with Netlify)" $legTwo.Log $u2
+        if ($cfSnapped) { [void](Wait-CloudflareProduction "Cloudflare (paired with Netlify)" $u2 (Join-Path $work "cf-with-netlify")) }
         Check-Engine "Cloudflare (paired with Netlify)" "$($u2.TrimEnd('/'))/"
         Check-PageLinks "Cloudflare (paired with Netlify)" "$($u2.TrimEnd('/'))/" cloudflare
     } else { No "no Cloudflare address in the paired output" }

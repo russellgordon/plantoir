@@ -1494,7 +1494,8 @@ not name this section's build in `Deploying from local build:` — read with
 the `\r` stripped, since the log is a terminal transcript and every line
 ends in `\r\n` (measured) — or whose page lacks the mark.
 
-Rejected: *the front page only* (Windows' oracle as it was; weak for exactly
+Rejected: *the front page only* (Windows' oracle as it was until #680, which
+matched this whole design on Windows, `-SelfTest` included; weak for exactly
 the static-files-only change above, and kept as half of this test); *fetching
 `<hash>.<project>.pages.dev`* (Windows measured it resolving later than
 production on a first publish, and it is not the address a teacher hands

@@ -7894,24 +7894,65 @@ mirrors the checkout's working tree into the folder before it judges
 anything (the three `.sh` launchers, the `.toolchain/` root files and
 `recipeFolders`, `__pycache__` skipped on both sides), rebuilds from scratch
 when anything differed, and diffs the folder again at the end. Its
-Cloudflare wait goes one step further than the one below: production must
+Cloudflare wait went one step further than this side's did: production must
 serve the front page AND the borrowed page of runnable code byte for byte,
 and that page carries a mark made fresh for every run, because the front
 page alone cannot tell two deployments apart when only static files or
-headers moved. Windows owes matching the mark (the `windows` issue opened
-from #665); the reasoning and the measurements are in
+headers moved. Windows matched it in #680 ("Cloudflare propagation", next);
+the reasoning and the mac's measurements are in
 `documentation/07-deployment.md` → "`verify-deploy.sh` — the publishing
 harness".
 
 **Cloudflare propagation** (the second trap at the same cut). Production
 was still serving the previous deployment when the single Cloudflare leg
 was judged: eight failures, all gone two minutes later. Every Cloudflare leg
-now waits until production's front page is byte for byte the `index.html`
-it just uploaded. The folder comes from deploy.py's "Deploying from local
-build:" line. The wait is at most 120 s, and a timeout FAILS rather than
-skips. Comparing against the deployment's own address
+now waits for production to serve what it uploaded, at most 120 s, polling
+every 5 s; a timeout is ONE failure that says so, and the run then judges
+what production does serve, never a skip. Since #680 (matching the mac's
+#665) "what it uploaded" means BOTH pages:
+
+- **This run's mark.** The borrowed page ends with `This run:
+  plantoir-verify-deploy-run-<UTC yyyyMMddTHHmmssZ>-<pid>.` (LF, no BOM, as
+  the mac's `printf`). Until #680 the wait compared the front page only, and
+  the built site carries nothing unique per build, so when only static files
+  or headers moved (`static/pyodide/*`, `_headers`, KaTeX) the old and new
+  deployments had the same `index.html` and the wait passed against the old
+  one: the shape of the 1.8.5 failures.
+- **A snapshot the moment each leg returns** (`Save-CloudflareUpload`): the
+  LAST "Deploying from local build:" line must end in
+  `\<COURSE>\section<N>\public` (the `\s*` before `$` swallows the
+  transcript's `\r`), and `index.html` and `Runner-Deploy-Check.html` are
+  copied from the folder it names (there is no fixed `$PUBLIC_DIR` here, as
+  there is on the mac); the copied page must carry the mark. The suffix
+  alone would accept another working folder's build of the same section; the
+  mark rules that out. In the folder pairing the snapshot is taken BEFORE
+  the folder leg, which rebuilds the section: the old wait read the
+  `index.html` the folder leg had just rewritten.
+- **The wait** (`Wait-CloudflareProduction`) fetches `/` and
+  `/Runner-Deploy-Check` with `curl -s -L --max-time 20` and no-cache, and
+  compares SHA-256 with the snapshot. A 404 is "not yet". The wording is
+  the mac's, with " - " for its em dash: "production serves this
+  deployment's front page and page of runnable code (after N s)" and "did
+  not serve this deployment within 120 s; judging what it does serve".
+
+**`-SelfTest`** proves the wait offline in about 20 s, before the preflight
+and touching no working folder: the mac's eight cases by the same names,
+against a COPY of `verify-deploy.sh`'s Python stub (kept byte for byte, run
+with `-I` on the bundled Python). Measured 2026-10-28 (Lenovo 20QES70500,
+i5-8365U): **8 passed, 0 failed** in 20 s; production switching after three
+requests passed "after 3 s", never switching failed once at the cap (9 s).
+On scratch copies, not committed: a wait that returns at once failed 3 of
+the 8; comparing the front page only failed "only the static files moved
+(same front page)", the case that must fail without the mark; dropping the
+`\s*` failed the `\r\n` case and the unmarked-page case. The real run's
+numbers are in #680's closing comment.
+
+Comparing against the deployment's own address
 (`<hash>.<project>.pages.dev`) was rejected: on a project's first publish
 that subdomain resolves later than the site does (`Url-FromLog`'s comment).
+The stub is a copy rather than one file both harnesses read, because the
+bash script carries it in a heredoc and the two harnesses share nothing
+else; change both or neither.
 
 #### A real first publish: `-FirstPublish` (#623)
 

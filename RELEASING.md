@@ -390,6 +390,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > sites the first-publish run made, so they can be deleted. Cloudflare
    > reuses a project of the same name, which is why the surname is random
    > on each run.
+   >
+   > **Run the self-test first: `verify-deploy.ps1 -SelfTest` on Windows,
+   > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline,
+   > about 20 s, no credentials: it proves the wait for Cloudflare's
+   > production address against a stub, so a real run's Cloudflare lines can
+   > be trusted.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503; when a BASE pin changed — Node, Python,
