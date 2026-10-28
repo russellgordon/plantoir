@@ -227,7 +227,7 @@ public static class HowITeachPage
 /// <summary>
 /// A How I Teach page the build kept off the website although the course's
 /// settings had LISTED it (<c>howITeachPage.keptOffMarker</c>). Read like
-/// <see cref="PagesDatedByTheBuild"/>, from the same two readers.
+/// <see cref="PagesDatedByTheBuild"/>, from the same three readers, through <see cref="BuildMachineLines"/>.Record (#660).
 /// </summary>
 public sealed record HowITeachKeptOffReport(string Course, int Section, IReadOnlyList<string> Pages, int? Count = null)
 {

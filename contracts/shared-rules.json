@@ -4794,7 +4794,7 @@
       "event": "curriculum maps built",
       "shape": "the build made N curriculum map(s): <title> from <folder> (<E> expectations), ... — or, with none: the build made no curriculum map: no curriculum folder holds an expectation page. N is the line's count when it carries one (#666), and a shortened line's maps end ' and M more' ('M not named' when it names none).",
       "why": "The count first, then each map as a teacher would say it; the folder is named because two maps' titles alone do not say which folder a missing one should have come from.",
-      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_DATED:)."
+      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_DATED:); on Windows also a run plantoir-mcp started (#660, BuildMachineLines)."
     }
   },
   "siteHealth": {
@@ -19987,7 +19987,7 @@
       "examples": [
         "PLANTOIR_KEPT_OFF: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"How I Teach\"]}"
       ],
-      "why": "The report this answers is real and arrives late: a teacher who already had a page called How I Teach, meant for students, finds it gone from the site after an update, and the console that said why is long gone - the same argument pagesDatedByTheBuild makes for itself. Read by the app the way PLANTOIR_DATED: is: from the console of a run it started, and from a scheduled publish's own log."
+      "why": "The report this answers is real and arrives late: a teacher who already had a page called How I Teach, meant for students, finds it gone from the site after an update, and the console that said why is long gone - the same argument pagesDatedByTheBuild makes for itself. Read by the app the way PLANTOIR_DATED: is: from the console of a run it started, and from a scheduled publish's own log; on Windows also a run plantoir-mcp started (#660, BuildMachineLines)."
     },
     "keptOffTrailLine": "the build kept {count} page(s) named How I Teach off the website that the course's settings had listed for it: {names}",
     "keptOffTrailLineWhenShortened": "{count} is the line's count when it carries one (#666, machineLineLength), and {names} then ends ' and M more', M = count minus the pages named ('M not named' when it names none).",
@@ -32036,7 +32036,7 @@
         "noSuccessCriteria": "the build made no My Progress page: no page students can see has boxes to tick under a success-criteria heading",
         "teachersOwnPage": "the build made no My Progress page: the course has its own page called My Progress"
       },
-      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_MAPS:)."
+      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_MAPS:); on Windows also a run plantoir-mcp started (#660, BuildMachineLines)."
     }
   },
   "obsidianOpensThePreviewedPage": {

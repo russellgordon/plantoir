@@ -8430,6 +8430,8 @@ guard by `TheClosedLineIsWrittenOnceAndOnlyAfterTheOpenedLine`.
 
 ## My Progress: the trail line and the two readers (#599, the mac's #545), v1.8.2
 
+(Three readers since #660, 2026-10-28: the window, a scheduled publish's record, and a run plantoir-mcp started, all through `BuildMachineLines.Record`; the heading keeps its name because other sections cite it.)
+
 The page itself is shared toolchain, and Windows inherits it with the build.
 What Windows owed:
 
