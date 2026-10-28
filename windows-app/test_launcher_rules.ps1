@@ -5,7 +5,7 @@
     dot-sourced: that would run the launcher).
 
 .DESCRIPTION
-    Three lists, each deserialised and never retyped:
+    Six lists, each deserialised and never retyped:
 
     1. app-rules.json -> previewPorts.hostBlockCases, through preview.ps1's
        Find-FreePreviewPort (#286). A native walk binds ONE pair per block,
@@ -41,6 +41,16 @@
        launcher carries it (one marked block, the same in both), checking
        who refused as well as whether; then the four sentences and the trail
        lines word for word against the contract.
+
+    6. app-rules.json -> launcherTrailFolder.cases (#682, the Windows half of
+       mac #664), every one, through Write-TrailLine as EACH launcher
+       carries it, with LOCALAPPDATA pointed at a scratch folder and the
+       current folder moved into it (so a relative value wrongly taken is
+       caught there): the line must land in the expected folder and no other
+       file may appear. Plus Windows-only rows for the two shapes
+       [IO.Path]::IsPathRooted calls rooted and which are not absolute
+       (C:state, \state\Logs), and a check that both launchers read the
+       contract's variable name.
 
     Run with:  powershell -NoProfile -File windows-app\test_launcher_rules.ps1
 #>
@@ -362,6 +372,69 @@ $previewSource = Get-Content -LiteralPath (Join-Path $repo 'preview.ps1') -Raw -
 foreach ($pair in @(@($declined, 'launcherLineWhenItsSectionIsBeingDeployed'), @($portEvent, 'launcherLineWhenEveryAddressIsTaken'))) {
     $format = ([string]$pair[0].($pair[1])).Replace('{course}', '{0}').Replace('{section}', '{1}').Replace($dotText, '{2}').Replace($dashText, '{3}')
     Report 'activityTrail/preview.ps1' $pair[1] ($previewSource.Contains('Write-TrailLine ("' + $format + '" -f $COURSE, $SECTION, [char]0x00B7, [char]0x2014)')) "does not record '$format'"
+}
+
+# ---- 6. Where a launcher's own trail lines go (#682) ----
+# app-rules.json -> launcherTrailFolder.cases, every one, through the REAL
+# Write-TrailLine of EACH launcher. `{scratch}` is a scratch folder, `/` is
+# written as `\`, no `value` means the variable is not set, and `default` is
+# %LOCALAPPDATA%\Plantoir\Logs with LOCALAPPDATA pointed at scratch\home. The
+# current folder - PowerShell's AND the process's, which IO.FileStream
+# follows and Set-Location does not move - is the scratch folder, so a
+# relative value wrongly taken lands inside it and is caught by the one-file
+# check. Two Windows-only rows: C:state and \state\Logs are "rooted" to
+# [IO.Path]::IsPathRooted on PowerShell 5.1 but not absolute.
+$trailRules = $appRules.launcherTrailFolder
+$trailVariable = [string]$trailRules.variable
+$trailRows = @($trailRules.cases) + @(
+    [PSCustomObject]@{ name = 'drive-relative, no separator (Windows only)'; value = 'C:state'; expect = 'default' },
+    [PSCustomObject]@{ name = 'root of the current drive (Windows only)'; value = '\state\Logs'; expect = 'default' })
+foreach ($launcher in @('preview.ps1', 'deploy.ps1')) {
+    $source = Get-Content -LiteralPath (Join-Path $repo $launcher) -Raw -Encoding UTF8
+    Report "launcherTrailFolder/$launcher" 'reads the contract''s variable' ($source.Contains('$env:' + $trailVariable)) "does not read `$env:$trailVariable"
+    Import-LauncherFunctions (Join-Path $repo $launcher) @('Write-TrailLine')
+    foreach ($case in $trailRows) {
+        $list = "launcherTrailFolder/$launcher"
+        $scratch = Join-Path ([IO.Path]::GetTempPath()) ('trail-' + [guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Force -Path $scratch
+        $savedLocalAppData = $env:LOCALAPPDATA
+        $savedVariable = [Environment]::GetEnvironmentVariable($trailVariable)
+        $savedProcessFolder = [Environment]::CurrentDirectory
+        $strayRoot = Join-Path ([IO.Path]::GetPathRoot($scratch)) 'state\Logs\activity.txt'
+        $strayBefore = Test-Path -LiteralPath $strayRoot
+        Push-Location -LiteralPath $scratch
+        try {
+            [Environment]::CurrentDirectory = $scratch
+            $env:LOCALAPPDATA = Join-Path $scratch 'home'
+            if ($case.PSObject.Properties.Name -contains 'value') {
+                $value = ([string]$case.value).Replace('{scratch}', $scratch).Replace('/', '\')
+                [Environment]::SetEnvironmentVariable($trailVariable, $value)
+            } else {
+                [Environment]::SetEnvironmentVariable($trailVariable, $null)
+            }
+            if ([string]$case.expect -eq 'default') {
+                $expected = Join-Path $scratch 'home\Plantoir\Logs'
+            } else {
+                $expected = ([string]$case.expect).Replace('{scratch}', $scratch).Replace('/', '\').TrimEnd('\')
+            }
+            $what = 'case ' + [guid]::NewGuid().ToString('N')
+            Write-TrailLine $what
+            $file = Join-Path $expected 'activity.txt'
+            $landed = (Test-Path -LiteralPath $file) -and ((Get-Content -LiteralPath $file -Raw -Encoding UTF8).Contains($what))
+            $everything = @(Get-ChildItem -LiteralPath $scratch -Recurse -File -Force)
+            $strayed = (-not $strayBefore) -and (Test-Path -LiteralPath $strayRoot)
+            $ok = $landed -and $everything.Count -eq 1 -and -not $strayed
+            $found = ($everything | ForEach-Object { $_.FullName.Substring($scratch.Length) }) -join ', '
+            Report $list $case.name $ok "expected the line in $($file.Substring($scratch.Length)) and nothing else; found [$found]$(if ($strayed) { ' and ' + $strayRoot })"
+            if ($strayed) { Remove-Item -LiteralPath $strayRoot -Force -ErrorAction SilentlyContinue }
+        } finally {
+            Pop-Location
+            [Environment]::CurrentDirectory = $savedProcessFolder
+            $env:LOCALAPPDATA = $savedLocalAppData
+            [Environment]::SetEnvironmentVariable($trailVariable, $savedVariable)
+            Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 Write-Host ("{0} passed, {1} failed, {2} skipped" -f $passed, $failed, $skipped)

@@ -1326,6 +1326,78 @@ A progress marker would not have done: those are matched loosely and getting one
 wrong is silent (see `app-rules.json` → `markerOrigins`). A prefixed JSON line is
 unambiguous and carries structure a sentence cannot.
 
+### How long a machine line may be (#666)
+
+**The rule** (`contracts/shared-rules.json` → `machineLineLength`): every
+`PLANTOIR_` JSON line the shared Python prints is at most `maxCharacters`
+(4,000) characters long, prefix included. The lines that carry an unbounded
+list are printed through `scripts/machine_line.py`:
+
+- `PLANTOIR_DATED:` (`build_site.announce_dated_pages`), `PLANTOIR_KEPT_OFF:`
+  (`how_i_teach.announce`) and `PLANTOIR_MAPS:` (`build_site.announce_coverage_maps`)
+  go through `machine_line.listed`. A line that fits is printed exactly as
+  before. A longer one keeps the FIRST k entries, k as large as fits (found by
+  halving), and adds `"count"` (how many there were) and `"more"` (how many it
+  left out) after the list. k can be 0: a line whose first entry alone would
+  not fit carries an empty list with `count`, and a reader must read it as a
+  report ('M not named'), not as none.
+- `PLANTOIR_HEALTH:` (`site_health.announce`) goes through
+  `machine_line.fitted`. Every finding that names a list is made through
+  `site_health.shortenable`, which remembers how to make it again with a
+  smaller `most`. A finding whose line would be too long is remade naming
+  fewer blocks or pages (at most ten, fewer when they would not fit), its
+  `andMore` saying how many it left out.
+  Its sentence keeps the true count, so no new key is needed. The console's own
+  two lines above it keep all ten. `site_said.py`'s two findings go through
+  the same `shortenable`.
+- The bounded markers (`PLANTOIR_MY_PROGRESS:`, `PLANTOIR_REPAIRED:`,
+  `PLANTOIR_LINKS_CHECKLIST:`, both copies of `PLANTOIR_SWIFT:`, and deploy.py's
+  space-separated `PLANTOIR_CLOUDFLARE_REMADE:`) are printed as they always
+  were. `test_machine_line_length.py` holds each under the cap at its worst
+  plausible size, so a list added to one later is caught.
+
+JSON is never cut mid-text, so a reader parses a shortened line exactly as it
+parses a whole one. A reader that WORDS a count (the DATED, KEPT_OFF and MAPS
+trail lines) takes `count` when it is there, so its "and N more" also counts
+what the line left out. Without that the trail would say "the build gave 206
+pages…" for a build that dated 300 (the count-first reasoning of
+`pagesDatedByTheBuild.trailLine.why`). Russell's ruling on the plan: the true
+count travels as its own field, and both apps' readers use it (Windows in
+#666, the mac by its own issue).
+
+**The numbers.** The mac's kernel pseudo terminal never splits a line.
+Windows' pseudo console does, when a line longer than the console wraps on the
+bottom row while Quartz's spinner redraws (#662, measured on a Lenovo
+20QES70500, i5-8365U, Windows 11 Pro 26200): a 611-character finding split at
+400 columns. #662 widened the app's console to 8,192 columns, the widest
+Windows PowerShell 5.1 can afford (doc 12 → "How wide the console is, and
+why"). But nothing bounded the lines. `PLANTOIR_DATED:` runs to about 40
+characters a page, so about 200 pages pass 8,192, and a ten-block health
+finding is about 2,300. The cap is 4,000, HALF the narrowest limit, because a
+"character" is counted three ways: Python counts code points, the app's carry
+guard (`ScriptRunner`, 8,000) counts UTF-16 units, and the console counts
+cells. A CJK character or an emoji is two of either. The Windows suite pins
+`2 × maxCharacters` against both (`MachineLineLengthContractTests`). The
+contract's cases, run through the REAL emitters: 51 pages of one long name
+are 4,029 characters whole, so the line keeps 50, at 3,975 characters; 300
+short pages keep 206; 200 kept-off pages keep 154; 100 maps keep 42; ten
+links with ~190-character page names (4,382 whole) name 9.
+
+**Rejected:**
+- **(b) a side file per payload**, as `PLANTOIR_LINKS_CHECKLIST:` does. Both
+  apps' readers would change, a scheduled record keeps lines rather than
+  files, and there would be a fourth kind of file to clean up. Russell chose
+  (a) on #666.
+- **A 32,767-column console.** PowerShell 5.1 pads progress to the width
+  (over 280 s for a 2 MB download), and a wider console only moves the limit.
+- **Chopping the text at N.** The JSON no longer parses and the reader
+  records nothing, which is today's bug made certain instead of occasional.
+- **A cap per reader.** The Python prints the line, so one cap in one place
+  reaches every reader, the scheduled record included. A reader cannot mend a
+  line that has already split.
+- **Shortening without the count.** The trail would under-count, which is
+  the one thing the trail lines' count-first shape exists to prevent.
+
 ### Three traps, all met here
 
 - **Do not read the findings from a tail.** Most other structured-line readers in

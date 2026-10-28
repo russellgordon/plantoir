@@ -52,7 +52,4 @@ public sealed record MyProgressBuilt(string Course, int Section, bool Built, int
             return null;
         }
     }
-
-    public static IReadOnlyList<MyProgressBuilt> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
 }

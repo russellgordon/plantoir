@@ -27,6 +27,7 @@ import unicodedata
 from pathlib import Path
 
 import contracts
+import machine_line
 
 # The fallback is only for a contract that cannot be read at all — the build
 # would already have stopped for other reasons by then — and a test pins it to
@@ -206,8 +207,9 @@ def announce(course: str, section_number: int, found_here: bool, look_alikes: li
         printer(look_alike_line(name))
     if not dropped_places:
         return
-    payload = {"course": course, "section": section_number, "pages": dropped_places}
-    printer(f"{marker_prefix()} {json.dumps(payload, ensure_ascii=False)}")
+    # At most machineLineLength.maxCharacters (#666), as PLANTOIR_DATED: is.
+    printer(machine_line.listed(marker_prefix(), {"course": course, "section": section_number},
+                                "pages", dropped_places))
 
 
 def place_in_the_course(name: str, section_folder: str = "") -> str:

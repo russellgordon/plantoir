@@ -86,7 +86,4 @@ public sealed record SwiftGotReady(bool Ready, int Seconds, long DownloadedBytes
             return null;
         }
     }
-
-    public static IReadOnlyList<SwiftGotReady> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
 }
