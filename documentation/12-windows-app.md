@@ -1900,7 +1900,7 @@ runtime's Node 20.18.1):
   --build-only --non-interactive` with `PLANTOIR_RUNTIME` set; the built
   `index.css` carries the forced-colours rule (`CanvasText`, one match);
   `public\` served by `python -m http.server` on 127.0.0.1; then
-  `node --experimental-websocket browser-checks/sidebar_page_marker.mjs
+  `node browser-checks/sidebar_page_marker.mjs
   "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
   http://127.0.0.1:<port>/Discussions/Marker-Fixture-Long.html
   http://127.0.0.1:<port>/Discussions/index.html Discussions Tasks "Marker
@@ -1982,7 +1982,8 @@ as work happens:
 **Read this before the architecture sections below.** Windows dropped Docker,
 WSL2 and the whole image/container model on 2026-08-19 (`GUI-IMPROVEMENTS.md`
 entry 290) in favour of a **native runtime**: `windows-app/Vendor/fetch-runtime.ps1`
-fetches pinned, portable pieces — Node 20 (zip, no installer), Python 3.11
+fetches pinned, portable pieces — Node 22.23.4 (zip, no installer; Node 20
+until #675), Python 3.11
 (the embeddable distribution plus `python-frontmatter==1.3.0`,
 `PyYAML==6.0.3` and `Pillow==12.3.0`, pinned there since 2026-09-19 and held
 against `contracts/toolchain.json` → `pins` by
@@ -2402,7 +2403,7 @@ the same day.)
    the Python embeddable zip and the emoji font — and refuses (deleting the
    file) on a mismatch. The pins were measured on the build PC (i5-8365U,
    Windows 11 26200), not copied: Node's equals nodejs.org's own
-   `SHASUMS256.txt` for v20.18.1; the Python zip's `python.exe` and
+   `SHASUMS256.txt` for v20.18.1 (and, since #675, for v22.23.4); the Python zip's `python.exe` and
    `python311.dll` are byte-identical to the runtime that has shipped; the font
    equals the shipped font. Proven by running the script's own `Fetch` (lifted
    out of the file by its syntax tree, against a `file://` copy): the right pin
@@ -7495,7 +7496,8 @@ parent + `vendor`; `figures.helper_command` runs `node` from PATH.
   (`8c68b08531cee21b507a3edb31e9346c9294defa63a0a0d04c5dde05a6827b37`). The
   mac has not yet printed its own SHA-256 for the same SVG, so whether Node
   20.18.1 and 20.20.2 draw the same bytes is not known (the `mac` issue from
-  this batch asks).
+  this batch asks). On Node 22.23.4 (#675, 2026-10-28, same PC) the same
+  test drew the same 1,540 bytes, SHA-256 `8c68b085…6827b37` again.
 - The engine's load: **1.6 s** the first time after the fetch (Defender
   scanning 5,450 new files was not visible in it), 1.4–1.8 s after; the
   triangle drawn in 0.33–0.45 s. Nowhere near `figures.START_SECONDS` (120 s).
@@ -9228,7 +9230,9 @@ and once in the search index. The build's `quartz.config.ts` says
    `isolation_headers.publish_headers(site, "netlify")`, then
    `netlify_badge.write_netlify_headers_file`.
 3. Run
-   `node --experimental-websocket browser-checks/mermaid_draws.mjs <edge> <clone> /Printable-Fixture.html`.
+   `node browser-checks/mermaid_draws.mjs <edge> <clone> /Printable-Fixture.html`
+   (it was run with `--experimental-websocket` on Node 20.18.1; on the
+   runtime's 22.23.4, since #675, the flag is not needed).
 
 It printed **`OK: 2 of 2 diagrams drawn, 0 requests blocked by the policy,
 under the policy _headers carries`** (3.8 s).
@@ -9245,7 +9249,9 @@ Every `.mjs` check in this section ran on the runtime's own Node 20.18.1
 (`windows-app\Vendor\runtime\node\node.exe`) with
 `--experimental-websocket`, because the checks expect Node 22's built-in
 WebSocket. That is the same arrangement as doc 12's earlier browser
-measurements.
+measurements. Since #675 the runtime is Node 22.23.4, where `WebSocket` is
+global (`typeof WebSocket` is `function`), so the commands here and above are
+written without the flag; it is still accepted on 22 and does nothing.
 
 On Git Bash, run the check with `MSYS_NO_PATHCONV=1`. Without it the
 `/Printable-Fixture.html` argument becomes
@@ -9293,7 +9299,7 @@ bare on a page of their own, `Picture Sizes Hand`:
 These are the answers the mac's oracle holds the same JavaScript to.
 
 **The browser check.**
-`node --experimental-websocket browser-checks/picture_heights.mjs <edge> <public copy>`
+`node browser-checks/picture_heights.mjs <edge> <public copy>`
 takes the site FOLDER and serves it itself. It ran three times, 6.8–7.0 s
 each, and printed the same line every time:
 
@@ -9748,3 +9754,142 @@ quotes the 1.13.7 label), and a OneDrive-evicted `.md`.
 `plantoir-math-graphs` skill §9 and `figureFences.knownLimits[2]` still say
 nothing about Plantoir adding the add-ons; with both platforms adding them now,
 they can say so — together with the mac, not from here.
+
+## Node 22, GeoGebra's engine and the npm audit on Windows (#675, #687, #685), v1.9.0
+
+Three runtime pieces the mac landed in the image for v1.9.0 — Node 22.23.4
+(#640), GeoGebra's engine (#578) and the npm audit (#667) — made the Windows
+way, in one piece because all three change what `fetch-runtime.ps1` makes.
+The manual for each is on the mac's side and is not repeated here:
+[02 → Node 22](02-docker-image.md#node-22-640-v190),
+[02 → `/opt/vendor/geogebra`](02-docker-image.md#optvendorgeogebra-578) and
+[02 → Known vulnerabilities](02-docker-image.md#known-vulnerabilities-in-the-images-npm-packages-667-v190).
+This is what Windows does differently, and what it measured (2026-10-28,
+Lenovo 20QES70500, Intel Core i5-8365U, 16 GB, Windows 11 Pro 26200, wired
+Ethernet, Ontario).
+
+**Node 22.23.4.** `$NodeVersion` and `$NodeZipSha256` (nodejs.org's
+`SHASUMS256.txt` line for `node-v22.23.4-win-x64.zip`), held to the `node`
+pin by its new `windowsRuntimeContains`. npm 10.9.9, OpenSSL 3.5.9, global
+`WebSocket` (`typeof WebSocket` is `function`, so `--experimental-websocket`
+is no longer needed for the browser checks). Quartz's `npm ls --all` is
+**identical** to the Node 20.18.1 runtime's (1,055 lines, exit 0, no
+EBADENGINE), and so is the TikZ engine's (251 lines). The contract's
+triangle through `plantoir-figures.mjs` is the same 1,540 bytes, SHA-256
+`8c68b085…6827b37`, as on 20.18.1. wrangler 4.80.0 answers `--version` on
+it. `NODE_OPTIONS=--disable-warning=DEP0040` silences `require('punycode')`,
+which warns without it.
+
+**A Node bump is a full re-fetch, and the script now says so.** Until #675
+the run read only the manifest's base KEYS, never their values. Bumping
+`$NodeVersion` on a copy of a 20.18.1 runtime answered "[OK] Runtime already
+in place" and exited 0, so a build PC would have gone on shipping Node 20
+under a release that said 22. It now compares every base key's value with
+its pin (node, python, quartz, wrangler, emoji) and REFUSES on a difference,
+saying to delete `runtime\` and re-run. **Rejected: redoing the base phase in
+place.** `Move-Item` of the new Node folder onto an existing `runtime\node`
+nests it inside the old one, and `git clone` refuses a non-empty `quartz\`;
+making each step idempotent would be a rewrite for a once-a-release event.
+The app's build refuses too: `Plantoir.csproj` → `CheckNativeRuntimeManifest`
+names `_PlantoirRuntimeNode` (held to the pin by
+`ToolchainContractTests.TheBuildRefusesARuntimeWithoutGeoGebraOrOnAnotherNode`)
+and matches it with a regex, because Windows PowerShell 5.1's `ConvertTo-Json`
+writes `"node":  "20.18.1"` with two spaces and a BOM, so a `Contains` of the
+spaced text would be wrong either way. Proven against four hand-made
+manifests: Node 20 refused, 22.23.4 accepted, 22.23.45 refused, no
+`geogebra` key refused.
+
+A second fix the re-fetch found: the scaffold bake (`setup_course`'s two
+`ensure_…` calls) prints a check mark, and with the script's output sent to a
+log Python wrote it in the ANSI code page and died with `UnicodeEncodeError`.
+That call runs with `-X utf8` now.
+
+**GeoGebra 5.4.933.1 into `runtime\vendor\geogebra`.** The Dockerfile's
+layer, step for step. `scripts\geogebra_engine.py version` must print
+`$GeogebraVersion` first. Then the zip comes from GeoGebra's own address
+with the Dockerfile's curl flags (`--retry 6 --retry-all-errors --retry-delay
+5 --connect-timeout 30 --speed-limit 1024 --speed-time 60`). If that fails, it
+comes from plantoir.app's mirror of the same file. One SHA-256 and the
+33,461,640-byte length are checked whichever host answered. Then
+`python -I scripts\geogebra_engine.py adapt <zip> runtime\vendor\geogebra`
+runs: the ONE recipe, never a PowerShell copy, so both platforms carry the
+same bytes. It made **117 files, 27,093,283 bytes, 83 language files left
+out**. The three `files` hashes in the pin match
+(`TheNativeRuntimeCarriesGeoGebraAtTheContractsHashes`). For a mac
+comparison of the whole folder, SHA-256 over the sorted lines
+`<posix path>\0<file sha256 hex>\n` is
+`c1c144defc6185b666bfadfe96fa9e7b7144ea9befe69f5407ecf2deaac871d0`.
+`scripts/test_geogebra_engine.py` with `PLANTOIR_GEOGEBRA_ZIP` set to the real
+zip passes here. `$GeogebraVersion = "…"` is written with ONE space, unaligned,
+because the contract's `windowsRuntimeContains` is that text and the test is
+an ordinal `Contains`. The address spells the version `5-4-933-1`, so the
+script's address-carries-version guard uses `$GeogebraVersion.Replace('.', '-')`.
+
+`scripts/test_geogebra_engine.py` failed 2 of 20 tests on Windows with every
+byte right. It sorted `Path` objects, and `WindowsPath` compares
+case-folded, so `deployggb.js` came before `HTML5/…`. It sorts the posix
+strings now. The mac is unaffected: its order was already the strings'.
+
+**Times.** A full fetch from nothing: **218 s**. Vendor only (simulated by
+taking `geogebra` out of a 22.23.4 manifest: the path a runtime takes at the
+next vendor-pin change): **31 s**,
+the vendor phase 29 s of it, GeoGebra's download 3 s. With GeoGebra's host
+made unreachable (a copy of the script naming `download.geogebra.invalid`),
+the fallback reached the mirror after curl's six retries: download 32 s,
+whole vendor-only run 60 s, the same 117 files. geogebra.org answered both
+real fetches today. The 4-of-8 timeouts were the mac's, on 2026-10-23.
+
+**The installer.** About +27.1 MB of files. `installer.iss` →
+`[InstallDelete]` now also empties `{app}\runtime\node` (an older npm's
+files would otherwise stay inside the new one) and
+`{app}\runtime\vendor\geogebra` (the adapter makes the folder whole, so the
+next version must not inherit this one's files). The MPM2D `.ggb` reaches
+the bundle through `support\**`. Its source is 1,594,544 bytes, a zip, and
+`*.ggb binary` in `.gitattributes`
+(`TheBundleIncludesTheSlopeAngleSketchAsTheFileThePayloadHolds`). That test
+proves inclusion, not the installer's output bytes: the test project does not
+reference the app.
+
+**Not measured here, owed by hand** (#687 §4): one real geogebra.org
+material fetch through the Windows certificate store, a sketch on a Netlify
+site in Edge, a sketch in a quiz, and Narrator. No new trail line: an engine
+that is missing already surfaces as the `geogebraSketchesNotReady` folder
+problem.
+
+**The npm audit: `windows-app\audit-runtime.ps1`** (#685). It is opt-in and
+named in RELEASING.md step 2 beside verify.sh's line. It is not a `dotnet
+test` fact, because the advisory database changes daily and a default gate
+would turn red with nothing in the product changed (`npmAudit.note`'s reason
+for keeping it out of the image build). It is not in `scripts\`, because that
+folder is the image's build context and a Windows-only file there would
+rebuild every Mac's image. It runs the runtime's own npm from the runtime's
+Python with `-I -X utf8`. Python captures each tree's STDOUT and writes it as
+UTF-8 without a BOM, because Windows PowerShell 5.1's `>` writes UTF-16 and
+`Out-File` a BOM, while `npm_audit.read_audit` reads UTF-8. It emits
+verify.sh's markers (`{"plantoir":"no-lockfile"}`,
+`{"plantoir":"lockfile-step-failed",…}`) and exits as `npm_audit.compare`
+says: 0, 1 or 2.
+
+**wrangler's tree is read from the lockfile npm wrote beside the prefix
+install** (`runtime\wrangler\package-lock.json`), after `npm ls --all`
+agrees with it. Rejected: verify.sh's copy-into-an-empty-project. In the
+image wrangler is a global install whose dependencies sit inside its own
+folder, so a copy carries them. Here they are hoisted beside it, so a copy of
+the package alone would make npm resolve them again from the registry, at
+today's newest versions, and audit a tree nobody installed.
+
+**First run, 2026-10-28, 16 s online: exit 1, FAILED.** 87 advisories across
+the five trees, 81 accepted, 3 blocking, 3 reported, 0 stale. Per tree (npm's
+own counts): quartz 19 vulnerable packages (12 high), wrangler 6 (5 high),
+tikz-engine, pagedjs and function-plot 0. The 3 blocking advisories are high
+ones in `undici` 7.24.4 under wrangler, which `miniflare` 4.20260401.0 pins
+exactly: GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx and GHSA-qrxm-fqhp-jwvm.
+GitHub published all three on 2026-10-27, after the list's `reviewed`
+2026-10-24, with 7.30.1 fixing them. The 3 reported moderates are
+GHSA-9fm3-97px-rjf6 and GHSA-55wc-3pg8-jfw6 (undici, same day) and
+GHSA-wx4j-mvgx-mqwp (satori, under Quartz, 2026-10-27). **None of them is
+Windows-only**: the same exact pins put the same undici in the image, so
+verify.sh's next online run should report the same three. Deciding them
+(accept with exposure, or move wrangler) is a shared decision for the list,
+not this piece's. Offline (the registry pointed at a closed port) the
+script said SKIPPED and exited 2, with all five trees unreachable.

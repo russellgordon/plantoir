@@ -97,10 +97,10 @@ The image is layered as follows (in order):
    [deployment](07-deployment.md)). It is pinned, and pinned **below
    4.87** deliberately: 4.87.0 is the first wrangler whose `engines.node` is
    `>=22.0.0` (4.80.0 to 4.86.0 say `>=20.3.0`; this said 4.100 until #640,
-   which was never a boundary). The image runs Node 22 since #640, but the
-   pin is shared with Windows, whose runtime stays on Node 20 until its own
-   issue lands — so the ceiling is Windows' now, and moving wrangler is its
-   own piece once both platforms run 22. If Node is ever raised, revalidate
+   which was never a boundary). The image runs Node 22 since #640 and
+   Windows' runtime since #675 (the pin is shared), so the ceiling no longer
+   protects either platform: it stays only until moving wrangler, its own
+   piece, retires it on both. If Node is ever raised, revalidate
    Quartz *before* chasing a newer CLI. The pin also keeps the image reproducible and stops
    an upstream CLI change from breaking a teacher's publishing mid-term.
    Note this adds an npm-registry dependency to the image build, alongside
@@ -703,8 +703,9 @@ deb.nodesource.com), so the `=` resolves from NodeSource, not Debian.
 `latest`) say `>=22.0.0`; none needs 24 yet. The pin's old reason, "below
 4.100", was thirteen minors late — the pin itself was always safe. wrangler
 stays at 4.80.0 and runs on 22 (`wrangler --version`, `wrangler pages --help`
-exit 0); `mustStayBelow` is now `"4.87"` because Windows' runtime is still on
-Node 20.18.1 and the pin is shared. The contract records wrangler's own
+exit 0); `mustStayBelow` became `"4.87"` because Windows' runtime was still on
+Node 20.18.1 and the pin is shared (Windows moved to 22.23.4 in #675, and
+wrangler 4.80.0 answers `--version` on it there too). The contract records wrangler's own
 engines as `nodeEngine` (`>=20.3.0`): verify.sh reads it out of the image's
 wrangler `package.json`, and the mac suite checks the `node` pin satisfies it.
 
@@ -744,8 +745,9 @@ set and never writing the flag twice. The figure helper was measured silent
 on Node 22 with and without it (a diagram and a graph, stderr empty); it is
 routed anyway so every node the build starts is under one rule, and a later
 deprecation cannot become the reason given when the helper fails to start. It is accepted from Node 20.11
-(measured on 20.20.2 and 22.23.4), so Windows' Node 20 runtime inherits it
-safely. `scripts/test_node_warnings.py` pins the helper and both callers;
+(measured on 20.20.2 and 22.23.4), so Windows' Node 20 runtime inherited it
+safely; on Windows' 22.23.4 (#675) `NODE_OPTIONS=--disable-warning=DEP0040`
+silences `require('punycode')`, which warns without it. `scripts/test_node_warnings.py` pins the helper and both callers;
 verify.sh fails if the main build's log carries a `[DEP` code at all (Node's
 own prefix, not the word "DeprecationWarning", which a page could carry).
 
@@ -764,11 +766,14 @@ own prefix, not the word "DeprecationWarning", which a page could carry).
 - **`NODE_NO_WARNINGS=1`** — hides every warning, including the ones a real
   break would print.
 - **Removing `mustStayBelow` now** — Windows' suite reads it, and the ceiling
-  still holds for Windows' Node 20.
+  still held for Windows' Node 20 when #640 landed. Windows runs 22 since
+  #675; the removal belongs to the wrangler piece, on both platforms.
 
-**For Windows:** the runtime (`windows-app/Vendor/fetch-runtime.ps1`) stays
-on Node 20.18.1 until its own `windows` issue moves it to the same 22.23.4;
-that issue adds `windowsRuntimeContains` to the `node` pin with the bump.
+**Windows** (#675, v1.9.0): the runtime (`windows-app/Vendor/fetch-runtime.ps1`)
+carries the same 22.23.4, and the `node` pin's `windowsRuntimeContains` holds
+it there. What was measured on that side, and why a Node bump there is a full
+re-fetch, is in
+[12 → Node 22, GeoGebra's engine and the npm audit](12-windows-app.md#node-22-geogebras-engine-and-the-npm-audit-on-windows-675-687-685-v190).
 
 ### Known vulnerabilities in the image's npm packages (#667, v1.9.0)
 
@@ -857,7 +862,8 @@ attribute): its OUTPUT reaches students, but only the teacher writes the
 Markdown it reads. The 15 xmldom advisories are in a package nothing runs:
 pixi.js's, for the Graph view build_site.py removes. A built site has no
 `pixi` or `xmldom` string. The undici advisories touch only a Cloudflare
-deploy, and are fixed in wrangler > 4.113.0, which waits on Windows' Node 22.
+deploy, and are fixed in wrangler > 4.113.0, which waited on Windows' Node 22
+(landed in #675; the move itself is its own piece).
 The audit takes about 22 s online. Offline it takes about 2.5 min (npm's
 retries), and only then. One more exposure fact, not this piece's to fix: the
 preview ports are published on every interface (`lsof` shows `TCP *:8133` and
@@ -873,8 +879,8 @@ advisory. Either upgrade, in its own piece, or accept it with its reason.
 **REJECTED.**
 
 - **Upgrading now.** The ruling on #667 is no upgrades this release. Quartz's
-  tree moves with Quartz 5 (#512). wrangler moves in its own piece once
-  Windows runs Node 22 (its pin's `mustStayBelow`).
+  tree moves with Quartz 5 (#512). wrangler moves in its own piece, which
+  waited for Windows to run Node 22 (its pin's `mustStayBelow`; #675 did).
 - **Auditing in the image build.** It would need the network on every build,
   and it would fail an unchanged recipe, and a teacher's first build, the day
   an advisory is published. verify.sh is the developer's gate, and that is
@@ -889,18 +895,20 @@ advisory. Either upgrade, in its own piece, or accept it with its reason.
 - **Unpacking their dist files** to identify the libraries bundled inside.
   `npm audit` cannot read a bundle.
 
-**For Windows:** the same audit over the runtime's copies, at each tree's
-`windowsRuntime` (`runtime\quartz`, `runtime\wrangler`,
+**For Windows** (#685, v1.9.0): the same audit over the runtime's copies, at
+each tree's `windowsRuntime` (`runtime\quartz`, `runtime\wrangler`,
 `runtime\vendor\tikz-engine`, `runtime\vendor\pagedjs`,
-`runtime\vendor\function-plot`). It uses Windows' own npm and goes through
+`runtime\vendor\function-plot`), run by `windows-app\audit-runtime.ps1`,
+opt-in like verify.sh's. It uses the runtime's own npm and goes through
 the same `scripts/npm_audit.py compare` against the same list. The
 comparator's tests (`scripts/test_npm_audit.py`, stdlib) already run there
 through `PythonToolchainTests`. Only the wrangler tree can give a
-Windows-only finding: its lockfile is built from the INSTALLED copy, while
-the Quartz and tikz-engine lockfiles and the pin-made pagedjs and
+Windows-only finding: its lockfile is the one npm wrote beside the INSTALLED
+copy, while the Quartz and tikz-engine lockfiles and the pin-made pagedjs and
 function-plot lockfiles already list every platform's optional packages
 identically. Decide such a finding, and add it to the shared list under its
-tree.
+tree. How it is run there, and its first result, is in
+[12 → Node 22, GeoGebra's engine and the npm audit](12-windows-app.md#node-22-geogebras-engine-and-the-npm-audit-on-windows-675-687-685-v190).
 
 ### What the first build downloads (measured for #334)
 

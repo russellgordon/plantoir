@@ -834,7 +834,7 @@ kind of session can do, measured on the day and written for the next one:
   website builder. Reinstall Plantoir, then try again." (`setup.ps1`,
   `preview.ps1`, `deploy.ps1`); there is no fallback path left to take. Run
   `windows-app/Vendor/fetch-runtime.ps1` once before building — it fetches
-  Node 20, Python 3.11 embeddable, patched Quartz with win-x64 node_modules,
+  Node (22.23.4 since #675; 20 before), Python 3.11 embeddable, patched Quartz with win-x64 node_modules,
   wrangler and the emoji font into `windows-app/Vendor/runtime/` (~600 MB,
   gitignored), which the build robocopy-mirrors beside the app. The
   launchers run natively whenever `PLANTOIR_RUNTIME` (set by `ScriptRunner`)
