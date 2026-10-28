@@ -115,6 +115,33 @@ public class ObsidianRouteSourceTests
     }
 
     /// <summary>
+    /// #690: a second press on a course kept for reference while its note is
+    /// up is told it waits and returns BEFORE the trail line - so two presses
+    /// leave one "page opened in Obsidian" line, not one per press - and the
+    /// note marks the course asking for as long as it is up.
+    /// </summary>
+    [Fact]
+    public void TheReferenceRoute_ASecondPressWhileTheNoteIsUpWritesNoSecondLine()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Reference.cs")).Replace("\r\n", "\n");
+        int start = source.IndexOf("private async Task OpenReferenceInObsidian(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string route = source[start..end];
+        int guard = route.IndexOf("ObsidianFigureAddOnsThisRun.Asking.Contains(course.DirectoryPath)", StringComparison.Ordinal);
+        int noted = route.IndexOf("PreviewedPageSource.NoteThePress(", StringComparison.Ordinal);
+        int asking = route.IndexOf("ObsidianFigureAddOnsThisRun.Asking.Add(course.DirectoryPath)", StringComparison.Ordinal);
+        int shown = route.IndexOf("ShowDialogSafelyAsync(note)", StringComparison.Ordinal);
+        Assert.True(guard > 0 && noted > guard, $"guard {guard}, trail line {noted}: the guard must come before the line");
+        string turnedAway = route[guard..noted];
+        Assert.Contains("report?.TrySetResult(new OpenInObsidianPress.WaitingForAnAnswer())", turnedAway);
+        Assert.Contains("return;", turnedAway);
+        Assert.Equal(1, route.Split("PreviewedPageSource.NoteThePress(").Length - 1);
+        Assert.True(asking > noted && shown > asking, $"asking {asking}, note shown {shown}: the course is asking while the note is up");
+        Assert.Contains("finally { ObsidianFigureAddOnsThisRun.Asking.Remove(course.DirectoryPath); }", route);
+    }
+
+    /// <summary>
     /// #690: the assistant's press goes through <c>AssistantsObsidianPress</c>,
     /// whose order is tested in Core - the window only supplies itself, and
     /// selects the section in <c>BringUp</c>, never before the wait.

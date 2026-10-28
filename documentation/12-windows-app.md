@@ -4206,9 +4206,10 @@ checked against a real course. (This said counting the course busy while
 the zip runs in `plantoir-mcp` was not built and that `courseIsBeingCopied`
 stayed in the ledger against #360. It was built in parity bundle 6a —
 `AssistWording.CourseIsBeingCopied`, `WorkLease`, `CourseBeingCopiedTests` —
-and `NamedGapLedger` has been empty since bundle 9, but for a few hours on
+and `NamedGapLedger` was empty from bundle 9, but for a few hours on
 2026-10-16 when mac #524's sixteen plan-table sentences were held against #548
-until #548 landed them.)
+until #548 landed them — and since 2026-10-28 it holds two entries against
+mac #698 (v1.9.1): `wording.obsidianIsNotOnThisMac` and its scenario, #690.)
 
 ---
 
@@ -10055,7 +10056,10 @@ so a scan that fails (the reply says nothing was opened) leaves no line saying
 it opened; still before any question, so a press that goes ahead writes
 exactly one — and never for a course press. A reference course's press
 writes it before the pages are locked again, as the mac's notes it before
-`lockAgain`.
+`lockAgain`, and its route is guarded too: a second press while that course's
+note is up (`ObsidianFigureAddOnsThisRun.Asking`) is told `WaitingForAnAnswer`
+and returns before the line, so two presses still leave exactly one
+(`TheReferenceRoute_ASecondPressWhileTheNoteIsUpWritesNoSecondLine`).
 
 **Things the mac must merely KNOW** (no contract case changes, so no mac suite
 goes red):
@@ -10164,8 +10168,9 @@ sentence there is, because each of its clauses is true (opening a page in
 Obsidian happens in Plantoir; open the section there and press Open in
 Obsidian; nothing was opened). It reads a little oddly from the in-app
 assistant, which is IN Plantoir. The contract has no sentence for a press that
-failed, and that gap is the mac's to fill (a `wording` key and a scenario),
-since Windows cannot regenerate `assist-wording.json`.
+failed, and that gap is the mac's to fill, since Windows cannot regenerate
+`assist-wording.json`: mac [#698](https://github.com/russellgordon/plantoir/issues/698)
+asks for a `wording` key and a scenario `given.obsidianPress: "didNotOpen"`.
 `AFailedPressIsAnsweredWithoutAFalseSentence` and
 `TheReferenceRouteReportsDidNotOpenWhenItThrows` pin it.
 

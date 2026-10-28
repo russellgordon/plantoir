@@ -198,6 +198,15 @@ public sealed partial class SidebarPane
     private async Task OpenReferenceInObsidian(Course course, string revealFolder, PreviewedPageSource.Answer? answer = null,
                                                int? section = null, TaskCompletionSource<OpenInObsidianPress>? report = null)
     {
+        // A second press while this course's note is up (#690) opens nothing
+        // - the first press opens Obsidian once the note is answered - so it
+        // is told it waits, and writes no trail line: one line per press that
+        // opens something, as ObsidianOpenRoute's guard does for a section.
+        if (ObsidianFigureAddOnsThisRun.Asking.Contains(course.DirectoryPath))
+        {
+            report?.TrySetResult(new OpenInObsidianPress.WaitingForAnAnswer());
+            return;
+        }
         if (answer is not null && section is int number) PreviewedPageSource.NoteThePress(answer, course.Code, number);
 
         // Lock the pages again FIRST, on every route (#491 item 4; the mac's

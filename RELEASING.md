@@ -302,7 +302,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > second half is still yours: open the file and check each entry's issue is
    > open. An entry whose milestone IS this release means the work is owed
    > NOW — build it, or move the issue (and the entry) to a later milestone as
-   > a deliberate decision. Never cut over one. The boundary and the reasoning
+   > a deliberate decision. Never cut over one. **For this cut the ledger is
+   > deliberately NOT empty**: it holds two entries against mac #698 (v1.9.1,
+   > #690's `obsidianIsNotOnThisMac` and its scenario), and since v1.9.1 is
+   > later than 1.8.7 `EveryEntryIsOwedByAMilestoneLaterThanThisBuild` passes
+   > with them in it. The boundary and the reasoning
    > are in `contracts/README.md` → "Named gaps".
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries

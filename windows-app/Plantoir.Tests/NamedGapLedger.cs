@@ -153,12 +153,13 @@ internal static class NamedGapLedger
         keys.Select(key => new Entry(area, key, issue, milestone, reason));
 
     // Reasons, one per owning issue, as `private const string` beside the
-    // milestones above. EMPTY since 2026-10-16: #548 closed the sixteen
-    // plan-table sentences (mac #524) that #551's piece held open that
-    // morning, when the plan table landed. (Empty before that from
-    // 2026-10-15, when the catch-up to mac 1.7.1, #481, closed its last two.)
-    // Not empty from 2026-10-22 until #581 landed the same day: its four
-    // Obsidian add-on events.
+    // milestones above. TWO ENTRIES since 2026-10-28, both against mac #698
+    // (v1.9.1): #690's obsidianIsNotOnThisMac and its scenario, below.
+    // Empty before that from 2026-10-22, when #581 landed its four Obsidian
+    // add-on events (held open earlier that day); empty from 2026-10-16, when
+    // #548 closed the sixteen plan-table sentences (mac #524) that #551's
+    // piece held open that morning; and empty from 2026-10-15, when the
+    // catch-up to mac 1.7.1, #481, closed its last two.
 
     private const string ObsidianNotOnThisMachine =
         "the contract's sentence says \"this Mac\" without {machine}; Windows cannot say it as written and " +

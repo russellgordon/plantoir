@@ -359,8 +359,9 @@ public sealed class AssistToolRunner
             OpenInObsidianPress.Opened => AssistWording.OpenedTheSectionPageNotFound(course, section),
             OpenInObsidianPress.WaitingForAnAnswer => AssistWording.ObsidianOpensAfterTheQuestion(course, section),
             OpenInObsidianPress.AlreadyOpening => AssistWording.ObsidianIsAlreadyOpening(course),
-            // The contract has no sentence for a press that failed (a gap the
-            // mac is told of). This one is the least wrong: every clause of it
+            // The contract has no sentence for a press that failed: mac #698
+            // asks for a `wording` key and a scenario
+            // `given.obsidianPress: "didNotOpen"`. This one is the least wrong: every clause of it
             // is true - the button is in Plantoir, pressing it is the way, and
             // nothing was opened - where "no window" and "opened" are not.
             OpenInObsidianPress.DidNotOpen => AssistWording.OpenInObsidianIsInTheSectionWindow(course, section),
