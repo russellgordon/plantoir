@@ -1740,6 +1740,7 @@ check_baked() {
   fi
 }
 check_baked scripts/contracts.py          /opt/scripts/contracts.py
+check_baked scripts/machine_line.py       /opt/scripts/machine_line.py
 check_baked scripts/site_health.py        /opt/scripts/site_health.py
 check_baked scripts/site_said.py          /opt/scripts/site_said.py
 # The contract itself must be IN the image: the container's only bind mount is
