@@ -66,7 +66,7 @@ Branch `issue/657-verify-deploy`.
 - The re-run after the review fixes, `-FirstPublish` again: 166 passed, 0 failed, 0 skipped.
 - Every Netlify and Cloudflare leg: 23 of 23 links answered 200.
 
-New issues: #661 (the app's own console very likely shows the same joins) and #665 (the mac's Cloudflare race). `documentation/12-windows-app.md` → "verify-deploy.ps1".
+New issues: #661 (the app's own console very likely shows the same joins; confirmed and fixed 2026-10-28, `ScriptRunner` now runs the same stage) and #665 (the mac's Cloudflare race). `documentation/12-windows-app.md` → "verify-deploy.ps1".
 
 **Gate:** `dotnet test` Failed 7, Passed 2986, Total 2993. The seven are `dev`'s curriculum-folder and Obsidian-wording cases, plus one `PythonToolchainTests` 3-minute load timeout; a different file timed out when it was re-run alone.
 

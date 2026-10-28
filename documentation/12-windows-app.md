@@ -296,7 +296,9 @@ else that calls `ConPtyProcess.Start` — PtyDriver, the harnesses,
 `ConPtyRedirectedParentTests` — keeps the 400-column default, deliberately:
 #623's work on reading cursor moves as line breaks (12 → "verify-deploy.ps1",
 `CursorMoveLineBreaks.cs`) reads PtyDriver's output at 400, and widening it
-under that work would change what it measures. Widening PtyDriver is left to
+under that work would change what it measures. (Since #661 the app's own
+output goes through the same stage at 8,192: "Line breaks ConPTY draws as
+cursor moves", below.) Widening PtyDriver is left to
 a later issue if anybody wants it.
 
 **What went wrong at 400.** The first check of #650 on this PC found the
@@ -390,6 +392,136 @@ hidden whole as before (`transcriptStripping.machineLines`).
 **For the mac, to know only.** Its pseudo terminal is the kernel's, which
 passes bytes through as written and never repaints, so it has nothing to do
 here. Windows' screen is wide for this reason, not out of habit.
+
+### Line breaks ConPTY draws as cursor moves (#623, #661)
+
+**The fault.** While the screen has not yet scrolled, ConPTY draws "text,
+blank line, text" printed in one flush by JUMPING the cursor
+(`…unchanged.\e[15;1H📁 Shared…`) instead of with CR LF CR LF.
+`TranscriptBuilder.StripControlSequences` removes the jump and, with it, the
+only thing between the two lines. #623 found it in PtyDriver and fixed it
+there (`CursorMoveLineBreaks`, "verify-deploy.ps1" below); #661 confirmed it
+in the app's own window and routed the app through the same stage.
+
+**Measured, 2026-10-28, Lenovo 20QES70500 (i5-8365U), Windows 11 Pro 26200,**
+with a throwaway probe that runs a launcher exactly as `ScriptRunner` does
+(`ConPtyProcess.Start` at `LauncherColumns` x 30, the same UTF-8 decoder,
+the same `TranscriptBuilder`) and logs every read:
+
+- **The real window.** x64 Debug, `--state-dir`, `--auto-deploy PRB1O 1` on a
+  fresh section publishing to a folder. The saved `Logs\runs\…preview.ps1.txt`
+  had "📋 Timetable sections for this course: [1]🔎 Preflight: discovering…"
+  at line 8 and "ℹ️ No new items discovered; course_config.json unchanged.📁
+  Shared folders to include for 'section1':" at line 14, and the console
+  showed the same (both read `Transcript.Lines`). Both come from
+  build_site.py's own `print("\n…")`. #662's 8,192 columns does not help: the
+  jump depends on the screen's ROWS. `deploy.ps1 --to-folder` printed six
+  lines with no blank line and no join.
+- **Questions.** A stub printing `"\nGot x.\n"` and then asking
+  `input("Continue anyway? [y/N] ")` left `Transcript.CurrentLine` — what the
+  question box and `MayBeWaitingForInput` read — as "Got x.Continue anyway?
+  [y/N] ". A real first publish to Netlify (`deploy.ps1 ICS3U 1`, no site
+  record) left "This name is shared globally with all users across the
+  world.Enter Netlify site name [ics3u-s1-2026-…]: ". Through the stage, each
+  is the question alone.
+- **Machine lines** (from the code, not seen in a real run): a
+  `PLANTOIR_HEALTH:` line with a jump after it carried the next line's text on
+  its end, so its JSON did not parse and the finding and its trail line were
+  lost; a sentence with a health line jumped to after it was hidden whole by
+  `transcriptStripping.machineLines`.
+- **An escape cut by a read** (`\e[` | `33m…`): the stripper keeps no state,
+  so "33m" reached the console. The stage holds an unfinished escape back
+  until it is whole, which fixes that too.
+- **The setup wizard.** setup_course.py repaints the colour picker with
+  `\e[2J\e[H` for every section and every arrow key, and `NewCourseCreator`
+  answers the last non-empty prompt-shaped line, so a repaint the stage cut
+  differently could have left it waiting for ever. The capture: after the
+  clear, ConPTY sends 30 rows of `\e[K\r\n` (blank lines, as before), then the
+  WHOLE picker, with jumps to rows 4, 14 and 24. The footer arrives as
+  `\e[24;1HUse ← / → … Enter to select…` and used to be glued onto the last
+  swatch ("textHighlight Use ← / →…", which `LooksLikePrompt` matched only
+  because it uses Contains). Through the stage it is a line of its own, three
+  lines more per repaint; no partial repaint was seen. Two sections, driven
+  the way `NewCourseCreator` drives it: through the transcript the app had,
+  browsing twice per section, exit 0 in 26.1 s with 26 answers; through the
+  stage, browsing 0, 2 and 5 times per section, exit 0 in 19.0, 22.4 and
+  26.8 s with 22, 26 and 32 answers, every footer seen. The real
+  `NewCourseCreator` and `ScriptRunner`, before and after the change: exit 0
+  in 21.5 s and 23.2 s. The UI wizard-to-preview test (`run-ui-tests.ps1`, filtered to
+  `WizardToPreviewUiTests`, alone): its wizard half passed twice ("created
+  MFM2P in 34 s", then "33 s"); both runs then stopped at the first click
+  after it, "Plantoir could not be brought in front of" an untitled window, because this
+  PC's screen was locked (LogonUI.exe running in the session), so the
+  preview half was not driven.
+- **A real deploy's repaints.** A Netlify first publish through the probe
+  went from 148 lines to 153: three joins undone (" Timestamp TZ offset:
+  -0400" | "Choose a Website Address.", "…across the world." | "Enter Netlify
+  site name…", "…unchanged." | "📁 Shared folders…"), and two from
+  `Invoke-WebRequest`'s progress banner in Windows PowerShell 5.1, which
+  ConPTY erases with a row of spaces and then a jump back to row 2: a line of
+  spaces now ends there, where before it ran into the next line. No line of
+  text was repeated. **A Cloudflare deploy (wrangler's own progress) was NOT
+  measured**: the saved Cloudflare token was rejected by
+  `/user/tokens/verify` at the first attempt, and `deploy.ps1` cleared it as
+  it is written to do; #661's closing comment says what is owed.
+
+**The fix.** `ScriptRunner.ReceiveOutput` — the single entry point the
+process and the tests both feed — passes each read through a
+`CursorMoveLineBreaks` FIRST, so every reader sees the restored breaks:
+`Transcript.Append` (the console, the saved transcript, the question box),
+`AdvanceMilestones`, `CollectHealthFindings`, `CapturePreviewAddress` and the
+prompt check. There is one stage per PROCESS (`Run` makes a new one,
+keepTranscript or not, and the field has an initialiser for tests that feed
+a runner that never ran), because what it holds back belongs to the output
+that printed it. `FinishRun` flushes it straight after the buffered output
+and before anything reads the transcript (`EndIsAClosingForADeploy` reads
+`DisplayText`, then the transcript is saved), with no question check, since
+the process has gone. A keepTranscript leg's stage starts with "no text on
+the line" even if the previous leg left an unfinished line in
+`Transcript.CurrentLine`, so the next leg's first jump does not end that
+line, as before the change. The stage only ever ADDS a CR LF, and only before
+an escape, so `transcriptStripping` is untouched and a milestone marker found
+by IndexOf cannot be split. Tests: `ScriptRunnerCursorJumpTests`, from
+captured bytes; ten of its twelve fail with the stage taken out.
+
+**Accepted cost (as in #623).** A repaint of an EARLIER row with `CSI r;1H`
+while the current line has text shows the repainted text as a line of its
+own, so it appears twice in the console and the saved transcript (before the
+stage it was glued onto the current line instead).
+`ARepaintOfAnEarlierRowShowsTwice_Accepted` pins it. In the runs measured
+the only repaint of an earlier row was the progress banner's row of spaces
+above. The skipped blank row stays lost.
+
+**Redaction.** The saved transcript is redacted line by line. A value the
+stage moves onto a line of its own is out of reach of `labelledSecret`, which
+needs its label on the same line; that is the shape an ordinary CR LF between
+a label and its value always had, and a prompt's echoed answer stays on the
+prompt's row. A 40-character token is still caught by the long-secret rule
+(`ATokenJumpedOntoALineOfItsOwnIsStillRedacted`).
+
+**Not covered.** `plantoir-mcp`'s `LauncherRunner` reads launchers through
+redirected pipes, not ConPTY, so it never sees a jump. The stripper still ends
+a CSI only at an ASCII letter, so a CSI with another final byte (`\e[3~`)
+eats text up to the next letter; none of the runs measured carried one.
+
+**Rejected:**
+- *The stage inside `TranscriptBuilder`*: `CollectHealthFindings` and
+  `CapturePreviewAddress` read the raw text, not the transcript, so they
+  would keep the joins.
+- *The stage in `ReadLoop`*: the tests feed `ReceiveOutput` directly, so it
+  would be untested.
+- *Tracking rows* to bring the blank line back: #623's reasons.
+- *A screen of one or two rows*, measured: at 8192 x 1 and x 2 the stub and a
+  real build had no jumps and no `\e[nC`, and kept their blank lines. But
+  ConPTY renders each run differently at that size — at two rows the prompt
+  lost its trailing space ("(letters only):") and the echoed answer was glued
+  to it ("(letters only):testing") — too little is characterised (Read-Host
+  on PowerShell 5.1, spinners, wraps), and it would widen the gap with
+  PtyDriver and the harnesses, which run at 400 x 30. It could be a follow-up
+  with its own measurements.
+
+**For the mac, to know only.** Its pseudo terminal never draws a blank line
+as a cursor jump, so it has nothing to do here.
 
 ---
 
@@ -7826,7 +7958,7 @@ has already scrolled, both came out as plain `\r\n` with no join. That is
 why most of the old log's blank lines survived and the joins all sat in its
 first 30 rows (ConPty.cs makes the screen 30 rows).
 
-**The fix is narrow and is PtyDriver's alone:**
+**The fix is narrow, and was PtyDriver's alone until #661:**
 `Plantoir.Core/Scripting/CursorMoveLineBreaks.cs`. A cursor position
 (`CSI row;1 H`/`f`, or no column) or cursor-next-line (`CSI n E`) that lands
 in column 1 while the current line has text ends that line. A CR LF goes in
@@ -7845,8 +7977,10 @@ bytes.
 - *Changing `StripControlSequences` or the app's `TranscriptBuilder` path*.
   `ScriptRunner`'s question detection reads the same lines, and
   `transcriptStripping` pins what the console strips. The app's console
-  very probably shows the same joins in a run's first 30 rows. That is
-  #661, to be confirmed in the window first.
+  did show the same joins in a run's first 30 rows: #661 confirmed it in
+  the window and put this stage in front of `ScriptRunner.ReceiveOutput`,
+  leaving the stripper as it was ("Line breaks ConPTY draws as cursor
+  moves (#623, #661)", above).
 
 **Accepted cost:** when ConPTY repaints a row in place with `CSI r;1 H`,
 the repainted line now shows up a second time in `--raw-log` and the

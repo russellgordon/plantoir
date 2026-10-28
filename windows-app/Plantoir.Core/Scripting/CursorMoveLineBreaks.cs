@@ -30,11 +30,23 @@ namespace Plantoir.Core.Scripting;
 /// it wrong duplicates lines. A blank line lost is harmless to every reader of
 /// these logs; a line joined to the next is not.</para>
 ///
-/// <para><b>Opt-in, used only by PtyDriver.</b> The app's console
-/// (<see cref="TranscriptBuilder"/> through ScriptRunner) is deliberately NOT
-/// routed through this: its question detection reads the same lines, and
-/// whether a teacher's console shows the same joins is its own piece of work,
-/// not a side effect of fixing the harness.</para>
+/// <para><b>Two users.</b> PtyDriver (#623), so the harnesses match the
+/// prompt alone; and, since #661, <see cref="ScriptRunner.ReceiveOutput"/>,
+/// the app's single entry point for a launcher's output, so the console, the
+/// saved transcript, the question box and the PLANTOIR_HEALTH reader all see
+/// the restored breaks. #661 confirmed the joins in the app's own window
+/// (x64 Debug, 2026-10-28, i5-8365U): a fresh section's
+/// <c>preview.ps1 --build-only</c> saved "📋 Timetable sections for this
+/// course: [1]🔎 Preflight: …" and "… course_config.json unchanged.📁 Shared
+/// folders …" as one line each, from build_site.py's own
+/// <c>print("\n…")</c>. #662's 8192 columns does not help: the jump depends
+/// on the screen's ROWS. A question was affected too: <c>print("\nGot
+/// x.\n")</c> then <c>input("Continue anyway? [y/N] ")</c> left "Got
+/// x.Continue anyway? [y/N] " as the line the question box reads. The setup
+/// wizard's colour picker was measured through this stage as well: its
+/// footer arrives as <c>\e[24;1HUse ← / → …</c>, becomes its own line, and
+/// NewCourseCreator still answers it. documentation/12-windows-app.md →
+/// "Line breaks ConPTY draws as cursor moves (#623, #661)".</para>
 ///
 /// <para>Stateful because a read can end in the middle of an escape: an
 /// unfinished one is held back until the next <see cref="Process"/> call (or
