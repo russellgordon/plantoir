@@ -309,10 +309,11 @@ Neither app contains toolchain logic of its own: they write the same
    2026-10-28 Russell had the history rewritten to change those trailers to
    `noreply@google.com`, which maps to no account. Every commit from
    2026-08-17 on has a new hash; hashes cited in files, commit messages and
-   issues were updated to match, and the old-to-new list is attached to the
-   issue that records the rewrite. A clone made before that date must be
-   re-cloned or hard-reset, never pulled: a pull merges the old history back
-   in, and the next push brings the trailer back with it. The failure
+   issues were updated to match, and the old-to-new list is
+   `research/history-rewrite-2026-10-28/old-to-new-hashes.txt`. A clone made
+   before that date must be re-cloned or hard-reset, never pulled: a pull
+   merges the old history back in, and the next push brings the trailer back
+   with it. The failure
    the commit-per-piece order prevents is unchanged: one session's worth of
    unrelated work in one working tree — forty files, a dozen decisions
    tangled together, no way to undo one piece without unpicking the rest —
