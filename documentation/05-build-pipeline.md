@@ -1973,12 +1973,13 @@ programs students edit and run in their browser; the site's half is
    one line. Its patch to latex.ts (`patch_katex_local`, beside
    `patch_katex_mhchem`) is 06 → C2-26.
 
-**The live-preview edge.** The preview's own rebuilds (a page edited while
-it serves) do not run the gate or rewrite the words file. A page that gains
-`codeRunner: true` or its first runnable block while a preview is ALREADY
-running therefore shows its blocks as plain code, with the `plantoir: error:`
-line in the preview's output, until the next Preview — never a Run button
-that cannot work. A page that already had runnable code keeps working. Such
+**The live-preview edge.** Quartz's own rebuilds of the merged copy, which
+a teacher's edit never reaches (see "A running preview does not follow
+edits", below), do not run the gate or rewrite the words file. A merged page
+that gains `codeRunner: true` or its first runnable block while a preview is
+ALREADY running therefore shows its blocks as plain code, with the
+`plantoir: error:` line in the preview's output, until the next Preview —
+never a Run button that cannot work. A page that already had runnable code keeps working. Such
 a block is NOT a folder problem: the site says its folder problem on the
 preview's first build only (#567, below).
 
@@ -2710,9 +2711,11 @@ here and as text by the site, and the net said so on its first build; the
 rule was then corrected on both sides and pinned (`aBoxNeedsWordsAfterIt`).
 A page students cannot see is parsed by Quartz too and never named.
 
-**The live-preview edge.** As for runnable code: the preview's own rebuilds
-do not re-run the check or rewrite the files, so a quiz added while a
-preview serves is rendered by the site's own reading (its verdict is the
+**The live-preview edge.** As for runnable code: Quartz's own rebuilds of
+the merged copy, which a teacher's edit never reaches (see "A running
+preview does not follow edits", below), do not re-run the check or rewrite
+the files, so a quiz added to that copy while a preview serves is rendered
+by the site's own reading (its verdict is the
 site's, the same rules), and its folder problem and any safety-net line
 come with the next Preview.
 
@@ -2864,7 +2867,10 @@ wrong section on one platform.
   runs `npx quartz build --concurrency 1 --serve --port <8081-8084>
   --wsPort <port+1000>` (the websocket port keeps concurrent previews'
   live reload from colliding). The teacher browses the HOST address the
-  launcher printed; Quartz rebuilds on file changes.
+  launcher printed. Quartz's watcher watches only the MERGED `content/`, not
+  the course folder, so an edit a teacher makes reaches the preview on the
+  next Preview, on both platforms ([A running preview does not follow
+  edits](#a-running-preview-does-not-follow-edits-671)).
 - **Build-only mode:** `npx quartz build --concurrency 1`, verifies
   `public/` exists in `/tmp/quartz-builds/...`, and performs a one-shot
   sync to the host `.merged_output/section<N>/public/` and `course_config.json`.
@@ -3071,6 +3077,77 @@ will open on whatever page happens to come first" is true of a PREVIEW, and for
 publishing there is no site at all. Its detail in `shared-rules.json` →
 `siteHealth.checks` now names both outcomes, so a teacher can tell whether they
 may carry on for now or must fix it before they publish.
+
+## A running preview does not follow edits (#671)
+
+**The rule, on both platforms: an edit reaches the preview on the NEXT
+Preview.** Nothing re-merges the course while a preview is serving.
+`build_site.py` copies the course into `<build root>/work/<CODE>/section<N>/content`
+once per build (the `rmtree` and copy in the merge), and then runs a plain
+`quartz build --serve` (`build_site.py` ~9790). Quartz's watcher
+(`build.ts` → `startWatching`) watches that COPY. No launcher
+(`preview.sh`, `preview.ps1`) and neither app runs a watcher on `courses/`:
+on Windows the one `FileSystemWatcher` in the app is
+`ScheduledPublishWatcher`'s, and the mac has no course watcher either.
+research/preview-staleness/FINDINGS.md said the same of the mac in its
+"Two more gaps" ("the merge runs once, at preview start"). The fence note
+earlier in this page ("The live-preview edge") is one case of this rule.
+
+**How it was found.** #650's step 3 asked for "edit a page while the
+preview runs, and no second dialog appears". On Windows (2026-10-23) no
+rebuild ever followed, which was read as a fault. #671 measured it
+(2026-10-28, Lenovo 20QES70500, i5-8365U, Windows 11 Pro 26200, runtime on
+Node 22.23.4):
+
+- By hand, a course-page edit at 10:42:36 gave no "Detected change" and no
+  new page by 10:43:11. In the app (x64 Debug, `--state-dir`,
+  `--auto-preview`) an edit at 10:49:50 gave nothing in 111 s. That is the
+  rule above working, not a fault: `--state-dir` plays no part, because the
+  launchers resolve `%LOCALAPPDATA%\Plantoir\builds\<id>` themselves (#664)
+  and both runs built there.
+- So #650's step 3 cannot happen on either platform: a second dialog could
+  only come from a second Preview, which is a new first build.
+
+**A second, Windows-only fault, in Quartz v4.5.0.** Editing the MERGED copy
+in place, written the way Obsidian writes, Quartz printed `Detected change`,
+`Parsed 1 Markdown files` and `Emitted 3 files` — `index.xml`,
+`sitemap.xml` and `static/contentIndex.json` — while
+`Discussions/Edit-Me.html` kept its old modification time and the served
+page did not change (by hand at 10:44:47, and in the app at 10:51:41 after
+67 s). The cause is in `build.ts` (the `add`/`change`/`unlink` handlers,
+~161-175, and `rebuild`, ~203-245): chokidar reports
+`Discussions\Edit Me.md` with BACKSLASHES, that becomes the key in
+`changesSinceLastBuild`, and `contentMap` is keyed by the POSIX
+`relativePath`, so the lookup misses, the change event carries no `file`,
+and `contentPage.partialEmit` skips it. Proved by patching a throwaway work
+copy's three handlers to
+
+```ts
+.on("change", (rawFp) => {
+  const fp = toPosixPath(rawFp)   // already imported from ./util/glob
+  ...
+```
+
+after which the same edit gave `Emitted 6 files` and was served within
+3 s (reverted, then deleted). A second shape with the same cause: an `add`
+of a file that vanished before Quartz copied it (sed's temp file
+`sedVmo4aO`) killed the serve — `ENOENT copyfile` in `assets.ts`, node
+exited 1, and build_site exited with a traceback. The mac does not meet
+this, for a stronger reason than its POSIX paths: its watcher never sees a
+write made on the Mac at all, because file events do not cross the Colima
+mount (FINDINGS, "But live reload is dead even where the port matches").
+
+**Not patched in 1.9.0** (decided for #671 on 2026-10-28; the follow-up is
+#703). The patch is small — an ALWAYS-section, idempotent
+`patch_quartz_watcher_posix_paths` beside `patch_quartz_build_clean`, with
+a marker comment and a `scripts/test_*.py` fixture — but it changes every
+folder's recipe hash, so every mac rebuilds its image and `verify.sh` has to
+gate it, for a path no teacher reaches: by the rule above, the watched
+folder changes only when a build rewrites it. **Whoever adds live
+re-merging — the only thing that would make the fault reachable — must
+apply the patch first**, and handle the vanished-file crash. Live re-merging
+as a feature would be its own issue, for both platforms and Russell to
+decide.
 
 ## Quartz serves the OLD site before it builds the new one
 

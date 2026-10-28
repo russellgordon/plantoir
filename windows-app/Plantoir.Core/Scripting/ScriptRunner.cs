@@ -22,6 +22,12 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     private Thread? _readerThread;
     private Thread? _exitThread;
     private int _finished;                 // 0 until FinishRun runs, guards against a double finish
+    // Puts back the line breaks ConPTY draws as cursor jumps (#661). One per
+    // PROCESS: what it holds back (half an escape, whether the line has text)
+    // belongs to the output of the process that printed it. Initialised here
+    // as well as in Run, because tests feed ReceiveOutput on a runner that
+    // never launched anything.
+    private CursorMoveLineBreaks _lineBreaks = new();
     private CancellationTokenSource? _promptCheck;
     private readonly StringBuilder _pendingOutput = new();
     private readonly object _outputGate = new();
@@ -252,6 +258,10 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         IsRunning = true;
         StartedAt = DateTime.UtcNow;
         _finished = 0;
+        // A new process, so a new stage - even for a keepTranscript leg. Its
+        // first line starts with no text of its own, whatever the previous
+        // leg left unfinished in Transcript.CurrentLine (#661).
+        _lineBreaks = new CursorMoveLineBreaks();
         _launchedScriptName = scriptName;
         // "started preview.ps1 COMP 1" — the sentence a teacher would
         // recognise; Note() redacts the arguments on the way in.
@@ -328,7 +338,17 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     // ---- The single entry point -----------------------------------------
 
     /// <summary>Feed output into the runner — the process does, and so do tests.</summary>
-    public void ReceiveOutput(string text)
+    /// <remarks>
+    /// The FIRST thing done to it is <see cref="CursorMoveLineBreaks"/> (#661):
+    /// under ConPTY a blank line in the first screenful arrives as a cursor
+    /// jump, and the stripper would glue the lines either side of it into one
+    /// — in the console, in the saved transcript, in the question box, and in
+    /// a PLANTOIR_HEALTH line that then no longer parses. Every reader below
+    /// sees the restored breaks, and none keeps a copy from before the stage.
+    /// </remarks>
+    public void ReceiveOutput(string text) => ReceiveProcessedOutput(_lineBreaks.Process(text));
+
+    private void ReceiveProcessedOutput(string text, bool checkForQuestion = true)
     {
         Transcript.Append(text);
         AdvanceMilestones(text);
@@ -342,7 +362,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         LastOutputAt = DateTime.UtcNow;
         if (IsAwaitingInput) { IsAwaitingInput = false; Notify(nameof(IsAwaitingInput)); }
         Notify(nameof(Transcript));
-        SchedulePromptCheck();
+        if (checkForQuestion) SchedulePromptCheck();
     }
 
     /// <summary>
@@ -514,6 +534,11 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         _promptCheck?.Cancel();
         if (IsAwaitingInput) { IsAwaitingInput = false; Notify(nameof(IsAwaitingInput)); }
         FlushBufferedOutput();
+        // Whatever the line-break stage still holds (an escape the process
+        // never finished), BEFORE anything below reads the transcript. No
+        // question check: the process has gone, so nothing can be waiting.
+        string heldBack = _lineBreaks.Flush();
+        if (heldBack.Length > 0) ReceiveProcessedOutput(heldBack, checkForQuestion: false);
         FlushUnfinishedPreviewLine();
         // Asked BEFORE LastExitCode is set, which is what the views watch, so
         // they never see a preview another program's deploy ended as a failure.

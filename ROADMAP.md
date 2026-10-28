@@ -46,19 +46,21 @@ download joins the release, with what 1.9.0 brought the Mac:
   ([#675](https://github.com/russellgordon/plantoir/issues/675)), with a
   record of known weaknesses in the parts Plantoir carries
   ([#685](https://github.com/russellgordon/plantoir/issues/685)).
-- **Windows fixes of its own:** a preview that did not rebuild after an edit
-  ([#671](https://github.com/russellgordon/plantoir/issues/671)); the line
+- **Windows fixes of its own:** the line
   shown when the disk fills while Swift is being set up
   ([#672](https://github.com/russellgordon/plantoir/issues/672)); the Quizzes
   page pictures on plantoir.app
-  ([#590](https://github.com/russellgordon/plantoir/issues/590)); and what a
+  ([#590](https://github.com/russellgordon/plantoir/issues/590)); what a
   scheduled publish does when the computer is asleep
-  ([#554](https://github.com/russellgordon/plantoir/issues/554)).
+  ([#554](https://github.com/russellgordon/plantoir/issues/554)); and
+  messages in the window no longer run two lines together, and a question is
+  asked on its own
+  ([#661](https://github.com/russellgordon/plantoir/issues/661)).
 - **Behind the scenes:** a few checks that both apps behave the same way
   ([#659](https://github.com/russellgordon/plantoir/issues/659),
   [#660](https://github.com/russellgordon/plantoir/issues/660),
-  [#661](https://github.com/russellgordon/plantoir/issues/661),
   [#666](https://github.com/russellgordon/plantoir/issues/666),
+  [#671](https://github.com/russellgordon/plantoir/issues/671),
   [#673](https://github.com/russellgordon/plantoir/issues/673),
   [#680](https://github.com/russellgordon/plantoir/issues/680),
   [#682](https://github.com/russellgordon/plantoir/issues/682)).

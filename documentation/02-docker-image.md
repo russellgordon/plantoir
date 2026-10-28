@@ -681,6 +681,34 @@ among them OpenSSL itself (`libssl3t64` 3.5.6 → 3.5.7), which is the library
 `urllib` runs on — a follow-up issue decides between a digest bump and
 naming the package.
 
+**On Windows (#652, #659).** There is no image: `deploy.py` runs on the
+bundled Python, whose `load_default_certs` reads the Windows store (Root and
+CA, both scopes), so `fetch-runtime.ps1` cannot change what it trusts.
+Measured on the Windows test PC (Lenovo 20QES70500, i5-8365U, Windows 11 Pro
+26200), with the bundled Python 3.11.9: on 2026-10-23 the default context
+held 38 certificates and still trusted "AAA Certificate Services" (Root and
+AuthRoot, both scopes, no EKU restriction); the emSign G3 roots and the six
+intermediates were in no store. **Decision (#659): accept that until Windows
+distrusts it, rather than ship a CA file of our own.** A bundle in
+`deploy.py` is a second trust store to keep current at every runtime refresh,
+for a root that is not above the compromised intermediates (Debian's removal
+of it was separate housekeeping), and it would drop the roots schools install
+for TLS inspection (inferred; no school network was measured). Windows did so
+within days: on 2026-10-26 the automatic root update removed it (CAPI2 event
+4108, "Successful auto delete of third-party root certificate"; event 4111,
+root list effective 2026-10-23), and on 2026-10-28 the thumbprint
+`D1EB23A46D17D68FD92564C2F1F1601764D8E349` was in no store (LocalMachine
+Root and AuthRoot, CurrentUser Root, CA in either scope) and the default
+context held **37** certificates with neither subject. Node 22.23.4's own
+store, which wrangler uses, holds 116 and neither, as on the mac.
+**Revisit** if a teacher's PC has automatic root updates turned off (Group
+Policy "Turn off Automatic Root Certificates Update", plausible on managed
+school machines: such a PC keeps the roots it holds until it syncs), or if
+Debian or Mozilla drop a root Microsoft keeps. To check a PC:
+`Get-ChildItem Cert:\LocalMachine\Root | ? Thumbprint -eq
+D1EB23A46D17D68FD92564C2F1F1601764D8E349`, and the bundled Python's
+`ssl.create_default_context().get_ca_certs()`.
+
 ### Node 22 (#640, v1.9.0)
 
 The image moved from an unpinned `setup_20.x` to **Node 22.23.4, pinned

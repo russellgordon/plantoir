@@ -116,6 +116,10 @@ version line. A list that survives its own release is worse than no list.
 | 2026-10-28 | Nothing: the Windows website builder runs on Node 22.23.4, the version the mac's image uses | Windows | #675 |
 | 2026-10-28 | Nothing: the Windows runtime's npm advisories were audited and the six left are accepted on evidence; `windows-app\audit-runtime.ps1` re-runs the audit by hand | Windows | #685 |
 | 2026-10-28 | Open in Obsidian on a section opens the page its preview is showing, not the section's front page; and "Open this in Obsidian" typed to the assistant presses that button | Windows (the mac since 1.9.0) | [#681](https://github.com/russellgordon/plantoir/issues/681), [#690](https://github.com/russellgordon/plantoir/issues/690) |
+| 2026-10-28 | Messages in the window no longer run two lines together, and a question (a site name at a first publish, "Continue anyway?") is asked on its own rather than on the end of the line before it | Windows only | [#661](https://github.com/russellgordon/plantoir/issues/661) |
+| 2026-10-28 | Nothing: `verify-deploy.ps1`, the publishing harness, waits for Cloudflare's production address to serve this run's upload before judging it, and `-SelfTest` proves that wait offline — not yet run against a real pages.dev from Windows; the nothing-skipped run in step 2 is its proof | Windows (the mac's harness since #665) | [#680](https://github.com/russellgordon/plantoir/issues/680) |
+| 2026-10-28 | Nothing: a running preview does not follow edits on either platform (recorded; Quartz's Windows watcher fault is #703) | Both | [#671](https://github.com/russellgordon/plantoir/issues/671) |
+| 2026-10-28 | Nothing: Windows' publishing trusts the OS store; Windows removed the Comodo root 2026-10-26 | Windows | [#659](https://github.com/russellgordon/plantoir/issues/659) |
 
 
 ## Warnings the release notes MUST carry
@@ -390,6 +394,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > sites the first-publish run made, so they can be deleted. Cloudflare
    > reuses a project of the same name, which is why the surname is random
    > on each run.
+   >
+   > **Run the self-test first: `verify-deploy.ps1 -SelfTest` on Windows,
+   > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline,
+   > about 20 s, no credentials: it proves the wait for Cloudflare's
+   > production address against a stub, so a real run's Cloudflare lines can
+   > be trusted.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503; when a BASE pin changed — Node, Python,
