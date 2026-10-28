@@ -345,6 +345,33 @@ public class ToolchainContractTests
     }
 
     /// <summary>
+    /// #675: the fetch script compares the manifest's base VALUES with their
+    /// pins, not only its keys. Before #675 a Node bump against an existing
+    /// runtime was answered "already in place". Read as text: $BasePins must
+    /// name every one of $BaseKeys, and the loop over it must compare each
+    /// value and refuse.
+    /// </summary>
+    [Fact]
+    public void TheFetchScriptComparesEveryBaseValueWithItsPin()
+    {
+        string recipe = File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
+        var keys = System.Text.RegularExpressions.Regex.Match(recipe, @"(?m)^\$BaseKeys\s*=\s*@\(([^)]*)\)");
+        Assert.True(keys.Success, "fetch-runtime.ps1 no longer sets $BaseKeys.");
+        var names = System.Text.RegularExpressions.Regex.Matches(keys.Groups[1].Value, @"""([^""]+)""")
+            .Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(new[] { "node", "python", "quartz", "wrangler", "emoji" }, names);
+
+        var pins = System.Text.RegularExpressions.Regex.Match(recipe, @"(?ms)^\$BasePins\s*=\s*\[ordered\]@\{(.*?)^\}");
+        Assert.True(pins.Success, "fetch-runtime.ps1 no longer sets $BasePins.");
+        foreach (string name in names)
+            Assert.Matches(new System.Text.RegularExpressions.Regex(@"(?m)^\s*" + name + @"\s*=\s*\$\w+"), pins.Groups[1].Value);
+
+        Assert.Matches(new System.Text.RegularExpressions.Regex(
+            @"foreach \(\$key in \$BasePins\.Keys\)\s*\{\s*if \(\[string\]\$existing\.\$key -ne \$BasePins\[\$key\]\)\s*\{\s*throw"),
+            recipe);
+    }
+
+    /// <summary>
     /// #687: the first binary in any payload. <c>Plantoir.csproj</c> takes all
     /// of <c>support\**</c> as content; this proves the .ggb is INCLUDED -
     /// nothing excludes it, it is the bytes the payload holds, and git treats
@@ -361,12 +388,23 @@ public class ToolchainContractTests
         Assert.True(support.Success, "Plantoir.csproj no longer takes support\\** as content.");
         Assert.DoesNotContain("Exclude", support.Groups[1].Value);
         Assert.Contains(@"Link=""Toolchain\support\%(RecursiveDir)%(Filename)%(Extension)""", support.Groups[1].Value);
+        // Nor does a later item take it back out: no Remove= names support or a .ggb.
+        foreach (System.Text.RegularExpressions.Match remove in System.Text.RegularExpressions.Regex.Matches(project, @"Remove=""([^""]*)"""))
+        {
+            string value = remove.Groups[1].Value;
+            Assert.False(value.Contains("support", StringComparison.OrdinalIgnoreCase) || value.Contains(".ggb", StringComparison.OrdinalIgnoreCase),
+                $"Plantoir.csproj removes {value} from its items, which can drop the payload's GeoGebra sketch from the bundle.");
+        }
 
         string sketch = Path.Combine(RepoRoot, "support", "example_content", "MPM2D", "shared", "Explorations", "Slope Angle Conjecture.ggb");
         Assert.True(File.Exists(sketch), $"{sketch} is missing.");
         byte[] bytes = File.ReadAllBytes(sketch);
         Assert.Equal(1_594_544, bytes.Length);
         Assert.Equal("504b0304", Convert.ToHexString(bytes, 0, 4).ToLowerInvariant());
+        // The bytes the payload was committed with (2026-10-28), not merely a zip
+        // of the right length: a line-ending or filter rewrite changes this.
+        Assert.Equal("cc1ef8f35c0520429e5a75677cc3aef7e406c698ebea02d9af903fc2f0941069",
+            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant());
         Assert.Matches(new System.Text.RegularExpressions.Regex(@"(?m)^\*\.ggb\s+binary\s*$"),
             File.ReadAllText(Path.Combine(RepoRoot, ".gitattributes")));
     }
