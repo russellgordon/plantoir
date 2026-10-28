@@ -12,8 +12,8 @@ parse are checked independently of the expected numbers, so a wrong `kept` in
 the contract is caught as well as a line that is too long. The bounded
 markers are held under the cap at their worst plausible size.
 
-Stdlib only, plus what `build_site` imports; on the mac in `verify.sh`, on
-Windows in `PythonToolchainTests`.
+Stdlib only, plus what `build_site` imports; on the mac in `verify.sh` since
+#666, on Windows in `PythonToolchainTests`.
 """
 
 import json
