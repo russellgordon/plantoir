@@ -56,9 +56,17 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; change, a package the new tree dropped would stay beside the new ones and
 ; Node could resolve it. So the folder is emptied before [Files] puts the
 ; current tree back. (runtime\quartz\node_modules has always had the same
-; exposure; its tree has not changed since Quartz v4.5.0 was pinned.)
+; exposure; its tree has not changed since Quartz v4.5.0 was pinned, and was
+; still identical on Node 22, #675.) runtime\node is emptied for the same
+; reason since #675: Node 20.18.1 -> 22.23.4 replaces node.exe and the npm it
+; carries (10.9.9 now), and the files an older npm had that the new one does not
+; would otherwise stay inside it, for Node to resolve. And
+; runtime\vendor\geogebra (#687): scripts\geogebra_engine.py makes the folder
+; whole, so the next GeoGebra version must not inherit this one's files.
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\runtime\vendor\tikz-engine\node_modules"
+Type: filesandordirs; Name: "{app}\runtime\node"
+Type: filesandordirs; Name: "{app}\runtime\vendor\geogebra"
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
