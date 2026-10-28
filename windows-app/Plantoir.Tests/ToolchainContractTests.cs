@@ -228,7 +228,8 @@ public class ToolchainContractTests
 
         Assert.True(manifest.ContainsKey("pyodide"),
             $"{runtime}\\manifest.json has no \"pyodide\": this runtime predates #568. Re-run " +
-            "windows-app\\Vendor\\fetch-runtime.ps1 (it fetches only runtime\\vendor).");
+            "windows-app\\Vendor\\fetch-runtime.ps1: it fetches only runtime\\vendor, unless it says the runtime's Node " +
+            "(or another base part) differs from the pin, and then delete runtime\\ first.");
         Assert.Equal(version, manifest["pyodide"]!.ToString());
 
         string folder = Path.Combine(runtime, "vendor", "pyodide");
@@ -310,7 +311,8 @@ public class ToolchainContractTests
 
         Assert.True(manifest.ContainsKey("geogebra"),
             $"{runtime}\\manifest.json has no \"geogebra\": this runtime predates #687. Re-run " +
-            "windows-app\\Vendor\\fetch-runtime.ps1 (it fetches only runtime\\vendor).");
+            "windows-app\\Vendor\\fetch-runtime.ps1: it fetches only runtime\\vendor, unless it says the runtime's Node " +
+            "(or another base part) differs from the pin, and then delete runtime\\ first.");
         Assert.Equal(pin["value"]!.ToString(), manifest["geogebra"]!.ToString());
 
         string folder = Path.Combine(runtime, "vendor", "geogebra");
