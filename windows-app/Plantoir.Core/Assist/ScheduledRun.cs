@@ -549,7 +549,6 @@ public static class ScheduledRun
         catch { return null; }
     }
 
-    /// <summary>Run the wrapper with PowerShell, non-interactively, and answer its exit code.</summary>
     /// <summary>
     /// How the wrapper is started. It is handed this run's trail folder
     /// (#682), and its own children - <c>preview.ps1 --build-only</c> and each
@@ -573,6 +572,7 @@ public static class ScheduledRun
         return info;
     }
 
+    /// <summary>Run the wrapper with PowerShell, non-interactively, and answer its exit code.</summary>
     private static int RunWrapperForReal(string script)
     {
         var info = WrapperStartInfo(script);
