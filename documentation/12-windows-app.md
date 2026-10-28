@@ -368,7 +368,7 @@ shared Python keeps every machine line to `machineLineLength.maxCharacters`
 character is two cells or two UTF-16 units). A `PLANTOIR_DATED:`,
 `PLANTOIR_KEPT_OFF:` or `PLANTOIR_MAPS:` line that would be longer keeps its
 first entries and carries `count` and `more`; a health finding names fewer
-than ten. The readers here (`PagesDatedByTheBuild`, `HowITeachKeptOffReport`,
+blocks (at most ten, fewer when they would not fit). The readers here (`PagesDatedByTheBuild`, `HowITeachKeptOffReport`,
 `CoverageMapsBuilt`) say the line's `count` on the trail. Doc 05 → "How long a
 machine line may be (#666)" has the rule, the numbers and what was rejected.
 (Whether a long line printed before Quartz's spinner starts would have split

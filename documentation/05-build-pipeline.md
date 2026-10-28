@@ -1338,7 +1338,9 @@ list are printed through `scripts/machine_line.py`:
   go through `machine_line.listed`. A line that fits is printed exactly as
   before. A longer one keeps the FIRST k entries, k as large as fits (found by
   halving), and adds `"count"` (how many there were) and `"more"` (how many it
-  left out) after the list.
+  left out) after the list. k can be 0: a line whose first entry alone would
+  not fit carries an empty list with `count`, and a reader must read it as a
+  report ('M not named'), not as none.
 - `PLANTOIR_HEALTH:` (`site_health.announce`) goes through
   `machine_line.fitted`. Every finding that names a list is made through
   `site_health.shortenable`, which remembers how to make it again with a

@@ -93,7 +93,7 @@ class TheCapHolds(unittest.TestCase):
                         # The filled andMore, not just its number: a bare digit
                         # is in a page name ("Unit 1/...") as often as not.
                         table = site_health._checks_by_name()
-                        and_more = site_health.filled(table["linksIntoHiddenPages"]["andMore"],
+                        and_more = site_health.filled(table[payload["name"]]["andMore"],
                                                       {"count": total - expect["named"]})
                         self.assertIn(and_more, payload["detail"])
                     continue

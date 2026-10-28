@@ -166,8 +166,10 @@ public class BuildMachineLinesTests : IDisposable
                                               "HowITeachKeptOffReport", "BuildRepairReport", "CloudflareProjectRemade", "SiteHealthFinding", "LinksChecklistMarker" })
             {
                 Assert.False(source.Contains(reader + ".Parse(line)", StringComparison.Ordinal), $"{name} reads {reader} by hand");
-                Assert.False(source.Contains(reader + ".ReportsIn(", StringComparison.Ordinal), $"{name} reads {reader} by hand");
             }
+            // SiteHealthFinding.FindingsIn is for readers of a whole transcript; a
+            // product source that reads line by line must go through Record instead.
+            Assert.False(source.Contains("SiteHealthFinding.FindingsIn(", StringComparison.Ordinal), $"{name} reads SiteHealthFinding.FindingsIn by hand");
         }
         Assert.Contains("BuildMachineLines.ScheduledRecordMarkers", wrapper);
 

@@ -32311,6 +32311,28 @@
           "count": 12,
           "trailLine": "the build gave 12 pages the date of their class: 12 not named"
         }
+      },
+      {
+        "line": "PLANTOIR_KEPT_OFF: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [], \"count\": 3, \"more\": 3}",
+        "why": "k = 0 for the kept-off line: an empty list with count is a report of 3 pages kept off, not of none.",
+        "expect": {
+          "course": "ICS4U",
+          "section": 1,
+          "shown": 0,
+          "count": 3,
+          "trailLine": "the build kept 3 pages named How I Teach off the website that the course's settings had listed for it: 3 not named"
+        }
+      },
+      {
+        "line": "PLANTOIR_MAPS: {\"course\": \"ICS3U\", \"section\": 1, \"maps\": [], \"count\": 5, \"more\": 5}",
+        "why": "k = 0 for the maps line: an empty list with count is a report of 5 maps made, not of none.",
+        "expect": {
+          "course": "ICS3U",
+          "section": 1,
+          "shown": 0,
+          "count": 5,
+          "trailLine": "the build made 5 curriculum maps: 5 not named"
+        }
       }
     ]
   }
