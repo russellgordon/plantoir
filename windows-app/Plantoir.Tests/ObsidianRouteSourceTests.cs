@@ -86,12 +86,10 @@ public class ObsidianRouteSourceTests
     [Fact]
     public void TheSectionPressReadsTheAddressOnce()
     {
-        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs"));
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs")).Replace("\r\n", "\n");
         int start = source.IndexOf("public Task<OpenInObsidianPress> OpenInObsidian(", StringComparison.Ordinal);
         Assert.True(start > 0);
-        int end = source.IndexOf("
-    }
-", start, StringComparison.Ordinal);
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
         string press = source[start..end];
         Assert.Equal(1, press.Split("PreviewedAddressFor(").Length - 1);
         Assert.Contains("PreviewedPageSource.Resolve(", press);

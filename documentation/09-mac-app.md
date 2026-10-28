@@ -4601,11 +4601,16 @@ an `otherBuild` refusal on `buildId` (the app never learns which build a
 preview shows, and `.build-id` moves on Rebuild before the list does); a new
 `PreviewedPages` registry (above).
 
-**On Windows**: it inherits the list free (shared Python, native build) and
-owes reading `CoreWebView2.Source` at the press through its `PreviewStartPage`
-normaliser, the resolution cases, the page through its Open in Obsidian
-route, and the trail event — the `windows` issue for #518. The assistant's door (#610) is a separate `windows` issue: the call is
-answered by the APP, pressing the section window's own Open in Obsidian.
+**On Windows** (landed 2026-10-28, #681 and #690): it inherits the list free
+(shared Python, native build), reads `CoreWebView2.Source` once at the press
+through its `PreviewStartPage` normaliser, runs every resolution case
+(`ObsidianOpensThePreviewedPageContractTests`), opens the page through its Open
+in Obsidian route's page door and writes the trail event. The assistant's door
+(#610) is #690 there: the call is answered by the APP, pressing the section
+window's own Open in Obsidian. Where Windows differs — a press that reports
+early because its questions are awaited dialogs, a name kept decomposed on
+NTFS, the link's `/` written `%2F` — is in `12-windows-app.md` → "Open in
+Obsidian opens the page the preview shows on Windows (#681)".
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 

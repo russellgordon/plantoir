@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-10-28 | Open in Obsidian on a section opens the page its preview is showing, not the section's front page; and "Open this in Obsidian" typed to the assistant presses that button | Windows (the mac since 1.9.0) | [#681](https://github.com/russellgordon/plantoir/issues/681), [#690](https://github.com/russellgordon/plantoir/issues/690) |
 
 
 ## Warnings the release notes MUST carry

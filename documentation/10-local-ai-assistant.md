@@ -2952,10 +2952,10 @@ against 13 — the twenty-three that exist (twenty-two until #610 added
 Obsidian from the assistant"), plus fifteen served only over MCP
 (#209's three How I Teach tools and #96's start-of-year pair, both 2026-09-26;
 see "Getting a section ready for the start of the year" below).
-(Windows' separate `plantoir-mcp.exe` serves 42 — 40 since #340 brought the How I
-Teach tools there on 2026-09-30, 42 since bundle 6a's start-of-year pair — the
-mac's 37 before #610 plus five of its own; since #610 the mac has ONE Windows
-lacks, `open_in_obsidian`, owed by the `windows` issue for #610, which takes it to 43; "The two MCP surfaces are not the same
+(Windows' separate `plantoir-mcp.exe` serves 43 — 40 since #340 brought the How I
+Teach tools there on 2026-09-30, 42 since bundle 6a's start-of-year pair, 43 since
+#690 added `open_in_obsidian` (served and refused there, as here) — the mac's 38
+plus five of its own; "The two MCP surfaces are not the same
 product" below names them. [Issue #66](https://github.com/russellgordon/plantoir/issues/66),
 which recorded the gap when the counts differed, is closed.) Six of the extra ones ask for judgement about meaning — reading the
 curriculum and deciding which expectations a page addresses, and reading or
@@ -3894,9 +3894,9 @@ the 13-tool local surface and the 38-tool MCP one (32 until #209 added three
 How I Teach tools and #96 the start-of-year pair, 37 until #610 added
 `open_in_obsidian`; `toolDescriptions` pins all 38). (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
-serves 42: the mac's 37 (before #610) plus five of its own (40 after #340 on 2026-09-30, 42 after bundle 6a's start-of-year pair); since #610 the mac has one Windows lacks, `open_in_obsidian` (owed, 42 → 43) — see "The two MCP surfaces are not
-the same product" below; `AssistSurfaceContractTests`' own comment there still
-says "the contract carries the mac's 32", which is Windows' to correct.) The mac's own test has
+serves 43: the mac's 38 plus five of its own (40 after #340 on 2026-09-30, 42 after bundle 6a's start-of-year pair, 43 since #690 added `open_in_obsidian`) — see "The two MCP surfaces are not
+the same product" below; `AssistSurfaceContractTests`' own comment there was
+corrected to the mac's 38 and Windows' 43 with #690.) The mac's own test has
 pinned that sum for longer than the prose said so; it is 23 + 15 MCP-only = 38 since #610 (22 + 15 = 37 before it): 22 + 10 = 32 once all six of the tools sorted as the mac's landed on 2026-09-08, then #209's three How I Teach tools and #96's start-of-year pair. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
@@ -4378,7 +4378,10 @@ other's — equal counts, different sets (re-counted 2026-09-27 against
 **Updated 2026-09-30 (Windows #340):** `plantoir-mcp.exe` now serves the three
 How I Teach tools too, so it declares **40** names: the mac's 37 less the
 start-of-year pair (still owed, #355), plus Windows' five. The two sets differ
-by five one way and two the other.
+by five one way and two the other. **Updated 2026-10-28 (Windows #690):** after
+bundle 6a's start-of-year pair (42) and `open_in_obsidian` (#610 on the mac,
+#690 here, refused by both servers), `plantoir-mcp.exe` declares **43**: the
+mac's 38 plus Windows' five, and the mac now has none Windows lacks.
 
 **Why neither suite noticed — and how it is now caught.** Not a subset check
 — an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is
@@ -7771,12 +7774,18 @@ scripted engine reply which the runner hands back (`shouldContinue`) loops for
 ever — the agent has no lap cap and the stub answered the same call every
 lap. The mac scenario runner now serves the scripted reply to the FIRST
 request only and plain text after it, so such a regression fails on
-`expectModelRequests` in seconds. Windows' runner should do the same.
+`expectModelRequests` in seconds. Windows' runner does the same since #690.
 
-**Windows** owes the tool on `plantoir-mcp.exe` (42 → 43, refusing there),
-the call answered by the APP pressing the section window's own Open in
-Obsidian (the shape of Windows' `deploy_section` hand-back), the fixed
-phrasings, and the scenarios — the `windows` issue for #610.
+**Windows landed it with #690** (and the press it presses with #681):
+`plantoir-mcp.exe` serves the tool and refuses (42 → 43), the call is answered
+by the APP pressing the section window's own Open in Obsidian
+(`MainWindow.PressOpenInObsidianFor`, the shape of its `deploy_section`
+hand-back), the eight fixed shapes are in `AssistCardCommand.FixedShapes`, and
+nine of the ten scenarios run; the tenth, "on a Mac without Obsidian", is held
+in `NamedGapLedger` because `wording.obsidianIsNotOnThisMac` names "this Mac"
+without `{machine}` (mac #698), so Windows says "this PC". How the press
+reports early on Windows, where a question is an awaited dialog, is in
+`12-windows-app.md` → "The assistant's Open in Obsidian (#690)".
 
 ## Telling an outside assistant how the course is taught (#209)
 
@@ -8079,7 +8088,7 @@ before changing it:
 
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 
-> **On Windows** the gate is a call-tool filter in plantoir-mcp (`Plantoir.Mcp/ReferenceWriteGate.cs`), reading each tool's own `ReadOnly` flag over all 42 tools it serves, so it covers the local window (which reaches its tools through plantoir-mcp) and every outside session alike. The local assistant also refuses a deploy before it shows a card or stops a preview. Details: `12-windows-app.md` → "The fifteen doors on Windows".
+> **On Windows** the gate is a call-tool filter in plantoir-mcp (`Plantoir.Mcp/ReferenceWriteGate.cs`), reading each tool's own `ReadOnly` flag over all 43 tools it serves, so it covers the local window (which reaches its tools through plantoir-mcp) and every outside session alike. The local assistant also refuses a deploy before it shows a card or stops a preview. Details: `12-windows-app.md` → "The fifteen doors on Windows".
 
 A reference course is read-only to every tool on both surfaces. The gate is one
 check at the top of `AssistToolRunner.run(call:)`, and three decisions in it are

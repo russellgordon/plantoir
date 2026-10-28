@@ -263,8 +263,11 @@ public static class PreviewedPageSource
     /// The link Obsidian is handed: <c>obsidian://open?path=</c> and the absolute
     /// path, never the vault's name (two working folders can hold courses with
     /// the same name). <see cref="Uri.EscapeDataString"/> writes '+' as %2B,
-    /// as <c>obsidianOpensThePreviewedPage.link</c> asks, and '/' and '' too,
-    /// which Obsidian decodes (<c>decodeURIComponent</c>).
+    /// as <c>obsidianOpensThePreviewedPage.link</c> asks, and every separator
+    /// too (<c>\</c> as %5C, ':' as %3A), which Obsidian decodes
+    /// (<c>decodeURIComponent</c>; measured on Obsidian for Windows 1.14.5,
+    /// <c>12-windows-app.md</c> → "Open in Obsidian opens the page the preview
+    /// shows on Windows (#681)").
     /// </summary>
     public static string ObsidianLink(string path) => "obsidian://open?path=" + Uri.EscapeDataString(path);
 
