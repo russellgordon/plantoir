@@ -3090,8 +3090,8 @@ once per build (the `rmtree` and copy in the merge), and then runs a plain
 on Windows the one `FileSystemWatcher` in the app is
 `ScheduledPublishWatcher`'s, and the mac has no course watcher either.
 research/preview-staleness/FINDINGS.md said the same of the mac in its
-"Two more gaps" ("the merge runs once, at preview start"). The fence note
-earlier in this page ("The live-preview edge") is one case of this rule.
+"Two more gaps" ("the merge runs once, at preview start"). The two fence notes
+earlier in this page (each headed "The live-preview edge") are cases of this rule.
 
 **How it was found.** #650's step 3 asked for "edit a page while the
 preview runs, and no second dialog appears". On Windows (2026-10-23) no
