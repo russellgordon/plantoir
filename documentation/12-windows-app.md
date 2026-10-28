@@ -8026,7 +8026,17 @@ builder on this PC" and before `build_site.py`. It is the order of
    in this order: `gettingReady`, then `gettingReadyPercent` about every ten
    per cent (the mac goes quiet for its minutes; a school line takes about
    six here), `unpacking`, then `ready`, followed by a `PLANTOIR_SWIFT:`
-   line for the trail.
+   line for the trail. Too little room BEFORE it starts prints `noRoom`,
+   with the gigabytes needed and free. The disk filling PART WAY through
+   (a download, the unpacking, or an installer's error 112) prints
+   `ranOutOfRoom` instead, which names no numbers (#672): the free-space
+   check had already passed, so "about 6 GB is needed, 7 GB is free"
+   would contradict itself, and until #672 that ending printed `noRoom`
+   with `{gigabytes}` and `{free}` unfilled. It is the twin of the mac's
+   `mac.printed.noRoom` (#642). Both endings exit 10 with the marker's
+   reason `noRoom`, so the state and the trail line are the same.
+   `test_swift_windows.py` drives every ending and fails if any printed
+   line keeps a `{placeholder}`.
 3. **Compile**: `🦅 Making N Swift programs ready to run…`, then
    `swift_windows_compile.py <jobs> <cache> --log=<.swift-cache\logs\compile-<pid>.log>`.
 4. **Prepare**: the build, unchanged. It reports `🦅 6 of 7 Swift programs

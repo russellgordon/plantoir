@@ -13,6 +13,7 @@ import hashlib
 import http.server
 import json
 import os
+import re
 import shutil
 import socket
 import struct
@@ -615,7 +616,8 @@ class EnsureTests(unittest.TestCase):
                 raise fetch.Failed(reason, "test")
             with self.subTest(reason=reason):
                 self.assertEqual(fetch.ensure(self.space.root, self.said.append, fetcher=failing), status)
-                self.assertIn(fetch.printed(reason), self.said)
+                # The disk filling part way has its own sentence, with no numbers in it (#672).
+                self.assertIn(fetch.printed("ranOutOfRoom" if reason == "noRoom" else reason), self.said)
                 self.assertEqual(self.markers(), [{"ready": False, "reason": reason}])
 
     def test_too_little_room_downloads_nothing(self):
@@ -628,6 +630,64 @@ class EnsureTests(unittest.TestCase):
             fetch.free_gigabytes = original
         self.assertEqual(status, fetch.NO_ROOM)
         self.assertEqual(self.said[0], fetch.printed("noRoom", gigabytes=fetch.need_gigabytes(), free=2))
+
+    def test_no_printed_line_keeps_a_placeholder(self):
+        # #672: a part-way noRoom printed "{gigabytes}" and "{free}" unfilled,
+        # and the test above asserted that text, so the suite was green over
+        # it. Every ending ensure has is driven here; the marker lines are
+        # JSON and carry braces of their own, so they are left out.
+        placeholder = re.compile(r"\{[A-Za-z]+\}")
+        endings = []
+
+        def progressing(root, say):
+            tell = fetch.Progress(1000, say).callback(0)
+            tell(500)
+            return self.ready_fetch(root, say)
+        endings.append(("ready", progressing))
+        for reason in ("offline", "damaged", "noRoom", "busy", "unpack"):
+            def failing(root, say, reason=reason):
+                raise fetch.Failed(reason, "test")
+            endings.append((reason, failing))
+
+        def broken(root, say):
+            raise RuntimeError("unexpected")
+        endings.append(("unexpected", broken))
+        for name, fetcher in endings:
+            self.said.clear()
+            shutil.rmtree(self.space.install, ignore_errors=True)
+            with self.subTest(ending=name):
+                fetch.ensure(self.space.root, self.said.append, fetcher=fetcher)
+                self.assertTrue(self.said)
+                self.assert_no_placeholder(placeholder)
+
+        self.said.clear()
+        shutil.rmtree(self.space.install, ignore_errors=True)
+        original = fetch.free_gigabytes
+        fetch.free_gigabytes = lambda root: 2
+        try:
+            fetch.ensure(self.space.root, self.said.append, fetcher=lambda root, say: self.fail("nothing is fetched"))
+        finally:
+            fetch.free_gigabytes = original
+        with self.subTest(ending="too little room before starting"):
+            self.assert_no_placeholder(placeholder)
+
+        if ON_WINDOWS:
+            self.said.clear()
+            held = fetch.Lock(self.space.root)
+            self.assertTrue(held.try_take())
+            try:
+                fetch.ensure(self.space.root, self.said.append, wait_seconds=0,
+                             fetcher=lambda root, say: self.fail("nothing is fetched"))
+            finally:
+                held.give_back()
+            with self.subTest(ending="waited for another"):
+                self.assert_no_placeholder(placeholder)
+
+    def assert_no_placeholder(self, placeholder):
+        for line in self.said:
+            if line.startswith(fetch.MARKER):
+                continue
+            self.assertIsNone(placeholder.search(line), line)
 
     @unittest.skipUnless(ON_WINDOWS, "the fetch lock is msvcrt's (Windows)")
     def test_a_second_launcher_waits_then_gives_up(self):
