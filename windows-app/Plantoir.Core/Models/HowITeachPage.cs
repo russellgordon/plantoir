@@ -227,16 +227,26 @@ public static class HowITeachPage
 /// <summary>
 /// A How I Teach page the build kept off the website although the course's
 /// settings had LISTED it (<c>howITeachPage.keptOffMarker</c>). Read like
-/// <see cref="PagesDatedByTheBuild"/>, from the same two readers.
+/// <see cref="PagesDatedByTheBuild"/>, from the same three readers, through <see cref="BuildMachineLines"/>.Record (#660).
 /// </summary>
-public sealed record HowITeachKeptOffReport(string Course, int Section, IReadOnlyList<string> Pages)
+public sealed record HowITeachKeptOffReport(string Course, int Section, IReadOnlyList<string> Pages, int? Count = null)
 {
     public const string Marker = "PLANTOIR_KEPT_OFF:";
 
     /// <summary><c>howITeachPage.keptOffTrailLine</c>, worded as the mac words it.</summary>
-    public string TrailSentence =>
-        $"the build kept {Pages.Count} {(Pages.Count == 1 ? "page" : "pages")} named How I Teach off the website " +
-        $"that the course's settings had listed for it: {string.Join(", ", Pages)}";
+    public string TrailSentence
+    {
+        get
+        {
+            // The count is the build's own when it shortened its line (#666).
+            int total = Math.Max(Count ?? 0, Pages.Count);
+            int notShown = total - Pages.Count;
+            string names = string.Join(", ", Pages);
+            if (notShown > 0) names = Pages.Count == 0 ? $"{notShown} not named" : names + $" and {notShown} more";
+            return $"the build kept {total} {(total == 1 ? "page" : "pages")} named How I Teach off the website " +
+                   $"that the course's settings had listed for it: {names}";
+        }
+    }
 
     public static bool IsMarkerLine(string line) => line.Contains(Marker, StringComparison.Ordinal);
 
@@ -254,15 +264,13 @@ public sealed record HowITeachKeptOffReport(string Course, int Section, IReadOnl
             var pages = (obj["pages"] as System.Text.Json.Nodes.JsonArray)?
                 .Select(page => page?.GetValue<string>() ?? "")
                 .Where(page => page.Length > 0).ToList() ?? new List<string>();
-            if (course.Length == 0 || section <= 0 || pages.Count == 0) return null;
-            return new HowITeachKeptOffReport(course, section, pages);
+            int? count = obj["count"] is System.Text.Json.Nodes.JsonValue counted && counted.TryGetValue(out int total) ? total : null;
+            if (course.Length == 0 || section <= 0 || (pages.Count == 0 && (count ?? 0) == 0)) return null;
+            return new HowITeachKeptOffReport(course, section, pages, count);
         }
         catch (Exception error) when (error is System.Text.Json.JsonException or InvalidOperationException or FormatException)
         {
             return null;
         }
     }
-
-    public static IReadOnlyList<HowITeachKeptOffReport> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
 }

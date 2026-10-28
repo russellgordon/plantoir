@@ -361,13 +361,18 @@ at four times 400's repaint time.
 
 **The lengths it has to hold.** A one-block plain-code finding is 531-611
 characters, and the most it names (ten blocks, then "and N more") about
-2,300; `site_said.py` packs every block into ONE finding. But no width is a
-cure: `PLANTOIR_DATED:` names every page the build rewrote and
-`PLANTOIR_MAPS:` every map, with no cap, so a line longer than 8,192 MAY split
-the same way. That is not measured: Python prints those lines before Quartz
-starts its spinner, and whether the split needs the spinner or only a full
-screen and a wrap on the bottom row is not known. The follow-up issue (#666)
-proposes a cap in the shared Python.
+2,300; `site_said.py` packs every block into ONE finding. No width is a
+cure on its own, so since #666 the width is no longer the only defence: the
+shared Python keeps every machine line to `machineLineLength.maxCharacters`
+(4,000, half the console's width and the carry guard's 8,000, because a wide
+character is two cells or two UTF-16 units). A `PLANTOIR_DATED:`,
+`PLANTOIR_KEPT_OFF:` or `PLANTOIR_MAPS:` line that would be longer keeps its
+first entries and carries `count` and `more`; a health finding names fewer
+blocks (at most ten, fewer when they would not fit). The readers here (`PagesDatedByTheBuild`, `HowITeachKeptOffReport`,
+`CoverageMapsBuilt`) say the line's `count` on the trail. Doc 05 → "How long a
+machine line may be (#666)" has the rule, the numbers and what was rejected.
+(Whether a long line printed before Quartz's spinner starts would have split
+at all was never measured; the cap makes the question moot.)
 (`PLANTOIR_LINKS_CHECKLIST:` carries counts only, not links.)
 
 **Rejected: joining a split line back together before the readers.** The
@@ -650,12 +655,15 @@ the evening before by UI-suite runs that had all been started with
   server as well. A server started by an outside door (Claude Code, Codex) is
   never handed it.
 - **The launchers' own refusal lines** (`Write-TrailLine` in `preview.ps1`
-  and `deploy.ps1`) still use the real path here. The mac's
-  `note_on_the_trail` follows `PLANTOIR_TRAIL_DIR` since #664, and the mac
-  app sets it always (doc 03 → "Where a launcher's own trail lines go");
-  the Windows half is still owed, by the `windows` issue opened from #664,
-  against `contracts/app-rules.json` → `launcherTrailFolder` (trail only,
-  never the builds root). No current UI test triggers a refusal.
+  and `deploy.ps1`) follow the redirect since #682, the Windows half of the
+  mac's #664. Every launcher child is handed `PLANTOIR_TRAIL_DIR` = the
+  app's own trail folder by `LauncherEnvironment` (ALWAYS, overriding an
+  inherited value, as the contract says), and `Write-TrailLine` takes it when
+  it is absolute (doc 03 → "Where a launcher's own trail lines go"). That
+  covers the window's launchers, the window's own `plantoir-mcp` (which has
+  `--state-dir`, so it hands over the redirected folder) and a scheduled
+  publish's wrapper and legs. It moves the trail ONLY: the launchers still
+  build into the real builds root. No current UI test triggers a refusal.
 
 **What a driven run must not touch**, and what now checks it: the real trail,
 settings, startup log, scheduled-deploy wrappers and pending sentinels, and
@@ -4167,18 +4175,25 @@ afterwards the old name is not on disk — and passes them to
 `SpecialFolderRenamer.Renaming`, which writes `curriculum_folders` and the
 legacy `curriculum_folder` naming the primary.
 
-`PLANTOIR_MAPS:` is read from the console (`ScriptRunner`) and from a scheduled
-publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
-`Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
-reader would never see the line. The wrapper is written afresh by
+`PLANTOIR_MAPS:` is read wherever a build's output arrives: the console
+(`ScriptRunner`), a scheduled publish's record (`ScheduledHealthFindings`) and,
+since #660, a run `plantoir-mcp` started (`LauncherRunner`). All three call
+ONE dispatch, `BuildMachineLines.Record`, which writes the trail line itself,
+so a marker cannot be known to one reader and not another (before #660 the
+MCP door read four markers of nine, and a build the assistant started left no
+maps, My Progress, Swift, dated-pages or kept-off line). The scheduled
+wrapper's `Select-String` scan is generated from the same helper's
+`ScheduledRecordMarkers` (`PLANTOIR_HEALTH:` first, then every trail marker but
+`PLANTOIR_CLOUDFLARE_REMADE:`, which the Cloudflare leg appends itself);
+without the scan the record reader would never see the line. Since #660 a
+record's lines reach the trail in LINE order rather than grouped by kind. The wrapper is written afresh by
 `ScheduledRun` at the moment each run starts (since bundle 3), so a deploy
 already scheduled scans for a new marker from its next run, once the
 `Plantoir.exe` it was registered with (`TaskScheduling.RunnerExecutable`) has
 been updated in place, with no need to schedule it again. Only a task set
 before bundle 3 runs its own baked wrapper, once, and misses it.
 `PLANTOIR_MY_PROGRESS:` (#599) and `PLANTOIR_REPAIRED:` (#645) ride the same
-three places — the console reader, the record reader and the wrapper's scan —
-the same way ("My
+helper and the same scan the same way ("My
 Progress: the trail line and the two readers (#599)" below). (This said a
 wrapper "keeps its old scan until its schedule is set again" until
 2026-10-23, which has not been true of a task set since bundle 3.)
@@ -5466,6 +5481,23 @@ the whole table).
   script in place).
 - **`AgentGuidance`'s skills** go through `SyncDirectory` with no manifest,
   so they take exactly the pre-#559 path.
+
+**A test of the mirror must never depend on two writes landing in different
+clock ticks (#673).** Equal length plus times within 2 ms is the fast path,
+and it is reached twice: first in `SyncDirectory`'s own `FilesLookIdentical`
+check, then again at the top of `SyncFile`. NTFS takes a file's time from the
+system clock tick, so two files written in one tick get the same stamp. A
+fixture that writes a copy and its bundled file at the SAME length, one
+straight after the other, is therefore "identical" whenever the writes share
+a tick, and the mirror correctly copies nothing.
+`ScheduledRunTests.TheRunBringsTheFoldersToolsUpToDateBeforeItWritesTheWrapper`
+did exactly that ("OLD fingerprint" against "NEW fingerprint", 15 characters
+each) and failed once in a full run at the 1.8.7 cut, green 5 of 5 alone. The
+suspicion that #559's read-back of each copy's time contributed was wrong for
+that test: its bundle has no `.hashes`, so `MirrorPass.BundledHash` is null and
+the manifest and index paths are never reached. Give the copy a different
+LENGTH (that alone guarantees the copy is read and replaced), and set its time
+explicitly when the test is about times. The fixture now does both.
 
 **Measured** (same PC, 2026-10-23, warm cache, a scratch working folder
 filled from the x64 Debug build's `Toolchain\`, 12,909 files). The harness
@@ -8022,7 +8054,17 @@ builder on this PC" and before `build_site.py`. It is the order of
    in this order: `gettingReady`, then `gettingReadyPercent` about every ten
    per cent (the mac goes quiet for its minutes; a school line takes about
    six here), `unpacking`, then `ready`, followed by a `PLANTOIR_SWIFT:`
-   line for the trail.
+   line for the trail. Too little room BEFORE it starts prints `noRoom`,
+   with the gigabytes needed and free. The disk filling PART WAY through
+   (a download, the unpacking, or an installer's error 112) prints
+   `ranOutOfRoom` instead, which names no numbers (#672): the free-space
+   check had already passed, so "about 6 GB is needed, 7 GB is free"
+   would contradict itself, and until #672 that ending printed `noRoom`
+   with `{gigabytes}` and `{free}` unfilled. It is the twin of the mac's
+   `mac.printed.noRoom` (#642). Both endings exit 10 with the marker's
+   reason `noRoom`, so the state and the trail line are the same.
+   `test_swift_windows.py` drives every ending and fails if any printed
+   line keeps a `{placeholder}`.
 3. **Compile**: `🦅 Making N Swift programs ready to run…`, then
    `swift_windows_compile.py <jobs> <cache> --log=<.swift-cache\logs\compile-<pid>.log>`.
 4. **Prepare**: the build, unchanged. It reports `🦅 6 of 7 Swift programs
@@ -8286,10 +8328,11 @@ anything unexpected, such as a signature check that hangs past 300 s:
 traceback without its marker) or waited (another preview held the fetch for
 longer than the 1,200 s wait) (`whyWords`). Every ending of `ensure` but
 "already ready" prints the marker. They are read from the `PLANTOIR_SWIFT:` line by
-`SwiftGotReady.cs`, in both readers (the console's
-`ScriptRunner.RecordHealthFinding`, and the scheduled publish's
-`ScheduledHealthFindings`), and in the scheduled wrapper's marker scan
-(`TaskScheduling.cs`). A deploy already scheduled picks the line up from its
+`SwiftGotReady.cs`, through `BuildMachineLines.Record` in all three readers
+(the console's `ScriptRunner`, the scheduled publish's
+`ScheduledHealthFindings`, and since #660 a run `plantoir-mcp` started), and
+kept by the scheduled wrapper's marker scan (`TaskScheduling.cs`, generated
+from `BuildMachineLines.ScheduledRecordMarkers`). A deploy already scheduled picks the line up from its
 next run, because `ScheduledRun` writes the wrapper afresh each time (see
 `PLANTOIR_MAPS:` above). Neither event carries `appliesOn`: the mac has
 recorded both since v1.9.0 (#635), from the same `PLANTOIR_SWIFT:` line, which
@@ -8387,15 +8430,18 @@ guard by `TheClosedLineIsWrittenOnceAndOnlyAfterTheOpenedLine`.
 
 ## My Progress: the trail line and the two readers (#599, the mac's #545), v1.8.2
 
+(Three readers since #660, 2026-10-28: the window, a scheduled publish's record, and a run plantoir-mcp started, all through `BuildMachineLines.Record`; the heading keeps its name because other sections cite it.)
+
 The page itself is shared toolchain, and Windows inherits it with the build.
 What Windows owed:
 
 - **`my progress page built`** (`ActivityTrail.Event.MyProgressPageBuilt`),
   read from the build's `PLANTOIR_MY_PROGRESS:` line by `MyProgressBuilt` —
-  the `CoverageMapsBuilt` pattern — in the console reader
-  (`ScriptRunner.RecordHealthFinding`, and the 8000-character carry guard),
-  the scheduled publish's record reader (`ScheduledHealthFindings`) and the
-  wrapper's marker scan (`TaskScheduling.cs`). A deploy already scheduled
+  the `CoverageMapsBuilt` pattern — through `BuildMachineLines.Record` in the
+  console reader (`ScriptRunner`, whose 8000-character carry guard keeps any
+  `PLANTOIR_` line since #660), the scheduled publish's record reader
+  (`ScheduledHealthFindings`) and a run `plantoir-mcp` started (#660), and
+  kept by the wrapper's marker scan (`TaskScheduling.cs`). A deploy already scheduled
   scans for it from its next run, since `ScheduledRun` writes the wrapper
   afresh each time; only a task set before bundle 3 misses it, once. The sentences are
   `myProgressBuilt.trailLine.shapes`, "N page(s)" spelled 1 page / N pages.
@@ -9088,12 +9134,15 @@ front page's title itself, so Windows inherits the repair and its console
 sentence. The `PLANTOIR_REPAIRED:` line is read by `BuildRepairReport` in all
 three places a build's output arrives — the console (`ScriptRunner`), a
 scheduled run's record (`ScheduledHealthFindings`, through the wrapper's
-`Select-String` scan) and a run `plantoir-mcp` started (`LauncherRunner`) —
+`Select-String` scan) and a run `plantoir-mcp` started (`LauncherRunner`),
+all through `BuildMachineLines.Record` since #660 —
 and written as `folder problem repaired` with `trailLine`; a repair key this
 app does not know writes nothing (#645, `BuildRepairReportTests`) —
 [04 → "A course made before 1.8.1 is put right by its next
 build"](04-course-setup.md). `LauncherRunner` also drops every other machine
-line (`TranscriptBuilder.IsMachineLine`) before it reports progress, so no
+line (`TranscriptBuilder.IsMachineLine`, and anything the helper read) before it
+reports progress (`LauncherRunnerCaptureTests` feeds its capture every
+marker's example), so no
 `PLANTOIR_` JSON reaches the assistant's progress text.
 
 **Not on disk, on purpose.** The contract's seventh folder case is `Unit 1:

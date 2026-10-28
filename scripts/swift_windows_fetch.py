@@ -702,7 +702,11 @@ def ensure(root=None, say=print, wait_seconds=WAIT_SECONDS, fetcher=fetch, cours
             except Exception as error:  # never a traceback on the teacher's console
                 raise Failed("unpack", f"{type(error).__name__}: {error}") from error
         except Failed as failure:
-            say(printed(failure.reason))
+            # The disk filling PART WAY has its own sentence (#672): the
+            # free-space check above already passed, so noRoom's numbers
+            # would contradict themselves, and unfilled they printed as
+            # "{gigabytes}" and "{free}". The marker keeps reason noRoom.
+            say(printed("ranOutOfRoom" if failure.reason == "noRoom" else failure.reason))
             say(marker(dict(where, ready=False, reason=failure.reason)))
             _log(root, f"could not get Swift ready: {failure}")
             if failure.reason == "noRoom":

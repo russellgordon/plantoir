@@ -228,11 +228,12 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // When the app carries the native runtime (node, python, Quartz,
         // wrangler in its own folder), tell the launcher where it is: the
         // launcher then builds directly on this PC — no WSL2, no container,
-        // no administrator rights. Every launcher child must get this —
-        // see NativeRuntime for the sweep that once did not.
-        IReadOnlyDictionary<string, string>? extraEnvironment = null;
-        if (NativeRuntime.Directory is { } runtimeDir)
-            extraEnvironment = new Dictionary<string, string> { ["PLANTOIR_RUNTIME"] = runtimeDir };
+        // no administrator rights. And always hand it the app's own trail
+        // folder (#682), so a --state-dir run keeps the launcher's refusal
+        // lines. Every launcher child must get both: see LauncherEnvironment
+        // for the sweep that once did not. ConPTY merges these over the
+        // inherited environment, the extra value winning.
+        IReadOnlyDictionary<string, string> extraEnvironment = LauncherEnvironment.Current;
 
         try
         {
@@ -680,15 +681,10 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // drop the finding: the exact failure the line buffering exists to
         // prevent. So a carry that has outgrown any plausible line is dropped
         // only when it cannot become a finding.
-        if (_unscannedHealthOutput.Length > 8000 &&
-            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal) &&
-            !Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(_unscannedHealthOutput) &&
-            !Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(_unscannedHealthOutput) &&
-            !Plantoir.Core.Models.BuildRepairReport.IsMarkerLine(_unscannedHealthOutput) &&
-            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.CoverageMapsBuilt.Marker, StringComparison.Ordinal) &&
-            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.MyProgressBuilt.Marker, StringComparison.Ordinal) &&
-            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SwiftGotReady.Marker, StringComparison.Ordinal) &&
-            !_unscannedHealthOutput.Contains(Plantoir.Core.Assist.LinksChecklistMarker.Prefix, StringComparison.Ordinal))
+        // Any machine line counts (#660: BuildMachineLines.MayHoldOne is the
+        // contract's one PLANTOIR_ rule), so a marker added tomorrow is kept
+        // too rather than having to be listed here by hand.
+        if (_unscannedHealthOutput.Length > 8000 && !BuildMachineLines.MayHoldOne(_unscannedHealthOutput))
             _unscannedHealthOutput = "";
     }
 
@@ -701,82 +697,20 @@ public sealed class ScriptRunner : INotifyPropertyChanged
 
     private void RecordHealthFinding(string line)
     {
-        if (Plantoir.Core.Assist.LinksChecklistMarker.Parse(line) is { } offered)
+        // One dispatch for every machine line a build prints (#660): the
+        // same helper reads plantoir-mcp's runs and a scheduled publish's
+        // record, so a marker cannot be known to one reader and not another.
+        // It writes the trail lines itself; what the window keeps is here.
+        var read = BuildMachineLines.Record(line);
+        if (read.Checklist is { } offered)
         {
             LinksChecklistMarker = offered;
             Notify(nameof(LinksChecklistMarker));
             return;
         }
-
-        // The build's PLANTOIR_DATED: line (#279) rides the same line buffer:
-        // it names the teacher's pages the build rewrote with their class's
-        // date, and the trail is the only place that survives the console.
-        // The build's PLANTOIR_MAPS: line (#345): which coverage maps it wrote.
-        if (Plantoir.Core.Models.CoverageMapsBuilt.Parse(line) is { } maps)
-        {
-            ActivityTrail.Note(ActivityTrail.Event.CurriculumMapsBuilt, maps.TrailSentence, maps.Course, maps.Section);
-            return;
-        }
-
-        // The build's PLANTOIR_MY_PROGRESS: line (#599): whether it made the
-        // section's My Progress page, and why not when it did not.
-        if (Plantoir.Core.Models.MyProgressBuilt.Parse(line) is { } progress)
-        {
-            ActivityTrail.Note(ActivityTrail.Event.MyProgressPageBuilt, progress.TrailSentence, progress.Course, progress.Section);
-            return;
-        }
-
-        // swift_windows_fetch.py's PLANTOIR_SWIFT: line (#570): Swift got
-        // ready on this PC for the first preview that needed it, or why not.
-        if (Plantoir.Core.Models.SwiftGotReady.Parse(line) is { } swift)
-        {
-            swift.Record();
-            return;
-        }
-
-        if (Plantoir.Core.Models.PagesDatedByTheBuild.Parse(line) is { } dated)
-        {
-            ActivityTrail.Note(ActivityTrail.Event.PagesDatedByTheBuild,
-                               dated.TrailSentence, dated.Course, dated.Section);
-            return;
-        }
-
-        // The build's PLANTOIR_KEPT_OFF: line (#340): a How I Teach page the
-        // course's settings had listed is now kept off the site.
-        if (Plantoir.Core.Models.HowITeachKeptOffReport.Parse(line) is { } keptOff)
-        {
-            ActivityTrail.Note(ActivityTrail.Event.HowITeachPageKeptOff,
-                               keptOff.TrailSentence, keptOff.Course, keptOff.Section);
-            return;
-        }
-
-        // The build's PLANTOIR_REPAIRED: line (#584, mac #645): something the
-        // build put right in the teacher's own page without being asked.
-        if (Plantoir.Core.Models.BuildRepairReport.Parse(line) is { } repaired)
-        {
-            repaired.Record();
-            return;
-        }
-
-        // deploy.py's PLANTOIR_CLOUDFLARE_REMADE: (#395): a section's
-        // Cloudflare project was gone and was made again, so its address may
-        // have changed and a custom domain went with the old one.
-        if (Plantoir.Core.Models.CloudflareProjectRemade.Parse(line) is { } remade)
-        {
-            ActivityTrail.Note(ActivityTrail.Event.CloudflareProjectMadeAgain,
-                               remade.TrailSentence, remade.Course, remade.Section);
-            return;
-        }
-
-        var finding = Plantoir.Core.Models.SiteHealthFinding.Parse(line);
-        if (finding is null) return;
-        // The same section rebuilt in one task reports the same problem twice;
-        // that is one problem, not two. The key is the record's own, so this
-        // and SiteHealthFinding.FindingsIn cannot drift apart.
-        if (!_healthFindingsSeen.Add(finding.Identity)) return;
+        if (read.Finding is not { } finding) return;
+        if (!BuildMachineLines.AddFinding(finding, _healthFindingsSeen)) return;
         _healthFindings.Add(finding);
-        ActivityTrail.Note(ActivityTrail.Event.FolderProblemFound,
-                           finding.TrailSentence, finding.Course, finding.Section);
         Notify(nameof(HealthFindings));
     }
 

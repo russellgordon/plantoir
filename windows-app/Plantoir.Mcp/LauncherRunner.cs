@@ -50,8 +50,11 @@ public sealed class LauncherRunner : ILauncherRunner
         };
         // The MCP server ships beside the app, so the same bundled runtime
         // sits beside this executable too - point the launcher at it, or it
-        // takes the container branch (see NativeRuntime).
-        Plantoir.Core.Scripting.NativeRuntime.Apply(info);
+        // takes the container branch (see NativeRuntime) - and hand it this
+        // server's own trail folder (#682): the window's server, started
+        // with --state-dir, keeps the launcher's lines in the redirected
+        // trail; one Claude Code or Codex started hands over the real one.
+        Plantoir.Core.Scripting.LauncherEnvironment.Apply(info);
 
         if (OperatingSystem.IsWindows())
         {
@@ -131,7 +134,7 @@ public sealed class LauncherRunner : ILauncherRunner
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                 };
-                Plantoir.Core.Scripting.NativeRuntime.Apply(info);
+                Plantoir.Core.Scripting.LauncherEnvironment.Apply(info);
                 foreach (string argument in new[] { "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
                                                     run.Arguments[0], run.Arguments[1], "--stop" })
                     info.ArgumentList.Add(argument);
@@ -150,91 +153,10 @@ public sealed class LauncherRunner : ILauncherRunner
     private async Task<LaunchOutcome> RunStarted(Process process, string script, IProgress<string>? progress,
                                                  CancellationToken cancellation)
     {
-        var tail = new Queue<string>();
-        var gate = new object();
-        var findings = new List<Plantoir.Core.Models.SiteHealthFinding>();
-        var findingsSeen = new HashSet<string>(StringComparer.Ordinal);
-        Plantoir.Core.Assist.LinksChecklistMarker? linksChecklist = null;
+        var capture = new OutputCapture(progress);
 
-        void Capture(string? line)
-        {
-            if (string.IsNullOrWhiteSpace(line)) return;
-
-            // A folder problem, not narration. Lifted out and NEVER passed on
-            // as text: it is a JSON payload, and both the progress reports and
-            // the kept tail are read by a teacher through the assistant
-            // (CLAUDE.md rule 1). The human sentence it carries is reported
-            // properly, by the caller, out of Findings — and site_health.py
-            // prints its own sentence separately besides.
-            // #395: deploy.py's PLANTOIR_CLOUDFLARE_REMADE: from a deploy this
-            // server ran - the same trail line the app writes from its own runs.
-            if (Plantoir.Core.Models.CloudflareProjectRemade.Parse(line) is { } remade)
-            {
-                Plantoir.Core.Scripting.ActivityTrail.Note(
-                    Plantoir.Core.Scripting.ActivityTrail.Event.CloudflareProjectMadeAgain,
-                    remade.TrailSentence, remade.Course, remade.Section);
-                return;
-            }
-
-            // The links checklist's marker (#392): kept, so the assistant
-            // can say the checklist WILL be offered only when this build made one.
-            if (Plantoir.Core.Assist.LinksChecklistMarker.Parse(line) is { } checklist)
-            {
-                lock (gate) linksChecklist = checklist;
-                return;
-            }
-
-            // #584 (mac #645): the build's PLANTOIR_REPAIRED: line, a front
-            // page's title it put right in the teacher's own page - the same
-            // trail line the app writes from its own runs.
-            if (Plantoir.Core.Models.BuildRepairReport.Parse(line) is { } repaired)
-            {
-                repaired.Record();
-                return;
-            }
-
-            if (Plantoir.Core.Models.SiteHealthFinding.Parse(line) is { } finding)
-            {
-                lock (gate)
-                {
-                    // The same problem in one run is one problem, keyed the
-                    // record's own way so this and ScriptRunner cannot drift
-                    // into disagreeing about what a duplicate is.
-                    if (findingsSeen.Add(finding.Identity))
-                    {
-                        findings.Add(finding);
-                        // Recorded here rather than by whatever displays it,
-                        // for the reason the trail exists: this process is
-                        // headless, and a teacher who asks the assistant to
-                        // publish leaves no console behind to look at.
-                        Plantoir.Core.Scripting.ActivityTrail.Note(
-                            Plantoir.Core.Scripting.ActivityTrail.Event.FolderProblemFound,
-                            finding.TrailSentence, finding.Course, finding.Section);
-                    }
-                }
-                return;
-            }
-
-            // Any other machine line (PLANTOIR_DATED:, PLANTOIR_KEPT_OFF:, a
-            // marker the shared Python adds tomorrow) is JSON, not narration,
-            // and never reaches the assistant's progress text or the kept
-            // tail - transcriptStripping.machineLines' one rule, as the app's
-            // console applies it.
-            if (Plantoir.Core.Scripting.TranscriptBuilder.IsMachineLine(line)) return;
-
-            lock (gate)
-            {
-                tail.Enqueue(line);
-                while (tail.Count > KeptLines) tail.Dequeue();
-            }
-            // The launchers narrate with emoji-led milestone lines; passing
-            // them straight through means the assistant's progress messages
-            // are the toolchain's own words, not a paraphrase of them.
-            progress?.Report(line.Trim());
-        }
-
-        process.OutputDataReceived += (_, e) => Capture(e.Data);
-        process.ErrorDataReceived += (_, e) => Capture(e.Data);
+        process.OutputDataReceived += (_, e) => capture.Take(e.Data);
+        process.ErrorDataReceived += (_, e) => capture.Take(e.Data);
 
         try { process.Start(); }
         catch (Exception error) { return new LaunchOutcome(false, $"{Path.GetFileName(script)} could not be started: {error.Message}"); }
@@ -253,13 +175,7 @@ public sealed class LauncherRunner : ILauncherRunner
             return new LaunchOutcome(false, "This was stopped before it finished.");
         }
 
-        string transcript;
-        Plantoir.Core.Models.SiteHealthFinding[] found;
-        lock (gate)
-        {
-            transcript = string.Join("\n", tail);
-            found = findings.ToArray();
-        }
+        var (transcript, found, linksChecklist) = capture.Snapshot();
 
         return process.ExitCode == 0
             ? new LaunchOutcome(true, transcript, found, 0, linksChecklist)
@@ -281,5 +197,83 @@ public sealed class LauncherRunner : ILauncherRunner
         message.Append($"(The launcher exited with code {exitCode}.)");
         if (transcript.Length > 0) message.Append("\n\nLast output:\n").Append(transcript);
         return message.ToString();
+    }
+
+    /// <summary>
+    /// What a run's output becomes (#660): every line through the one
+    /// dispatch, the folder problems and the links checklist kept, the last
+    /// lines of narration kept for the outcome, and narration - never a
+    /// machine line - reported as progress. Its own type so a test can feed
+    /// it lines (<c>LauncherRunnerCaptureTests</c>).
+    /// </summary>
+    internal sealed class OutputCapture
+    {
+        private readonly IProgress<string>? _progress;
+        private readonly object _gate = new();
+        private readonly Queue<string> _tail = new();
+        private readonly List<Plantoir.Core.Models.SiteHealthFinding> _findings = new();
+        private readonly HashSet<string> _findingsSeen = new(StringComparer.Ordinal);
+        private Plantoir.Core.Assist.LinksChecklistMarker? _linksChecklist;
+
+        internal OutputCapture(IProgress<string>? progress) => _progress = progress;
+
+        internal void Take(string? line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) return;
+
+            // Every machine line goes through the ONE dispatch the app's
+            // console and the scheduled record use (#660), which writes the
+            // build's trail lines itself (the maps, My Progress, Swift, the
+            // dated pages, a How I Teach page kept off, a repair, a remade
+            // Cloudflare project) - before #660 this door read four of the
+            // nine and a build the assistant started left the other five
+            // nowhere. Kept here: the links checklist (#392), so the
+            // assistant can say the checklist WILL be offered only when this
+            // build made one, and the folder problems, which the caller
+            // reports out of Findings. Recorded here rather than by whatever
+            // displays them, because this process is headless and a teacher
+            // who asks the assistant to publish leaves no console behind.
+            var read = Plantoir.Core.Scripting.BuildMachineLines.Record(line);
+            if (read.Checklist is { } checklist)
+            {
+                lock (_gate) _linksChecklist = checklist;
+                return;
+            }
+            if (read.Finding is { } finding)
+            {
+                lock (_gate)
+                {
+                    // The same problem in one run is one problem, keyed the
+                    // record's own way, as ScriptRunner keys it.
+                    if (Plantoir.Core.Scripting.BuildMachineLines.AddFinding(finding, _findingsSeen))
+                        _findings.Add(finding);
+                }
+                return;
+            }
+
+            // Any machine line - one read above, or a marker the shared
+            // Python adds tomorrow - is JSON, not narration, and NEVER reaches
+            // the assistant's progress text or the kept tail: both are read
+            // by a teacher through the assistant (CLAUDE.md rule 1,
+            // transcriptStripping.machineLines' one rule, as the app's
+            // console applies it).
+            if (read.WasMachineLine || Plantoir.Core.Scripting.TranscriptBuilder.IsMachineLine(line)) return;
+
+            lock (_gate)
+            {
+                _tail.Enqueue(line);
+                while (_tail.Count > KeptLines) _tail.Dequeue();
+            }
+            // The launchers narrate with emoji-led milestone lines; passing
+            // them straight through means the assistant's progress messages
+            // are the toolchain's own words, not a paraphrase of them.
+            _progress?.Report(line.Trim());
+        }
+
+        internal (string Transcript, Plantoir.Core.Models.SiteHealthFinding[] Findings,
+                  Plantoir.Core.Assist.LinksChecklistMarker? LinksChecklist) Snapshot()
+        {
+            lock (_gate) return (string.Join("\n", _tail), _findings.ToArray(), _linksChecklist);
+        }
     }
 }

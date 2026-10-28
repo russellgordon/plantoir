@@ -50,8 +50,4 @@ public sealed record CloudflareProjectRemade(string Course, int Section, string 
     public string TrailSentence =>
         $"the Cloudflare project {Project} was not in this Cloudflare account, so it was made again; " +
         $"the website is now at {Address}";
-
-    /// <summary>Every report in a scheduled publish's record.</summary>
-    public static IReadOnlyList<CloudflareProjectRemade> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
 }

@@ -62,8 +62,12 @@ public class SwiftGotReadyTests
     public void BothReadersAndTheWrappersScanKnowTheMarker()
     {
         string core = Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Core");
-        Assert.Contains("SwiftGotReady.Parse(line)", File.ReadAllText(Path.Combine(core, "Scripting", "ScriptRunner.cs")));
-        Assert.Contains("SwiftGotReady.ReportsIn(lines)", File.ReadAllText(Path.Combine(core, "Assist", "ScheduledHealthFindings.cs")));
-        Assert.Contains("'PLANTOIR_SWIFT:'", File.ReadAllText(Path.Combine(core, "Assist", "TaskScheduling.cs")));
+        // #660: all three readers go through BuildMachineLines, which knows
+        // this marker, and the wrapper's scan is generated from its list.
+        Assert.Contains(SwiftGotReady.Marker, Plantoir.Core.Scripting.BuildMachineLines.TrailMarkers);
+        Assert.Contains(SwiftGotReady.Marker, Plantoir.Core.Scripting.BuildMachineLines.ScheduledRecordMarkers);
+        Assert.Contains("BuildMachineLines.Record(", File.ReadAllText(Path.Combine(core, "Scripting", "ScriptRunner.cs")));
+        Assert.Contains("BuildMachineLines.Record(", File.ReadAllText(Path.Combine(core, "Assist", "ScheduledHealthFindings.cs")));
+        Assert.Contains("BuildMachineLines.ScheduledRecordMarkers", File.ReadAllText(Path.Combine(core, "Assist", "TaskScheduling.cs")));
     }
 }

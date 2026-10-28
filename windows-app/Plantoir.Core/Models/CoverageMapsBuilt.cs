@@ -18,18 +18,27 @@ namespace Plantoir.Core.Models;
 /// asked about. Titles, folder names and counts are course structure, never
 /// anything written on a page.
 /// </summary>
-public sealed record CoverageMapsBuilt(string Course, int Section, IReadOnlyList<CoverageMapsBuilt.Map> Maps)
+public sealed record CoverageMapsBuilt(string Course, int Section, IReadOnlyList<CoverageMapsBuilt.Map> Maps, int? Count = null)
 {
     public sealed record Map(string Title, string Folder, int Expectations);
 
     public const string Marker = "PLANTOIR_MAPS:";
 
     /// <summary><c>trailLine.shape</c>: the count first, then each map as a teacher would say it.</summary>
-    public string TrailSentence => Maps.Count == 0
-        ? "the build made no curriculum map: no curriculum folder holds an expectation page"
-        : $"the build made {Maps.Count} curriculum {(Maps.Count == 1 ? "map" : "maps")}: " +
-          string.Join(", ", Maps.Select(map =>
-              $"{map.Title} from {map.Folder} ({map.Expectations.ToString(CultureInfo.InvariantCulture)} {(map.Expectations == 1 ? "expectation" : "expectations")})"));
+    public string TrailSentence
+    {
+        get
+        {
+            // The count is the build's own when it shortened its line (#666).
+            int total = Math.Max(Count ?? 0, Maps.Count);
+            if (total == 0) return "the build made no curriculum map: no curriculum folder holds an expectation page";
+            string names = string.Join(", ", Maps.Select(map =>
+                $"{map.Title} from {map.Folder} ({map.Expectations.ToString(CultureInfo.InvariantCulture)} {(map.Expectations == 1 ? "expectation" : "expectations")})"));
+            int notShown = total - Maps.Count;
+            if (notShown > 0) names = Maps.Count == 0 ? $"{notShown} not named" : names + $" and {notShown} more";
+            return $"the build made {total} curriculum {(total == 1 ? "map" : "maps")}: {names}";
+        }
+    }
 
     public static CoverageMapsBuilt? Parse(string? line)
     {
@@ -50,14 +59,12 @@ public sealed record CoverageMapsBuilt(string Course, int Section, IReadOnlyList
                     map["expectations"]?.GetValue<int>() ?? 0))
                 .Where(map => map.Title.Length > 0)
                 .ToList();
-            return new CoverageMapsBuilt(course, section, parsed);
+            int? count = obj["count"] is JsonValue counted && counted.TryGetValue(out int total) ? total : null;
+            return new CoverageMapsBuilt(course, section, parsed, count);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException)
         {
             return null;
         }
     }
-
-    public static IReadOnlyList<CoverageMapsBuilt> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
 }

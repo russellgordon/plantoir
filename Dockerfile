@@ -252,6 +252,9 @@ COPY patches/build.ts /opt/quartz/quartz/build.ts
 # PLANTOIR_* environment variables.
 COPY scripts/toolchain_paths.py /opt/scripts/toolchain_paths.py
 COPY scripts/contracts.py /opt/scripts/contracts.py
+# How long a machine line may be (#666): site_health, build_site and
+# how_i_teach print their list-carrying lines through it.
+COPY scripts/machine_line.py /opt/scripts/machine_line.py
 COPY scripts/site_health.py /opt/scripts/site_health.py
 # What a course calls its class pages and which folder they live in. Both
 # setup_course.py and build_site.py import it by bare name, which only resolves

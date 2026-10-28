@@ -2626,9 +2626,35 @@ the real trail. Python tests that start a launcher with `os.environ` and a
 scratch `HOME` remove the variable first, because an inherited one would send
 their lines out of the scratch folder.
 
-**Windows still owes its half:** `Write-TrailLine` in `preview.ps1` and
-`deploy.ps1` builds its path from `%LOCALAPPDATA%` (doc 12 → the `--state-dir`
-section), and the contract's cases are written for both.
+**Windows (#682).** `Write-TrailLine` in `preview.ps1` and `deploy.ps1` (one
+function, byte-identical in both) takes `PLANTOIR_TRAIL_DIR` when it is
+absolute and falls back to `%LOCALAPPDATA%\Plantoir\Logs` otherwise. The
+Windows trap is what "absolute" means. `[IO.Path]::IsPathRooted`, which the
+issue first proposed, is TRUE on Windows PowerShell 5.1 for `\state\Logs`
+(relative to the current DRIVE) and for `C:state` (relative to the current
+folder on C:), and `IsPathFullyQualified` does not exist there. So the
+launcher accepts only a drive letter followed by a separator, or a UNC
+`\\server\share`. A trailing `\` or `/` is dropped, except that `C:\`
+stays `C:\` (trimmed to `C:` it would mean the current folder on C:). A bare
+`\` therefore means the default, never an empty folder that would lose the
+line. The named mutex `Local\PlantoirActivityTrail` is a name, not a path,
+so it still serialises against the app. `setup.ps1` writes no trail lines of
+its own, so it has nothing to change (the mac changed three launchers).
+
+The app side is one resolver, `LauncherEnvironment` (`Plantoir.Core/Scripting`),
+which hands every launcher child `PLANTOIR_RUNTIME` (when the app carries
+the runtime) and `PLANTOIR_TRAIL_DIR` (always, `ActivityTrail.CurrentLogDirectory`):
+`ScriptRunner.Run`, `plantoir-mcp`'s `LauncherRunner` (its run and its
+`--stop` sweep), `PreviewStopper`, and the scheduled publish's wrapper
+(`ScheduledRun.WrapperStartInfo`), whose `Start-Process` children inherit it.
+The wrapper is handed ONLY the trail: which runtime a task uses is a separate
+question (#702). `windows-app/test_launcher_rules.ps1` section 6 runs the five
+contract cases through each launcher's real function, with `LOCALAPPDATA` and
+the current folder (PowerShell's and the process's) inside a scratch folder,
+plus two Windows-only rows for `C:state` and `\state\Logs`;
+`LauncherEnvironmentTests` pins the override, the contract's variable name,
+the wrapper, and - by scanning the product for every process started with
+`-File` - that no launcher start site is missing it.
 
 ## A note on line endings
 
