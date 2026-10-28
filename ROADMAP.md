@@ -52,11 +52,13 @@ download joins the release, with what 1.9.0 brought the Mac:
   page pictures on plantoir.app
   ([#590](https://github.com/russellgordon/plantoir/issues/590)); and what a
   scheduled publish does when the computer is asleep
-  ([#554](https://github.com/russellgordon/plantoir/issues/554)).
+  ([#554](https://github.com/russellgordon/plantoir/issues/554)); and
+  messages in the window no longer run two lines together, and a question is
+  asked on its own
+  ([#661](https://github.com/russellgordon/plantoir/issues/661)).
 - **Behind the scenes:** a few checks that both apps behave the same way
   ([#659](https://github.com/russellgordon/plantoir/issues/659),
   [#660](https://github.com/russellgordon/plantoir/issues/660),
-  [#661](https://github.com/russellgordon/plantoir/issues/661),
   [#666](https://github.com/russellgordon/plantoir/issues/666),
   [#671](https://github.com/russellgordon/plantoir/issues/671),
   [#673](https://github.com/russellgordon/plantoir/issues/673),

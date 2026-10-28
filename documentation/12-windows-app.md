@@ -492,6 +492,15 @@ stage it was glued onto the current line instead).
 the only repaint of an earlier row was the progress banner's row of spaces
 above. The skipped blank row stays lost.
 
+**Residual risk for the setup wizard.** `NewCourseCreator` answers the last
+prompt-shaped line, and the colour picker's footer now arrives as a line of
+its own. If ConPTY ever repainted an EARLIER row (a swatch, say) AFTER the
+footer, that repaint would become the last non-empty line and the footer
+would no longer be the line read, so the wizard could wait for ever. It was
+never seen: every repaint in the captures redrew the whole picker with the
+footer last, and the drives above saw every footer. `LooksLikePrompt` keeps
+`Contains` for the pre-#661 glued shape; it does not cover this one.
+
 **Redaction.** The saved transcript is redacted line by line. A value the
 stage moves onto a line of its own is out of reach of `labelledSecret`, which
 needs its label on the same line; that is the shape an ordinary CR LF between
@@ -8086,11 +8095,32 @@ against a COPY of `verify-deploy.sh`'s Python stub (kept byte for byte, run
 with `-I` on the bundled Python). Measured 2026-10-28 (Lenovo 20QES70500,
 i5-8365U): **8 passed, 0 failed** in 20 s; production switching after three
 requests passed "after 3 s", never switching failed once at the cap (9 s).
-On scratch copies, not committed: a wait that returns at once failed 3 of
-the 8; comparing the front page only failed "only the static files moved
-(same front page)", the case that must fail without the mark; dropping the
-`\s*` failed the `\r\n` case and the unmarked-page case. The real run's
-numbers are in #680's closing comment.
+On scratch copies, not committed: a wait that returns `$true` at once
+failed **4 of the 8**, the mac's figure (07 → "`./verify-deploy.sh
+--self-test`"); comparing the front page only failed "only the static files moved (same front page)", the
+case that must fail without the mark; dropping the `\s*` failed the `\r\n`
+case and the unmarked-page case.
+
+The must-fail count was 3, not the mac's 4, until review found why:
+`Measure-Case` hid the call's Ok lines and returned only its result and its
+failures, so "a brand-new project answers 404 at first" checked "returned
+`$true`, no failure" and a wait that returned at once WITHOUT a word passed
+it. The mac's case greps the wait's output for its ✅ line, so the same copy
+fails it there. `Measure-Case` now also returns `Passes` (the Ok lines the
+call would have printed) and that case requires exactly one, so the silent
+copy fails it here too: re-measured the same day, **4 passed, 4 failed**
+(switching, never switching, the 404 case and the static-files case). A copy
+that prints its Ok line and THEN returns at once still passes the 404 case
+on both harnesses (5 passed, 3 failed here); the switching, never-switching
+and static-files cases are what catch that one.
+
+**What has NOT run live on Windows.** The credentialed run on this PC
+skipped every Cloudflare leg, because there was no Cloudflare token (the
+saved one had been rejected and cleared, "Line breaks ConPTY draws as cursor
+moves" above), so `Wait-CloudflareProduction` has never waited on a real
+`pages.dev` address from Windows. The wait has run live only on the mac
+(#665). The proof owed is the nothing-skipped `verify-deploy.ps1` run that
+`RELEASING.md` step 2 requires before the Windows cut.
 
 Comparing against the deployment's own address
 (`<hash>.<project>.pages.dev`) was rejected: on a project's first publish

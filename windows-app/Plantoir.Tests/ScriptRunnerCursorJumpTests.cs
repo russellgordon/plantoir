@@ -68,6 +68,8 @@ public class ScriptRunnerCursorJumpTests : IDisposable
     /// <c>preview.ps1 PRB1O 1 --build-only</c> on a fresh section, reads 7-10
     /// of the capture: build_site.py's own <c>print("\n🔎 Preflight…")</c> and
     /// <c>print("\n📁 Shared folders…")</c>, drawn as jumps to rows 7 and 15.
+    /// Read 10 is cut after its first two lines past the jump (the "📁 Shared
+    /// folders" header and " - Discussions"); the rest of that read is left out.
     /// The app's saved transcript of the same run, before the fix, carried
     /// both joins at its lines 8 and 14.
     /// </summary>

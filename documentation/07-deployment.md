@@ -1531,7 +1531,8 @@ switching (exactly one failure, at the cap, and the function returns), a
 first publish's 404s, the static-files-only change (same front page, the
 runnable-code page switches late), a `\r\n` log line, a log naming another
 section, and an upload without the run's mark. Proved must-fail on copies of
-the script: with the wait returning at once, 4 of the 8 fail; comparing the
+the script: with the wait returning at once, 4 of the 8 fail (the mac's
+figure; Windows' is in 12); comparing the
 front page only fails the static-files case; without the `\r` strip the two
 transcript cases fail.
 

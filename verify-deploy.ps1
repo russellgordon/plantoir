@@ -309,14 +309,17 @@ server.serve_forever()
         return (Test-Path -LiteralPath $judged) -and (Get-FileHash -LiteralPath $judged).Hash -eq (Get-FileHash -LiteralPath $Expected).Hash
     }
     # Runs one call with its own Ok/No lines hidden and its counts taken back
-    # out, and says what it did: the result, and the failures it recorded.
+    # out, and says what it did: the result, the Ok lines it would have
+    # printed (Passes) and the failures it recorded. Passes is the mac's
+    # grep for its ok mark: a wait that returns $true without saying so fails.
     function Measure-Case([scriptblock]$Call) {
         $pass = $script:Pass; $fail = $script:Fail; $failures = $script:Failures
         $script:Quiet = $true
         try { $result = & $Call } finally { $script:Quiet = $false }
         $said = @($script:Failures | Select-Object -Skip $failures.Count)
+        $passes = $script:Pass - $pass
         $script:Pass = $pass; $script:Fail = $fail; $script:Failures = $failures
-        return @{ Result = $result; Failures = $said }
+        return @{ Result = $result; Passes = $passes; Failures = $said }
     }
 
     Hdr "Self-test - the wait for Cloudflare's production address (#680, the mac's #665)"
@@ -345,8 +348,8 @@ server.serve_forever()
 
         Start-Stub '404:2' '404:2'
         $case = Measure-Case { Wait-CloudflareProduction "case" $script:StubUrl $snap }
-        if ($case.Result -eq $true -and $case.Failures.Count -eq 0) { Ok "a brand-new project answers 404 at first: that is 'not yet', and the wait passes when it answers" }
-        else { No "a brand-new project answers 404 at first: result $($case.Result), said: $($case.Failures -join ' | ')" }
+        if ($case.Result -eq $true -and $case.Passes -eq 1 -and $case.Failures.Count -eq 0) { Ok "a brand-new project answers 404 at first: that is 'not yet', and the wait passes when it answers" }
+        else { No "a brand-new project answers 404 at first: result $($case.Result), $($case.Passes) ok line(s), said: $($case.Failures -join ' | ')" }
         Stop-Stub
 
         Start-Stub 'new' 'old:3'

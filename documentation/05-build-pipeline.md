@@ -1901,12 +1901,13 @@ programs students edit and run in their browser; the site's half is
    one line. Its patch to latex.ts (`patch_katex_local`, beside
    `patch_katex_mhchem`) is 06 → C2-26.
 
-**The live-preview edge.** The preview's own rebuilds (a page edited while
-it serves) do not run the gate or rewrite the words file. A page that gains
-`codeRunner: true` or its first runnable block while a preview is ALREADY
-running therefore shows its blocks as plain code, with the `plantoir: error:`
-line in the preview's output, until the next Preview — never a Run button
-that cannot work. A page that already had runnable code keeps working. Such
+**The live-preview edge.** Quartz's own rebuilds of the merged copy, which
+a teacher's edit never reaches (see "A running preview does not follow
+edits", below), do not run the gate or rewrite the words file. A merged page
+that gains `codeRunner: true` or its first runnable block while a preview is
+ALREADY running therefore shows its blocks as plain code, with the
+`plantoir: error:` line in the preview's output, until the next Preview —
+never a Run button that cannot work. A page that already had runnable code keeps working. Such
 a block is NOT a folder problem: the site says its folder problem on the
 preview's first build only (#567, below).
 
@@ -2638,9 +2639,11 @@ here and as text by the site, and the net said so on its first build; the
 rule was then corrected on both sides and pinned (`aBoxNeedsWordsAfterIt`).
 A page students cannot see is parsed by Quartz too and never named.
 
-**The live-preview edge.** As for runnable code: the preview's own rebuilds
-do not re-run the check or rewrite the files, so a quiz added while a
-preview serves is rendered by the site's own reading (its verdict is the
+**The live-preview edge.** As for runnable code: Quartz's own rebuilds of
+the merged copy, which a teacher's edit never reaches (see "A running
+preview does not follow edits", below), do not re-run the check or rewrite
+the files, so a quiz added to that copy while a preview serves is rendered
+by the site's own reading (its verdict is the
 site's, the same rules), and its folder problem and any safety-net line
 come with the next Preview.
 
