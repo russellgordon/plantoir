@@ -67,7 +67,4 @@ public sealed record CoverageMapsBuilt(string Course, int Section, IReadOnlyList
             return null;
         }
     }
-
-    public static IReadOnlyList<CoverageMapsBuilt> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
 }

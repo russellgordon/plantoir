@@ -70,9 +70,6 @@ public sealed record BuildRepairReport(string Course, int Section, string Repair
         }
     }
 
-    public static IReadOnlyList<BuildRepairReport> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
-
     /// <summary>
     /// Writes this repair on the trail as <c>folder problem repaired</c>, when
     /// this app knows how to word it; a repair it does not know writes nothing.

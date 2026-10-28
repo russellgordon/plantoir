@@ -78,8 +78,4 @@ public sealed record PagesDatedByTheBuild(string Course, int Section, IReadOnlyL
             return null;
         }
     }
-
-    /// <summary>Every report in a list of lines (a scheduled publish's record).</summary>
-    public static IReadOnlyList<PagesDatedByTheBuild> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
 }

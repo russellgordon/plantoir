@@ -273,7 +273,4 @@ public sealed record HowITeachKeptOffReport(string Course, int Section, IReadOnl
             return null;
         }
     }
-
-    public static IReadOnlyList<HowITeachKeptOffReport> ReportsIn(IEnumerable<string> lines) =>
-        lines.Select(Parse).Where(report => report is not null).Select(report => report!).ToList();
 }
