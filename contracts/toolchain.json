@@ -586,7 +586,7 @@
         "tree": "wrangler",
         "package": "undici",
         "exposure": "Cloudflare deploy only",
-        "reason": "wrangler's HTTP client, used only while a Cloudflare deploy talks to Cloudflare's API from the teacher's Mac. The SOCKS5 and pool-proxy advisories need a proxy, and none is configured. The cache and cookie advisories need a shared cache, and wrangler makes fixed API calls with none. The WebSocket, EventSource and decompression ones are client-side denials of service from Cloudflare's own responses. Fixed in wrangler > 4.113.0, which needs Node 22 on Windows too: moving wrangler is its own piece (the wrangler pin).",
+        "reason": "wrangler's HTTP client, used only while a Cloudflare deploy talks to Cloudflare's API from the teacher's computer. The SOCKS5 and pool-proxy advisories need a proxy, and none is configured. The cache and cookie advisories need a shared cache, and wrangler makes fixed API calls with none. The WebSocket, EventSource and decompression ones are client-side denials of service from Cloudflare's own responses. Fixed in wrangler > 4.113.0, whose engines need Node 22: both platforms run Node 22.23.4 since #675, and moving wrangler is its own piece (the wrangler pin).",
         "advisories": [
           {"id": "GHSA-vmh5-mc38-953g", "severity": "high"},
           {"id": "GHSA-p88m-4jfj-68fv", "severity": "moderate"},

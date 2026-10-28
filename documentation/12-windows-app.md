@@ -2383,7 +2383,7 @@ Windows figures are the v1.1.0 release assets.
 | | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
 |---|---|---|---|
 | Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
-| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 22.23.4, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
 | Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine), and since 2026-10-15 (#503) the Paged.js and function-plot tarballs and the Debian Latin Modern package, with the files kept from each checked again; `get-pip.py` deliberately not (below) |

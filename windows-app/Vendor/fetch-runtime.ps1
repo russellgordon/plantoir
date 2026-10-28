@@ -403,7 +403,7 @@ try {
     Remove-Item Env:\PLANTOIR_CONTRACTS_DIR
     Write-Host "Quartz $QuartzTag patched and provisioned." -ForegroundColor Green
 
-    # ---- wrangler (Cloudflare's deploy CLI, pinned below 4.100) --------------
+    # ---- wrangler (Cloudflare's deploy CLI, pinned at 4.80.0, below 4.87) -----
     $wranglerDir = Join-Path $Runtime "wrangler"
     New-Item -ItemType Directory -Force $wranglerDir | Out-Null
     & "$nodeDir\npm.cmd" install --prefix $wranglerDir --no-audit --no-fund --silent "wrangler@$WranglerVersion"
