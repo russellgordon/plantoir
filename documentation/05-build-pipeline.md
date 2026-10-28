@@ -1525,7 +1525,7 @@ measured: with the widened code rule and a plain alphabetical scan, a scratch
 LCS course whose `College Board Curriculum` held `1.A` pages had Ontario's map
 silently replaced by College Board's under the same title, because `College`
 sorts before `Ontario`. A golden (Ontario with pages, College Board with `1.A`
-pages, nothing declared) holds it byte for byte to what ff1213ed built. The scan is a FALLBACK, never additive:
+pages, nothing declared) holds it byte for byte to what 92a7099a built. The scan is a FALLBACK, never additive:
 Russell's ruling on the plan. A course made from scratch declares nothing, so
 the scan is still its real path, and its site is unchanged. The whole rule is
 `contracts/shared-rules.json` → `specialNames.curriculumFoldersResolution`,
@@ -1537,7 +1537,7 @@ folder the scan found — is always `Curriculum Coverage`; every other map is
 `<Folder> Coverage`, and a title that would repeat another gets ` (2)`
 (`curriculumRules.coveragePageTitles`). So a course with one map keeps the page,
 its address and every link to it, byte for byte (the goldens in
-`test_coverage_maps.py` were captured from origin/dev ff1213ed before any edit:
+`test_coverage_maps.py` were captured from origin/dev 92a7099a before any edit:
 a `Curriculum/` course and the LCS default, Ontario with pages and College
 Board empty), and a course that declares a second folder later gets a SECOND
 page rather than two renamed ones. Only a non-primary title is written quoted

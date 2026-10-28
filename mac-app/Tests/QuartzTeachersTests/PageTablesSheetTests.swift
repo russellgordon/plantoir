@@ -18,7 +18,7 @@ final class PageTablesSheetTests: XCTestCase {
 
     /// The sizes these sheets had on `dev` before v1.8.6 touched them,
     /// measured by `fittingSize(of:)` with no product change made
-    /// (2a4ca8e68, macOS 26.6; the record is the piece's closing comment).
+    /// (07da7b4be, macOS 26.6; the record is the piece's closing comment).
     /// A sheet opens at its fitted size, so these are the sizes a teacher saw.
     static let soyWorstCaseHeight: CGFloat = 606
     static let soyTwentyClassesHeight: CGFloat = 478

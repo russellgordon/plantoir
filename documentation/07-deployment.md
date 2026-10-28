@@ -962,7 +962,7 @@ deliberately omitted to avoid confusion.
 Both apps turn that into one sentence for the teacher ("Netlify is limiting how
 often websites can be deployed right now…") only when the output carries
 deploy.py's own phrase, `Netlify API error 429`, or the words `rate limit` —
-never a bare `429` (#482, mac commit cb1b13e77, Windows 2026-10-15). The bare
+never a bare `429` (#482, mac commit 057775edb, Windows 2026-10-15). The bare
 match fired on the eight-digit image tag every build prints (about one tag in
 seven hundred carries the digits), on a "Built in 429ms" timing, and on a
 Cloudflare 429, each time telling the teacher Netlify was limiting deploys. A
@@ -1088,7 +1088,7 @@ security delete-generic-password -s containerized-quartz-cloudflare-account
 
 `ATeacherAlreadyBittenGetsOutOfIt` in `scripts/test_deploy_sh_questions.py`
 pins both halves, and pins them against the REAL blob — it lifts the pre-fix
-function out of `07952399^`, runs it, and feeds what it actually produced back
+function out of `6ca40f6a^`, runs it, and feeds what it actually produced back
 in as the remembered value, rather than a tidy short string that would not
 have caught this.
 

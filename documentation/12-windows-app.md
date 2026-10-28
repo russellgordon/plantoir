@@ -4478,7 +4478,7 @@ from one course into another", and its "On Windows" subsection has the numbers.
   `_get_excluded_note_config` (which re-reads the contracts on every call) and
   nothing else. Single-process it took 78 s for 2,017 pages × 4 sections on this
   PC — every file open pays for Defender — and 30 s across the pool. Set
-  `PLANTOIR_FUZZ_N` to go bigger; **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0.** **Re-run 2026-10-01 (bundle 9, #414) over the ORIGINAL range in ONE process, seed 20260930, on dev `684993aa`: 399,417 certified, 600,583 refused, 0 certified-and-not-hidden, 1 h 8 m** (this PC, i5-8365U, 16 GB, Windows 11 26200; failing-page dump empty). **What differed is the binary, not the luck:** the generator is seeded and the guard deterministic, so the certified count is a fingerprint of the code — and the 856 run certified 401,096. Every committed state gives 399,417 (measured compose-only at `9f788524`, the very commit that recorded the 856, and at dev; the 400,000-999,999 tail at dev gives 239,722, exactly the clean tail run's count), and nothing the guard reads changed between them. So the 856 came from a binary no commit contains. WHICH part of it differed is NOT known: the guard, the generator, or both on the C# side (the count proves one of them did), and possibly an oracle from before `20adc020` (23:22, "the build oracle's workers share one temp folder"), which falls inside the window the run started in. If the difference was a wider generator, the committed guard may never have been tested on the inputs that failed. Not reproducible, so not explained; the issue stays open on that ruling. The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net either way. Set PLANTOIR_FUZZ_DUMP to a path to write failing pages out, and PLANTOIR_FUZZ_SKIP to run part of the seeded sequence.
+  `PLANTOIR_FUZZ_N` to go bigger; **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0.** **Re-run 2026-10-01 (bundle 9, #414) over the ORIGINAL range in ONE process, seed 20260930, on dev `b3f05c7f`: 399,417 certified, 600,583 refused, 0 certified-and-not-hidden, 1 h 8 m** (this PC, i5-8365U, 16 GB, Windows 11 26200; failing-page dump empty). **What differed is the binary, not the luck:** the generator is seeded and the guard deterministic, so the certified count is a fingerprint of the code — and the 856 run certified 401,096. Every committed state gives 399,417 (measured compose-only at `0fa8ed8e`, the very commit that recorded the 856, and at dev; the 400,000-999,999 tail at dev gives 239,722, exactly the clean tail run's count), and nothing the guard reads changed between them. So the 856 came from a binary no commit contains. WHICH part of it differed is NOT known: the guard, the generator, or both on the C# side (the count proves one of them did), and possibly an oracle from before `ff557bb9` (23:22, "the build oracle's workers share one temp folder"), which falls inside the window the run started in. If the difference was a wider generator, the committed guard may never have been tested on the inputs that failed. Not reproducible, so not explained; the issue stays open on that ruling. The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net either way. Set PLANTOIR_FUZZ_DUMP to a path to write failing pages out, and PLANTOIR_FUZZ_SKIP to run part of the seeded sequence.
 - **The dialog** is a `ContentDialog` whose primary button cancels its own
   close (`args.Cancel = true` under a deferral) so one dialog walks the three
   stages; the picker is an `AutoSuggestBox` fed only on
@@ -6437,7 +6437,7 @@ that); Publish 35 epx above the window's bottom. **Since #542 the window opens
 at its 900 × 600 minimum (XAML root about 563)**, and there a 112-epx note fits
 whole beside 5 rows — correct behaviour, and it left
 `LongNotesScrollToTheirEndInsideTheWindow` failing on "the notes do not
-scroll" in the full UI run of 2026-10-16 on `dev` b0af8d3fd (window 900x600;
+scroll" in the full UI run of 2026-10-16 on `dev` 816e8007c (window 900x600;
 notes area 112; note 112 tall). The product was right and the FIXTURE too
 short, so it now links seventy classes: a note well past the notes' 120-epx
 cap, which scrolls at ANY window height rather than only at the one it was
@@ -7003,7 +7003,7 @@ OPENED below it.** Measured on the same PC at 150% by
 `WindowMinimumUiTests.AtItsNarrowestTheWindowStillShowsPreviewDeployAndBrowser`,
 reading the frame both through UI Automation and through `GetWindowRect` on a
 thread made per-monitor DPI-aware, against an x64 Debug build of dev
-99295805c, "Preview at Last Viewed" seeded:
+e84118a13, "Preview at Last Viewed" seeded:
 
 - **At launch** (first run, no remembered frame): 1190 × 725 px, which UI
   Automation reports as 793 × 483, i.e. **793 × 483 epx** — the first-run size
@@ -7953,7 +7953,7 @@ existing Netlify site (published before #628). They failed as they should:
 1 of 23 links answered 200, with 22 case 301s and no marker.
 
 **Measured 2026-10-23** (i5-8365U, Windows 11 Pro 26200, Ethernet), from
-this checkout at 11d71b49e, which mirrored 85 files into a folder last
+this checkout at c6602172e, which mirrored 85 files into a folder last
 refreshed 2026-10-15:
 - **The first-publish run: 167 passed, 0 failed, 0 skipped.** It answered
   exactly two questions, "First time setup... what is your last name?
@@ -9132,7 +9132,7 @@ The course is a scratch working folder:
 - `website/shots/print_set_windows.mirror_toolchain` copied the launchers and
   `.toolchain\` from this tree.
 - `courses\EXC2O` was copied from `support/example_course`.
-- verify.sh's own plant blocks (lines 1957–3034 at dev 0df44a5f2) ran
+- verify.sh's own plant blocks (lines 1957–3034 at dev 81cfacb7d) ran
   unchanged under Git Bash, with `python3` pointed at `python`. They planted
   How I Teach, the printable fixtures, Plain Long Page, the marker fixtures,
   the #499 pictures, `#609: Picture Fixture`, figures, runnable code, #505,

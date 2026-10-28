@@ -25,7 +25,7 @@ WHAT CHANGES FOR THE MODEL
   description.
 
 ARMS
-  BEFORE   origin/dev 31c71d74883d2a979a3ae1fb8d1c7fa7d7c7fc2e (the branch's
+  BEFORE   origin/dev 113f66f0ed41da9902db3fac63dac4cd3f1c8a63 (the branch's
            base), the WHOLE tree taken by `git archive` (plan review finding
            4: the suites read AssistAgent.swift, AssistModelClient.swift,
            Views/Assist/AssistSupportingViews.swift and support/*); tools =

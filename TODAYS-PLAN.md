@@ -4,8 +4,8 @@
 > 2026-08-25.** Piece 1 (the marks pool), Piece 2 (`excluded_items`, the
 > preflight fix and the `index.md` notes) and Piece 3 (the protection model)
 > each landed with the adversarial review that followed it —
-> `GUI-IMPROVEMENTS.md` rows 374–380, and commits `11a70b7e` through
-> `0905a87d`.
+> `GUI-IMPROVEMENTS.md` rows 374–380, and commits `d78003cc` through
+> `e9dfbcc0`.
 >
 > **This file is now HISTORY, not instructions.** Everything below is written
 > in the future tense because that is what it was when it was written; nothing

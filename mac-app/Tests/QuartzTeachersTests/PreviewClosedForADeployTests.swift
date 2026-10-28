@@ -5,7 +5,7 @@ import XCTest
 /// `deploy_section`, or a publish set for later, whose build kills that
 /// section's serving preview (`build_site.stop_preview_serving`) — is shown as
 /// "Closed for a deploy", not as a failure (#433's stack review, item 6), and
-/// ONLY then (the bb8fbe12 ruling): it had been serving, its output shows the
+/// ONLY then (the de80da2f ruling): it had been serving, its output shows the
 /// server killed that way, and another program holds a build lease on the
 /// course. Every other end is a failure, as before.
 @MainActor

@@ -43,7 +43,7 @@
 //     print(), the page put back - not "Preparing to print…" for good.
 //
 // A to E each FAILED on the code before #576, and W on #576's first version
-// (2bfee8653), proven by copy-and-restore of print.inline.ts, 2026-10-23
+// (b3c9820f9), proven by copy-and-restore of print.inline.ts, 2026-10-23
 // (documentation/06-quartz-customizations.md F3).
 //
 //   node browser-checks/print_fallback.mjs <chrome> <site folder> [page path]

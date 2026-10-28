@@ -16,7 +16,7 @@ CONDITIONS (they belong to these numbers and to nothing else)
              --threads 4 --n-gpu-layers 999 --jinja --parallel 1
   body       the app's own request body; temperature 0
   prompt     the shipped system prompt, and the 13-tool local surface at dev
-             7b677d76
+             0d721c10
   dateline   "(Today is 2026-09-19, a Saturday.)" on every user message, on the
              END, exactly as AssistAgent.say stores it
   courses    ICS4U section 1 and ICD2O section 1

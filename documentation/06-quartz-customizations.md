@@ -532,7 +532,7 @@ not opt in renders exactly as it did before #454 (its sidebar aside, since
 #515: below): its HTML carries no print
 markup at all — no wrapper, no button, no style, no `@page` — and its date
 line is the plain `<p class="content-meta">` it always was. Measured on EXC2O
-(implementation review, `origin/dev` 8178eeaac against the branch): **all 300
+(implementation review, `origin/dev` f7afcb83f against the branch): **all 300
 pages that do not opt in are byte-identical** once what Quartz already varies
 between ANY two builds is set aside (the explorer's random list id, build-time
 dates on curriculum pages, and the order of tag-list entries sharing one of
@@ -568,7 +568,7 @@ in the PDF's text layer, so a text comparison found them all (F9).
 What every site DOES change is its two shared bundles, measured on EXC2O
 against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
 `index.css` 35,386 → 41,045 (+5,659) on the final branch (the review measured
-+10,525 and +5,659 at 4c587f670, before the light-page wait and the corner
++10,525 and +5,659 at 84aead914, before the light-page wait and the corner
 change), every rule in them scoped so it cannot touch an ordinary page.
 Those are history, as #501's +316 above is: since #515 (v1.7.2) `index.css`
 also carries the sidebar's page marker, 454 bytes, which DOES touch every page's
@@ -797,7 +797,7 @@ budget; (D) pictures that never arrive — `couldNotPrepare`, no `print()`;
 and the button prints again; (F) headless Chrome's own `print()` — put back
 at once; (W) the PRINT LAYOUT never finishing (the stylesheet Paged.js
 fetches never answered once Print is pressed) — `couldNotPrepare` by the
-budget, no `print()`. W failed on #576's first version (2bfee8653: still
+budget, no `print()`. W failed on #576's first version (b3c9820f9: still
 "Preparing to print…" at 34 s) and passed on the fix, by copy-and-restore
 in a scratch build of the ICS3U page (esbuild bundle spliced into a built
 `postscript.js`). A to E each FAILED on the code before #576 (copy-and-restore of
@@ -1580,7 +1580,7 @@ the page's:
   below it.
   **A wait-for-the-scroll-to-end gate was REJECTED for that reason**: it
   proves nothing the pairing does not, and it cannot defend against a move
-  after the gate. The first fix (f12bd11b1) paired only the every-row loop,
+  after the gate. The first fix (76e552476) paired only the every-row loop,
   kept the step-1 box when a re-read came back empty, and left the
   long-title block judging that step-1 box against lines read later; all
   three are gone. Also rejected: the dot from `getComputedStyle(row,
@@ -1947,7 +1947,7 @@ after the edit, the student's code. ⌘P of pages that do not opt in, built
 before and after this branch: Help Sessions 1 page and Building Series and
 Parallel Circuits 3 pages each time, identical text.
 
-**What every site's bundles cost** (EXC2O built with `origin/dev` 1f29ff04a's
+**What every site's bundles cost** (EXC2O built with `origin/dev` 570ea5359's
 image and with this branch's): `postscript.js` 106,596 → 121,277 bytes
 (+14,681), `index.css` 57,824 → 60,812 (+2,988). Of 299 pages, 293 are
 identical once the two KaTeX lines in the head (C2-26) and Quartz's own build
@@ -2503,7 +2503,7 @@ print path (a WKWebView's print operation, `shouldPrintBackgrounds` false -
 Safari itself cannot be told to print to a file from a script)
 (implementation review F2).
 
-**What every site's bundles cost** (EXC2O, dev 0fe0d1cba's build against this
+**What every site's bundles cost** (EXC2O, dev 20e19be58's build against this
 branch's): `postscript.js` 143,510 → 164,508 bytes (+20,998; gzipped 47,495 → 56,115, +8,620 - both tokenizers and the frame), `index.css` 66,571 → 71,531 (+4,960; gzipped +777, with the review's print and inline-code rules). Every site carries them, as it carries the rest of the runner.
 
 **Rejected:** `contenteditable` (iPadOS input methods and undo); Shiki itself
@@ -2912,13 +2912,13 @@ makes; if Russell chooses it, #545's own page is the one exception.
 
 Every page with a task item outside a quiz changes: `disabled` removed, a
 class and two data attributes, the label. Measured on EXC2O against
-`origin/dev` 0fe0d1cba, both builds from the same planted course: 190 of 316
+`origin/dev` 20e19be58, both builds from the same planted course: 190 of 316
 pages byte-identical once Quartz's own build-to-build variance is set aside
 (the random `<ul class="overflow">` ids, build-time `<time datetime>`, and the
 order of tag-list entries sharing a date); the 120 pages that hold a task item
 changed (+33,411 bytes in all, +6,255 gzipped); the other 6 differ only in
 that variance. Every site's two shared bundles grow, measured again at the branch's head
-against `origin/dev` 0c755ce97 (after #585): `postscript.js` 163,996 →
+against `origin/dev` c4cffb977 (after #585): `postscript.js` 163,996 →
 165,912 bytes (+1,916, on verify.sh's EXC2O fixture site; gzip 55,947 → 56,528) and `index.css` 71,601 → 73,127
 (+1,526; gzip 12,772 → 12,952), #588's few bytes included. (The first
 measurement, +1,696, was taken before the print hook.) A page with no
@@ -3089,7 +3089,7 @@ edit reaches every existing section without a new image patch.
 
 ### L4. Byte identity
 
-Measured 2026-10-19 on EXC2O, `origin/dev` a70c5e7e8 against this branch, both
+Measured 2026-10-19 on EXC2O, `origin/dev` 8e068c210 against this branch, both
 builds from the same planted course (Progress Fixture plus one Other page):
 every site's `postscript.js` 165,233 → 170,037 bytes (+4,804; gzip 56,312 →
 57,872, +1,560) — the page's script, `pinnedOrder` and the pin's data line —
@@ -3215,7 +3215,7 @@ carrying HTML in the manifest (the page draws with `textContent` only),
 a fetch of each page (the manifest already holds what is needed).
 
 Measured 2026-10-19 (M4 Pro, macOS 26.6, Chrome for Testing 155), EXC2O
-with the verify fixture planted, `origin/dev` b49cb7b8f against this
+with the verify fixture planted, `origin/dev` e988f99de against this
 branch: `postscript.js` 169,936 → 171,789 bytes (+1,853; gzip +539),
 `index.css` 74,461 → 76,525 (+2,064; gzip +278), `progress-manifest.json`
 1,094 → 1,385 for two pages (+291); `My-Progress.html` unchanged; no other
@@ -4336,7 +4336,7 @@ the correction is the useful part.
 
 Kept as it was written, because the reasoning is the point of the section and a
 deleted obligation takes its reason with it. Landed on branch
-`issue/31-rename-link-escaping`, commit `2bed7c83`: `Spelled` calls a
+`issue/31-rename-link-escaping`, commit `7deff069`: `Spelled` calls a
 `PercentEncoded` driven by `leaveUnescaped` in BOTH branches, and
 `FolderPathRewriterTests` deserialises every case. 1125 passed, 2 skipped, 0
 failed (1031 before).

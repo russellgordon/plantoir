@@ -1,6 +1,6 @@
 #440 - add_next_class and units, days and counts, on the mac. Measured
 2026-10-07 (15:20-16:01 EDT), BOTH tiers, three arms, against the rule in
-next-class-unit-440-preregistration.txt (committed 8f3ac581e, before the
+next-class-unit-440-preregistration.txt (committed eb47bb2cb, before the
 first request). RESULT: the plan's design PASSES on both tiers; A' FAILS on
 both and is NOT adopted.
 
@@ -14,7 +14,7 @@ CONDITIONS (as pre-registered)
   LARGER  qwen3-4b-q4_k_m.gguf from AssistModelTier.downloadURL, 2,497,280,256
           bytes (== downloadBytes), scratch folder, deleted afterwards.
   10 greedy trials. Dateline "(Today is 2026-10-07, a Wednesday.)".
-  BEFORE = dfa34e51c (origin/dev 4b177c684 + piece S), harness by git
+  BEFORE = 3318354a4 (origin/dev 5c3ccaf24 + piece S), harness by git
   archive. AFTER = this branch. Local tool JSON BEFORE vs AFTER: byte-equal
   (and parsed-equal); scripts/test_tool_surface_digest.py OK (LOCAL_DIGEST
   46b96562...2cd96cb6 unmoved). A' = AFTER's tools + newUnit (boolean) and
