@@ -77,4 +77,107 @@ public class ObsidianRouteSourceTests
     [InlineData("CourseSettingsView.xaml.cs", "_window.SidebarPane.OpenInObsidian(_course, null)")]
     public void TheToolbars_TakeTheOneRoute(string file, string call) =>
         Assert.Contains(call, File.ReadAllText(Path.Combine(AppFolder, "Views", file)));
+
+    /// <summary>
+    /// #681: a section's press reads the preview's address ONCE, in the one
+    /// route, and resolves it against the build's list - so the page that
+    /// opens and the page the assistant's reply names are the same answer.
+    /// </summary>
+    [Fact]
+    public void TheSectionPressReadsTheAddressOnce()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs")).Replace("\r\n", "\n");
+        int start = source.IndexOf("public Task<OpenInObsidianPress> OpenInObsidian(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string press = source[start..end];
+        Assert.Equal(1, press.Split("PreviewedAddressFor(").Length - 1);
+        Assert.Contains("PreviewedPageSource.Resolve(", press);
+        Assert.Contains(".Press(course, reveal, answer, section)", press);
+    }
+
+    /// <summary>
+    /// #690: a course kept for reference's route that throws before opening is
+    /// reported DidNotOpen by <c>Finishing</c>, never Opened from a finally.
+    /// </summary>
+    [Fact]
+    public void TheReferenceRouteReportsDidNotOpenWhenItThrows()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Menus.cs")).Replace("\r\n", "\n");
+        int start = source.IndexOf("private static async Task Finishing(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string finishing = source[start..end];
+        int caught = finishing.IndexOf("catch", StringComparison.Ordinal);
+        Assert.True(caught > 0);
+        Assert.Contains("new OpenInObsidianPress.DidNotOpen()", finishing[caught..]);
+        Assert.DoesNotContain("finally", finishing);
+    }
+
+    /// <summary>
+    /// #690: a second press on a course kept for reference while its note is
+    /// up is told it waits and returns BEFORE the trail line - so two presses
+    /// leave one "page opened in Obsidian" line, not one per press - and the
+    /// note marks the course asking for as long as it is up.
+    /// </summary>
+    [Fact]
+    public void TheReferenceRoute_ASecondPressWhileTheNoteIsUpWritesNoSecondLine()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SidebarPane.Reference.cs")).Replace("\r\n", "\n");
+        int start = source.IndexOf("private async Task OpenReferenceInObsidian(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string route = source[start..end];
+        int guard = route.IndexOf("ObsidianFigureAddOnsThisRun.Asking.Contains(course.DirectoryPath)", StringComparison.Ordinal);
+        int noted = route.IndexOf("PreviewedPageSource.NoteThePress(", StringComparison.Ordinal);
+        int asking = route.IndexOf("ObsidianFigureAddOnsThisRun.Asking.Add(course.DirectoryPath)", StringComparison.Ordinal);
+        int shown = route.IndexOf("ShowDialogSafelyAsync(note)", StringComparison.Ordinal);
+        Assert.True(guard > 0 && noted > guard, $"guard {guard}, trail line {noted}: the guard must come before the line");
+        string turnedAway = route[guard..noted];
+        Assert.Contains("report?.TrySetResult(new OpenInObsidianPress.WaitingForAnAnswer())", turnedAway);
+        Assert.Contains("return;", turnedAway);
+        Assert.Equal(1, route.Split("PreviewedPageSource.NoteThePress(").Length - 1);
+        Assert.True(asking > noted && shown > asking, $"asking {asking}, note shown {shown}: the course is asking while the note is up");
+        Assert.Contains("finally { ObsidianFigureAddOnsThisRun.Asking.Remove(course.DirectoryPath); }", route);
+    }
+
+    /// <summary>
+    /// #690: the assistant's press goes through <c>AssistantsObsidianPress</c>,
+    /// whose order is tested in Core - the window only supplies itself, and
+    /// selects the section in <c>BringUp</c>, never before the wait.
+    /// </summary>
+    [Fact]
+    public void TheAssistantsPressTakesTheTestedOrder()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "MainWindow.xaml.cs")).Replace("\r\n", "\n");
+        int start = source.IndexOf("public async Task<OpenInObsidianPress> PressOpenInObsidianFor(", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string press = source[start..end];
+        Assert.Contains("AssistantsObsidianPress.RunAsync(", press);
+        Assert.Contains("BringUp: ShowTheSection", press);
+        Assert.DoesNotContain("Task.Delay", press);
+        int run = press.IndexOf("AssistantsObsidianPress.RunAsync(", StringComparison.Ordinal);
+        int selected = press.IndexOf("Workspace.Selection =", StringComparison.Ordinal);
+        int shown = press.IndexOf("void ShowTheSection()", StringComparison.Ordinal);
+        Assert.True(shown >= 0 && selected > shown && selected < run, "the section is selected only inside ShowTheSection");
+    }
+
+    /// <summary>
+    /// #681: the address is WebView2's own, through the normaliser - never the
+    /// page last viewed, which ignores the app's own loads (the contract's
+    /// <c>obsidianOpensThePreviewedPage.rejected</c>).
+    /// </summary>
+    [Fact]
+    public void ThePressReadsWebView2sSourceThroughTheNormaliser()
+    {
+        string source = File.ReadAllText(Path.Combine(AppFolder, "Views", "SectionDetailView.xaml.cs"));
+        int start = source.IndexOf("internal string? PreviewedAddress()", StringComparison.Ordinal);
+        Assert.True(start > 0);
+        int end = source.IndexOf(";", start, StringComparison.Ordinal);
+        string reader = source[start..end];
+        Assert.Contains("CoreWebView2?.Source", reader);
+        Assert.Contains("PreviewStartPage.Remember(", reader);
+        Assert.DoesNotContain("LastViewedPages", reader);
+    }
 }

@@ -893,9 +893,9 @@ Four things that cost a day each if you do not know them:
   `add_classes` and `make_room_for_classes` pairs). The local 13's full digest is pinned
   (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades, and
   that is true of the MCP list as well as the local one. **Windows'
-  `plantoir-mcp.exe` serves 42: the mac's 37 before #610 plus five of its own;
-  since #610 the mac has one Windows lacks (`open_in_obsidian`)** — so the two MCP surfaces are still not the same
-  product, five tools wider on the Windows side (four net, since #610 gave the mac one Windows lacks); which five, and why, is in
+  `plantoir-mcp.exe` serves 43: the mac's 38 plus five of its own** (42 until
+  #690 served `open_in_obsidian` there, refusing it as the mac's server does) — so the two MCP surfaces are still not the same
+  product, five tools wider on the Windows side; which five, and why, is in
   `documentation/10-local-ai-assistant.md` → "The two MCP surfaces are not the
   same product" (issue #66, now closed, is where the count was first measured).
 

@@ -678,6 +678,18 @@ public sealed class AssistAgent
     /// </summary>
     public Func<Task<LaterClassesAtADeploy>>? AskAboutClassesDatedLaterInApp { get; set; }
 
+    /// <summary>
+    /// Press the section window's own Open in Obsidian (#690) - see
+    /// <see cref="AssistToolRunner.OpenInObsidianInApp"/>.
+    /// </summary>
+    public Func<Task<Plantoir.Core.Models.OpenInObsidianPress>>? OpenInObsidianInApp { get; set; }
+
+    /// <summary>Whether Obsidian is installed - see <see cref="AssistToolRunner.ObsidianIsInstalled"/>.</summary>
+    public Func<bool> ObsidianIsInstalled { get; set; } = () => true;
+
+    /// <summary>The code a teacher reads for the course - see <see cref="AssistToolRunner.ShownCourseCode"/>.</summary>
+    public Func<string>? ShownCourseCode { get; set; }
+
     /// <summary>Deploy through the main window's own flow, console and all. Any thread.</summary>
     public Action? StartDeployInApp { get; set; }
 
@@ -2220,6 +2232,9 @@ public sealed class AssistAgent
             StopPreviewInApp = StopPreviewInApp,
             StopPreviewInAppAsync = StopPreviewInAppAsync,
             CourseIsKeptForReference = CourseIsKeptForReference,
+            OpenInObsidianInApp = OpenInObsidianInApp,
+            ObsidianIsInstalled = ObsidianIsInstalled,
+            ShownCourseCode = ShownCourseCode,
         };
         var (answer, handed) = await runner.Run(call, cancellation);
         if (answer.ConversationBackupPath is { } savedCopy) OnConversationBackup?.Invoke(savedCopy);
