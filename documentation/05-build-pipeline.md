@@ -1343,7 +1343,8 @@ list are printed through `scripts/machine_line.py`:
   `machine_line.fitted`. Every finding that names a list is made through
   `site_health.shortenable`, which remembers how to make it again with a
   smaller `most`. A finding whose line would be too long is remade naming
-  fewer than ten blocks or pages, its `andMore` saying how many it left out.
+  fewer blocks or pages (at most ten, fewer when they would not fit), its
+  `andMore` saying how many it left out.
   Its sentence keeps the true count, so no new key is needed. The console's own
   two lines above it keep all ten. `site_said.py`'s two findings go through
   the same `shortenable`.
