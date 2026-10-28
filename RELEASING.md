@@ -150,7 +150,8 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
    gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional. And
-   **revisit the npm audit** (#667): read verify.sh's npm-audit line (step 2).
+   **revisit the npm audit** (#667): read verify.sh's npm-audit line, and on
+   Windows run `windows-app\audit-runtime.ps1` (#685) (step 2).
 1a. **Minor releases (x.y.0) only: is Cloudflare Pages still safe?** Check
    Cloudflare's changelog for a Pages end-of-life date and whether Workers now
    takes custom domains with outside nameservers. Checklist step 1a says what
@@ -322,6 +323,21 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    not mean the moderates were read; this step is where they are.
    `documentation/02-docker-image.md` → "Known vulnerabilities in the image's
    npm packages" says what each outcome means.
+
+   **On Windows, the same audit over the runtime** (#685): run
+   `.\windows-app\audit-runtime.ps1` from the repository root, against the
+   runtime the installer will carry (`-Runtime <folder>` for another one).
+   It audits the same five trees with the runtime's own npm and compares
+   them through the same `scripts/npm_audit.py` and the same accepted list:
+   exit 0 clean, 1 a blocking advisory or a tree not audited, 2 SKIPPED
+   (offline — run it again with the network). It is opt-in and in no
+   `dotnet test`, for the reason the image keeps it out of its build: the
+   advisory database changes daily. It prints where it kept each tree's
+   audit, for `npm_audit.py findings`. Only the wrangler tree can carry an
+   advisory the image does not (its lockfile is the one npm wrote beside
+   the installed copy); one that appears there only is decided like any
+   other, added to the shared list under `wrangler` with its reason, and
+   told to the mac in a `mac` issue, because the list moved under it.
 
    **If the release changes anything under `scripts/`, the Dockerfile or a
    launcher, run the publishing verifier rather than smoking it by hand** —
