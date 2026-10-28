@@ -4165,18 +4165,25 @@ afterwards the old name is not on disk — and passes them to
 `SpecialFolderRenamer.Renaming`, which writes `curriculum_folders` and the
 legacy `curriculum_folder` naming the primary.
 
-`PLANTOIR_MAPS:` is read from the console (`ScriptRunner`) and from a scheduled
-publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
-`Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
-reader would never see the line. The wrapper is written afresh by
+`PLANTOIR_MAPS:` is read wherever a build's output arrives: the console
+(`ScriptRunner`), a scheduled publish's record (`ScheduledHealthFindings`) and,
+since #660, a run `plantoir-mcp` started (`LauncherRunner`). All three call
+ONE dispatch, `BuildMachineLines.Record`, which writes the trail line itself,
+so a marker cannot be known to one reader and not another (before #660 the
+MCP door read four markers of nine, and a build the assistant started left no
+maps, My Progress, Swift, dated-pages or kept-off line). The scheduled
+wrapper's `Select-String` scan is generated from the same helper's
+`ScheduledRecordMarkers` (`PLANTOIR_HEALTH:` first, then every trail marker but
+`PLANTOIR_CLOUDFLARE_REMADE:`, which the Cloudflare leg appends itself);
+without the scan the record reader would never see the line. Since #660 a
+record's lines reach the trail in LINE order rather than grouped by kind. The wrapper is written afresh by
 `ScheduledRun` at the moment each run starts (since bundle 3), so a deploy
 already scheduled scans for a new marker from its next run, once the
 `Plantoir.exe` it was registered with (`TaskScheduling.RunnerExecutable`) has
 been updated in place, with no need to schedule it again. Only a task set
 before bundle 3 runs its own baked wrapper, once, and misses it.
 `PLANTOIR_MY_PROGRESS:` (#599) and `PLANTOIR_REPAIRED:` (#645) ride the same
-three places — the console reader, the record reader and the wrapper's scan —
-the same way ("My
+helper and the same scan the same way ("My
 Progress: the trail line and the two readers (#599)" below). (This said a
 wrapper "keeps its old scan until its schedule is set again" until
 2026-10-23, which has not been true of a task set since bundle 3.)
@@ -9105,12 +9112,15 @@ front page's title itself, so Windows inherits the repair and its console
 sentence. The `PLANTOIR_REPAIRED:` line is read by `BuildRepairReport` in all
 three places a build's output arrives — the console (`ScriptRunner`), a
 scheduled run's record (`ScheduledHealthFindings`, through the wrapper's
-`Select-String` scan) and a run `plantoir-mcp` started (`LauncherRunner`) —
+`Select-String` scan) and a run `plantoir-mcp` started (`LauncherRunner`),
+all through `BuildMachineLines.Record` since #660 —
 and written as `folder problem repaired` with `trailLine`; a repair key this
 app does not know writes nothing (#645, `BuildRepairReportTests`) —
 [04 → "A course made before 1.8.1 is put right by its next
 build"](04-course-setup.md). `LauncherRunner` also drops every other machine
-line (`TranscriptBuilder.IsMachineLine`) before it reports progress, so no
+line (`TranscriptBuilder.IsMachineLine`, and anything the helper read) before it
+reports progress (`LauncherRunnerCaptureTests` feeds its capture every
+marker's example), so no
 `PLANTOIR_` JSON reaches the assistant's progress text.
 
 **Not on disk, on purpose.** The contract's seventh folder case is `Unit 1:

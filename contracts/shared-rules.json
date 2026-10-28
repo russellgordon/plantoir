@@ -766,7 +766,7 @@
       {
         "carries": "the course and section built, and the place in the course folder of each page with the reserved name that the build dropped from a copy list the course's settings had named it in. Never anything written on it.",
         "event": "How I Teach page kept off the website",
-        "why": "#209's build rule can take a page OFF a site that used to publish it: a teacher who already had a page called How I Teach, meant for students, finds it gone after an update, and the build's console, which said why, is gone by the time they ask. Read from the build's own PLANTOIR_KEPT_OFF: line (howITeachPage.keptOffMarker) - by the app from the console of a run it started and from a scheduled publish's own log, as PLANTOIR_DATED: is. Printed only when the build dropped a listed page, so a course whose page was never on the site leaves no line on every build.",
+        "why": "#209's build rule can take a page OFF a site that used to publish it: a teacher who already had a page called How I Teach, meant for students, finds it gone after an update, and the build's console, which said why, is gone by the time they ask. Read from the build's own PLANTOIR_KEPT_OFF: line (howITeachPage.keptOffMarker) - by the app from the console of a run it started and from a scheduled publish's own log, as PLANTOIR_DATED: is (on Windows also from a run plantoir-mcp started, #660). Printed only when the build dropped a listed page, so a course whose page was never on the site leaves no line on every build.",
         "line": "howITeachPage.keptOffTrailLine"
       },
       {
@@ -778,12 +778,12 @@
       {
         "carries": "the course and section, and for each coverage map the build wrote its title, the folder it was built from and how many expectations it shows - or that it wrote none. NEVER anything written on a page.",
         "event": "curriculum maps built",
-        "why": "#128: a course can have a map per curriculum folder, and 'my second map is missing' or 'the map shows the wrong folder' is answerable only if the trail says which maps each build made. Read from the build's PLANTOIR_MAPS: line - coverageMapsBuilt - by the console reader for a run the app starts and by the scheduled publish's log reader, so the build nobody watches leaves it too."
+        "why": "#128: a course can have a map per curriculum folder, and 'my second map is missing' or 'the map shows the wrong folder' is answerable only if the trail says which maps each build made. Read from the build's PLANTOIR_MAPS: line - coverageMapsBuilt - by the console reader for a run the app starts and by the scheduled publish's log reader, so the build nobody watches leaves it too; on Windows also from a run plantoir-mcp started (#660: one dispatch, BuildMachineLines, for all three; the mac's MCP door runs through its ScriptRunner already)."
       },
       {
         "carries": "the course and section, whether the build made the My Progress page, how many pages students can see have success criteria to tick, and - when it made none - why (no such page, or the course's own page by that name). NEVER anything written on a page.",
         "event": "my progress page built",
-        "why": "#545: the build adds a page students see, and 'my students have no My Progress page' or 'it counts the wrong pages' is answerable only if the trail says what each build did. Read from the build's PLANTOIR_MY_PROGRESS: line - myProgressBuilt - by the console reader for a run the app starts and by the scheduled publish's log reader."
+        "why": "#545: the build adds a page students see, and 'my students have no My Progress page' or 'it counts the wrong pages' is answerable only if the trail says what each build did. Read from the build's PLANTOIR_MY_PROGRESS: line - myProgressBuilt - by the console reader for a run the app starts and by the scheduled publish's log reader; on Windows also from a run plantoir-mcp started (#660: one dispatch, BuildMachineLines, for all three; the mac's MCP door runs through its ScriptRunner already)."
       },
       {
         "carries": "the course, the section the copy is named for, the backup's FILE NAME (a course code, a moment and who made it - never anything written on a page), its size in MB and how long it took in seconds, one decimal each; or, when it failed, that it could not and why.",
@@ -4718,7 +4718,7 @@
       "event": "pages dated by the build",
       "shape": "the build gave N page(s) the date of their class: <names, comma-separated>",
       "why": "Names only, and the count first, so a long list can be shortened without losing how many there were.",
-      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, which reads that log for PLANTOIR_HEALTH: lines already). Both, or the scheduled build — the one likeliest to rewrite files — leaves no trace."
+      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, which reads that log for PLANTOIR_HEALTH: lines already); on Windows also a run plantoir-mcp started (#660, BuildMachineLines; the mac's MCP door is its ScriptRunner). Both, or the scheduled build — the one likeliest to rewrite files — leaves no trace."
     }
   },
   "buildRepairs": {

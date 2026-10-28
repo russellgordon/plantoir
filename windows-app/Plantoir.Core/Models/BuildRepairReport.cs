@@ -11,12 +11,11 @@ namespace Plantoir.Core.Models;
 /// <c>buildRepairs.marker</c>), and this reads it so the repair goes on the
 /// trail as <c>folder problem repaired</c> — the same event a repair the
 /// teacher asked for leaves, since both record that something wrong was put
-/// right. Read from the same three places as <see cref="PagesDatedByTheBuild"/>
-/// ought to be: the console of a run the app started (<c>ScriptRunner</c>), a
-/// scheduled publish's own record (<c>ScheduledHealthFindings</c>), and a run
-/// <c>plantoir-mcp</c> started (<c>LauncherRunner</c>). That the MCP door
-/// reads <see cref="PagesDatedByTheBuild"/> and the other build lines nowhere
-/// yet is #660.</para>
+/// right. Read from the same three places as <see cref="PagesDatedByTheBuild"/>:
+/// the console of a run the app started (<c>ScriptRunner</c>), a scheduled
+/// publish's own record (<c>ScheduledHealthFindings</c>), and a run
+/// <c>plantoir-mcp</c> started (<c>LauncherRunner</c>) - all three through
+/// <see cref="Scripting.BuildMachineLines"/> since #660.</para>
 ///
 /// <para>Not printed when the build could quote only its own copy (a course
 /// kept for reference, a linked page, a locked one), so such a course leaves
