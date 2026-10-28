@@ -32300,6 +32300,17 @@
           "count": 100,
           "trailLine": "the build made 100 curriculum maps: Curriculum Coverage 1 from Ontario Curriculum 1 (42 expectations) and 99 more"
         }
+      },
+      {
+        "line": "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 2, \"pages\": [], \"count\": 12, \"more\": 12}",
+        "why": "k = 0: a line whose first entry alone would not fit keeps none and still carries count. A reader that treats an empty list as no report records nothing, which is the failure #666 exists to end; it must read count and say 'M not named'.",
+        "expect": {
+          "course": "ICS4U",
+          "section": 2,
+          "shown": 0,
+          "count": 12,
+          "trailLine": "the build gave 12 pages the date of their class: 12 not named"
+        }
       }
     ]
   }
