@@ -9813,9 +9813,12 @@ counts are unchanged: no new caller of `FolderActions.OpenInObsidian(`.
 Obsidian" line (`ICS3U/1 · opened Unit 1/Lesson 3 in Obsidian, the page the
 preview shows`, or `… not a page of the preview: <why>`), for every SECTION
 press that goes ahead — after the route's guard against a second press, so a
-press turned away during the scan writes nothing — and never for a course
-press. A reference course's press writes it before the pages are locked again,
-as the mac's notes it before `lockAgain`.
+press turned away during the scan writes nothing, and after the scan itself,
+so a scan that fails (the reply says nothing was opened) leaves no line saying
+it opened; still before any question, so a press that goes ahead writes
+exactly one — and never for a course press. A reference course's press
+writes it before the pages are locked again, as the mac's notes it before
+`lockAgain`.
 
 **Things the mac must merely KNOW** (no contract case changes, so no mac suite
 goes red):

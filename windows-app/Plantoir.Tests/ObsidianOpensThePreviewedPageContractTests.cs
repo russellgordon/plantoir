@@ -153,6 +153,39 @@ public sealed class ObsidianOpensThePreviewedPageContractTests : IDisposable
             PreviewedPageSource.Resolve("Unit-1/Lesson-3", list, course));
     }
 
+    /// <summary>
+    /// A list key or source holding a lone surrogate - legal JSON, legal on
+    /// NTFS - makes string.Normalize throw. Resolve runs on the toolbar's
+    /// click, so it falls back to the section instead of throwing.
+    /// (FileFor checks the file is there before normalizing the place, so
+    /// a source the disk does not have is FileGone, not a throw.)
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ALoneSurrogateInTheListFallsBackRatherThanThrowing(bool inTheKey)
+    {
+        string course = LayOutTheFixture();
+        const char lone = '\uD800';
+        // Built in memory rather than through ListFor: the list reaches
+        // Resolve as it is, whatever a JSON round trip would make of it.
+        var list = new JsonObject
+        {
+            ["version"] = PreviewedPageSource.ListVersion,
+            ["pages"] = inTheKey
+                ? new JsonObject { ["Unit-1/Lesson-3" + lone] = new JsonObject { ["source"] = "Unit 1/Lesson 3.md", ["hidden"] = false } }
+                : new JsonObject { ["Unit-1/Lesson-3"] = new JsonObject { ["source"] = "Unit 1/Lesson 3" + lone + ".md", ["hidden"] = false } },
+        };
+        // The premise: this is what would otherwise reach the click.
+        Assert.Throws<ArgumentException>(() => ("x" + lone).Normalize(NormalizationForm.FormC));
+        var answer = PreviewedPageSource.Resolve("Unit-1/Lesson-3", list, course);
+        // In the key, the list cannot be read at all: not in the list. In the
+        // source, no such file is on disk, which is caught first.
+        Assert.Equal(new PreviewedPageSource.FellBack(inTheKey
+            ? PreviewedPageSource.Fallback.NotInTheList
+            : PreviewedPageSource.Fallback.FileGone), answer);
+    }
+
     [Fact]
     public void TheTrailWordsAreTheContracts()
     {
@@ -187,7 +220,7 @@ public sealed class ObsidianOpensThePreviewedPageContractTests : IDisposable
     /// The contract's <c>link.cases</c> are POSIX paths, and the note says the
     /// percent-encoding of everything but '+' is the platform encoder's own:
     /// Windows' <c>Uri.EscapeDataString</c> escapes every separator - a Windows
-    /// path's '' as %5C and ':' as %3A (and these POSIX paths' '/' as %2F) -
+    /// path's '\' as %5C and ':' as %3A (and these POSIX paths' '/' as %2F) -
     /// so the strings are not compared. What IS the contract's: '+' is %2B, '&amp;' is
     /// %26, a space is %20, and the path comes back whole.
     /// </summary>

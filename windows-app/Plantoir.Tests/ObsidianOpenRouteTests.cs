@@ -463,6 +463,7 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         Assert.IsType<OpenInObsidianPress.DidNotOpen>(await reported.WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.DoesNotContain(world.Asked, asked => asked.StartsWith("open", StringComparison.Ordinal));
         Assert.Empty(ObsidianFigureAddOnsThisRun.BeingOpened);
+        Assert.Equal(0, PressLines);
     }
 
     // ---- #690: the assistant's press, in the order AssistantsObsidianPress keeps ----
@@ -563,11 +564,11 @@ public sealed class ObsidianOpenRouteTests : IDisposable
     }
 
     /// <summary>
-    /// The route's question guard wins over the wait for a dialog: while an
-    /// earlier press's add-ons offer is up (a dialog, and Asking), the
-    /// assistant's press says it is waiting and is NEVER run - not even once
-    /// the offer has closed - so Obsidian opens once and one trail line is
-    /// written, by the first press.
+    /// The question guard comes BEFORE the wait for a dialog (step 2): while
+    /// an earlier press's add-ons offer is up (a dialog, and Asking), the
+    /// assistant's press says it is waiting and returns at once - it never
+    /// enters the wait (the delay is never called) and is never run - so
+    /// Obsidian opens once and one trail line is written, by the first press.
     /// </summary>
     [Fact]
     public async Task TheAssistantsPress_DuringAnotherPresssQuestionNeverPressesAgain()
@@ -588,14 +589,17 @@ public sealed class ObsidianOpenRouteTests : IDisposable
                 DialogOpen = true,
                 Pressing = () => route.Press(course, course.DirectoryPath, page, 1).Reported,
             };
+            int looks = 0;
             var (reported, run) = await RunTheAssistantsPress(window, _ =>
             {
+                looks++;
                 window.DialogOpen = false;
                 answer.TrySetResult();
                 return Task.CompletedTask;
             });
             await run;
             Assert.IsType<OpenInObsidianPress.WaitingForAnAnswer>(reported);
+            Assert.Equal(0, looks);
             Assert.Empty(window.Asked);
         }
         finally
@@ -605,6 +609,34 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         }
         Assert.Single(world.Asked, asked => asked.StartsWith("open", StringComparison.Ordinal));
         Assert.Equal(1, PressLines);
+    }
+
+    /// <summary>
+    /// The re-check after the wait: a dialog is up and no question is being
+    /// asked when the press arrives, but while it waits another press's
+    /// question begins (Asking) and the first dialog closes. The press says
+    /// it is waiting and is never run - the guard is read again after the
+    /// wait, not only before it.
+    /// </summary>
+    [Fact]
+    public async Task TheAssistantsPress_ChecksTheQuestionAgainAfterTheWait()
+    {
+        const string coursePath = @"C:\courses\MPM2D";
+        var window = new FakeWindow { CoursePath = coursePath, DialogOpen = true };
+        Assert.Empty(ObsidianFigureAddOnsThisRun.Asking);
+        try
+        {
+            var (reported, run) = await RunTheAssistantsPress(window, _ =>
+            {
+                ObsidianFigureAddOnsThisRun.Asking.Add(coursePath);
+                window.DialogOpen = false;
+                return Task.CompletedTask;
+            });
+            await run;
+            Assert.IsType<OpenInObsidianPress.WaitingForAnAnswer>(reported);
+            Assert.Empty(window.Asked);
+        }
+        finally { ObsidianFigureAddOnsThisRun.Asking.Remove(coursePath); }
     }
 
     /// <summary>

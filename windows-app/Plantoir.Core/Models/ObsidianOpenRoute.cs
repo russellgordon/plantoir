@@ -121,7 +121,8 @@ public sealed class ObsidianOpenRoute
     /// (Obsidian handed something, a question about to be shown, or turned
     /// away), and ALWAYS completes; <c>Finished</c> is the route itself.
     /// A section press that goes ahead writes one trail line, after the
-    /// guard against a second press; a course press writes none.
+    /// guard against a second press and the scan, before any question; a
+    /// course press writes none.
     /// </summary>
     public (Task<OpenInObsidianPress> Reported, Task<bool> Finished) Press(
         Course course, string folder, PreviewedPageSource.Answer? answer, int? section)
@@ -157,8 +158,11 @@ public sealed class ObsidianOpenRoute
             }
             try
             {
-                NoteThePress(answer, course, section);
                 var (needed, wouldAdd) = await _world.ScanAsync(coursePath);
+                // After the scan, so a scan that fails leaves no line saying
+                // it opened; before any question, so a press that goes ahead
+                // still writes exactly one.
+                NoteThePress(answer, course, section);
                 await OpenAfterTheScanAsync(press, course, folder, page, needed, wouldAdd);
             }
             finally { ObsidianFigureAddOnsThisRun.BeingOpened.Remove(coursePath); }

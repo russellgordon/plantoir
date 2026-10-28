@@ -97,7 +97,21 @@ public static class PreviewedPageSource
     /// root as <see cref="PreviewStartPage.Remember"/> gives it, or null when no
     /// page is showing — from the list, inside <paramref name="courseFolder"/> only.
     /// </summary>
+    /// <remarks>
+    /// Total: it never throws. It runs synchronously on the toolbar's click,
+    /// where an exception would take the app down, and a list can hold what
+    /// <see cref="string.Normalize()"/> refuses - a lone surrogate is legal
+    /// JSON and a legal NTFS name, and Normalize throws ArgumentException on
+    /// it. Anything that cannot be resolved opens the section, as a page not
+    /// in the list does.
+    /// </remarks>
     public static Answer Resolve(string? address, JsonObject? list, string courseFolder)
+    {
+        try { return Resolving(address, list, courseFolder); }
+        catch (Exception) { return new FellBack(Fallback.NotInTheList); }
+    }
+
+    private static Answer Resolving(string? address, JsonObject? list, string courseFolder)
     {
         if (address is null) return new FellBack(Fallback.NoPageShowing);
         var pages = PagesOf(Validated(list));

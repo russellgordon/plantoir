@@ -139,7 +139,7 @@ public sealed partial class SidebarPane
         }
         catch (Exception ex)
         {
-            App.LogDiagnostic($"Open in Obsidian failed: {ex.Message}");
+            App.LogDiagnostic($"Open in Obsidian failed: {ex}");
             reported?.TrySetResult(new OpenInObsidianPress.DidNotOpen());
         }
     }
