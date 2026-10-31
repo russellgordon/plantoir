@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 24 October 2026. The current release is **1.9.0** on the Mac and **1.8.7** on Windows.*
+*Last updated: 31 October 2026. The current release is **1.9.0** on both the Mac and Windows.*
 
 A few things to know before you read on:
 
@@ -25,48 +25,6 @@ Each item links to its GitHub issue, if you want the full detail. You don't
 need to read those to use Plantoir.
 
 ---
-
-## Next: Windows catches up to 1.9.0
-
-Plantoir 1.9.0 is out for the Mac. Windows stays on 1.8.7 until its own 1.9.0
-download joins the release, with what 1.9.0 brought the Mac:
-
-- **GeoGebra sketches on your pages** — a sketch saved beside the page, typed
-  GeoGebra commands, or a sketch from geogebra.org kept once; in quiz
-  questions too ([#687](https://github.com/russellgordon/plantoir/issues/687)).
-- **Text blocks that wrap** at the window's width, with their line numbers
-  kept ([#676](https://github.com/russellgordon/plantoir/issues/676)).
-- **Open in Obsidian goes to the page you're looking at**
-  ([#681](https://github.com/russellgordon/plantoir/issues/681)), and the
-  assistant can do it when you ask
-  ([#690](https://github.com/russellgordon/plantoir/issues/690)).
-- **A quiz the website reads differently** is shown among your folder's
-  problems ([#677](https://github.com/russellgordon/plantoir/issues/677)).
-- **The newer, supported engine** that draws your sites
-  ([#675](https://github.com/russellgordon/plantoir/issues/675)), with a
-  record of known weaknesses in the parts Plantoir carries
-  ([#685](https://github.com/russellgordon/plantoir/issues/685)).
-- **Windows fixes of its own:** the line
-  shown when the disk fills while Swift is being set up
-  ([#672](https://github.com/russellgordon/plantoir/issues/672)); the Quizzes
-  page pictures on plantoir.app
-  ([#590](https://github.com/russellgordon/plantoir/issues/590)); what a
-  scheduled publish does when the computer is asleep
-  ([#554](https://github.com/russellgordon/plantoir/issues/554)); and
-  messages in the window no longer run two lines together, and a question is
-  asked on its own
-  ([#661](https://github.com/russellgordon/plantoir/issues/661)).
-- **Behind the scenes:** a few checks that both apps behave the same way
-  ([#659](https://github.com/russellgordon/plantoir/issues/659),
-  [#660](https://github.com/russellgordon/plantoir/issues/660),
-  [#666](https://github.com/russellgordon/plantoir/issues/666),
-  [#671](https://github.com/russellgordon/plantoir/issues/671),
-  [#673](https://github.com/russellgordon/plantoir/issues/673),
-  [#680](https://github.com/russellgordon/plantoir/issues/680),
-  [#682](https://github.com/russellgordon/plantoir/issues/682)).
-
----
-
 
 ## Version 2.0
 
