@@ -501,9 +501,10 @@ class VisualizationsPageGeoGebraTests(unittest.TestCase):
     def test_the_geogebra_section_shows_its_picture_in_both_appearances(self):
         # #578: the GeoGebra section of /visualizations/ shows MPM2D's
         # slope-angle page with its sketch opened (capture.py --geogebra),
-        # light AND dark. The Windows twin was taken on 2026-10-31 (#590,
-        # capture_windows.py --geogebra); site.json's availability flag is
-        # the release's (it flips at the 1.9.0 cut), so it is not pinned here.
+        # light AND dark. The Windows runtime carries the engine since #687
+        # (Windows 1.9.0) and the Windows twin was taken on 2026-10-31 (#590,
+        # capture_windows.py --geogebra), so both the availability flag and
+        # the Windows picture are true.
         import re
         page = (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8")
         self.assertIn('<section id="geogebra">', page)
@@ -516,6 +517,8 @@ class VisualizationsPageGeoGebraTests(unittest.TestCase):
         self.assertNotIn("awaiting_capture", shot)
         self.assertIs(shot.get("windows"), True)
         self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).is_file())
+        site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
+        self.assertIs(site["availability"]["features"]["geogebra"]["windows"], True)
         for suffix in ("light", "dark", "windows-light", "windows-dark"):
             for extension in ("png", "webp"):
                 picture = build.IMAGE_DIR / f"geogebra-sketch-{suffix}.{extension}"
@@ -635,7 +638,9 @@ class PreviewPageSceneTests(unittest.TestCase):
             found.append((shot["id"], shot["capture"]["workspace"], shot["capture"]["course"]))
             with self.subTest(shot=shot["id"]):
                 self.assertTrue((capture.PREPARE_DIR / shot["capture"]["prepare"]).is_file())
-                self.assertIs(shot.get("windows"), False)
+                # No windows: false assertion any more: every quiz shot has its
+                # Windows twin since #590, and WINDOWS_PICTURE_OWED is where a
+                # shot still owed one is pinned (#686; the Mac retake is #710).
         self.assertEqual(found, [("quiz-math", "demo", "MCV4U"), ("quiz-chemistry", "demo", "SCH3U"),
                                  ("quiz-english", "demo", "ENG2D"), ("quiz-code-run", "marketing", "ICS3U")])
 

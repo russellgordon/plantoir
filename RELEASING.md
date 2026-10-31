@@ -112,14 +112,6 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-10-28 | GeoGebra sketches (a ```` ```geogebra ```` fence, or a `.ggb` file beside a page) open on a site built on Windows, from the site's own copy of the engine | Windows (the mac had it in 1.9.0) | #687 |
-| 2026-10-28 | Nothing: the Windows website builder runs on Node 22.23.4, the version the mac's image uses | Windows | #675 |
-| 2026-10-28 | Nothing: the Windows runtime's npm advisories were audited and the six left are accepted on evidence; `windows-app\audit-runtime.ps1` re-runs the audit by hand | Windows | #685 |
-| 2026-10-28 | Open in Obsidian on a section opens the page its preview is showing, not the section's front page; and "Open this in Obsidian" typed to the assistant presses that button | Windows (the mac since 1.9.0) | [#681](https://github.com/russellgordon/plantoir/issues/681), [#690](https://github.com/russellgordon/plantoir/issues/690) |
-| 2026-10-28 | Messages in the window no longer run two lines together, and a question (a site name at a first publish, "Continue anyway?") is asked on its own rather than on the end of the line before it | Windows only | [#661](https://github.com/russellgordon/plantoir/issues/661) |
-| 2026-10-28 | Nothing: `verify-deploy.ps1`, the publishing harness, waits for Cloudflare's production address to serve this run's upload before judging it, and `-SelfTest` proves that wait offline — not yet run against a real pages.dev from Windows; the nothing-skipped run in step 2 is its proof | Windows (the mac's harness since #665) | [#680](https://github.com/russellgordon/plantoir/issues/680) |
-| 2026-10-28 | Nothing: a running preview does not follow edits on either platform (recorded; Quartz's Windows watcher fault is #703) | Both | [#671](https://github.com/russellgordon/plantoir/issues/671) |
-| 2026-10-28 | Nothing: Windows' publishing trusts the OS store; Windows removed the Comodo root 2026-10-26 | Windows | [#659](https://github.com/russellgordon/plantoir/issues/659) |
 
 
 ## Warnings the release notes MUST carry
@@ -134,7 +126,6 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
-| 2026-10-28 | Windows: stop any preview, and let a scheduled deploy finish, before installing this version by hand. | Since #675 the installer empties `runtime\node` on an upgrade so an old Node cannot linger inside the new one, and it does not close `node.exe` (its close list names only Plantoir, plantoir-mcp and llama-server). A preview server or scheduled deploy still running leaves that folder half deleted and the teacher facing a file-in-use prompt. Tracked as #700. |
 
 ## Trim the roadmap
 
