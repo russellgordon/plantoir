@@ -441,13 +441,12 @@ WINDOWS_PICTURE_OWED: dict = {
     # code-swift and code-swift-live left this list on 2026-10-23, their 2x
     # pictures taken in a 4K session (Swift runs on Windows since v1.8.6,
     # #570), and site.json's runnable-swift became windows: true with them.
-    "quiz-math": "too tall for the 1280 x 860 window at 2x: quiz-math.js refuses it (767 pt) (#590)",
-    "quiz-code-run": "too tall for the 1280 x 860 window at 2x: quiz-code-run.js refuses it (744 pt) (#590)",
-    # The Visualizations page's GeoGebra figure (#578): the Windows runtime
-    # does not carry GeoGebra yet (fetch-runtime.ps1, #578's windows issue),
-    # so there is no Windows preview of the sketch to photograph. It leaves
-    # this list with site.json's availability geogebra -> windows: true.
-    "geogebra-sketch": "the Windows runtime carries GeoGebra since #687 (Windows 1.9.0); its picture waits for a 4K session at 200% (#590)",
+    # quiz-math, quiz-code-run and geogebra-sketch left this list on
+    # 2026-10-31 (#590), taken at 2x in a 4K session: the two quizzes once
+    # their shared prepare scripts' margins became 16/24 pt (they were too
+    # tall for the 1280 x 860 window under 40/56), the GeoGebra figure by
+    # capture_windows.py --geogebra once the runtime carried the engine
+    # (#687). site.json's geogebra flag is the release's, not this list's.
 }
 
 
@@ -503,8 +502,9 @@ class VisualizationsPageGeoGebraTests(unittest.TestCase):
         # #578: the GeoGebra section of /visualizations/ shows MPM2D's
         # slope-angle page with its sketch opened (capture.py --geogebra),
         # light AND dark. The Windows runtime carries the engine since #687
-        # (Windows 1.9.0, 2026-10-31), so the availability flag is true on
-        # both; the Windows PICTURE is still owed (WINDOWS_PICTURE_OWED, #590).
+        # (Windows 1.9.0) and the Windows twin was taken on 2026-10-31 (#590,
+        # capture_windows.py --geogebra), so both the availability flag and
+        # the Windows picture are true.
         import re
         page = (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8")
         self.assertIn('<section id="geogebra">', page)
@@ -515,11 +515,11 @@ class VisualizationsPageGeoGebraTests(unittest.TestCase):
         shot = {entry["id"]: entry for entry in manifest["shots"]}["geogebra-sketch"]
         self.assertEqual(shot["capture"]["scene"], "geogebra")
         self.assertNotIn("awaiting_capture", shot)
-        self.assertIs(shot.get("windows"), False)
+        self.assertIs(shot.get("windows"), True)
         self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).is_file())
         site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
         self.assertIs(site["availability"]["features"]["geogebra"]["windows"], True)
-        for suffix in ("light", "dark"):
+        for suffix in ("light", "dark", "windows-light", "windows-dark"):
             for extension in ("png", "webp"):
                 picture = build.IMAGE_DIR / f"geogebra-sketch-{suffix}.{extension}"
                 self.assertTrue(picture.is_file(), f"{picture.name} is missing")
@@ -587,6 +587,11 @@ class PreviewPageSceneTests(unittest.TestCase):
                          ["quiz-math", "quiz-chemistry", "quiz-english", "quiz-code-run"])
         self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("code", ["code-swift"])],
                          ["code-swift"])
+        # --geogebra (#590, #687): the Visualizations page's one figure, which
+        # --promote may mark too.
+        self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("geogebra")],
+                         ["geogebra-sketch"])
+        self.assertIn("geogebra-sketch", preview_pages_windows.windows_preview_ids())
         # Each figure's page, named as the planting steps name it, so the
         # changed-page guard can match their report: a page planted from
         # CODE_PAGES or folders.json, or one of the ready-made course's.
@@ -633,7 +638,9 @@ class PreviewPageSceneTests(unittest.TestCase):
             found.append((shot["id"], shot["capture"]["workspace"], shot["capture"]["course"]))
             with self.subTest(shot=shot["id"]):
                 self.assertTrue((capture.PREPARE_DIR / shot["capture"]["prepare"]).is_file())
-                self.assertIs(shot.get("windows"), False)
+                # No windows: false assertion any more: every quiz shot has its
+                # Windows twin since #590, and WINDOWS_PICTURE_OWED is where a
+                # shot still owed one is pinned (#686; the Mac retake is #710).
         self.assertEqual(found, [("quiz-math", "demo", "MCV4U"), ("quiz-chemistry", "demo", "SCH3U"),
                                  ("quiz-english", "demo", "ENG2D"), ("quiz-code-run", "marketing", "ICS3U")])
 

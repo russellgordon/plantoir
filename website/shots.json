@@ -138,7 +138,7 @@
       },
       "alt": "A Grade 10 mathematics exploration on a class website, The Slope-Angle Conjecture: under the heading The sketch, a GeoGebra sketch opened on the page, with three right triangles of different sizes that share one marked angle, the slider that sets it, and the ratio of each triangle's two shorter sides.",
       "caption": "A GeoGebra file saved beside the page, opened with a tap. Students drag the points and the slider; the sketch comes from your own class site.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "The sketch",
         "GeoGebra"
@@ -280,7 +280,7 @@
       },
       "alt": "A self-check question on a class website showing the graph of f(x) = x³ − 3x + 1 and asking for an estimate of its root between 0 and 1, with 0.35 typed in the blank, a tick beside it, the word Right!, and the explanation opened under it.",
       "caption": "Read the graph, type a number: close enough is right.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "Right!",
         "Why",
@@ -339,7 +339,7 @@
       },
       "alt": "The last self-check question on a class website's Check Your Loops page: a short Python program inside the question, run, with its output 2, 5 and 8 and the word Finished, the answer 3 picked, the word Right!, the explanation, and under it the page's score, 4 of 5 right on the first try, with Start again.",
       "caption": "Run the program, answer, and see the page's score.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "Run",
         "Finished",

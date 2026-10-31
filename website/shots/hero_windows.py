@@ -685,6 +685,28 @@ def land_on_anchor(page, fragment: str) -> None:
     raise SystemExit(f"#{fragment}: {anchor_problem(page, fragment)}. Nothing past this point was taken.")
 
 
+def wait_for_extension_targets_to_go(seconds: float = 40.0) -> None:
+    """Wait, up to `seconds`, until the fresh profile's built-in extensions
+    have closed their background pages and service workers, so the DevTools
+    target list is the page alone. Measured 2026-10-31 (#590, i5-8365U):
+    for the first 15 to 30 s Edge lists five extension background pages and
+    a service worker, which then close; Playwright's connect_over_cdp, which
+    attaches to every target, hung for its whole 180 s three times out of
+    five when it connected while they were closing. Past the bound it
+    connects anyway, as before."""
+    import urllib.request
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json", timeout=5) as answer:
+                targets = json.load(answer)
+            if targets and all(target.get("type") == "page" for target in targets):
+                return
+        except (OSError, ValueError):
+            pass
+        time.sleep(1.0)
+
+
 def capture_page(url: str, title_fragment: str, destination: Path, *,
                  size_dip: tuple[int, int] = (PAGE_WIDTH_DIP, PAGE_HEIGHT_DIP), prepare_page=None,
                  fit: bool = False) -> Path:
@@ -715,8 +737,11 @@ def capture_page(url: str, title_fragment: str, destination: Path, *,
         position = place_visible if fit else place
         position(hwnd, x, y, width, height)
         press_escape()
+        wait_for_extension_targets_to_go()
         with sync_playwright() as playwright:
-            browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
+            # Bounded at 60 s rather than Playwright's 180: when it hangs it
+            # never recovers (#590, 2026-10-31), and a caller may try again.
+            browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}", timeout=60000)
             page = browser.contexts[0].pages[0]
             page.wait_for_load_state("networkidle")
             # The page must be in the colour mode Windows is in. Edge's `--app`

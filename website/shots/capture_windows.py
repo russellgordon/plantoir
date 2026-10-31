@@ -21,7 +21,11 @@ What it does:
 6. Scales and optimizes all captured PNGs and generates WebP companions.
 7. Rebuilds the marketing site (website/build.py).
 
-Not part of a full run (as on the Mac): ``--code`` and ``--quizzes`` take the
+Not part of a full run (as on the Mac): ``--geogebra`` takes the
+Visualizations page's GeoGebra figure from a native preview of MPM2D made,
+as ``--print-set`` makes it, in the folder ``--print-folder`` names (no
+default, as on the Mac), the
+sketch opened by ``prepare/geogebra-sketch.js``; ``--code`` and ``--quizzes`` take the
 Code and Quizzes pages' figures from native previews of the marketing folder
 (``~/School Web Space``, ICS3U) and the demo folder (``~/Teaching``), each
 page put into its figure's state by ``website/shots/prepare/<id>.js``
@@ -289,11 +293,18 @@ def main() -> int:
         --quizzes [id,id]  the Quizzes page's figures (quiz-math,
                            quiz-chemistry, quiz-english from ~/Teaching,
                            quiz-code-run from ~/School Web Space)
-        --dry-run          with --code / --quizzes: every page put into its
+        --geogebra         the Visualizations page's GeoGebra figure
+                           (geogebra-sketch): MPM2D's slope-angle page with
+                           its sketch opened, from a preview of MPM2D made
+                           in --print-folder <folder> (required: a new
+                           folder, as on the Mac), as --print-set makes
+                           it (#590, #687)
+        --dry-run          with --code / --quizzes / --geogebra: every page put into its
                            state and photographed at this screen's scale,
                            into a scratch folder; nothing into site/img, no
                            site rebuild
-        --promote id,id    no pictures: mark these preview-page figures
+        --promote id,id    no pictures: mark these preview-page figures (Code,
+                           Quizzes or GeoGebra)
                            `windows: true` once both pictures are in site/img
                            at 2560 x 1720 and were taken at 2x; take them off
                            WINDOWS_PICTURE_OWED by hand in the same commit
@@ -336,10 +347,33 @@ def main() -> int:
             return 2
         return promote(named)
 
-    if "--dry-run" in arguments and not ("--code" in arguments or "--quizzes" in arguments):
+    if "--dry-run" in arguments and not any(flag in arguments for flag in ("--code", "--quizzes", "--geogebra")):
         # Without them a dry run would be the full REAL run.
-        print("--dry-run goes with --code or --quizzes; nothing else has a dry run.", file=sys.stderr)
+        print("--dry-run goes with --code, --quizzes or --geogebra; nothing else has a dry run.", file=sys.stderr)
         return 2
+
+    if "--geogebra" in arguments:
+        # The Visualizations page's figure, on its own, never part of a full
+        # run (as on the Mac, where --geogebra needs --print-folder).
+        from preview_pages_windows import capture_geogebra
+        from print_set_windows import PRINT_FOLDER
+        dry_run = "--dry-run" in arguments
+        # No default, as on the Mac: ~/Plantoir Print is the print set's, and
+        # one made before the page was in the example content does not have
+        # it (this PC's was made 2026-10-15; the page landed 2026-10-24).
+        index = arguments.index("--print-folder") if "--print-folder" in arguments else -1
+        if index < 0 or index + 1 >= len(arguments) or arguments[index + 1].startswith("--"):
+            print("--geogebra needs --print-folder <folder>: a new folder inside your home folder, or one "
+                  f"whose MPM2D already has the slope-angle page (not {PRINT_FOLDER}, the print set's).",
+                  file=sys.stderr)
+            return 2
+        folder = Path(arguments[index + 1]).expanduser()
+        capture_geogebra(folder, dry_run=dry_run)
+        if dry_run:
+            return 0
+        announce("Rebuilding plantoir.app")
+        subprocess.run([sys.executable, str(WEBSITE / "build.py")], cwd=REPO, check=True)
+        return 0
 
     if "--code" in arguments or "--quizzes" in arguments:
         # The Code and Quizzes pages' figures, on their own: never part of a

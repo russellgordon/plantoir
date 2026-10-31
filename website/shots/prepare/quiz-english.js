@@ -38,7 +38,7 @@ if (feedback() !== RIGHT) return "the feedback reads \"" + feedback() + "\", not
 const explain = quiz.querySelector(".plantoir-quiz-explain")
 if (!explain || explain.hidden) return "the explanation is not shown"
 document.activeElement && document.activeElement.blur && document.activeElement.blur()
-// Framing as quiz-math.js, with the passage's top as the top that must stay
+// Framing as code-quiz.js (40/56 pt), with the passage's top as the top that must stay
 // in the picture: the question is about it.
 const overhang = quiz.getBoundingClientRect().bottom - (window.innerHeight - 56)
 if (overhang > 0) window.scrollBy(0, overhang)
