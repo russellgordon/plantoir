@@ -739,7 +739,9 @@ def capture_page(url: str, title_fragment: str, destination: Path, *,
         press_escape()
         wait_for_extension_targets_to_go()
         with sync_playwright() as playwright:
-            browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
+            # Bounded at 60 s rather than Playwright's 180: when it hangs it
+            # never recovers (#590, 2026-10-31), and a caller may try again.
+            browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}", timeout=60000)
             page = browser.contexts[0].pages[0]
             page.wait_for_load_state("networkidle")
             # The page must be in the colour mode Windows is in. Edge's `--app`

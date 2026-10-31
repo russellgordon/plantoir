@@ -337,7 +337,13 @@ def take_window(url: str, part: Path, script: Path) -> None:
     profile's processes to end, and one retry, is the cure; anything else
     still stops the run."""
     from hero_windows import capture_page, stop_matching, EDGE_PROFILE
-    for attempt in (1, 2):
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    # Measured 2026-10-31 (#590): Playwright's connect_over_cdp hung, never
+    # to recover, on 4 of 9 launches on this PC, on MCV4U's and ICS3U's
+    # pages alike and with the extension targets gone; a fresh Edge then
+    # connected. So a hung connection is tried again too, up to three times.
+    attempts = (1, 2, 3)
+    for attempt in attempts:
         deadline = time.time() + 20
         while capture_profile_processes() and time.time() < deadline:
             time.sleep(0.5)
@@ -345,10 +351,14 @@ def take_window(url: str, part: Path, script: Path) -> None:
             capture_page(url, "", part, size_dip=PAGE_SIZE_DIP, prepare_page=run_prepare(script), fit=True)
             return
         except SystemExit as stopped:
-            if attempt == 2 or "No window appeared" not in str(stopped):
+            if attempt == attempts[-1] or "No window appeared" not in str(stopped):
                 raise
             print("   no window appeared; once more, after the last Edge has gone")
-            stop_matching("msedge.exe", str(EDGE_PROFILE))
+        except PlaywrightTimeout as stopped:
+            if attempt == attempts[-1] or "connect_over_cdp" not in str(stopped):
+                raise
+            print("   the browser did not answer; once more, with a fresh Edge")
+        stop_matching("msedge.exe", str(EDGE_PROFILE))
 
 
 def refuse_the_wrong_scale(dry_run: bool) -> float:
