@@ -29,10 +29,19 @@ if (feedback() !== RIGHT) return "the feedback reads \"" + feedback() + "\", not
 const explain = quiz.querySelector(".plantoir-quiz-explain")
 if (!explain || explain.hidden) return "the explanation is not shown"
 document.activeElement && document.activeElement.blur && document.activeElement.blur()
-// Framing (as code-quiz.js): the quiz's bottom brought a little above the
-// window's edge if it would be cut off — and refused if that pushes the
-// question's top under the title bar, so a cut-off figure fails here.
-const overhang = quiz.getBoundingClientRect().bottom - (window.innerHeight - 56)
+// Framing: the quiz's bottom brought a little above the window's edge if it
+// would be cut off — and refused if that pushes the question's top too near
+// the window's top, so a cut-off figure fails here. The margins are 16 pt
+// at the top and 24 at the bottom, not code-quiz.js's 40 and 56 (#590,
+// Russell's ruling (a), 2026-10-31): this quiz is about 767 pt tall in
+// Windows' fonts, and Edge's own title bar sits OUTSIDE the page, so the
+// 1280 x 860 window at 2x gives the page about 827 pt — 731 fit under the
+// old margins, 787 fit under these. On the Mac the page runs under an
+// invisible title bar with no buttons (webwindow.swift), so the top margin
+// was only ever space, not clearance; the Mac's picture is retaken with it.
+const MARGIN_TOP = 16
+const MARGIN_BOTTOM = 24
+const overhang = quiz.getBoundingClientRect().bottom - (window.innerHeight - MARGIN_BOTTOM)
 if (overhang > 0) window.scrollBy(0, overhang)
-if (quiz.getBoundingClientRect().top < 40) return "the quiz is " + Math.round(quiz.getBoundingClientRect().height) + " pt tall and does not fit in the window"
+if (quiz.getBoundingClientRect().top < MARGIN_TOP) return "the quiz is " + Math.round(quiz.getBoundingClientRect().height) + " pt tall and does not fit in the window"
 return "ready"

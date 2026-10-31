@@ -586,6 +586,11 @@ class PreviewPageSceneTests(unittest.TestCase):
                          ["quiz-math", "quiz-chemistry", "quiz-english", "quiz-code-run"])
         self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("code", ["code-swift"])],
                          ["code-swift"])
+        # --geogebra (#590, #687): the Visualizations page's one figure, which
+        # --promote may mark too.
+        self.assertEqual([shot["id"] for shot in preview_pages_windows.preview_page_shots("geogebra")],
+                         ["geogebra-sketch"])
+        self.assertIn("geogebra-sketch", preview_pages_windows.windows_preview_ids())
         # Each figure's page, named as the planting steps name it, so the
         # changed-page guard can match their report: a page planted from
         # CODE_PAGES or folders.json, or one of the ready-made course's.

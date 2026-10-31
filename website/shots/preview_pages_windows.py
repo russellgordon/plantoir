@@ -76,7 +76,7 @@ LEDGER = SCRATCH / "preview-pages-windows.json"
 PREPARE_DIR = HERE / "prepare"
 PREPARE_TIMEOUT_MS = 120000
 
-SCENES = ("code", "quizzes")
+SCENES = ("code", "quizzes", "geogebra")
 
 # #557: a Windows window capture is never scaled, and stands beside the Mac's
 # 2x capture, so it is taken at exactly 2x: 1280 x 860 DIPs is 2560 x 1720.
@@ -485,6 +485,60 @@ def capture_preview_pages(selection: dict[str, list[str] | None], dry_run: bool 
     if not dry_run:
         print("   Not promoted: once Russell has looked at them, `capture_windows.py --promote "
               + ",".join(sorted({entry.rsplit('-', 1)[0] for entry in taken})) + "` marks them windows: true.")
+    return taken
+
+
+# ---------- The Visualizations page's GeoGebra figure (#578, #687) ----------
+
+def refuse_folder_without_geogebra_page(folder: Path, shots: list[dict]) -> None:
+    """Stop, naming the page, when a shot's page is not in the folder's
+    course (capture.py's `refuse_folder_without_geogebra_pages`). The address
+    is the file's path with each space a dash and the file's own dashes kept
+    (The-Slope-Angle-Conjecture is The Slope-Angle Conjecture.md)."""
+    for shot in shots:
+        *parents, name = shot["capture"]["path"].strip("/").split("/")
+        place = folder / "courses" / shot["capture"]["course"] / Path(*parents) if parents else             folder / "courses" / shot["capture"]["course"]
+        found = place.is_dir() and any(entry.suffix == ".md" and entry.stem.replace(" ", "-") == name
+                                       for entry in place.iterdir())
+        if not found:
+            raise SystemExit(f"{shot['capture']['path']} is not in {folder}: its MPM2D was made before the page "
+                             "was in the example content. Name another folder with --print-folder, or delete "
+                             "this one's courses/MPM2D.")
+
+
+def capture_geogebra(folder: Path = print_set_windows.PRINT_FOLDER, dry_run: bool = False) -> list[str]:
+    """`capture_windows.py --geogebra`: the Windows twin of capture.py's
+    `capture_geogebra_set`, in `--print-set`'s shape. MPM2D's The Slope-Angle
+    Conjecture, previewed NATIVELY (the bundled runtime carries GeoGebra's
+    engine since #687) in the print set's own folder (~/Plantoir Print, or
+    `--print-folder`), the sketch OPENED with a tap by
+    `prepare/geogebra-sketch.js` -- the Mac's script, unchanged -- and
+    photographed in light then dark at exactly 2x (#557), as the Code and
+    Quizzes figures are. MPM2D is made from its example content by the
+    committed setup.ps1 when the folder has none; a folder whose MPM2D lacks
+    the page is refused BEFORE anything is written to it. Neither the demo
+    nor the marketing folder holds MPM2D, which is why the print set's
+    folder is used. Returns the pictures taken, as `<id>-light` / `<id>-dark`."""
+    shots = preview_page_shots("geogebra")
+    if not shots:
+        raise SystemExit("shots.json has no preview-page shot in the geogebra scene.")
+    if plantoir_is_running():
+        raise SystemExit("Plantoir is running: it would put its own launchers back into the folder this run "
+                         "writes. Quit it first.")
+    scale = refuse_the_wrong_scale(dry_run)
+    code = shots[0]["capture"]["course"]
+    if (folder / "courses" / code / "course_config.json").exists():
+        refuse_folder_without_geogebra_page(folder, shots)
+    refuse_uncommitted_inputs()
+    recipe = committed_recipe()
+    try:
+        announce(f"Photographing {', '.join(shot['id'] for shot in shots)} in {folder}")
+        print_set_windows.provision(folder, source=recipe)
+        refuse_folder_without_geogebra_page(folder, shots)
+        taken = photograph_course(folder, code, shots, scale, dry_run)
+    finally:
+        shutil.rmtree(recipe, ignore_errors=True)
+    announce(f"Took {len(taken)} picture(s){' (a dry run: none for the site)' if dry_run else ''}")
     return taken
 
 
