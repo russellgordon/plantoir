@@ -22,8 +22,9 @@ What it does:
 7. Rebuilds the marketing site (website/build.py).
 
 Not part of a full run (as on the Mac): ``--geogebra`` takes the
-Visualizations page's GeoGebra figure from a native preview of MPM2D in
-``~/Plantoir Print`` (``--print-set``'s folder, or ``--print-folder``), the
+Visualizations page's GeoGebra figure from a native preview of MPM2D made,
+as ``--print-set`` makes it, in the folder ``--print-folder`` names (no
+default, as on the Mac), the
 sketch opened by ``prepare/geogebra-sketch.js``; ``--code`` and ``--quizzes`` take the
 Code and Quizzes pages' figures from native previews of the marketing folder
 (``~/School Web Space``, ICS3U) and the demo folder (``~/Teaching``), each
@@ -294,9 +295,10 @@ def main() -> int:
                            quiz-code-run from ~/School Web Space)
         --geogebra         the Visualizations page's GeoGebra figure
                            (geogebra-sketch): MPM2D's slope-angle page with
-                           its sketch opened, from a preview in ~/Plantoir
-                           Print (or --print-folder <folder>), as
-                           --print-set makes it (#590, #687)
+                           its sketch opened, from a preview of MPM2D made
+                           in --print-folder <folder> (required: a new
+                           folder, as on the Mac), as --print-set makes
+                           it (#590, #687)
         --dry-run          with --code / --quizzes / --geogebra: every page put into its
                            state and photographed at this screen's scale,
                            into a scratch folder; nothing into site/img, no
@@ -356,13 +358,16 @@ def main() -> int:
         from preview_pages_windows import capture_geogebra
         from print_set_windows import PRINT_FOLDER
         dry_run = "--dry-run" in arguments
-        folder = PRINT_FOLDER
-        if "--print-folder" in arguments:
-            index = arguments.index("--print-folder")
-            if index + 1 >= len(arguments) or arguments[index + 1].startswith("--"):
-                print("--print-folder needs a folder after it.", file=sys.stderr)
-                return 2
-            folder = Path(arguments[index + 1]).expanduser()
+        # No default, as on the Mac: ~/Plantoir Print is the print set's, and
+        # one made before the page was in the example content does not have
+        # it (this PC's was made 2026-10-15; the page landed 2026-10-24).
+        index = arguments.index("--print-folder") if "--print-folder" in arguments else -1
+        if index < 0 or index + 1 >= len(arguments) or arguments[index + 1].startswith("--"):
+            print("--geogebra needs --print-folder <folder>: a new folder inside your home folder, or one "
+                  f"whose MPM2D already has the slope-angle page (not {PRINT_FOLDER}, the print set's).",
+                  file=sys.stderr)
+            return 2
+        folder = Path(arguments[index + 1]).expanduser()
         capture_geogebra(folder, dry_run=dry_run)
         if dry_run:
             return 0

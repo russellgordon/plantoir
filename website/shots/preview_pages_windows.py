@@ -502,23 +502,23 @@ def refuse_folder_without_geogebra_page(folder: Path, shots: list[dict]) -> None
                                        for entry in place.iterdir())
         if not found:
             raise SystemExit(f"{shot['capture']['path']} is not in {folder}: its MPM2D was made before the page "
-                             "was in the example content. Name another folder with --print-folder, or delete "
-                             "this one's courses/MPM2D.")
+                             "was in the example content. Name a new folder with --print-folder.")
 
 
-def capture_geogebra(folder: Path = print_set_windows.PRINT_FOLDER, dry_run: bool = False) -> list[str]:
+def capture_geogebra(folder: Path, dry_run: bool = False) -> list[str]:
     """`capture_windows.py --geogebra`: the Windows twin of capture.py's
     `capture_geogebra_set`, in `--print-set`'s shape. MPM2D's The Slope-Angle
     Conjecture, previewed NATIVELY (the bundled runtime carries GeoGebra's
-    engine since #687) in the print set's own folder (~/Plantoir Print, or
-    `--print-folder`), the sketch OPENED with a tap by
+    engine since #687) in the folder `--print-folder` names -- no default,
+    as on the Mac: ~/Plantoir Print is the print set's, and one made before
+    the page was in the example content lacks it -- the sketch OPENED with a tap by
     `prepare/geogebra-sketch.js` -- the Mac's script, unchanged -- and
     photographed in light then dark at exactly 2x (#557), as the Code and
     Quizzes figures are. MPM2D is made from its example content by the
     committed setup.ps1 when the folder has none; a folder whose MPM2D lacks
     the page is refused BEFORE anything is written to it. Neither the demo
-    nor the marketing folder holds MPM2D, which is why the print set's
-    folder is used. Returns the pictures taken, as `<id>-light` / `<id>-dark`."""
+    nor the marketing folder holds MPM2D, which is why a folder of its own
+    is used. Returns the pictures taken, as `<id>-light` / `<id>-dark`."""
     shots = preview_page_shots("geogebra")
     if not shots:
         raise SystemExit("shots.json has no preview-page shot in the geogebra scene.")
