@@ -8619,7 +8619,7 @@ the page runs under an invisible title bar with no buttons
 (`webwindow.swift`), so the old top margin was only space, not clearance.
 **The mac's two pictures were taken under 40/56 and must be retaken with
 the new scripts** (`capture.py --quizzes --quiz-shots
-quiz-math,quiz-code-run`) so the twins frame alike; that is the mac's issue.
+quiz-math,quiz-code-run`) so the twins frame alike; that is mac #710.
 The other quiz and code scripts keep 40/56.
 
 **`--geogebra`.** The Windows twin of `capture.py --geogebra`, in

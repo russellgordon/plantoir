@@ -507,7 +507,8 @@ def refuse_folder_without_geogebra_page(folder: Path, shots: list[dict]) -> None
     (The-Slope-Angle-Conjecture is The Slope-Angle Conjecture.md)."""
     for shot in shots:
         *parents, name = shot["capture"]["path"].strip("/").split("/")
-        place = folder / "courses" / shot["capture"]["course"] / Path(*parents) if parents else             folder / "courses" / shot["capture"]["course"]
+        place = (folder / "courses" / shot["capture"]["course"] / Path(*parents) if parents
+                 else folder / "courses" / shot["capture"]["course"])
         found = place.is_dir() and any(entry.suffix == ".md" and entry.stem.replace(" ", "-") == name
                                        for entry in place.iterdir())
         if not found:

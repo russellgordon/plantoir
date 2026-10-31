@@ -34,7 +34,7 @@ if (feedback() !== ONE_OF_TWO) return "the feedback reads \"" + feedback() + "\"
 const explain = quiz.querySelector(".plantoir-quiz-explain")
 if (!explain || explain.hidden) return "the explanation is not shown"
 document.activeElement && document.activeElement.blur && document.activeElement.blur()
-// Framing as quiz-math.js.
+// Framing as code-quiz.js (40/56 pt).
 const overhang = quiz.getBoundingClientRect().bottom - (window.innerHeight - 56)
 if (overhang > 0) window.scrollBy(0, overhang)
 if (quiz.getBoundingClientRect().top < 40) return "the quiz is " + Math.round(quiz.getBoundingClientRect().height) + " pt tall and does not fit in the window"
