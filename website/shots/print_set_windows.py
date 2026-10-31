@@ -133,12 +133,14 @@ def powershell(script: str, *arguments: str) -> list[str]:
     return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, *arguments]
 
 
-def provision(folder: Path) -> None:
+def provision(folder: Path, source: Path = REPO) -> None:
     """Make MPM2D from its example content, unless it is there: setup.ps1,
     answered the way the app's New Course panel answers it -- Return at every
     question, the course code where it is asked for. A payload page changed
-    since reaches the folder only when it is made again: delete the folder."""
-    mirror_toolchain(folder)
+    since reaches the folder only when it is made again: delete the folder.
+    `source` is where the launchers and recipe come from (the GeoGebra pass
+    passes the tree's committed files, as the preview pictures do)."""
+    mirror_toolchain(folder, source=source)
     course = folder / "courses" / PRINT_CODE
     if (course / "course_config.json").exists() and (course / "Exercises").is_dir():
         print(f"   {PRINT_CODE} is already there.")

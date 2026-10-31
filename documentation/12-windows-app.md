@@ -8595,6 +8595,61 @@ for the Mac's (so a line wraps a little differently and the text sits a
 little lower), and Edge's title bar for the Mac window's frame.
 
 
+### The last three plantoir.app pictures (#590), 2026-10-31
+
+`quiz-math`, `quiz-code-run` (the Quizzes page, the mac's #587) and
+`geogebra-sketch` (the Visualizations page, #578) were the last Windows
+twins owed on plantoir.app. All three were taken at exactly 2x (fitted
+scale 2.000, 2560 x 1720, light and dark) on this PC (i5-8365U, a Remote
+Desktop session at 3840 x 2160, 200%), promoted with `capture_windows.py
+--promote`, and taken off `WINDOWS_PICTURE_OWED`.
+
+**The two tall quizzes: smaller margins in the SHARED prepare scripts.**
+`quiz-math.js` and `quiz-code-run.js` scroll the quiz's bottom (the score,
+for `quiz-code-run`) a margin above the window's bottom and refuse when
+that pushes the question's top within a margin of the window's top. Under
+40 pt top and 56 bottom, about 731 pt fitted on Windows, because Edge's
+`--app` title bar sits OUTSIDE the page and leaves it about 827 of the 860
+pt; in Windows' fonts the two are 767 and 744 pt, so both refused. Russell
+chose option (a) of three: the margins are now 16 pt top and 24 bottom in
+those two scripts only (787 pt fits). Rejected: (b) a taller Windows frame,
+which breaks the 2560 x 1720 match with the mac (#557), and (c) shorter
+quizzes, which changes what teachers are shown to fit a capture. On the mac
+the page runs under an invisible title bar with no buttons
+(`webwindow.swift`), so the old top margin was only space, not clearance.
+**The mac's two pictures were taken under 40/56 and must be retaken with
+the new scripts** (`capture.py --quizzes --quiz-shots
+quiz-math,quiz-code-run`) so the twins frame alike; that is mac #710.
+The other quiz and code scripts keep 40/56.
+
+**`--geogebra`.** The Windows twin of `capture.py --geogebra`, in
+`--print-set`'s shape: neither the demo nor the marketing folder holds
+MPM2D, so the course is made from its example content by the committed
+`setup.ps1` in a folder of its own. `--print-folder` is REQUIRED, as on the
+mac. The default was `~/Plantoir Print` at first, but this PC's copy was
+made on 2026-10-15 and the slope-angle page landed on 2026-10-24; the run
+refused it, as designed, before writing anything. A new
+`~/Plantoir GeoGebra` took 5 min 39 s to make, preview and stop; then the
+mac's `geogebra-sketch.js` reached "ready" unchanged, and OCR read "The
+sketch" and "GeoGebra" in both schemes. The applet draws on white in dark
+mode too, as it does on the mac.
+
+**Edge's DevTools connection hung, and is now bounded and retried.**
+Playwright's `connect_over_cdp` hung for its whole 180 s on 4 of 9
+launches in this sitting, on MCV4U's and ICS3U's pages alike. For the
+first 15 to 30 s a fresh profile also lists five built-in extension
+background pages and a service worker, which then close.
+`hero_windows.capture_page` now waits up to 40 s for the target list to be
+the page alone, and connects with a 60 s bound. `preview_pages_windows.
+take_window` tries a hung connection again with a fresh Edge, up to three
+times in all. The waiting alone did not cure it (one more hang came
+after it), so the cause is not fully known. The retry is what made the run
+reliable: the next run connected first time. Two earlier failures were not
+Edge at all: the Remote Desktop session disconnected (`query session`:
+Disc), which made one dark frame come out 1992 x 1137 and then locked the
+desktop.
+
+
 ## The trail's first and last lines (#565, the mac's #560), v1.8.0
 
 **"Plantoir opened" prints the version a teacher can name.** It was built

@@ -397,6 +397,9 @@ from native previews of `~/School Web Space` (ICS3U, and ICS4U for Swift) and
 `shots/prepare/<id>.js` and read back against `expectText`. It backs each
 folder's courses up into its `courses/_backups` first, refuses while
 Plantoir is running, and refuses any scale but 2× (a 4K session at 200%);
+The GeoGebra figure is `capture_windows.py --geogebra --print-folder
+~/<new folder>` (#590, #687): MPM2D made there by the committed setup.ps1,
+previewed natively, the sketch opened by the Mac's `geogebra-sketch.js`.
 `--dry-run` proves every page at any scale into a scratch folder and writes
 nothing to `site/img`. It promotes nothing: `--promote id,id` marks a shot
 `windows: true` once its pictures pass, and the shot comes off

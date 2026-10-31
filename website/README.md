@@ -456,8 +456,9 @@ and `code-python` keeps the paragraph under Spot the Bug's block, which
 describes the bug, out of frame, because the picture shows it fixed.
 
 **The Quizzes page (v1.8.1, #587, `--quizzes`).** One self-check question per
-subject, just checked, light and dark, Mac only (`windows: false`, owed by
-name in `WINDOWS_PICTURE_OWED`): `quiz-math` (MCV4U, *Check Your Curve
+subject, just checked, light and dark (each Mac only, `windows: false` and
+owed by name in `WINDOWS_PICTURE_OWED`, until its Windows twin was taken,
+#590; the last two on 2026-10-31): `quiz-math` (MCV4U, *Check Your Curve
 Sketching*: a root estimated from a graph inside the question, answered 0.35
 against `0.35 ± 0.06`), `quiz-chemistry` (SCH3U, *Check Your Stoichiometry*:
 a `\ce{}` equation and two blanks, the moles right and the mass wrong — 4.39 g,
@@ -487,7 +488,8 @@ mathematics set; for `quiz-chemistry`, typeset with no `.katex-error`),
 answers, presses Check, waits for the contract's words (`right`,
 `notRight`, `oneBlankRight`, `score`, `finished`), then scrolls only as far as it takes
 to bring the quiz's bottom (the score, for `quiz-code-run`) 56 points inside
-the window — and FAILS, naming the height, when that pushes the question's
+the window (24 for `quiz-math` and `quiz-code-run`, whose top margin is 16
+rather than 40: #590, 2026-10-31, so they fit the window on Windows too) — and FAILS, naming the height, when that pushes the question's
 top (the passage's, for `quiz-english`) under the title bar, so a cut-off
 quiz is never photographed. Planting puts the three pages into
 `~/Desktop/Teaching` for good: later hero and app-window retakes show them
@@ -641,8 +643,9 @@ out on its text alone, and the issue says how to take it (the first two were
 whose section does not exist.
 
 **The GeoGebra figure (v1.9.0, #578, `--geogebra`).** `geogebra-sketch`
-(light and dark, Mac only — `windows: false`, owed by name in
-`WINDOWS_PICTURE_OWED` until the Windows runtime carries GeoGebra) is MPM2D's
+(light and dark; Mac only until its Windows twin was taken on 2026-10-31 by
+`capture_windows.py --geogebra`, #590, once the Windows runtime carried
+GeoGebra, #687) is MPM2D's
 *The Slope-Angle Conjecture* with its sketch opened. It is taken from a
 preview of MPM2D made from its example content, as the print set's is, in
 the folder `--print-folder` names — required here, with no default, and a

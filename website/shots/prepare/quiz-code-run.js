@@ -67,7 +67,17 @@ while (Date.now() < until && !(score && score.textContent.includes(SCORE))) awai
 if (!score || !score.textContent.includes(SCORE)) return "the score reads \"" + (score ? score.textContent : "") + "\""
 document.activeElement && document.activeElement.blur && document.activeElement.blur()
 // Framing: the score's bottom a little above the window's edge, and refused
-// if that pushes the fifth question's top under the title bar.
-window.scrollBy(0, score.getBoundingClientRect().bottom - (window.innerHeight - 56))
-if (fifth.getBoundingClientRect().top < 40) return "the fifth quiz and the score are " + Math.round(score.getBoundingClientRect().bottom - fifth.getBoundingClientRect().top) + " pt tall and do not fit in the window"
+// if that pushes the fifth question's top too near the window's top. The
+// margins are 16 pt at the top and 24 at the bottom, not the 40 and 56 the
+// other quiz figures keep (#590, Russell's ruling (a), 2026-10-31): the
+// fifth question and the score are about 744 pt tall in Windows' fonts, and
+// Edge's own title bar sits OUTSIDE the page, so the 1280 x 860 window at
+// 2x gives the page about 827 pt — 731 fit under the old margins, 787 fit
+// under these. On the Mac the page runs under an invisible title bar with
+// no buttons (webwindow.swift), so the top margin was only ever space, not
+// clearance; the Mac's picture is retaken with it.
+const MARGIN_TOP = 16
+const MARGIN_BOTTOM = 24
+window.scrollBy(0, score.getBoundingClientRect().bottom - (window.innerHeight - MARGIN_BOTTOM))
+if (fifth.getBoundingClientRect().top < MARGIN_TOP) return "the fifth quiz and the score are " + Math.round(score.getBoundingClientRect().bottom - fifth.getBoundingClientRect().top) + " pt tall and do not fit in the window"
 return "ready"
